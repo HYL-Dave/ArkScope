@@ -1,10 +1,9 @@
 # Security Lifecycle Investigation Implementation Plan
 
-> **Status:** TASKS 0-4 COMPLETE. TASK 5 CORRECTED M1-M22 REPLAY COMPLETE; TASK
-> 5 IS PAUSED AT A B-CLASS FINAL-ADMISSION EVOLVED-OWNER AMENDMENT AWAITING
-> FOCUSED REVIEW. TASKS 6-7 REMAIN BLOCKED; TASK 8 RETAINS ITS SEPARATE
-> LIVE-PREFLIGHT GATE. LIVE MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN
-> UNAUTHORIZED.
+> **Status:** TASKS 0-5 COMPLETE. TASK 5 FINAL MECHANICAL ADMISSION PASSED; TASK
+> 6 INDEPENDENT IMPLEMENTATION REVIEW IS NEXT. TASK 7 REMAINS BLOCKED; TASK 8
+> RETAINS ITS SEPARATE LIVE-PREFLIGHT GATE. LIVE MIGRATION, MERGE, PUSH, AND
+> PROVIDER CALLS REMAIN UNAUTHORIZED.
 >
 > **Date:** 2026-08-19
 >
@@ -1506,8 +1505,8 @@ node body so identical source content is re-observed at
 current; M6 must make only that owner stale. This correction adds no node,
 changes no node ID, mutation count, product byte, path/route/tool ledger,
 collection/focused identity, protected path, or Task 5 admission target. The
-false-GREEN and diagnostic RED remain in the Task 5 packet; Task 5 is paused
-until this amendment receives focused review.
+false-GREEN and diagnostic RED remain in the Task 5 packet; focused review
+completed before the amended owner fixture was adopted.
 
 The 2026-08-21 M9 owner-set correction is B-class. The literal mutation removes
 only the `PermissionClass.metered_spend` call from
@@ -1521,8 +1520,8 @@ zero socket attempts in both runs. This correction changes only M9's uniquely
 specified mutation and complete required owner set; it changes no product/test
 byte, test ID, mutation count, path/node/route/tool ledger, collection/focused
 identity, protected path, or Task 5 admission target. The incomplete-owner run
-remains rejected evidence; Task 5 is paused until this amendment receives
-focused review.
+remains rejected evidence; focused review completed before the owner set was
+adopted.
 
 The 2026-08-21 no-tail correction is B-class. Final admission found
 `SecurityLifecycleInvestigationStore.insert_legacy_assessment()` in the runtime
@@ -1569,8 +1568,8 @@ actions` node plus the four omitted retained nodes. The current implementation
 passes all 13 file nodes. Add only those four retained nodes to the ledger,
 raising it from 55 to 59 rows, and pin the new ledger hash. This correction
 changes no product/test byte, test ID, path, route, tool, schema, collection,
-focused identity, protected byte, or mutation result. Task 5 remains paused
-until the docs-only correction receives focused review. A separate stage-aware
+focused identity, protected byte, or mutation result. Focused review completed
+before the four ledger rows were adopted. A separate stage-aware
 audit found 24 globally added nodes whose bodies were later adjusted under
 their explicit reviewed amendments; those nodes remain additions rather than
 base-retained nodes. The four rows added here were the only changed
@@ -1652,6 +1651,17 @@ admission authority for implementation; real provider canaries are Task 8 and
 require configuration plus separate approval.
 
 **Task 5 evidence commit:** evidence/governance only; no product change.
+
+Task 5 final admission on 2026-08-21 reproduced backend
+`4229/e6fb7f69...` with two byte-identical canonical reports at
+`4217 passed / 12 skipped / 0 failed`, frontend
+`1201/103 files/027ef443...` with two `1201/1201` runs, 535 backend and 75
+frontend focused passes, all 22 exact-owner mutations with byte restoration,
+180 routes, 52 tools, zero unclassified no-tail hits, and zero provider or
+network calls in sanitized startup. Seven exact-path traces recorded zero
+production-file syscalls; after the App, browsers, and a retained Vite process
+were quiesced, four production asset manifests were byte-identical at
+`1f509528...` with zero openers. No live migration or provider call occurred.
 
 ---
 
@@ -1874,7 +1884,7 @@ pytest -q \
 # Frontend collection/runtime from apps/arkscope-web
 ../../node_modules/.bin/vitest --version
 ../../node_modules/.bin/vitest list --json
-../../node_modules/.bin/vitest run --maxWorkers=1 --minWorkers=1
+../../node_modules/.bin/vitest run --maxWorkers=1 --no-file-parallelism
 
 # Canonical native
 /tmp/eir002-green-baseline/run_native.sh <STAGE>
