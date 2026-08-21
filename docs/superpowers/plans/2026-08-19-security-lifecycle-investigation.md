@@ -4,7 +4,8 @@
 > AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
 > `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
 > COMPLETE; TASK 1 IMPLEMENTATION AND INDEPENDENT REVIEW GREEN AT `e2f90f98`;
-> TASK 2 COMPLETE; TASK 3 BRIDGE-OWNERSHIP AMENDMENT AWAITS FOCUSED REVIEW;
+> TASK 2 COMPLETE; TASK 3 BRIDGE-OWNERSHIP AMENDMENT GREEN; 2026-08-21
+> SOURCE/TIME/INTEGRITY AMENDMENT USER-AUTHORIZED AND UNDER EXECUTOR REVIEW;
 > TASKS 1-3 ARE
 > NON-DEPLOYABLE STAGING UNTIL TASK 4 COMPLETES THE ROUTE/CONSUMER CUTOVER; LIVE
 > MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
@@ -13,11 +14,10 @@
 >
 > **Design authority:**
 > `docs/superpowers/specs/2026-08-19-security-lifecycle-investigation-design.md`
-> at `93ad444990fb856a6006ba4793b96a9c1a53625d`, SHA-256
-> `410bae56c3d50a0358d2b6c8cf0c726c86268ad8c42e36069fb27c2520869dd5`.
-> This docs commit changes only that file's status line after design GREEN;
-> promoted-file SHA-256 is
-> `03a0c03fe84d7059ceba8a0726be052ec105eead774793974dbe0e313a9e8d80`.
+> at `3ca5ed537d45b06eeadcc858ffc17877f0dd6e68`, SHA-256
+> `e72ad6e7eebff2e1ecae1155d89a28a95767b5fcdce78068d8805bf909a25606`.
+> That commit changes only the design authority and records the user's approved
+> formal-event/market-impact, source, time, quota, and integrity boundaries.
 >
 > **Product grounding base:**
 > `93ad444990fb856a6006ba4793b96a9c1a53625d` (docs-only design amendment
@@ -43,16 +43,24 @@ The implementation carries these user decisions without reopening them:
    acknowledgement, not a fabricated assessment.
 3. Search providers and agent harnesses are replaceable adapters. The durable
    product assets are case/evidence contracts and local HTTP/MCP/tool access.
-4. The first implementation is attended. Search requires an explicit click;
+4. Formal event truth and market-impact research are separate. Current v1 uses
+   the structured provider observation as the required accepted-assessment
+   anchor; web evidence corroborates or explains it. LLM drafts, hosted search,
+   IBKR contract-state corroboration, and market-reaction analysis are follow-ons,
+   not implicit Task 3 behavior.
+5. Source absence is data integrity, not an investment conclusion. The ordinary
+   queue excludes it while an explicit source-presence filter/count retains it;
+   no absent-source assessment, acknowledgement, search, or proposal is allowed.
+6. The first implementation is attended. Search requires an explicit click;
    action proposals are explanations only and have no executor.
-5. Images, PDFs, OCR, model-assisted assessment, Notes, Alerts, and unattended
+7. Images, PDFs, OCR, model-assisted assessment, Notes, Alerts, and unattended
    investigation remain separately designed work.
-6. Settings owns storage health and a link only. Universe owns lifecycle
+8. Settings owns storage health and a link only. Universe owns lifecycle
    triage, investigation, evidence, assessment, acknowledgement, and proposal
    presentation.
 
 Opus review findings are inputs, not authority. Any implementation choice that
-changes the six rulings above is a hard stop for user decision.
+changes the eight rulings above is a hard stop for user decision.
 
 ### 0.2 Authorization boundary
 
@@ -323,7 +331,8 @@ run status
 
 run failure
   adapter_unavailable | credential_missing | permission_denied |
-  rate_limited | network_error | extract_failed | unsupported_content
+  rate_limited | usage_limit_reached | network_error | extract_failed |
+  unsupported_content
 
 evidence kind
   web_search_result | web_page_excerpt | manual_url | manual_text |
@@ -501,6 +510,12 @@ Rows are immutable. Manual text has no invented URL. A document reference has
 answers, relevance scores, raw bodies, scripts, exception text, and secrets are
 not persisted.
 
+`source_published_at` is null, an exact ISO date, or an aware RFC 3339 instant;
+normalization preserves date/minute/second/subsecond precision and never turns a
+date into midnight. `retrieved_at` is the ArkScope UTC retrieval clock. Filing,
+effective, publication, retrieval, and observation clocks are never substituted
+for one another; market-reaction timestamps belong to the separate follow-on.
+
 `security_lifecycle_assessments`:
 
 ```text
@@ -538,8 +553,9 @@ and the cited content hash. Its CHECK requires null evidence ID for the single
 observation citation and a real same-case evidence FK for an evidence citation.
 
 Accepting a conclusive assessment requires non-undetermined relevance, at least
-one non-undetermined outcome, a provider/evidence citation, conclusion, impact,
-and `author=human|legacy_review`. New UI/API writes cannot choose
+one non-undetermined outcome, a current provider-observation citation,
+conclusion, impact, and `author=human|legacy_review`. Profile evidence may be
+additional corroboration but cannot replace the observation anchor. New UI/API writes cannot choose
 `symbol_or_venue_changed`; only migration can. Acceptance supersedes the prior
 accepted revision in one profile transaction and snapshots all cited hashes.
 
@@ -638,6 +654,13 @@ List/detail reads:
 Exact identity reappearance reattaches history. Identical fingerprint restores
 current projection; changed fingerprint retains history but blocks proposal
 generation until explicit revalidation.
+
+The ordinary case list defaults to `source_presence=present` and returns a
+separate `source_missing_count`; an explicit `source_presence=source_missing`
+filter reads the data-integrity cohort. Source-missing detail/history remains
+readable and manual evidence may be appended, but investigation, assessment
+create/accept, acknowledgement, and proposal generation fail before permission
+or persistence. No null/fabricated fingerprint or inferred absence cause exists.
 
 ### 1.5 Legacy migration contract
 
@@ -750,6 +773,10 @@ evidence item. It can support an inconclusive acknowledgement. Provider/network
 failure stores one closed failure code and safe bounded diagnostics; raw
 exception strings and response bodies do not enter the database or API.
 
+Tavily request throttling and account/plan exhaustion map to `rate_limited` and
+`usage_limit_reached` respectively. Neither condition selects another paid
+adapter. Hosted search remains outside this plan until its own normalized canary.
+
 ### 1.7 Assessment, acknowledgement, and proposal rules
 
 API payload validation precedes permission or storage. Additive writes call
@@ -793,7 +820,9 @@ get_security_lifecycle_case
 
 Both are `category=analysis`, `requires_dal=false`, local-read-only, and perform
 zero network and zero write. Their schemas expose bounded case/ticker/state
-filters and a case ID respectively. They return explicit `market` and `profile`
+filters, including source presence, and a case ID respectively. List output is a
+bounded summary; detail output bounds every history collection and excerpt while
+reporting truncation counts. They return explicit `market` and `profile`
 components plus composed workflow fields; they do not leak Tavily-specific raw
 objects. Missing case/store is typed, not an empty invented record.
 
@@ -1098,6 +1127,36 @@ property rows with the central parameter rows. The owned path, node ID, RED
 failure set, collection/focused identities, and product capability surface are
 unchanged.
 
+The 2026-08-21 source/time/integrity amendment is B-class because it tightens
+Task 2 schema/acceptance behavior and Task 3 API/tool behavior after their
+original RED contracts were written. It is user-authorized and changes no file,
+route, tool-name, node-ID, collection, focused, protected, allowlist, or path
+ledger identity. It authorizes only these bounded changes within already owned
+paths:
+
+1. add `usage_limit_reached` to the closed run-failure vocabulary and keep it
+   distinct from `rate_limited`, with no paid-provider fallback;
+2. normalize source publication values without manufacturing time precision;
+3. require a current observation citation before assessment acceptance;
+4. default list reads to present observations, add an explicit source-presence
+   filter plus source-missing data-integrity count, and reject absent-source
+   search/assessment/acknowledgement/proposal work before permission or write;
+5. make missing/partial lifecycle schemas typed unavailable without creating a
+   database, validate assessment payload shape before permissions, bound both
+   local read-tool outputs, and pin the resolved public address used by fetched
+   HTTPS evidence rather than resolving independently after validation; and
+6. correct Task 5's stale owned-path count from 53 to 55.
+
+The amendment may evolve only existing added test bodies in
+`test_security_lifecycle_schema.py`, `test_security_lifecycle_investigation.py`,
+`test_security_lifecycle_search.py`, `test_security_lifecycle_routes.py`, and
+`test_security_lifecycle_tools.py`; it adds/removes no node. Before product edits,
+run those exact owners against the current pre-amendment implementation and retain
+the complete failing-node/reason ledger. Any additional product path, route, tool,
+test ID, source-presence state, acknowledgement reason, LLM writer, IBKR call,
+market-impact record, or capability-manifest implementation is another B-class
+stop.
+
 ### 5.1 RED commit
 
 1. Add exactly 14 route and 8 tool IDs.
@@ -1120,7 +1179,8 @@ Commit: `test(lifecycle): define API and local-tool contracts`.
    outside the bounded removal hunk.
 3. Add dependency factories for the lifecycle market reader, profile store,
    composition service, and injected search adapter. Test overrides use scratch
-   paths and fakes.
+   paths and fakes. Missing paths and missing/partial schemas are typed
+   unavailable; no dependency or read service creates them.
 4. Call `db_write` for every additive write before persistence. Search route
    then follows Task 2's external permissions. Reads call no permission.
 5. Add exactly two `analysis`, no-DAL local tools. Register both in the central
@@ -1142,6 +1202,16 @@ Commit: `test(lifecycle): define API and local-tool contracts`.
   15/exact hash.
 - Tool calls issue zero network, zero write, and no database creation on missing
   paths.
+- Default list reads exclude `source_missing` from the ordinary queue while
+  returning its data-integrity count; the explicit source-presence filter and
+  detail read retain the complete bounded history.
+- Source-missing search, assessment create/accept, acknowledgement, and proposal
+  generation fail before permission or persistence; manual evidence and reads
+  remain available.
+- Accepted assessments require the current provider-observation citation;
+  evidence-only drafts cannot be accepted.
+- Date-only publication/effective values remain date-only, request throttling and
+  usage exhaustion are distinct, and neither invokes a fallback provider.
 - Every write route calls `db_write`; investigation additionally proves the two
   egress permission calls before fake transport.
 - Protected aggregate and frontend stream remain exact.
@@ -1185,7 +1255,9 @@ Commit: `test(lifecycle): define Universe investigation workflow`.
    controls and relationship/event tables.
 5. Implement filters, evidence/run history, manual evidence, explicit Tavily
    click, assessment citation selection, acknowledgement/reopen, and proposal
-   dismissal. There is no apply control.
+   dismissal. The default task table shows present observations; source-missing
+   count/filter is a distinct data-integrity view with investigation/assessment/
+   acknowledgement controls absent. There is no apply control.
 6. Add bilingual copy in the existing resource owners. Provider evidence stays
    verbatim.
 7. Add scoped CSS only for lifecycle-owned classes. Do not modify protected UI
@@ -1208,6 +1280,9 @@ Commit: `test(lifecycle): define Universe investigation workflow`.
   viewport. Manual evidence POST occurs only after its own explicit command.
 - Settings contains no old review action/copy; Universe displays all separated
   concepts and no apply action.
+- Source-missing cases do not inflate the ordinary investment-event queue, remain
+  reachable through their data-integrity count/filter, and expose no command that
+  requires an observation fingerprint.
 - Protected aggregate remains exact; no provider or production DB is touched.
 
 Commit: `feat(lifecycle): move investigation workflow into Universe`.
@@ -1244,6 +1319,11 @@ or overbroad mutation is retained as rejected evidence and does not count.
 | M15 | accept a stale assessment for proposal | `test_stale_assessment_blocks_existing_and_new_proposals` |
 | M16 | search on mount/focus instead of click | `opening refreshing focusing and switching tabs issue zero investigation requests` |
 | M17 | restore one Settings review command | `shows lifecycle storage health and opens the Universe workflow without review actions` |
+| M18 | accept an evidence-only assessment | `test_accepting_assessment_requires_conclusion_citation_and_human_author` |
+| M19 | collapse usage exhaustion into rate limiting | `test_adapter_failure_is_typed_and_keeps_prior_evidence` |
+| M20 | allow a source-missing assessment or acknowledgement | `test_source_missing_case_detail_remains_queryable` |
+| M21 | turn a date-only publication value into midnight | `test_normalization_drops_provider_answers_scores_scripts_and_raw_bodies` |
+| M22 | resolve the validated evidence hostname again during connect | `test_unsafe_local_private_and_redirect_urls_are_rejected` |
 
 Each mutation must fail exactly its named owner within the declared focused
 suite. An additional failing node is a B-class stop unless the plan is amended
@@ -1256,7 +1336,7 @@ to explain why the owner was not independent.
    stream is exactly base minus removals plus additions; no third change.
 3. Rebuild 180 routes/exact hash, 52 tools/exact hash, analysis 15, bridges 53,
    and both allowlists 15/exact hash.
-4. Verify all 53 owned paths have the declared final action and every changed
+4. Verify all 55 owned paths have the declared final action and every changed
    product/test/catalog path is owned. Verify all 24 protected paths and
    aggregate.
 5. AST-scan retained test bodies: changes equal the 47 evolved-owner rows and no
@@ -1447,14 +1527,17 @@ Stop before commit and issue a bounded amendment when any condition holds:
 13. An inconclusive acknowledgement can be created from failed-only history or
     generates an assessment/proposal.
 14. A source-missing case/evidence/assessment disappears from list/detail, or
-    changed source content silently reactivates stale judgment.
+    changed source content silently reactivates stale judgment, or an absent
+    source can be searched, assessed, acknowledged, or used for proposal
+    generation.
 15. A provider/harness-specific field enters durable case/evidence/assessment/
     proposal contracts.
 16. Search requires parsing free-form model prose for citations, browser
     automation, arbitrary file access, binary upload, OCR, or an unbounded plan.
 17. Any mount/focus/refresh/poll/scheduler/background path starts investigation.
 18. URL safety cannot reject and recheck redirects/private resolution before
-    transport.
+    transport, or the connect path resolves a validated hostname independently
+    instead of using its admitted public address.
 19. Any raw provider exception/body, secret, private path, or chain-of-thought
     reaches a product record, API response, log packet, or UI.
 20. A proposal is executed or mutates watchlists, active-universe state,
@@ -1474,6 +1557,9 @@ Stop before commit and issue a bounded amendment when any condition holds:
 27. Product behavior requires a non-logical user choice not already present in
     design section 1.1. Stop and ask the user; reviewer preference is not a
     product ruling.
+28. An accepted assessment can omit the current provider-observation citation,
+    a date-only value is promoted to a fabricated instant, usage exhaustion is
+    collapsed into throttling, or one paid adapter silently falls back to another.
 
 ---
 
