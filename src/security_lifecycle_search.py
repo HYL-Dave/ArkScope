@@ -115,6 +115,8 @@ class TavilyLifecycleSearchAdapter:
             raise
         except _UnsafeLifecycleUrl:
             raise LifecycleSearchFailure("unsupported_content") from None
+        except (TypeError, AttributeError):
+            raise LifecycleSearchFailure("adapter_unavailable") from None
         except Exception:
             raise LifecycleSearchFailure("network_error") from None
         if not isinstance(payload, Mapping):
@@ -141,6 +143,8 @@ class TavilyLifecycleSearchAdapter:
             raise
         except _UnsafeLifecycleUrl:
             raise LifecycleSearchFailure("unsupported_content") from None
+        except (TypeError, AttributeError):
+            raise LifecycleSearchFailure("adapter_unavailable") from None
         except Exception:
             raise LifecycleSearchFailure("network_error") from None
         if payload is None:

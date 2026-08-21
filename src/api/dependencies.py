@@ -124,6 +124,8 @@ class _LifecycleTavilyClient:
             )
         except LifecycleSearchFailure:
             raise
+        except (TypeError, AttributeError):
+            raise LifecycleSearchFailure("adapter_unavailable") from None
         except Exception:
             raise LifecycleSearchFailure("network_error") from None
         status_code = int(getattr(response, "status_code", 0))
