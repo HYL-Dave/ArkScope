@@ -1192,6 +1192,19 @@ already-closed `adapter_unavailable` failure code, while transport/runtime error
 remain `network_error`. The amendment changes no node, route, tool, schema,
 failure vocabulary, provider, permission, or owned path.
 
+The 2026-08-21 Task 4 post-RED assertion-ceiling amendment is A-class. The
+approved Settings handoff removes the old event/relationship tables and replaces
+their six-field review summary with two storage-health facts, but four retained
+`SettingsLocalStorage.test.ts` bodies also assert those superseded headings. Evolve
+only `renders only current local storage panels in normal settings navigation`,
+`lists_the_active_data_group_and_its_stable_subsections`, `renders English market
+data and storage outcomes`, and `keeps corrected single-locale headings` to assert
+the approved lifecycle-health title and two health fields. Also narrow the added
+`records successful zero-result runs without claiming no impact` assertion to the
+rendered run-history row; filter option labels are not claims about that run. This
+amendment changes no node, route, DTO, command, state, provider, capability, or
+owned path.
+
 ### 5.1 RED commit
 
 1. Add exactly 14 route and 8 tool IDs.
