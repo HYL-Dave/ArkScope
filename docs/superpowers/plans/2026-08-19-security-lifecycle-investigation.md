@@ -1183,6 +1183,15 @@ identity. A new node, product path, route, provider call, state, or capability i
 B-class. Task 4 remains blocked until the amended Task 3 implementation receives
 independent review.
 
+The 2026-08-21 post-GREEN adapter-classification amendment is A-class. Independent
+review confirmed that broad terminal `except Exception` handlers can mislabel an
+adapter programming error as `network_error`. Evolve only the existing
+`test_adapter_failure_is_typed_and_keeps_prior_evidence` body to require
+`TypeError` and `AttributeError` at the Tavily client/adapter seams to use the
+already-closed `adapter_unavailable` failure code, while transport/runtime errors
+remain `network_error`. The amendment changes no node, route, tool, schema,
+failure vocabulary, provider, permission, or owned path.
+
 ### 5.1 RED commit
 
 1. Add exactly 14 route and 8 tool IDs.
