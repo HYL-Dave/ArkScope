@@ -1,9 +1,10 @@
 # Security Lifecycle Investigation Implementation Plan
 
-> **Status:** TASKS 0-4 COMPLETE. TASK 5 M1-M22 INITIAL REPLAY COMPLETE; TASK 5
-> IS PAUSED AT A B-CLASS NO-TAIL AMENDMENT AWAITING FOCUSED REVIEW. TASKS 6-7
-> REMAIN BLOCKED; TASK 8 RETAINS ITS SEPARATE LIVE-PREFLIGHT GATE. LIVE
-> MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED.
+> **Status:** TASKS 0-4 COMPLETE. TASK 5 CORRECTED M1-M22 REPLAY COMPLETE; TASK
+> 5 IS PAUSED AT A B-CLASS FINAL-ADMISSION EVOLVED-OWNER AMENDMENT AWAITING
+> FOCUSED REVIEW. TASKS 6-7 REMAIN BLOCKED; TASK 8 RETAINS ITS SEPARATE
+> LIVE-PREFLIGHT GATE. LIVE MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN
+> UNAUTHORIZED.
 >
 > **Date:** 2026-08-19
 >
@@ -151,7 +152,7 @@ scope from prose.
 | `...-backend-additions.nodes` | 83 | `a99d98fee39c1a598d35b7b04cb5b7e7daabfb71019ec9a20a1712bfb113ad1c` |
 | `...-frontend-removals.nodes` | 2 | `55e24459805b139ee6f2db3db3684c0eb4c3641c26e4e6fe522df0276dc75899` |
 | `...-frontend-additions.nodes` | 26 | `52d3c8b268d3b2141fd6bcc26708c99c54d5932904140c9970683838d1f8cf7f` |
-| `...-evolved-owners.tsv` | 55 data rows | `c9e4b4aedd7426586348d34688adc851e7499084919b9a5582d8355749077534` |
+| `...-evolved-owners.tsv` | 59 data rows | `8e42d7ced83d2a325989e90e387003d961c6e000bc6f06be6c72ab16dde84c8e` |
 | `...-owned-paths.tsv` | 57 data rows | `ba8361a38f69247af4d6a327f2253c8a3d2007f91fa015f2009a8507683d4e77` |
 | `...-focused-paths.tsv` | 25 data rows | `7be852db3dc34bf7c2fcfaf2a77bb72c758434e9e45e6e2d56281a88f238ee72` |
 | `...-protected.paths` | 24 | `4d037a50c97365484e59637484b3c903dd6ac0077250f2147df5ffa672b91faa` |
@@ -1552,10 +1553,28 @@ assessment anchored to the current observation, then generate proposals. It
 must still fail only `test_adapter_output_cannot_write_an_assessment_or_proposal`.
 After the correction, rerun M1-M22 from the clean corrected tip rather than
 reusing any pre-correction mutation result. Backend/frontend node identities,
-the 55-row retained-body ledger, route/tool/allowlist/schema vocabularies, the
+the then-current retained-body ledger, route/tool/allowlist/schema vocabularies, the
 57-path ownership ledger, and protected bytes remain unchanged. Any additional
 node, path, runtime legacy token, mutation owner, or surface change is another
 B-class stop.
+
+The 2026-08-21 final-admission evolved-owner correction is B-class. The Task 4
+post-RED assertion-ceiling amendment explicitly authorized four retained
+`SettingsLocalStorage.test.ts` body changes, but the mechanical
+`evolved-owners.tsv` authority omitted those four rows even though the Task 4
+prose said they had been added. A pre-T4 hybrid replay using the final five
+relevant test bodies produced exactly `5 failed / 8 passed`: the already-added
+`shows lifecycle storage health and opens the Universe workflow without review
+actions` node plus the four omitted retained nodes. The current implementation
+passes all 13 file nodes. Add only those four retained nodes to the ledger,
+raising it from 55 to 59 rows, and pin the new ledger hash. This correction
+changes no product/test byte, test ID, path, route, tool, schema, collection,
+focused identity, protected byte, or mutation result. Task 5 remains paused
+until the docs-only correction receives focused review. A separate stage-aware
+audit found 24 globally added nodes whose bodies were later adjusted under
+their explicit reviewed amendments; those nodes remain additions rather than
+base-retained nodes. The four rows added here were the only changed
+base-retained bodies outside the mechanical ledger.
 
 ### 7.1 Required mutations
 
@@ -1598,7 +1617,7 @@ to explain why the owner was not independent.
 4. Verify all 57 owned paths have the declared final action and every changed
    product/test/catalog path is owned. Verify all 24 protected paths and
    aggregate.
-5. AST-scan retained test bodies: changes equal the 55 evolved-owner rows and no
+5. AST-scan retained test bodies: changes equal the 59 evolved-owner rows and no
    others. Module-level fixture edits remain inside the named test files and
    contain no new test ID.
 6. Scan product and UI for retired routes, relationship API/table ownership,
@@ -1642,7 +1661,7 @@ The reviewer independently reconstructs, without using executor generators as
 primary evidence:
 
 1. base and final backend/frontend streams and all staged/focused identities;
-2. node removals/additions, all 55 evolved owners, and path ownership;
+2. node removals/additions, all 59 evolved owners, and path ownership;
 3. market/profile schemas, closed vocabularies, and no-create verifiers;
 4. 37-row mapping, 36/37 output, CCL multi-kind survival, four legacy reviews,
    relationship hard stop, interruption/resume, and coordinated restore;
@@ -1773,7 +1792,7 @@ Stop before commit and issue a bounded amendment when any condition holds:
    active-universe owner, generic cache/registry, or shared UI controls.
 6. More than the exact 14 backend or 2 frontend IDs must retire, more than the
    exact 83/26 IDs must be added, or a new truthful replacement is needed.
-7. A retained test body outside the 55-row evolved ledger must change.
+7. A retained test body outside the 59-row evolved ledger must change.
 8. A legacy row cannot map literally, CCL core fields conflict, same-kind
    payloads conflict, a review value is unknown, or any identity contains NUL.
 9. The relationship table is non-empty in the migration input.
@@ -1877,7 +1896,7 @@ scheduler tick, or database resolver.
 Independent review must rebuild, from literal rows and design text rather than
 executor tools:
 
-1. the nine non-evolution ledgers plus the 55-row evolved-owner ledger and
+1. the nine non-evolution ledgers plus the 59-row evolved-owner ledger and
    every SHA/count;
 2. base/staged/final full and focused identities, including T1's corrected
    24-owner evolution and RED arithmetic;

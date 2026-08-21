@@ -46,6 +46,10 @@ T3	tests/test_tools.py::TestRegistry::test_categories	analysis count 13 to 15	mu
 T3	tests/test_tools.py::TestRegistry::test_openai_schema	registry count 50 to 52	must_fail
 T3	tests/test_tools.py::TestRegistry::test_register_all	registry count 50 to 52	must_fail
 T3	tests/test_tools.py::TestRegistry::test_tool_names	expected registry names add two lifecycle tools	must_fail
+T4	src/SettingsLocalStorage.test.ts::local storage panels > keeps corrected single-locale headings	Settings lifecycle heading becomes the approved health and Universe handoff	must_fail
+T4	src/SettingsLocalStorage.test.ts::local storage panels > lists_the_active_data_group_and_its_stable_subsections	active Data group directory names the lifecycle health and Universe handoff	must_fail
+T4	src/SettingsLocalStorage.test.ts::local storage panels > renders English market data and storage outcomes	English storage inventory exposes present and source-missing lifecycle health	must_fail
+T4	src/SettingsLocalStorage.test.ts::local storage panels > renders only current local storage panels in normal settings navigation	normal Settings navigation replaces the retired company-status review surface	must_fail
 T4	src/SettingsWorkspace.test.tsx::Settings workspace > shows_only_the_active_group_directory_while_search_remains_cross_group	Settings lifecycle directory becomes a Universe handoff	must_fail
 T4	src/i18n/resources.test.ts::bundled i18n resources > contains the exact Explore subtree inventory in both locales	Lifecycle workflow adds the reviewed Explore subtree	must_fail
 T4	src/i18n/resources.test.ts::bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales	Lifecycle handoff moves copy from Settings to Explore	must_fail
