@@ -5,7 +5,8 @@
 > `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
 > COMPLETE; TASK 1 IMPLEMENTATION AND INDEPENDENT REVIEW GREEN AT `e2f90f98`;
 > TASK 2 COMPLETE; TASK 3 BRIDGE-OWNERSHIP AMENDMENT GREEN; 2026-08-21
-> SOURCE/TIME/INTEGRITY AMENDMENT USER-AUTHORIZED AND UNDER EXECUTOR REVIEW;
+> SOURCE/TIME/INTEGRITY AMENDMENT USER-AUTHORIZED; TASK 3 INDEPENDENT-REVIEW
+> AMENDMENT USER-AUTHORIZED AND UNDER EXECUTOR REVIEW;
 > TASKS 1-3 ARE
 > NON-DEPLOYABLE STAGING UNTIL TASK 4 COMPLETES THE ROUTE/CONSUMER CUTOVER; LIVE
 > MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
@@ -1156,6 +1157,31 @@ the complete failing-node/reason ledger. Any additional product path, route, too
 test ID, source-presence state, acknowledgement reason, LLM writer, IBKR call,
 market-impact record, or capability-manifest implementation is another B-class
 stop.
+
+The 2026-08-21 independent-review amendment is A-class under the user's
+self-review ruling: every affected path and surface is already owned, no route,
+tool, node ID, state vocabulary, provider, or capability is added, and the fixes
+only make the approved contracts executable at their existing boundaries. It
+authorizes existing Task 3 test bodies to pin these seven regressions before the
+corresponding product edits:
+
+1. atomically create the profile case row with the first persisted run, manual
+   evidence item, or assessment for an otherwise projected market case;
+2. require successful two-store composition before manual evidence persistence,
+   while retaining manual evidence for a valid `source_missing` case;
+3. compose the complete market-observation set rather than silently treating
+   observations beyond a reader limit as absent;
+4. reject malformed bounded text and non-HTTPS manual URLs before permission;
+5. return the newest bounded history rows in explicit chronological-plus-ID
+   order for every local-tool detail collection;
+6. disable redirects on the fixed Tavily search endpoint and classify any 3xx as
+   unsupported content; and
+7. preserve real source-supplied fractional-second precision beyond six digits.
+
+The amendment must retain the exact 4,229-node collection and 535-node focused
+identity. A new node, product path, route, provider call, state, or capability is
+B-class. Task 4 remains blocked until the amended Task 3 implementation receives
+independent review.
 
 ### 5.1 RED commit
 
