@@ -1328,9 +1328,15 @@ not expose raw enum identifiers as UI copy. Compose provider-owned drawer title
 parts structurally and render revalidation/run separators structurally rather
 than adding source-content allowlist debt. No allowlist, scanner, test ID,
 route, DTO, capability, dependency, path ledger, protected byte, or collection/
-focused identity changes. The four-node RED from the preceding amendment
-remains valid because all four failures occurred before these product/resource
-changes.
+focused identity changes. The preceding four-node RED used the pre-closure
+resource counts, so it is not admission evidence for the final test bodies.
+First update those bodies to the final `483/796/99/1,982` resource contract and
+replay them against otherwise pre-T4 product bytes, before adding the 22
+product-resource leaves. Require the failure set to remain exactly those four
+evolved owners. A fifth inventory failure is another ownership stop, not an
+allowed consequence. Then add the 22 leaves and require all four owners to
+pass; requiring the resource-count owners to remain red after those leaves
+exist would contradict their contract.
 
 **Owned files:** exactly the 22 T4 rows.
 
