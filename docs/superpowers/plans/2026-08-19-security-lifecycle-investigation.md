@@ -1541,7 +1541,7 @@ primary evidence:
    tool I/O;
 9. Universe/Settings ownership, browser request ledger, computed geometry, and
    absence of apply controls;
-10. M1-M17 RED owners and byte restoration;
+10. M1-M22 RED owners and byte restoration;
 11. canonical native/frontend reports, protected aggregate, production-open
     traces, leak audit, packet manifests, topology, and clean trees.
 
@@ -1778,7 +1778,7 @@ executor tools:
    semantics, and provider-neutral durable data;
 8. route/tool/UI ownership and absence of action execution or future-feature
    claims;
-9. M1-M17's ability to kill the exact contract; and
+9. M1-M22's ability to kill the exact contract; and
 10. separation of implementation admission, ff merge, live migration, and live
     provider authorization.
 
