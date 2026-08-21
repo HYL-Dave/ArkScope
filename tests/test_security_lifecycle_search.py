@@ -101,6 +101,8 @@ def test_adapter_failure_is_typed_and_keeps_prior_evidence(tmp_path):
     from src.api.dependencies import _LifecycleTavilyClient
     from src.security_lifecycle_search import (
         LifecycleSearchFailure,
+        ResolvedHttpsTarget,
+        TavilyLifecycleSearchAdapter,
         add_manual_evidence,
         run_tavily_investigation,
     )
@@ -137,6 +139,43 @@ def test_adapter_failure_is_typed_and_keeps_prior_evidence(tmp_path):
     with pytest.raises(LifecycleSearchFailure, match="unsupported_content"):
         redirect_client.search(query="issuer event", max_results=5)
     assert redirect_request["allow_redirects"] is False
+
+    def raise_error(error):
+        def broken_transport(**_kwargs):
+            raise error
+
+        return broken_transport
+
+    for error in (TypeError("signature mismatch"), AttributeError("missing field")):
+        client = _LifecycleTavilyClient(
+            api_key_loader=lambda: "test-key",
+            transport=raise_error(error),
+        )
+        with pytest.raises(LifecycleSearchFailure, match="adapter_unavailable"):
+            client.search(query="issuer event", max_results=5)
+
+    class BrokenClient:
+        def search(self, **_kwargs):
+            raise TypeError("client contract mismatch")
+
+    adapter = TavilyLifecycleSearchAdapter(
+        client=BrokenClient(),
+        fetch_transport=raise_error(AttributeError("fetch contract mismatch")),
+    )
+    with pytest.raises(LifecycleSearchFailure, match="adapter_unavailable"):
+        adapter.search(query="issuer event", max_results=5)
+    target = ResolvedHttpsTarget(
+        url="https://example.com/story",
+        hostname="example.com",
+        port=443,
+        addresses=("93.184.216.34",),
+    )
+    with pytest.raises(LifecycleSearchFailure, match="adapter_unavailable"):
+        adapter.fetch(
+            target=target,
+            max_bytes=1000,
+            redirect_guard=lambda _url: target,
+        )
 
     conn, store, case_id, observation = _context(tmp_path)
     try:
