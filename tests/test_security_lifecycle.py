@@ -236,14 +236,35 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
     profile = _open_profile(profile_path)
     try:
         profile_store = SecurityLifecycleInvestigationStore(profile)
-        profile_store.insert_legacy_assessment(
+        case_id = profile_store.ensure_case(
             source="sec_edgar",
             source_ref="0000712515-26-000042",
             ticker="EA",
-            reviewed_state="inactive_confirmed",
-            reviewed_at="2026-08-06T00:00:00Z",
-            observation_fingerprint_sha256=fingerprint,
+            at="2026-08-06T00:00:00Z",
         )
+        assessment_id = profile_store.create_assessment(
+            case_id=case_id,
+            relevance="direct_tracked_security",
+            confidence="unknown",
+            author="legacy_review",
+            conclusion="Historical review marked the tracked security inactive.",
+            impact_summary="Historical review retained no supporting rationale.",
+            outcomes=("listing_ended",),
+            citations=(
+                {
+                    "reference_kind": "observation",
+                    "cited_content_sha256": fingerprint,
+                },
+            ),
+            observation_fingerprint_sha256=fingerprint,
+            at="2026-08-06T00:00:00Z",
+        )
+        profile_store.accept_assessment(
+            assessment_id,
+            observation_fingerprint_sha256=fingerprint,
+            at="2026-08-06T00:00:00Z",
+        )
+        assert not hasattr(profile_store, "insert_legacy_assessment")
     finally:
         profile.close()
 
