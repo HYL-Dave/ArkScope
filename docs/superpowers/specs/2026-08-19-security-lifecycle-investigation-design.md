@@ -1,11 +1,15 @@
 # Security Lifecycle Investigation and Action Proposal Design
 
-**Status:** DESIGN APPROVED; 2026-08-21 SOURCE/TIME/INTEGRITY AMENDMENT APPROVED
+**Status:** DESIGN APPROVED; TASKS 0-7 IMPLEMENTED AND LOCALLY MERGED; TASK 8
+LIVE CUTOVER NOT AUTHORIZED
 **Date:** 2026-08-19
 **Base:** `be263855` (`master`; not pushed by this design)
 **Priority owner:** `PROJECT_PRIORITY_MAP.md` P0-E, Slice 2
-**Scope:** Design only. This document does not authorize product-code edits,
-production-data migration, external web calls, profile mutations, merge, or push.
+**Implementation:** Exact product tip `e3faa24e` passed the Task 7 exact-master
+closeout gates. Production databases remain on the legacy schema; no live
+migration or real provider canary has run.
+**Scope:** This remains the design authority. It does not authorize Task 8,
+external provider calls, profile action execution, or push.
 
 ## 1. Problem and authority
 
