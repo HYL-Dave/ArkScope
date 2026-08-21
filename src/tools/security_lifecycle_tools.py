@@ -244,7 +244,7 @@ class SecurityLifecycleReadService:
     def get_case(self, case_id: str) -> dict:
         for case in self._cases():
             if case["case_id"] == case_id:
-                return case
+                return {**case, **_case_summary(case)}
         raise KeyError("case_not_found")
 
 

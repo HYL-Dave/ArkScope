@@ -317,6 +317,13 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
         tools = _configure(monkeypatch, market_path, profile_path)
         payload = tools.get_security_lifecycle_case(case_id)
         rendered = json.dumps(payload, sort_keys=True)
+        assert payload["case"]["issuer_name"] == "Electronic Arts Inc."
+        assert payload["case"]["filing_date"] == "2026-08-04"
+        assert payload["case"]["kinds"] == [
+            {"event_type": "acquisition_completed", "effective_date": "2026-08-04"}
+        ]
+        assert payload["case"]["investigation_run_count"] == 1
+        assert payload["case"]["evidence_count"] == 25
         assert payload["case"]["observation"]["ticker"] == "EA"
         assert payload["case"]["investigation_runs"][0]["status"] == "succeeded"
         assert len(payload["case"]["evidence"]) == 20
