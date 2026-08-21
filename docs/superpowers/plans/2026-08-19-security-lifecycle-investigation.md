@@ -1471,6 +1471,30 @@ RED owner set; it changes no product/test byte, test ID, mutation count,
 path/node/route/tool ledger, collection/focused identity, protected path, or
 Task 5 admission target.
 
+The 2026-08-21 M5/M8/M14 owner-set correction is B-class. A preflight audit of
+the remaining table applied the literal mutation at the shared product seam,
+replayed all 535 backend owners, and restored each preimage byte-for-byte:
+
+- M5 hides every profile-only case at composition. It fails the core
+  composition, source reattachment, HTTP detail, and local-tool detail owners;
+  all four are independent public projections of the same source-missing
+  history contract.
+- M8 makes `succeed_investigation_run(result_count=0, ...)` record a failed run.
+  It fails the run-state vocabulary, inconclusive acknowledgement, search
+  orchestration, and provider-neutral tool-detail owners; each independently
+  requires a successful zero-result run.
+- M14 remounts `GET /market-data/security-lifecycle`. It fails the local-runtime
+  180-route census, the exact lifecycle route surface, and the dedicated legacy
+  route absence owner.
+
+The exact replays were respectively `4 failed / 531 passed`, `4 failed / 531
+passed`, and `3 failed / 532 passed`, each with zero socket attempts and no
+additional owner. Their preflight attempts remain rejected evidence because
+the former table named incomplete owner sets. This correction changes only
+those three required RED owner sets; it changes no product/test byte, test ID,
+mutation count, path/node/route/tool ledger, collection/focused identity,
+protected path, or Task 5 admission target.
+
 ### 7.1 Required mutations
 
 | ID | Mutation | Required RED owner |
@@ -1479,16 +1503,16 @@ Task 5 admission target.
 | M2 | clear the CCL `acquisition_completed` kind's `effective_date` during collapse, without dropping the kind | `test_migration_collapses_ccl_only_after_core_fields_match` and `test_migration_preserves_every_source_field_kind_date_and_old_row_mapping` |
 | M3 | allow a non-empty relationship table | `test_migration_rejects_nonempty_relationship_table_before_either_store_changes` |
 | M4 | allow writes with incomplete receipt | `test_incomplete_receipt_blocks_all_lifecycle_writes` |
-| M5 | hide profile history when source row is absent | `test_read_composition_keeps_profile_history_visible_when_source_is_missing` |
+| M5 | hide profile history when source row is absent | `test_read_composition_keeps_profile_history_visible_when_source_is_missing`, `test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content`, `test_source_missing_case_detail_remains_queryable`, and `test_detail_tool_is_local_read_only_and_returns_source_missing_history` |
 | M6 | include `last_observed_at` in source fingerprint | `test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content` |
 | M7 | allow failed-only acknowledgement | `test_failed_run_alone_cannot_acknowledge_a_case` |
-| M8 | classify zero results as failed | `test_successful_zero_result_run_can_support_inconclusive_acknowledgement` |
+| M8 | classify zero results as failed | `test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary`, `test_successful_zero_result_run_can_support_inconclusive_acknowledgement`, `test_successful_zero_result_search_is_succeeded_not_failed`, and `test_tools_return_observation_and_profile_facts_without_provider_fields` |
 | M9 | remove one pre-egress permission call | `test_search_calls_external_and_metered_permissions_before_egress` |
 | M10 | let adapter output create a proposal | `test_adapter_output_cannot_write_an_assessment_or_proposal` |
 | M11 | allow a private/redirect URL | `test_unsafe_local_private_and_redirect_urls_are_rejected` |
 | M12 | allow hide/remap with open position | `test_open_portfolio_position_blocks_hide_and_remap_proposals` |
 | M13 | make one local tool call transport | `test_tool_reads_issue_zero_network_calls` |
-| M14 | remount one old integer review route | `test_old_integer_event_and_relationship_routes_are_absent` |
+| M14 | remount `GET /market-data/security-lifecycle` | `test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes`, `test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes`, and `test_old_integer_event_and_relationship_routes_are_absent` |
 | M15 | accept a stale assessment for proposal | `test_stale_assessment_blocks_existing_and_new_proposals` |
 | M16 | search on mount/focus instead of click | `opening refreshing focusing and switching tabs issue zero investigation requests` |
 | M17 | restore one Settings review command | `shows lifecycle storage health and opens the Universe workflow without review actions` |
