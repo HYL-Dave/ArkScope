@@ -255,7 +255,9 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
     market.row_factory = sqlite3.Row
     try:
         store = SecurityLifecycleStore(market)
-        store.upsert_observation(_observation())
+        store.upsert_observation(
+            _observation(observed_at="2026-08-06T00:00:00Z")
+        )
     finally:
         market.close()
     identical = compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
