@@ -77,7 +77,12 @@ def test_catalog_registry_and_both_generic_bridges_expose_exact_lifecycle_schema
         _configure(monkeypatch, market_path, profile_path)
         registry = create_default_registry()
         expected = {
-            "list_security_lifecycle_cases": ["ticker", "workflow_state", "limit"],
+            "list_security_lifecycle_cases": [
+                "ticker",
+                "workflow_state",
+                "source_presence",
+                "limit",
+            ],
             "get_security_lifecycle_case": ["case_id"],
         }
         for name, parameters in expected.items():
@@ -126,6 +131,14 @@ def test_detail_tool_is_local_read_only_and_returns_source_missing_history(tmp_p
         assert payload["status"] == "ok"
         assert payload["case"]["source_presence"] == "source_missing"
         assert payload["case"]["evidence"][0]["excerpt"] == "Reviewed issuer context."
+        ordinary = tools.list_security_lifecycle_cases()
+        assert ordinary["count"] == 0
+        assert ordinary["data_integrity"] == {"source_missing_count": 1}
+        missing = tools.list_security_lifecycle_cases(
+            source_presence="source_missing"
+        )
+        assert missing["count"] == 1
+        assert missing["cases"][0]["case_id"] == case_id
     finally:
         profile.close()
 
@@ -179,6 +192,9 @@ def test_list_tool_is_local_read_only_and_stably_sorted(tmp_path, monkeypatch):
         payload = tools.list_security_lifecycle_cases(limit=20)
         assert payload["status"] == "ok"
         assert [item["ticker"] for item in payload["cases"]] == ["EA", "OLD"]
+        assert all("evidence" not in item for item in payload["cases"])
+        assert all("investigation_runs" not in item for item in payload["cases"])
+        assert all(item["evidence_count"] == 0 for item in payload["cases"])
         assert tools.list_security_lifecycle_cases(ticker="old", limit=20)["count"] == 1
         assert tools.list_security_lifecycle_cases(
             workflow_state="unresolved", limit=1
@@ -201,6 +217,29 @@ def test_missing_case_is_typed_without_creating_either_database(tmp_path, monkey
     }
     assert not market_path.exists()
     assert not profile_path.exists()
+
+    from src.security_lifecycle import SecurityLifecycleStore
+
+    market_path = tmp_path / "market.db"
+    market = sqlite3.connect(market_path)
+    SecurityLifecycleStore(market)
+    market.close()
+    profile_path = tmp_path / "profile-without-lifecycle.db"
+    profile = sqlite3.connect(profile_path)
+    profile.execute("CREATE TABLE unrelated_state (value TEXT)")
+    profile.commit()
+    profile.close()
+    before = profile_path.read_bytes()
+    tools = _configure(monkeypatch, market_path, profile_path, sources={})
+    payload = tools.list_security_lifecycle_cases()
+    assert payload == {
+        "status": "unavailable",
+        "error": {
+            "code": "security_lifecycle_profile_store_unavailable",
+            "store": "profile",
+        },
+    }
+    assert profile_path.read_bytes() == before
 
 
 def test_tool_reads_issue_zero_network_calls(tmp_path, monkeypatch):
@@ -256,11 +295,34 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
             usage={"search_requests": 1},
             at=_AT,
         )
+        for index in range(25):
+            store.add_evidence(
+                case_id=case_id,
+                run_id=None,
+                kind="manual_text",
+                adapter="manual",
+                excerpt=f"Evidence {index:02d} " + ("x" * 4000),
+                source_url=None,
+                title=None,
+                publisher=None,
+                domain=None,
+                source_published_at=None,
+                retrieved_at=None,
+                mime_type="text/plain",
+                document_status=None,
+                at=f"2026-08-20T00:{index:02d}:00Z",
+            )
         tools = _configure(monkeypatch, market_path, profile_path)
         payload = tools.get_security_lifecycle_case(case_id)
         rendered = json.dumps(payload, sort_keys=True)
         assert payload["case"]["observation"]["ticker"] == "EA"
         assert payload["case"]["investigation_runs"][0]["status"] == "succeeded"
+        assert len(payload["case"]["evidence"]) == 20
+        assert max(len(item["excerpt"]) for item in payload["case"]["evidence"]) <= 2000
+        assert payload["case"]["truncation"]["evidence"] == {
+            "total": 25,
+            "returned": 20,
+        }
         assert "tavily" not in rendered
         assert "usage_json" not in rendered
         assert "query_plan_json" not in rendered

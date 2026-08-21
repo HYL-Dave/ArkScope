@@ -67,7 +67,8 @@ class _Adapter:
             "usage": dict(self.usage),
         }
 
-    def fetch(self, *, url, max_bytes, redirect_guard):
+    def fetch(self, *, target, max_bytes, redirect_guard):
+        url = target.url
         self.fetch_calls.append((url, max_bytes))
         value = self.fetched.get(url)
         if isinstance(value, Exception):
@@ -97,11 +98,31 @@ def _result(index=1, **overrides):
 
 
 def test_adapter_failure_is_typed_and_keeps_prior_evidence(tmp_path):
+    from src.api.dependencies import _LifecycleTavilyClient
     from src.security_lifecycle_search import (
         LifecycleSearchFailure,
         add_manual_evidence,
         run_tavily_investigation,
     )
+
+    class Response:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+        def json(self):
+            return {"results": []}
+
+    for status_code, failure_code in (
+        (429, "rate_limited"),
+        (432, "usage_limit_reached"),
+        (433, "usage_limit_reached"),
+    ):
+        client = _LifecycleTavilyClient(
+            api_key_loader=lambda: "test-key",
+            transport=lambda **_kwargs: Response(status_code),
+        )
+        with pytest.raises(LifecycleSearchFailure, match=failure_code):
+            client.search(query="issuer event", max_results=5)
 
     conn, store, case_id, observation = _context(tmp_path)
     try:
@@ -124,6 +145,21 @@ def test_adapter_failure_is_typed_and_keeps_prior_evidence(tmp_path):
         )
         assert result["status"] == "failed"
         assert result["failure_code"] == "network_error"
+        assert store.list_evidence(case_id) == before
+
+        exhausted = run_tavily_investigation(
+            store=store,
+            case_id=case_id,
+            observation=observation,
+            adapter=_Adapter(
+                failure=LifecycleSearchFailure("usage_limit_reached")
+            ),
+            permission=lambda *_args: None,
+            resolver=_safe_resolver,
+            at="2026-08-20T00:30:00Z",
+        )
+        assert exhausted["status"] == "failed"
+        assert exhausted["failure_code"] == "usage_limit_reached"
         assert store.list_evidence(case_id) == before
 
         fetched = _result()
@@ -293,7 +329,16 @@ def test_manual_adapter_adds_bounded_text_and_https_urls_with_zero_network(tmp_p
 
 
 def test_normalization_drops_provider_answers_scores_scripts_and_raw_bodies(tmp_path):
-    from src.security_lifecycle_search import run_tavily_investigation
+    from src.security_lifecycle_search import (
+        _normalize_source_published_at,
+        run_tavily_investigation,
+    )
+
+    assert _normalize_source_published_at("2026-08-19") == "2026-08-19"
+    assert _normalize_source_published_at(
+        "2026-08-19T08:30:45.120+08:00"
+    ) == "2026-08-19T00:30:45.120Z"
+    assert _normalize_source_published_at("yesterday") is None
 
     conn, store, case_id, observation = _context(tmp_path)
     try:
@@ -301,6 +346,8 @@ def test_normalization_drops_provider_answers_scores_scripts_and_raw_bodies(tmp_
             content="Visible <script>secret()</script> excerpt",
             score=0.77,
             raw_body="RAW SECRET BODY",
+            published_date="2026-08-19",
+            published_at="yesterday",
         )
         adapter = _Adapter(
             results=[result],
@@ -333,6 +380,10 @@ def test_normalization_drops_provider_answers_scores_scripts_and_raw_bodies(tmp_
         ):
             assert forbidden not in serialized
         assert "Useful filing text" in serialized
+        assert {
+            item["source_published_at"]
+            for item in store.list_evidence(case_id)
+        } == {"2026-08-19"}
     finally:
         conn.close()
 
@@ -433,9 +484,11 @@ def test_successful_zero_result_search_is_succeeded_not_failed(tmp_path):
 
 
 def test_unsafe_local_private_and_redirect_urls_are_rejected(tmp_path):
+    from src.api.dependencies import _lifecycle_fetch_transport
     from src.security_lifecycle_search import (
         LifecycleSearchFailure,
         TavilyLifecycleSearchAdapter,
+        _resolve_https_target,
         add_manual_evidence,
         run_tavily_investigation,
     )
@@ -508,6 +561,91 @@ def test_unsafe_local_private_and_redirect_urls_are_rejected(tmp_path):
         )
         assert production_redirect["failure_code"] == "unsupported_content"
         assert isinstance(LifecycleSearchFailure("unsupported_content"), RuntimeError)
+
+        resolver_calls = []
+
+        def resolver(host):
+            resolver_calls.append(host)
+            return ("93.184.216.34",)
+
+        admitted = _resolve_https_target(
+            "https://example.com/issuer",
+            resolver=resolver,
+        )
+        pool_calls = []
+
+        class Response:
+            status = 200
+            headers = {"Content-Type": "text/plain"}
+
+            def stream(self, _chunk_size):
+                yield b"issuer evidence"
+
+            def release_conn(self):
+                pool_calls.append(("released",))
+
+        class Pool:
+            def urlopen(self, method, path, **kwargs):
+                pool_calls.append((method, path, kwargs))
+                return Response()
+
+            def close(self):
+                pool_calls.append(("closed",))
+
+        fetched = _lifecycle_fetch_transport(
+            target=admitted,
+            max_bytes=100,
+            redirect_guard=lambda candidate: _resolve_https_target(
+                candidate, resolver=resolver
+            ),
+            pool_factory=lambda target: (
+                pool_calls.append(("target", target)),
+                Pool(),
+            )[1],
+        )
+        assert fetched["content"] == "issuer evidence"
+        assert resolver_calls == ["example.com"]
+        assert pool_calls[0][0] == "target"
+        assert pool_calls[0][1] == admitted
+        request = next(item for item in pool_calls if item[0] == "GET")
+        assert request[1] == "/issuer"
+        assert request[2]["headers"]["Host"] == "example.com"
+
+        changing_resolver_calls = []
+
+        def changing_resolver(host):
+            changing_resolver_calls.append(host)
+            if len(changing_resolver_calls) == 1:
+                return ("93.184.216.34",)
+            return ("127.0.0.1",)
+
+        class RepeatedResultClient:
+            def search(self, **_kwargs):
+                return {"results": [safe]}
+
+        pinned_pool_calls = []
+        pinned_adapter = TavilyLifecycleSearchAdapter(
+            client=RepeatedResultClient(),
+            fetch_transport=lambda **kwargs: _lifecycle_fetch_transport(
+                pool_factory=lambda target: (
+                    pinned_pool_calls.append(target),
+                    Pool(),
+                )[1],
+                **kwargs,
+            ),
+        )
+        pinned = run_tavily_investigation(
+            store=store,
+            case_id=case_id,
+            observation=observation,
+            adapter=pinned_adapter,
+            permission=lambda *_args: None,
+            resolver=changing_resolver,
+            at="2026-08-20T02:00:00Z",
+        )
+        assert pinned["status"] == "succeeded"
+        assert changing_resolver_calls == ["example.com"]
+        assert pinned_pool_calls[0].addresses == ("93.184.216.34",)
     finally:
         conn.close()
 
@@ -550,6 +688,22 @@ def test_usage_and_diagnostics_are_bounded_and_secret_safe(tmp_path):
         assert "NaN" not in database_text
         assert "Infinity" not in database_text
         assert run["failure_code"] == "network_error"
+
+        succeeded = run_tavily_investigation(
+            store=store,
+            case_id=case_id,
+            observation=observation,
+            adapter=_Adapter(
+                results=[],
+                usage={"credits": 1, "provider_blob": "not persisted"},
+            ),
+            permission=lambda *_args: None,
+            resolver=_safe_resolver,
+            at="2026-08-20T01:00:00Z",
+        )
+        usage = store.get_investigation_run(succeeded["run_id"])["usage_json"]
+        assert '"credits":3' in usage
+        assert "provider_blob" not in usage
     finally:
         conn.close()
 

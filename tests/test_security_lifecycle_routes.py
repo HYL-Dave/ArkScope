@@ -23,8 +23,8 @@ class _SearchAdapter:
         self.search_calls.append((query, max_results))
         return {"results": [], "usage": {"search_requests": 1}}
 
-    def fetch(self, *, url, max_bytes, redirect_guard):
-        self.fetch_calls.append(url)
+    def fetch(self, *, target, max_bytes, redirect_guard):
+        self.fetch_calls.append(target.url)
         return None
 
 
@@ -145,6 +145,10 @@ def _create_draft(client, context, evidence_id):
             "impact_summary": "Review the symbol membership before acting.",
             "outcomes": ["acquisition_stock"],
             "citations": [
+                {
+                    "reference_kind": "observation",
+                    "cited_content_sha256": context["fingerprint"],
+                },
                 {"reference_kind": "evidence", "evidence_id": evidence_id}
             ],
             "successor_ticker": "EA2",
@@ -370,12 +374,17 @@ def test_investigation_route_requires_one_explicit_attended_command(tmp_path, mo
 def test_manual_evidence_route_adds_url_or_text_without_network_access(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     socket_calls: list[object] = []
+    permission_calls: list[str] = []
     monkeypatch.setattr(
         "socket.create_connection",
         lambda *args, **kwargs: socket_calls.append((args, kwargs)),
     )
     try:
-        client, _ = _client(context, monkeypatch)
+        client, _ = _client(
+            context,
+            monkeypatch,
+            permissions=lambda action, _detail: permission_calls.append(action),
+        )
         text = client.post(
             f"/security-lifecycle/cases/{context['case_id']}/evidence",
             json={"text": "Issuer statement.", "url": None},
@@ -386,6 +395,21 @@ def test_manual_evidence_route_adds_url_or_text_without_network_access(tmp_path,
         )
         assert text.status_code == 200
         assert url.status_code == 200
+        invalid = [
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/evidence",
+                json={"text": None, "url": None},
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/evidence",
+                json={"text": "text", "url": "https://example.com/issuer"},
+            ),
+        ]
+        assert [item.status_code for item in invalid] == [422, 422]
+        assert permission_calls == [
+            "security_lifecycle_add_evidence",
+            "security_lifecycle_add_evidence",
+        ]
         assert socket_calls == []
     finally:
         context["profile_conn"].close()
@@ -400,7 +424,7 @@ def test_old_integer_event_and_relationship_routes_are_absent():
     assert "/market-data/security-lifecycle/relationships/{relationship_id}" not in paths
 
 
-def test_route_failure_is_typed_and_never_falls_back_to_one_store(monkeypatch):
+def test_route_failure_is_typed_and_never_falls_back_to_one_store(tmp_path, monkeypatch):
     from src.api import dependencies
     from src.api.routes import security_lifecycle as routes
     from src.security_lifecycle_investigation import LifecycleStoreUnavailable
@@ -420,6 +444,39 @@ def test_route_failure_is_typed_and_never_falls_back_to_one_store(monkeypatch):
         "code": "security_lifecycle_profile_store_unavailable",
         "store": "profile",
     }
+
+    from src.security_lifecycle_schema import create_market_schema
+
+    market_path = tmp_path / "market.db"
+    market = sqlite3.connect(market_path)
+    create_market_schema(market)
+    market.close()
+    missing_profile = tmp_path / "missing-profile.db"
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(missing_profile))
+    real_app = FastAPI()
+    real_app.include_router(routes.router)
+    unavailable = TestClient(real_app).post(
+        "/security-lifecycle/cases/slc_missing/assessments",
+        json={
+            "relevance": "direct_tracked_security",
+            "confidence": "high",
+            "conclusion": "Bounded conclusion.",
+            "impact_summary": "Bounded impact.",
+            "outcomes": ["listing_ended"],
+            "citations": [
+                {
+                    "reference_kind": "observation",
+                    "cited_content_sha256": "a" * 64,
+                }
+            ],
+        },
+    )
+    assert unavailable.status_code == 503
+    assert unavailable.json()["detail"]["code"] == (
+        "security_lifecycle_profile_store_unavailable"
+    )
+    assert not missing_profile.exists()
 
 
 def test_route_writes_do_not_mutate_universe_portfolio_sa_or_market_history(tmp_path, monkeypatch):
@@ -462,22 +519,74 @@ def test_route_writes_do_not_mutate_universe_portfolio_sa_or_market_history(tmp_
 
 def test_source_missing_case_detail_remains_queryable(tmp_path, monkeypatch):
     context = _build_context(tmp_path, with_observation=False)
+    permission_calls: list[str] = []
     try:
-        client, _ = _client(context, monkeypatch)
+        client, _ = _client(
+            context,
+            monkeypatch,
+            permissions=lambda action, _detail: permission_calls.append(action),
+        )
         response = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
         )
         assert response.status_code == 200
         assert response.json()["source_presence"] == "source_missing"
         assert response.json()["observation"] is None
+        ordinary = client.get("/security-lifecycle/cases")
+        assert ordinary.status_code == 200
+        assert ordinary.json()["cases"] == []
+        assert ordinary.json()["data_integrity"] == {"source_missing_count": 1}
+        integrity = client.get(
+            "/security-lifecycle/cases?source_presence=source_missing"
+        )
+        assert [item["case_id"] for item in integrity.json()["cases"]] == [
+            context["case_id"]
+        ]
+
+        attempts = [
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/investigations",
+                json={"adapter": "tavily"},
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    "relevance": "direct_tracked_security",
+                    "confidence": "high",
+                    "conclusion": "Bounded conclusion.",
+                    "impact_summary": "Bounded impact.",
+                    "outcomes": ["listing_ended"],
+                    "citations": [
+                        {
+                            "reference_kind": "observation",
+                            "cited_content_sha256": "a" * 64,
+                        }
+                    ],
+                },
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/acknowledgements",
+                json={"reason": "evidence_insufficient", "note": None},
+            ),
+        ]
+        assert [item.status_code for item in attempts] == [422, 422, 422]
+        assert {
+            item.json()["detail"]["code"] for item in attempts
+        } == {"source_observation_missing"}
+        assert permission_calls == []
     finally:
         context["profile_conn"].close()
 
 
 def test_unknown_or_conflicting_assessment_payload_is_rejected_before_write(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
+    permission_calls: list[str] = []
     try:
-        client, _ = _client(context, monkeypatch)
+        client, _ = _client(
+            context,
+            monkeypatch,
+            permissions=lambda action, _detail: permission_calls.append(action),
+        )
         base = {
             "relevance": "direct_tracked_security",
             "confidence": "high",
@@ -502,8 +611,63 @@ def test_unknown_or_conflicting_assessment_payload_is_rejected_before_write(tmp_
             f"/security-lifecycle/cases/{context['case_id']}/assessments",
             json={**base, "outcomes": ["symbol_or_venue_changed"]},
         )
-        assert {unknown.status_code, conflicting.status_code, legacy.status_code} == {422}
+        malformed = [
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["listing_ended"],
+                    "counterparty_cik": "12AB",
+                },
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["listing_ended"],
+                    "effective_date": "2026-02-30",
+                },
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["acquisition_cash"],
+                    "consideration_currency": "usd",
+                    "cash_per_security_decimal": "9" * 5000,
+                },
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["acquisition_cash"],
+                    "cash_per_security_decimal": "1e10000",
+                },
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["listing_ended"],
+                    "citations": [
+                        {
+                            "reference_kind": "observation",
+                            "evidence_id": "sle_wrong_shape",
+                            "cited_content_sha256": context["fingerprint"],
+                        }
+                    ],
+                },
+            ),
+        ]
+        assert {
+            unknown.status_code,
+            conflicting.status_code,
+            legacy.status_code,
+            *(item.status_code for item in malformed),
+        } == {422}
         assert context["store"].list_assessments(context["case_id"]) == []
+        assert permission_calls == []
         source = inspect.getsource(
             __import__(
                 "src.api.routes.security_lifecycle",

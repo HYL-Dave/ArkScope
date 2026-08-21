@@ -162,6 +162,20 @@ def test_accepting_assessment_requires_conclusion_citation_and_human_author(tmp_
         with pytest.raises(ValueError, match="citation"):
             _accept(store, missing_citation)
 
+        evidence_id = _manual_evidence(store, case_id)
+        evidence_only = _draft(
+            store,
+            case_id,
+            citations=[
+                {
+                    "reference_kind": "evidence",
+                    "evidence_id": evidence_id,
+                }
+            ],
+        )
+        with pytest.raises(ValueError, match="observation_citation_required"):
+            _accept(store, evidence_only)
+
         undetermined = _draft(
             store,
             case_id,
@@ -289,6 +303,10 @@ def test_active_universe_unavailable_blocks_proposals_without_blocking_evidence(
             case_id,
             citations=[
                 {
+                    "reference_kind": "observation",
+                    "cited_content_sha256": _FINGERPRINT,
+                },
+                {
                     "reference_kind": "evidence",
                     "evidence_id": evidence_id,
                 }
@@ -339,6 +357,9 @@ def test_decimal_assessment_fields_are_canonical_strings_not_floats(tmp_path):
     try:
         with pytest.raises((TypeError, ValueError), match="decimal"):
             _draft(store, case_id, cash=10.5)
+        for oversized in ("1e10000", "1e-10000"):
+            with pytest.raises(ValueError, match="decimal"):
+                _draft(store, case_id, cash=oversized)
         assessment_id = _draft(store, case_id, cash="10.5000", ratio="0.2500")
         assessment = store.get_assessment(assessment_id)
         assert assessment["cash_per_security_decimal"] == "10.5"

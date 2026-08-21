@@ -97,6 +97,24 @@ def test_profile_schema_matches_the_exact_case_evidence_and_proposal_contract(tm
             "created_at",
             "updated_at",
         ]
+        assert _columns(conn, "security_lifecycle_evidence") == [
+            "evidence_id",
+            "case_id",
+            "run_id",
+            "kind",
+            "source_url",
+            "title",
+            "publisher",
+            "domain",
+            "source_published_at",
+            "retrieved_at",
+            "adapter",
+            "excerpt",
+            "content_sha256",
+            "mime_type",
+            "document_status",
+            "created_at",
+        ]
         assert _columns(conn, "security_lifecycle_migration_receipts") == [
             "migration_key",
             "market_snapshot_sha256",
@@ -151,6 +169,49 @@ def test_profile_foreign_keys_and_closed_vocabularies_reject_invalid_rows(tmp_pa
                 "2026-08-20T00:00:00Z",
             ),
         )
+        conn.execute(
+            "INSERT INTO security_lifecycle_investigation_runs "
+            "(run_id,case_id,trigger,adapter,status,query_plan_json,query_count,"
+            "result_count,fetch_count,usage_json,failure_code,finished_at,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                "run_usage",
+                "slc_case",
+                "attended_user",
+                "tavily",
+                "failed",
+                "[]",
+                0,
+                None,
+                0,
+                "{}",
+                "usage_limit_reached",
+                "2026-08-20T00:00:00Z",
+                "2026-08-20T00:00:00Z",
+            ),
+        )
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO security_lifecycle_investigation_runs "
+                "(run_id,case_id,trigger,adapter,status,query_plan_json,query_count,"
+                "result_count,fetch_count,usage_json,failure_code,finished_at,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    "run_unknown",
+                    "slc_case",
+                    "attended_user",
+                    "tavily",
+                    "failed",
+                    "[]",
+                    0,
+                    None,
+                    0,
+                    "{}",
+                    "quotaish_unknown",
+                    "2026-08-20T00:00:00Z",
+                    "2026-08-20T00:00:00Z",
+                ),
+            )
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
                 "INSERT INTO security_lifecycle_case_acknowledgements "
