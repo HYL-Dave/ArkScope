@@ -23,6 +23,13 @@ from src.security_lifecycle_schema import (
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DETAIL_HISTORY_LIMIT = 20
 _DETAIL_EXCERPT_LIMIT = 2000
+_HISTORY_ORDER_FIELDS = {
+    "investigation_runs": ("created_at", "run_id"),
+    "evidence": ("created_at", "evidence_id"),
+    "assessment_history": ("created_at", "assessment_id"),
+    "acknowledgement_history": ("acknowledged_at", "acknowledgement_id"),
+    "proposals": ("created_at", "proposal_id"),
+}
 
 
 def _profile_db_path() -> str:
@@ -61,7 +68,15 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
     truncation = {}
     for name in histories:
         rows = list(item.get(name, []))
-        selected = rows[-_DETAIL_HISTORY_LIMIT:]
+        timestamp_field, id_field = _HISTORY_ORDER_FIELDS[name]
+        ordered = sorted(
+            rows,
+            key=lambda row: (
+                str(row.get(timestamp_field) or ""),
+                str(row.get(id_field) or ""),
+            ),
+        )
+        selected = ordered[-_DETAIL_HISTORY_LIMIT:]
         rendered = []
         for row in selected:
             value = dict(row)

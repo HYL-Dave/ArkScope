@@ -115,6 +115,7 @@ class _LifecycleTavilyClient:
                 url="https://api.tavily.com/search",
                 json=payload,
                 timeout=(5.0, 30.0),
+                allow_redirects=False,
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
@@ -136,6 +137,8 @@ class _LifecycleTavilyClient:
         }
         if status_code in failure_codes:
             raise LifecycleSearchFailure(failure_codes[status_code])
+        if 300 <= status_code < 400:
+            raise LifecycleSearchFailure("unsupported_content")
         if status_code != 200:
             raise LifecycleSearchFailure("network_error")
         try:

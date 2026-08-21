@@ -34,7 +34,7 @@ _USAGE_FIELDS = frozenset(
 _MAX_USAGE_VALUE = 1_000_000_000_000
 _RFC3339_RE = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2})T(?P<hour>\d{2}):(?P<minute>\d{2})"
-    r"(?::(?P<second>\d{2})(?P<fraction>\.\d{1,6})?)?"
+    r"(?::(?P<second>\d{2})(?P<fraction>\.\d+)?)?"
     r"(?P<offset>Z|[+-]\d{2}:\d{2})$"
 )
 
@@ -172,7 +172,12 @@ def _normalize_source_published_at(value: object) -> str | None:
     if match is None:
         return None
     offset = match.group("offset")
-    parseable = raw[:-1] + "+00:00" if offset == "Z" else raw
+    second = match.group("second")
+    parseable = (
+        f"{match.group('date')}T{match.group('hour')}:{match.group('minute')}"
+        f"{f':{second}' if second is not None else ''}"
+        f"{'+00:00' if offset == 'Z' else offset}"
+    )
     try:
         parsed = datetime.fromisoformat(parseable)
     except ValueError:
@@ -258,6 +263,11 @@ def _canonical_https_url(
     return _resolve_https_target(value, resolver=resolver).url
 
 
+def canonical_manual_https_url(value: object) -> str:
+    """Validate and normalize a manual evidence URL without fetching it."""
+    return _canonical_https_url(value, resolver=None)
+
+
 def build_lifecycle_query_plan(observation: Mapping[str, object]) -> tuple[str, ...]:
     ticker = _clean_text(observation.get("ticker"), limit=20)
     issuer = _clean_text(observation.get("issuer_name"), limit=240)
@@ -285,6 +295,7 @@ def add_manual_evidence(
     text: str | None,
     url: str | None,
     at: str,
+    case_identity: Mapping[str, object] | None = None,
 ) -> str:
     if (text is None) == (url is None):
         raise ValueError("manual_evidence_shape")
@@ -307,8 +318,9 @@ def add_manual_evidence(
             mime_type="text/plain",
             document_status=None,
             at=at,
+            case_identity=case_identity,
         )
-    source_url = _canonical_https_url(url, resolver=None)
+    source_url = canonical_manual_https_url(url)
     return store.add_evidence(
         case_id=case_id,
         run_id=None,
@@ -324,6 +336,7 @@ def add_manual_evidence(
         mime_type=None,
         document_status=None,
         at=at,
+        case_identity=case_identity,
     )
 
 
@@ -396,6 +409,7 @@ def run_tavily_investigation(
         adapter="tavily",
         query_plan=queries,
         at=at,
+        case_identity=observation,
     )
     detail = {"adapter": "tavily", "case_id": case_id, "query_count": len(queries)}
     fetch_count = 0
@@ -541,5 +555,6 @@ __all__ = [
     "TavilyLifecycleSearchAdapter",
     "add_manual_evidence",
     "build_lifecycle_query_plan",
+    "canonical_manual_https_url",
     "run_tavily_investigation",
 ]

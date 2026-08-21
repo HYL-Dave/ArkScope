@@ -265,6 +265,37 @@ class SecurityLifecycleInvestigationStore:
             return self._id_factory(prefix, ordinal)
         return f"{prefix}_{uuid.uuid4().hex}"
 
+    def _case_identity_for_write(
+        self,
+        case_id: str,
+        case_identity: Mapping[str, object] | None,
+    ) -> tuple[str, str, str] | None:
+        if case_identity is None:
+            self._case_row(case_id)
+            return None
+        source = _identity_value("source", case_identity.get("source"))
+        source_ref = _identity_value("source_ref", case_identity.get("source_ref"))
+        ticker = _identity_value("ticker", case_identity.get("ticker"))
+        if case_id_for(source, source_ref, ticker) != case_id:
+            raise ValueError("case_identity")
+        return source, source_ref, ticker
+
+    def _upsert_case_row(
+        self,
+        case_id: str,
+        identity: tuple[str, str, str],
+        *,
+        at: str,
+    ) -> None:
+        source, source_ref, ticker = identity
+        self.conn.execute(
+            "INSERT INTO security_lifecycle_cases "
+            "(case_id,source,source_ref,ticker,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?) "
+            "ON CONFLICT(case_id) DO UPDATE SET updated_at=excluded.updated_at",
+            (case_id, source, source_ref, ticker, at, at),
+        )
+
     def ensure_case(
         self,
         *,
@@ -279,13 +310,7 @@ class SecurityLifecycleInvestigationStore:
         ticker = _identity_value("ticker", ticker)
         case_id = case_id_for(source, source_ref, ticker)
         with self.conn:
-            self.conn.execute(
-                "INSERT INTO security_lifecycle_cases "
-                "(case_id,source,source_ref,ticker,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?) "
-                "ON CONFLICT(case_id) DO UPDATE SET updated_at=excluded.updated_at",
-                (case_id, source, source_ref, ticker, at, at),
-            )
+            self._upsert_case_row(case_id, (source, source_ref, ticker), at=at)
         return case_id
 
     def insert_legacy_assessment(
@@ -393,9 +418,10 @@ class SecurityLifecycleInvestigationStore:
         adapter: str,
         query_plan: Iterable[str],
         at: str,
+        case_identity: Mapping[str, object] | None = None,
     ) -> str:
         self._assert_write()
-        self._case_row(case_id)
+        identity = self._case_identity_for_write(case_id, case_identity)
         if trigger not in RUN_TRIGGERS:
             raise ValueError("trigger")
         if adapter not in RUN_ADAPTERS:
@@ -408,6 +434,8 @@ class SecurityLifecycleInvestigationStore:
             raise ValueError("query_count")
         run_id = self._new_id("slr")
         with self.conn:
+            if identity is not None:
+                self._upsert_case_row(case_id, identity, at=at)
             self.conn.execute(
                 "INSERT INTO security_lifecycle_investigation_runs "
                 "(run_id,case_id,trigger,adapter,status,query_plan_json,query_count,"
@@ -534,9 +562,10 @@ class SecurityLifecycleInvestigationStore:
         mime_type: str | None,
         document_status: str | None,
         at: str,
+        case_identity: Mapping[str, object] | None = None,
     ) -> str:
         self._assert_write()
-        self._case_row(case_id)
+        identity = self._case_identity_for_write(case_id, case_identity)
         if kind not in EVIDENCE_KINDS:
             raise ValueError("evidence_kind")
         if adapter not in RUN_ADAPTERS:
@@ -559,6 +588,8 @@ class SecurityLifecycleInvestigationStore:
             raise ValueError("source_url")
         evidence_id = self._new_id("sle")
         with self.conn:
+            if identity is not None:
+                self._upsert_case_row(case_id, identity, at=at)
             self.conn.execute(
                 "INSERT INTO security_lifecycle_evidence "
                 "(evidence_id,case_id,run_id,kind,source_url,title,publisher,domain,"
@@ -618,9 +649,10 @@ class SecurityLifecycleInvestigationStore:
         consideration_currency: str | None = None,
         cash_per_security_decimal: object = None,
         exchange_ratio_decimal: object = None,
+        case_identity: Mapping[str, object] | None = None,
     ) -> str:
         self._assert_write()
-        self._case_row(case_id)
+        identity = self._case_identity_for_write(case_id, case_identity)
         if relevance not in ASSESSMENT_RELEVANCE:
             raise ValueError("relevance")
         if confidence not in ASSESSMENT_CONFIDENCE:
@@ -675,6 +707,8 @@ class SecurityLifecycleInvestigationStore:
         )
         assessment_id = self._new_id("sla")
         with self.conn:
+            if identity is not None:
+                self._upsert_case_row(case_id, identity, at=at)
             self.conn.execute(
                 "INSERT INTO security_lifecycle_assessments "
                 "(assessment_id,case_id,revision,status,relevance,confidence,author,"
@@ -1223,7 +1257,7 @@ def _read_profile(
 
 def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dict:
     try:
-        observations = read_market_observations(market_db_path)
+        observations = read_market_observations(market_db_path, limit=None)
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("market") from None
     by_case: dict[str, dict] = {}

@@ -26,6 +26,7 @@ from src.security_lifecycle_investigation import (
 from src.security_lifecycle_search import (
     LifecycleSearchAdapter,
     add_manual_evidence,
+    canonical_manual_https_url,
     run_tavily_investigation,
 )
 from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
@@ -40,6 +41,30 @@ def _utc_now() -> str:
     )
 
 
+def _request_text(
+    value: str | None,
+    *,
+    name: str,
+    required: bool,
+) -> str | None:
+    if value is None:
+        if required:
+            raise ValueError(name)
+        return None
+    normalized = value.strip()
+    if "\0" in value or (required and not normalized):
+        raise ValueError(name)
+    return normalized or None
+
+
+def _case_identity(case: dict) -> dict[str, str]:
+    return {
+        "source": str(case["source"]),
+        "source_ref": str(case["source_ref"]),
+        "ticker": str(case["ticker"]),
+    }
+
+
 class InvestigationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,14 +77,25 @@ class ManualEvidenceRequest(BaseModel):
     text: str | None = Field(default=None, max_length=16000)
     url: str | None = Field(default=None, max_length=1000)
 
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value):
+        return _request_text(value, name="manual_text", required=value is not None)
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value):
+        if value is None:
+            return None
+        try:
+            return canonical_manual_https_url(value)
+        except ValueError as exc:
+            raise ValueError("manual_url") from exc
+
     @model_validator(mode="after")
     def validate_shape(self):
         if (self.text is None) == (self.url is None):
             raise ValueError("manual_evidence_shape")
-        if self.text is not None and not self.text.strip():
-            raise ValueError("manual_text")
-        if self.url is not None and not self.url.strip():
-            raise ValueError("manual_url")
         return self
 
 
@@ -69,6 +105,15 @@ class CitationRequest(BaseModel):
     reference_kind: Literal["observation", "evidence"]
     evidence_id: str | None = Field(default=None, max_length=80)
     cited_content_sha256: str | None = Field(default=None, max_length=64)
+
+    @field_validator("evidence_id")
+    @classmethod
+    def validate_evidence_id(cls, value):
+        return _request_text(
+            value,
+            name="citation",
+            required=value is not None,
+        )
 
     @model_validator(mode="after")
     def validate_reference_shape(self):
@@ -119,6 +164,21 @@ class AssessmentRequest(BaseModel):
     cash_per_security_decimal: str | None = Field(default=None, max_length=128)
     exchange_ratio_decimal: str | None = Field(default=None, max_length=128)
 
+    @field_validator("conclusion", "impact_summary")
+    @classmethod
+    def validate_required_text(cls, value, info):
+        return _request_text(value, name=info.field_name, required=True)
+
+    @field_validator(
+        "counterparty_name",
+        "counterparty_ticker",
+        "successor_ticker",
+        "destination_venue",
+    )
+    @classmethod
+    def validate_optional_text(cls, value, info):
+        return _request_text(value, name=info.field_name, required=False)
+
     @field_validator("counterparty_cik")
     @classmethod
     def validate_counterparty_cik(cls, value):
@@ -168,6 +228,11 @@ class AcknowledgementRequest(BaseModel):
 
     reason: Literal["evidence_insufficient"]
     note: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("note")
+    @classmethod
+    def validate_note(cls, value):
+        return _request_text(value, name="note", required=False)
 
 
 def _store_error(exc: LifecycleStoreUnavailable) -> HTTPException:
@@ -298,11 +363,15 @@ def investigate_case(
 def create_manual_evidence(
     case_id: str,
     body: ManualEvidenceRequest,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
     store: SecurityLifecycleInvestigationStore = Depends(
         get_security_lifecycle_store
     ),
 ):
     try:
+        case = service.get_case(case_id)
         require_db_write("security_lifecycle_add_evidence", {"case_id": case_id})
         evidence_id = add_manual_evidence(
             store=store,
@@ -310,8 +379,11 @@ def create_manual_evidence(
             text=body.text,
             url=body.url,
             at=_utc_now(),
+            case_identity=_case_identity(case),
         )
         return {"evidence_id": evidence_id}
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
     except KeyError as exc:
         raise _not_found(exc) from None
     except (LifecycleWritesUnavailable, ValueError) as exc:
@@ -344,6 +416,7 @@ def create_assessment(
             citations=citations,
             observation_fingerprint_sha256=fingerprint,
             at=_utc_now(),
+            case_identity=_case_identity(case),
             **values,
         )
         return {"assessment_id": assessment_id}

@@ -240,13 +240,16 @@ class SecurityLifecycleStore:
             raise KeyError("observation_not_found")
         return _row_to_observation(self.conn, row)
 
-    def list_observations(self, *, limit: int = 1000) -> list[dict]:
-        bounded = min(max(int(limit), 1), 1000)
-        rows = self.conn.execute(
+    def list_observations(self, *, limit: int | None = 1000) -> list[dict]:
+        sql = (
             "SELECT * FROM security_lifecycle_observations "
-            "ORDER BY filing_date DESC, source, source_ref, ticker LIMIT ?",
-            (bounded,),
-        ).fetchall()
+            "ORDER BY filing_date DESC, source, source_ref, ticker"
+        )
+        if limit is None:
+            rows = self.conn.execute(sql).fetchall()
+        else:
+            bounded = min(max(int(limit), 1), 1000)
+            rows = self.conn.execute(f"{sql} LIMIT ?", (bounded,)).fetchall()
         return [_row_to_observation(self.conn, row) for row in rows]
 
 
@@ -266,7 +269,11 @@ def _row_to_observation(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
     return item
 
 
-def read_market_observations(db_path: str, *, limit: int = 1000) -> list[dict]:
+def read_market_observations(
+    db_path: str,
+    *,
+    limit: int | None = 1000,
+) -> list[dict]:
     """Read observation facts without creating or repairing a database."""
     path = Path(db_path)
     if not path.is_file():
