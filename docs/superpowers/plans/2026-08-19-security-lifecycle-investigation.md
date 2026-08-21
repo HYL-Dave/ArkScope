@@ -1444,11 +1444,23 @@ records preimage SHA, applies one bounded patch, proves the exact owner RED,
 restores bytes, proves preimage==postimage, and reruns the owner GREEN. A failed
 or overbroad mutation is retained as rejected evidence and does not count.
 
+The 2026-08-21 M1 owner correction is B-class. Preflight proved that appending a
+representative `event_type` to the case-ID hash bytes fails
+`test_case_id_rejects_embedded_nul_and_hashes_literal_provider_identity`, while
+the former owner
+`test_observation_upsert_reconciles_many_kinds_without_changing_case_identity`
+remains green because both of its `case_id_for(source, source_ref, ticker)` calls
+have identical inputs. The former owner still protects observation-kind
+reconciliation, but it cannot own the literal case-ID byte contract. This
+correction changes only the required M1 RED owner; it changes no product/test
+byte, test ID, mutation count, path/node/route/tool ledger, collection/focused
+identity, protected path, or Task 5 admission target.
+
 ### 7.1 Required mutations
 
 | ID | Mutation | Required RED owner |
 |---|---|---|
-| M1 | put `event_type` back into case-ID bytes | `test_observation_upsert_reconciles_many_kinds_without_changing_case_identity` |
+| M1 | put `event_type` back into case-ID bytes | `test_case_id_rejects_embedded_nul_and_hashes_literal_provider_identity` |
 | M2 | drop one CCL kind/date during collapse | `test_migration_preserves_every_source_field_kind_date_and_old_row_mapping` |
 | M3 | allow a non-empty relationship table | `test_migration_rejects_nonempty_relationship_table_before_either_store_changes` |
 | M4 | allow writes with incomplete receipt | `test_incomplete_receipt_blocks_all_lifecycle_writes` |
