@@ -124,6 +124,20 @@ def test_adapter_failure_is_typed_and_keeps_prior_evidence(tmp_path):
         with pytest.raises(LifecycleSearchFailure, match=failure_code):
             client.search(query="issuer event", max_results=5)
 
+    redirect_request = {}
+
+    def redirect_transport(**kwargs):
+        redirect_request.update(kwargs)
+        return Response(302)
+
+    redirect_client = _LifecycleTavilyClient(
+        api_key_loader=lambda: "test-key",
+        transport=redirect_transport,
+    )
+    with pytest.raises(LifecycleSearchFailure, match="unsupported_content"):
+        redirect_client.search(query="issuer event", max_results=5)
+    assert redirect_request["allow_redirects"] is False
+
     conn, store, case_id, observation = _context(tmp_path)
     try:
         add_manual_evidence(
@@ -338,6 +352,9 @@ def test_normalization_drops_provider_answers_scores_scripts_and_raw_bodies(tmp_
     assert _normalize_source_published_at(
         "2026-08-19T08:30:45.120+08:00"
     ) == "2026-08-19T00:30:45.120Z"
+    assert _normalize_source_published_at(
+        "2026-08-19T08:30:45.123456789+08:00"
+    ) == "2026-08-19T00:30:45.123456789Z"
     assert _normalize_source_published_at("yesterday") is None
 
     conn, store, case_id, observation = _context(tmp_path)

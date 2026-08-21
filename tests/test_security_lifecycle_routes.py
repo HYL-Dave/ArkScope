@@ -28,7 +28,12 @@ class _SearchAdapter:
         return None
 
 
-def _build_context(tmp_path, *, with_observation=True):
+def _build_context(
+    tmp_path,
+    *,
+    with_observation=True,
+    materialize_profile_case=True,
+):
     from src.security_lifecycle import (
         LifecycleObservation,
         ObservationKind,
@@ -36,6 +41,7 @@ def _build_context(tmp_path, *, with_observation=True):
     )
     from src.security_lifecycle_investigation import (
         SecurityLifecycleInvestigationStore,
+        case_id_for,
         observation_fingerprint,
     )
     from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
@@ -73,12 +79,15 @@ def _build_context(tmp_path, *, with_observation=True):
         profile_conn,
         id_factory=lambda prefix, ordinal: f"{prefix}_{ordinal:04d}",
     )
-    case_id = profile_store.ensure_case(
-        source="sec_edgar",
-        source_ref=_SOURCE_REF,
-        ticker="EA",
-        at=_AT,
-    )
+    if materialize_profile_case:
+        case_id = profile_store.ensure_case(
+            source="sec_edgar",
+            source_ref=_SOURCE_REF,
+            ticker="EA",
+            at=_AT,
+        )
+    else:
+        case_id = case_id_for("sec_edgar", _SOURCE_REF, "EA")
     fingerprint = observation_fingerprint(observation) if observation else ""
     service = SecurityLifecycleReadService(
         market_db_path=str(market_path),
@@ -277,12 +286,42 @@ def test_case_list_composes_both_stores_in_stable_order_without_read_side_writes
             hashlib.sha256(context["profile_path"].read_bytes()).hexdigest(),
         )
         assert after == before
+
+        from src.security_lifecycle import (
+            LifecycleObservation,
+            ObservationKind,
+            SecurityLifecycleStore,
+        )
+
+        market = sqlite3.connect(context["market_path"])
+        market_store = SecurityLifecycleStore(market)
+        for index in range(1000):
+            market_store.upsert_observation(
+                LifecycleObservation(
+                    ticker=f"Z{index:04d}",
+                    cik=f"{index:010d}",
+                    issuer_name=f"Newer issuer {index}",
+                    filing_date="2026-08-05",
+                    source="bulk_fixture",
+                    source_ref=f"bulk-{index:04d}",
+                    filing_form="8-K",
+                    filing_items=("3.01",),
+                    evidence_url=f"https://example.com/filing/{index}",
+                    description="Newer listing observation.",
+                    observed_at=_AT,
+                    kinds=(ObservationKind("listing_status_review", None),),
+                )
+            )
+        market.close()
+        original = context["service"].get_case(context["case_id"])
+        assert original["source_presence"] == "present"
+        assert original["observation"]["source_ref"] == _SOURCE_REF
     finally:
         context["profile_conn"].close()
 
 
 def test_case_write_routes_call_db_write_before_persistence(tmp_path, monkeypatch):
-    context = _build_context(tmp_path)
+    context = _build_context(tmp_path, materialize_profile_case=False)
     calls: list[str] = []
 
     def permission(action, _detail):
@@ -290,7 +329,13 @@ def test_case_write_routes_call_db_write_before_persistence(tmp_path, monkeypatc
 
     try:
         client, _ = _client(context, monkeypatch, permissions=permission)
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 0
         evidence_id = _add_manual(client, context["case_id"])
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 1
         assessment_id = _create_draft(client, context, evidence_id)
         accepted = client.post(
             f"/security-lifecycle/assessments/{assessment_id}/accept"
@@ -354,17 +399,22 @@ def test_dismiss_proposal_route_does_not_apply_any_profile_action(tmp_path, monk
 
 
 def test_investigation_route_requires_one_explicit_attended_command(tmp_path, monkeypatch):
-    context = _build_context(tmp_path)
+    context = _build_context(tmp_path, materialize_profile_case=False)
     try:
         adapter = _SearchAdapter()
         client, _ = _client(context, monkeypatch, adapter=adapter)
-        assert context["store"].list_investigation_runs(context["case_id"]) == []
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 0
         response = client.post(
             f"/security-lifecycle/cases/{context['case_id']}/investigations",
             json={"adapter": "tavily"},
         )
         assert response.status_code == 200
         assert response.json()["trigger"] == "attended_user"
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 1
         assert len(context["store"].list_investigation_runs(context["case_id"])) == 1
         assert len(adapter.search_calls) in {2, 3}
     finally:
@@ -404,8 +454,16 @@ def test_manual_evidence_route_adds_url_or_text_without_network_access(tmp_path,
                 f"/security-lifecycle/cases/{context['case_id']}/evidence",
                 json={"text": "text", "url": "https://example.com/issuer"},
             ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/evidence",
+                json={"text": None, "url": "http://example.com/issuer"},
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/evidence",
+                json={"text": "contains\u0000nul", "url": None},
+            ),
         ]
-        assert [item.status_code for item in invalid] == [422, 422]
+        assert [item.status_code for item in invalid] == [422, 422, 422, 422]
         assert permission_calls == [
             "security_lifecycle_add_evidence",
             "security_lifecycle_add_evidence",
@@ -478,6 +536,30 @@ def test_route_failure_is_typed_and_never_falls_back_to_one_store(tmp_path, monk
     )
     assert not missing_profile.exists()
 
+    manual_root = tmp_path / "manual-store-outage"
+    manual_root.mkdir()
+    context = _build_context(manual_root)
+    permission_calls = []
+    try:
+        context["market_path"].unlink()
+        client, _ = _client(
+            context,
+            monkeypatch,
+            permissions=lambda action, _detail: permission_calls.append(action),
+        )
+        manual = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/evidence",
+            json={"text": "Issuer statement.", "url": None},
+        )
+        assert manual.status_code == 503
+        assert manual.json()["detail"] == {
+            "code": "security_lifecycle_market_store_unavailable",
+            "store": "market",
+        }
+        assert permission_calls == []
+    finally:
+        context["profile_conn"].close()
+
 
 def test_route_writes_do_not_mutate_universe_portfolio_sa_or_market_history(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
@@ -542,6 +624,12 @@ def test_source_missing_case_detail_remains_queryable(tmp_path, monkeypatch):
         assert [item["case_id"] for item in integrity.json()["cases"]] == [
             context["case_id"]
         ]
+        manual = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/evidence",
+            json={"text": "Manual data-integrity note.", "url": None},
+        )
+        assert manual.status_code == 200
+        assert permission_calls == ["security_lifecycle_add_evidence"]
 
         attempts = [
             client.post(
@@ -573,13 +661,13 @@ def test_source_missing_case_detail_remains_queryable(tmp_path, monkeypatch):
         assert {
             item.json()["detail"]["code"] for item in attempts
         } == {"source_observation_missing"}
-        assert permission_calls == []
+        assert permission_calls == ["security_lifecycle_add_evidence"]
     finally:
         context["profile_conn"].close()
 
 
 def test_unknown_or_conflicting_assessment_payload_is_rejected_before_write(tmp_path, monkeypatch):
-    context = _build_context(tmp_path)
+    context = _build_context(tmp_path, materialize_profile_case=False)
     permission_calls: list[str] = []
     try:
         client, _ = _client(
@@ -659,6 +747,22 @@ def test_unknown_or_conflicting_assessment_payload_is_rejected_before_write(tmp_
                     ],
                 },
             ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["listing_ended"],
+                    "conclusion": "   ",
+                },
+            ),
+            client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/assessments",
+                json={
+                    **base,
+                    "outcomes": ["listing_ended"],
+                    "impact_summary": "contains\u0000nul",
+                },
+            ),
         ]
         assert {
             unknown.status_code,
@@ -668,6 +772,38 @@ def test_unknown_or_conflicting_assessment_payload_is_rejected_before_write(tmp_
         } == {422}
         assert context["store"].list_assessments(context["case_id"]) == []
         assert permission_calls == []
+
+        missing_evidence = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/assessments",
+            json={
+                **base,
+                "outcomes": ["listing_ended"],
+                "citations": [
+                    *base["citations"],
+                    {
+                        "reference_kind": "evidence",
+                        "evidence_id": "sle_missing",
+                    },
+                ],
+            },
+        )
+        assert missing_evidence.status_code == 422
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 0
+
+        valid = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/assessments",
+            json={**base, "outcomes": ["listing_ended"]},
+        )
+        assert valid.status_code == 200
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 1
+        assert permission_calls == [
+            "security_lifecycle_create_assessment",
+            "security_lifecycle_create_assessment",
+        ]
         source = inspect.getsource(
             __import__(
                 "src.api.routes.security_lifecycle",

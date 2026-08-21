@@ -278,6 +278,8 @@ def test_tool_reads_never_write_or_generate_action_proposals(tmp_path, monkeypat
 
 
 def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_path, monkeypatch):
+    from src.tools.security_lifecycle_tools import _provider_neutral_case
+
     market_path, profile_path, profile, store, case_id = _databases(tmp_path)
     try:
         run_id = store.create_investigation_run(
@@ -327,5 +329,60 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
         assert "usage_json" not in rendered
         assert "query_plan_json" not in rendered
         assert "api_key" not in rendered
+
+        ascending = list(range(25))
+        newest_first = list(reversed(ascending))
+        synthetic = _provider_neutral_case(
+            {
+                "investigation_runs": [
+                    {
+                        "run_id": f"run-{index:02d}",
+                        "created_at": f"2026-08-20T00:{index:02d}:00Z",
+                        "adapter": "tavily",
+                    }
+                    for index in newest_first
+                ],
+                "evidence": [
+                    {
+                        "evidence_id": f"evidence-{index:02d}",
+                        "created_at": f"2026-08-20T00:{index:02d}:00Z",
+                        "excerpt": "evidence",
+                    }
+                    for index in ascending
+                ],
+                "assessment_history": [
+                    {
+                        "assessment_id": f"assessment-{index:02d}",
+                        "created_at": f"2026-08-20T00:{index:02d}:00Z",
+                    }
+                    for index in newest_first
+                ],
+                "acknowledgement_history": [
+                    {
+                        "acknowledgement_id": f"acknowledgement-{index:02d}",
+                        "acknowledged_at": f"2026-08-20T00:{index:02d}:00Z",
+                    }
+                    for index in newest_first
+                ],
+                "proposals": [
+                    {
+                        "proposal_id": f"proposal-{index:02d}",
+                        "created_at": f"2026-08-20T00:{index:02d}:00Z",
+                    }
+                    for index in ascending
+                ],
+            }
+        )
+        for collection, id_field in (
+            ("investigation_runs", "run_id"),
+            ("evidence", "evidence_id"),
+            ("assessment_history", "assessment_id"),
+            ("acknowledgement_history", "acknowledgement_id"),
+            ("proposals", "proposal_id"),
+        ):
+            assert [row[id_field] for row in synthetic[collection]] == [
+                f"{id_field.removesuffix('_id')}-{index:02d}"
+                for index in range(5, 25)
+            ]
     finally:
         profile.close()
