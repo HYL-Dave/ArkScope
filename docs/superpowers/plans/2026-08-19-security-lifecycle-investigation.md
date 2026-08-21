@@ -1479,10 +1479,13 @@ replayed all 535 backend owners, and restored each preimage byte-for-byte:
   composition, source reattachment, HTTP detail, and local-tool detail owners;
   all four are independent public projections of the same source-missing
   history contract.
-- M8 makes `succeed_investigation_run(result_count=0, ...)` record a failed run.
-  It fails the run-state vocabulary, inconclusive acknowledgement, search
-  orchestration, and provider-neutral tool-detail owners; each independently
-  requires a successful zero-result run.
+- M8 makes `succeed_investigation_run(result_count=0, ...)` return
+  `fail_investigation_run(..., failure_code="extract_failed", usage=usage,
+  fetch_count=fetch_count, at=at)` before writing the success row. It does not
+  mutate the orchestrator or add a failure code. It fails the run-state
+  vocabulary, inconclusive acknowledgement, search orchestration, and
+  provider-neutral tool-detail owners; each independently requires a successful
+  zero-result run.
 - M14 remounts `GET /market-data/security-lifecycle`. It fails the local-runtime
   180-route census, the exact lifecycle route surface, and the dedicated legacy
   route absence owner.
@@ -1506,7 +1509,7 @@ protected path, or Task 5 admission target.
 | M5 | hide profile history when source row is absent | `test_read_composition_keeps_profile_history_visible_when_source_is_missing`, `test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content`, `test_source_missing_case_detail_remains_queryable`, and `test_detail_tool_is_local_read_only_and_returns_source_missing_history` |
 | M6 | include `last_observed_at` in source fingerprint | `test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content` |
 | M7 | allow failed-only acknowledgement | `test_failed_run_alone_cannot_acknowledge_a_case` |
-| M8 | classify zero results as failed | `test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary`, `test_successful_zero_result_run_can_support_inconclusive_acknowledgement`, `test_successful_zero_result_search_is_succeeded_not_failed`, and `test_tools_return_observation_and_profile_facts_without_provider_fields` |
+| M8 | in `succeed_investigation_run`, route `result_count == 0` through `fail_investigation_run` with existing code `extract_failed` while preserving `usage`, `fetch_count`, and `at` | `test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary`, `test_successful_zero_result_run_can_support_inconclusive_acknowledgement`, `test_successful_zero_result_search_is_succeeded_not_failed`, and `test_tools_return_observation_and_profile_facts_without_provider_fields` |
 | M9 | remove one pre-egress permission call | `test_search_calls_external_and_metered_permissions_before_egress` |
 | M10 | let adapter output create a proposal | `test_adapter_output_cannot_write_an_assessment_or_proposal` |
 | M11 | allow a private/redirect URL | `test_unsafe_local_private_and_redirect_urls_are_rejected` |
