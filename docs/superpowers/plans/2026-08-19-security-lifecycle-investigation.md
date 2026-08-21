@@ -1292,10 +1292,8 @@ the original `20 T4 rows` and the required `1,201/1,201` gate were mutually
 inconsistent. This amendment adds exactly those two base-pinned test owners and
 exactly the four retained node bodies to the evolved ledger. It changes no test
 ID, route, DTO, product capability, dependency, protected byte, or collection/
-focused identity. The final resource inventory is mechanically derived as
-Explore `461`, Settings `796`, and all reviewed namespaces `1,960` leaves per
-locale. The revised Settings directory expectation replaces only the retired
-review surface label with the lifecycle health/handoff owner.
+focused identity. The revised Settings directory expectation replaces only the
+retired review surface label with the lifecycle health/handoff owner.
 
 Before the implementation commit, apply those four test-body changes to the
 pre-T4 product bytes and require exactly four failures for the four newly
@@ -1303,6 +1301,36 @@ listed `must_fail` owners. Then replay them against the implementation tip and
 require four passes before rerunning the full sequential suite. The rejected
 full-suite run is diagnostic only; its five failures are not admission
 evidence.
+
+The 2026-08-21 visible-copy closure amendment is B-class. Replaying the newly
+owned resource tests exposed the already owned global visible-literal scanner:
+after replacing the first dynamic confidence key, it found the dynamic outcome
+key and then the hard-coded bilingual maps in `lifecyclePresentation.ts`.
+Hiding those strings behind a different runtime object would satisfy neither
+the scanner nor the Task 4 bilingual-resource contract. Move the complete
+bounded copy surface into the existing English and Traditional Chinese Explore
+resource owners:
+
+- five workflow-state labels;
+- one additional source-presence label beside the existing source-missing
+  label;
+- six proposal labels;
+- four investigation-run status labels;
+- one acknowledgement-reason label; and
+- five typed/fallback error messages.
+
+This is exactly 22 additional Explore leaves. Final resource inventory is
+therefore Explore `483`, Settings `796`, lifecycle subtree `99`, and all
+reviewed namespaces `1,982` leaves per locale. Presentation functions keep
+their existing signatures and outputs but select only bundled resource values;
+`LifecycleView` uses the same proposal/run/acknowledgement resources and does
+not expose raw enum identifiers as UI copy. Compose provider-owned drawer title
+parts structurally and render revalidation/run separators structurally rather
+than adding source-content allowlist debt. No allowlist, scanner, test ID,
+route, DTO, capability, dependency, path ledger, protected byte, or collection/
+focused identity changes. The four-node RED from the preceding amendment
+remains valid because all four failures occurred before these product/resource
+changes.
 
 **Owned files:** exactly the 22 T4 rows.
 
