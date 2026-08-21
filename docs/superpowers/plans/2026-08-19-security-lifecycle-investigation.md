@@ -1516,6 +1516,21 @@ collection/focused identity, protected path, or Task 5 admission target. The
 false-GREEN and diagnostic RED remain in the Task 5 packet; Task 5 is paused
 until this amendment receives focused review.
 
+The 2026-08-21 M9 owner-set correction is B-class. The literal mutation removes
+only the `PermissionClass.metered_spend` call from
+`run_tavily_investigation`, preserving `external_web_access`, DB-write
+authorization, and transport behavior. A complete 535-node replay produced
+exactly `2 failed / 533 passed`: the dedicated permission-order owner and
+`test_case_write_routes_call_db_write_before_persistence`, whose route-level
+contract independently requires all three investigation permission calls. The
+source file was restored byte-for-byte and both owners passed afterward, with
+zero socket attempts in both runs. This correction changes only M9's uniquely
+specified mutation and complete required owner set; it changes no product/test
+byte, test ID, mutation count, path/node/route/tool ledger, collection/focused
+identity, protected path, or Task 5 admission target. The incomplete-owner run
+remains rejected evidence; Task 5 is paused until this amendment receives
+focused review.
+
 ### 7.1 Required mutations
 
 | ID | Mutation | Required RED owner |
@@ -1528,7 +1543,7 @@ until this amendment receives focused review.
 | M6 | include `last_observed_at` in source fingerprint | `test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content` |
 | M7 | allow failed-only acknowledgement | `test_failed_run_alone_cannot_acknowledge_a_case` |
 | M8 | in `succeed_investigation_run`, route `result_count == 0` through `fail_investigation_run` with existing code `extract_failed` while preserving `usage`, `fetch_count`, and `at` | `test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary`, `test_successful_zero_result_run_can_support_inconclusive_acknowledgement`, `test_successful_zero_result_search_is_succeeded_not_failed`, and `test_tools_return_observation_and_profile_facts_without_provider_fields` |
-| M9 | remove one pre-egress permission call | `test_search_calls_external_and_metered_permissions_before_egress` |
+| M9 | remove only the `PermissionClass.metered_spend` call from `run_tavily_investigation`, preserving the other permission calls and transport | `test_search_calls_external_and_metered_permissions_before_egress` and `test_case_write_routes_call_db_write_before_persistence` |
 | M10 | let adapter output create a proposal | `test_adapter_output_cannot_write_an_assessment_or_proposal` |
 | M11 | allow a private/redirect URL | `test_unsafe_local_private_and_redirect_urls_are_rejected` |
 | M12 | allow hide/remap with open position | `test_open_portfolio_position_blocks_hide_and_remap_proposals` |
