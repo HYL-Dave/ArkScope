@@ -1498,6 +1498,24 @@ those three required RED owner sets; it changes no product/test byte, test ID,
 mutation count, path/node/route/tool ledger, collection/focused identity,
 protected path, or Task 5 admission target.
 
+The 2026-08-21 M6 owner-fixture correction is B-class. Applying the literal M6
+field-tuple mutation to the reviewed test bytes produced `535 passed`: the
+named reattachment owner deleted and restored an observation with the same
+`observed_at`, while its later timestamp change also changed `description` and
+therefore could not isolate timestamp stability. A diagnostic replay changed
+only the identical-content reattachment to a later `observed_at`; the same M6
+mutation then failed exactly
+`test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content`
+with zero socket attempts. After focused review, evolve only that already-added
+node body so identical source content is re-observed at
+`2026-08-06T00:00:00Z` before the existing independent content-change case at
+`2026-08-07T00:00:00Z`. The unmutated product must keep the former assessment
+current; M6 must make only that owner stale. This correction adds no node,
+changes no node ID, mutation count, product byte, path/route/tool ledger,
+collection/focused identity, protected path, or Task 5 admission target. The
+false-GREEN and diagnostic RED remain in the Task 5 packet; Task 5 is paused
+until this amendment receives focused review.
+
 ### 7.1 Required mutations
 
 | ID | Mutation | Required RED owner |
