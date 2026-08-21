@@ -50,3 +50,7 @@ T4	src/SettingsWorkspace.test.tsx::Settings workspace > shows_only_the_active_gr
 T4	src/i18n/resources.test.ts::bundled i18n resources > contains the exact Explore subtree inventory in both locales	Lifecycle workflow adds the reviewed Explore subtree	must_fail
 T4	src/i18n/resources.test.ts::bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales	Lifecycle handoff moves copy from Settings to Explore	must_fail
 T4	src/i18n/resources.test.ts::bundled i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move	Retired Settings lifecycle review keys leave the inventory	must_fail
+T4	src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow > requires cited evidence before accepting a conclusive assessment	UI must bind the current provider-observation fingerprint, not create an evidence-only dead-end draft	must_fail
+T4	tests/test_security_lifecycle_routes.py::test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal	case detail exposes the current observation fingerprint needed for an explicit citation	must_fail
+T4	tests/test_security_lifecycle_routes.py::test_case_list_composes_both_stores_in_stable_order_without_read_side_writes	list count reports all filtered cases independently of the bounded returned page	must_fail
+T4	tests/test_security_lifecycle_tools.py::test_list_tool_is_local_read_only_and_stably_sorted	local list count reports all filtered cases independently of the bounded returned page	must_fail

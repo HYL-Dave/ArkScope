@@ -7,6 +7,8 @@
 > TASK 2 COMPLETE; TASK 3 BRIDGE-OWNERSHIP AMENDMENT GREEN; 2026-08-21
 > SOURCE/TIME/INTEGRITY AMENDMENT USER-AUTHORIZED; TASK 3 INDEPENDENT-REVIEW
 > AMENDMENT USER-AUTHORIZED AND UNDER EXECUTOR REVIEW;
+> TASK 4 CITATION/COUNT SEAM AMENDMENT AWAITS FOCUSED REVIEW; TASK 4 PRODUCT
+> BYTES REMAIN UNCOMMITTED;
 > TASKS 1-3 ARE
 > NON-DEPLOYABLE STAGING UNTIL TASK 4 COMPLETES THE ROUTE/CONSUMER CUTOVER; LIVE
 > MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
@@ -157,8 +159,8 @@ scope from prose.
 | `...-backend-additions.nodes` | 83 | `a99d98fee39c1a598d35b7b04cb5b7e7daabfb71019ec9a20a1712bfb113ad1c` |
 | `...-frontend-removals.nodes` | 2 | `55e24459805b139ee6f2db3db3684c0eb4c3641c26e4e6fe522df0276dc75899` |
 | `...-frontend-additions.nodes` | 26 | `52d3c8b268d3b2141fd6bcc26708c99c54d5932904140c9970683838d1f8cf7f` |
-| `...-evolved-owners.tsv` | 51 data rows | `db7926795fe78b02b717117cae7a6d67fc4c3853c498462d3842d7ad28643c07` |
-| `...-owned-paths.tsv` | 57 data rows | `bd3aac8556dfe594471f95c105b744a046762e768d6aff903ab5e47f81265bbc` |
+| `...-evolved-owners.tsv` | 55 data rows | `c9e4b4aedd7426586348d34688adc851e7499084919b9a5582d8355749077534` |
+| `...-owned-paths.tsv` | 57 data rows | `ba8361a38f69247af4d6a327f2253c8a3d2007f91fa015f2009a8507683d4e77` |
 | `...-focused-paths.tsv` | 25 data rows | `7be852db3dc34bf7c2fcfaf2a77bb72c758434e9e45e6e2d56281a88f238ee72` |
 | `...-protected.paths` | 24 | `4d037a50c97365484e59637484b3c903dd6ac0077250f2147df5ffa672b91faa` |
 | `...-route-removals.tsv` | 3 | `945f0ba83efa557dd9169743f0e5724ebfad5e22c8f061c11d98181dcc1a081f` |
@@ -1338,7 +1340,38 @@ allowed consequence. Then add the 22 leaves and require all four owners to
 pass; requiring the resource-count owners to remain red after those leaves
 exist would contradict their contract.
 
-**Owned files:** exactly the 22 T4 rows.
+The 2026-08-21 Task 4 citation/count seam amendment is B-class. Final
+self-review found two cross-stage contract failures that the focused UI mocks
+could not expose:
+
+1. the Settings health panel requests `limit=1` and displays `count`, while the
+   Task 3 read service currently defines `count` as the number of returned
+   rows. A nonempty production store therefore displays one present-source case
+   instead of the complete filtered count; and
+2. the Task 4 assessment form can emit only evidence citations, while Task 3
+   acceptance correctly requires a citation bound to the current provider-
+   observation fingerprint. No successful UI path to an accepted assessment
+   exists because case detail does not expose that fingerprint.
+
+Keep list payloads bounded, but define `count` as the full filtered count before
+the page limit. Add the current `observation_fingerprint_sha256` to present-
+source case detail only; source-missing detail returns null. The UI must require
+the user to select that current observation, submit its exact fingerprint as an
+`observation` citation, and may add same-case evidence citations as additional
+corroboration. Do not synthesize the citation server-side, compute a duplicate
+frontend fingerprint algorithm, weaken acceptance, or make evidence replace the
+observation anchor.
+
+This amendment adds T4 phase ownership to exactly three existing T3 paths and
+evolves exactly four already existing test nodes. It changes no path row count,
+test ID, route, tool, schema table, resource leaf, dependency, provider,
+permission, protected byte, collection identity, or focused identity. Before
+the fix, require those four evolved owners to fail against the current Task 4
+implementation bytes for the stated reasons and all other 535 backend and 75
+frontend focused owners to retain their prior result. After the fix, require
+all four to pass and replay both focused suites.
+
+**Owned files:** exactly the 25 T4 rows.
 
 ### 6.1 RED commit
 
@@ -1452,7 +1485,7 @@ to explain why the owner was not independent.
 4. Verify all 57 owned paths have the declared final action and every changed
    product/test/catalog path is owned. Verify all 24 protected paths and
    aggregate.
-5. AST-scan retained test bodies: changes equal the 51 evolved-owner rows and no
+5. AST-scan retained test bodies: changes equal the 55 evolved-owner rows and no
    others. Module-level fixture edits remain inside the named test files and
    contain no new test ID.
 6. Scan product and UI for retired routes, relationship API/table ownership,
@@ -1496,7 +1529,7 @@ The reviewer independently reconstructs, without using executor generators as
 primary evidence:
 
 1. base and final backend/frontend streams and all staged/focused identities;
-2. node removals/additions, all 47 evolved owners, and path ownership;
+2. node removals/additions, all 55 evolved owners, and path ownership;
 3. market/profile schemas, closed vocabularies, and no-create verifiers;
 4. 37-row mapping, 36/37 output, CCL multi-kind survival, four legacy reviews,
    relationship hard stop, interruption/resume, and coordinated restore;
@@ -1627,7 +1660,7 @@ Stop before commit and issue a bounded amendment when any condition holds:
    active-universe owner, generic cache/registry, or shared UI controls.
 6. More than the exact 14 backend or 2 frontend IDs must retire, more than the
    exact 83/26 IDs must be added, or a new truthful replacement is needed.
-7. A retained test body outside the 47-row evolved ledger must change.
+7. A retained test body outside the 55-row evolved ledger must change.
 8. A legacy row cannot map literally, CCL core fields conflict, same-kind
    payloads conflict, a review value is unknown, or any identity contains NUL.
 9. The relationship table is non-empty in the migration input.
@@ -1731,7 +1764,7 @@ scheduler tick, or database resolver.
 Independent review must rebuild, from literal rows and design text rather than
 executor tools:
 
-1. the nine non-evolution ledgers plus the 47-row evolved-owner ledger and
+1. the nine non-evolution ledgers plus the 55-row evolved-owner ledger and
    every SHA/count;
 2. base/staged/final full and focused identities, including T1's corrected
    24-owner evolution and RED arithmetic;

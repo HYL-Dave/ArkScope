@@ -37,7 +37,7 @@ src/security_lifecycle_migration.py	T1	add	0	ABSENT
 src/security_lifecycle_schema.py	T1	add	0	ABSENT
 src/security_lifecycle_search.py	T2	add	0	ABSENT
 src/tools/registry.py	T3	modify	1249	99f28fcd5aef06f4e49719d7dfa0d26b2128d7f3f2ff0805b1f24f5813167b36
-src/tools/security_lifecycle_tools.py	T3	add	0	ABSENT
+src/tools/security_lifecycle_tools.py	T3/T4	add	0	ABSENT
 tests/fixtures/security_lifecycle_legacy_37.json	T1	add	0	ABSENT
 tests/test_agents.py	T3	modify	635	1fd9d6adb6a2ed1a5dfa2e75d06c8f88c873074428717545bcf58cc8193d090e
 tests/test_analyst_tools.py	T3	modify	309	09f69a4b9b67ae4ebb0e19ca3cfb490e1b6b5f67ea8c35f6d96d704a917d43dd
@@ -51,8 +51,8 @@ tests/test_sec_tools.py	T3	modify	172	043539a1d29af22f653cbbe07cca58fd7a0a920edf
 tests/test_security_lifecycle.py	T1	modify	450	ad06dfcd40e4d563d9ccb46bc5937fe97cc4c3eede83cc3017714593cefcfd16
 tests/test_security_lifecycle_investigation.py	T2	add	0	ABSENT
 tests/test_security_lifecycle_migration.py	T1	add	0	ABSENT
-tests/test_security_lifecycle_routes.py	T3	add	0	ABSENT
+tests/test_security_lifecycle_routes.py	T3/T4	add	0	ABSENT
 tests/test_security_lifecycle_schema.py	T1	add	0	ABSENT
 tests/test_security_lifecycle_search.py	T2	add	0	ABSENT
-tests/test_security_lifecycle_tools.py	T3	add	0	ABSENT
+tests/test_security_lifecycle_tools.py	T3/T4	add	0	ABSENT
 tests/test_tools.py	T3	modify	450	1d283276b3f0018053d3de54491053ea8af7e3fce3601a7eaa3b0613b83868c0
