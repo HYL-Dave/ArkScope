@@ -733,13 +733,13 @@ const settings = {
       financialCache: "{{value}} 列（有效 {{count}} · 過期 {{expiredCount}}）· 最新抓取 {{timestamp}}",
     },
     lifecycle: {
-      title: "標的生命週期調查",
-      description: "顯示全部標的生命週期工作流所使用的本地案件與證據儲存健康狀態。",
+      title: "標的事件調查",
+      description: "顯示全部標的事件調查所使用的本地案件與證據儲存健康狀態。",
       handoff: "調查、判定與處置建議由「全部標的」負責。",
       openWorkflow: "前往全部標的調查",
       summary: {
-        activeCases: "來源存在案件",
-        sourceMissing: "來源缺失案件",
+        activeCases: "原始觀察可用案件",
+        sourceMissing: "原始觀察缺失案件",
       },
     },
     coverage: {

@@ -2375,7 +2375,7 @@ export type SecurityLifecycleRelevance =
   | "issuer_related"
   | "unrelated";
 export type SecurityLifecycleConfidence = "unknown" | "low" | "medium" | "high";
-export type SecurityLifecycleOutcome =
+export type SecurityLifecycleAssessmentOutcome =
   | "undetermined"
   | "listing_ended"
   | "venue_transfer"
@@ -2388,13 +2388,44 @@ export type SecurityLifecycleOutcome =
   | "no_tracked_security_change"
   | "other"
   | "not_applicable";
+export type SecurityLifecycleOutcome =
+  | SecurityLifecycleAssessmentOutcome
+  | "symbol_or_venue_changed";
 export type SecurityLifecycleProposalType =
   | "archive_manual_memberships"
+  | "hide_from_active_universe"
   | "keep_tracking"
   | "no_action"
   | "notify"
   | "remap_symbol"
   | "review_portfolio_position";
+export type SecurityLifecycleTrackingSource =
+  | "manual_lists"
+  | "portfolio_open"
+  | "sa_alpha_picks_current"
+  | "legacy_config_seed";
+export type SecurityLifecycleProposalStatus = "proposed" | "dismissed";
+export type SecurityLifecycleProposalBlockReason =
+  | "portfolio_position_open"
+  | "successor_evidence_missing"
+  | "source_context_unavailable"
+  | "stale_assessment"
+  | "action_executor_not_available";
+export type SecurityLifecycleInvestigationStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+export type SecurityLifecycleInvestigationFailureCode =
+  | "adapter_unavailable"
+  | "credential_missing"
+  | "permission_denied"
+  | "rate_limited"
+  | "usage_limit_reached"
+  | "network_error"
+  | "extract_failed"
+  | "unsupported_content";
 
 export interface SecurityLifecycleObservationKind {
   event_type: SecurityLifecycleEventType;
@@ -2433,6 +2464,10 @@ export interface SecurityLifecycleAssessment {
   exchange_ratio_decimal?: string | null;
   successor_ticker?: string | null;
   destination_venue?: string | null;
+  counterparty_name?: string | null;
+  counterparty_ticker?: string | null;
+  counterparty_cik?: string | null;
+  effective_date?: string | null;
 }
 
 export interface SecurityLifecycleAcknowledgement {
@@ -2446,9 +2481,9 @@ export interface SecurityLifecycleAcknowledgement {
 
 export interface SecurityLifecycleInvestigationRun {
   run_id: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: SecurityLifecycleInvestigationStatus;
   result_count: number;
-  failure_code: string | null;
+  failure_code: SecurityLifecycleInvestigationFailureCode | null;
   created_at: string;
 }
 
@@ -2467,9 +2502,12 @@ export interface SecurityLifecycleEvidence {
 export interface SecurityLifecycleActionProposal {
   proposal_id: string;
   action_type: SecurityLifecycleProposalType;
-  status: "proposed" | "dismissed";
-  block_reason: string | null;
-  source_snapshot: string[];
+  status: SecurityLifecycleProposalStatus;
+  block_reason: SecurityLifecycleProposalBlockReason | null;
+  projected_block_reason?: SecurityLifecycleProposalBlockReason | null;
+  source_snapshot: SecurityLifecycleTrackingSource[];
+  source_ticker?: string;
+  replacement_ticker?: string | null;
   created_at: string;
 }
 
@@ -2485,7 +2523,7 @@ export interface SecurityLifecycleCaseSummary {
   kinds: SecurityLifecycleObservationKind[];
   current_assessment: SecurityLifecycleAssessment | null;
   current_acknowledgement: SecurityLifecycleAcknowledgement | null;
-  active_sources: string[];
+  active_sources: SecurityLifecycleTrackingSource[];
   source_context: "available" | "unavailable";
   components: Record<string, unknown>;
   investigation_run_count: number;
@@ -2588,8 +2626,17 @@ export interface SecurityLifecycleAssessmentInput {
   confidence: SecurityLifecycleConfidence;
   conclusion: string;
   impact_summary: string;
-  outcomes: SecurityLifecycleOutcome[];
+  outcomes: SecurityLifecycleAssessmentOutcome[];
   citations: SecurityLifecycleCitationInput[];
+  counterparty_name?: string | null;
+  counterparty_ticker?: string | null;
+  counterparty_cik?: string | null;
+  successor_ticker?: string | null;
+  destination_venue?: string | null;
+  effective_date?: string | null;
+  consideration_currency?: string | null;
+  cash_per_security_decimal?: string | null;
+  exchange_ratio_decimal?: string | null;
 }
 
 export function createSecurityLifecycleAssessment(

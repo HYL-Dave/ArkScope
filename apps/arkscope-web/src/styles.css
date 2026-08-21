@@ -1810,6 +1810,7 @@ table.wl tbody tr.archived td {
 .lifecycle-filters select,
 .lifecycle-commands input,
 .lifecycle-commands textarea,
+.lifecycle-assessment-form input,
 .lifecycle-assessment-form select,
 .lifecycle-assessment-form textarea {
   width: 100%;
@@ -1831,6 +1832,7 @@ table.wl tbody tr.archived td {
 .lifecycle-filters select:focus-visible,
 .lifecycle-commands input:focus-visible,
 .lifecycle-commands textarea:focus-visible,
+.lifecycle-assessment-form input:focus-visible,
 .lifecycle-assessment-form select:focus-visible,
 .lifecycle-assessment-form textarea:focus-visible {
   outline: 2px solid var(--accent);
@@ -1944,6 +1946,29 @@ table.lifecycle-table tbody tr:last-child td {
   padding: 1px 0 1px 10px;
   border-left: 2px solid var(--border);
 }
+.lifecycle-assessment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lifecycle-assessment-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 12px;
+  margin: 9px 0;
+}
+.lifecycle-assessment-facts > div {
+  min-width: 0;
+}
+.lifecycle-assessment-facts dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.lifecycle-assessment-facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
 .lifecycle-commands,
 .lifecycle-assessment-form {
   display: grid;
@@ -1957,8 +1982,28 @@ table.lifecycle-table tbody tr:last-child td {
 .lifecycle-assessment-form > .errorbox {
   justify-self: start;
 }
+.lifecycle-assessment-form > .lifecycle-assessment-wide,
+.lifecycle-assessment-form > .lifecycle-outcome-fieldset {
+  grid-column: 1 / -1;
+}
+.lifecycle-outcome-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.lifecycle-outcome-fieldset legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.lifecycle-outcome-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 12px;
+}
 .lifecycle-commands > .ui-button:first-child,
-.lifecycle-assessment-form > label:nth-of-type(n + 4),
 .lifecycle-assessment-form > .lifecycle-citation,
 .lifecycle-assessment-form > .errorbox {
   grid-column: 1 / -1;
@@ -2048,10 +2093,17 @@ table.lifecycle-table tbody tr:last-child td {
   }
   .lifecycle-commands > *,
   .lifecycle-assessment-form > *,
-  .lifecycle-assessment-form > label:nth-of-type(n + 4),
   .lifecycle-assessment-form > .lifecycle-citation,
   .lifecycle-assessment-form > .errorbox {
     grid-column: 1;
+  }
+  .lifecycle-assessment-form > .lifecycle-assessment-wide,
+  .lifecycle-assessment-form > .lifecycle-outcome-fieldset {
+    grid-column: 1;
+  }
+  .lifecycle-assessment-facts,
+  .lifecycle-outcome-options {
+    grid-template-columns: minmax(0, 1fr);
   }
   .lifecycle-commands > .ui-button,
   .lifecycle-assessment-form > .ui-button {

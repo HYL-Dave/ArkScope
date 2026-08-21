@@ -734,13 +734,13 @@ const settings = {
       financialCache: "{{value}} rows ({{count}} valid · {{expiredCount}} expired) · latest fetch {{timestamp}}",
     },
     lifecycle: {
-      title: "Lifecycle Investigation Storage",
-      description: "Local case and evidence-store health for the Universe lifecycle workflow.",
+      title: "Security Event Investigation",
+      description: "Local case and evidence-store health for the Universe security-event workflow.",
       handoff: "Investigation, assessment, and recommendation controls are owned by Universe.",
       openWorkflow: "Open investigation in Universe",
       summary: {
-        activeCases: "Present-source cases",
-        sourceMissing: "Source-missing cases",
+        activeCases: "Cases with source observations",
+        sourceMissing: "Cases missing source observations",
       },
     },
     coverage: {

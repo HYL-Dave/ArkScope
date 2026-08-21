@@ -639,12 +639,12 @@ describe("Universe localization", () => {
     await waitForText(SOURCE_TICKER);
     const tabs = host!.querySelector('[role="tablist"]');
     expect(tabs?.textContent).toContain("標的清冊");
-    expect(tabs?.textContent).toContain("生命週期調查");
+    expect(tabs?.textContent).toContain("標的事件調查");
 
-    await click(buttonByText("生命週期調查", tabs!));
+    await click(buttonByText("標的事件調查", tabs!));
     await waitForText("QBTS");
-    expect(host!.textContent).toContain("標的生命週期調查");
-    expect(host!.querySelectorAll('main[aria-label="標的生命週期調查"]')).toHaveLength(1);
+    expect(host!.textContent).toContain("標的事件調查");
+    expect(host!.querySelectorAll('main[aria-label="標的事件調查"]')).toHaveLength(1);
   });
 
   it("opens an exact lifecycle case navigation target and preserves it across locale switch", async () => {
@@ -656,12 +656,12 @@ describe("Universe localization", () => {
     await waitForText("D-Wave Quantum Inc.");
     const drawer = document.body.querySelector('[role="dialog"]');
     const selected = host!.querySelector('[role="tab"][aria-selected="true"]');
-    expect(selected?.textContent).toContain("生命週期調查");
+    expect(selected?.textContent).toContain("標的事件調查");
     expect(drawer?.textContent).toContain("QBTS");
 
     await switchLocale("en");
     expect(document.body.querySelector('[role="dialog"]')).toBe(drawer);
     expect(host!.querySelector('[role="tab"][aria-selected="true"]')?.textContent)
-      .toContain("Lifecycle investigation");
+      .toContain("Security event investigation");
   });
 });

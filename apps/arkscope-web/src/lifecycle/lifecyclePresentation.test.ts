@@ -8,7 +8,9 @@ describe("Lifecycle presentation", () => {
       /* @vite-ignore */ PRESENTATION_MODULE
     );
 
-    expect(lifecycleSourcePresenceLabel("source_missing", "en")).toBe("Source missing");
+    expect(lifecycleSourcePresenceLabel("source_missing", "en")).toBe(
+      "Source observation missing",
+    );
     expect(lifecycleWorkflowLabel("unresolved", "en")).toBe("Unresolved");
     expect(lifecycleSourcePresenceLabel("source_missing", "en")).not.toContain("Unresolved");
   });
@@ -39,9 +41,52 @@ describe("Lifecycle presentation", () => {
       block_reason: null,
     }, "en")).toEqual(expect.objectContaining({
       label: "Review removing manual tracking",
-      state: "Recommendation only",
+      state: "Recommendation only; not applied",
       canApply: false,
     }));
+
+    expect(actionProposalPresentation({
+      action_type: "hide_from_active_universe",
+      status: "dismissed",
+      block_reason: null,
+    }, "en")).toEqual(expect.objectContaining({
+      label: "Recommend hiding from the active universe",
+      state: "Recommendation dismissed; not applied",
+      canApply: false,
+    }));
+  });
+
+  it("labels every persisted proposal block reason without a semantic fallback", async () => {
+    const { lifecycleProposalBlockReasonLabel } = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    );
+
+    expect(lifecycleProposalBlockReasonLabel("successor_evidence_missing", "en"))
+      .toBe("Successor evidence is missing");
+    expect(lifecycleProposalBlockReasonLabel("action_executor_not_available", "en"))
+      .toBe("No action executor is available");
+  });
+
+  it("labels cancelled runs without reporting them as failures", async () => {
+    const { lifecycleRunStatusLabel } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
+
+    expect(lifecycleRunStatusLabel("cancelled", "en")).toBe("Cancelled");
+    expect(lifecycleRunStatusLabel("cancelled", "en")).not.toBe("Failed");
+  });
+
+  it("keeps provider failure categories distinct in user-facing copy", async () => {
+    const { lifecycleErrorPresentation } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
+
+    expect(lifecycleErrorPresentation({ code: "credential_missing" }, "en").message)
+      .toBe("Tavily credentials are not configured");
+    expect(lifecycleErrorPresentation({ code: "permission_denied" }, "en").message)
+      .toBe("Web search permission was denied");
+    expect(lifecycleErrorPresentation({ code: "network_error" }, "en").message)
+      .toBe("The search service could not be reached");
+    expect(lifecycleErrorPresentation({ code: "extract_failed" }, "en").message)
+      .toBe("Search results could not be extracted");
+    expect(lifecycleErrorPresentation({ code: "unsupported_content" }, "en").message)
+      .toBe("The search service returned unsupported content");
   });
 
   it("sanitizes typed API failures without exposing diagnostic detail", async () => {
@@ -56,7 +101,7 @@ describe("Lifecycle presentation", () => {
     const rendered = lifecycleErrorPresentation(error, "en");
     expect(rendered).toEqual({
       code: "security_lifecycle_profile_store_unavailable",
-      message: "Lifecycle data is unavailable.",
+      message: "Security event data is unavailable.",
     });
     expect(JSON.stringify(rendered)).not.toMatch(/token|\/home\/private|sqlite3/);
   });

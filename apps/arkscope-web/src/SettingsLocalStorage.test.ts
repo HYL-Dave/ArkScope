@@ -280,7 +280,7 @@ describe("local storage panels", () => {
     cache.replace(tradingDayCoverageKey(10), coverage);
 
     const { onNavigateTarget } = await renderDataStorage(cache);
-    expect(host!.textContent).toContain("標的生命週期調查");
+    expect(host!.textContent).toContain("標的事件調查");
     expect(host!.textContent).toContain("33");
     expect(host!.textContent).toContain("2");
     expect(host!.textContent).not.toMatch(/確認關係|確認已下市|標記代號異動|清除覆核/);
@@ -435,7 +435,7 @@ describe("local storage panels", () => {
 
     expect(Array.from(host!.querySelectorAll("h2"), (node) => node.textContent)).toEqual([
       "市場資料",
-      "標的生命週期調查",
+      "標的事件調查",
       "交易日 / 價格覆蓋",
       "新聞資料",
       "總經資料",
@@ -453,7 +453,7 @@ describe("local storage panels", () => {
         "連線與金鑰",
         "資料來源排程",
         "市場資料",
-        "標的生命週期調查",
+        "標的事件調查",
         "交易日 / 價格覆蓋",
         "新聞資料",
         "總經資料",
@@ -614,8 +614,8 @@ describe("local storage panels", () => {
         "News",
         "Stored SEC Fundamentals",
         "Financial Cache",
-        "Present-source cases",
-        "Source-missing cases",
+        "Cases with source observations",
+        "Cases missing source observations",
         "Universe",
         "Interval",
         "Market scope",
@@ -703,7 +703,7 @@ describe("local storage panels", () => {
     const news = host!.querySelector('[data-settings-anchor="news_storage"]');
     const macro = host!.querySelector('[data-settings-anchor="macro_storage"]');
     expect(Array.from(storage?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
-      .toEqual(["市場資料", "標的生命週期調查", "交易日 / 價格覆蓋"]);
+      .toEqual(["市場資料", "標的事件調查", "交易日 / 價格覆蓋"]);
     expect(Array.from(news?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
       .toEqual(["新聞資料"]);
     expect(Array.from(macro?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))

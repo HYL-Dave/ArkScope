@@ -24,9 +24,10 @@ import {
   type SecurityLifecycleCaseDetail,
   type SecurityLifecycleCaseFilters,
   type SecurityLifecycleCaseSummary,
+  type SecurityLifecycleAssessment,
+  type SecurityLifecycleAssessmentOutcome,
   type SecurityLifecycleConfidence,
   type SecurityLifecycleEventType,
-  type SecurityLifecycleOutcome,
   type SecurityLifecycleProposalType,
   type SecurityLifecycleRelevance,
   type SecurityLifecycleSourcePresence,
@@ -35,10 +36,17 @@ import {
 import { Button } from "../ui/Button";
 import {
   actionProposalPresentation,
+  formatAssessmentDecimal,
+  lifecycleAssessmentStatusLabel,
+  lifecycleConfidenceLabel,
   lifecycleErrorPresentation,
+  lifecycleEventLabel,
+  lifecycleOutcomeLabel,
   lifecycleProposalLabel,
+  lifecycleRelevanceLabel,
   lifecycleRunStatusLabel,
   lifecycleSourcePresenceLabel,
+  lifecycleTrackingSourceLabel,
   lifecycleWorkflowLabel,
   safeEvidenceUrl,
   type LifecycleLocale,
@@ -67,61 +75,116 @@ const EVENT_KINDS: SecurityLifecycleEventType[] = [
 ];
 const PROPOSAL_TYPES: SecurityLifecycleProposalType[] = [
   "archive_manual_memberships",
+  "hide_from_active_universe",
   "keep_tracking",
   "no_action",
   "notify",
   "remap_symbol",
   "review_portfolio_position",
 ];
+const ASSESSMENT_OUTCOMES: SecurityLifecycleAssessmentOutcome[] = [
+  "undetermined",
+  "listing_ended",
+  "venue_transfer",
+  "symbol_changed",
+  "acquisition_cash",
+  "acquisition_stock",
+  "acquisition_mixed",
+  "acquisition_terms_unknown",
+  "issuer_security_change",
+  "no_tracked_security_change",
+  "other",
+  "not_applicable",
+];
 
 function localeValue(locale: string | undefined): LifecycleLocale {
   return locale === "en" ? "en" : "zh-Hant";
 }
 
-function relevanceLabel(value: SecurityLifecycleRelevance, t: TFunction<"explore">) {
-  if (value === "direct_tracked_security") return t(($) => $.lifecycle.relevance.direct);
-  if (value === "issuer_related") return t(($) => $.lifecycle.relevance.issuer);
-  if (value === "unrelated") return t(($) => $.lifecycle.relevance.unrelated);
-  return t(($) => $.lifecycle.relevance.undetermined);
+function optionalText(value: string, transform?: (value: string) => string): string | null {
+  const normalized = transform ? transform(value.trim()) : value.trim();
+  return normalized || null;
 }
 
-function eventLabel(value: SecurityLifecycleEventType, t: TFunction<"explore">) {
-  if (value === "merger_agreement") return t(($) => $.lifecycle.eventKinds.mergerAgreement);
-  if (value === "merger_proxy") return t(($) => $.lifecycle.eventKinds.mergerProxy);
-  if (value === "acquisition_completed") return t(($) => $.lifecycle.eventKinds.acquisitionCompleted);
-  if (value === "listing_status_review") return t(($) => $.lifecycle.eventKinds.listingStatusReview);
-  return t(($) => $.lifecycle.eventKinds.listingRemovalNotice);
-}
-
-function outcomeLabel(value: SecurityLifecycleOutcome, t: TFunction<"explore">) {
-  if (value === "listing_ended") return t(($) => $.lifecycle.outcomes.listingEnded);
-  if (value === "venue_transfer") return t(($) => $.lifecycle.outcomes.venueTransfer);
-  if (value === "symbol_changed") return t(($) => $.lifecycle.outcomes.symbolChanged);
-  if (value === "acquisition_cash") return t(($) => $.lifecycle.outcomes.acquisitionCash);
-  if (value === "acquisition_stock") return t(($) => $.lifecycle.outcomes.acquisitionStock);
-  if (value === "acquisition_mixed") return t(($) => $.lifecycle.outcomes.acquisitionMixed);
-  if (value === "acquisition_terms_unknown") {
-    return t(($) => $.lifecycle.outcomes.acquisitionUnknown);
-  }
-  if (value === "issuer_security_change") {
-    return t(($) => $.lifecycle.outcomes.issuerSecurityChange);
-  }
-  if (value === "no_tracked_security_change") {
-    return t(($) => $.lifecycle.outcomes.noTrackedChange);
-  }
-  if (value === "not_applicable") return t(($) => $.lifecycle.outcomes.notApplicable);
-  if (value === "other") return t(($) => $.lifecycle.outcomes.other);
-  return t(($) => $.lifecycle.outcomes.undetermined);
-}
-
-function confidenceLabel(
-  value: SecurityLifecycleConfidence,
-  t: TFunction<"explore">,
-) {
-  if (value === "low") return t(($) => $.lifecycle.confidence.low);
-  if (value === "medium") return t(($) => $.lifecycle.confidence.medium);
-  if (value === "high") return t(($) => $.lifecycle.confidence.high);
-  return t(($) => $.lifecycle.confidence.unknown);
+function AssessmentHistory({
+  assessment,
+  locale,
+  t,
+  canAccept,
+  onAccept,
+}: {
+  assessment: SecurityLifecycleAssessment;
+  locale: LifecycleLocale;
+  t: TFunction<"explore">;
+  canAccept: boolean;
+  onAccept: () => void;
+}) {
+  const transactionFacts = [
+    [t(($) => $.lifecycle.fields.counterpartyName), assessment.counterparty_name],
+    [t(($) => $.lifecycle.fields.counterpartyTicker), assessment.counterparty_ticker],
+    [t(($) => $.lifecycle.fields.counterpartyCik), assessment.counterparty_cik],
+    [t(($) => $.lifecycle.fields.successorTicker), assessment.successor_ticker],
+    [t(($) => $.lifecycle.fields.destinationVenue), assessment.destination_venue],
+    [t(($) => $.lifecycle.fields.effectiveDate), assessment.effective_date],
+    [
+      t(($) => $.lifecycle.fields.considerationCurrency),
+      assessment.consideration_currency,
+    ],
+    [
+      t(($) => $.lifecycle.fields.cashPerSecurity),
+      assessment.cash_per_security_decimal
+        ? formatAssessmentDecimal(
+          assessment.cash_per_security_decimal,
+          assessment.consideration_currency,
+          locale,
+        )
+        : null,
+    ],
+    [t(($) => $.lifecycle.fields.exchangeRatio), assessment.exchange_ratio_decimal],
+  ].filter((item): item is [string, string] => Boolean(item[1]));
+  return (
+    <article className="lifecycle-history-row lifecycle-assessment-history">
+      <div className="lifecycle-assessment-heading">
+        <strong>{assessment.author === "legacy_review"
+          ? t(($) => $.lifecycle.states.legacy)
+          : assessment.conclusion}</strong>
+        <span className="lifecycle-state">
+          {lifecycleAssessmentStatusLabel(assessment.status, locale)}
+        </span>
+      </div>
+      {assessment.author === "legacy_review" ? (
+        <>
+          <p>{assessment.conclusion}</p>
+          <p>{t(($) => $.lifecycle.states.limitedProvenance)}</p>
+        </>
+      ) : null}
+      <dl className="lifecycle-assessment-facts">
+        <div>
+          <dt>{t(($) => $.lifecycle.fields.relevance)}</dt>
+          <dd>{lifecycleRelevanceLabel(assessment.relevance, locale)}</dd>
+        </div>
+        <div>
+          <dt>{t(($) => $.lifecycle.fields.confidence)}</dt>
+          <dd>{lifecycleConfidenceLabel(assessment.confidence, locale)}</dd>
+        </div>
+        <div>
+          <dt>{t(($) => $.lifecycle.fields.outcome)}</dt>
+          <dd>{assessment.outcomes
+            .map((value) => lifecycleOutcomeLabel(value, locale)).join(" · ")}</dd>
+        </div>
+        {transactionFacts.map(([label, value]) => (
+          <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+        ))}
+      </dl>
+      <p>{assessment.impact_summary}</p>
+      {assessment.stale ? <p>{t(($) => $.lifecycle.states.revalidation)}</p> : null}
+      {canAccept ? (
+        <Button size="compact" icon={<Check size={15} />} onClick={onAccept}>
+          {t(($) => $.lifecycle.actions.acceptAssessment)}
+        </Button>
+      ) : null}
+    </article>
+  );
 }
 
 function CaseTable({
@@ -163,14 +226,16 @@ function CaseTable({
                 </button>
               </td>
               <td>{item.filing_date ?? "—"}</td>
-              <td>{item.kinds.map((kind) => eventLabel(kind.event_type, t)).join(" · ") || "—"}</td>
+              <td>{item.kinds
+                .map((kind) => lifecycleEventLabel(kind.event_type, locale)).join(" · ") || "—"}</td>
               <td><span className={`lifecycle-state lifecycle-state-${item.workflow_state}`}>
                 {lifecycleWorkflowLabel(item.workflow_state, locale)}
               </span></td>
               <td>{item.current_assessment
-                ? relevanceLabel(item.current_assessment.relevance, t)
-                : relevanceLabel("undetermined", t)}</td>
-              <td>{item.active_sources.join(", ") || "—"}</td>
+                ? lifecycleRelevanceLabel(item.current_assessment.relevance, locale)
+                : lifecycleRelevanceLabel("undetermined", locale)}</td>
+              <td>{item.active_sources
+                .map((source) => lifecycleTrackingSourceLabel(source, locale)).join(", ") || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -203,7 +268,18 @@ export function LifecycleView({
     "undetermined",
   );
   const [confidence, setConfidence] = useState<SecurityLifecycleConfidence>("unknown");
-  const [outcome, setOutcome] = useState<SecurityLifecycleOutcome>("undetermined");
+  const [outcomes, setOutcomes] = useState<SecurityLifecycleAssessmentOutcome[]>([
+    "undetermined",
+  ]);
+  const [counterpartyName, setCounterpartyName] = useState("");
+  const [counterpartyTicker, setCounterpartyTicker] = useState("");
+  const [counterpartyCik, setCounterpartyCik] = useState("");
+  const [successorTicker, setSuccessorTicker] = useState("");
+  const [destinationVenue, setDestinationVenue] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState("");
+  const [considerationCurrency, setConsiderationCurrency] = useState("");
+  const [cashPerSecurity, setCashPerSecurity] = useState("");
+  const [exchangeRatio, setExchangeRatio] = useState("");
   const [citeObservation, setCiteObservation] = useState(false);
   const [citedEvidence, setCitedEvidence] = useState<string[]>([]);
   const [citationError, setCitationError] = useState(false);
@@ -244,7 +320,16 @@ export function LifecycleView({
     setImpact("");
     setRelevance("undetermined");
     setConfidence("unknown");
-    setOutcome("undetermined");
+    setOutcomes(["undetermined"]);
+    setCounterpartyName("");
+    setCounterpartyTicker("");
+    setCounterpartyCik("");
+    setSuccessorTicker("");
+    setDestinationVenue("");
+    setEffectiveDate("");
+    setConsiderationCurrency("");
+    setCashPerSecurity("");
+    setExchangeRatio("");
     setCiteObservation(false);
     setCitedEvidence([]);
     setCitationError(false);
@@ -280,6 +365,19 @@ export function LifecycleView({
   const evidenceCitations = useMemo(() => currentEvidence.filter(
     (item) => Boolean(item.evidence_id),
   ), [currentEvidence]);
+
+  const updateOutcome = (
+    value: SecurityLifecycleAssessmentOutcome,
+    checked: boolean,
+  ) => setOutcomes((current) => {
+    if (value === "undetermined") {
+      return checked ? ["undetermined"] : current;
+    }
+    const determinate = current.filter((item) => item !== "undetermined");
+    if (checked) return [...determinate, value];
+    const remaining = determinate.filter((item) => item !== value);
+    return remaining.length > 0 ? remaining : ["undetermined"];
+  });
 
   return (
     <main className="lifecycle-triage" aria-label={t(($) => $.lifecycle.aria)}>
@@ -332,14 +430,14 @@ export function LifecycleView({
           label={t(($) => $.lifecycle.filters.relevance)}
           value={filters.relevance ?? ""}
           onChange={(value) => updateFilter("relevance", value as SecurityLifecycleRelevance | "")}
-          options={RELEVANCE.map((value) => [value, relevanceLabel(value, t)])}
+          options={RELEVANCE.map((value) => [value, lifecycleRelevanceLabel(value, locale)])}
           allLabel={t(($) => $.lifecycle.filters.all)}
         />
         <FilterSelect
           label={t(($) => $.lifecycle.filters.eventKind)}
           value={filters.event_type ?? ""}
           onChange={(value) => updateFilter("event_type", value as SecurityLifecycleEventType | "")}
-          options={EVENT_KINDS.map((value) => [value, eventLabel(value, t)])}
+          options={EVENT_KINDS.map((value) => [value, lifecycleEventLabel(value, locale)])}
           allLabel={t(($) => $.lifecycle.filters.all)}
         />
         <FilterSelect
@@ -384,6 +482,9 @@ export function LifecycleView({
             ) : null}
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.source)}>
               <p><strong>{lifecycleSourcePresenceLabel(detail.source_presence, locale)}</strong></p>
+              {detail.source_context === "unavailable" ? (
+                <p>{t(($) => $.lifecycle.states.sourceContextUnavailable)}</p>
+              ) : null}
               {detail.observation ? (
                 <>
                   <p>{detail.observation.filing_form} · {detail.observation.filing_date}</p>
@@ -537,27 +638,16 @@ export function LifecycleView({
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.assessment)}>
               {detail.assessment_history.map((assessment) => (
-                <article className="lifecycle-history-row" key={assessment.assessment_id}>
-                  <strong>{assessment.author === "legacy_review"
-                    ? t(($) => $.lifecycle.states.legacy)
-                    : assessment.conclusion}</strong>
-                  {assessment.author === "legacy_review" ? (
-                    <p>{t(($) => $.lifecycle.states.limitedProvenance)}</p>
-                  ) : null}
-                  <p>{assessment.impact_summary}</p>
-                  {assessment.stale ? <p>{t(($) => $.lifecycle.states.revalidation)}</p> : null}
-                  {assessment.status === "draft" && detail.source_presence === "present" ? (
-                    <Button
-                      size="compact"
-                      icon={<Check size={15} />}
-                      onClick={() => void runCommand("accept", () => (
-                        acceptSecurityLifecycleAssessment(assessment.assessment_id)
-                      ))}
-                    >
-                      {t(($) => $.lifecycle.actions.acceptAssessment)}
-                    </Button>
-                  ) : null}
-                </article>
+                <AssessmentHistory
+                  assessment={assessment}
+                  locale={locale}
+                  t={t}
+                  canAccept={assessment.status === "draft" && detail.source_presence === "present"}
+                  onAccept={() => void runCommand("accept", () => (
+                    acceptSecurityLifecycleAssessment(assessment.assessment_id)
+                  ))}
+                  key={assessment.assessment_id}
+                />
               ))}
               {detail.source_presence === "present" ? (
                 <div className="lifecycle-assessment-form">
@@ -568,7 +658,9 @@ export function LifecycleView({
                       onChange={(event) => setRelevance(event.target.value as SecurityLifecycleRelevance)}
                     >
                       {RELEVANCE.map((value) => (
-                        <option value={value} key={value}>{relevanceLabel(value, t)}</option>
+                        <option value={value} key={value}>
+                          {lifecycleRelevanceLabel(value, locale)}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -579,34 +671,113 @@ export function LifecycleView({
                       onChange={(event) => setConfidence(event.target.value as SecurityLifecycleConfidence)}
                     >
                       {(["unknown", "low", "medium", "high"] as const).map((value) => (
-                        <option value={value} key={value}>{confidenceLabel(value, t)}</option>
+                        <option value={value} key={value}>
+                          {lifecycleConfidenceLabel(value, locale)}
+                        </option>
                       ))}
                     </select>
                   </label>
-                  <label>{t(($) => $.lifecycle.fields.outcome)}
-                    <select
-                      aria-label={t(($) => $.lifecycle.fields.outcome)}
-                      value={outcome}
-                      onChange={(event) => setOutcome(event.target.value as SecurityLifecycleOutcome)}
-                    >
-                      {([
-                        "undetermined", "listing_ended", "venue_transfer", "symbol_changed",
-                        "acquisition_cash", "acquisition_stock", "acquisition_mixed",
-                        "acquisition_terms_unknown", "issuer_security_change",
-                        "no_tracked_security_change", "other", "not_applicable",
-                      ] as const).map((value) => (
-                        <option value={value} key={value}>{outcomeLabel(value, t)}</option>
+                  <fieldset className="lifecycle-outcome-fieldset">
+                    <legend>{t(($) => $.lifecycle.fields.outcome)}</legend>
+                    <div className="lifecycle-outcome-options">
+                      {ASSESSMENT_OUTCOMES.map((value) => (
+                        <label className="lifecycle-citation" key={value}>
+                          <input
+                            type="checkbox"
+                            aria-label={lifecycleOutcomeLabel(value, locale)}
+                            checked={outcomes.includes(value)}
+                            onChange={(event) => updateOutcome(value, event.target.checked)}
+                          />
+                          {lifecycleOutcomeLabel(value, locale)}
+                        </label>
                       ))}
-                    </select>
+                    </div>
+                  </fieldset>
+                  <label>{t(($) => $.lifecycle.fields.counterpartyName)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.counterpartyName)}
+                      maxLength={240}
+                      value={counterpartyName}
+                      onChange={(event) => setCounterpartyName(event.target.value)}
+                    />
                   </label>
-                  <label>{t(($) => $.lifecycle.fields.conclusion)}
+                  <label>{t(($) => $.lifecycle.fields.counterpartyTicker)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.counterpartyTicker)}
+                      maxLength={20}
+                      value={counterpartyTicker}
+                      onChange={(event) => setCounterpartyTicker(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.counterpartyCik)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.counterpartyCik)}
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={counterpartyCik}
+                      onChange={(event) => setCounterpartyCik(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.successorTicker)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.successorTicker)}
+                      maxLength={20}
+                      value={successorTicker}
+                      onChange={(event) => setSuccessorTicker(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.destinationVenue)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.destinationVenue)}
+                      maxLength={120}
+                      value={destinationVenue}
+                      onChange={(event) => setDestinationVenue(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.effectiveDate)}
+                    <input
+                      type="date"
+                      aria-label={t(($) => $.lifecycle.fields.effectiveDate)}
+                      value={effectiveDate}
+                      onChange={(event) => setEffectiveDate(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.considerationCurrency)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.considerationCurrency)}
+                      maxLength={3}
+                      value={considerationCurrency}
+                      onChange={(event) => setConsiderationCurrency(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.cashPerSecurity)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.cashPerSecurity)}
+                      inputMode="decimal"
+                      maxLength={128}
+                      value={cashPerSecurity}
+                      onChange={(event) => setCashPerSecurity(event.target.value)}
+                    />
+                  </label>
+                  <label>{t(($) => $.lifecycle.fields.exchangeRatio)}
+                    <input
+                      aria-label={t(($) => $.lifecycle.fields.exchangeRatio)}
+                      inputMode="decimal"
+                      maxLength={128}
+                      value={exchangeRatio}
+                      onChange={(event) => setExchangeRatio(event.target.value)}
+                    />
+                  </label>
+                  <label className="lifecycle-assessment-wide">
+                    {t(($) => $.lifecycle.fields.conclusion)}
                     <textarea
                       aria-label={t(($) => $.lifecycle.fields.conclusion)}
                       value={conclusion}
                       onChange={(event) => setConclusion(event.target.value)}
                     />
                   </label>
-                  <label>{t(($) => $.lifecycle.fields.impact)}
+                  <label className="lifecycle-assessment-wide">
+                    {t(($) => $.lifecycle.fields.impact)}
                     <textarea
                       aria-label={t(($) => $.lifecycle.fields.impact)}
                       value={impact}
@@ -663,7 +834,25 @@ export function LifecycleView({
                           confidence,
                           conclusion: conclusion.trim(),
                           impact_summary: impact.trim(),
-                          outcomes: [outcome],
+                          outcomes,
+                          counterparty_name: optionalText(counterpartyName),
+                          counterparty_ticker: optionalText(
+                            counterpartyTicker,
+                            (value) => value.toUpperCase(),
+                          ),
+                          counterparty_cik: optionalText(counterpartyCik),
+                          successor_ticker: optionalText(
+                            successorTicker,
+                            (value) => value.toUpperCase(),
+                          ),
+                          destination_venue: optionalText(destinationVenue),
+                          effective_date: optionalText(effectiveDate),
+                          consideration_currency: optionalText(
+                            considerationCurrency,
+                            (value) => value.toUpperCase(),
+                          ),
+                          cash_per_security_decimal: optionalText(cashPerSecurity),
+                          exchange_ratio_decimal: optionalText(exchangeRatio),
                           citations: [
                             {
                               reference_kind: "observation",
@@ -691,10 +880,14 @@ export function LifecycleView({
                   <article className="lifecycle-proposal" key={proposal.proposal_id}>
                     <strong>{presentation.label}</strong>
                     <p>{presentation.state}</p>
-                    <p className="mono tiny">{proposal.source_snapshot.join(", ")}</p>
-                    {proposal.block_reason === "portfolio_position_open" ? (
-                      <p>{t(($) => $.lifecycle.states.portfolioBlock)}</p>
+                    <p className="tiny">{proposal.source_snapshot
+                      .map((source) => lifecycleTrackingSourceLabel(source, locale)).join(", ")}</p>
+                    {proposal.replacement_ticker ? (
+                      <p>{t(($) => $.lifecycle.fields.successorTicker)}: {
+                        proposal.replacement_ticker
+                      }</p>
                     ) : null}
+                    {presentation.blockReason ? <p>{presentation.blockReason}</p> : null}
                     {proposal.status === "proposed" ? (
                       <Button
                         size="compact"

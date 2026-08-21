@@ -31,6 +31,28 @@ const PROVIDER_EVIDENCE = "SEC source: Units of Beneficial Interest — 原文�
 const CASE_ID = "slc_case_present";
 const LIFECYCLE_VIEW_MODULE = "./LifecycleView";
 
+const LEGACY_ASSESSMENT = {
+  assessment_id: "assessment-legacy",
+  status: "accepted",
+  author: "legacy_review",
+  relevance: "direct_tracked_security",
+  confidence: "unknown",
+  conclusion: "Legacy review marked a symbol or venue change.",
+  impact_summary: "The legacy label did not distinguish renaming from transfer.",
+  outcomes: ["symbol_or_venue_changed"],
+  stale: false,
+  created_at: "2026-08-17T00:00:00Z",
+  counterparty_name: null,
+  counterparty_ticker: null,
+  counterparty_cik: null,
+  successor_ticker: null,
+  destination_venue: null,
+  effective_date: null,
+  consideration_currency: null,
+  cash_per_security_decimal: null,
+  exchange_ratio_decimal: null,
+};
+
 const CASES = [
   ["slc_unresolved", "AAA", "unresolved"],
   ["slc_investigating", "BBB", "investigating"],
@@ -75,6 +97,8 @@ const SUMMARY = {
 function detail(overrides: Record<string, unknown> = {}) {
   return {
     ...SUMMARY,
+    workflow_state: "resolved",
+    current_assessment: LEGACY_ASSESSMENT,
     observation_fingerprint_sha256: "f".repeat(64),
     observation: {
       ticker: "QBTS",
@@ -103,27 +127,22 @@ function detail(overrides: Record<string, unknown> = {}) {
       content_sha256: "a".repeat(64),
       created_at: "2026-08-20T00:00:00Z",
     }],
-    assessment_history: [{
-      assessment_id: "assessment-legacy",
-      status: "accepted",
-      author: "legacy_review",
-      relevance: "undetermined",
-      confidence: "unknown",
-      conclusion: "Legacy review: renamed or transferred.",
-      impact_summary: "Supporting rationale was not retained.",
-      outcomes: ["undetermined"],
-      stale: true,
-      created_at: "2026-08-17T00:00:00Z",
-    }],
+    assessment_history: [LEGACY_ASSESSMENT],
     acknowledgement_history: [],
     current_acknowledgement: null,
-    current_assessment: null,
     proposals: [{
       proposal_id: "proposal-review",
       action_type: "review_portfolio_position",
       status: "proposed",
       block_reason: "portfolio_position_open",
       source_snapshot: ["manual_lists", "portfolio_open"],
+      created_at: "2026-08-20T00:00:00Z",
+    }, {
+      proposal_id: "proposal-hide",
+      action_type: "hide_from_active_universe",
+      status: "dismissed",
+      block_reason: null,
+      source_snapshot: ["sa_alpha_picks_current", "legacy_config_seed"],
       created_at: "2026-08-20T00:00:00Z",
     }],
     truncation: {},
@@ -186,6 +205,13 @@ async function change(label: string, value: string) {
   await flush();
 }
 
+async function toggle(label: string) {
+  const checkbox = document.body.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+  if (!checkbox) throw new Error(`missing checkbox: ${label}`);
+  await act(async () => checkbox.click());
+  await flush();
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage("en");
   vi.clearAllMocks();
@@ -237,7 +263,7 @@ describe("Lifecycle workflow", () => {
       }))
       .mockResolvedValueOnce(detail());
     await mountLifecycle();
-    await click("Mark inconclusive");
+    await click("Record insufficient evidence");
     expect(apiMocks.acknowledgeSecurityLifecycleCase).toHaveBeenCalledWith(CASE_ID, {
       reason: "evidence_insufficient",
       note: null,
@@ -300,17 +326,19 @@ describe("Lifecycle workflow", () => {
       observation: null,
       workflow_state: "evidence_ready",
       assessment_history: [{
+        ...LEGACY_ASSESSMENT,
         assessment_id: "assessment-stale",
-        status: "accepted",
         stale: true,
         conclusion: "Prior accepted conclusion",
       }],
     }));
     await mountLifecycle();
-    expect(document.body.textContent).toContain("Source missing");
+    expect(document.body.textContent).toContain("Source observation missing");
     expect(document.body.textContent).toContain("Prior accepted conclusion");
     expect(document.body.textContent).toContain("Revalidation required");
-    expect(document.body.textContent).not.toMatch(/Search with Tavily|Mark inconclusive|Accept assessment/);
+    expect(document.body.textContent).not.toMatch(
+      /Search with Tavily|Record insufficient evidence|Accept assessment/,
+    );
   });
 
   it("names Tavily and sends exactly one bounded request after the explicit search click", async () => {
@@ -328,7 +356,7 @@ describe("Lifecycle workflow", () => {
     window.dispatchEvent(new Event("focus"));
     await click("Refresh cases");
     await click("Data integrity");
-    await click("Investment events");
+    await click("Security events");
     expect(apiMocks.startSecurityLifecycleInvestigation).not.toHaveBeenCalled();
   });
 
@@ -337,7 +365,7 @@ describe("Lifecycle workflow", () => {
     for (const label of [
       "Source observation",
       "Evidence and searches",
-      "Acknowledgement",
+      "Inconclusive review",
       "Assessment",
       "Action recommendations",
     ]) expect(document.body.textContent).toContain(label);
@@ -355,20 +383,34 @@ describe("Lifecycle workflow", () => {
 
   it("renders bilingual workflow copy without translating provider evidence", async () => {
     await mountLifecycle();
-    expect(document.body.textContent).toContain("Lifecycle investigation");
+    expect(document.body.textContent).toContain("Security event investigation");
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
     await act(async () => { await i18n.changeLanguage("zh-Hant"); });
     await flush();
-    expect(document.body.textContent).toContain("標的生命週期調查");
+    expect(document.body.textContent).toContain("標的事件調查");
+    expect(document.body.textContent).toContain("證據不足，未能定論");
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
   });
 
   it("renders source-aware proposals as unapplied explanations", async () => {
     await mountLifecycle();
-    expect(document.body.textContent).toContain("manual_lists");
-    expect(document.body.textContent).toContain("Recommendation only");
+    expect(document.body.textContent).toContain("Manual lists");
+    expect(document.body.textContent).toContain("Open portfolio position");
+    expect(document.body.textContent).toContain("Seeking Alpha picks");
+    expect(document.body.textContent).toContain("Imported legacy settings");
+    expect(document.body.textContent).toContain("Recommend hiding from the active universe");
+    expect(document.body.textContent).toContain("Recommendation dismissed; not applied");
+    expect(document.body.textContent).not.toMatch(
+      /manual_lists|portfolio_open|sa_alpha_picks_current|legacy_config_seed/,
+    );
+    expect(document.body.textContent).toContain("Recommendation only; not applied");
     await click("Dismiss recommendation");
     expect(apiMocks.dismissSecurityLifecycleProposal).toHaveBeenCalledWith("proposal-review");
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await flush();
+    for (const label of ["手動清單", "未平倉投資部位", "Seeking Alpha 選股", "舊設定匯入"]) {
+      expect(document.body.textContent).toContain(label);
+    }
   });
 
   it("renders unresolved investigating evidence ready inconclusive and resolved as distinct states", async () => {
@@ -392,9 +434,9 @@ describe("Lifecycle workflow", () => {
     expect(document.body.querySelector<HTMLSelectElement>(
       '[aria-label="Assessment confidence"]',
     )?.value).toBe("unknown");
-    expect(document.body.querySelector<HTMLSelectElement>(
-      '[aria-label="Assessment outcome"]',
-    )?.value).toBe("undetermined");
+    expect(document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="Undetermined"]',
+    )?.checked).toBe(true);
     await setField("Assessment conclusion", "The tracked security will stop trading.");
     await setField("Investment impact", "Review the portfolio position before acting.");
     await click("Save assessment draft");
@@ -403,7 +445,7 @@ describe("Lifecycle workflow", () => {
       "Select the current source observation before saving the assessment",
     );
     const evidenceCitation = document.body.querySelector<HTMLInputElement>(
-      'input[aria-label="Cite provider evidence"]',
+      'input[aria-label="Cite this evidence"]',
     );
     if (!evidenceCitation) throw new Error("missing evidence citation");
     await act(async () => evidenceCitation.click());
@@ -430,10 +472,116 @@ describe("Lifecycle workflow", () => {
     );
   });
 
+  it("preserves the accepted meaning of the real migrated legacy review in both locales", async () => {
+    await mountLifecycle();
+    const legacy = Array.from(document.body.querySelectorAll(".lifecycle-history-row"))
+      .find((item) => item.textContent?.includes("Legacy review"));
+    expect(legacy?.textContent).toContain("Directly concerns the tracked security");
+    expect(legacy?.textContent).toContain("Symbol or trading venue changed (legacy review)");
+    expect(legacy?.textContent).not.toContain("Undetermined");
+
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await flush();
+    expect(legacy?.textContent).toContain("直接涉及追蹤證券");
+    expect(legacy?.textContent).toContain("代號或交易市場異動（舊覆核未區分）");
+    expect(legacy?.textContent).not.toContain("尚未判定");
+  });
+
+  it("shows every known structured fact on an accepted assessment", async () => {
+    const assessment = {
+      ...LEGACY_ASSESSMENT,
+      assessment_id: "assessment-structured",
+      author: "human",
+      relevance: "issuer_related",
+      confidence: "high",
+      conclusion: "The merger consideration is confirmed.",
+      impact_summary: "Review the successor security and cash component.",
+      outcomes: ["symbol_changed", "acquisition_mixed"],
+      counterparty_name: "Acquirer Corp.",
+      counterparty_ticker: "ACQ",
+      counterparty_cik: "0000123456",
+      successor_ticker: "NEW",
+      destination_venue: "NYSE",
+      effective_date: "2026-09-30",
+      consideration_currency: "USD",
+      cash_per_security_decimal: "10.5000",
+      exchange_ratio_decimal: "0.2500",
+    };
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      current_assessment: assessment,
+      assessment_history: [assessment],
+    }));
+
+    await mountLifecycle();
+    const history = Array.from(document.body.querySelectorAll(".lifecycle-history-row"))
+      .find((item) => item.textContent?.includes("Acquirer Corp."));
+    expect(history).toBeDefined();
+    expect(history!.textContent).toContain("Issuer-related; may have indirect impact");
+    expect(history!.textContent).toContain("High");
+    expect(history!.textContent).toContain("Ticker symbol changed");
+    expect(history!.textContent).toContain("Mixed-consideration acquisition");
+    for (const value of [
+      "Acquirer Corp.", "ACQ", "0000123456", "NEW", "NYSE", "2026-09-30",
+      "USD 10.5000", "0.2500",
+    ]) expect(history!.textContent).toContain(value);
+    expect(history!.textContent).toContain("Consideration currencyUSD");
+  });
+
+  it("submits structured facts and multiple outcomes without moving them into prose", async () => {
+    await mountLifecycle();
+    for (const label of [
+      "Counterparty name", "Counterparty ticker", "Counterparty CIK", "Successor ticker",
+      "Destination venue", "Effective date", "Consideration currency", "Cash per security",
+      "Exchange ratio",
+    ]) {
+      expect(document.body.querySelector(`[aria-label="${label}"]`), label).not.toBeNull();
+    }
+    await change("Assessment relevance", "direct_tracked_security");
+    await change("Assessment confidence", "high");
+    await setField("Counterparty name", "Acquirer Corp.");
+    await setField("Counterparty ticker", "ACQ");
+    await setField("Counterparty CIK", "0000123456");
+    await setField("Successor ticker", "NEW");
+    await setField("Destination venue", "NYSE");
+    await setField("Effective date", "2026-09-30");
+    await setField("Consideration currency", "USD");
+    await setField("Cash per security", "10.5000");
+    await setField("Exchange ratio", "0.2500");
+    await toggle("Ticker symbol changed");
+    await toggle("Mixed-consideration acquisition");
+    await setField("Assessment conclusion", "The transaction terms are confirmed.");
+    await setField("Investment impact", "Review the successor security.");
+    await toggle("Source observation");
+    await click("Save assessment draft");
+
+    expect(apiMocks.createSecurityLifecycleAssessment).toHaveBeenCalledWith(CASE_ID, {
+      relevance: "direct_tracked_security",
+      confidence: "high",
+      conclusion: "The transaction terms are confirmed.",
+      impact_summary: "Review the successor security.",
+      outcomes: ["symbol_changed", "acquisition_mixed"],
+      counterparty_name: "Acquirer Corp.",
+      counterparty_ticker: "ACQ",
+      counterparty_cik: "0000123456",
+      successor_ticker: "NEW",
+      destination_venue: "NYSE",
+      effective_date: "2026-09-30",
+      consideration_currency: "USD",
+      cash_per_security_decimal: "10.5000",
+      exchange_ratio_decimal: "0.2500",
+      citations: [{
+        reference_kind: "observation",
+        cited_content_sha256: "f".repeat(64),
+      }],
+    });
+  });
+
   it("shows legacy reviews with limited provenance", async () => {
     await mountLifecycle();
     expect(document.body.textContent).toContain("Legacy review");
-    expect(document.body.textContent).toContain("Supporting rationale was not retained");
+    expect(document.body.textContent).toContain(
+      "The legacy label did not distinguish renaming from transfer",
+    );
     expect(document.body.textContent).toContain("Limited provenance");
   });
 

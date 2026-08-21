@@ -1,7 +1,15 @@
 import type {
   SecurityLifecycleActionProposal,
+  SecurityLifecycleAssessment,
+  SecurityLifecycleConfidence,
+  SecurityLifecycleEventType,
   SecurityLifecycleInvestigationRun,
+  SecurityLifecycleOutcome,
+  SecurityLifecycleProposalBlockReason,
+  SecurityLifecycleProposalType,
+  SecurityLifecycleRelevance,
   SecurityLifecycleSourcePresence,
+  SecurityLifecycleTrackingSource,
   SecurityLifecycleWorkflowState,
 } from "../api";
 import enExplore from "../i18n/resources/en/explore";
@@ -18,11 +26,14 @@ export function lifecycleWorkflowLabel(
   locale: LifecycleLocale,
 ): string {
   const copy = lifecycleCopy(locale).workflow;
-  if (value === "investigating") return copy.investigating;
-  if (value === "evidence_ready") return copy.evidenceReady;
-  if (value === "reviewed_inconclusive") return copy.reviewedInconclusive;
-  if (value === "resolved") return copy.resolved;
-  return copy.unresolved;
+  const labels: Record<SecurityLifecycleWorkflowState, string> = {
+    unresolved: copy.unresolved,
+    investigating: copy.investigating,
+    evidence_ready: copy.evidenceReady,
+    reviewed_inconclusive: copy.reviewedInconclusive,
+    resolved: copy.resolved,
+  };
+  return labels[value] ?? lifecycleCopy(locale).states.unknownValue;
 }
 
 export function lifecycleSourcePresenceLabel(
@@ -30,9 +41,104 @@ export function lifecycleSourcePresenceLabel(
   locale: LifecycleLocale,
 ): string {
   const copy = lifecycleCopy(locale).states;
-  const sourcePresent = value === "present";
-  if (sourcePresent) return copy.sourcePresent;
-  return copy.sourceMissing;
+  const labels: Record<SecurityLifecycleSourcePresence, string> = {
+    present: copy.sourcePresent,
+    source_missing: copy.sourceMissing,
+  };
+  return labels[value] ?? copy.unknownValue;
+}
+
+export function lifecycleTrackingSourceLabel(
+  value: SecurityLifecycleTrackingSource | string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleTrackingSource, string> = {
+    manual_lists: copy.trackingSources.manualLists,
+    portfolio_open: copy.trackingSources.portfolioOpen,
+    sa_alpha_picks_current: copy.trackingSources.saAlphaPicksCurrent,
+    legacy_config_seed: copy.trackingSources.legacyConfigSeed,
+  };
+  return labels[value as SecurityLifecycleTrackingSource] ?? copy.states.unknownValue;
+}
+
+export function lifecycleRelevanceLabel(
+  value: SecurityLifecycleRelevance,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleRelevance, string> = {
+    undetermined: copy.relevance.undetermined,
+    direct_tracked_security: copy.relevance.direct,
+    issuer_related: copy.relevance.issuer,
+    unrelated: copy.relevance.unrelated,
+  };
+  return labels[value] ?? copy.states.unknownValue;
+}
+
+export function lifecycleConfidenceLabel(
+  value: SecurityLifecycleConfidence,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleConfidence, string> = {
+    unknown: copy.confidence.unknown,
+    low: copy.confidence.low,
+    medium: copy.confidence.medium,
+    high: copy.confidence.high,
+  };
+  return labels[value] ?? copy.states.unknownValue;
+}
+
+export function lifecycleEventLabel(
+  value: SecurityLifecycleEventType,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleEventType, string> = {
+    merger_agreement: copy.eventKinds.mergerAgreement,
+    merger_proxy: copy.eventKinds.mergerProxy,
+    acquisition_completed: copy.eventKinds.acquisitionCompleted,
+    listing_status_review: copy.eventKinds.listingStatusReview,
+    listing_removal_notice: copy.eventKinds.listingRemovalNotice,
+  };
+  return labels[value] ?? copy.states.unknownValue;
+}
+
+export function lifecycleOutcomeLabel(
+  value: SecurityLifecycleOutcome,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleOutcome, string> = {
+    undetermined: copy.outcomes.undetermined,
+    listing_ended: copy.outcomes.listingEnded,
+    venue_transfer: copy.outcomes.venueTransfer,
+    symbol_changed: copy.outcomes.symbolChanged,
+    symbol_or_venue_changed: copy.outcomes.symbolOrVenueChanged,
+    acquisition_cash: copy.outcomes.acquisitionCash,
+    acquisition_stock: copy.outcomes.acquisitionStock,
+    acquisition_mixed: copy.outcomes.acquisitionMixed,
+    acquisition_terms_unknown: copy.outcomes.acquisitionUnknown,
+    issuer_security_change: copy.outcomes.issuerSecurityChange,
+    no_tracked_security_change: copy.outcomes.noTrackedChange,
+    other: copy.outcomes.other,
+    not_applicable: copy.outcomes.notApplicable,
+  };
+  return labels[value] ?? copy.states.unknownValue;
+}
+
+export function lifecycleAssessmentStatusLabel(
+  value: SecurityLifecycleAssessment["status"],
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleAssessment["status"], string> = {
+    draft: copy.assessmentStatuses.draft,
+    accepted: copy.assessmentStatuses.accepted,
+    superseded: copy.assessmentStatuses.superseded,
+  };
+  return labels[value] ?? copy.states.unknownValue;
 }
 
 export function formatAssessmentDecimal(
@@ -59,23 +165,53 @@ export function lifecycleProposalLabel(
   locale: LifecycleLocale,
 ): string {
   const copy = lifecycleCopy(locale).proposalTypes;
-  if (actionType === "archive_manual_memberships") return copy.archiveManualMemberships;
-  if (actionType === "keep_tracking") return copy.keepTracking;
-  if (actionType === "no_action") return copy.noAction;
-  if (actionType === "notify") return copy.notify;
-  if (actionType === "remap_symbol") return copy.remapSymbol;
-  return copy.reviewPortfolioPosition;
+  const labels: Record<SecurityLifecycleProposalType, string> = {
+    archive_manual_memberships: copy.archiveManualMemberships,
+    hide_from_active_universe: copy.hideFromActiveUniverse,
+    keep_tracking: copy.keepTracking,
+    no_action: copy.noAction,
+    notify: copy.notify,
+    remap_symbol: copy.remapSymbol,
+    review_portfolio_position: copy.reviewPortfolioPosition,
+  };
+  return labels[actionType] ?? lifecycleCopy(locale).states.unknownValue;
+}
+
+export function lifecycleProposalBlockReasonLabel(
+  reason: SecurityLifecycleProposalBlockReason | null | undefined,
+  locale: LifecycleLocale,
+): string | null {
+  if (!reason) return null;
+  const copy = lifecycleCopy(locale);
+  const labels: Record<SecurityLifecycleProposalBlockReason, string> = {
+    portfolio_position_open: copy.states.portfolioBlock,
+    successor_evidence_missing: copy.proposalBlocks.successorEvidenceMissing,
+    source_context_unavailable: copy.proposalBlocks.sourceContextUnavailable,
+    stale_assessment: copy.proposalBlocks.staleAssessment,
+    action_executor_not_available: copy.proposalBlocks.actionExecutorUnavailable,
+  };
+  return labels[reason] ?? copy.states.unknownValue;
 }
 
 export function actionProposalPresentation(
-  proposal: Pick<SecurityLifecycleActionProposal, "action_type" | "status" | "block_reason">,
+  proposal: Pick<
+    SecurityLifecycleActionProposal,
+    "action_type" | "status" | "block_reason" | "projected_block_reason"
+  >,
   locale: LifecycleLocale,
 ): { label: string; state: string; canApply: false; blockReason: string | null } {
+  const states: Record<SecurityLifecycleActionProposal["status"], string> = {
+    proposed: lifecycleCopy(locale).states.recommendationOnly,
+    dismissed: lifecycleCopy(locale).states.recommendationDismissed,
+  };
   return {
     label: lifecycleProposalLabel(proposal.action_type, locale),
-    state: lifecycleCopy(locale).states.recommendationOnly,
+    state: states[proposal.status] ?? lifecycleCopy(locale).states.unknownValue,
     canApply: false,
-    blockReason: proposal.block_reason,
+    blockReason: lifecycleProposalBlockReasonLabel(
+      proposal.projected_block_reason ?? proposal.block_reason,
+      locale,
+    ),
   };
 }
 
@@ -84,10 +220,14 @@ export function lifecycleRunStatusLabel(
   locale: LifecycleLocale,
 ): string {
   const copy = lifecycleCopy(locale).runStatuses;
-  if (status === "queued") return copy.queued;
-  if (status === "running") return copy.running;
-  if (status === "succeeded") return copy.succeeded;
-  return copy.failed;
+  const labels: Record<SecurityLifecycleInvestigationRun["status"], string> = {
+    queued: copy.queued,
+    running: copy.running,
+    succeeded: copy.succeeded,
+    failed: copy.failed,
+    cancelled: copy.cancelled,
+  };
+  return labels[status] ?? lifecycleCopy(locale).states.unknownValue;
 }
 
 export function lifecycleErrorPresentation(
@@ -103,6 +243,11 @@ export function lifecycleErrorPresentation(
   if (code === "usage_limit_reached") message = copy.usageLimitReached;
   else if (code === "rate_limited") message = copy.rateLimited;
   else if (code === "adapter_unavailable") message = copy.adapterUnavailable;
+  else if (code === "credential_missing") message = copy.credentialMissing;
+  else if (code === "permission_denied") message = copy.permissionDenied;
+  else if (code === "network_error") message = copy.networkError;
+  else if (code === "extract_failed") message = copy.extractFailed;
+  else if (code === "unsupported_content") message = copy.unsupportedContent;
   else if (
     code === "security_lifecycle_market_store_unavailable"
     || code === "security_lifecycle_profile_store_unavailable"
