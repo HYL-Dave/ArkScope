@@ -71,6 +71,24 @@ describe("shell navigation authority", () => {
     }
   });
 
+  it("resolves an exact Universe lifecycle case without inventing a nav item", () => {
+    const request = nextNavigationRequest(12, {
+      kind: "universe_lifecycle",
+      caseId: "slc-case-1",
+    } as never);
+
+    expect(resolveNavigationTarget(request)).toEqual({
+      view: "Universe",
+      universe: {
+        sequence: 13,
+        target: { kind: "universe_lifecycle", caseId: "slc-case-1" },
+      },
+    });
+    const navigation = JSON.stringify(SHELL_NAV_GROUPS);
+    expect(navigation).toContain('"view":"Universe"');
+    expect(navigation).not.toContain("universe_lifecycle");
+  });
+
   it("increments the request sequence even when the exact target repeats", () => {
     const target = { kind: "view", view: "Holdings" } as const;
     const first = nextNavigationRequest(0, target);

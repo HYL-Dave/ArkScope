@@ -155,12 +155,22 @@ vi.mock("./Settings", () => ({
     developerMode: boolean;
     navigationRequest?: NavigationRequest | null;
     settingsReadCache?: unknown;
+    onNavigateTarget?: (target: NavigationTarget) => void;
   }) => {
     shellMocks.settingsProps = props as unknown as Record<string, unknown>;
     if (props.navigationRequest) shellMocks.settingsRequests.push(props.navigationRequest);
     return (
       <main data-testid="settings-surface">
         <pre data-testid="settings-request">{JSON.stringify(props.navigationRequest ?? null)}</pre>
+        <button
+          type="button"
+          onClick={() => props.onNavigateTarget?.({
+            kind: "universe_lifecycle",
+            caseId: "slc-shell-case",
+          } as never)}
+        >
+          Open lifecycle workflow
+        </button>
       </main>
     );
   },
@@ -188,11 +198,14 @@ vi.mock("./Watchlist", () => ({
   },
 }));
 vi.mock("./Universe", () => ({
-  UniverseView: (props: Partial<ExploreCapabilityProps>) => {
+  UniverseView: (props: Partial<ExploreCapabilityProps> & {
+    navigationRequest?: NavigationRequest | null;
+  }) => {
     shellMocks.universeProps = props as Record<string, unknown>;
     return (
       <main data-testid="universe-surface">
         Universe surface
+        <pre data-testid="universe-request">{JSON.stringify(props.navigationRequest ?? null)}</pre>
         <button
           type="button"
           onClick={() => props.onNavigateTarget?.({
@@ -413,6 +426,19 @@ describe("App shell integration", () => {
     await click(button("資料來源設定"));
 
     expect(host.querySelector("[data-testid='settings-request']")?.textContent).toContain('"section":"data_sources"');
+  });
+
+  it("opens the Universe lifecycle workflow from the Settings health link", async () => {
+    const host = await renderApp();
+    await click(button("設定"));
+    await click(button("Open lifecycle workflow"));
+
+    expect(host.querySelector("[data-testid='universe-request']")?.textContent).toContain(
+      '"kind":"universe_lifecycle"',
+    );
+    expect(host.querySelector("[data-testid='universe-request']")?.textContent).toContain(
+      '"caseId":"slc-shell-case"',
+    );
   });
 
   it("passes Developer Mode into Settings without adding a second owner", async () => {

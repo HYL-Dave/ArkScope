@@ -32,6 +32,7 @@ const mocked = vi.hoisted(() => ({
   macroSnapshotError: null as Error | null,
   coverage: null as TradingDayCoverage | null,
   lifecycle: null as SecurityLifecycleSnapshot | null,
+  listLifecycleCases: vi.fn(),
 }));
 
 const emptyCatalog: ModelCatalog = {
@@ -253,6 +254,7 @@ vi.mock("./api", async (importOriginal) => {
     }),
     getTradingDayCoverage: vi.fn(async () => mocked.coverage!),
     getSecurityLifecycle: vi.fn(async () => mocked.lifecycle!),
+    listSecurityLifecycleCases: mocked.listLifecycleCases,
     reviewCorporateRelationship: vi.fn(async (id: number, status: "confirmed" | "rejected") => {
       mocked.lifecycle = {
         ...mocked.lifecycle!,
@@ -306,10 +308,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import {
   getMarketDataStatus,
-  getSecurityLifecycle,
   getTradingDayCoverage,
-  reviewCorporateRelationship,
-  reviewSecurityLifecycleEvent,
 } from "./api";
 import { SettingsView } from "./Settings";
 import { DataStorageSection } from "./settings/DataStorageSection";
@@ -363,82 +362,49 @@ async function renderSettings(
   await act(async () => { await Promise.resolve(); });
 }
 
-async function renderDataStorage(settingsReadCache: SettingsReadCache) {
+async function renderDataStorage(
+  settingsReadCache: SettingsReadCache,
+  onNavigateTarget = vi.fn(),
+) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(withTestUiLocale(React.createElement(DataStorageSection, {
+    root!.render(withTestUiLocale(React.createElement(
+      DataStorageSection as React.ComponentType<Record<string, unknown>>,
+      {
       developerMode: false,
       settingsReadCache,
+      onNavigateTarget,
     })));
   });
   await act(async () => { await Promise.resolve(); });
+  return { onNavigateTarget };
 }
 
 describe("local storage panels", () => {
-  it("shows SEC lifecycle evidence as review material and reloads it after its source runs", async () => {
+  it("shows lifecycle storage health and opens the Universe workflow without review actions", async () => {
     const cache = createSettingsReadCache();
     cache.replace("market_data_status", marketStatus);
-    cache.replace("security_lifecycle", lifecycle);
-    cache.replace(tradingDayCoverageKey(10), coverage);
-
-    await renderDataStorage(cache);
-    expect(getSecurityLifecycle).not.toHaveBeenCalled();
-    expect(host!.textContent).toContain("公司狀態與併購");
-    expect(host!.textContent).toContain("EA");
-    expect(host!.textContent).toContain("Oak-Eagle, LLC");
-    expect(host!.textContent).toContain("待確認");
-    expect(host!.textContent).toContain("不會自動從投資範圍移除標的");
-
-    const confirm = Array.from(host!.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("確認關係"),
-    );
-    if (!confirm) throw new Error("missing relationship confirmation action");
-    await act(async () => confirm.click());
-    expect(reviewCorporateRelationship).toHaveBeenCalledWith(1, "confirmed");
-    expect(getSecurityLifecycle).toHaveBeenCalledOnce();
-    expect(host!.textContent).toContain("已確認");
-
-    await act(async () => {
-      cache.invalidateDataSource("sec_corporate_actions");
-      await Promise.resolve();
-      await Promise.resolve();
+    cache.replace("security_lifecycle", {
+      ...lifecycle,
+      cases: [],
+      count: 33,
+      data_integrity: { source_missing_count: 2 },
     });
-    expect(getSecurityLifecycle).toHaveBeenCalledTimes(2);
-  });
-
-  it("offers explicit local confirmation only for listing-status events", async () => {
-    const cache = createSettingsReadCache();
-    cache.replace("market_data_status", marketStatus);
-    cache.replace("security_lifecycle", lifecycle);
     cache.replace(tradingDayCoverageKey(10), coverage);
 
-    await renderDataStorage(cache);
+    const { onNavigateTarget } = await renderDataStorage(cache);
+    expect(host!.textContent).toContain("標的生命週期調查");
+    expect(host!.textContent).toContain("33");
+    expect(host!.textContent).toContain("2");
+    expect(host!.textContent).not.toMatch(/確認關係|確認已下市|標記代號異動|清除覆核/);
 
-    const rows = Array.from(host!.querySelectorAll("tbody tr"));
-    const listingRow = rows.find((row) => row.textContent?.includes("DELIST"));
-    const acquisitionRow = rows.find((row) => row.textContent?.includes("EA"));
-    if (!listingRow || !acquisitionRow) throw new Error("missing lifecycle event rows");
-    expect(listingRow.textContent).toContain("確認已下市");
-    expect(listingRow.textContent).toContain("標記代號異動 / 轉板");
-    expect(acquisitionRow.textContent).not.toContain("確認已下市");
-    expect(host!.textContent).toContain("兩者都不會自動從投資範圍移除標的");
-
-    const confirm = Array.from(listingRow.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("確認已下市"),
-    );
-    if (!confirm) throw new Error("missing lifecycle confirmation action");
-    await act(async () => confirm.click());
-    expect(reviewSecurityLifecycleEvent).toHaveBeenCalledWith(2, "inactive_confirmed");
-    expect(host!.textContent).toContain("已確認停止上市");
-
-    const clear = Array.from(host!.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("清除覆核"),
-    );
-    if (!clear) throw new Error("missing lifecycle clear-review action");
-    await act(async () => clear.click());
-    expect(reviewSecurityLifecycleEvent).toHaveBeenLastCalledWith(2, "unreviewed");
+    const open = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("前往全部標的調查"));
+    if (!open) throw new Error("missing Universe lifecycle link");
+    await act(async () => open.click());
+    expect(onNavigateTarget).toHaveBeenCalledWith({ kind: "universe_lifecycle" });
   });
 
   it("keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads", async () => {

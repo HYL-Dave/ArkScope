@@ -5,12 +5,14 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ImportResult, UniverseResponse, WatchlistSummary } from "./api";
-import type { NavigationTarget } from "./shell/navigation";
+import type { NavigationRequest, NavigationTarget } from "./shell/navigation";
 
 const apiMocks = vi.hoisted(() => ({
   getProfileLists: vi.fn(),
   getUniverse: vi.fn(),
   importUniverse: vi.fn(),
+  getSecurityLifecycleCase: vi.fn(),
+  listSecurityLifecycleCases: vi.fn(),
   setTickerHidden: vi.fn(),
 }));
 
@@ -225,21 +227,27 @@ async function mountUniverse({
   developerMode = false,
   onOpenTicker = vi.fn(),
   onNavigateTarget = vi.fn(),
+  navigationRequest = null,
 }: {
   developerMode?: boolean;
   onOpenTicker?: (ticker: string) => void;
   onNavigateTarget?: (target: NavigationTarget) => void;
+  navigationRequest?: NavigationRequest | null;
 } = {}) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
     root!.render(
-      <UniverseView
-        onOpenTicker={onOpenTicker}
-        developerMode={developerMode}
-        onNavigateTarget={onNavigateTarget}
-      />,
+      React.createElement(
+        UniverseView as React.ComponentType<Record<string, unknown>>,
+        {
+          onOpenTicker,
+          developerMode,
+          onNavigateTarget,
+          navigationRequest,
+        },
+      ),
     );
     await Promise.resolve();
   });
@@ -279,6 +287,53 @@ beforeEach(async () => {
   document.documentElement.lang = "zh-Hant";
   apiMocks.getProfileLists.mockReset().mockResolvedValue({ lists: LISTS });
   apiMocks.getUniverse.mockReset().mockResolvedValue(UNIVERSE);
+  apiMocks.listSecurityLifecycleCases.mockReset().mockResolvedValue({
+    cases: [{
+      case_id: "slc-qbts",
+      source: "sec_edgar",
+      source_ref: "qbts-ref",
+      ticker: "QBTS",
+      source_presence: "present",
+      workflow_state: "unresolved",
+      issuer_name: "D-Wave Quantum Inc.",
+      filing_date: "2026-07-24",
+      kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
+      current_assessment: null,
+      current_acknowledgement: null,
+      active_sources: ["manual_lists"],
+      source_context: "available",
+      components: {},
+      investigation_run_count: 0,
+      evidence_count: 0,
+      assessment_count: 0,
+      acknowledgement_count: 0,
+      proposal_count: 0,
+    }],
+    count: 1,
+    data_integrity: { source_missing_count: 0 },
+  });
+  apiMocks.getSecurityLifecycleCase.mockReset().mockResolvedValue({
+    case_id: "slc-qbts",
+    source: "sec_edgar",
+    source_ref: "qbts-ref",
+    ticker: "QBTS",
+    source_presence: "present",
+    workflow_state: "unresolved",
+    issuer_name: "D-Wave Quantum Inc.",
+    observation: {
+      issuer_name: "D-Wave Quantum Inc.",
+      filing_date: "2026-07-24",
+      filing_form: "25-NSE",
+      evidence_url: "https://www.sec.gov/Archives/example/qbts.htm",
+      description: "Common stock",
+      kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
+    },
+    investigation_runs: [],
+    evidence: [],
+    assessment_history: [],
+    acknowledgement_history: [],
+    proposals: [],
+  });
   apiMocks.importUniverse.mockReset().mockResolvedValue(IMPORT_RESULT);
   apiMocks.setTickerHidden.mockReset().mockResolvedValue({ ticker: SOURCE_TICKER, hidden: true });
   confirmMock = vi.fn(() => true);
@@ -577,5 +632,36 @@ describe("Universe localization", () => {
     expect(category.value).toBe(SOURCE_CATEGORY);
     expect(Array.from(host!.querySelectorAll("tbody tr"))).toEqual(rowsBefore);
     expect(host!.querySelector(".surface-title")?.textContent).toBe("Universe");
+  });
+
+  it("keeps inventory and lifecycle as one Universe-owned tab set", async () => {
+    await mountUniverse();
+    await waitForText(SOURCE_TICKER);
+    const tabs = host!.querySelector('[role="tablist"]');
+    expect(tabs?.textContent).toContain("標的清冊");
+    expect(tabs?.textContent).toContain("生命週期調查");
+
+    await click(buttonByText("生命週期調查", tabs!));
+    await waitForText("QBTS");
+    expect(host!.textContent).toContain("標的生命週期調查");
+    expect(host!.querySelectorAll('main[aria-label="標的生命週期調查"]')).toHaveLength(1);
+  });
+
+  it("opens an exact lifecycle case navigation target and preserves it across locale switch", async () => {
+    const target = {
+      sequence: 41,
+      target: { kind: "universe_lifecycle", caseId: "slc-qbts" },
+    } as unknown as NavigationRequest;
+    await mountUniverse({ navigationRequest: target });
+    await waitForText("D-Wave Quantum Inc.");
+    const drawer = document.body.querySelector('[role="dialog"]');
+    const selected = host!.querySelector('[role="tab"][aria-selected="true"]');
+    expect(selected?.textContent).toContain("生命週期調查");
+    expect(drawer?.textContent).toContain("QBTS");
+
+    await switchLocale("en");
+    expect(document.body.querySelector('[role="dialog"]')).toBe(drawer);
+    expect(host!.querySelector('[role="tab"][aria-selected="true"]')?.textContent)
+      .toContain("Lifecycle investigation");
   });
 });
