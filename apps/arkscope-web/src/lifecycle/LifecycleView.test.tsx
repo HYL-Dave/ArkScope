@@ -75,6 +75,7 @@ const SUMMARY = {
 function detail(overrides: Record<string, unknown> = {}) {
   return {
     ...SUMMARY,
+    observation_fingerprint_sha256: "f".repeat(64),
     observation: {
       ticker: "QBTS",
       issuer_name: "D-Wave Quantum Inc.",
@@ -345,8 +346,11 @@ describe("Lifecycle workflow", () => {
 
   it("records successful zero-result runs without claiming no impact", async () => {
     await mountLifecycle();
-    expect(document.body.textContent).toContain("Search completed · 0 results");
-    expect(document.body.textContent).not.toMatch(/No impact|Unrelated|Nothing happened/);
+    const history = Array.from(document.body.querySelectorAll("section")).find(
+      (section) => section.querySelector("h3")?.textContent === "Evidence and searches",
+    );
+    expect(history?.textContent).toContain("Search completed · 0 results");
+    expect(history?.textContent).not.toMatch(/No impact|Unrelated|Nothing happened/);
   });
 
   it("renders bilingual workflow copy without translating provider evidence", async () => {
@@ -382,23 +386,47 @@ describe("Lifecycle workflow", () => {
 
   it("requires cited evidence before accepting a conclusive assessment", async () => {
     await mountLifecycle();
+    expect(document.body.querySelector<HTMLSelectElement>(
+      '[aria-label="Assessment relevance"]',
+    )?.value).toBe("undetermined");
+    expect(document.body.querySelector<HTMLSelectElement>(
+      '[aria-label="Assessment confidence"]',
+    )?.value).toBe("unknown");
+    expect(document.body.querySelector<HTMLSelectElement>(
+      '[aria-label="Assessment outcome"]',
+    )?.value).toBe("undetermined");
     await setField("Assessment conclusion", "The tracked security will stop trading.");
     await setField("Investment impact", "Review the portfolio position before acting.");
     await click("Save assessment draft");
     expect(apiMocks.createSecurityLifecycleAssessment).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("Select at least one evidence citation");
-    const citation = document.body.querySelector<HTMLInputElement>(
-      '[aria-label="Cite provider evidence"]',
+    expect(document.body.textContent).toContain(
+      "Select the current source observation before saving the assessment",
     );
-    if (!citation) throw new Error("missing evidence citation");
-    await act(async () => citation.click());
+    const evidenceCitation = document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="Cite provider evidence"]',
+    );
+    if (!evidenceCitation) throw new Error("missing evidence citation");
+    await act(async () => evidenceCitation.click());
+    await click("Save assessment draft");
+    expect(apiMocks.createSecurityLifecycleAssessment).not.toHaveBeenCalled();
+    const observationCitation = document.body.querySelector<HTMLInputElement>(
+      'input[data-citation-kind="observation"]',
+    );
+    if (!observationCitation) throw new Error("missing current observation citation");
+    await act(async () => observationCitation.click());
     await click("Save assessment draft");
     expect(apiMocks.createSecurityLifecycleAssessment).toHaveBeenCalledWith(
       CASE_ID,
-      expect.objectContaining({ citations: [{
-        reference_kind: "evidence",
-        evidence_id: "evidence-sec",
-      }] }),
+      expect.objectContaining({ citations: [
+        {
+          reference_kind: "observation",
+          cited_content_sha256: "f".repeat(64),
+        },
+        {
+          reference_kind: "evidence",
+          evidence_id: "evidence-sec",
+        },
+      ] }),
     );
   });
 

@@ -259,6 +259,7 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
             f"/security-lifecycle/cases/{context['case_id']}"
         ).json()
         assert payload["observation"]["source_ref"] == _SOURCE_REF
+        assert payload["observation_fingerprint_sha256"] == context["fingerprint"]
         assert payload["active_sources"] == ["manual_lists"]
         assert len(payload["evidence"]) == 1
         assert payload["current_assessment"]["assessment_id"] == assessment_id
@@ -313,6 +314,9 @@ def test_case_list_composes_both_stores_in_stable_order_without_read_side_writes
                 )
             )
         market.close()
+        limited = client.get("/security-lifecycle/cases?limit=1").json()
+        assert len(limited["cases"]) == 1
+        assert limited["count"] == 1001
         original = context["service"].get_case(context["case_id"])
         assert original["source_presence"] == "present"
         assert original["observation"]["source_ref"] == _SOURCE_REF

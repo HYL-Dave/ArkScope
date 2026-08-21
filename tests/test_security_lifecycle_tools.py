@@ -198,7 +198,7 @@ def test_list_tool_is_local_read_only_and_stably_sorted(tmp_path, monkeypatch):
         assert tools.list_security_lifecycle_cases(ticker="old", limit=20)["count"] == 1
         assert tools.list_security_lifecycle_cases(
             workflow_state="unresolved", limit=1
-        )["count"] == 1
+        )["count"] == 2
     finally:
         profile.close()
 
