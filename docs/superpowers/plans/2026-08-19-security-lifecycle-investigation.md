@@ -1,17 +1,9 @@
 # Security Lifecycle Investigation Implementation Plan
 
-> **Status:** PLAN GREEN FOR TASKS 0-7 AT `1907af23`; TASK 8 LIVE-PREFLIGHT
-> AMENDMENT GREEN AT `e958be2d`; TASK 0 SNAPSHOT-SELECTOR AMENDMENT GREEN AT
-> `8a600ce0`; TASK 0 BOOTSTRAP-TOPOLOGY AMENDMENT GREEN AT `0e99314f`; TASK 0
-> COMPLETE; TASK 1 IMPLEMENTATION AND INDEPENDENT REVIEW GREEN AT `e2f90f98`;
-> TASK 2 COMPLETE; TASK 3 BRIDGE-OWNERSHIP AMENDMENT GREEN; 2026-08-21
-> SOURCE/TIME/INTEGRITY AMENDMENT USER-AUTHORIZED; TASK 3 INDEPENDENT-REVIEW
-> AMENDMENT USER-AUTHORIZED AND UNDER EXECUTOR REVIEW;
-> TASK 4 CITATION/COUNT SEAM AMENDMENT AWAITS FOCUSED REVIEW; TASK 4 PRODUCT
-> BYTES REMAIN UNCOMMITTED;
-> TASKS 1-3 ARE
-> NON-DEPLOYABLE STAGING UNTIL TASK 4 COMPLETES THE ROUTE/CONSUMER CUTOVER; LIVE
-> MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED
+> **Status:** TASKS 0-4 COMPLETE. TASK 5 M1-M22 INITIAL REPLAY COMPLETE; TASK 5
+> IS PAUSED AT A B-CLASS NO-TAIL AMENDMENT AWAITING FOCUSED REVIEW. TASKS 6-7
+> REMAIN BLOCKED; TASK 8 RETAINS ITS SEPARATE LIVE-PREFLIGHT GATE. LIVE
+> MIGRATION, MERGE, PUSH, AND PROVIDER CALLS REMAIN UNAUTHORIZED.
 >
 > **Date:** 2026-08-19
 >
@@ -1531,6 +1523,40 @@ identity, protected path, or Task 5 admission target. The incomplete-owner run
 remains rejected evidence; Task 5 is paused until this amendment receives
 focused review.
 
+The 2026-08-21 no-tail correction is B-class. Final admission found
+`SecurityLifecycleInvestigationStore.insert_legacy_assessment()` in the runtime
+module even though it has no product or migration caller: its only caller is the
+added source-reattachment test. The method also keeps the retired
+`inactive_confirmed` and `renamed_or_transferred` product vocabulary in
+`src/security_lifecycle_investigation.py`, contradicting sections 1.1 and 7.2,
+which permit those values only as bounded migration input in the migration
+module, fixture, and tests. This is a test-support API left in product code, not
+an allowed migration seam.
+
+After focused review, evolve only the already-added
+`test_source_reattachment_restores_identical_fingerprint_and_revalidates_changed_content`
+body. Build its accepted historical assessment through `ensure_case()`,
+`create_assessment(author="legacy_review", outcome="listing_ended", current
+observation citation)`, and `accept_assessment()`; assert that the store exposes
+no `insert_legacy_assessment` method. Against the current product bytes that
+final test body must fail only on the method-absence assertion. Then remove the
+entire dead method and rerun the owner GREEN. Do not move the retired mapping,
+add a compatibility helper, weaken the source-reattachment assertions, or alter
+the migration implementation/schema.
+
+Because the old M10 diagnostic mutation called the dead helper, its evidence is
+superseded. M10 now uniquely means: when an adapter result contains a
+`proposal` mapping, use the ordinary store API at that exact result loop to
+create and accept a human `direct_tracked_security` / `listing_ended`
+assessment anchored to the current observation, then generate proposals. It
+must still fail only `test_adapter_output_cannot_write_an_assessment_or_proposal`.
+After the correction, rerun M1-M22 from the clean corrected tip rather than
+reusing any pre-correction mutation result. Backend/frontend node identities,
+the 55-row retained-body ledger, route/tool/allowlist/schema vocabularies, the
+57-path ownership ledger, and protected bytes remain unchanged. Any additional
+node, path, runtime legacy token, mutation owner, or surface change is another
+B-class stop.
+
 ### 7.1 Required mutations
 
 | ID | Mutation | Required RED owner |
@@ -1544,7 +1570,7 @@ focused review.
 | M7 | allow failed-only acknowledgement | `test_failed_run_alone_cannot_acknowledge_a_case` |
 | M8 | in `succeed_investigation_run`, route `result_count == 0` through `fail_investigation_run` with existing code `extract_failed` while preserving `usage`, `fetch_count`, and `at` | `test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary`, `test_successful_zero_result_run_can_support_inconclusive_acknowledgement`, `test_successful_zero_result_search_is_succeeded_not_failed`, and `test_tools_return_observation_and_profile_facts_without_provider_fields` |
 | M9 | remove only the `PermissionClass.metered_spend` call from `run_tavily_investigation`, preserving the other permission calls and transport | `test_search_calls_external_and_metered_permissions_before_egress` and `test_case_write_routes_call_db_write_before_persistence` |
-| M10 | let adapter output create a proposal | `test_adapter_output_cannot_write_an_assessment_or_proposal` |
+| M10 | at the adapter-result loop, let a result `proposal` create and accept a current human assessment through the ordinary store API and then generate proposals | `test_adapter_output_cannot_write_an_assessment_or_proposal` |
 | M11 | allow a private/redirect URL | `test_unsafe_local_private_and_redirect_urls_are_rejected` |
 | M12 | allow hide/remap with open position | `test_open_portfolio_position_blocks_hide_and_remap_proposals` |
 | M13 | make one local tool call transport | `test_tool_reads_issue_zero_network_calls` |
