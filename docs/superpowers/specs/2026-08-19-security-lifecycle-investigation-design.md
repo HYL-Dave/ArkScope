@@ -1,6 +1,6 @@
 # Security Lifecycle Investigation and Action Proposal Design
 
-**Status:** DESIGN APPROVED; RED-FIRST IMPLEMENTATION PLAN REVIEW PENDING
+**Status:** DESIGN APPROVED; 2026-08-21 SOURCE/TIME/INTEGRITY AMENDMENT APPROVED
 **Date:** 2026-08-19
 **Base:** `be263855` (`master`; not pushed by this design)
 **Priority owner:** `PROJECT_PRIORITY_MAP.md` P0-E, Slice 2
@@ -44,6 +44,17 @@ investigation and disposition layer.
 - The desired end state may include unattended research and alerts. The first
   implementation remains attended and reviewable because permission enforcement,
   alert product design, and cross-store action execution are not complete.
+- Formal event investigation and market-impact research are separate products.
+  SEC/provider observations and official exchange/issuer/acquirer material anchor
+  what happened; broker contract state may later corroborate current operational
+  identity. News, web commentary, price/volume reaction, and analyst interpretation
+  explain context or impact but do not become the formal event authority.
+- V1 does not require an LLM to reach or accept a conclusion. A later model may
+  interpret structured official evidence and write a cited draft only; it never
+  owns source facts, acceptance, action selection, or action execution.
+- Saved case/evidence results remain model-callable through stable local tools.
+  Whether a model may also start a real-time investigation is a separate permission
+  and product decision; this design does not infer it from read-tool availability.
 
 ## 2. Grounded current state
 
@@ -226,6 +237,16 @@ history. An identical observation fingerprint restores the prior current
 assessment or acknowledgement; a changed fingerprint preserves that history but
 requires revalidation.
 
+Source absence is a data-integrity condition, not an investment-event conclusion.
+The default lifecycle to-do projection excludes `source_missing` cases and exposes
+their count plus an explicit source-presence filter in the same Lifecycle view.
+Detail/history and bounded manual evidence remain readable/additive, but web
+investigation, assessment creation/acceptance, inconclusive acknowledgement, and
+proposal generation require a present observation fingerprint. V1 does not invent
+`source_withdrawn`, a null fingerprint, or another cause. A durable closure model
+needs an absence epoch/tombstone and becomes an owned follow-on only when the first
+real `source_missing` case appears.
+
 ### 3.3 Investigation run
 
 An **investigation run** records one bounded attempt to gather external evidence.
@@ -261,6 +282,17 @@ Required provenance includes `case_id`, source URL when applicable, title,
 publisher/domain, source/published/retrieved timestamps when known, adapter,
 bounded excerpt, content hash, MIME type when known, and the originating run.
 Missing fields remain null; they are not inferred.
+
+Time fields preserve their actual precision:
+
+- observation `filing_date`, kind `effective_date`, and assessment
+  `effective_date` are calendar dates, never fabricated midnight instants;
+- `source_published_at` accepts only a real source-supplied ISO date or an aware
+  RFC 3339 instant and retains date/minute/second/subsecond lexical precision;
+- `retrieved_at`, `first_observed_at`, and `last_observed_at` are ArkScope UTC
+  observation clocks, not event-effective times; and
+- future market-reaction windows have their own timestamped records. They must not
+  infer event time from EDGAR acceptance, web publication, or ArkScope retrieval.
 
 Provider-generated answers and relevance scores are leads, not evidence. A
 claim must cite one or more URL-addressable or user-supplied evidence items.
@@ -348,7 +380,8 @@ An accepted, resolved assessment must:
 
 - use relevance other than `undetermined`;
 - use at least one non-`undetermined` outcome;
-- cite at least one provider observation or profile evidence item;
+- cite the current provider observation; profile evidence may corroborate or
+  explain it but cannot replace that formal event anchor;
 - include a bounded conclusion and impact summary; and
 - identify the author as `human` or `legacy_review`.
 
@@ -623,6 +656,12 @@ requires a real-account canary proving that cited sources, query attempts,
 provider identity, usage, and failure states can be normalized without parsing
 free-form prose. Existing hosted-agent tool availability is not that proof.
 
+There is no automatic paid-provider fallback. Credential absence, request-rate
+throttling, and account/plan usage exhaustion are separate typed outcomes. A
+later adapter may be selected only by an explicit command or reviewed policy; an
+exhausted Tavily allowance never silently spends an OpenAI, Anthropic, or other
+provider allowance.
+
 `web_browse` is excluded from this slice because it requires the distinct
 `external_browser_automation` permission.
 
@@ -635,9 +674,11 @@ model to invent an unbounded browsing plan:
 2. symbol, venue, delisting, and successor query; and
 3. acquisition/merger consideration query for M&A observations.
 
-Official SEC, exchange, and issuer sources are preferred, followed by reputable
-reporting. Search rank never becomes source authority. Conflicting evidence is
-preserved and forces `undetermined` until a reviewer accepts a conclusion.
+The structured provider observation is the required formal-event anchor. Official
+SEC, exchange, issuer, and acquirer sources are preferred corroboration, followed
+by broker contract state and reputable reporting. Search rank never becomes source
+authority. Conflicting evidence is preserved and forces `undetermined` until a
+reviewer accepts a conclusion.
 
 Default run bounds are three queries, five results per query, and five selected
 fetches. The implementation plan may tighten these values but may not remove
@@ -659,7 +700,7 @@ the bounds.
   permissions, or instructions.
 - Adapter failures use a closed reason set such as `adapter_unavailable`,
   `credential_missing`, `permission_denied`, `rate_limited`, `network_error`,
-  `extract_failed`, and `unsupported_content`.
+  `usage_limit_reached`, `extract_failed`, and `unsupported_content`.
 - Raw provider exception text, API keys, private paths, full response bodies,
   and model chain-of-thought never enter product records.
 
@@ -714,7 +755,9 @@ silently convert that prose into a profile mutation.
 The lifecycle workflow moves to a `Lifecycle` view under `Universe`:
 
 - one compact triage table for cases;
-- filters for workflow state, relevance, event type, and proposal type;
+- filters for workflow state, source presence, relevance, event type, and proposal
+  type, with source-missing count presented as data integrity rather than an
+  ordinary investment-event task;
 - a detail drawer showing source presence and observations, current
   active-universe source membership, investigation history, evidence,
   acknowledgements, assessments, and proposals;
@@ -821,6 +864,33 @@ That workstream decides native-text extraction, page-level OCR routing, vision
 model selection, tables/charts, multilingual behavior, privacy, and artifact
 retention. Slice 2 does not select `pdf-inspector` or an OCR model on its behalf.
 
+### 8.4 Market-impact research
+
+Market impact is a separate normalized tool/result family keyed to case/evidence
+IDs. It may compare pre-event, announcement, effective-date, and post-event
+price/volume windows and retain sourced commentary. It may be consumed by AI
+Research, future notes, and future alerts, but it does not rewrite the accepted
+formal event assessment. Real-time execution remains undecided; saved results are
+the first stable integration contract.
+
+### 8.5 IBKR contract-state corroboration
+
+A future read-only `IBKRContractStateAdapter` may record current `conId`, symbol,
+local symbol, primary/listing exchange, valid exchanges, and available security
+identifiers. Contract drift may open or enrich an investigation; it never proves
+complete corporate-action history and never auto-remaps a tracked symbol. The
+existing `get_contract_details` helper is not this evidence owner because its
+current projection omits required identity/venue fields and collapses failures.
+
+### 8.6 Feature capability disclosure
+
+Provider-dependent features need one machine-readable capability authority that
+drives detailed setup documentation and Settings readiness. Each feature declares
+required accounts/keys/services/settings/permissions, optional enhancements,
+cost/quota behavior, external data sharing, degraded behavior, and a test/canary.
+README remains a summary. This slice records the requirement but does not create
+that cross-product manifest while only Lifecycle consumes it.
+
 ## 9. Alternatives considered
 
 ### A. Keep the current table and add a search button
@@ -878,6 +948,9 @@ Follow-on lines, not hidden tasks in this implementation:
 - source-aware action executor and reviewed symbol-identity transition;
 - model-assisted assessment drafts;
 - OpenAI/Anthropic hosted-search adapter canaries;
+- read-only IBKR contract-state corroboration;
+- market-impact research with independently timestamped price/volume windows;
+- cross-product feature capability/setup manifest;
 - Document Intelligence and binary artifact ingestion;
 - Alerts/unattended investigation; and
 - broader corporate relationship graph/dedup.
@@ -936,6 +1009,16 @@ minimum it must prove:
 18. External URL handling rejects local/private targets and unsafe redirects.
 19. Full canonical backend/frontend admission remains green with deterministic
     collection identities and byte-restored mutations.
+20. An accepted assessment without a current provider-observation citation is
+    rejected even when it cites web/manual evidence.
+21. Date-only source publication/effective values remain date-only; no code
+    manufactures midnight, and retrieval/observation clocks remain distinct.
+22. Rate throttling and plan/usage exhaustion remain distinct typed failures and
+    neither triggers a paid-provider fallback.
+23. `source_missing` cases are queryable through a data-integrity filter/count but
+    cannot be searched, assessed, acknowledged, or used to generate proposals.
+24. Saved local results remain callable without granting a model permission to
+    perform a real-time external investigation.
 
 ## 12. Hard stops
 
