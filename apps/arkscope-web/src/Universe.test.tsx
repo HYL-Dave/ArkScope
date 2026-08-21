@@ -240,7 +240,7 @@ async function mountUniverse({
   await act(async () => {
     root!.render(
       React.createElement(
-        UniverseView as React.ComponentType<Record<string, unknown>>,
+        UniverseView as unknown as React.ComponentType<Record<string, unknown>>,
         {
           onOpenTicker,
           developerMode,

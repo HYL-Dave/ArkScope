@@ -1778,6 +1778,211 @@ table.wl tbody tr.archived td {
 }
 
 /* ---- Universe (full inventory) ---- */
+.universe-surface,
+.lifecycle-triage {
+  min-width: 0;
+}
+.lifecycle-head {
+  align-items: center;
+}
+.lifecycle-view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.lifecycle-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(128px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.lifecycle-filters label,
+.lifecycle-commands label,
+.lifecycle-assessment-form > label:not(.lifecycle-citation) {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.lifecycle-filters input,
+.lifecycle-filters select,
+.lifecycle-commands input,
+.lifecycle-commands textarea,
+.lifecycle-assessment-form select,
+.lifecycle-assessment-form textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--fg);
+  padding: 6px 8px;
+  font: inherit;
+}
+.lifecycle-commands textarea,
+.lifecycle-assessment-form textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+.lifecycle-filters input:focus-visible,
+.lifecycle-filters select:focus-visible,
+.lifecycle-commands input:focus-visible,
+.lifecycle-commands textarea:focus-visible,
+.lifecycle-assessment-form select:focus-visible,
+.lifecycle-assessment-form textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.lifecycle-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+table.lifecycle-table {
+  min-width: 820px;
+}
+table.lifecycle-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.lifecycle-case-trigger {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.lifecycle-case-trigger:hover .strong {
+  color: var(--accent);
+}
+.lifecycle-case-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.lifecycle-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.lifecycle-state-unresolved {
+  color: var(--wait);
+  border-color: color-mix(in srgb, var(--wait) 55%, var(--border));
+}
+.lifecycle-state-investigating {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.lifecycle-state-evidence_ready {
+  color: #79c0ff;
+  border-color: color-mix(in srgb, #79c0ff 55%, var(--border));
+}
+.lifecycle-state-resolved {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--border));
+}
+.lifecycle-integrity-notice {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--wait);
+  background: color-mix(in srgb, var(--wait) 8%, transparent);
+  color: var(--fg);
+}
+.lifecycle-drawer-content {
+  display: grid;
+  min-width: 0;
+  gap: 0;
+}
+.lifecycle-detail-section {
+  min-width: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.lifecycle-detail-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.lifecycle-detail-section h3,
+.lifecycle-detail-section h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.lifecycle-detail-section p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.lifecycle-provider-evidence {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lifecycle-evidence-link,
+.lifecycle-history-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.lifecycle-history-row {
+  min-width: 0;
+  margin: 8px 0;
+  padding: 1px 0 1px 10px;
+  border-left: 2px solid var(--border);
+}
+.lifecycle-commands,
+.lifecycle-assessment-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.lifecycle-commands > .ui-button,
+.lifecycle-assessment-form > .ui-button,
+.lifecycle-assessment-form > .errorbox {
+  justify-self: start;
+}
+.lifecycle-commands > .ui-button:first-child,
+.lifecycle-assessment-form > label:nth-of-type(n + 4),
+.lifecycle-assessment-form > .lifecycle-citation,
+.lifecycle-assessment-form > .errorbox {
+  grid-column: 1 / -1;
+}
+.lifecycle-citation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  color: var(--fg);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.lifecycle-citation input {
+  margin: 2px 0 0;
+}
+.lifecycle-proposal {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+}
+
 .universe-hint {
   margin: 2px 0 8px;
   max-width: 880px;
@@ -1818,6 +2023,40 @@ table.wl tbody tr.archived td {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0 6px;
+}
+
+@media (max-width: 900px) {
+  .lifecycle-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .lifecycle-head > .spacer {
+    display: none;
+  }
+  .lifecycle-head > .ui-button {
+    width: 100%;
+  }
+  .lifecycle-view-switch .ui-button {
+    flex: 1 1 100%;
+  }
+  .lifecycle-filters,
+  .lifecycle-commands,
+  .lifecycle-assessment-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lifecycle-commands > *,
+  .lifecycle-assessment-form > *,
+  .lifecycle-assessment-form > label:nth-of-type(n + 4),
+  .lifecycle-assessment-form > .lifecycle-citation,
+  .lifecycle-assessment-form > .errorbox {
+    grid-column: 1;
+  }
+  .lifecycle-commands > .ui-button,
+  .lifecycle-assessment-form > .ui-button {
+    width: 100%;
+  }
 }
 
 /* ---- Watchlist list tabs ---- */

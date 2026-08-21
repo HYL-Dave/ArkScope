@@ -7,7 +7,7 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, SecurityLifecycleSnapshot, TaskRoute, TradingDayCoverage } from "./api";
+import type { MacroSnapshot, MacroStatus, MarketDataStatus, ModelCatalog, ModelTask, NewsStatus, SecurityLifecycleCaseListResponse, TaskRoute, TradingDayCoverage } from "./api";
 import {
   LocaleProvider,
   createUiLocaleController,
@@ -31,7 +31,7 @@ const mocked = vi.hoisted(() => ({
   macroError: null as Error | null,
   macroSnapshotError: null as Error | null,
   coverage: null as TradingDayCoverage | null,
-  lifecycle: null as SecurityLifecycleSnapshot | null,
+  lifecycle: null as SecurityLifecycleCaseListResponse | null,
   listLifecycleCases: vi.fn(),
 }));
 
@@ -119,79 +119,11 @@ const coverage: TradingDayCoverage = {
   provider_errors: [],
 };
 
-const lifecycle: SecurityLifecycleSnapshot = {
-  summary: {
-    event_count: 2,
-    review_required: 1,
-    pending_delisting: 1,
-    confirmed_inactive: 0,
-    renamed_or_transferred: 0,
-    relationship_candidates: 1,
-  },
-  events: [
-    {
-      id: 1,
-      ticker: "EA",
-      cik: "0000712515",
-      issuer_name: "Electronic Arts Inc.",
-      event_type: "acquisition_completed",
-      observed_lifecycle_state: "review_required",
-      lifecycle_state: "review_required",
-      reviewed_state: null,
-      reviewed_at: null,
-      filing_date: "2026-08-04",
-      effective_date: "2026-08-04",
-      source: "sec_edgar",
-      source_ref: "0000712515-26-000042",
-      filing_form: "8-K",
-      filing_items: ["2.01", "3.01"],
-      evidence_url: "https://www.sec.gov/Archives/example/ea-8k.htm",
-      description: "Current report",
-      first_observed_at: "2026-08-05T00:00:00Z",
-      last_observed_at: "2026-08-05T00:00:00Z",
-    },
-    {
-      id: 2,
-      ticker: "DELIST",
-      cik: "0000000002",
-      issuer_name: "Delisting Review Corp.",
-      event_type: "listing_removal_notice",
-      observed_lifecycle_state: "pending_delisting",
-      lifecycle_state: "pending_delisting",
-      reviewed_state: null,
-      reviewed_at: null,
-      filing_date: "2026-08-05",
-      effective_date: null,
-      source: "sec_edgar",
-      source_ref: "0000000002-26-000001",
-      filing_form: "25-NSE",
-      filing_items: [],
-      evidence_url: "https://www.sec.gov/Archives/example/delist-form25.htm",
-      description: "Listing removal notice",
-      first_observed_at: "2026-08-06T00:00:00Z",
-      last_observed_at: "2026-08-06T00:00:00Z",
-    },
-  ],
-  relationships: [{
-    id: 1,
-    action_type: "acquisition",
-    target_ticker: "EA",
-    target_cik: "0000712515",
-    target_name: "Electronic Arts Inc.",
-    acquirer_ticker: null,
-    acquirer_cik: null,
-    acquirer_name: "Oak-Eagle, LLC",
-    status: "candidate",
-    effective_date: "2026-08-04",
-    source: "sec_edgar",
-    source_ref: "0000712515-26-000042",
-    evidence_url: "https://www.sec.gov/Archives/example/ea-8k.htm",
-    evidence_excerpt: "The Company became a wholly owned subsidiary of Oak-Eagle, LLC.",
-    first_observed_at: "2026-08-05T00:00:00Z",
-    last_observed_at: "2026-08-05T00:00:00Z",
-    reviewed_at: null,
-  }],
-};
+const lifecycle = {
+  cases: [],
+  count: 33,
+  data_integrity: { source_missing_count: 2 },
+} satisfies SecurityLifecycleCaseListResponse;
 
 mocked.coverage = coverage;
 mocked.lifecycle = lifecycle;
@@ -253,55 +185,7 @@ vi.mock("./api", async (importOriginal) => {
       return mocked.macroSnapshot!;
     }),
     getTradingDayCoverage: vi.fn(async () => mocked.coverage!),
-    getSecurityLifecycle: vi.fn(async () => mocked.lifecycle!),
     listSecurityLifecycleCases: mocked.listLifecycleCases,
-    reviewCorporateRelationship: vi.fn(async (id: number, status: "confirmed" | "rejected") => {
-      mocked.lifecycle = {
-        ...mocked.lifecycle!,
-        relationships: mocked.lifecycle!.relationships.map((relationship) =>
-          relationship.id === id ? { ...relationship, status } : relationship),
-        summary: {
-          ...mocked.lifecycle!.summary,
-          relationship_candidates: mocked.lifecycle!.relationships.filter(
-            (relationship) => relationship.id !== id && relationship.status === "candidate",
-          ).length,
-        },
-      };
-      return { id, status };
-    }),
-    reviewSecurityLifecycleEvent: vi.fn(async (
-      id: number,
-      status: "inactive_confirmed" | "renamed_or_transferred" | "unreviewed",
-    ) => {
-      const events = mocked.lifecycle!.events.map((event) => {
-        if (event.id !== id) return event;
-        const reviewedState = status === "unreviewed" ? null : status;
-        return {
-          ...event,
-          lifecycle_state: reviewedState ?? event.observed_lifecycle_state,
-          reviewed_state: reviewedState,
-          reviewed_at: reviewedState ? "2026-08-12T01:00:00Z" : null,
-        };
-      });
-      mocked.lifecycle = {
-        ...mocked.lifecycle!,
-        events,
-        summary: {
-          ...mocked.lifecycle!.summary,
-          review_required: events.filter((event) =>
-            event.reviewed_state === null
-            && event.observed_lifecycle_state === "review_required").length,
-          pending_delisting: events.filter((event) =>
-            event.reviewed_state === null
-            && event.observed_lifecycle_state === "pending_delisting").length,
-          confirmed_inactive: events.filter((event) =>
-            event.reviewed_state === "inactive_confirmed").length,
-          renamed_or_transferred: events.filter((event) =>
-            event.reviewed_state === "renamed_or_transferred").length,
-        },
-      };
-      return { id, status };
-    }),
     getNewsStatus: vi.fn(async () => newsStatus),
   };
 });
@@ -339,6 +223,7 @@ afterEach(() => {
   mocked.macroSnapshotError = null;
   mocked.coverage = coverage;
   mocked.lifecycle = lifecycle;
+  mocked.listLifecycleCases.mockReset().mockResolvedValue(lifecycle);
 });
 
 async function renderSettings(
@@ -550,7 +435,7 @@ describe("local storage panels", () => {
 
     expect(Array.from(host!.querySelectorAll("h2"), (node) => node.textContent)).toEqual([
       "市場資料",
-      "公司狀態與併購",
+      "標的生命週期調查",
       "交易日 / 價格覆蓋",
       "新聞資料",
       "總經資料",
@@ -568,7 +453,7 @@ describe("local storage panels", () => {
         "連線與金鑰",
         "資料來源排程",
         "市場資料",
-        "公司狀態與併購",
+        "標的生命週期調查",
         "交易日 / 價格覆蓋",
         "新聞資料",
         "總經資料",
@@ -729,12 +614,8 @@ describe("local storage panels", () => {
         "News",
         "Stored SEC Fundamentals",
         "Financial Cache",
-        "Events",
-        "Review required",
-        "Delisting notices",
-        "Confirmed listing ended",
-        "Renamed or transferred",
-        "M&A relationship candidates",
+        "Present-source cases",
+        "Source-missing cases",
         "Universe",
         "Interval",
         "Market scope",
@@ -773,8 +654,6 @@ describe("local storage panels", () => {
     expect(Array.from(storage.querySelectorAll("table"), (table) =>
       Array.from(table.querySelectorAll("th"), (node) => node.textContent)))
       .toEqual([
-        ["Target", "Acquirer", "Status", "Filing / effective date", "Evidence", "Review"],
-        ["Ticker", "Event", "Status", "Filing / effective date", "Evidence", "Review"],
         ["Date", "Status", "Expected slots", "Complete", "Partial", "Unknown"],
       ]);
     const coverageRow = Array.from(storage.querySelectorAll<HTMLTableRowElement>("tbody tr"))
@@ -824,7 +703,7 @@ describe("local storage panels", () => {
     const news = host!.querySelector('[data-settings-anchor="news_storage"]');
     const macro = host!.querySelector('[data-settings-anchor="macro_storage"]');
     expect(Array.from(storage?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
-      .toEqual(["市場資料", "公司狀態與併購", "交易日 / 價格覆蓋"]);
+      .toEqual(["市場資料", "標的生命週期調查", "交易日 / 價格覆蓋"]);
     expect(Array.from(news?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))
       .toEqual(["新聞資料"]);
     expect(Array.from(macro?.querySelectorAll("h2") ?? []).map((heading) => heading.textContent))

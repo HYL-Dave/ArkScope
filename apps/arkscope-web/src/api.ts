@@ -2362,29 +2362,50 @@ export type SecurityLifecycleEventType =
   | "acquisition_completed"
   | "listing_status_review"
   | "listing_removal_notice";
-export type SecurityLifecycleState =
-  | "review_required"
-  | "pending_delisting"
-  | "inactive_confirmed"
-  | "renamed_or_transferred";
-export type CorporateRelationshipStatus = "candidate" | "confirmed" | "rejected";
-export type SecurityLifecycleReviewStatus =
-  | "inactive_confirmed"
-  | "renamed_or_transferred"
-  | "unreviewed";
+export type SecurityLifecycleSourcePresence = "present" | "source_missing";
+export type SecurityLifecycleWorkflowState =
+  | "unresolved"
+  | "investigating"
+  | "evidence_ready"
+  | "reviewed_inconclusive"
+  | "resolved";
+export type SecurityLifecycleRelevance =
+  | "undetermined"
+  | "direct_tracked_security"
+  | "issuer_related"
+  | "unrelated";
+export type SecurityLifecycleConfidence = "unknown" | "low" | "medium" | "high";
+export type SecurityLifecycleOutcome =
+  | "undetermined"
+  | "listing_ended"
+  | "venue_transfer"
+  | "symbol_changed"
+  | "acquisition_cash"
+  | "acquisition_stock"
+  | "acquisition_mixed"
+  | "acquisition_terms_unknown"
+  | "issuer_security_change"
+  | "no_tracked_security_change"
+  | "other"
+  | "not_applicable";
+export type SecurityLifecycleProposalType =
+  | "archive_manual_memberships"
+  | "keep_tracking"
+  | "no_action"
+  | "notify"
+  | "remap_symbol"
+  | "review_portfolio_position";
 
-export interface SecurityLifecycleEvent {
-  id: number;
+export interface SecurityLifecycleObservationKind {
+  event_type: SecurityLifecycleEventType;
+  effective_date: string | null;
+}
+
+export interface SecurityLifecycleObservation {
   ticker: string;
   cik: string | null;
   issuer_name: string;
-  event_type: SecurityLifecycleEventType;
-  observed_lifecycle_state: SecurityLifecycleState;
-  lifecycle_state: SecurityLifecycleState;
-  reviewed_state: Exclude<SecurityLifecycleReviewStatus, "unreviewed"> | null;
-  reviewed_at: string | null;
   filing_date: string;
-  effective_date: string | null;
   source: string;
   source_ref: string;
   filing_form: string;
@@ -2393,66 +2414,230 @@ export interface SecurityLifecycleEvent {
   description: string;
   first_observed_at: string;
   last_observed_at: string;
+  kinds: SecurityLifecycleObservationKind[];
 }
 
-export interface CorporateRelationship {
-  id: number;
-  action_type: "acquisition" | "merger";
-  target_ticker: string | null;
-  target_cik: string | null;
-  target_name: string;
-  acquirer_ticker: string | null;
-  acquirer_cik: string | null;
-  acquirer_name: string;
-  status: CorporateRelationshipStatus;
-  effective_date: string | null;
+export interface SecurityLifecycleAssessment {
+  assessment_id: string;
+  status: "draft" | "accepted" | "superseded";
+  author: string;
+  relevance: SecurityLifecycleRelevance;
+  confidence: SecurityLifecycleConfidence;
+  conclusion: string;
+  impact_summary: string;
+  outcomes: SecurityLifecycleOutcome[];
+  stale: boolean;
+  created_at: string;
+  consideration_currency?: string | null;
+  cash_per_security_decimal?: string | null;
+  exchange_ratio_decimal?: string | null;
+  successor_ticker?: string | null;
+  destination_venue?: string | null;
+}
+
+export interface SecurityLifecycleAcknowledgement {
+  acknowledgement_id: string;
+  reason: "evidence_insufficient";
+  note: string | null;
+  stale: boolean;
+  acknowledged_at: string;
+  reopened_at: string | null;
+}
+
+export interface SecurityLifecycleInvestigationRun {
+  run_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  result_count: number;
+  failure_code: string | null;
+  created_at: string;
+}
+
+export interface SecurityLifecycleEvidence {
+  evidence_id: string;
+  kind: string;
+  excerpt: string;
+  source_url: string | null;
+  content_sha256?: string;
+  created_at: string;
+  title?: string | null;
+  publisher?: string | null;
+  source_published_at?: string | null;
+}
+
+export interface SecurityLifecycleActionProposal {
+  proposal_id: string;
+  action_type: SecurityLifecycleProposalType;
+  status: "proposed" | "dismissed";
+  block_reason: string | null;
+  source_snapshot: string[];
+  created_at: string;
+}
+
+export interface SecurityLifecycleCaseSummary {
+  case_id: string;
   source: string;
   source_ref: string;
-  evidence_url: string;
-  evidence_excerpt: string;
-  first_observed_at: string;
-  last_observed_at: string;
-  reviewed_at: string | null;
+  ticker: string;
+  source_presence: SecurityLifecycleSourcePresence;
+  workflow_state: SecurityLifecycleWorkflowState;
+  issuer_name: string | null;
+  filing_date: string | null;
+  kinds: SecurityLifecycleObservationKind[];
+  current_assessment: SecurityLifecycleAssessment | null;
+  current_acknowledgement: SecurityLifecycleAcknowledgement | null;
+  active_sources: string[];
+  source_context: "available" | "unavailable";
+  components: Record<string, unknown>;
+  investigation_run_count: number;
+  evidence_count: number;
+  assessment_count: number;
+  acknowledgement_count: number;
+  proposal_count: number;
 }
 
-export interface SecurityLifecycleSnapshot {
-  events: SecurityLifecycleEvent[];
-  relationships: CorporateRelationship[];
-  summary: {
-    event_count: number;
-    review_required: number;
-    pending_delisting: number;
-    confirmed_inactive: number;
-    renamed_or_transferred: number;
-    relationship_candidates: number;
-  };
+export interface SecurityLifecycleCaseDetail extends SecurityLifecycleCaseSummary {
+  observation: SecurityLifecycleObservation | null;
+  observation_fingerprint_sha256: string | null;
+  investigation_runs: SecurityLifecycleInvestigationRun[];
+  evidence: SecurityLifecycleEvidence[];
+  assessment_history: SecurityLifecycleAssessment[];
+  acknowledgement_history: SecurityLifecycleAcknowledgement[];
+  proposals: SecurityLifecycleActionProposal[];
+  truncation?: Record<string, { total: number; returned: number }>;
 }
 
-export function getSecurityLifecycle(limit = 200): Promise<SecurityLifecycleSnapshot> {
-  return getJSON<SecurityLifecycleSnapshot>(
-    `/market-data/security-lifecycle?limit=${encodeURIComponent(limit)}`,
+export interface SecurityLifecycleCaseListResponse {
+  cases: SecurityLifecycleCaseSummary[];
+  count: number;
+  data_integrity: { source_missing_count: number };
+}
+
+export interface SecurityLifecycleCaseFilters {
+  ticker?: string;
+  workflow_state?: SecurityLifecycleWorkflowState | "";
+  relevance?: SecurityLifecycleRelevance | "";
+  event_type?: SecurityLifecycleEventType | "";
+  proposal_type?: SecurityLifecycleProposalType | "";
+  source_presence?: SecurityLifecycleSourcePresence;
+  limit?: number;
+}
+
+function lifecycleQuery(filters: SecurityLifecycleCaseFilters): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function listSecurityLifecycleCases(
+  filters: SecurityLifecycleCaseFilters = {},
+): Promise<SecurityLifecycleCaseListResponse> {
+  return getJSON<SecurityLifecycleCaseListResponse>(
+    `/security-lifecycle/cases${lifecycleQuery(filters)}`,
   );
 }
 
-export function reviewCorporateRelationship(
-  relationshipId: number,
-  status: Exclude<CorporateRelationshipStatus, "candidate">,
-): Promise<{ id: number; status: Exclude<CorporateRelationshipStatus, "candidate"> }> {
-  return sendJSON(
-    `/market-data/security-lifecycle/relationships/${encodeURIComponent(relationshipId)}`,
-    "PUT",
-    { status },
+export function getSecurityLifecycleCase(
+  caseId: string,
+): Promise<SecurityLifecycleCaseDetail> {
+  return getJSON<SecurityLifecycleCaseDetail>(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,
   );
 }
 
-export function reviewSecurityLifecycleEvent(
-  eventId: number,
-  status: SecurityLifecycleReviewStatus,
-): Promise<{ id: number; status: SecurityLifecycleReviewStatus }> {
+export function getSecurityLifecycleInvestigation(
+  runId: string,
+): Promise<SecurityLifecycleInvestigationRun> {
+  return getJSON<SecurityLifecycleInvestigationRun>(
+    `/security-lifecycle/investigations/${encodeURIComponent(runId)}`,
+  );
+}
+
+export function startSecurityLifecycleInvestigation(
+  caseId: string,
+  body: { adapter: "tavily" },
+): Promise<SecurityLifecycleInvestigationRun> {
   return sendJSON(
-    `/market-data/security-lifecycle/events/${encodeURIComponent(eventId)}`,
-    "PUT",
-    { status },
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/investigations`,
+    "POST",
+    body,
+  );
+}
+
+export function addSecurityLifecycleEvidence(
+  caseId: string,
+  body: { text: string | null; url: string | null },
+): Promise<{ evidence_id: string }> {
+  return sendJSON(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/evidence`,
+    "POST",
+    body,
+  );
+}
+
+export interface SecurityLifecycleCitationInput {
+  reference_kind: "observation" | "evidence";
+  evidence_id?: string;
+  cited_content_sha256?: string;
+}
+
+export interface SecurityLifecycleAssessmentInput {
+  relevance: SecurityLifecycleRelevance;
+  confidence: SecurityLifecycleConfidence;
+  conclusion: string;
+  impact_summary: string;
+  outcomes: SecurityLifecycleOutcome[];
+  citations: SecurityLifecycleCitationInput[];
+}
+
+export function createSecurityLifecycleAssessment(
+  caseId: string,
+  body: SecurityLifecycleAssessmentInput,
+): Promise<{ assessment_id: string }> {
+  return sendJSON(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/assessments`,
+    "POST",
+    body,
+  );
+}
+
+export function acceptSecurityLifecycleAssessment(
+  assessmentId: string,
+): Promise<{ assessment: SecurityLifecycleAssessment; proposals: SecurityLifecycleActionProposal[] }> {
+  return sendJSON(
+    `/security-lifecycle/assessments/${encodeURIComponent(assessmentId)}/accept`,
+    "POST",
+  );
+}
+
+export function acknowledgeSecurityLifecycleCase(
+  caseId: string,
+  body: { reason: "evidence_insufficient"; note: string | null },
+): Promise<{ acknowledgement_id: string }> {
+  return sendJSON(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/acknowledgements`,
+    "POST",
+    body,
+  );
+}
+
+export function reopenSecurityLifecycleAcknowledgement(
+  acknowledgementId: string,
+): Promise<{ acknowledgement_id: string; status: "reopened" }> {
+  return sendJSON(
+    `/security-lifecycle/acknowledgements/${encodeURIComponent(acknowledgementId)}/reopen`,
+    "POST",
+  );
+}
+
+export function dismissSecurityLifecycleProposal(
+  proposalId: string,
+): Promise<SecurityLifecycleActionProposal> {
+  return sendJSON(
+    `/security-lifecycle/action-proposals/${encodeURIComponent(proposalId)}/dismiss`,
+    "POST",
   );
 }
 

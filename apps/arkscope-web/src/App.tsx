@@ -26,6 +26,7 @@ import {
   type ResearchNavigationRequest,
   type SettingsNavigationRequest,
   type ShellView,
+  type UniverseNavigationRequest,
 } from "./shell/navigation";
 import { shellViewLabel } from "./shell/shellLabels";
 import { createSettingsReadCache } from "./settings/settingsReadCache";
@@ -51,6 +52,7 @@ export function App() {
   const navigationSequenceRef = useRef(0);
   const [researchNavigation, setResearchNavigation] = useState<ResearchNavigationRequest | null>(null);
   const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationRequest | null>(null);
+  const [universeNavigation, setUniverseNavigation] = useState<UniverseNavigationRequest | null>(null);
   const researchWork = useResearchWorkRegistry();
   const shellOverlay = useShellOverlay();
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -64,6 +66,7 @@ export function App() {
     if (resolved.view) setView(resolved.view);
     if (resolved.research) setResearchNavigation(resolved.research);
     if (resolved.settings) setSettingsNavigation(resolved.settings);
+    if (resolved.universe) setUniverseNavigation(resolved.universe);
   }, []);
 
   const exploreCapabilities = useMemo<ExploreSurfaceCapabilities>(() => ({
@@ -141,6 +144,12 @@ export function App() {
     <UniverseView
       {...exploreCapabilities}
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+      navigationRequest={universeNavigation}
+      onNavigationConsumed={(sequence) => {
+        setUniverseNavigation((current) => (
+          current?.sequence === sequence ? null : current
+        ));
+      }}
     />
   ) : view === "News" ? (
     <NewsView
@@ -179,6 +188,7 @@ export function App() {
       onRuntimeChanged={refreshRuntime}
       navigationRequest={settingsNavigation}
       settingsReadCache={settingsReadCache}
+      onNavigateTarget={navigate}
     />
   );
 

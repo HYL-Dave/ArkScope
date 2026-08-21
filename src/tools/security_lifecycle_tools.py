@@ -10,6 +10,7 @@ from src.market_data_admin import resolve_market_db_path
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     compose_security_lifecycle,
+    observation_fingerprint,
 )
 from src.security_lifecycle_schema import (
     ASSESSMENT_RELEVANCE,
@@ -174,6 +175,12 @@ class SecurityLifecycleReadService:
                 },
                 "profile": {"status": "available"},
             }
+            observation = item.get("observation")
+            item["observation_fingerprint_sha256"] = (
+                observation_fingerprint(dict(observation))
+                if isinstance(observation, Mapping)
+                else None
+            )
             rendered.append(item)
         return rendered
 
@@ -226,10 +233,11 @@ class SecurityLifecycleReadService:
             }:
                 continue
             selected.append(case)
+        count = len(selected)
         cases = [_case_summary(case) for case in selected[:bounded_limit]]
         return {
             "cases": cases,
-            "count": len(cases),
+            "count": count,
             "data_integrity": {"source_missing_count": source_missing_count},
         }
 

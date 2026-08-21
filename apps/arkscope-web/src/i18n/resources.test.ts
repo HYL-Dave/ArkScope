@@ -93,7 +93,8 @@ describe("bundled i18n resources", () => {
       errors: 48,
       home: 23,
       watchlist: 71,
-      universe: 35,
+      universe: 38,
+      lifecycle: 99,
       news: 44,
       tickerDetail: 86,
       aiCard: 67,
@@ -263,7 +264,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(381);
+      expect(flattened.size, `${locale}.explore`).toBe(483);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -720,9 +721,9 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 828,
+      settings: 796,
       research: 207,
-      explore: 381,
+      explore: 483,
       portfolio: 374,
       system: 24,
     } as const;
@@ -791,7 +792,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(1912);
+      expect(total, `${locale}.total`).toBe(1982);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1202,42 +1203,10 @@ describe("bundled i18n resources", () => {
       "dataSources.schedule.sources.secCorporateActions.description",
       "dataStorage.lifecycle.title",
       "dataStorage.lifecycle.description",
-      "dataStorage.lifecycle.empty",
-      "dataStorage.lifecycle.openEvidence",
-      "dataStorage.lifecycle.reviewBoundary",
-      "dataStorage.lifecycle.summary.events",
-      "dataStorage.lifecycle.summary.reviewRequired",
-      "dataStorage.lifecycle.summary.pendingDelisting",
-      "dataStorage.lifecycle.summary.confirmedInactive",
-      "dataStorage.lifecycle.summary.renamedOrTransferred",
-      "dataStorage.lifecycle.summary.relationshipCandidates",
-      "dataStorage.lifecycle.headings.ticker",
-      "dataStorage.lifecycle.headings.target",
-      "dataStorage.lifecycle.headings.acquirer",
-      "dataStorage.lifecycle.headings.event",
-      "dataStorage.lifecycle.headings.status",
-      "dataStorage.lifecycle.headings.date",
-      "dataStorage.lifecycle.headings.evidence",
-      "dataStorage.lifecycle.headings.actions",
-      "dataStorage.lifecycle.states.reviewRequired",
-      "dataStorage.lifecycle.states.pendingDelisting",
-      "dataStorage.lifecycle.states.inactiveConfirmed",
-      "dataStorage.lifecycle.states.renamedOrTransferred",
-      "dataStorage.lifecycle.events.title",
-      "dataStorage.lifecycle.events.mergerAgreement",
-      "dataStorage.lifecycle.events.mergerProxy",
-      "dataStorage.lifecycle.events.acquisitionCompleted",
-      "dataStorage.lifecycle.events.listingStatusReview",
-      "dataStorage.lifecycle.events.listingRemovalNotice",
-      "dataStorage.lifecycle.events.confirmInactiveAction",
-      "dataStorage.lifecycle.events.markTransferredAction",
-      "dataStorage.lifecycle.events.clearReviewAction",
-      "dataStorage.lifecycle.relationships.title",
-      "dataStorage.lifecycle.relationships.candidate",
-      "dataStorage.lifecycle.relationships.confirmed",
-      "dataStorage.lifecycle.relationships.rejected",
-      "dataStorage.lifecycle.relationships.confirmAction",
-      "dataStorage.lifecycle.relationships.rejectAction",
+      "dataStorage.lifecycle.handoff",
+      "dataStorage.lifecycle.openWorkflow",
+      "dataStorage.lifecycle.summary.activeCases",
+      "dataStorage.lifecycle.summary.sourceMissing",
     ] as const;
     const retiredSettingsPaths = [
       "dataStorage.update.title",

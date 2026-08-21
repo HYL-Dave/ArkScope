@@ -22,8 +22,13 @@ import {
   type ExploreErrorState,
   type UniverseImportOutcome,
 } from "./explore/explorePresentation";
-import type { NavigationTarget } from "./shell/navigation";
+import { LifecycleView } from "./lifecycle/LifecycleView";
+import type {
+  NavigationTarget,
+  UniverseNavigationRequest,
+} from "./shell/navigation";
 import { TAG_FACETS, TagChips, facetLabel } from "./tags";
+import { Tabs } from "./ui/Tabs";
 
 type UniverseFeedback = UniverseImportOutcome | ExploreErrorState;
 
@@ -31,15 +36,58 @@ function isImportOutcome(value: UniverseFeedback): value is UniverseImportOutcom
   return "kind" in value && value.kind === "universe_import_succeeded";
 }
 
-export function UniverseView({
-  onOpenTicker,
-  developerMode,
-  onNavigateTarget,
-}: {
+interface UniverseViewProps {
   onOpenTicker: (ticker: string) => void;
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
-}) {
+  navigationRequest?: UniverseNavigationRequest | null;
+  onNavigationConsumed?: (sequence: number) => void;
+}
+
+export function UniverseView({
+  navigationRequest = null,
+  onNavigationConsumed,
+  ...inventoryProps
+}: UniverseViewProps) {
+  const { t } = useTranslation("explore");
+  const [activeTab, setActiveTab] = useState<"inventory" | "lifecycle">("inventory");
+  const [caseId, setCaseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!navigationRequest) return;
+    setActiveTab("lifecycle");
+    setCaseId(navigationRequest.target.caseId ?? null);
+    onNavigationConsumed?.(navigationRequest.sequence);
+  }, [navigationRequest, onNavigationConsumed]);
+
+  return (
+    <div className="main universe-surface">
+      <Tabs
+        ariaLabel={t(($) => $.universe.tabs.aria)}
+        value={activeTab}
+        onValueChange={setActiveTab}
+        items={[
+          {
+            value: "inventory",
+            label: t(($) => $.universe.tabs.inventory),
+            panel: <UniverseInventoryView {...inventoryProps} />,
+          },
+          {
+            value: "lifecycle",
+            label: t(($) => $.universe.tabs.lifecycle),
+            panel: <LifecycleView initialCaseId={caseId} />,
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+function UniverseInventoryView({
+  onOpenTicker,
+  developerMode,
+  onNavigateTarget,
+}: Omit<UniverseViewProps, "navigationRequest" | "onNavigationConsumed">) {
   const { t } = useTranslation("explore");
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
   const [lists, setLists] = useState<WatchlistSummary[]>([]);

@@ -69,6 +69,7 @@ export type NavigationTarget =
   | { kind: "view"; view: ShellView }
   | { kind: "ticker"; ticker: string }
   | { kind: "research_thread"; threadId: string; runId?: string }
+  | { kind: "universe_lifecycle"; caseId?: string }
   | { kind: "settings_section"; section: EnabledSettingsSection };
 
 export interface NavigationRequest<T extends NavigationTarget = NavigationTarget> {
@@ -84,11 +85,16 @@ export type SettingsNavigationRequest = NavigationRequest<
   Extract<NavigationTarget, { kind: "settings_section" }>
 >;
 
+export type UniverseNavigationRequest = NavigationRequest<
+  Extract<NavigationTarget, { kind: "universe_lifecycle" }>
+>;
+
 export interface ResolvedNavigationTarget {
   view?: ShellView;
   ticker?: string;
   research?: ResearchNavigationRequest;
   settings?: SettingsNavigationRequest;
+  universe?: UniverseNavigationRequest;
 }
 
 export function nextNavigationRequest(
@@ -112,6 +118,16 @@ export function resolveNavigationTarget(
     return {
       view: "Research",
       research: { sequence: request.sequence, target },
+    };
+  }
+  if (target.kind === "universe_lifecycle") {
+    const caseId = target.caseId?.trim();
+    return {
+      view: "Universe",
+      universe: {
+        sequence: request.sequence,
+        target: caseId ? { ...target, caseId } : { kind: "universe_lifecycle" },
+      },
     };
   }
   if (target.kind === "settings_section") {

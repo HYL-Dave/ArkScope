@@ -13,7 +13,7 @@ import {
   getProvidersConfig,
   getProvidersHealth,
   getSchedule,
-  getSecurityLifecycle,
+  listSecurityLifecycleCases,
   getTradingDayCoverage,
   importModelRoutes,
   deleteFixedTaskRuntime,
@@ -119,6 +119,7 @@ export interface SettingsViewProps {
   onRuntimeChanged: () => Promise<void>;
   navigationRequest?: NavigationRequest<Extract<NavigationTarget, { kind: "settings_section" }>> | null;
   settingsReadCache?: SettingsReadCache;
+  onNavigateTarget?: (target: NavigationTarget) => void;
 }
 
 type SettingsNavigationIntent = {
@@ -281,6 +282,7 @@ export function SettingsView({
   onRuntimeChanged,
   navigationRequest,
   settingsReadCache,
+  onNavigateTarget = () => {},
 }: SettingsViewProps) {
   const { t } = useTranslation("settings");
   const cacheRef = useRef<SettingsReadCache | null>(null);
@@ -561,7 +563,7 @@ export function SettingsView({
         provider_health: getProvidersHealth,
         provider_config: getProvidersConfig,
         market_data_status: getMarketDataStatus,
-        security_lifecycle: getSecurityLifecycle,
+        security_lifecycle: () => listSecurityLifecycleCases({ limit: 1 }),
         "trading_day_coverage:15min:10": () => getTradingDayCoverage(10, "15min"),
         news_status: getNewsStatus,
         macro_status: getMacroStatus,
@@ -1041,7 +1043,13 @@ export function SettingsView({
       );
     }
     if (id === "data_storage") {
-      return <DataStorageSection developerMode={developerMode} settingsReadCache={readCache} />;
+      return (
+        <DataStorageSection
+          developerMode={developerMode}
+          settingsReadCache={readCache}
+          onNavigateTarget={onNavigateTarget}
+        />
+      );
     }
     if (id === "news_storage") {
       return <NewsStorageSection developerMode={developerMode} settingsReadCache={readCache} />;
