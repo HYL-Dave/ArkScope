@@ -46,3 +46,7 @@ T3	tests/test_tools.py::TestRegistry::test_categories	analysis count 13 to 15	mu
 T3	tests/test_tools.py::TestRegistry::test_openai_schema	registry count 50 to 52	must_fail
 T3	tests/test_tools.py::TestRegistry::test_register_all	registry count 50 to 52	must_fail
 T3	tests/test_tools.py::TestRegistry::test_tool_names	expected registry names add two lifecycle tools	must_fail
+T4	src/SettingsWorkspace.test.tsx::Settings workspace > shows_only_the_active_group_directory_while_search_remains_cross_group	Settings lifecycle directory becomes a Universe handoff	must_fail
+T4	src/i18n/resources.test.ts::bundled i18n resources > contains the exact Explore subtree inventory in both locales	Lifecycle workflow adds the reviewed Explore subtree	must_fail
+T4	src/i18n/resources.test.ts::bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales	Lifecycle handoff moves copy from Settings to Explore	must_fail
+T4	src/i18n/resources.test.ts::bundled i18n resources > preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move	Retired Settings lifecycle review keys leave the inventory	must_fail

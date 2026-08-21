@@ -3,9 +3,11 @@ apps/arkscope-web/src/App.tsx	T4	modify	247	4f8ac79a0e159e56744f999e7656d3b08fd3
 apps/arkscope-web/src/AppShell.test.tsx	T4	modify	797	7d442a1797d81870ffc1d1478c0a931fd14d0eb3782a5d710639011c9d1b8360
 apps/arkscope-web/src/Settings.tsx	T4	modify	1214	c47e74b0038a6958a91c67c5fb4cc3221474e445591296679faf548563baf1b7
 apps/arkscope-web/src/SettingsLocalStorage.test.ts	T4	modify	1091	fa372b18ea05d012aa644d99062eab9a4c6643a51a7e4fbf276821680eb7b6eb
+apps/arkscope-web/src/SettingsWorkspace.test.tsx	T4	modify	1068	7854e5df932dac8c22ea545dbe91e856c26c53d7944fe476a4636c3063a23eec
 apps/arkscope-web/src/Universe.test.tsx	T4	modify	581	5b6b3041241e73dbad3f22d2d4366894f65ae49937425090a4e2a2b9aed55a21
 apps/arkscope-web/src/Universe.tsx	T4	modify	353	871905efa921b724ac1fdbf099c2f8af6c65a78a926557b7826857e10fd710ca
 apps/arkscope-web/src/api.ts	T4	modify	3075	c5919a94da0643cfbfddd0dc98d8784b193ac45c64e327ca9710737a6769ee08
+apps/arkscope-web/src/i18n/resources.test.ts	T4	modify	1309	463f714337f28cd3ad07ec7c13c72bc8b3fc8638e52ed09e2dc1451e504d6c4d
 apps/arkscope-web/src/i18n/resources/en/explore.ts	T4	modify	422	9f894ca1e45cdd95ee658c7416da1b1dbc54ce711bfde60d2d5f0df9c07d9f76
 apps/arkscope-web/src/i18n/resources/en/settings.ts	T4	modify	1144	27c3ec71ce68475dd022209eeaca61336ae0aff21380d9867c491041cbe79353
 apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts	T4	modify	419	4777692f0a9a53289334f81ec435452ced7d9c0073dedf65e08836c4d4090dfe

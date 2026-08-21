@@ -157,8 +157,8 @@ scope from prose.
 | `...-backend-additions.nodes` | 83 | `a99d98fee39c1a598d35b7b04cb5b7e7daabfb71019ec9a20a1712bfb113ad1c` |
 | `...-frontend-removals.nodes` | 2 | `55e24459805b139ee6f2db3db3684c0eb4c3641c26e4e6fe522df0276dc75899` |
 | `...-frontend-additions.nodes` | 26 | `52d3c8b268d3b2141fd6bcc26708c99c54d5932904140c9970683838d1f8cf7f` |
-| `...-evolved-owners.tsv` | 47 data rows | `98adeff26e8cc2776afda7864854f3fd12d14997b936e3c3b547d5144967b3c4` |
-| `...-owned-paths.tsv` | 55 data rows | `192408363bbe9641f9dd166acd973581356eba627a76457c9bf929d625cf9245` |
+| `...-evolved-owners.tsv` | 51 data rows | `db7926795fe78b02b717117cae7a6d67fc4c3853c498462d3842d7ad28643c07` |
+| `...-owned-paths.tsv` | 57 data rows | `bd3aac8556dfe594471f95c105b744a046762e768d6aff903ab5e47f81265bbc` |
 | `...-focused-paths.tsv` | 25 data rows | `7be852db3dc34bf7c2fcfaf2a77bb72c758434e9e45e6e2d56281a88f238ee72` |
 | `...-protected.paths` | 24 | `4d037a50c97365484e59637484b3c903dd6ac0077250f2147df5ffa672b91faa` |
 | `...-route-removals.tsv` | 3 | `945f0ba83efa557dd9169743f0e5724ebfad5e22c8f061c11d98181dcc1a081f` |
@@ -1273,7 +1273,38 @@ Stop for Task 3 review unless a reviewed batch ruling applies.
 
 ## 6. Task 4 - Universe lifecycle workflow and Settings handoff
 
-**Owned files:** exactly the 20 T4 rows.
+The 2026-08-21 full-suite ownership amendment is B-class. The exact final
+frontend collection was already `1,201/103/027ef443...`, and the 75-node
+focused stream was green, but the first full sequential run exposed five
+retained failures that the original focused owner set could not see:
+
+1. the visible-literal scanner rejects the dynamic
+   `$.lifecycle.confidence[value]` key in the already owned
+   `LifecycleView.tsx`; replace it with a closed explicit mapping inside that
+   owner, with no resource or node change;
+2. one `SettingsWorkspace.test.tsx` node still expects the retired lifecycle
+   review directory label; and
+3. three `i18n/resources.test.ts` nodes still pin the pre-T4 exact Explore,
+   Settings, total, and Settings lifecycle-key inventories.
+
+The latter two test files were absent from the original ownership ledger, so
+the original `20 T4 rows` and the required `1,201/1,201` gate were mutually
+inconsistent. This amendment adds exactly those two base-pinned test owners and
+exactly the four retained node bodies to the evolved ledger. It changes no test
+ID, route, DTO, product capability, dependency, protected byte, or collection/
+focused identity. The final resource inventory is mechanically derived as
+Explore `461`, Settings `796`, and all reviewed namespaces `1,960` leaves per
+locale. The revised Settings directory expectation replaces only the retired
+review surface label with the lifecycle health/handoff owner.
+
+Before the implementation commit, apply those four test-body changes to the
+pre-T4 product bytes and require exactly four failures for the four newly
+listed `must_fail` owners. Then replay them against the implementation tip and
+require four passes before rerunning the full sequential suite. The rejected
+full-suite run is diagnostic only; its five failures are not admission
+evidence.
+
+**Owned files:** exactly the 22 T4 rows.
 
 ### 6.1 RED commit
 
@@ -1384,10 +1415,10 @@ to explain why the owner was not independent.
    stream is exactly base minus removals plus additions; no third change.
 3. Rebuild 180 routes/exact hash, 52 tools/exact hash, analysis 15, bridges 53,
    and both allowlists 15/exact hash.
-4. Verify all 55 owned paths have the declared final action and every changed
+4. Verify all 57 owned paths have the declared final action and every changed
    product/test/catalog path is owned. Verify all 24 protected paths and
    aggregate.
-5. AST-scan retained test bodies: changes equal the 47 evolved-owner rows and no
+5. AST-scan retained test bodies: changes equal the 51 evolved-owner rows and no
    others. Module-level fixture edits remain inside the named test files and
    contain no new test ID.
 6. Scan product and UI for retired routes, relationship API/table ownership,
