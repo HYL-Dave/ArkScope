@@ -1456,8 +1456,9 @@ correction changes only the required M1 RED owner; it changes no product/test
 byte, test ID, mutation count, path/node/route/tool ledger, collection/focused
 identity, protected path, or Task 5 admission target.
 
-The 2026-08-21 M2 owner correction is B-class. Dropping the dated CCL
-`acquisition_completed` kind during `_observation_from_group()` fails both
+The 2026-08-21 M2 owner correction is B-class. Clearing only the
+`effective_date` of CCL's `acquisition_completed` kind during
+`_observation_from_group()` fails both
 `test_migration_collapses_ccl_only_after_core_fields_match`, which owns the
 preflight collapse result, and
 `test_migration_preserves_every_source_field_kind_date_and_old_row_mapping`,
@@ -1475,7 +1476,7 @@ Task 5 admission target.
 | ID | Mutation | Required RED owner |
 |---|---|---|
 | M1 | put `event_type` back into case-ID bytes | `test_case_id_rejects_embedded_nul_and_hashes_literal_provider_identity` |
-| M2 | drop one CCL kind/date during collapse | `test_migration_collapses_ccl_only_after_core_fields_match` and `test_migration_preserves_every_source_field_kind_date_and_old_row_mapping` |
+| M2 | clear the CCL `acquisition_completed` kind's `effective_date` during collapse, without dropping the kind | `test_migration_collapses_ccl_only_after_core_fields_match` and `test_migration_preserves_every_source_field_kind_date_and_old_row_mapping` |
 | M3 | allow a non-empty relationship table | `test_migration_rejects_nonempty_relationship_table_before_either_store_changes` |
 | M4 | allow writes with incomplete receipt | `test_incomplete_receipt_blocks_all_lifecycle_writes` |
 | M5 | hide profile history when source row is absent | `test_read_composition_keeps_profile_history_visible_when_source_is_missing` |
