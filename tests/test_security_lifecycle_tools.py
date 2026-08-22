@@ -154,7 +154,9 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     assert len(anthropic) == 15
 
 
-def test_list_tool_is_local_read_only_and_stably_sorted(tmp_path, monkeypatch):
+def test_list_tool_is_local_read_only_stably_sorted_and_filters_ticker_prefixes(
+    tmp_path, monkeypatch
+):
     from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
     from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
 
@@ -177,28 +179,59 @@ def test_list_tool_is_local_read_only_and_stably_sorted(tmp_path, monkeypatch):
             kinds=(ObservationKind("listing_removal_notice", None),),
         )
     )
+    market_store.upsert_observation(
+        LifecycleObservation(
+            ticker="ZETA",
+            cik="0001851003",
+            issuer_name="Zeta Global Holdings Corp.",
+            filing_date="2026-07-15",
+            source="sec_edgar",
+            source_ref="zeta-ref",
+            filing_form="25-NSE",
+            filing_items=(),
+            evidence_url="https://www.sec.gov/Archives/example/zeta.htm",
+            description="Listing notice.",
+            observed_at=_AT,
+            kinds=(ObservationKind("listing_removal_notice", None),),
+        )
+    )
     market.close()
     second = SecurityLifecycleInvestigationStore(profile)
     second.ensure_case(
         source="sec_edgar", source_ref="older-ref", ticker="OLD", at=_AT
+    )
+    second.ensure_case(
+        source="sec_edgar", source_ref="zeta-ref", ticker="ZETA", at=_AT
     )
     try:
         tools = _configure(
             monkeypatch,
             market_path,
             profile_path,
-            sources={"EA": ("manual_lists",), "OLD": ("manual_lists",)},
+            sources={
+                "EA": ("manual_lists",),
+                "OLD": ("manual_lists",),
+                "ZETA": ("manual_lists",),
+            },
         )
         payload = tools.list_security_lifecycle_cases(limit=20)
         assert payload["status"] == "ok"
-        assert [item["ticker"] for item in payload["cases"]] == ["EA", "OLD"]
+        assert [item["ticker"] for item in payload["cases"]] == [
+            "EA",
+            "ZETA",
+            "OLD",
+        ]
         assert all("evidence" not in item for item in payload["cases"])
         assert all("investigation_runs" not in item for item in payload["cases"])
         assert all(item["evidence_count"] == 0 for item in payload["cases"])
         assert tools.list_security_lifecycle_cases(ticker="old", limit=20)["count"] == 1
+        for prefix in ("z", "ze", "ZET"):
+            filtered = tools.list_security_lifecycle_cases(ticker=prefix, limit=20)
+            assert filtered["count"] == 1
+            assert [item["ticker"] for item in filtered["cases"]] == ["ZETA"]
         assert tools.list_security_lifecycle_cases(
             workflow_state="unresolved", limit=1
-        )["count"] == 2
+        )["count"] == 3
     finally:
         profile.close()
 

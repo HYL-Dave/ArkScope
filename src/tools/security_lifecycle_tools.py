@@ -215,7 +215,9 @@ class SecurityLifecycleReadService:
         for case in all_cases:
             if case["source_presence"] != source_presence:
                 continue
-            if normalized_ticker and case["ticker"] != normalized_ticker:
+            if normalized_ticker and not case["ticker"].startswith(
+                normalized_ticker
+            ):
                 continue
             if workflow_state and case["workflow_state"] != workflow_state:
                 continue
