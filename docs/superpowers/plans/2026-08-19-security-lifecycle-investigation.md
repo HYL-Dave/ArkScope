@@ -1,11 +1,11 @@
 # Security Lifecycle Investigation Implementation Plan
 
-> **Status:** TASKS 0-7 COMPLETE. TASK 6 REVIEW RETURNED GREEN; THE REVIEWED
-> PRODUCT TIP WAS FAST-FORWARD MERGED AND PASSED A FRESH EXACT-MASTER CLOSEOUT.
-> FOCUSED CLOSEOUT REVIEW IS NEXT. TASK 8 RETAINS ITS SEPARATE LIVE-PREFLIGHT
-> GATE; LIVE MIGRATION AND PROVIDER CALLS REMAIN UNAUTHORIZED. THE USER HAD
-> ALREADY PUBLISHED `master` THROUGH `e492c32e`; THE TASK 7 MERGE/CLOSEOUT IS
-> LOCAL AND UNPUSHED, AND THE IMPLEMENTATION BRANCH WAS NOT PUSHED.
+> **Status:** TASKS 0-8 COMPLETE. THE REVIEWED PRODUCT AND TRUTHFUL UI FIXES ARE
+> LOCALLY MERGED. THE USER APPROVED LIVE MANIFEST `7261d414...`, ALL 37 MAPPING
+> ROWS AT `76881791...`, DURABLE TWO-DATABASE BACKUPS, AND THE FORMAL CUTOVER.
+> MIGRATION COMPLETED ON 2026-08-22 WITH 36 OBSERVATIONS, 37 KINDS, FOUR
+> ACCEPTED LEGACY ASSESSMENTS, AND 32 UNRESOLVED CASES. NO PROVIDER CANARY,
+> PROPOSAL EXECUTION, OR CODEX PUSH OCCURRED.
 >
 > **Date:** 2026-08-19
 >
@@ -1801,6 +1801,17 @@ evidence.
 OpenAI/Anthropic hosted search, browser automation, document ingestion, model
 assessment, action execution, Alerts, Notes, and unattended operation remain
 out of scope after Task 8.
+
+Task 8 completed on 2026-08-22 at `5a07a5b5`. The approved mapping migrated 37
+legacy rows into 36 observations and 37 kinds, preserved four accepted legacy
+assessments, and projected four resolved plus 32 unresolved cases. Both stores
+passed integrity and foreign-key checks; every unrelated table row and schema
+matched the approved backups. A read-only browser smoke opened migrated QBTS
+history with zero write, provider, or failed requests. The local cutover packet
+is `data/backups/security-lifecycle-task8-cutover-20260822T094106+0800`; the
+durable rollback backup remains
+`data/backups/security-lifecycle-task8-20260822T052234+0800`. No provider canary,
+proposal execution, or push was authorized or performed by Task 8.
 
 ---
 
