@@ -6,15 +6,14 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 are locally review-ready on the isolated
-`ticker-identity-continuation` branch through `0f63d96e`. The implementation
-includes exact schema verification, attended preview/approval, atomic apply and
-reversal, provider-free due execution, bilingual UI and lineage, plus an
-approval-bound migration/backup/restore utility with no production-path
-defaults. Scratch-only admission passed backend `4282 / 12 skipped`, cumulative
-focused `287`, frontend `104 files / 1217`, and `185` routes. No live preflight,
-backup, migration, provider call, merge, or push has been performed for this
-slice.
+**Implementation:** Tasks 0-7 reached local self-review on the isolated
+`ticker-identity-continuation` branch through `90027051`. Independent review
+then found blocking stale-plan and broker-position race defects plus three
+durability/safety gaps; the branch is in repair and is not review-ready. The
+earlier scratch admission (`4282 / 12 skipped`, cumulative focused `287`,
+frontend `104 files / 1217`, and `185` routes) is retained only as historical
+evidence. No live preflight, backup, migration, provider call, merge, or push
+has been performed for this slice.
 
 **Depends on:**
 
@@ -292,6 +291,19 @@ current rows. Any changed profile-owned effect, accepted assessment, provider
 observation fingerprint, or source snapshot moves the plan to `needs_review`
 without mutation.
 
+The profile dependency digest is recomputed after `BEGIN IMMEDIATE` and covers
+every profile row that can change the active-universe decision, including open
+portfolio positions and their account archive state. A broker refresh that
+lands after service recomposition but before the write lock therefore blocks
+the transition durably instead of allowing suppression of a held ticker.
+
+SEC/market observations and Seeking Alpha capture are separate database
+authorities. The service samples them before entering the profile transaction;
+the executor does not claim atomicity across those databases. A changed sample
+presented to the store produces `needs_review`. A provider update committed
+after that sample is a later observation and is reconciled on the next preview
+or collection cycle. Provider-owned rows are never rewritten by this executor.
+
 The evaluator returns all blocker codes, not only a primary reason. UI copy is
 derived from a closed mapping; unknown codes render as an explicit unknown
 value and never as a different known reason.
@@ -375,6 +387,20 @@ transition writes. Read paths never auto-create missing tables. The live
 migration is additive but still requires a separate read-only preflight,
 backup, approval manifest, and explicit production-write authorization.
 
+Verification owns the complete SQLite object surface of the three identity
+tables: approved tables and indexes must match exactly, and no additional
+trigger, view, or arbitrary-named index may attach to an identity table.
+SQLite-generated autoindexes with no user SQL are the only exception.
+
+### 8.5 Restore protocol
+
+The restore utility is not a process-quiescence detector and must never replace
+an existing profile database inode. The live rollback runbook must stop all app
+and scheduler writers, move the failed target aside, and then invoke restore at
+that absent path. Restore revalidates the backup, copies it to a same-directory
+temporary file, revalidates the copy, and installs it with an atomic no-clobber
+operation. An existing or concurrently recreated target is a typed refusal.
+
 ## 9. API and Permissions
 
 New routes:
@@ -414,6 +440,12 @@ For each due `approved` plan, bounded by a fixed per-tick limit:
 6. apply only if the digest still matches;
 7. commit the transition, attempt, identity link, and all profile effects
    together.
+
+The service must not turn a recomputed-preview mismatch into an ephemeral
+exception before step 4. It passes that preview into the store so the store can
+append the blocked attempt and persist `needs_review`. A request digest that
+does not match the stored approved digest remains an immediate client conflict
+and is never treated as a new approval.
 
 Concurrent scheduler/app attempts serialize on SQLite. Re-entry after commit
 returns `already_applied`. A crash before commit leaves no partial profile
@@ -529,6 +561,14 @@ The implementation must prove at minimum:
     cancellation, or reversal.
 18. Live migration remains separately authorized and preserves unrelated
     profile rows and schema.
+19. A broker position/account change between preview recomposition and the
+    profile write lock blocks with a durable `needs_review` receipt.
+20. Stored approved effects and caveats remain visible in approved,
+    `needs_review`, and applied case states.
+21. Exact schema verification rejects side-effecting extensions attached to
+    identity tables.
+22. Restore refuses an existing target and cannot replace an active database
+    inode.
 
 ## 16. Rejected Alternatives
 

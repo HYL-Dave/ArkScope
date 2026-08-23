@@ -10,13 +10,15 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
-**Implementation status (2026-08-23):** Tasks 0-7 are locally implemented
-and self-reviewed on the isolated `ticker-identity-continuation` branch through
-`0f63d96e`. Scratch-only admission is GREEN at backend `4282 passed / 12
-skipped`, cumulative focused `287 passed`, frontend `104 files / 1217 passed`,
-and `185` runtime routes. No provider call, production database write, live
-migration, merge, or push occurred. Fresh production preflight, backup, restore
-probe, and cutover remain gated after independent implementation review.
+**Implementation status (2026-08-23):** Tasks 0-7 were locally implemented and
+self-reviewed on the isolated `ticker-identity-continuation` branch through
+`90027051`, but independent review found two blocking correctness defects and
+three durability/safety defects. Repair is active and the prior scratch-only
+admission (`4282 passed / 12 skipped`, cumulative focused `287 passed`, frontend
+`104 files / 1217 passed`, and `185` runtime routes) is historical evidence,
+not current release clearance. No provider call, production database write,
+live migration, merge, or push occurred. Fresh production preflight, backup,
+restore probe, and cutover remain gated after repaired implementation review.
 
 ## Global Constraints
 
@@ -676,6 +678,19 @@ git commit -m "feat(lifecycle): review ticker transition effects"
 - Create: `tests/test_ticker_identity_migration.py`
 - Modify: `tests/test_api.py`
 - Modify: `tests/test_data_provider_config.py`
+- Modify: `src/ticker_identity_service.py`
+- Modify: `src/ticker_identity_transition.py`
+- Modify: `src/ticker_identity_schema.py`
+- Modify: `src/tools/security_lifecycle_tools.py`
+- Modify: `tests/test_ticker_identity_schema.py`
+- Modify: `tests/test_ticker_identity_transition.py`
+- Modify: `tests/test_ticker_identity_routes.py`
+- Modify: `tests/test_ticker_identity_migration.py`
+- Modify: `apps/arkscope-web/src/api.ts`
+- Modify: `apps/arkscope-web/src/lifecycle/LifecycleView.tsx`
+- Modify: `apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx`
+- Modify: `apps/arkscope-web/src/i18n/resources/{en,zh-Hant}/explore.ts`
+- Modify: `apps/arkscope-web/src/i18n/resources.test.ts`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Modify: `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 - Modify: `docs/superpowers/plans/2026-08-23-ticker-identity-continuation.md`
@@ -734,7 +749,41 @@ tables/indexes and explicitly exercised profile rows differ.
 Record exact commits, counts, route inventory, mutation/rollback evidence,
 browser fixtures, and zero-network proof. Do not claim production migration.
 
-- [ ] **Step 6: Stop for live authorization**
+- [ ] **Step 6: Repair independent-review findings RED-first**
+
+The repair must prove all of the following before repeating admission:
+
+1. A broker position opened after service recomposition but before
+   `BEGIN IMMEDIATE` changes the lock-time dependency digest, records a blocked
+   attempt, moves the transition to `needs_review`, and performs no profile
+   suppression or membership archive.
+2. A stale scheduled preview reaches the store's durable blocked-attempt path
+   instead of raising in the service while leaving the plan `approved`.
+   Client-supplied approval digests remain fail-closed before execution.
+3. Exact schema verification rejects every unapproved trigger, view, or index
+   attached to an identity table, including objects without the expected name
+   prefix; SQLite-owned autoindexes remain permitted.
+4. Case detail returns the bounded stored approved preview, and approved,
+   `needs_review`, and applied UI states retain the exact approved effects and
+   caveats after the editable preview closes.
+5. Restore never replaces an existing profile database. It installs a
+   reverified backup only at an absent target using a same-directory atomic
+   no-clobber operation; an operator must first stop writers and move the old
+   target aside.
+
+Market/SEC/SA inputs are sampled before the profile transaction and cannot be
+made atomically current by this profile-only executor. A change observed before
+apply must produce `needs_review`; a provider change after that sample is a new
+observation for the next reconciliation cycle. The implementation and docs may
+not claim cross-database linearizability.
+
+- [ ] **Step 7: Repeat full admission and independent review**
+
+Run every Task 7 gate from a clean repaired tip and obtain an independent
+review with the five repair regressions in scope. Historical GREEN counts do
+not authorize the repaired tip.
+
+- [ ] **Step 8: Stop for live authorization**
 
 Only after implementation review GREEN, run a fresh read-only production
 preflight and present its approval digest, backup path/digest, schema delta, and
