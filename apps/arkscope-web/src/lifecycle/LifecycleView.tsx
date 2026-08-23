@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
+  ArrowRightLeft,
   Check,
   ExternalLink,
   Plus,
@@ -15,11 +16,16 @@ import {
   acceptSecurityLifecycleAssessment,
   acknowledgeSecurityLifecycleCase,
   addSecurityLifecycleEvidence,
+  approveTickerIdentityTransition,
+  cancelTickerIdentityTransition,
   createSecurityLifecycleAssessment,
   dismissSecurityLifecycleProposal,
   getSecurityLifecycleCase,
+  getTickerIdentityTransitionPreview,
   listSecurityLifecycleCases,
   reopenSecurityLifecycleAcknowledgement,
+  retryTickerIdentityTransition,
+  reverseTickerIdentityTransition,
   startSecurityLifecycleInvestigation,
   type SecurityLifecycleCaseDetail,
   type SecurityLifecycleCaseFilters,
@@ -32,8 +38,16 @@ import {
   type SecurityLifecycleRelevance,
   type SecurityLifecycleSourcePresence,
   type SecurityLifecycleWorkflowState,
+  type TickerIdentityPriorityResolution,
+  type TickerIdentityTransitionAttemptResult,
+  type TickerIdentityTransitionBlockReason,
+  type TickerIdentityTransitionCaveat,
+  type TickerIdentityTransitionKind,
+  type TickerIdentityTransitionPreview,
+  type TickerIdentityTransitionStatus,
 } from "../api";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
   actionProposalPresentation,
   formatAssessmentDecimal,
@@ -52,6 +66,12 @@ import {
   type LifecycleLocale,
 } from "./lifecyclePresentation";
 import { LifecycleCaseDrawer, LifecycleCaseSection } from "./LifecycleCaseDrawer";
+import {
+  tickerTransitionBlockReasonLabel,
+  tickerTransitionCaveatLabel,
+  tickerTransitionKindLabel,
+  tickerTransitionStatusLabel,
+} from "./tickerIdentityPresentation";
 
 const WORKFLOW_STATES: SecurityLifecycleWorkflowState[] = [
   "unresolved",
@@ -104,6 +124,270 @@ function localeValue(locale: string | undefined): LifecycleLocale {
 function optionalText(value: string, transform?: (value: string) => string): string | null {
   const normalized = transform ? transform(value.trim()) : value.trim();
   return normalized || null;
+}
+
+function transitionStatusLabels(
+  t: TFunction<"explore">,
+): Record<TickerIdentityTransitionStatus, string> {
+  return {
+    approved: t(($) => $.lifecycle.transition.statuses.approved),
+    needs_review: t(($) => $.lifecycle.transition.statuses.needsReview),
+    applied: t(($) => $.lifecycle.transition.statuses.applied),
+    cancelled: t(($) => $.lifecycle.transition.statuses.cancelled),
+    reversed: t(($) => $.lifecycle.transition.statuses.reversed),
+  };
+}
+
+function transitionKindLabels(
+  t: TFunction<"explore">,
+): Record<TickerIdentityTransitionKind, string> {
+  return {
+    symbol_continuation: t(($) => $.lifecycle.transition.kinds.symbolContinuation),
+    terminal_delisting: t(($) => $.lifecycle.transition.kinds.terminalDelisting),
+  };
+}
+
+function transitionBlockLabels(
+  t: TFunction<"explore">,
+): Record<TickerIdentityTransitionBlockReason, string> {
+  return {
+    successor_missing: t(($) => $.lifecycle.transition.blockers.successorMissing),
+    successor_not_distinct: t(($) => $.lifecycle.transition.blockers.successorNotDistinct),
+    outcome_not_executable: t(($) => $.lifecycle.transition.blockers.outcomeNotExecutable),
+    assessment_case_mismatch: t(($) => $.lifecycle.transition.blockers.assessmentCaseMismatch),
+    assessment_not_accepted: t(($) => $.lifecycle.transition.blockers.assessmentNotAccepted),
+    assessment_not_direct: t(($) => $.lifecycle.transition.blockers.assessmentNotDirect),
+    stale_assessment: t(($) => $.lifecycle.transition.blockers.staleAssessment),
+    observation_citation_required: t(
+      ($) => $.lifecycle.transition.blockers.observationCitationRequired,
+    ),
+    execution_date_required: t(($) => $.lifecycle.transition.blockers.executionDateRequired),
+    execution_date_invalid: t(($) => $.lifecycle.transition.blockers.executionDateInvalid),
+    source_context_unavailable: t(
+      ($) => $.lifecycle.transition.blockers.sourceContextUnavailable,
+    ),
+    no_active_tracking_source: t(
+      ($) => $.lifecycle.transition.blockers.noActiveTrackingSource,
+    ),
+    remap_proposal_missing: t(($) => $.lifecycle.transition.blockers.remapProposalMissing),
+    proposal_missing: t(($) => $.lifecycle.transition.blockers.proposalMissing),
+    priority_resolution_required: t(
+      ($) => $.lifecycle.transition.blockers.priorityResolutionRequired,
+    ),
+    successor_hidden: t(($) => $.lifecycle.transition.blockers.successorHidden),
+    portfolio_position_open: t(($) => $.lifecycle.transition.blockers.portfolioPositionOpen),
+    preview_changed: t(($) => $.lifecycle.transition.blockers.previewChanged),
+    reverse_state_changed: t(($) => $.lifecycle.transition.blockers.reverseStateChanged),
+    successor_has_later_transition: t(
+      ($) => $.lifecycle.transition.blockers.successorHasLaterTransition,
+    ),
+  };
+}
+
+function transitionCaveatLabels(
+  t: TFunction<"explore">,
+  sourceTicker: string,
+): Record<TickerIdentityTransitionCaveat, string> {
+  return {
+    provider_owned_sources_retained: t(
+      ($) => $.lifecycle.transition.caveats.providerOwnedSourcesRetained,
+    ),
+    portfolio_position_retained: t(
+      ($) => $.lifecycle.transition.caveats.portfolioPositionRetained,
+      { ticker: sourceTicker },
+    ),
+    successor_already_tracked: t(
+      ($) => $.lifecycle.transition.caveats.successorAlreadyTracked,
+    ),
+  };
+}
+
+function commandErrorPresentation(
+  error: unknown,
+  locale: LifecycleLocale,
+  t: TFunction<"explore">,
+): { code: string; message: string } {
+  const base = lifecycleErrorPresentation(error, locale);
+  if (base.code === "transition_preview_changed") {
+    return {
+      code: base.code,
+      message: t(($) => $.lifecycle.errors.transitionPreviewChanged),
+    };
+  }
+  if (base.code === "successor_has_later_transition") {
+    return {
+      code: base.code,
+      message: t(($) => $.lifecycle.errors.transitionLaterExists),
+    };
+  }
+  if (base.code === "reverse_state_changed" || base.code === "reverse_restore_mismatch") {
+    return {
+      code: base.code,
+      message: t(($) => $.lifecycle.errors.transitionReverseChanged),
+    };
+  }
+  return base;
+}
+
+const EFFECT_ACTIONS = ["add", "archive", "reactivate", "unchanged"] as const;
+
+function currentNewYorkDate(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "America/New_York",
+    year: "numeric",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function requireCompletedTransitionAttempt(
+  result: TickerIdentityTransitionAttemptResult,
+): TickerIdentityTransitionAttemptResult {
+  if (result.status !== "blocked") return result;
+  const code = result.block_reasons[0] || "security_lifecycle_unavailable";
+  throw Object.assign(new Error(code), { code });
+}
+
+function TransitionPreviewContent({
+  preview,
+  dateValue,
+  priorityResolution,
+  unhideSuccessor,
+  onDateChange,
+  onPriorityChange,
+  onUnhideChange,
+}: {
+  preview: TickerIdentityTransitionPreview;
+  dateValue: string;
+  priorityResolution: TickerIdentityPriorityResolution | null;
+  unhideSuccessor: boolean;
+  onDateChange: (value: string) => void;
+  onPriorityChange: (value: TickerIdentityPriorityResolution) => void;
+  onUnhideChange: (value: boolean) => void;
+}) {
+  const { t } = useTranslation("explore");
+  const unknown = t(($) => $.lifecycle.states.unknownValue);
+  const kindLabels = transitionKindLabels(t);
+  const caveatLabels = transitionCaveatLabels(t, preview.source_ticker);
+  const effectLabels = {
+    add: t(($) => $.lifecycle.transition.effects.add),
+    archive: t(($) => $.lifecycle.transition.effects.archive),
+    reactivate: t(($) => $.lifecycle.transition.effects.reactivate),
+    unchanged: t(($) => $.lifecycle.transition.effects.unchanged),
+  } satisfies Record<(typeof EFFECT_ACTIONS)[number], string>;
+  const priority = preview.effects.priority;
+  const hasPriorityChoice = priority.source_value !== null
+    && priority.successor_value !== null
+    && priority.source_value !== priority.successor_value;
+
+  return (
+    <div className="lifecycle-history-row">
+      <p className="strong">
+        {preview.successor_ticker
+          ? t(($) => $.lifecycle.transition.route, {
+            source: preview.source_ticker,
+            successor: preview.successor_ticker,
+          })
+          : t(($) => $.lifecycle.transition.terminalRoute, { source: preview.source_ticker })}
+      </p>
+      <dl className="lifecycle-assessment-facts">
+        <div>
+          <dt>{t(($) => $.lifecycle.transition.fields.kind)}</dt>
+          <dd>{preview.transition_kind
+            ? tickerTransitionKindLabel(preview.transition_kind, kindLabels, unknown)
+            : unknown}</dd>
+        </div>
+        <div>
+          <dt>{t(($) => $.lifecycle.transition.fields.executeOn)}</dt>
+          <dd>{preview.execute_on ?? unknown}</dd>
+        </div>
+      </dl>
+
+      <label>
+        {t(($) => $.lifecycle.transition.fields.executeOn)}
+        <input
+          type="date"
+          aria-label={t(($) => $.lifecycle.transition.fields.executeOn)}
+          value={dateValue}
+          onChange={(event) => onDateChange(event.target.value)}
+        />
+      </label>
+
+      {hasPriorityChoice ? (
+        <fieldset className="lifecycle-outcome-fieldset">
+          <legend>{t(($) => $.lifecycle.transition.fields.priority)}</legend>
+          <label className="lifecycle-citation">
+            <input
+              type="radio"
+              name="ticker-transition-priority"
+              checked={priorityResolution === "source"}
+              onChange={() => onPriorityChange("source")}
+            />
+            {t(($) => $.lifecycle.transition.fields.keepSourcePriority, {
+              value: priority.source_value ?? unknown,
+            })}
+          </label>
+          <label className="lifecycle-citation">
+            <input
+              type="radio"
+              name="ticker-transition-priority"
+              checked={priorityResolution === "successor"}
+              onChange={() => onPriorityChange("successor")}
+            />
+            {t(($) => $.lifecycle.transition.fields.keepSuccessorPriority, {
+              value: priority.successor_value ?? unknown,
+            })}
+          </label>
+        </fieldset>
+      ) : null}
+
+      {preview.effects.suppression.successor_hidden || unhideSuccessor ? (
+        <label className="lifecycle-citation">
+          <input
+            type="checkbox"
+            aria-label={t(($) => $.lifecycle.transition.fields.unhideSuccessor)}
+            checked={unhideSuccessor}
+            onChange={(event) => onUnhideChange(event.target.checked)}
+          />
+          {t(($) => $.lifecycle.transition.fields.unhideSuccessor)}
+        </label>
+      ) : null}
+
+      {EFFECT_ACTIONS.flatMap((action) => preview.effects.watchlists[action].map((item) => (
+        <p key={`watchlist-${action}-${item.list_id}-${item.ticker}`}>
+          <strong>{t(($) => $.lifecycle.transition.fields.watchlists)}</strong>
+          <span aria-hidden="true"> · </span>
+          {effectLabels[action]}: {item.list_name} · <span className="mono">{item.ticker}</span>
+        </p>
+      )))}
+      {EFFECT_ACTIONS.flatMap((action) => preview.effects.legacy_config_seed[action].map((item) => (
+        <p key={`legacy-${action}-${item.ticker}`}>
+          <strong>{t(($) => $.lifecycle.transition.fields.legacySeed)}</strong>
+          <span aria-hidden="true"> · </span>
+          {effectLabels[action]}: <span className="mono">{item.ticker}</span>
+        </p>
+      )))}
+      {preview.effects.editable_tags_to_copy.map((item) => (
+        <p key={`${item.facet}-${item.source}-${item.value}`}>
+          <strong>{t(($) => $.lifecycle.transition.fields.tags)}</strong>
+          <span aria-hidden="true"> · </span>
+          {item.facet}: {item.value} · <span className="mono">{item.ticker}</span>
+        </p>
+      ))}
+      {preview.caveats.length > 0 ? (
+        <div>
+          <strong>{t(($) => $.lifecycle.transition.fields.caveats)}</strong>
+          {preview.caveats.map((caveat) => (
+            <p key={caveat}>{tickerTransitionCaveatLabel(caveat, caveatLabels, unknown)}</p>
+          ))}
+        </div>
+      ) : null}
+      <p>{t(($) => $.lifecycle.transition.noHistoricalRewrite)}</p>
+      <p>{t(($) => $.lifecycle.transition.approvalConsequence)}</p>
+    </div>
+  );
 }
 
 function AssessmentHistory({
@@ -283,6 +567,17 @@ export function LifecycleView({
   const [citeObservation, setCiteObservation] = useState(false);
   const [citedEvidence, setCitedEvidence] = useState<string[]>([]);
   const [citationError, setCitationError] = useState(false);
+  const [transitionPreview, setTransitionPreview] = useState<TickerIdentityTransitionPreview | null>(
+    null,
+  );
+  const [transitionPreviewLoading, setTransitionPreviewLoading] = useState(false);
+  const [transitionDate, setTransitionDate] = useState("");
+  const [transitionPriority, setTransitionPriority] = useState<
+    TickerIdentityPriorityResolution | null
+  >(null);
+  const [transitionUnhideSuccessor, setTransitionUnhideSuccessor] = useState(false);
+  const [transitionDialog, setTransitionDialog] = useState<"approve" | "reverse" | null>(null);
+  const transitionPreviewRequestRef = useRef(0);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const loadCases = useCallback(async () => {
@@ -308,11 +603,55 @@ export function LifecycleView({
     }
   }, [locale]);
 
+  const loadTransitionPreview = useCallback(async (
+    caseId: string,
+    options: {
+      execute_on?: string;
+      priority_resolution?: TickerIdentityPriorityResolution;
+      unhide_successor?: boolean;
+    } = {},
+    initializeControls = false,
+  ) => {
+    const requestId = ++transitionPreviewRequestRef.current;
+    setTransitionPreviewLoading(true);
+    try {
+      const response = await getTickerIdentityTransitionPreview(caseId, options);
+      if (requestId !== transitionPreviewRequestRef.current) return;
+      setTransitionPreview(response);
+      if (initializeControls) {
+        setTransitionDate(response.execute_on ?? "");
+        setTransitionPriority(response.effects.priority.resolution);
+        setTransitionUnhideSuccessor(response.effects.suppression.unhide_successor);
+      }
+    } catch (error) {
+      if (requestId !== transitionPreviewRequestRef.current) return;
+      setTransitionPreview(null);
+      setCommandError(commandErrorPresentation(error, locale, t));
+    } finally {
+      if (requestId === transitionPreviewRequestRef.current) {
+        setTransitionPreviewLoading(false);
+      }
+    }
+  }, [locale, t]);
+
   useEffect(() => { void loadCases(); }, [loadCases]);
   useEffect(() => {
     if (selectedCaseId) void loadDetail(selectedCaseId);
     else setDetail(null);
   }, [loadDetail, selectedCaseId]);
+  useEffect(() => {
+    const transition = detail?.ticker_transition;
+    const shouldPreview = detail?.source_presence === "present"
+      && detail.current_assessment?.status === "accepted"
+      && (!transition || transition.status === "needs_review");
+    if (shouldPreview && detail) {
+      void loadTransitionPreview(detail.case_id, {}, true);
+    } else {
+      transitionPreviewRequestRef.current += 1;
+      setTransitionPreview(null);
+      setTransitionPreviewLoading(false);
+    }
+  }, [detail, loadTransitionPreview]);
   useEffect(() => {
     setManualText("");
     setManualUrl("");
@@ -333,6 +672,12 @@ export function LifecycleView({
     setCiteObservation(false);
     setCitedEvidence([]);
     setCitationError(false);
+    setTransitionPreview(null);
+    setTransitionPreviewLoading(false);
+    setTransitionDate("");
+    setTransitionPriority(null);
+    setTransitionUnhideSuccessor(false);
+    setTransitionDialog(null);
   }, [selectedCaseId]);
   useEffect(() => {
     if (initialCaseId) {
@@ -347,15 +692,17 @@ export function LifecycleView({
     value: SecurityLifecycleCaseFilters[Key],
   ) => setFilters((current) => ({ ...current, [key]: value }));
 
-  const runCommand = async (name: string, command: () => Promise<unknown>) => {
-    if (!selectedCaseId || busy) return;
+  const runCommand = async (name: string, command: () => Promise<unknown>): Promise<boolean> => {
+    if (!selectedCaseId || busy) return false;
     setBusy(name);
     setCommandError(null);
     try {
       await command();
       await Promise.all([loadCases(), loadDetail(selectedCaseId)]);
+      return true;
     } catch (error) {
-      setCommandError(lifecycleErrorPresentation(error, locale));
+      setCommandError(commandErrorPresentation(error, locale, t));
+      return false;
     } finally {
       setBusy(null);
     }
@@ -378,6 +725,32 @@ export function LifecycleView({
     const remaining = determinate.filter((item) => item !== value);
     return remaining.length > 0 ? remaining : ["undetermined"];
   });
+
+  const statusLabels = transitionStatusLabels(t);
+  const kindLabels = transitionKindLabels(t);
+  const blockLabels = transitionBlockLabels(t);
+  const unknownTransitionValue = t(($) => $.lifecycle.states.unknownValue);
+
+  const refreshTransitionOptions = (
+    values: {
+      executeOn?: string;
+      priority?: TickerIdentityPriorityResolution | null;
+      unhideSuccessor?: boolean;
+    },
+  ) => {
+    if (!selectedCaseId) return;
+    const executeOn = values.executeOn ?? transitionDate;
+    const priority = values.priority === undefined ? transitionPriority : values.priority;
+    const unhideSuccessor = values.unhideSuccessor ?? transitionUnhideSuccessor;
+    setTransitionDate(executeOn);
+    setTransitionPriority(priority);
+    setTransitionUnhideSuccessor(unhideSuccessor);
+    void loadTransitionPreview(selectedCaseId, {
+      execute_on: executeOn || undefined,
+      priority_resolution: priority ?? undefined,
+      unhide_successor: unhideSuccessor,
+    });
+  };
 
   return (
     <main className="lifecycle-triage" aria-label={t(($) => $.lifecycle.aria)}>
@@ -904,9 +1277,278 @@ export function LifecycleView({
                 );
               })}
             </LifecycleCaseSection>
+
+            <LifecycleCaseSection title={t(($) => $.lifecycle.sections.transition)}>
+              {detail.ticker_transition ? (
+                <div className="lifecycle-history-row">
+                  <p>
+                    <strong>{tickerTransitionKindLabel(
+                      detail.ticker_transition.kind,
+                      kindLabels,
+                      unknownTransitionValue,
+                    )}</strong>
+                    <span aria-hidden="true"> · </span>
+                    {tickerTransitionStatusLabel(
+                      detail.ticker_transition.status,
+                      statusLabels,
+                      unknownTransitionValue,
+                    )}
+                  </p>
+                  <p className="mono">
+                    {detail.ticker_transition.successor_ticker
+                      ? t(($) => $.lifecycle.transition.route, {
+                        source: detail.ticker_transition.source_ticker,
+                        successor: detail.ticker_transition.successor_ticker,
+                      })
+                      : t(($) => $.lifecycle.transition.terminalRoute, {
+                        source: detail.ticker_transition.source_ticker,
+                      })}
+                  </p>
+                  <p>
+                    {t(($) => $.lifecycle.transition.fields.executeOn)}: {
+                      detail.ticker_transition.execute_on
+                    }
+                  </p>
+                  {detail.ticker_transition.latest_attempt ? (
+                    <div>
+                      <strong>{t(($) => $.lifecycle.transition.fields.latestAttempt)}</strong>
+                      <span aria-hidden="true"> · </span>
+                      {detail.ticker_transition.latest_attempt.attempted_at}
+                      {detail.ticker_transition.latest_attempt.block_reasons.map((reason) => (
+                        <p key={reason}>{tickerTransitionBlockReasonLabel(
+                          reason,
+                          blockLabels,
+                          unknownTransitionValue,
+                        )}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="lifecycle-commands">
+                    {detail.ticker_transition.status === "approved" ? (
+                      <>
+                        <Button
+                          size="compact"
+                          tone="ghost"
+                          icon={<X size={15} />}
+                          disabled={Boolean(busy)}
+                          onClick={() => void runCommand("cancel-transition", () => (
+                            cancelTickerIdentityTransition(
+                              detail.ticker_transition!.transition_id,
+                            )
+                          ))}
+                        >
+                          {t(($) => $.lifecycle.actions.cancelTransition)}
+                        </Button>
+                        {detail.ticker_transition.execute_on <= currentNewYorkDate() ? (
+                          <Button
+                            size="compact"
+                            icon={<ArrowRightLeft size={15} />}
+                            disabled={Boolean(busy)}
+                            onClick={() => void runCommand("retry-transition", async () => (
+                              requireCompletedTransitionAttempt(await retryTickerIdentityTransition(
+                                detail.ticker_transition!.transition_id,
+                                {
+                                  preview_sha256:
+                                    detail.ticker_transition!.approved_preview_sha256,
+                                },
+                              ))
+                            ))}
+                          >
+                            {t(($) => $.lifecycle.actions.retryTransition)}
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {detail.ticker_transition.status === "needs_review" ? (
+                      <Button
+                        size="compact"
+                        tone="ghost"
+                        icon={<X size={15} />}
+                        disabled={Boolean(busy)}
+                        onClick={() => void runCommand("cancel-transition", () => (
+                          cancelTickerIdentityTransition(
+                            detail.ticker_transition!.transition_id,
+                          )
+                        ))}
+                      >
+                        {t(($) => $.lifecycle.actions.cancelTransition)}
+                      </Button>
+                    ) : null}
+                    {detail.ticker_transition.status === "applied" ? (
+                      <Button
+                        size="compact"
+                        tone="ghost"
+                        icon={<RotateCcw size={15} />}
+                        disabled={Boolean(busy)}
+                        onClick={() => setTransitionDialog("reverse")}
+                      >
+                        {t(($) => $.lifecycle.actions.reverseTransition)}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {transitionPreviewLoading ? (
+                <p className="muted">{t(($) => $.lifecycle.transition.awaitingPreview)}</p>
+              ) : null}
+              {transitionPreview ? (
+                <div>
+                  <label>
+                    {t(($) => $.lifecycle.transition.fields.executeOn)}
+                    <input
+                      type="date"
+                      aria-label={t(($) => $.lifecycle.transition.fields.executeOn)}
+                      value={transitionDate}
+                      disabled={Boolean(busy) || transitionPreviewLoading}
+                      onChange={(event) => refreshTransitionOptions({
+                        executeOn: event.target.value,
+                      })}
+                    />
+                  </label>
+                  {transitionPreview.block_reasons.length > 0 ? (
+                    <div>
+                      <strong>{t(($) => $.lifecycle.transition.fields.blockers)}</strong>
+                      {transitionPreview.block_reasons.map((reason) => (
+                        <p key={reason}>{tickerTransitionBlockReasonLabel(
+                          reason,
+                          blockLabels,
+                          unknownTransitionValue,
+                        )}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {transitionPreview.effects.priority.source_value !== null
+                    && transitionPreview.effects.priority.successor_value !== null
+                    && transitionPreview.effects.priority.source_value
+                      !== transitionPreview.effects.priority.successor_value ? (
+                      <fieldset className="lifecycle-outcome-fieldset">
+                        <legend>{t(($) => $.lifecycle.transition.fields.priority)}</legend>
+                        <label className="lifecycle-citation">
+                          <input
+                            type="radio"
+                            name="ticker-transition-priority-summary"
+                            checked={transitionPriority === "source"}
+                            disabled={Boolean(busy) || transitionPreviewLoading}
+                            onChange={() => refreshTransitionOptions({ priority: "source" })}
+                          />
+                          {t(($) => $.lifecycle.transition.fields.keepSourcePriority, {
+                            value: transitionPreview.effects.priority.source_value,
+                          })}
+                        </label>
+                        <label className="lifecycle-citation">
+                          <input
+                            type="radio"
+                            name="ticker-transition-priority-summary"
+                            checked={transitionPriority === "successor"}
+                            disabled={Boolean(busy) || transitionPreviewLoading}
+                            onChange={() => refreshTransitionOptions({ priority: "successor" })}
+                          />
+                          {t(($) => $.lifecycle.transition.fields.keepSuccessorPriority, {
+                            value: transitionPreview.effects.priority.successor_value,
+                          })}
+                        </label>
+                      </fieldset>
+                    ) : null}
+                  {transitionPreview.effects.suppression.successor_hidden
+                    || transitionUnhideSuccessor ? (
+                      <label className="lifecycle-citation">
+                        <input
+                          type="checkbox"
+                          aria-label={t(($) => $.lifecycle.transition.fields.unhideSuccessor)}
+                          checked={transitionUnhideSuccessor}
+                          disabled={Boolean(busy) || transitionPreviewLoading}
+                          onChange={(event) => refreshTransitionOptions({
+                            unhideSuccessor: event.target.checked,
+                          })}
+                        />
+                        {t(($) => $.lifecycle.transition.fields.unhideSuccessor)}
+                      </label>
+                    ) : null}
+                  {!transitionPreview.transition_kind ? (
+                    <p>{t(($) => $.lifecycle.transition.noExecutableTransition)}</p>
+                  ) : null}
+                  {transitionPreview.eligible
+                    && (!detail.ticker_transition
+                      || detail.ticker_transition.status === "needs_review") ? (
+                      <Button
+                        size="compact"
+                        icon={<ArrowRightLeft size={15} />}
+                        disabled={Boolean(busy) || transitionPreviewLoading}
+                        onClick={() => setTransitionDialog("approve")}
+                      >
+                        {t(($) => $.lifecycle.actions.reviewTransition)}
+                      </Button>
+                    ) : null}
+                </div>
+              ) : null}
+            </LifecycleCaseSection>
           </>
         ) : null}
       </LifecycleCaseDrawer>
+
+      <ConfirmDialog
+        open={transitionDialog === "approve" && Boolean(transitionPreview?.eligible)}
+        title={t(($) => $.lifecycle.transition.modalTitle)}
+        consequence={transitionPreview ? (
+          <TransitionPreviewContent
+            preview={transitionPreview}
+            dateValue={transitionDate}
+            priorityResolution={transitionPriority}
+            unhideSuccessor={transitionUnhideSuccessor}
+            onDateChange={(value) => refreshTransitionOptions({ executeOn: value })}
+            onPriorityChange={(value) => refreshTransitionOptions({ priority: value })}
+            onUnhideChange={(value) => refreshTransitionOptions({ unhideSuccessor: value })}
+          />
+        ) : null}
+        confirmLabel={t(($) => $.lifecycle.actions.approveTransition)}
+        tone="primary"
+        busy={busy === "approve-transition"}
+        onCancel={() => setTransitionDialog(null)}
+        onConfirm={() => {
+          if (!transitionPreview?.execute_on) return;
+          const reviewedPreview = transitionPreview;
+          void (async () => {
+            const succeeded = await runCommand("approve-transition", () => (
+              approveTickerIdentityTransition(detail!.case_id, {
+                execute_on: reviewedPreview.execute_on!,
+                preview_sha256: reviewedPreview.preview_sha256,
+                priority_resolution: reviewedPreview.effects.priority.resolution,
+                unhide_successor: reviewedPreview.effects.suppression.unhide_successor,
+              })
+            ));
+            setTransitionDialog(null);
+            if (!succeeded && selectedCaseId) {
+              void loadTransitionPreview(selectedCaseId, {
+                execute_on: transitionDate || undefined,
+                priority_resolution: transitionPriority ?? undefined,
+                unhide_successor: transitionUnhideSuccessor,
+              });
+            }
+          })();
+        }}
+      />
+
+      <ConfirmDialog
+        open={transitionDialog === "reverse" && detail?.ticker_transition?.status === "applied"}
+        title={t(($) => $.lifecycle.transition.reverseTitle)}
+        consequence={<p>{t(($) => $.lifecycle.transition.reverseConsequence)}</p>}
+        confirmLabel={t(($) => $.lifecycle.actions.confirmReverse)}
+        busy={busy === "reverse-transition"}
+        onCancel={() => setTransitionDialog(null)}
+        onConfirm={() => {
+          const transitionId = detail?.ticker_transition?.transition_id;
+          if (!transitionId) return;
+          void (async () => {
+            await runCommand("reverse-transition", async () => (
+              requireCompletedTransitionAttempt(
+                await reverseTickerIdentityTransition(transitionId),
+              )
+            ));
+            setTransitionDialog(null);
+          })();
+        }}
+      />
     </main>
   );
 }

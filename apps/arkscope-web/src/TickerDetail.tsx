@@ -103,6 +103,45 @@ export function TickerDetailView({
         )}
       </div>
 
+      {state && (state.lineage.predecessors.length > 0 || state.lineage.successors.length > 0) ? (
+        <div className="lifecycle-assessment-facts" aria-label={t(($) => $.tickerDetail.lineage)}>
+          {state.lineage.predecessors.length > 0 ? (
+            <div>
+              <strong>{t(($) => $.tickerDetail.predecessors)}</strong>
+              <span className="chips">
+                {state.lineage.predecessors.map((item) => (
+                  <button
+                    className="btn-ghost mono"
+                    key={item.transition_id}
+                    type="button"
+                    onClick={() => onNavigateTarget({ kind: "ticker", ticker: item.ticker })}
+                  >
+                    {item.ticker}
+                  </button>
+                ))}
+              </span>
+            </div>
+          ) : null}
+          {state.lineage.successors.length > 0 ? (
+            <div>
+              <strong>{t(($) => $.tickerDetail.successors)}</strong>
+              <span className="chips">
+                {state.lineage.successors.map((item) => (
+                  <button
+                    className="btn-ghost mono"
+                    key={item.transition_id}
+                    type="button"
+                    onClick={() => onNavigateTarget({ kind: "ticker", ticker: item.ticker })}
+                  >
+                    {item.ticker}
+                  </button>
+                ))}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {stateErr && (
         <ExploreErrorNotice
           state={stateErr}

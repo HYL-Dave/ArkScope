@@ -10,12 +10,17 @@ const apiMocks = vi.hoisted(() => ({
   acknowledgeSecurityLifecycleCase: vi.fn(),
   acceptSecurityLifecycleAssessment: vi.fn(),
   addSecurityLifecycleEvidence: vi.fn(),
+  approveTickerIdentityTransition: vi.fn(),
+  cancelTickerIdentityTransition: vi.fn(),
   createSecurityLifecycleAssessment: vi.fn(),
   dismissSecurityLifecycleProposal: vi.fn(),
   getSecurityLifecycleCase: vi.fn(),
   getSecurityLifecycleInvestigation: vi.fn(),
+  getTickerIdentityTransitionPreview: vi.fn(),
   listSecurityLifecycleCases: vi.fn(),
   reopenSecurityLifecycleAcknowledgement: vi.fn(),
+  retryTickerIdentityTransition: vi.fn(),
+  reverseTickerIdentityTransition: vi.fn(),
   startSecurityLifecycleInvestigation: vi.fn(),
 }));
 
@@ -94,6 +99,60 @@ const SUMMARY = {
   investigation_run_count: 1,
 };
 
+const TRANSITION_PREVIEW = {
+  active_sources: ["manual_lists", "portfolio_open", "sa_alpha_picks_current"],
+  assessment_fingerprint_sha256: "1".repeat(64),
+  assessment_id: "assessment-transition",
+  block_reasons: [],
+  case_id: CASE_ID,
+  caveats: ["portfolio_position_retained", "provider_owned_sources_retained"],
+  effects: {
+    editable_tags_to_copy: [{
+      facet: "theme",
+      source: "user",
+      ticker: "QBTS.B",
+      value: "Quantum",
+    }],
+    legacy_config_seed: {
+      add: [],
+      archive: [{ source_key: "legacy_config_seed", ticker: "QBTS" }],
+      reactivate: [{ source_key: "legacy_config_seed", ticker: "QBTS.B" }],
+      unchanged: [],
+    },
+    priority: {
+      resolution: "source",
+      result_value: "high",
+      source_value: "high",
+      successor_value: "low",
+      write_successor: true,
+    },
+    suppression: {
+      hide_source: false,
+      source_hidden: false,
+      successor_hidden: true,
+      unhide_successor: true,
+    },
+    watchlists: {
+      add: [{ list_id: 7, list_name: "Quantum", position: 2, ticker: "QBTS.B" }],
+      archive: [{ list_id: 7, list_name: "Quantum", position: 4, ticker: "QBTS" }],
+      reactivate: [],
+      unchanged: [],
+    },
+  },
+  eligible: true,
+  evidence_set_sha256: "2".repeat(64),
+  execute_on: "2026-09-01",
+  observation_fingerprint_sha256: "3".repeat(64),
+  outcomes: ["symbol_changed"],
+  preview_sha256: "b".repeat(64),
+  profile_state_sha256: "4".repeat(64),
+  proposal_ids: ["proposal-remap"],
+  provider_owned_sources: ["sa_alpha_picks_current"],
+  source_ticker: "QBTS",
+  successor_ticker: "QBTS.B",
+  transition_kind: "symbol_continuation",
+};
+
 function detail(overrides: Record<string, unknown> = {}) {
   return {
     ...SUMMARY,
@@ -130,6 +189,7 @@ function detail(overrides: Record<string, unknown> = {}) {
     assessment_history: [LEGACY_ASSESSMENT],
     acknowledgement_history: [],
     current_acknowledgement: null,
+    ticker_transition: null,
     proposals: [{
       proposal_id: "proposal-review",
       action_type: "review_portfolio_position",
@@ -157,6 +217,14 @@ async function flush() {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 async function mountLifecycle(caseId: string | null = CASE_ID) {
@@ -241,6 +309,23 @@ beforeEach(async () => {
   apiMocks.dismissSecurityLifecycleProposal.mockResolvedValue({
     proposal_id: "proposal-review",
     status: "dismissed",
+  });
+  apiMocks.getTickerIdentityTransitionPreview.mockResolvedValue(TRANSITION_PREVIEW);
+  apiMocks.approveTickerIdentityTransition.mockResolvedValue({
+    transition_id: "transition-1",
+    status: "approved",
+  });
+  apiMocks.cancelTickerIdentityTransition.mockResolvedValue({
+    transition_id: "transition-1",
+    status: "cancelled",
+  });
+  apiMocks.retryTickerIdentityTransition.mockResolvedValue({
+    transition_id: "transition-1",
+    status: "applied",
+  });
+  apiMocks.reverseTickerIdentityTransition.mockResolvedValue({
+    transition_id: "transition-1",
+    status: "reversed",
   });
 });
 
@@ -583,6 +668,149 @@ describe("Lifecycle workflow", () => {
       "The legacy label did not distinguish renaming from transfer",
     );
     expect(document.body.textContent).toContain("Limited provenance");
+  });
+
+  it("reviews every owned effect and approves only the server preview digest", async () => {
+    await mountLifecycle();
+    await click("Review ticker transition");
+
+    const dialog = document.body.querySelector<HTMLElement>(".ui-confirm-dialog");
+    expect(dialog).not.toBeNull();
+    for (const value of [
+      "QBTS -> QBTS.B",
+      "2026-09-01",
+      "Quantum",
+      "theme",
+      "high",
+      "low",
+      "The old broker position remains on QBTS",
+      "Seeking Alpha tracking stays with the provider-owned source",
+      "Historical notes, evidence, prices, and filings are not rewritten",
+    ]) expect(dialog!.textContent).toContain(value);
+    expect(dialog!.querySelectorAll('input[type="radio"]')).toHaveLength(2);
+
+    await click("Approve scheduled transition", dialog!);
+    expect(apiMocks.approveTickerIdentityTransition).toHaveBeenCalledWith(CASE_ID, {
+      execute_on: "2026-09-01",
+      preview_sha256: "b".repeat(64),
+      priority_resolution: "source",
+      unhide_successor: true,
+    });
+  });
+
+  it("renders ineligible blockers without exposing an approval command", async () => {
+    apiMocks.getTickerIdentityTransitionPreview.mockResolvedValue({
+      ...TRANSITION_PREVIEW,
+      eligible: false,
+      block_reasons: ["successor_missing", "priority_resolution_required"],
+      successor_ticker: null,
+      transition_kind: null,
+    });
+    await mountLifecycle();
+    expect(document.body.textContent).toContain("Successor ticker is required");
+    expect(document.body.textContent).toContain("Choose which priority to keep");
+    expect(document.body.textContent).not.toContain("Approve scheduled transition");
+  });
+
+  it("lets a missing execution date be resolved through a fresh server preview", async () => {
+    apiMocks.getTickerIdentityTransitionPreview
+      .mockResolvedValueOnce({
+        ...TRANSITION_PREVIEW,
+        eligible: false,
+        execute_on: null,
+        block_reasons: ["execution_date_required"],
+      })
+      .mockResolvedValue({
+        ...TRANSITION_PREVIEW,
+        execute_on: "2026-09-02",
+      });
+    await mountLifecycle();
+    await setField("Scheduled date", "2026-09-02");
+    expect(apiMocks.getTickerIdentityTransitionPreview).toHaveBeenLastCalledWith(CASE_ID, {
+      execute_on: "2026-09-02",
+      priority_resolution: "source",
+      unhide_successor: true,
+    });
+    expect(document.body.textContent).toContain("Review ticker transition");
+  });
+
+  it("cancels an approved transition through its durable case state", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      ticker_transition: {
+        transition_id: "transition-1",
+        kind: "symbol_continuation",
+        status: "approved",
+        source_ticker: "QBTS",
+        successor_ticker: "QBTS.B",
+        execute_on: "2026-09-01",
+        approved_preview_sha256: "b".repeat(64),
+        updated_at: "2026-08-23T10:00:00Z",
+        latest_attempt: null,
+      },
+    }));
+    await mountLifecycle();
+    expect(document.body.textContent).toContain("Scheduled; waiting for the effective date");
+    await click("Cancel scheduled transition");
+    expect(apiMocks.cancelTickerIdentityTransition).toHaveBeenCalledWith("transition-1");
+  });
+
+  it("reports a changed preview and never treats the stale approval as successful", async () => {
+    apiMocks.approveTickerIdentityTransition.mockRejectedValue(Object.assign(
+      new Error("stale preview"),
+      { code: "transition_preview_changed" },
+    ));
+    await mountLifecycle();
+    await click("Review ticker transition");
+    await click("Approve scheduled transition");
+    expect(document.body.textContent).toContain(
+      "The transition preview changed; review the current effects before approving again",
+    );
+  });
+
+  it("keeps reversal blocked when later state no longer matches", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      ticker_transition: {
+        transition_id: "transition-applied",
+        kind: "symbol_continuation",
+        status: "applied",
+        source_ticker: "QBTS",
+        successor_ticker: "QBTS.B",
+        execute_on: "2026-08-22",
+        approved_preview_sha256: "b".repeat(64),
+        updated_at: "2026-08-23T10:00:00Z",
+        latest_attempt: {
+          status: "applied",
+          block_reasons: [],
+          attempted_at: "2026-08-22T13:00:00Z",
+        },
+      },
+    }));
+    apiMocks.reverseTickerIdentityTransition.mockResolvedValue({
+      status: "blocked",
+      block_reasons: ["successor_has_later_transition"],
+      transition: { transition_id: "transition-applied", status: "applied" },
+    });
+    await mountLifecycle();
+    await click("Reverse transition");
+    await click("Confirm reversal");
+    expect(document.body.textContent).toContain(
+      "A later ticker transition exists; this transition cannot be reversed",
+    );
+  });
+
+  it("disables transition commands while approval is pending", async () => {
+    const pending = deferred<{ transition_id: string; status: string }>();
+    apiMocks.approveTickerIdentityTransition.mockReturnValue(pending.promise);
+    await mountLifecycle();
+    await click("Review ticker transition");
+    const dialog = document.body.querySelector<HTMLElement>(".ui-confirm-dialog")!;
+    await click("Approve scheduled transition", dialog);
+    const confirm = Array.from(dialog.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Approve scheduled transition"));
+    expect(confirm?.disabled).toBe(true);
+    expect(dialog.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+    pending.resolve({ transition_id: "transition-1", status: "approved" });
+    await flush();
   });
 
   it("uses the stable responsive triage and drawer structure", async () => {

@@ -144,6 +144,10 @@ const STATE: TickerAggregate = {
     USER_TAG,
     { facet: "source_custom_axis", value: "UNKNOWN TAG VALUE", source: SOURCE_TAG_SOURCE },
   ],
+  lineage: {
+    predecessors: [{ ticker: "SRC", transition_id: "transition-prev" }],
+    successors: [{ ticker: "NEXT.TW", transition_id: "transition-next" }],
+  },
 };
 
 const PRICE: PriceChange = {
@@ -447,6 +451,19 @@ describe("Ticker Detail localization", () => {
     expect(host!.querySelector("img")).toBeNull();
     expect(apiMocks.getTickerState).toHaveBeenCalledWith(TICKER);
     expect(apiMocks.getPriceChange).toHaveBeenCalledWith(TICKER, 30);
+  });
+
+  it("navigates predecessor and successor history without moving notes", async () => {
+    const onNavigateTarget = vi.fn();
+    await mountTicker({ onNavigateTarget });
+    await waitForText("前身代號");
+
+    await click(buttonByText("SRC"));
+    expect(onNavigateTarget).toHaveBeenLastCalledWith({ kind: "ticker", ticker: "SRC" });
+    await click(buttonByText("NEXT.TW"));
+    expect(onNavigateTarget).toHaveBeenLastCalledWith({ kind: "ticker", ticker: "NEXT.TW" });
+    expect(apiMocks.addNote).not.toHaveBeenCalled();
+    expect(apiMocks.deleteNote).not.toHaveBeenCalled();
   });
 
   it("renders English ticker chrome without translating financial statement rows", async () => {

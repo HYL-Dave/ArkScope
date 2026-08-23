@@ -414,6 +414,15 @@ export interface TickerAggregate {
   note_count: number;
   priority: string | null;
   tags?: TagRef[];
+  lineage: {
+    predecessors: TickerIdentityLineageItem[];
+    successors: TickerIdentityLineageItem[];
+  };
+}
+
+export interface TickerIdentityLineageItem {
+  ticker: string;
+  transition_id: string;
 }
 
 // --- universe (full tracked inventory) ---
@@ -2511,6 +2520,139 @@ export interface SecurityLifecycleActionProposal {
   created_at: string;
 }
 
+export type TickerIdentityTransitionKind =
+  | "symbol_continuation"
+  | "terminal_delisting";
+export type TickerIdentityTransitionStatus =
+  | "approved"
+  | "needs_review"
+  | "applied"
+  | "cancelled"
+  | "reversed";
+export type TickerIdentityTransitionBlockReason =
+  | "successor_missing"
+  | "successor_not_distinct"
+  | "outcome_not_executable"
+  | "assessment_case_mismatch"
+  | "assessment_not_accepted"
+  | "assessment_not_direct"
+  | "stale_assessment"
+  | "observation_citation_required"
+  | "execution_date_required"
+  | "execution_date_invalid"
+  | "source_context_unavailable"
+  | "no_active_tracking_source"
+  | "remap_proposal_missing"
+  | "proposal_missing"
+  | "priority_resolution_required"
+  | "successor_hidden"
+  | "portfolio_position_open"
+  | "preview_changed"
+  | "reverse_state_changed"
+  | "successor_has_later_transition";
+export type TickerIdentityTransitionCaveat =
+  | "provider_owned_sources_retained"
+  | "portfolio_position_retained"
+  | "successor_already_tracked";
+export type TickerIdentityPriorityResolution = "source" | "successor";
+
+export interface TickerIdentityWatchlistEffect {
+  list_id: number;
+  list_name: string;
+  position: number;
+  ticker: string;
+}
+
+export interface TickerIdentityLegacySeedEffect {
+  source_key: "legacy_config_seed";
+  ticker: string;
+}
+
+export interface TickerIdentityEditableTagEffect {
+  facet: string;
+  source: string;
+  ticker: string;
+  value: string;
+}
+
+export interface TickerIdentityTransitionPreview {
+  active_sources: SecurityLifecycleTrackingSource[];
+  assessment_fingerprint_sha256: string;
+  assessment_id: string;
+  block_reasons: TickerIdentityTransitionBlockReason[];
+  case_id: string;
+  caveats: TickerIdentityTransitionCaveat[];
+  effects: {
+    editable_tags_to_copy: TickerIdentityEditableTagEffect[];
+    legacy_config_seed: Record<
+      "add" | "archive" | "reactivate" | "unchanged",
+      TickerIdentityLegacySeedEffect[]
+    >;
+    priority: {
+      resolution: TickerIdentityPriorityResolution | null;
+      result_value: string | null;
+      source_value: string | null;
+      successor_value: string | null;
+      write_successor: boolean;
+    };
+    suppression: {
+      hide_source: boolean;
+      source_hidden: boolean;
+      successor_hidden: boolean;
+      unhide_successor: boolean;
+    };
+    watchlists: Record<
+      "add" | "archive" | "reactivate" | "unchanged",
+      TickerIdentityWatchlistEffect[]
+    >;
+  };
+  eligible: boolean;
+  evidence_set_sha256: string;
+  execute_on: string | null;
+  observation_fingerprint_sha256: string;
+  outcomes: SecurityLifecycleOutcome[];
+  preview_sha256: string;
+  profile_state_sha256: string;
+  proposal_ids: string[];
+  provider_owned_sources: string[];
+  source_ticker: string;
+  successor_ticker: string | null;
+  transition_kind: TickerIdentityTransitionKind | null;
+}
+
+export interface TickerIdentityTransitionState {
+  transition_id: string;
+  kind: TickerIdentityTransitionKind;
+  status: TickerIdentityTransitionStatus;
+  source_ticker: string;
+  successor_ticker: string | null;
+  execute_on: string;
+  approved_preview_sha256: string;
+  updated_at: string;
+  latest_attempt: {
+    status: "blocked" | "applied" | "already_applied" | "reversed";
+    block_reasons: string[];
+    attempted_at: string;
+  } | null;
+}
+
+export interface TickerIdentityTransitionRecord {
+  transition_id: string;
+  kind: TickerIdentityTransitionKind;
+  status: TickerIdentityTransitionStatus;
+  source_ticker: string;
+  successor_ticker: string | null;
+  execute_on: string;
+  approved_preview_sha256: string;
+  updated_at: string;
+}
+
+export interface TickerIdentityTransitionAttemptResult {
+  status: "blocked" | "applied" | "already_applied" | "reversed";
+  block_reasons: string[];
+  transition: TickerIdentityTransitionRecord;
+}
+
 export interface SecurityLifecycleCaseSummary {
   case_id: string;
   source: string;
@@ -2541,6 +2683,7 @@ export interface SecurityLifecycleCaseDetail extends SecurityLifecycleCaseSummar
   assessment_history: SecurityLifecycleAssessment[];
   acknowledgement_history: SecurityLifecycleAcknowledgement[];
   proposals: SecurityLifecycleActionProposal[];
+  ticker_transition: TickerIdentityTransitionState | null;
   truncation?: Record<string, { total: number; returned: number }>;
 }
 
@@ -2684,6 +2827,79 @@ export function dismissSecurityLifecycleProposal(
 ): Promise<SecurityLifecycleActionProposal> {
   return sendJSON(
     `/security-lifecycle/action-proposals/${encodeURIComponent(proposalId)}/dismiss`,
+    "POST",
+  );
+}
+
+export interface TickerIdentityTransitionPreviewOptions {
+  execute_on?: string;
+  priority_resolution?: TickerIdentityPriorityResolution;
+  unhide_successor?: boolean;
+}
+
+function tickerIdentityPreviewQuery(options: TickerIdentityTransitionPreviewOptions): string {
+  const params = new URLSearchParams();
+  if (options.execute_on) params.set("execute_on", options.execute_on);
+  if (options.priority_resolution) {
+    params.set("priority_resolution", options.priority_resolution);
+  }
+  if (options.unhide_successor) params.set("unhide_successor", "true");
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function getTickerIdentityTransitionPreview(
+  caseId: string,
+  options: TickerIdentityTransitionPreviewOptions = {},
+): Promise<TickerIdentityTransitionPreview> {
+  return getJSON<TickerIdentityTransitionPreview>(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/transition-preview${
+      tickerIdentityPreviewQuery(options)
+    }`,
+  );
+}
+
+export function approveTickerIdentityTransition(
+  caseId: string,
+  body: {
+    execute_on: string;
+    preview_sha256: string;
+    priority_resolution: TickerIdentityPriorityResolution | null;
+    unhide_successor: boolean;
+  },
+): Promise<TickerIdentityTransitionRecord> {
+  return sendJSON<TickerIdentityTransitionRecord>(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/approve-transition`,
+    "POST",
+    body,
+  );
+}
+
+export function cancelTickerIdentityTransition(
+  transitionId: string,
+): Promise<TickerIdentityTransitionRecord> {
+  return sendJSON<TickerIdentityTransitionRecord>(
+    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/cancel`,
+    "POST",
+  );
+}
+
+export function retryTickerIdentityTransition(
+  transitionId: string,
+  body: { preview_sha256: string },
+): Promise<TickerIdentityTransitionAttemptResult> {
+  return sendJSON<TickerIdentityTransitionAttemptResult>(
+    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/retry`,
+    "POST",
+    body,
+  );
+}
+
+export function reverseTickerIdentityTransition(
+  transitionId: string,
+): Promise<TickerIdentityTransitionAttemptResult> {
+  return sendJSON<TickerIdentityTransitionAttemptResult>(
+    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/reverse`,
     "POST",
   );
 }
