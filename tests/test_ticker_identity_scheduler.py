@@ -9,6 +9,14 @@ import threading
 import pytest
 
 
+class _GetOnly:
+    def __init__(self, values: dict):
+        self._values = values
+
+    def get(self, key, default=None):
+        return self._values.get(key, default)
+
+
 def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
     from src.profile_state import ProfileStateStore
     from src.security_lifecycle import (
@@ -434,7 +442,11 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
 
 @pytest.mark.parametrize(
     "malformed_result",
-    [None, {"status": "blocked", "transition": None}],
+    [
+        None,
+        {"status": "blocked", "transition": None},
+        _GetOnly({"status": "applied"}),
+    ],
 )
 def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
     malformed_result,
@@ -732,11 +744,12 @@ def test_scheduler_failure_witness_deduplicates_concurrent_identical_failures(
     JobRunsLocalStore(profile_path)
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
     original_list_runs = JobRunsLocalStore.list_runs
-    barrier = threading.Barrier(2)
+    legacy_read_barrier = threading.Barrier(2)
+    start_barrier = threading.Barrier(2)
 
     def synchronized_list_runs(store, **kwargs):
         rows = original_list_runs(store, **kwargs)
-        barrier.wait(timeout=5)
+        legacy_read_barrier.wait(timeout=5)
         return rows
 
     monkeypatch.setattr(JobRunsLocalStore, "list_runs", synchronized_list_runs)
@@ -749,16 +762,15 @@ def test_scheduler_failure_witness_deduplicates_concurrent_identical_failures(
     )
     now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        persisted = list(
-            executor.map(
-                lambda _index: scheduler.record_ticker_identity_scheduler_result(
-                    failure,
-                    now=now,
-                ),
-                range(2),
-            )
+    def record_failure(_index):
+        start_barrier.wait(timeout=5)
+        return scheduler.record_ticker_identity_scheduler_result(
+            failure,
+            now=now,
         )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        persisted = list(executor.map(record_failure, range(2)))
 
     assert persisted == [True, True]
     with sqlite3.connect(profile_path) as conn:
@@ -776,7 +788,7 @@ def test_scheduler_recovery_uses_insertion_order_when_clock_moves_backward(
     from src.service.job_runs_store import JobRunsLocalStore
 
     profile_path = tmp_path / "profile_state.db"
-    JobRunsLocalStore(profile_path)
+    telemetry = JobRunsLocalStore(profile_path)
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
     failure = _scheduler_result(
         status="unavailable",
@@ -797,6 +809,46 @@ def test_scheduler_recovery_uses_insertion_order_when_clock_moves_backward(
         now=datetime(2026, 8, 25, 9, 1, tzinfo=timezone.utc),
     )
 
+    runs = telemetry.list_runs(job_name="ticker_identity.transitions", limit=10)
+    assert [(row["status"], row["message"]) for row in runs] == [
+        ("succeeded", "ticker_identity_scheduler_recovered"),
+        ("failed", "ticker_identity_scheduler_failure"),
+    ]
+
+
+def test_scheduler_concurrent_healthy_ticks_record_one_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    failure = _scheduler_result(
+        status="unavailable",
+        reason="profile_store_unavailable",
+    )
+    healthy = _scheduler_result(status="succeeded", reason=None)
+    failed_at = datetime(2026, 8, 25, 10, 0, tzinfo=timezone.utc)
+    assert scheduler.record_ticker_identity_scheduler_result(
+        failure,
+        now=failed_at,
+    )
+    barrier = threading.Barrier(2)
+
+    def record_recovery(_index):
+        barrier.wait(timeout=5)
+        return scheduler.record_ticker_identity_scheduler_result(
+            healthy,
+            now=failed_at,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        persisted = list(executor.map(record_recovery, range(2)))
+
+    assert persisted == [True, True]
     with sqlite3.connect(profile_path) as conn:
         assert conn.execute(
             "SELECT status,message FROM job_runs WHERE job_name=? ORDER BY id",
@@ -841,6 +893,9 @@ def test_scheduler_witness_write_failure_never_logs_raw_database_text(
     assert persisted is False
     assert "private customer detail" not in caplog.text
     assert "profile_store_unavailable" in caplog.text
+    with sqlite3.connect(profile_path, timeout=0.1, isolation_level=None) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.rollback()
 
 
 def test_scheduler_failure_incident_ignores_successful_companion_churn(

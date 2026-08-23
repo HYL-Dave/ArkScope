@@ -318,9 +318,28 @@ def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
     assert "private detail" not in json.dumps(runs[0], sort_keys=True)
 
 
+@pytest.mark.parametrize(
+    "runner_result",
+    [
+        None,
+        SimpleNamespace(
+            get={
+                "status": "succeeded",
+                "reason": None,
+                "due": 0,
+                "applied": 0,
+                "needs_review": 0,
+                "already_applied": 0,
+                "transition_ids": [],
+                "failed_transition_ids": [],
+            }.get
+        ),
+    ],
+)
 def test_tick_records_non_mapping_ticker_runner_result_as_failed_witness(
     tmp_path,
     monkeypatch,
+    runner_result,
 ):
     profile_path = tmp_path / "profile_state.db"
     telemetry = _REAL_JOB_RUNS_LOCAL_STORE(profile_path)
@@ -328,7 +347,7 @@ def test_tick_records_non_mapping_ticker_runner_result_as_failed_witness(
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: None,
+        lambda *, now: runner_result,
     )
     fired = []
 
