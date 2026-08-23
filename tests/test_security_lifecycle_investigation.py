@@ -570,13 +570,15 @@ def test_issuer_related_assessment_proposes_notify_and_keep_tracking(tmp_path):
         conn.close()
 
 
-def test_open_portfolio_position_blocks_hide_and_remap_proposals(tmp_path):
+def test_open_portfolio_position_keeps_safe_remap_and_requests_position_review(
+    tmp_path,
+):
     conn, store, case_id = _context(tmp_path)
     try:
         assessment = _draft(
             store,
             case_id,
-            outcomes=("symbol_changed", "listing_ended"),
+            outcomes=("symbol_changed",),
             successor_ticker="EA2",
         )
         _accept(store, assessment)
@@ -590,7 +592,7 @@ def test_open_portfolio_position_blocks_hide_and_remap_proposals(tmp_path):
         assert "review_portfolio_position" in actions
         assert "notify" in actions
         assert "hide_from_active_universe" not in actions
-        assert "remap_symbol" not in actions
+        assert "remap_symbol" in actions
         review = next(
             item
             for item in result["proposals"]
@@ -647,7 +649,7 @@ def test_stale_assessment_blocks_existing_and_new_proposals(tmp_path):
             _draft(
                 store,
                 case_id,
-                outcomes=("acquisition_stock",),
+                outcomes=("symbol_changed",),
                 successor_ticker="EA2",
                 fingerprint=fingerprint,
             ),
@@ -692,6 +694,61 @@ def test_stale_assessment_blocks_existing_and_new_proposals(tmp_path):
             at=_LATER,
         )
         assert blocked == {"proposals": [], "block_reason": "stale_assessment"}
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    "outcomes",
+    [
+        ("venue_transfer",),
+        ("acquisition_stock",),
+        ("acquisition_mixed",),
+    ],
+)
+def test_non_continuation_outcomes_never_emit_symbol_remap(tmp_path, outcomes):
+    conn, store, case_id = _context(tmp_path)
+    try:
+        assessment = _draft(
+            store,
+            case_id,
+            outcomes=outcomes,
+            successor_ticker="EA2",
+        )
+        _accept(store, assessment)
+        result = store.generate_action_proposals(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            sources_by_ticker={"EA": ("manual_lists",)},
+            at=_LATER,
+        )
+        assert "remap_symbol" not in {
+            item["action_type"] for item in result["proposals"]
+        }
+    finally:
+        conn.close()
+
+
+def test_same_symbol_venue_transfer_proposes_notify_and_keep_tracking(tmp_path):
+    conn, store, case_id = _context(tmp_path)
+    try:
+        assessment = _draft(
+            store,
+            case_id,
+            outcomes=("venue_transfer",),
+            successor_ticker=None,
+        )
+        _accept(store, assessment)
+        result = store.generate_action_proposals(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            sources_by_ticker={"EA": ("manual_lists",)},
+            at=_LATER,
+        )
+        assert {item["action_type"] for item in result["proposals"]} == {
+            "keep_tracking",
+            "notify",
+        }
     finally:
         conn.close()
 

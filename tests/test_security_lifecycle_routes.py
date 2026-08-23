@@ -182,7 +182,6 @@ def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, m
         assert {item["action_type"] for item in payload["proposals"]} == {
             "archive_manual_memberships",
             "notify",
-            "remap_symbol",
         }
         assert all(item["status"] == "proposed" for item in payload["proposals"])
         assert not hasattr(context["store"], "apply_action_proposal")

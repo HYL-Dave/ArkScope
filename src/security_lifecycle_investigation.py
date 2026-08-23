@@ -213,7 +213,7 @@ def _digest_rows(rows: Iterable[tuple[str, str]]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _assessment_fingerprint(assessment: Mapping[str, object]) -> str:
+def assessment_fingerprint(assessment: Mapping[str, object]) -> str:
     return hashlib.sha256(
         "\0".join(
             (
@@ -983,17 +983,26 @@ class SecurityLifecycleInvestigationStore:
                 action_rows.append(
                     ("review_portfolio_position", None, "portfolio_position_open")
                 )
-            else:
-                if outcomes & {
-                    "symbol_changed",
-                    "venue_transfer",
+            successor_ticker = str(assessment["successor_ticker"] or "").strip()
+            if (
+                "symbol_changed" in outcomes
+                and not outcomes
+                & {
+                    "acquisition_cash",
                     "acquisition_stock",
                     "acquisition_mixed",
-                }:
-                    if assessment["successor_ticker"]:
-                        action_rows.append(
-                            ("remap_symbol", assessment["successor_ticker"], None)
-                        )
+                    "acquisition_terms_unknown",
+                    "listing_ended",
+                    "symbol_or_venue_changed",
+                    "undetermined",
+                }
+                and successor_ticker
+                and successor_ticker.upper() != str(case["ticker"]).upper()
+            ):
+                action_rows.append(("remap_symbol", successor_ticker, None))
+            if outcomes == {"venue_transfer"}:
+                action_rows.append(("keep_tracking", None, None))
+            if "portfolio_open" not in sources:
                 if outcomes & {
                     "listing_ended",
                     "acquisition_cash",
@@ -1008,7 +1017,7 @@ class SecurityLifecycleInvestigationStore:
                         "legacy_config_seed",
                     }:
                         action_rows.append(("hide_from_active_universe", None, None))
-        assessment_fingerprint = _assessment_fingerprint(assessment)
+        current_assessment_fingerprint = assessment_fingerprint(assessment)
         created: list[dict] = []
         for action_type, replacement_ticker, block_reason in action_rows:
             if action_type not in PROPOSAL_ACTIONS:
@@ -1046,7 +1055,7 @@ class SecurityLifecycleInvestigationStore:
                             source_json,
                             f"Derived from accepted assessment revision {assessment['revision']}.",
                             block_reason,
-                            assessment_fingerprint,
+                            current_assessment_fingerprint,
                             dedupe_key,
                             at,
                         ),
@@ -1110,7 +1119,7 @@ class SecurityLifecycleInvestigationStore:
                 != observation_fingerprint_sha256
                 or assessment["evidence_set_sha256"] != evidence_digest
                 or proposal["assessment_fingerprint_sha256"]
-                != _assessment_fingerprint(assessment)
+                != assessment_fingerprint(assessment)
             )
             rendered.append(
                 {
