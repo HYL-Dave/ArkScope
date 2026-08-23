@@ -204,10 +204,26 @@ def test_tick_fires_only_enabled_and_due():
 def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    transition_result = {
+        "status": "succeeded",
+        "reason": None,
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+    }
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: events.append(("transitions", now)) or {"due": 0},
+        lambda *, now: events.append(("transitions", now)) or transition_result,
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_ticker_identity_scheduler_result",
+        lambda result, *, now: events.append(("transition-result", result, now)),
+        raising=False,
     )
 
     fired = ds.tick_once(
@@ -218,8 +234,104 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     assert fired == ["finnhub_news"]
     assert events == [
         ("transitions", _NOW),
+        ("transition-result", transition_result, _NOW),
         ("provider", "finnhub_news"),
     ]
+
+
+def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as ticker_scheduler
+
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = _REAL_JOB_RUNS_LOCAL_STORE(profile_path)
+    monkeypatch.setattr(
+        ticker_scheduler,
+        "_job_store",
+        lambda: telemetry,
+        raising=False,
+    )
+    failure = {
+        "status": "partial",
+        "reason": "transition_execution_failed",
+        "due": 2,
+        "applied": 1,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": ["slt_ok", "slt_failed"],
+        "failed_transition_ids": ["slt_failed"],
+    }
+    recovered = {
+        "status": "succeeded",
+        "reason": None,
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+    }
+    results = iter((failure, failure, recovered, recovered))
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda *, now: next(results),
+    )
+
+    for offset in range(4):
+        ds.tick_once(_NOW + timedelta(seconds=offset), fire=lambda _source: None)
+
+    runs = telemetry.list_runs(job_name="ticker_identity.transitions", limit=10)
+    assert [(row["status"], row["error"]) for row in runs] == [
+        ("succeeded", None),
+        ("failed", "transition_execution_failed"),
+    ]
+    assert runs[1]["result"] == failure
+    assert runs[0]["result"] == recovered
+
+
+def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as ticker_scheduler
+
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = _REAL_JOB_RUNS_LOCAL_STORE(profile_path)
+    monkeypatch.setattr(
+        ticker_scheduler,
+        "_job_store",
+        lambda: telemetry,
+        raising=False,
+    )
+    ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda *, now: (_ for _ in ()).throw(RuntimeError("private detail")),
+    )
+    fired = []
+
+    result = ds.tick_once(_NOW, fire=fired.append)
+
+    assert result == fired == ["finnhub_news"]
+    runs = telemetry.list_runs(job_name="ticker_identity.transitions", limit=10)
+    assert len(runs) == 1
+    assert runs[0]["status"] == "failed"
+    assert runs[0]["error"] == "ticker_identity_scheduler_failed"
+    assert runs[0]["result"] == {
+        "status": "unavailable",
+        "reason": "ticker_identity_scheduler_failed",
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+    }
+    assert "private detail" not in json.dumps(runs[0], sort_keys=True)
 
 
 def test_tick_once_defers_extra_market_writers(monkeypatch):

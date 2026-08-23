@@ -396,11 +396,14 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
     assert len(service.executed) == 10
     assert all(row[2] == "scheduler" for row in service.executed)
     assert result == {
+        "status": "partial",
+        "reason": "transition_execution_failed",
         "due": 10,
         "applied": 8,
         "needs_review": 1,
         "already_applied": 0,
         "transition_ids": [f"slt_{index}" for index in range(10)],
+        "failed_transition_ids": ["slt_2"],
     }
     assert len(permission_calls) == 8
 
@@ -474,11 +477,105 @@ def test_due_runner_with_no_identity_component_creates_nothing(tmp_path, monkeyp
     )
 
     assert result == {
+        "status": "unavailable",
+        "reason": "profile_store_missing",
         "due": 0,
         "applied": 0,
         "needs_review": 0,
         "already_applied": 0,
         "transition_ids": [],
+        "failed_transition_ids": [],
     }
     assert not profile_path.exists()
     assert not market_path.exists()
+
+
+def test_due_runner_reports_existing_profile_without_identity_schema_as_not_installed(
+    tmp_path,
+    monkeypatch,
+):
+    from src.profile_state import ProfileStateStore
+    from src.service import ticker_identity_scheduler as scheduler
+
+    profile_path = tmp_path / "profile_state.db"
+    market_path = tmp_path / "market_data.db"
+    ProfileStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    )
+
+    assert result == {
+        "status": "not_installed",
+        "reason": "identity_schema_absent",
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+    }
+    assert profile_path.is_file()
+    assert not market_path.exists()
+
+
+def test_due_runner_reports_malformed_identity_schema_as_unavailable(
+    tmp_path,
+    monkeypatch,
+):
+    from src.profile_state import ProfileStateStore
+    from src.service import ticker_identity_scheduler as scheduler
+
+    profile_path = tmp_path / "profile_state.db"
+    market_path = tmp_path / "market_data.db"
+    ProfileStateStore(profile_path)
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute("CREATE TABLE ticker_identity_broken (value TEXT)")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    )
+
+    assert result == {
+        "status": "unavailable",
+        "reason": "identity_schema_mismatch",
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+    }
+    assert not market_path.exists()
+
+
+def test_scheduler_failure_witness_does_not_create_missing_profile_database(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    profile_path = tmp_path / "missing" / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    result = {
+        "status": "unavailable",
+        "reason": "profile_store_missing",
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+    }
+
+    persisted = scheduler.record_ticker_identity_scheduler_result(
+        result,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert persisted is False
+    assert not profile_path.exists()
