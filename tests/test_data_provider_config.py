@@ -7,6 +7,7 @@ import os
 import pytest
 
 import src.data_provider_config as dpc
+import src.provider_config_runtime as provider_runtime
 from src.data_provider_config import DataProviderConfigStore
 
 
@@ -20,6 +21,7 @@ def hermetic(monkeypatch, tmp_path):
     """Never touch the real env keys / config/.env / app-applied tracking.
     reload_var_from_file is stubbed to "file defines nothing" — tests that care
     about the fallback override it themselves."""
+    provider_runtime.clear_provider_config_setup_required()
     empty_env = tmp_path / ".env"
     empty_env.write_text("", encoding="utf-8")
     monkeypatch.setattr("src.env_keys.env_file_path", lambda: empty_env)
@@ -35,9 +37,12 @@ def hermetic(monkeypatch, tmp_path):
     )
     for var in managed_vars:
         monkeypatch.delenv(var, raising=False)
-    yield
-    for var in managed_vars:
-        os.environ.pop(var, None)
+    try:
+        yield
+    finally:
+        for var in managed_vars:
+            os.environ.pop(var, None)
+        provider_runtime.clear_provider_config_setup_required()
 
 
 # --- store -----------------------------------------------------------------------
