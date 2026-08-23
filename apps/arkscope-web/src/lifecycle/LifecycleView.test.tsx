@@ -744,6 +744,7 @@ describe("Lifecycle workflow", () => {
         successor_ticker: "QBTS.B",
         execute_on: "2026-09-01",
         approved_preview_sha256: "b".repeat(64),
+        approved_preview: TRANSITION_PREVIEW,
         updated_at: "2026-08-23T10:00:00Z",
         latest_attempt: null,
       },
@@ -777,6 +778,7 @@ describe("Lifecycle workflow", () => {
         successor_ticker: "QBTS.B",
         execute_on: "2026-08-22",
         approved_preview_sha256: "b".repeat(64),
+        approved_preview: TRANSITION_PREVIEW,
         updated_at: "2026-08-23T10:00:00Z",
         latest_attempt: {
           status: "applied",
@@ -791,6 +793,11 @@ describe("Lifecycle workflow", () => {
       transition: { transition_id: "transition-applied", status: "applied" },
     });
     await mountLifecycle();
+    expect(document.body.textContent).toContain("The old broker position remains on QBTS");
+    expect(document.body.textContent).toContain(
+      "Seeking Alpha tracking stays with the provider-owned source",
+    );
+    expect(document.body.textContent).toContain("Historical notes, evidence, prices, and filings are not rewritten");
     await click("Reverse transition");
     await click("Confirm reversal");
     expect(document.body.textContent).toContain(

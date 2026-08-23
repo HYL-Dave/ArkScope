@@ -239,6 +239,40 @@ def test_identity_verifier_rejects_missing_extended_or_changed_schema(tmp_path):
         changed.close()
 
 
+@pytest.mark.parametrize(
+    "extension_sql",
+    [
+        "CREATE INDEX unrelated_status_lookup "
+        "ON ticker_identity_transitions(status)",
+        "CREATE TRIGGER unrelated_transition_trigger "
+        "AFTER INSERT ON ticker_identity_transitions BEGIN SELECT 1; END",
+        "CREATE VIEW ticker_identity_transition_projection AS "
+        "SELECT transition_id FROM ticker_identity_transitions",
+    ],
+)
+def test_identity_verifier_rejects_every_unapproved_owned_object(
+    tmp_path,
+    extension_sql,
+):
+    from src.security_lifecycle_schema import create_profile_schema
+    from src.ticker_identity_schema import (
+        TickerIdentitySchemaMismatch,
+        create_ticker_identity_schema,
+        verify_ticker_identity_connection,
+    )
+
+    conn = sqlite3.connect(tmp_path / "extended-object.db")
+    try:
+        create_profile_schema(conn)
+        create_ticker_identity_schema(conn)
+        conn.execute(extension_sql)
+
+        with pytest.raises(TickerIdentitySchemaMismatch, match="object set"):
+            verify_ticker_identity_connection(conn)
+    finally:
+        conn.close()
+
+
 def test_identity_schema_enforces_closed_shapes_and_coherent_terminal_states(tmp_path):
     from src.security_lifecycle_schema import create_profile_schema
     from src.ticker_identity_schema import create_ticker_identity_schema

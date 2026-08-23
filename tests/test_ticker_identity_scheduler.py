@@ -7,7 +7,7 @@ import sqlite3
 import threading
 
 
-def _build_due_context(tmp_path):
+def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
     from src.profile_state import ProfileStateStore
     from src.security_lifecycle import (
         LifecycleObservation,
@@ -27,6 +27,10 @@ def _build_due_context(tmp_path):
     ProfileStateStore(profile_path).import_lists(
         [{"name": "Core", "kind": "custom", "tickers": ["OLD"]}]
     )
+    if with_portfolio_schema:
+        from src.portfolio_state import PortfolioStore
+
+        PortfolioStore(profile_path)
     market_conn = sqlite3.connect(market_path)
     market_store = SecurityLifecycleStore(market_conn)
     market_store.upsert_observation(
@@ -105,6 +109,112 @@ def _build_due_context(tmp_path):
         before_write=lambda: None,
     )
     return service, profile_path, transition["transition_id"]
+
+
+def _approved_preview_sha256(service, transition_id: str) -> str:
+    rows = service.list_due_transitions(on_date="2026-08-25", limit=10)
+    return next(
+        str(row["approved_preview_sha256"])
+        for row in rows
+        if row["transition_id"] == transition_id
+    )
+
+
+def test_due_execution_records_needs_review_when_recomputed_preview_changed(tmp_path):
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    digest = _approved_preview_sha256(service, transition_id)
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "UPDATE watchlist_memberships SET position=9,updated_at=? "
+            "WHERE ticker='OLD'",
+            ("2026-08-25T12:59:59Z",),
+        )
+
+    permission_calls: list[str] = []
+    result = service.execute_transition(
+        transition_id,
+        preview_sha256=digest,
+        trigger="scheduler",
+        before_write=lambda: permission_calls.append("write"),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["block_reasons"] == ["preview_changed"]
+    assert result["transition"]["status"] == "needs_review"
+    assert permission_calls == ["write"]
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,block_reasons_json "
+            "FROM ticker_identity_transition_attempts"
+        ).fetchall() == [("blocked", '["preview_changed"]')]
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships WHERE ticker='OLD'"
+        ).fetchone() == (None,)
+
+
+def test_due_execution_rechecks_new_broker_position_after_service_preview(tmp_path):
+    service, profile_path, transition_id = _build_due_context(
+        tmp_path,
+        with_portfolio_schema=True,
+    )
+    digest = _approved_preview_sha256(service, transition_id)
+
+    def insert_broker_position() -> None:
+        with sqlite3.connect(profile_path) as conn:
+            account_id = conn.execute(
+                "INSERT INTO portfolio_accounts "
+                "(label,broker,sync_mode,base_currency,include_in_total,"
+                "created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+                (
+                    "Broker",
+                    "ibkr",
+                    "sync",
+                    "USD",
+                    1,
+                    "2026-08-25T12:59:59Z",
+                    "2026-08-25T12:59:59Z",
+                ),
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO portfolio_positions "
+                "(account_id,broker,symbol,asset_class,quantity,currency,"
+                "source,sync_status,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    account_id,
+                    "ibkr",
+                    "OLD",
+                    "stock",
+                    10,
+                    "USD",
+                    "ibkr",
+                    "synced",
+                    "2026-08-25T12:59:59Z",
+                    "2026-08-25T12:59:59Z",
+                ),
+            )
+
+    result = service.execute_transition(
+        transition_id,
+        preview_sha256=digest,
+        trigger="scheduler",
+        before_write=insert_broker_position,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["block_reasons"] == ["preview_changed"]
+    assert result["transition"]["status"] == "needs_review"
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships WHERE ticker='OLD'"
+        ).fetchone() == (None,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+        ).fetchone() == (0,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM portfolio_positions WHERE symbol='OLD' "
+            "AND closed_at IS NULL"
+        ).fetchone() == (1,)
 
 
 def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(

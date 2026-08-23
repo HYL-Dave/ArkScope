@@ -402,6 +402,7 @@ def test_case_detail_exposes_durable_transition_state_without_changing_preview(
         "successor_ticker": "NEW",
         "execute_on": "2026-08-25",
         "approved_preview_sha256": preview["preview_sha256"],
+        "approved_preview": preview,
         "updated_at": "2026-08-25T13:00:00Z",
         "latest_attempt": None,
     }

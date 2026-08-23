@@ -300,11 +300,43 @@ def test_backup_is_logically_bound_and_restore_fails_before_target_mutation(tmp_
         restore_profile_backup(profile_path=backup.path, backup=backup)
     assert backup.sha256 == _sha(backup.path)
 
+    with pytest.raises(TickerIdentityRestoreRejected, match="target_must_be_absent"):
+        restore_profile_backup(profile_path=profile_path, backup=backup)
+    assert profile_path.read_bytes() == b"changed-profile"
+
+    profile_path.unlink()
     restore_profile_backup(profile_path=profile_path, backup=backup)
     assert profile_path.read_bytes() == backup.path.read_bytes()
     assert preflight_ticker_identity_migration(
         profile_path=profile_path
     ).approval_sha256 == original_preflight.approval_sha256
+
+
+def test_restore_refuses_an_existing_idle_database_without_sidecars(tmp_path):
+    from src.ticker_identity_migration import (
+        TickerIdentityRestoreRejected,
+        create_profile_backup,
+        restore_profile_backup,
+    )
+
+    profile_path = _profile_database(tmp_path / "live-idle")
+    backup = create_profile_backup(
+        profile_path=profile_path,
+        backup_dir=tmp_path / "backups-idle",
+        clock=lambda: "2026-08-23T10:11:12Z",
+    )
+    idle = sqlite3.connect(profile_path)
+    try:
+        assert not profile_path.with_name(f"{profile_path.name}-wal").exists()
+        assert not profile_path.with_name(f"{profile_path.name}-shm").exists()
+        with pytest.raises(
+            TickerIdentityRestoreRejected,
+            match="target_must_be_absent",
+        ):
+            restore_profile_backup(profile_path=profile_path, backup=backup)
+        assert idle.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    finally:
+        idle.close()
 
 
 def test_public_migration_paths_are_keyword_only_and_have_no_defaults():
