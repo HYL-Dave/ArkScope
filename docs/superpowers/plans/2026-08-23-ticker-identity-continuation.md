@@ -665,6 +665,8 @@ git commit -m "feat(lifecycle): review ticker transition effects"
 **Files:**
 - Create: `src/ticker_identity_migration.py`
 - Create: `tests/test_ticker_identity_migration.py`
+- Modify: `tests/test_api.py`
+- Modify: `tests/test_data_provider_config.py`
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Modify: `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 - Modify: `docs/superpowers/plans/2026-08-23-ticker-identity-continuation.md`
@@ -689,6 +691,14 @@ immediately before `BEGIN IMMEDIATE` and creates only the three approved tables
 and indexes.
 
 - [ ] **Step 3: Run focused and full admission**
+
+The five Task 4 routes evolve the exact local-runtime inventory from `180` to
+`185`; update that existing count owner. Full-suite RED also proved that the
+simulated unavailable-profile startup in `tests/test_api.py` can leave the
+process-global `provider_config_setup_required` state set for later modules.
+Extend the existing hermetic fixture in `tests/test_data_provider_config.py` to
+clear that process-global state before and after each test. This is test
+isolation only; do not weaken the production fail-closed state or its routes.
 
 ```bash
 python -m pytest tests/test_ticker_identity_schema.py tests/test_ticker_identity_transition.py tests/test_ticker_identity_routes.py tests/test_ticker_identity_scheduler.py tests/test_ticker_identity_migration.py tests/test_security_lifecycle_investigation.py tests/test_profile_state.py tests/test_data_scheduler.py -q
