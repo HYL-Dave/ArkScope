@@ -201,6 +201,27 @@ def test_tick_fires_only_enabled_and_due():
     assert out == fired == ["finnhub_news"]
 
 
+def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
+    events = []
+    ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda *, now: events.append(("transitions", now)) or {"due": 0},
+    )
+
+    fired = ds.tick_once(
+        _NOW,
+        fire=lambda source: events.append(("provider", source)),
+    )
+
+    assert fired == ["finnhub_news"]
+    assert events == [
+        ("transitions", _NOW),
+        ("provider", "finnhub_news"),
+    ]
+
+
 def test_tick_once_defers_extra_market_writers(monkeypatch):
     now = datetime(2026, 7, 4, tzinfo=timezone.utc)
     fired = []

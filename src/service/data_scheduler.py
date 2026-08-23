@@ -60,6 +60,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
+from src.service.ticker_identity_scheduler import (
+    run_due_ticker_identity_transitions,
+)
+
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -1523,6 +1527,13 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     for testability; ``fire`` defaults to a thread-offloaded run_source."""
     now = now or datetime.now(timezone.utc)
     fired = []
+    try:
+        run_due_ticker_identity_transitions(now=now)
+    except Exception as exc:  # lifecycle work must not stop provider scheduling
+        logger.warning(
+            "ticker identity scheduler tick failed code=%s",
+            type(exc).__name__,
+        )
     market_writer_fired = False
     macro_writer_fired = False
     for source, d in SOURCES.items():

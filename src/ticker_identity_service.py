@@ -14,6 +14,7 @@ from src.security_lifecycle_schema import (
     verify_profile_connection,
 )
 from src.ticker_identity_schema import (
+    ATTEMPT_TRIGGERS,
     TickerIdentitySchemaMismatch,
     identity_schema_present,
     verify_ticker_identity_connection,
@@ -160,6 +161,10 @@ class TickerIdentityService:
                 options=options,
             )
 
+    def list_due_transitions(self, *, on_date: str, limit: int) -> list[dict]:
+        with self._profile_connection(write=False) as conn:
+            return self._store(conn).list_due(on_date=on_date, limit=limit)
+
     def approve_case(
         self,
         case_id: str,
@@ -214,13 +219,25 @@ class TickerIdentityService:
         transition_id: str,
         *,
         preview_sha256: str,
+        trigger: str = "attended_user",
         before_write: Callable[[], None],
     ) -> dict:
+        if trigger not in ATTEMPT_TRIGGERS:
+            raise ValueError("trigger")
         with self._profile_connection(write=True) as conn:
             store = self._store(conn)
             transition = store.get(transition_id)
             if transition["status"] not in {"approved", "applied"}:
                 raise ValueError("transition_not_retryable")
+            if preview_sha256 != transition["approved_preview_sha256"]:
+                raise TickerIdentityConflict("transition_preview_changed")
+            if transition["status"] == "applied":
+                before_write()
+                return store.apply(
+                    transition_id,
+                    current_preview={"preview_sha256": preview_sha256},
+                    trigger=trigger,
+                )
             if (
                 transition["status"] == "approved"
                 and str(transition["execute_on"]) > self._new_york_date()
@@ -241,7 +258,7 @@ class TickerIdentityService:
             return store.apply(
                 transition_id,
                 current_preview=preview,
-                trigger="attended_user",
+                trigger=trigger,
             )
 
     def reverse_transition(
