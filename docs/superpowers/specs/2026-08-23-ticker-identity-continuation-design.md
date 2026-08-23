@@ -6,17 +6,15 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 and the first four bounded review repairs are
-implemented on the isolated branch through `134aa057`. Fourth-round RED was
-exact (`9 failed`) and fresh self-admission passed Task 7 focused `245`, full
-backend `4309 / 12 skipped` (collection `4321`), frontend `104 files / 1220`,
+**Implementation:** Tasks 0-7 and all five bounded review repairs are complete
+on the isolated branch through `d9f029f7`. Fifth-round RED was exact (`3 failed
+/ 5 passed`) and fresh admission passed Task 7 focused `248`, full backend
+`4312 / 12 skipped` (collection `4324`), frontend `104 files / 1220`,
 typecheck, literal scan, production build, `185` routes, and the bilingual
-desktop/mobile browser matrix. Independent review then reproduced two remaining
-contract defects: a non-mapping object with a `.get()` method could masquerade
-as a valid result, and a backward caller clock made public job history display
-recovery behind the prior failure. A fifth bounded RED-first repair is active;
-no live preflight, backup, migration, provider call, merge, or push is
-authorized by this status.
+desktop/mobile browser matrix. Independent review returned GREEN after
+withdrawing one timestamp concern whose reproduction required a manually
+injected, unreachable noncanonical row. No live preflight, backup, migration,
+provider call, merge, or push was performed. Step 8 remains separately gated.
 
 **Depends on:**
 
