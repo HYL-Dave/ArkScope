@@ -6,16 +6,18 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 and both bounded independent-review repairs are
-implemented on the isolated branch through `936747b9`. The second repair was
-RED-first (`6 failed / 24 passed`) and fresh self-admission passed Task 7
-focused `231`, full backend `4295 / 12 skipped` (collection `4307`), frontend
-`104 files / 1220`, typecheck, literal scan, production build, `185` routes,
-and the bilingual desktop/mobile browser matrix. Independent review of that tip
-returned GREEN, but a later audit found that the due runner represented an
-unavailable identity store with the same all-zero result as a healthy idle
-tick. A third bounded RED-first repair is active; no live preflight, backup,
-migration, provider call, merge, or push is authorized by this status.
+**Implementation:** Tasks 0-7 and the first three bounded review repairs are
+implemented on the isolated branch through `0ce6b7cc`. The third repair was
+RED-first (`8 failed`) and fresh self-admission passed Task 7 focused `236`,
+full backend `4300 / 12 skipped` (collection `4312`), frontend `104 files /
+1220`, typecheck, literal scan, production build, `185` routes, and the
+bilingual desktop/mobile browser matrix. Independent review then reproduced
+four remaining scheduler-witness defects: malformed per-plan results escaped
+isolation, an existence-check race could recreate a missing profile database,
+witness deduplication was non-atomic and clock-ordered, and the generic job-run
+writer logged raw SQLite text. A fourth bounded RED-first repair is active; no
+live preflight, backup, migration, provider call, merge, or push is authorized
+by this status.
 
 **Depends on:**
 
@@ -452,7 +454,10 @@ The runner has a closed top-level outcome vocabulary:
 `unavailable` and `not_installed` must never reuse the healthy all-zero idle
 shape. A `partial` result includes every failed transition ID; a failure before
 the due list exists has no transition ID and must not invent one. Raw exception
-messages are never persisted or returned.
+messages are never persisted or returned. Execution and interpretation of one
+plan's returned shape share the same isolation boundary: a malformed mapping,
+status, or nested transition result fails that plan, retains its ID, and does
+not prevent later selected plans from running.
 
 The app scheduler records a sanitized `job_runs` failure witness for
 `unavailable` and `partial`, deduplicating an unchanged persistent failure and
@@ -463,6 +468,18 @@ process log remain the honest boundary; the implementation must not claim a
 durable database witness or create a replacement profile database. Transition
 attempt rows remain the authority for executions that reached the transition
 store.
+
+Witness deduplication and recovery use one existing-only `mode=rw` connection
+and one `BEGIN IMMEDIATE` transaction spanning the latest-row read and any
+insert. The implementation checks the existing `job_runs` table inside that
+connection and never calls an auto-provisioning store constructor. The latest
+witness is selected by durable insertion identity (`id DESC`), not a
+caller-supplied event timestamp, so clock regression cannot create repeated
+recoveries. Concurrent identical failures serialize and produce one witness;
+concurrent healthy ticks after a failure produce one recovery. Any open,
+schema, transaction, or insert failure is reported only through the scheduler's
+closed sanitized diagnostic, never through a generic writer that logs the raw
+database exception.
 
 There is no second global `enabled` switch. Each `approved` transition is the
 explicit attended authorization to execute the reviewed effects on or after its

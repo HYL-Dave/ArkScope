@@ -10,18 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
-**Implementation status (2026-08-23):** Tasks 0-7 and both bounded
-independent-review repair rounds are implemented on the isolated branch through
-`936747b9`. Second-round RED was exact (`6 failed / 24 passed`); fresh GREEN is
-Task 7 focused `231 passed`, full backend `4295 passed / 12 skipped`
-(collection `4307`), frontend `104 files / 1220 passed`, typecheck, literal
-scan, production build, `185` routes, and the ten-screenshot bilingual browser
-matrix. Independent review returned GREEN, but a later audit reproduced one
-remaining honesty defect: identity-store unavailability is returned as the
-same all-zero shape as a healthy idle tick. A third bounded RED-first repair is
-active. No provider call, production database target, live migration, merge,
-or push was used. Fresh production preflight, backup, restore probe, and cutover
-remain separately gated by Step 8 authorization after repaired review GREEN.
+**Implementation status (2026-08-23):** Tasks 0-7 and the first three bounded
+review repairs are implemented on the isolated branch through `0ce6b7cc`.
+Third-round RED was exact (`8 failed`); fresh GREEN is Task 7 focused `236
+passed`, full backend `4300 passed / 12 skipped` (collection `4312`), frontend
+`104 files / 1220 passed`, typecheck, literal scan, production build, `185`
+routes, and the ten-screenshot bilingual browser matrix. Independent review
+returned RED with four reproduced scheduler/witness defects, so a fourth
+bounded RED-first repair is active. No provider call, production database
+target, live migration, merge, or push was used. Fresh production preflight,
+backup, restore probe, and cutover remain separately gated by Step 8
+authorization after repaired review GREEN.
 
 ## Global Constraints
 
@@ -870,6 +869,37 @@ The repair may modify only the ticker scheduler/service, its scheduler handoff,
 focused tests, and these authority documents. It does not authorize production
 data, provider calls, migration, merge, or push. Repeat the complete Task 7
 admission and independent review from the repaired clean tip.
+
+Third-round implementation evidence at `0ce6b7cc`: exact RED was `8 failed`.
+GREEN was `101 passed` for scheduler/data-scheduler focus, `75 passed` for the
+complete ticker group, and `236 passed` for the cumulative Task 7 backend gate.
+Full backend passed `4300 / 12 skipped` (collection `4312`), while frontend
+remained `104 files / 1220 passed`. Typecheck, literal scan, production build,
+the `185`-route runtime owner, and the repeated bilingual browser matrix passed.
+
+Independent review then reproduced four in-contract defects. Repair them
+RED-first under this fourth bounded contract:
+
+1. Include execution-result interpretation in the per-plan exception boundary.
+   A non-mapping result, invalid status, or malformed nested transition shape
+   marks that transition ID failed and continues to later selected plans.
+2. Do not instantiate an auto-provisioning job-run store after a separate
+   existence check. Open the profile database in SQLite `mode=rw`, verify the
+   existing `job_runs` table on that connection, and fail without creating a
+   file if the path disappears before open.
+3. Serialize latest-witness read, exact failure deduplication, recovery
+   detection, and insertion in one `BEGIN IMMEDIATE` transaction. Select the
+   latest witness by insertion ID rather than caller time. Concurrent identical
+   failures and concurrent recovery ticks each produce exactly one row, even if
+   the supplied clock moves backward.
+4. Keep all telemetry failures behind the scheduler's sanitized diagnostic.
+   Do not call a generic persistence method that logs raw SQLite/OSError text.
+
+The fourth repair may modify the same bounded scheduler/service, scheduler
+handoff, focused tests, and authority documents only. It does not authorize a
+global switch, production data, provider calls, migration, merge, or push. The
+complete Task 7 admission and independent review restart from its clean tip;
+none of the third-round GREEN is inherited.
 
 - [ ] **Step 8: Stop for live authorization**
 
