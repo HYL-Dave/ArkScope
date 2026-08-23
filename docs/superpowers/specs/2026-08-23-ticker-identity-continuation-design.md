@@ -11,11 +11,11 @@ implemented on the isolated branch through `936747b9`. The second repair was
 RED-first (`6 failed / 24 passed`) and fresh self-admission passed Task 7
 focused `231`, full backend `4295 / 12 skipped` (collection `4307`), frontend
 `104 files / 1220`, typecheck, literal scan, production build, `185` routes,
-and the bilingual desktop/mobile browser matrix. Independent review of this new
-tip returned GREEN after the reviewer withdrew a concern that required the
-explicitly excluded cross-database linearizability guarantee. No live
-preflight, backup, migration, provider call, merge, or push is authorized by
-this status.
+and the bilingual desktop/mobile browser matrix. Independent review of that tip
+returned GREEN, but a later audit found that the due runner represented an
+unavailable identity store with the same all-zero result as a healthy idle
+tick. A third bounded RED-first repair is active; no live preflight, backup,
+migration, provider call, merge, or push is authorized by this status.
 
 **Depends on:**
 
@@ -437,6 +437,39 @@ lineage.
 
 The app-owned scheduler invokes a provider-free due-plan runner. It does not add
 a fake data provider or call SEC, IBKR, SA, Tavily, or an LLM.
+
+The runner has a closed top-level outcome vocabulary:
+
+- `succeeded`: the identity component was available and every selected plan
+  reached an explicit terminal runner result;
+- `partial`: later plans continued, but one or more selected transition IDs
+  raised before they could append their own transition attempt;
+- `unavailable`: the profile or identity store could not satisfy its exact
+  contract;
+- `not_installed`: the optional identity schema is absent before its separately
+  authorized migration.
+
+`unavailable` and `not_installed` must never reuse the healthy all-zero idle
+shape. A `partial` result includes every failed transition ID; a failure before
+the due list exists has no transition ID and must not invent one. Raw exception
+messages are never persisted or returned.
+
+The app scheduler records a sanitized `job_runs` failure witness for
+`unavailable` and `partial`, deduplicating an unchanged persistent failure and
+recording recovery after the next healthy tick. This witness is possible only
+when the existing profile `job_runs` authority remains writable. If the profile
+database itself is absent or unavailable, the typed runner result and sanitized
+process log remain the honest boundary; the implementation must not claim a
+durable database witness or create a replacement profile database. Transition
+attempt rows remain the authority for executions that reached the transition
+store.
+
+There is no second global `enabled` switch. Each `approved` transition is the
+explicit attended authorization to execute the reviewed effects on or after its
+date, and it can be cancelled before application. A global switch would create
+a second authority that could silently strand an approved plan. Operational
+cutovers instead quiesce the app scheduler as already required by the migration
+and restore protocol.
 
 For each due `approved` plan, bounded by a fixed per-tick limit:
 

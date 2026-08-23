@@ -16,12 +16,12 @@ independent-review repair rounds are implemented on the isolated branch through
 Task 7 focused `231 passed`, full backend `4295 passed / 12 skipped`
 (collection `4307`), frontend `104 files / 1220 passed`, typecheck, literal
 scan, production build, `185` routes, and the ten-screenshot bilingual browser
-matrix. Independent review returned GREEN after confirming the sole raised
-concern required the explicitly excluded cross-database linearizability
-guarantee. Tasks 0-7 are review-complete, but this does not authorize live or
-merge work. No provider call, production database target, live migration,
-merge, or push was used. Fresh production preflight, backup, restore probe, and
-cutover remain separately gated by Step 8 authorization.
+matrix. Independent review returned GREEN, but a later audit reproduced one
+remaining honesty defect: identity-store unavailability is returned as the
+same all-zero shape as a healthy idle tick. A third bounded RED-first repair is
+active. No provider call, production database target, live migration, merge,
+or push was used. Fresh production preflight, backup, restore probe, and cutover
+remain separately gated by Step 8 authorization after repaired review GREEN.
 
 ## Global Constraints
 
@@ -790,7 +790,7 @@ Traditional Chinese browser matrix produced ten screenshots, mechanically
 asserted retained approved caveats, and recorded zero writes, external requests,
 console errors, page errors, or horizontal overflow.
 
-- [x] **Step 7: Repeat full admission and independent review**
+- [ ] **Step 7: Repeat full admission and independent review**
 
 Run every Task 7 gate from a clean repaired tip and obtain an independent
 review with the five repair regressions in scope. Historical GREEN counts do
@@ -839,6 +839,37 @@ the reviewer withdrew it after checking the approved contract, which explicitly
 classifies that as a later observation for the next reconciliation cycle rather
 than claiming cross-database linearizability. No in-contract blocking or medium
 finding remains.
+
+A later audit found one additional in-contract defect. The due runner catches
+`TickerIdentityStoreUnavailable` before a due list exists and returns the same
+all-zero dictionary as a healthy idle tick; the parent scheduler discards that
+result. Per-transition exceptions log an ID but are also absent from the result
+summary. Repair this RED-first with the following bounded contract:
+
+1. Add closed runner outcomes `succeeded | partial | unavailable |
+   not_installed`, a sanitized reason, and bounded `failed_transition_ids`.
+   Missing schema before the separately authorized migration is
+   `not_installed`; a damaged or inaccessible present authority is
+   `unavailable`. Neither is healthy idle.
+2. Preserve isolation: one failed transition does not stop later IDs. Persist
+   those IDs in the runner summary and scheduler witness without raw exception
+   text. A failure before list construction has no ID and must not fabricate
+   one.
+3. The parent tick records a deduplicated failed `job_runs` witness for
+   `partial` or `unavailable`, and one recovery witness after a later healthy
+   tick. It must reuse an existing profile/job-runs authority and must not
+   create a missing profile database merely to report that it is missing.
+4. `job_runs` shares `profile_state.db` with the failed component. If the whole
+   database cannot accept the witness, report that fact in the sanitized log;
+   never claim durability that did not occur.
+5. Do not add a global scheduler switch. Per-row `approved` is the attended
+   execution authority, cancellation is its pre-application stop, and a second
+   switch would create an ambiguous silent-stop state.
+
+The repair may modify only the ticker scheduler/service, its scheduler handoff,
+focused tests, and these authority documents. It does not authorize production
+data, provider calls, migration, merge, or push. Repeat the complete Task 7
+admission and independent review from the repaired clean tip.
 
 - [ ] **Step 8: Stop for live authorization**
 
