@@ -495,11 +495,16 @@ def test_due_runner_reports_existing_profile_without_identity_schema_as_not_inst
     monkeypatch,
 ):
     from src.profile_state import ProfileStateStore
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
     from src.service import ticker_identity_scheduler as scheduler
 
     profile_path = tmp_path / "profile_state.db"
     market_path = tmp_path / "market_data.db"
     ProfileStateStore(profile_path)
+    with sqlite3.connect(profile_path) as conn:
+        SecurityLifecycleInvestigationStore(conn)
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
 
@@ -526,12 +531,16 @@ def test_due_runner_reports_malformed_identity_schema_as_unavailable(
     monkeypatch,
 ):
     from src.profile_state import ProfileStateStore
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
     from src.service import ticker_identity_scheduler as scheduler
 
     profile_path = tmp_path / "profile_state.db"
     market_path = tmp_path / "market_data.db"
     ProfileStateStore(profile_path)
     with sqlite3.connect(profile_path) as conn:
+        SecurityLifecycleInvestigationStore(conn)
         conn.execute("CREATE TABLE ticker_identity_broken (value TEXT)")
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))

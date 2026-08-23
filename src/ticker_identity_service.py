@@ -27,12 +27,31 @@ from src.ticker_identity_transition import (
 from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
 
 
+TICKER_IDENTITY_STORE_UNAVAILABLE_REASONS = frozenset(
+    {
+        "identity_schema_absent",
+        "identity_schema_mismatch",
+        "profile_schema_mismatch",
+        "profile_store_missing",
+        "profile_store_unavailable",
+    }
+)
+
+
 class TickerIdentityStoreUnavailable(RuntimeError):
     """The profile store cannot satisfy the exact ticker identity contract."""
 
-    def __init__(self, store: str = "profile"):
+    def __init__(
+        self,
+        store: str = "profile",
+        *,
+        reason: str = "profile_store_unavailable",
+    ):
+        if reason not in TICKER_IDENTITY_STORE_UNAVAILABLE_REASONS:
+            raise ValueError("ticker_identity_store_unavailable_reason")
         super().__init__(store)
         self.store = store
+        self.reason = reason
 
 
 class TickerIdentityConflict(RuntimeError):
@@ -74,7 +93,7 @@ class TickerIdentityService:
         conn: sqlite3.Connection | None = None
         try:
             if not path.is_file():
-                raise TickerIdentityStoreUnavailable()
+                raise TickerIdentityStoreUnavailable(reason="profile_store_missing")
             mode = "rw" if write else "ro"
             conn = sqlite3.connect(
                 f"file:{path.resolve()}?mode={mode}",
@@ -84,18 +103,25 @@ class TickerIdentityService:
             )
             verify_profile_connection(conn)
             if not identity_schema_present(conn):
-                raise TickerIdentityStoreUnavailable()
+                raise TickerIdentityStoreUnavailable(reason="identity_schema_absent")
             verify_ticker_identity_connection(conn)
         except TickerIdentityStoreUnavailable:
             if conn is not None:
                 conn.close()
             raise
-        except (
-            OSError,
-            sqlite3.Error,
-            LifecycleSchemaMismatch,
-            TickerIdentitySchemaMismatch,
-        ):
+        except LifecycleSchemaMismatch:
+            if conn is not None:
+                conn.close()
+            raise TickerIdentityStoreUnavailable(
+                reason="profile_schema_mismatch"
+            ) from None
+        except TickerIdentitySchemaMismatch:
+            if conn is not None:
+                conn.close()
+            raise TickerIdentityStoreUnavailable(
+                reason="identity_schema_mismatch"
+            ) from None
+        except (OSError, sqlite3.Error):
             if conn is not None:
                 conn.close()
             raise TickerIdentityStoreUnavailable() from None
@@ -309,7 +335,7 @@ def read_ticker_identity_lineage(profile_db_path: str, ticker: str) -> dict:
     conn: sqlite3.Connection | None = None
     try:
         if not path.is_file():
-            raise TickerIdentityStoreUnavailable()
+            raise TickerIdentityStoreUnavailable(reason="profile_store_missing")
         conn = sqlite3.connect(
             f"file:{path.resolve()}?mode=ro",
             uri=True,
@@ -322,7 +348,11 @@ def read_ticker_identity_lineage(profile_db_path: str, ticker: str) -> dict:
         lineage = TickerIdentityTransitionStore(conn).lineage_for_ticker(ticker)
     except TickerIdentityStoreUnavailable:
         raise
-    except (OSError, sqlite3.Error, TickerIdentitySchemaMismatch):
+    except TickerIdentitySchemaMismatch:
+        raise TickerIdentityStoreUnavailable(
+            reason="identity_schema_mismatch"
+        ) from None
+    except (OSError, sqlite3.Error):
         raise TickerIdentityStoreUnavailable() from None
     finally:
         if conn is not None:
@@ -346,6 +376,7 @@ def read_ticker_identity_lineage(profile_db_path: str, ticker: str) -> dict:
 
 
 __all__ = [
+    "TICKER_IDENTITY_STORE_UNAVAILABLE_REASONS",
     "TickerIdentityConflict",
     "TickerIdentityService",
     "TickerIdentityStoreUnavailable",

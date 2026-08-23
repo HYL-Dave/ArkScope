@@ -61,7 +61,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from src.service.ticker_identity_scheduler import (
+    record_ticker_identity_scheduler_result,
     run_due_ticker_identity_transitions,
+    ticker_identity_scheduler_failure,
 )
 
 logger = logging.getLogger(__name__)
@@ -1528,10 +1530,20 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     now = now or datetime.now(timezone.utc)
     fired = []
     try:
-        run_due_ticker_identity_transitions(now=now)
+        transition_result = run_due_ticker_identity_transitions(now=now)
     except Exception as exc:  # lifecycle work must not stop provider scheduling
         logger.warning(
             "ticker identity scheduler tick failed code=%s",
+            type(exc).__name__,
+        )
+        transition_result = ticker_identity_scheduler_failure(
+            "ticker_identity_scheduler_failed"
+        )
+    try:
+        record_ticker_identity_scheduler_result(transition_result, now=now)
+    except Exception as exc:  # telemetry must not stop provider scheduling
+        logger.warning(
+            "ticker identity scheduler result recording failed code=%s",
             type(exc).__name__,
         )
     market_writer_fired = False
