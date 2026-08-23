@@ -248,6 +248,10 @@ def test_identity_verifier_rejects_missing_extended_or_changed_schema(tmp_path):
         "AFTER INSERT ON ticker_identity_transitions BEGIN SELECT 1; END",
         "CREATE VIEW ticker_identity_transition_projection AS "
         "SELECT transition_id FROM ticker_identity_transitions",
+        "CREATE TEMP TRIGGER unrelated_temp_transition_trigger "
+        "AFTER INSERT ON ticker_identity_transitions BEGIN SELECT 1; END",
+        "CREATE TEMP VIEW ticker_identity_temp_projection AS "
+        "SELECT transition_id FROM ticker_identity_transitions",
     ],
 )
 def test_identity_verifier_rejects_every_unapproved_owned_object(
@@ -269,6 +273,27 @@ def test_identity_verifier_rejects_every_unapproved_owned_object(
 
         with pytest.raises(TickerIdentitySchemaMismatch, match="object set"):
             verify_ticker_identity_connection(conn)
+    finally:
+        conn.close()
+
+
+def test_identity_verifier_allows_external_read_only_consumer_view(tmp_path):
+    from src.security_lifecycle_schema import create_profile_schema
+    from src.ticker_identity_schema import (
+        create_ticker_identity_schema,
+        verify_ticker_identity_connection,
+    )
+
+    conn = sqlite3.connect(tmp_path / "external-consumer.db")
+    try:
+        create_profile_schema(conn)
+        create_ticker_identity_schema(conn)
+        conn.execute(
+            "CREATE VIEW lifecycle_transition_reporting AS "
+            "SELECT transition_id,status FROM ticker_identity_transitions"
+        )
+
+        verify_ticker_identity_connection(conn)
     finally:
         conn.close()
 

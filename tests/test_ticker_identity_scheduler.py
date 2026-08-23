@@ -6,6 +6,8 @@ import socket
 import sqlite3
 import threading
 
+import pytest
+
 
 def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
     from src.profile_state import ProfileStateStore
@@ -215,6 +217,126 @@ def test_due_execution_rechecks_new_broker_position_after_service_preview(tmp_pa
             "SELECT COUNT(*) FROM portfolio_positions WHERE symbol='OLD' "
             "AND closed_at IS NULL"
         ).fetchone() == (1,)
+
+
+def test_due_execution_durably_blocks_when_provider_observation_invalidates_assessment(
+    tmp_path,
+):
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    digest = _approved_preview_sha256(service, transition_id)
+    with sqlite3.connect(tmp_path / "market_data.db") as conn:
+        conn.execute(
+            "UPDATE security_lifecycle_observations "
+            "SET description='Changed provider observation' "
+            "WHERE source='sec_edgar' AND source_ref='due-ref' AND ticker='OLD'"
+        )
+
+    permission_calls: list[str] = []
+    result = service.execute_transition(
+        transition_id,
+        preview_sha256=digest,
+        trigger="scheduler",
+        before_write=lambda: permission_calls.append("write"),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["block_reasons"] == ["preview_changed"]
+    assert result["transition"]["status"] == "needs_review"
+    assert permission_calls == ["write"]
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,block_reasons_json,observed_preview_sha256 "
+            "FROM ticker_identity_transition_attempts WHERE transition_id=?",
+            (transition_id,),
+        ).fetchall() == [("blocked", '["preview_changed"]', None)]
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships WHERE ticker='OLD'"
+        ).fetchone() == (None,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+        ).fetchone() == (0,)
+
+
+def test_attended_retry_rechecks_expected_digest_inside_write_lock(
+    tmp_path,
+    monkeypatch,
+):
+    from src.ticker_identity_service import (
+        TickerIdentityConflict,
+        TickerIdentityService,
+    )
+    from src.ticker_identity_transition import TransitionOptions
+
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    old_digest = _approved_preview_sha256(service, transition_id)
+    transition = service.list_due_transitions(on_date="2026-08-25", limit=10)[0]
+    case_id = str(transition["case_id"])
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "UPDATE watchlist_memberships SET position=9,updated_at=? "
+            "WHERE ticker='OLD'",
+            ("2026-08-25T12:59:59Z",),
+        )
+
+    reapprover = TickerIdentityService(
+        market_db_path=str(tmp_path / "market_data.db"),
+        profile_db_path=str(profile_path),
+        source_loader=lambda: {"OLD": ("manual_lists",)},
+        clock=lambda: "2026-08-25T13:00:00Z",
+    )
+    options = TransitionOptions(execute_on="2026-08-25")
+    new_preview = reapprover.preview_case(case_id, options=options)
+    assert new_preview["preview_sha256"] != old_digest
+
+    original_get_case = service._read_service.get_case
+    raced = False
+
+    def reapprove_before_recomposition(requested_case_id: str):
+        nonlocal raced
+        if not raced:
+            raced = True
+            updated = reapprover.approve_case(
+                requested_case_id,
+                options=options,
+                preview_sha256=new_preview["preview_sha256"],
+                before_write=lambda: None,
+            )
+            assert updated["transition_id"] == transition_id
+        return original_get_case(requested_case_id)
+
+    monkeypatch.setattr(
+        service._read_service,
+        "get_case",
+        reapprove_before_recomposition,
+    )
+    permission_calls: list[str] = []
+    with pytest.raises(TickerIdentityConflict, match="transition_preview_changed"):
+        service.execute_transition(
+            transition_id,
+            preview_sha256=old_digest,
+            trigger="attended_user",
+            before_write=lambda: permission_calls.append("write"),
+        )
+
+    assert raced is True
+    assert permission_calls == ["write"]
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT approved_preview_sha256,status FROM ticker_identity_transitions "
+            "WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == (new_preview["preview_sha256"], "approved")
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts "
+            "WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == (0,)
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships WHERE ticker='OLD'"
+        ).fetchone() == (None,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+        ).fetchone() == (0,)
 
 
 def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(

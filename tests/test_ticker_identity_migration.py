@@ -5,6 +5,7 @@ import inspect
 from pathlib import Path
 import socket
 import sqlite3
+import stat
 
 import pytest
 
@@ -337,6 +338,63 @@ def test_restore_refuses_an_existing_idle_database_without_sidecars(tmp_path):
         assert idle.execute("PRAGMA integrity_check").fetchone() == ("ok",)
     finally:
         idle.close()
+
+
+def test_restore_fsyncs_copy_and_parent_before_reporting_success(
+    tmp_path,
+    monkeypatch,
+):
+    import src.ticker_identity_migration as migration
+
+    profile_path = _profile_database(tmp_path / "live-durable")
+    backup = migration.create_profile_backup(
+        profile_path=profile_path,
+        backup_dir=tmp_path / "backups-durable",
+        clock=lambda: "2026-08-23T10:11:12Z",
+    )
+    profile_path.unlink()
+    real_fsync = migration.os.fsync
+    fsync_modes: list[int] = []
+
+    def recording_fsync(descriptor: int) -> None:
+        fsync_modes.append(migration.os.fstat(descriptor).st_mode)
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(migration.os, "fsync", recording_fsync)
+    migration.restore_profile_backup(profile_path=profile_path, backup=backup)
+
+    assert any(stat.S_ISREG(mode) for mode in fsync_modes)
+    assert any(stat.S_ISDIR(mode) for mode in fsync_modes)
+    assert profile_path.read_bytes() == backup.path.read_bytes()
+
+
+def test_restore_rechecks_sidecars_after_copy_before_install(tmp_path, monkeypatch):
+    import src.ticker_identity_migration as migration
+
+    profile_path = _profile_database(tmp_path / "live-sidecar-race")
+    backup = migration.create_profile_backup(
+        profile_path=profile_path,
+        backup_dir=tmp_path / "backups-sidecar-race",
+        clock=lambda: "2026-08-23T10:11:12Z",
+    )
+    profile_path.unlink()
+    wal_path = Path(f"{profile_path}-wal")
+    real_copy2 = migration.shutil.copy2
+
+    def copy_then_create_sidecar(source, destination):
+        result = real_copy2(source, destination)
+        wal_path.write_bytes(b"concurrent-writer-marker")
+        return result
+
+    monkeypatch.setattr(migration.shutil, "copy2", copy_then_create_sidecar)
+    with pytest.raises(
+        migration.TickerIdentityRestoreRejected,
+        match="target_not_quiesced",
+    ):
+        migration.restore_profile_backup(profile_path=profile_path, backup=backup)
+
+    assert not profile_path.exists()
+    assert wal_path.read_bytes() == b"concurrent-writer-marker"
 
 
 def test_public_migration_paths_are_keyword_only_and_have_no_defaults():
