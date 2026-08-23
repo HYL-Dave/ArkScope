@@ -660,6 +660,42 @@ def test_transition_approval_rechecks_profile_digest_inside_its_write_lock(tmp_p
         conn.close()
 
 
+def test_transition_approval_rechecks_assessment_authority_inside_write_lock(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        conn.execute(
+            "UPDATE security_lifecycle_assessments SET status='superseded' "
+            "WHERE assessment_id='sla_1'"
+        )
+        conn.commit()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-24T01:00:00Z",
+        )
+
+        with pytest.raises(ValueError, match="preview_changed"):
+            store.approve(
+                preview=preview,
+                approved_preview_sha256=preview["preview_sha256"],
+            )
+
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
 def test_cancel_is_idempotent_before_apply_and_removes_transition_from_due_list(
     tmp_path,
 ):
@@ -886,6 +922,47 @@ def test_apply_rechecks_profile_state_inside_write_lock_and_never_overwrites_edi
         assert conn.execute(
             "SELECT status,block_reasons_json FROM ticker_identity_transition_attempts"
         ).fetchall() == [("blocked", '["preview_changed"]')]
+    finally:
+        conn.close()
+
+
+def test_apply_rechecks_accepted_assessment_inside_write_lock(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        conn.execute(
+            "UPDATE security_lifecycle_assessments SET status='superseded' "
+            "WHERE assessment_id='sla_1'"
+        )
+        conn.commit()
+
+        result = store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="scheduler",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["block_reasons"] == ["preview_changed"]
+        assert result["transition"]["status"] == "needs_review"
+        assert conn.execute(
+            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+        ).fetchone()[0] == 0
     finally:
         conn.close()
 

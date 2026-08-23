@@ -787,6 +787,38 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex}"
 
 
+def _assessment_authority_matches(
+    conn: sqlite3.Connection,
+    *,
+    assessment_id: str,
+    case_id: str,
+    observation_fingerprint_sha256: str,
+    evidence_set_sha256: str,
+    assessment_fingerprint_sha256: str,
+) -> bool:
+    row = conn.execute(
+        "SELECT case_id,status,observation_fingerprint_sha256,"
+        "evidence_set_sha256 FROM security_lifecycle_assessments "
+        "WHERE assessment_id=?",
+        (assessment_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    current = {
+        "assessment_id": assessment_id,
+        "observation_fingerprint_sha256": str(row[2]),
+        "evidence_set_sha256": str(row[3]),
+    }
+    return (
+        str(row[0]) == case_id
+        and str(row[1]) == "accepted"
+        and current["observation_fingerprint_sha256"]
+        == observation_fingerprint_sha256
+        and current["evidence_set_sha256"] == evidence_set_sha256
+        and assessment_fingerprint(current) == assessment_fingerprint_sha256
+    )
+
+
 class TickerIdentityTransitionStore:
     """Durable approval state over a caller-owned profile connection."""
 
@@ -895,6 +927,9 @@ class TickerIdentityTransitionStore:
             "assessment_fingerprint_sha256",
             preview.get("assessment_fingerprint_sha256"),
         )
+        evidence_fingerprint = _sha256(
+            "evidence_set_sha256", preview.get("evidence_set_sha256")
+        )
         digest = str(preview["preview_sha256"])
         preview_json = _canonical_json(dict(preview))
         proposal_ids_json = _canonical_json(proposal_ids)
@@ -911,6 +946,15 @@ class TickerIdentityTransitionStore:
 
         self._begin()
         try:
+            if not _assessment_authority_matches(
+                self.conn,
+                assessment_id=assessment_id,
+                case_id=case_id,
+                observation_fingerprint_sha256=observation_fingerprint,
+                evidence_set_sha256=evidence_fingerprint,
+                assessment_fingerprint_sha256=current_assessment_fingerprint,
+            ):
+                raise ValueError("preview_changed")
             expected_profile_digest = _sha256(
                 "profile_state_sha256", preview.get("profile_state_sha256")
             )
@@ -1169,10 +1213,25 @@ class TickerIdentityTransitionStore:
                 source_ticker=source_ticker,
                 successor_ticker=successor_ticker,
             )
+            assessment_current = _assessment_authority_matches(
+                self.conn,
+                assessment_id=str(transition["assessment_id"]),
+                case_id=str(transition["case_id"]),
+                observation_fingerprint_sha256=str(
+                    transition["approved_observation_fingerprint_sha256"]
+                ),
+                evidence_set_sha256=str(
+                    transition["approved_preview"]["evidence_set_sha256"]
+                ),
+                assessment_fingerprint_sha256=str(
+                    transition["approved_assessment_fingerprint_sha256"]
+                ),
+            )
             if (
                 not current_preview_valid
                 or current_digest != transition["approved_preview_sha256"]
                 or current_profile_digest != observed_profile_digest
+                or not assessment_current
             ):
                 result = self._blocked_apply(
                     transition_id=transition_id,
