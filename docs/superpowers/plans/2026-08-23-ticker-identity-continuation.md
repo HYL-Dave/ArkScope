@@ -894,6 +894,14 @@ RED-first under this fourth bounded contract:
    the supplied clock moves backward.
 4. Keep all telemetry failures behind the scheduler's sanitized diagnostic.
    Do not call a generic persistence method that logs raw SQLite/OSError text.
+5. Validate runner accounting before treating a tick as healthy: `due` equals
+   both selected-ID count and the sum of applied, needs-review,
+   already-applied, and failed-ID counts. Convert any impossible returned shape
+   to sanitized `ticker_identity_scheduler_failed` and witness it when possible;
+   it must never create a recovery row.
+6. Define one persistent failure incident by status, sanitized reason, and the
+   sorted failed-transition ID set. Changing successfully processed companion
+   IDs does not append repeated failure rows before recovery.
 
 The fourth repair may modify the same bounded scheduler/service, scheduler
 handoff, focused tests, and authority documents only. It does not authorize a

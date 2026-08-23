@@ -459,6 +459,13 @@ plan's returned shape share the same isolation boundary: a malformed mapping,
 status, or nested transition result fails that plan, retains its ID, and does
 not prevent later selected plans from running.
 
+Every top-level runner summary is internally closed: `due` equals the number of
+selected transition IDs and also equals `applied + needs_review +
+already_applied + failed_transition_ids`. An impossible or malformed summary is
+a typed `ticker_identity_scheduler_failed` outcome, never a successful tick or
+recovery. When telemetry is writable, that contract failure receives the same
+sanitized failed witness as an exception raised by the runner.
+
 The app scheduler records a sanitized `job_runs` failure witness for
 `unavailable` and `partial`, deduplicating an unchanged persistent failure and
 recording recovery after the next healthy tick. This witness is possible only
@@ -475,7 +482,10 @@ insert. The implementation checks the existing `job_runs` table inside that
 connection and never calls an auto-provisioning store constructor. The latest
 witness is selected by durable insertion identity (`id DESC`), not a
 caller-supplied event timestamp, so clock regression cannot create repeated
-recoveries. Concurrent identical failures serialize and produce one witness;
+recoveries. A persistent failure incident is keyed by runner status, sanitized
+reason, and the sorted failed-transition ID set; changes to successfully
+processed companion rows in the same bounded batch do not create a new failure
+witness. Concurrent identical failures serialize and produce one witness;
 concurrent healthy ticks after a failure produce one recovery. Any open,
 schema, transaction, or insert failure is reported only through the scheduler's
 closed sanitized diagnostic, never through a generic writer that logs the raw
