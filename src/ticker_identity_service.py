@@ -233,31 +233,55 @@ class TickerIdentityService:
                 raise TickerIdentityConflict("transition_preview_changed")
             if transition["status"] == "applied":
                 before_write()
-                return store.apply(
-                    transition_id,
-                    current_preview={"preview_sha256": preview_sha256},
-                    trigger=trigger,
-                )
+                try:
+                    return store.apply(
+                        transition_id,
+                        current_preview={"preview_sha256": preview_sha256},
+                        expected_preview_sha256=preview_sha256,
+                        trigger=trigger,
+                    )
+                except ValueError as exc:
+                    if str(exc) == "request_preview_changed":
+                        raise TickerIdentityConflict(
+                            "transition_preview_changed"
+                        ) from None
+                    raise
             if (
                 transition["status"] == "approved"
                 and str(transition["execute_on"]) > self._new_york_date()
             ):
                 raise ValueError("transition_not_due")
-            preview = self._preview_with_connection(
-                conn,
-                case_id=str(transition["case_id"]),
-                options=TransitionOptions(
-                    execute_on=str(transition["execute_on"]),
-                    priority_resolution=transition["priority_resolution"],
-                    unhide_successor=bool(transition["unhide_successor"]),
-                ),
-            )
+            try:
+                preview = self._preview_with_connection(
+                    conn,
+                    case_id=str(transition["case_id"]),
+                    options=TransitionOptions(
+                        execute_on=str(transition["execute_on"]),
+                        priority_resolution=transition["priority_resolution"],
+                        unhide_successor=bool(transition["unhide_successor"]),
+                    ),
+                )
+            except ValueError as exc:
+                if str(exc) not in {
+                    "accepted_assessment_required",
+                    "source_observation_missing",
+                }:
+                    raise
+                preview = None
             before_write()
-            return store.apply(
-                transition_id,
-                current_preview=preview,
-                trigger=trigger,
-            )
+            try:
+                return store.apply(
+                    transition_id,
+                    current_preview=preview,
+                    expected_preview_sha256=preview_sha256,
+                    trigger=trigger,
+                )
+            except ValueError as exc:
+                if str(exc) == "request_preview_changed":
+                    raise TickerIdentityConflict(
+                        "transition_preview_changed"
+                    ) from None
+                raise
 
     def reverse_transition(
         self,

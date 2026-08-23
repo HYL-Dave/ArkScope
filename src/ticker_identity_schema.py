@@ -186,25 +186,30 @@ def verify_ticker_identity_connection(conn: sqlite3.Connection) -> None:
         raise TickerIdentitySchemaMismatch("ticker identity index set mismatch")
 
     expected_objects = expected_tables | set(IDENTITY_INDEX_SQL)
-    owned_objects = []
     placeholders = ",".join("?" for _ in expected_tables)
-    for object_type, name, table_name, sql in conn.execute(
-        "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE "
-        "name LIKE 'ticker_identity_%' OR "
-        "name LIKE 'idx_ticker_identity_%' OR "
-        f"tbl_name IN ({placeholders})",
-        tuple(sorted(expected_tables)),
-    ):
-        if (
-            str(object_type) == "index"
-            and str(name).startswith("sqlite_autoindex_")
-            and sql is None
+    owned_object_names: dict[str, set[str]] = {}
+    for catalog in ("sqlite_master", "sqlite_temp_master"):
+        names: set[str] = set()
+        for object_type, name, _table_name, sql in conn.execute(
+            f"SELECT type,name,tbl_name,sql FROM {catalog} WHERE "
+            "name LIKE 'ticker_identity_%' OR "
+            "name LIKE 'idx_ticker_identity_%' OR "
+            f"tbl_name IN ({placeholders})",
+            tuple(sorted(expected_tables)),
         ):
-            continue
-        owned_objects.append((str(object_type), str(name), str(table_name)))
-    if {
-        name for _object_type, name, _table_name in owned_objects
-    } != expected_objects:
+            if (
+                catalog == "sqlite_master"
+                and str(object_type) == "index"
+                and str(name).startswith("sqlite_autoindex_")
+                and sql is None
+            ):
+                continue
+            names.add(str(name))
+        owned_object_names[catalog] = names
+    if (
+        owned_object_names["sqlite_master"] != expected_objects
+        or owned_object_names["sqlite_temp_master"]
+    ):
         raise TickerIdentitySchemaMismatch("ticker identity object set mismatch")
 
     for name, expected_sql in IDENTITY_TABLE_SQL.items():

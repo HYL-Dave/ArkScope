@@ -399,6 +399,23 @@ def _sidecars(path: Path) -> tuple[Path, Path]:
     return Path(f"{path}-wal"), Path(f"{path}-shm")
 
 
+def _fsync_file(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def restore_profile_backup(*, profile_path: str | Path, backup: ProfileBackup) -> None:
     """Install a verified backup only at an explicitly absent target path."""
 
@@ -435,7 +452,16 @@ def restore_profile_backup(*, profile_path: str | Path, backup: ProfileBackup) -
         if restored.approval_sha256 != backup.source_approval_sha256:
             raise TickerIdentityRestoreRejected("restore_copy_logical_digest_mismatch")
         try:
+            _fsync_file(temp_path)
+        except OSError as exc:
+            raise TickerIdentityRestoreRejected("restore_sync_failed") from exc
+        if target.exists():
+            raise TickerIdentityRestoreRejected("target_must_be_absent")
+        if any(path.exists() for path in _sidecars(target)):
+            raise TickerIdentityRestoreRejected("target_not_quiesced")
+        try:
             os.link(temp_path, target)
+            _fsync_directory(target.parent)
         except FileExistsError as exc:
             raise TickerIdentityRestoreRejected("target_must_be_absent") from exc
         except OSError as exc:

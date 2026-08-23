@@ -1196,17 +1196,23 @@ class TickerIdentityTransitionStore:
         self,
         transition_id: str,
         *,
-        current_preview: Mapping[str, object],
+        current_preview: Mapping[str, object] | None,
+        expected_preview_sha256: str,
         trigger: str,
     ) -> dict:
         if trigger not in ATTEMPT_TRIGGERS:
             raise ValueError("trigger")
+        expected_digest = _sha256(
+            "preview_digest", expected_preview_sha256
+        )
         now = self._clock()
         self._begin()
         try:
             transition = self._get(transition_id)
             if transition is None:
                 raise KeyError("transition_not_found")
+            if transition["approved_preview_sha256"] != expected_digest:
+                raise ValueError("request_preview_changed")
             if transition["status"] == "applied":
                 attempt_id = self._insert_attempt(
                     transition_id=transition_id,
@@ -1214,7 +1220,7 @@ class TickerIdentityTransitionStore:
                     status="already_applied",
                     block_reasons=(),
                     observed_preview_sha256=str(
-                        current_preview.get("preview_sha256") or ""
+                        (current_preview or {}).get("preview_sha256") or ""
                     )
                     or None,
                     at=now,
@@ -1234,11 +1240,24 @@ class TickerIdentityTransitionStore:
                     trigger=trigger,
                     reasons=[reason],
                     observed_preview_sha256=str(
-                        current_preview.get("preview_sha256") or ""
+                        (current_preview or {}).get("preview_sha256") or ""
                     )
                     or None,
                     at=now,
                     mark_needs_review=False,
+                )
+                self.conn.commit()
+                result["transition"] = self.get(transition_id)
+                return result
+
+            if current_preview is None:
+                result = self._blocked_apply(
+                    transition_id=transition_id,
+                    trigger=trigger,
+                    reasons=["preview_changed"],
+                    observed_preview_sha256=None,
+                    at=now,
+                    mark_needs_review=True,
                 )
                 self.conn.commit()
                 result["transition"] = self.get(transition_id)

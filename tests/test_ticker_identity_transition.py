@@ -758,6 +758,7 @@ def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
         result = applying.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="attended_user",
         )
 
@@ -811,6 +812,7 @@ def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
         repeated = applying.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="scheduler",
         )
         assert repeated["status"] == "already_applied"
@@ -862,11 +864,12 @@ def test_apply_rolls_back_every_profile_and_receipt_mutation_on_failure(
             _step_hook=fail_at_step,
         )
         with pytest.raises(RuntimeError, match="injected_failure"):
-            applying.apply(
-                transition["transition_id"],
-                current_preview=preview,
-                trigger="scheduler",
-            )
+                applying.apply(
+                    transition["transition_id"],
+                    current_preview=preview,
+                    expected_preview_sha256=preview["preview_sha256"],
+                    trigger="scheduler",
+                )
 
         assert calls == fail_after
         assert _rows_by_table(conn) == before
@@ -907,6 +910,7 @@ def test_apply_rechecks_profile_state_inside_write_lock_and_never_overwrites_edi
         result = store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="scheduler",
         )
 
@@ -954,6 +958,7 @@ def test_apply_rechecks_accepted_assessment_inside_write_lock(tmp_path):
         result = store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="scheduler",
         )
 
@@ -1022,6 +1027,7 @@ def test_open_position_preserves_old_visibility_without_blocking_successor_track
         assert store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="scheduler",
         )["status"] == "applied"
 
@@ -1075,6 +1081,7 @@ def test_terminal_delisting_archives_and_suppresses_without_creating_successor(
         result = store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="attended_user",
         )
 
@@ -1119,6 +1126,7 @@ def test_reversal_restores_exact_owned_rows_and_keeps_reversed_lineage(tmp_path)
         store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="attended_user",
         )
         reversing = TickerIdentityTransitionStore(
@@ -1174,6 +1182,7 @@ def test_reversal_blocks_after_user_edit_without_overwriting_the_edit(tmp_path):
         store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="scheduler",
         )
         conn.execute(
@@ -1226,6 +1235,7 @@ def test_reversal_blocks_when_successor_has_a_later_active_continuation(tmp_path
         store.apply(
             transition["transition_id"],
             current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
             trigger="scheduler",
         )
         conn.execute(
