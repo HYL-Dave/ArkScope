@@ -6,6 +6,16 @@ migration.
 
 **Date:** 2026-08-23
 
+**Implementation:** Tasks 0-7 are locally review-ready on the isolated
+`ticker-identity-continuation` branch through `0f63d96e`. The implementation
+includes exact schema verification, attended preview/approval, atomic apply and
+reversal, provider-free due execution, bilingual UI and lineage, plus an
+approval-bound migration/backup/restore utility with no production-path
+defaults. Scratch-only admission passed backend `4282 / 12 skipped`, cumulative
+focused `287`, frontend `104 files / 1217`, and `185` routes. No live preflight,
+backup, migration, provider call, merge, or push has been performed for this
+slice.
+
 **Depends on:**
 
 - `docs/superpowers/specs/2026-08-19-security-lifecycle-investigation-design.md`

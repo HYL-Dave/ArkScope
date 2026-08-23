@@ -10,16 +10,25 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
+**Implementation status (2026-08-23):** Tasks 0-7 are locally implemented
+and self-reviewed on the isolated `ticker-identity-continuation` branch through
+`0f63d96e`. Scratch-only admission is GREEN at backend `4282 passed / 12
+skipped`, cumulative focused `287 passed`, frontend `104 files / 1217 passed`,
+and `185` runtime routes. No provider call, production database write, live
+migration, merge, or push occurred. Fresh production preflight, backup, restore
+probe, and cutover remain gated after independent implementation review.
+
 ## Global Constraints
 
-- No provider/network call is allowed in Tasks 0-6.
+- No provider/network call is allowed in Tasks 0-7 implementation or admission.
 - No production database write or migration is authorized by this plan.
 - Existing `security_lifecycle_%` schema and migrated rows stay byte-compatible.
 - `ticker_aliases`, portfolio positions, SA capture rows, notes, research, and historical market rows are never rewritten.
 - Only `user` and `legacy` tags may copy to a successor.
 - Acquisition and `symbol_or_venue_changed` outcomes never enter the executor.
 - Every mutation is RED-first and uses scratch databases.
-- Production migration remains a separately approved Task 7 operation.
+- Production preflight, backup, and migration remain separately approved live
+  operations after Task 7 implementation review.
 
 ---
 
@@ -54,7 +63,7 @@
 - Consumes: clean `master` with backend collection `4229` and frontend `1207/1207`.
 - Produces: an isolated worktree and exact baseline receipts used by every later task.
 
-- [ ] **Step 1: Create the isolated worktree**
+- [x] **Step 1: Create the isolated worktree**
 
 Run:
 
@@ -64,7 +73,7 @@ git worktree add /tmp/arkscope-ticker-identity -b ticker-identity-continuation m
 
 Expected: the new worktree points at the plan-authority commit and `git status --short` is empty.
 
-- [ ] **Step 2: Record product ownership before edits**
+- [x] **Step 2: Record product ownership before edits**
 
 Run:
 
@@ -76,7 +85,7 @@ rg -l "remap_symbol|archive_manual_memberships|hide_from_active_universe|symbol_
 
 Expected: every future edit is either in the File Map or is added to the plan through a docs-only amendment before product code changes.
 
-- [ ] **Step 3: Reproduce the baseline**
+- [x] **Step 3: Reproduce the baseline**
 
 Run:
 
@@ -90,7 +99,7 @@ npm test -- --run
 
 Expected: collection is `4229`; focused backend and all `1207` frontend tests pass.
 
-- [ ] **Step 4: Commit the authority docs on master before product work**
+- [x] **Step 4: Commit the authority docs on master before product work**
 
 Run from the main worktree:
 
@@ -117,7 +126,7 @@ git -C /tmp/arkscope-ticker-identity merge --ff-only master
 - Produces: `create_ticker_identity_schema(conn) -> None`, `verify_ticker_identity_connection(conn) -> None`, `identity_schema_present(conn) -> bool`, and closed status constants.
 - Consumes: a caller-owned `sqlite3.Connection`; never opens a path itself.
 
-- [ ] **Step 1: Write schema RED tests**
+- [x] **Step 1: Write schema RED tests**
 
 Add tests that assert exact tables, columns, checks, indexes, and no implicit creation:
 
@@ -143,7 +152,7 @@ def test_identity_verifier_rejects_missing_extended_or_changed_schema(tmp_path):
         verify_ticker_identity_connection(conn)
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -153,7 +162,7 @@ python -m pytest tests/test_ticker_identity_schema.py -q
 
 Expected: collection/import fails because `src.ticker_identity_schema` does not exist.
 
-- [ ] **Step 3: Implement exact DDL**
+- [x] **Step 3: Implement exact DDL**
 
 Define:
 
@@ -171,7 +180,7 @@ PRIORITY_RESOLUTIONS = frozenset({"source", "successor"})
 
 Create the three tables from Spec §8. Use closed CHECK constraints, bounded JSON lengths, terminal-state timestamp coherence, foreign keys to lifecycle case/assessment tables, and indexes for `(status, execute_on)` plus both lineage directions. `verify_ticker_identity_connection` must compare normalized SQL and exact table/index sets prefixed with `ticker_identity_`.
 
-- [ ] **Step 4: Run GREEN and schema mutation checks**
+- [x] **Step 4: Run GREEN and schema mutation checks**
 
 Run:
 
@@ -181,7 +190,7 @@ python -m pytest tests/test_ticker_identity_schema.py tests/test_security_lifecy
 
 Expected: all pass; existing lifecycle schema tests remain unchanged.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ticker_identity_schema.py tests/test_ticker_identity_schema.py
@@ -202,7 +211,7 @@ git commit -m "feat(lifecycle): add ticker transition schema"
 - Produces: `TransitionOptions`, `build_transition_preview(conn, *, case, assessment, proposals, observation_fingerprint_sha256, sources, options) -> dict`, `profile_snapshot_sha256(preview) -> str`.
 - Consumes: current lifecycle rows and literal source names; performs no write and no network call.
 
-- [ ] **Step 1: Write eligibility RED tests**
+- [x] **Step 1: Write eligibility RED tests**
 
 Cover each closed decision:
 
@@ -231,14 +240,14 @@ Add independent tests for differing priority, hidden successor, missing date,
 stale assessment, missing observation citation, successor equal to source, and
 no active source.
 
-- [ ] **Step 2: Write profile-effect RED tests**
+- [x] **Step 2: Write profile-effect RED tests**
 
 Seed scratch rows for `A` and `B`, then assert the preview lists exact adds,
 reactivations, archives, copied editable tags, untouched provider tags, priority
 resolution, suppression behavior, and caveats. Include `B` already active,
 archived, and absent.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 python -m pytest tests/test_ticker_identity_transition.py tests/test_security_lifecycle_investigation.py -q
@@ -248,7 +257,7 @@ Expected: new tests fail because the preview kernel is absent; the evolved
 portfolio test fails until proposal generation no longer suppresses safe
 successor tracking.
 
-- [ ] **Step 4: Implement canonical preview**
+- [x] **Step 4: Implement canonical preview**
 
 Use immutable options:
 
@@ -274,7 +283,7 @@ Change proposal generation so:
 - acquisition outcomes emit no executable remap;
 - ambiguous legacy outcomes emit no remap.
 
-- [ ] **Step 5: Run GREEN**
+- [x] **Step 5: Run GREEN**
 
 ```bash
 python -m pytest tests/test_ticker_identity_transition.py tests/test_security_lifecycle_investigation.py -q
@@ -282,7 +291,7 @@ python -m pytest tests/test_ticker_identity_transition.py tests/test_security_li
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/ticker_identity_transition.py src/security_lifecycle_investigation.py tests/test_ticker_identity_transition.py tests/test_security_lifecycle_investigation.py
@@ -301,7 +310,7 @@ git commit -m "feat(lifecycle): derive safe ticker transition previews"
 - Produces: `TickerIdentityTransitionStore` with `approve`, `get`, `list_due`, `apply`, `cancel`, `reverse`, and `lineage_for_ticker`.
 - Consumes: a verified caller-owned profile connection and a current preview supplied by the service.
 
-- [ ] **Step 1: Write approval and idempotency RED tests**
+- [x] **Step 1: Write approval and idempotency RED tests**
 
 Use deterministic IDs and clock:
 
@@ -319,7 +328,7 @@ assert store.approve(...)["transition_id"] == transition["transition_id"]
 Assert a mismatched preview digest, ineligible preview, or unresolved conflict
 writes zero rows.
 
-- [ ] **Step 2: Write atomic-apply RED tests**
+- [x] **Step 2: Write atomic-apply RED tests**
 
 For `A -> B`, assert final rows and operation order. Inject failures after each
 logical mutation through a test-only callable seam:
@@ -340,7 +349,7 @@ for fail_after in range(1, 9):
 The production signature must not expose `fail_after_step`; inject a private
 step hook in the store constructor and pass it only in tests.
 
-- [ ] **Step 3: Write source-ownership RED tests**
+- [x] **Step 3: Write source-ownership RED tests**
 
 Before/after-digest all protected tables and assert:
 
@@ -351,13 +360,13 @@ Before/after-digest all protected tables and assert:
 - `ticker_aliases` is never opened;
 - an old broker position leaves `A` unsuppressed while `B` tracking is active.
 
-- [ ] **Step 4: Write reversal RED tests**
+- [x] **Step 4: Write reversal RED tests**
 
 Assert exact restore succeeds immediately, while a user edit after application
 causes `reverse_state_changed` and zero mutation. Assert a later active
 `B -> C` link blocks reversing `A -> B`.
 
-- [ ] **Step 5: Run RED**
+- [x] **Step 5: Run RED**
 
 ```bash
 python -m pytest tests/test_ticker_identity_transition.py -q
@@ -365,7 +374,7 @@ python -m pytest tests/test_ticker_identity_transition.py -q
 
 Expected: store methods are missing.
 
-- [ ] **Step 6: Implement one-transaction writes**
+- [x] **Step 6: Implement one-transaction writes**
 
 `apply` must execute `BEGIN IMMEDIATE`, re-read profile-owned rows, compare the
 current digest, and either:
@@ -378,7 +387,7 @@ without profile mutation, or commit memberships, editable tags, priority,
 suppression, link, transition status, and attempt together. Re-entry after
 commit records/returns `already_applied` without changing profile rows.
 
-- [ ] **Step 7: Run GREEN**
+- [x] **Step 7: Run GREEN**
 
 ```bash
 python -m pytest tests/test_ticker_identity_transition.py tests/test_profile_state.py -q
@@ -386,7 +395,7 @@ python -m pytest tests/test_ticker_identity_transition.py tests/test_profile_sta
 
 Expected: all pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/ticker_identity_transition.py tests/test_ticker_identity_transition.py
@@ -412,7 +421,7 @@ git commit -m "feat(lifecycle): apply atomic ticker transitions"
 - Produces routes from Spec §9 and `lineage` in the ticker-state DTO.
 - Consumes current lifecycle composition and `build_active_universe_snapshot`.
 
-- [ ] **Step 1: Write route RED tests**
+- [x] **Step 1: Write route RED tests**
 
 Create a scratch app with dependency overrides. Assert:
 
@@ -432,7 +441,7 @@ Assert malformed input is rejected before permission invocation; writes call
 `profile_state_write`, not `db_write`; stale digest returns 409; missing schema
 returns typed 503; ineligible cases return 422; read preview opens no network.
 
-- [ ] **Step 2: Write lineage route RED tests**
+- [x] **Step 2: Write lineage route RED tests**
 
 Extend ticker state expectations:
 
@@ -446,7 +455,7 @@ assert payload["lineage"] == {
 Assert the read is empty when identity schema is absent rather than creating
 tables; a malformed present schema returns typed unavailable.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 python -m pytest tests/test_ticker_identity_routes.py tests/test_profile_state.py tests/test_security_lifecycle_routes.py -q
@@ -454,7 +463,7 @@ python -m pytest tests/test_ticker_identity_routes.py tests/test_profile_state.p
 
 Expected: new imports/routes fail.
 
-- [ ] **Step 4: Implement service composition**
+- [x] **Step 4: Implement service composition**
 
 The service opens `market_data.db` read-only and `profile_state.db` read/write
 only for commands. It obtains the case through the existing lifecycle read
@@ -471,13 +480,13 @@ def get_ticker_identity_service():
     )
 ```
 
-- [ ] **Step 5: Implement routes and permissions**
+- [x] **Step 5: Implement routes and permissions**
 
 Pydantic request models use `extra="forbid"`, canonical dates, closed priority
 choices, and bounded ticker values. Call `require_profile_state_write` only
 after request validation and service preflight, immediately before mutation.
 
-- [ ] **Step 6: Run GREEN and route inventory**
+- [x] **Step 6: Run GREEN and route inventory**
 
 ```bash
 python -m pytest tests/test_ticker_identity_routes.py tests/test_profile_state.py tests/test_security_lifecycle_routes.py -q
@@ -486,7 +495,7 @@ python -c 'from src.api.app import create_app; print(len(create_app().routes))'
 
 Expected: all pass and exactly five routes are added.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/ticker_identity_service.py src/api/routes/ticker_identity.py src/api/dependencies.py src/api/app.py src/api/routes/profile.py tests/test_ticker_identity_routes.py tests/test_profile_state.py tests/test_security_lifecycle_routes.py
@@ -507,7 +516,7 @@ git commit -m "feat(lifecycle): expose reviewed ticker transitions"
 - Produces: `run_due_ticker_identity_transitions(*, limit: int = 10, now: datetime | None = None) -> dict`.
 - Consumes: approved transition rows and the shared service; performs no provider call.
 
-- [ ] **Step 1: Write scheduler RED tests**
+- [x] **Step 1: Write scheduler RED tests**
 
 Assert:
 
@@ -522,7 +531,7 @@ Assert:
 
 Use a socket-denial fixture around the full due runner.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 python -m pytest tests/test_ticker_identity_scheduler.py tests/test_data_scheduler.py -q
@@ -530,7 +539,7 @@ python -m pytest tests/test_ticker_identity_scheduler.py tests/test_data_schedul
 
 Expected: scheduler module/handoff is absent.
 
-- [ ] **Step 3: Implement bounded runner**
+- [x] **Step 3: Implement bounded runner**
 
 Return a stable summary:
 
@@ -548,7 +557,7 @@ The data scheduler calls this once per tick after interrupted-run
 reconciliation and before provider source dispatch. Failures are logged with
 sanitized codes and never stop provider scheduling.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 ```bash
 python -m pytest tests/test_ticker_identity_scheduler.py tests/test_data_scheduler.py -q
@@ -556,7 +565,7 @@ python -m pytest tests/test_ticker_identity_scheduler.py tests/test_data_schedul
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/service/ticker_identity_scheduler.py src/service/data_scheduler.py tests/test_ticker_identity_scheduler.py tests/test_data_scheduler.py
@@ -583,7 +592,7 @@ git commit -m "feat(lifecycle): run approved ticker transitions"
 - Produces exhaustive TypeScript DTO/status/blocker maps and attended commands.
 - Consumes the Task 4 routes; does not recompute hashes or transition effects.
 
-- [ ] **Step 1: Write presentation RED tests**
+- [x] **Step 1: Write presentation RED tests**
 
 Use `Record<TransitionStatus, string>` and `Record<TransitionBlockReason, string>`
 so a missing backend enum is a TypeScript error. Assert distinct copy for:
@@ -596,7 +605,7 @@ so a missing backend enum is a TypeScript error. Assert distinct copy for:
 - reversed;
 - explicit unknown value.
 
-- [ ] **Step 2: Write workflow RED tests**
+- [x] **Step 2: Write workflow RED tests**
 
 Render a real transition-preview shape. Assert the modal displays `A -> B`,
 date, list effects, tags, priority conflict control, broker caveat, and the
@@ -606,12 +615,12 @@ historical-data non-rewrite statement. Assert approval sends the server-provided
 Add tests for ineligible proposals, cancellation, changed-preview 409, reversal
 blocked by later edits, and action buttons disabled while a command is pending.
 
-- [ ] **Step 3: Write lineage RED tests**
+- [x] **Step 3: Write lineage RED tests**
 
 Render ticker `B` with predecessor `A`; clicking it invokes the existing ticker
 navigation rather than rewriting notes into `B`.
 
-- [ ] **Step 4: Run RED**
+- [x] **Step 4: Run RED**
 
 ```bash
 cd apps/arkscope-web
@@ -620,14 +629,14 @@ npm test -- --run src/lifecycle/tickerIdentityPresentation.test.ts src/lifecycle
 
 Expected: new types/components are absent.
 
-- [ ] **Step 5: Implement DTOs, copy, and controls**
+- [x] **Step 5: Implement DTOs, copy, and controls**
 
 Use existing compact lifecycle sections and modal patterns. Do not create nested
 cards or a new landing surface. All visible copy lives in locale resources.
 Conflict choices use a segmented/radio control; commands use existing button
 styles and familiar icons where available.
 
-- [ ] **Step 6: Run frontend gates**
+- [x] **Step 6: Run frontend gates**
 
 ```bash
 npm test -- --run
@@ -639,7 +648,7 @@ npm run build
 Expected: all tests pass, TypeScript is clean, visible-literal scan is clean,
 and production build succeeds.
 
-- [ ] **Step 7: Browser verification**
+- [x] **Step 7: Browser verification**
 
 Run the app against scratch migrated fixtures and capture `1440x900` and
 `390x844` screenshots for:
@@ -651,7 +660,7 @@ Run the app against scratch migrated fixtures and capture `1440x900` and
 
 Assert no overlap, truncation, raw enum leakage, or provider/network request.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/arkscope-web/src/api.ts apps/arkscope-web/src/lifecycle/tickerIdentityPresentation.ts apps/arkscope-web/src/lifecycle/tickerIdentityPresentation.test.ts apps/arkscope-web/src/lifecycle/LifecycleView.tsx apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx apps/arkscope-web/src/TickerDetail.tsx apps/arkscope-web/src/TickerDetail.test.tsx apps/arkscope-web/src/i18n/resources/en/explore.ts apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts apps/arkscope-web/src/i18n/resources.test.ts
@@ -675,14 +684,14 @@ git commit -m "feat(lifecycle): review ticker transition effects"
 - Produces: `preflight_ticker_identity_migration`, `create_profile_backup`, `migrate_ticker_identity_schema`, and `restore_profile_backup`.
 - Consumes: an explicit profile path, clock, backup directory, and approval digest; no default production path.
 
-- [ ] **Step 1: Write migration RED tests**
+- [x] **Step 1: Write migration RED tests**
 
 Assert read-only preflight creates nothing; additive migration preserves every
 existing table schema/row digest; interruption rolls back all three new tables;
 re-run is idempotent; malformed pre-existing identity tables stop; restore
 requires a verified backup and never targets the backup itself.
 
-- [ ] **Step 2: Implement explicit migration functions**
+- [x] **Step 2: Implement explicit migration functions**
 
 All public functions require keyword-only paths with no production defaults.
 Preflight returns exact existing schema/integrity digests, identity-table
@@ -690,7 +699,7 @@ presence, lifecycle counts, and an approval SHA-256. Migration checks that SHA
 immediately before `BEGIN IMMEDIATE` and creates only the three approved tables
 and indexes.
 
-- [ ] **Step 3: Run focused and full admission**
+- [x] **Step 3: Run focused and full admission**
 
 The five Task 4 routes evolve the exact local-runtime inventory from `180` to
 `185`; update that existing count owner. Full-suite RED also proved that the
@@ -713,14 +722,14 @@ npm run build
 Expected: zero failures, backend collection equals baseline plus reviewed
 additions, and frontend equals baseline plus reviewed additions.
 
-- [ ] **Step 4: Prove protected boundaries**
+- [x] **Step 4: Prove protected boundaries**
 
 On scratch copies, compare before/after schema and row digests for lifecycle
 observations, evidence, assessments, portfolio, notes, research, SA, market
 history, and aliases. Run with sockets denied. Expected: only the three identity
 tables/indexes and explicitly exercised profile rows differ.
 
-- [ ] **Step 5: Update status docs and request independent review**
+- [x] **Step 5: Update status docs and request independent review**
 
 Record exact commits, counts, route inventory, mutation/rollback evidence,
 browser fixtures, and zero-network proof. Do not claim production migration.
