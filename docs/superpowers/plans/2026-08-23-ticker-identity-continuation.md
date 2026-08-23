@@ -10,17 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
-**Implementation status (2026-08-23):** Tasks 0-7 and the first three bounded
-review repairs are implemented on the isolated branch through `0ce6b7cc`.
-Third-round RED was exact (`8 failed`); fresh GREEN is Task 7 focused `236
-passed`, full backend `4300 passed / 12 skipped` (collection `4312`), frontend
+**Implementation status (2026-08-23):** Tasks 0-7 and the first four bounded
+review repairs are implemented on the isolated branch through `134aa057`.
+Fourth-round RED was exact (`9 failed`); fresh GREEN is Task 7 focused `245
+passed`, full backend `4309 passed / 12 skipped` (collection `4321`), frontend
 `104 files / 1220 passed`, typecheck, literal scan, production build, `185`
 routes, and the ten-screenshot bilingual browser matrix. Independent review
-returned RED with four reproduced scheduler/witness defects, so a fourth
-bounded RED-first repair is active. No provider call, production database
-target, live migration, merge, or push was used. Fresh production preflight,
-backup, restore probe, and cutover remain separately gated by Step 8
-authorization after repaired review GREEN.
+returned RED with two reproduced result/history defects, so a fifth bounded
+RED-first repair is active. No provider call, production database target, live
+migration, merge, or push was used. Fresh production preflight, backup, restore
+probe, and cutover remain separately gated by Step 8 authorization after
+repaired review GREEN.
 
 ## Global Constraints
 
@@ -908,6 +908,36 @@ handoff, focused tests, and authority documents only. It does not authorize a
 global switch, production data, provider calls, migration, merge, or push. The
 complete Task 7 admission and independent review restart from its clean tip;
 none of the third-round GREEN is inherited.
+
+Fourth-round implementation evidence at `134aa057`: nine exact RED nodes were
+observed before product repair. GREEN was `110 passed` for scheduler/data
+focus, `83 passed` for the complete ticker group, and `245 passed` for the
+cumulative Task 7 backend gate. Full backend passed `4309 / 12 skipped`
+(collection `4321`), while frontend remained `104 files / 1220 passed`.
+Typecheck, literal scan, production build, the `185`-route runtime owner, and
+the repeated bilingual browser matrix passed.
+
+Independent review then reproduced two additional in-contract defects. Repair
+them RED-first under this fifth bounded contract:
+
+1. Require an actual `Mapping` at both result boundaries. A duck-typed object
+   that only implements `.get()` is malformed: per-plan it retains that failed
+   transition ID and later plans continue; top-level it becomes sanitized
+   `ticker_identity_scheduler_failed` and cannot record recovery.
+2. Preserve truthful public history under caller-clock regression without
+   changing the global job-run reader. Within the existing witness transaction,
+   clamp the new witness `started_at` to at least the preceding same-job
+   witness time; the reader's existing `started_at DESC, id DESC` ordering then
+   matches durable insertion order.
+3. Add committed real-SQLite coverage that concurrent healthy ticks produce one
+   recovery and that a failed witness transaction releases its write lock. The
+   existing concurrent-failure test must retain an explicit start barrier even
+   though the old store-specific synchronization hook no longer owns the seam.
+
+The fifth repair remains limited to this scheduler, focused tests, and these
+authority documents. It does not authorize a global switch, production data,
+provider calls, migration, merge, or push. Repeat complete admission and obtain
+fresh independent GREEN; none of the fourth-round GREEN is inherited.
 
 - [ ] **Step 8: Stop for live authorization**
 

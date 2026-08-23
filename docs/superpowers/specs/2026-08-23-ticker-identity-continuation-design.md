@@ -6,18 +6,17 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 and the first three bounded review repairs are
-implemented on the isolated branch through `0ce6b7cc`. The third repair was
-RED-first (`8 failed`) and fresh self-admission passed Task 7 focused `236`,
-full backend `4300 / 12 skipped` (collection `4312`), frontend `104 files /
-1220`, typecheck, literal scan, production build, `185` routes, and the
-bilingual desktop/mobile browser matrix. Independent review then reproduced
-four remaining scheduler-witness defects: malformed per-plan results escaped
-isolation, an existence-check race could recreate a missing profile database,
-witness deduplication was non-atomic and clock-ordered, and the generic job-run
-writer logged raw SQLite text. A fourth bounded RED-first repair is active; no
-live preflight, backup, migration, provider call, merge, or push is authorized
-by this status.
+**Implementation:** Tasks 0-7 and the first four bounded review repairs are
+implemented on the isolated branch through `134aa057`. Fourth-round RED was
+exact (`9 failed`) and fresh self-admission passed Task 7 focused `245`, full
+backend `4309 / 12 skipped` (collection `4321`), frontend `104 files / 1220`,
+typecheck, literal scan, production build, `185` routes, and the bilingual
+desktop/mobile browser matrix. Independent review then reproduced two remaining
+contract defects: a non-mapping object with a `.get()` method could masquerade
+as a valid result, and a backward caller clock made public job history display
+recovery behind the prior failure. A fifth bounded RED-first repair is active;
+no live preflight, backup, migration, provider call, merge, or push is
+authorized by this status.
 
 **Depends on:**
 
@@ -457,7 +456,9 @@ the due list exists has no transition ID and must not invent one. Raw exception
 messages are never persisted or returned. Execution and interpretation of one
 plan's returned shape share the same isolation boundary: a malformed mapping,
 status, or nested transition result fails that plan, retains its ID, and does
-not prevent later selected plans from running.
+not prevent later selected plans from running. Both the per-plan result and the
+top-level summary must be actual `Mapping` instances; duck-typed objects that
+merely expose `.get()` are malformed.
 
 Every top-level runner summary is internally closed: `due` equals the number of
 selected transition IDs and also equals `applied + needs_review +
@@ -486,10 +487,13 @@ recoveries. A persistent failure incident is keyed by runner status, sanitized
 reason, and the sorted failed-transition ID set; changes to successfully
 processed companion rows in the same bounded batch do not create a new failure
 witness. Concurrent identical failures serialize and produce one witness;
-concurrent healthy ticks after a failure produce one recovery. Any open,
-schema, transaction, or insert failure is reported only through the scheduler's
-closed sanitized diagnostic, never through a generic writer that logs the raw
-database exception.
+concurrent healthy ticks after a failure produce one recovery. The witness
+`started_at` is monotonically clamped to the preceding witness for this job;
+the existing `started_at DESC, id DESC` reader therefore presents insertion
+order honestly even if the caller clock moves backward. Any open, schema,
+transaction, or insert failure is reported only through the scheduler's closed
+sanitized diagnostic, never through a generic writer that logs the raw database
+exception; rollback and close must release the write lock.
 
 There is no second global `enabled` switch. Each `approved` transition is the
 explicit attended authorization to execute the reviewed effects on or after its
