@@ -43,6 +43,17 @@ def get_security_lifecycle_read_service():
     )
 
 
+def get_ticker_identity_service():
+    """Request-owned ticker identity transition service."""
+    from src.market_data_admin import resolve_market_db_path
+    from src.ticker_identity_service import TickerIdentityService
+
+    return TickerIdentityService(
+        market_db_path=resolve_market_db_path(),
+        profile_db_path=_local_state_db_path(),
+    )
+
+
 def get_security_lifecycle_store():
     """Request-owned profile-side investigation store."""
     from fastapi import HTTPException

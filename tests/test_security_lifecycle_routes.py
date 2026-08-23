@@ -235,9 +235,14 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("POST", "/security-lifecycle/cases/{case_id}/assessments"),
         ("POST", "/security-lifecycle/cases/{case_id}/evidence"),
         ("POST", "/security-lifecycle/cases/{case_id}/investigations"),
+        ("GET", "/security-lifecycle/cases/{case_id}/transition-preview"),
+        ("POST", "/security-lifecycle/cases/{case_id}/approve-transition"),
+        ("POST", "/security-lifecycle/transitions/{transition_id}/cancel"),
+        ("POST", "/security-lifecycle/transitions/{transition_id}/retry"),
+        ("POST", "/security-lifecycle/transitions/{transition_id}/reverse"),
     }
     assert expected <= rows
-    assert len(rows) == 180
+    assert len(rows) == 185
     assert {
         ("GET", "/market-data/security-lifecycle"),
         ("PUT", "/market-data/security-lifecycle/events/{event_id}"),

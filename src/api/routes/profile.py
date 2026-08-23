@@ -503,7 +503,28 @@ def get_ticker_state(
     dal: DataAccessLayer = Depends(get_dal),
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    return _ticker_state_payload(store, ticker, dal=dal, include_profile_priority=True)
+    from src.ticker_identity_service import (
+        TickerIdentityStoreUnavailable,
+        read_ticker_identity_lineage,
+    )
+
+    payload = _ticker_state_payload(
+        store,
+        ticker,
+        dal=dal,
+        include_profile_priority=True,
+    )
+    try:
+        payload["lineage"] = read_ticker_identity_lineage(store.db_path, ticker)
+    except TickerIdentityStoreUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "ticker_identity_profile_store_unavailable",
+                "store": "profile",
+            },
+        ) from None
+    return payload
 
 
 @router.post("/profile/tickers/{ticker}/archive")

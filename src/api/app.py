@@ -198,6 +198,7 @@ def create_app() -> FastAPI:
     from .routes.consensus import router as consensus_router
     from .routes.market_data import router as market_data_router
     from .routes.security_lifecycle import router as security_lifecycle_router
+    from .routes.ticker_identity import router as ticker_identity_router
     from .routes.schedule import router as schedule_router
     from .routes.providers_config import router as providers_config_router
     from .routes.research import router as research_router
@@ -224,6 +225,7 @@ def create_app() -> FastAPI:
     app.include_router(consensus_router)
     app.include_router(market_data_router)
     app.include_router(security_lifecycle_router)
+    app.include_router(ticker_identity_router)
     app.include_router(schedule_router)
     app.include_router(providers_config_router)
     app.include_router(research_router)

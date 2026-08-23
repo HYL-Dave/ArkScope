@@ -451,6 +451,110 @@ def test_priority_route_overrides_universe_and_ticker_state(api_store):
     assert state["priority"] == "medium"
 
 
+def _seed_ticker_identity_lineage(path: Path) -> None:
+    from src.security_lifecycle_schema import create_profile_schema
+    from src.ticker_identity_schema import create_ticker_identity_schema
+
+    with sqlite3.connect(path) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        create_profile_schema(conn)
+        create_ticker_identity_schema(conn)
+        conn.execute(
+            "INSERT INTO security_lifecycle_cases "
+            "(case_id,source,source_ref,ticker,created_at,updated_at) "
+            "VALUES ('slc_lineage','sec_edgar','lineage-ref','OLD',?,?)",
+            (ROUTE_NOW_TEXT, ROUTE_NOW_TEXT),
+        )
+        conn.execute(
+            "INSERT INTO security_lifecycle_assessments "
+            "(assessment_id,case_id,revision,status,relevance,confidence,author,"
+            "conclusion,impact_summary,successor_ticker,effective_date,"
+            "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at) "
+            "VALUES ('sla_lineage','slc_lineage',1,'accepted',"
+            "'direct_tracked_security','high','human',?,?,?,?,?,?,?,?)",
+            (
+                "OLD continues as NEW.",
+                "Keep the user's tracking intent.",
+                "NEW",
+                "2026-07-20",
+                "a" * 64,
+                "b" * 64,
+                ROUTE_NOW_TEXT,
+                ROUTE_NOW_TEXT,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO ticker_identity_transitions "
+            "(transition_id,case_id,assessment_id,proposal_ids_json,"
+            "transition_dedupe_key,kind,status,source_ticker,successor_ticker,"
+            "execute_on,priority_resolution,unhide_successor,"
+            "approved_observation_fingerprint_sha256,"
+            "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
+            "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
+            "approved_at,updated_at,applied_at,cancelled_at,reversed_at) "
+            "VALUES ('slt_1','slc_lineage','sla_lineage','[\"slp_1\"]',"
+            "'lineage-dedupe','symbol_continuation','applied','OLD','NEW',"
+            "'2026-07-20',NULL,0,?,?,?,?,?,?,?, ?,?,NULL,NULL)",
+            (
+                "a" * 64,
+                "c" * 64,
+                "d" * 64,
+                '{"eligible":true}',
+                '{"keys":{}}',
+                "e" * 64,
+                ROUTE_NOW_TEXT,
+                ROUTE_NOW_TEXT,
+                ROUTE_NOW_TEXT,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO ticker_identity_links "
+            "(link_id,transition_id,source_ticker,successor_ticker,relationship,"
+            "effective_date,created_at,reversed_at) "
+            "VALUES ('til_1','slt_1','OLD','NEW','symbol_continuation',"
+            "'2026-07-20',?,NULL)",
+            (ROUTE_NOW_TEXT,),
+        )
+
+
+def test_ticker_state_lineage_is_exact_empty_when_absent_and_fails_on_drift(
+    tmp_path,
+):
+    exact_path = tmp_path / "exact.db"
+    exact_store = ProfileStateStore(exact_path)
+    exact_store.set_priority("NEW", "high")
+    _seed_ticker_identity_lineage(exact_path)
+
+    payload = get_ticker_state("NEW", dal=None, store=exact_store)
+    assert payload["lineage"] == {
+        "predecessors": [{"ticker": "OLD", "transition_id": "slt_1"}],
+        "successors": [],
+    }
+
+    absent_path = tmp_path / "absent.db"
+    absent_store = ProfileStateStore(absent_path)
+    absent = get_ticker_state("OLD", dal=None, store=absent_store)
+    assert absent["lineage"] == {"predecessors": [], "successors": []}
+    with sqlite3.connect(absent_path) as conn:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name LIKE 'ticker_identity_%'"
+        ).fetchall() == []
+
+    malformed_path = tmp_path / "malformed.db"
+    malformed_store = ProfileStateStore(malformed_path)
+    _seed_ticker_identity_lineage(malformed_path)
+    with sqlite3.connect(malformed_path) as conn:
+        conn.execute("DROP INDEX idx_ticker_identity_links_source")
+    with pytest.raises(HTTPException) as exc:
+        get_ticker_state("NEW", dal=None, store=malformed_store)
+    assert exc.value.status_code == 503
+    assert exc.value.detail == {
+        "code": "ticker_identity_profile_store_unavailable",
+        "store": "profile",
+    }
+
+
 def test_all_tickers_distinct_sorted(store):
     store.import_lists(
         [
