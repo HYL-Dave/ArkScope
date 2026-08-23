@@ -400,7 +400,7 @@ def _sidecars(path: Path) -> tuple[Path, Path]:
 
 
 def restore_profile_backup(*, profile_path: str | Path, backup: ProfileBackup) -> None:
-    """Replace an explicit quiesced target only after full backup verification."""
+    """Install a verified backup only at an explicitly absent target path."""
 
     target = Path(profile_path)
     if target.resolve() == backup.path.resolve():
@@ -415,6 +415,8 @@ def restore_profile_backup(*, profile_path: str | Path, backup: ProfileBackup) -
         raise TickerIdentityRestoreRejected("backup_invalid") from exc
     if backup_state.approval_sha256 != backup.source_approval_sha256:
         raise TickerIdentityRestoreRejected("backup_logical_digest_mismatch")
+    if target.exists():
+        raise TickerIdentityRestoreRejected("target_must_be_absent")
     if any(path.exists() for path in _sidecars(target)):
         raise TickerIdentityRestoreRejected("target_not_quiesced")
     if not target.parent.is_dir():
@@ -432,7 +434,12 @@ def restore_profile_backup(*, profile_path: str | Path, backup: ProfileBackup) -
         restored = preflight_ticker_identity_migration(profile_path=temp_path)
         if restored.approval_sha256 != backup.source_approval_sha256:
             raise TickerIdentityRestoreRejected("restore_copy_logical_digest_mismatch")
-        os.replace(temp_path, target)
+        try:
+            os.link(temp_path, target)
+        except FileExistsError as exc:
+            raise TickerIdentityRestoreRejected("target_must_be_absent") from exc
+        except OSError as exc:
+            raise TickerIdentityRestoreRejected("restore_install_failed") from exc
     finally:
         temp_path.unlink(missing_ok=True)
 

@@ -2628,6 +2628,7 @@ export interface TickerIdentityTransitionState {
   successor_ticker: string | null;
   execute_on: string;
   approved_preview_sha256: string;
+  approved_preview: TickerIdentityTransitionPreview;
   updated_at: string;
   latest_attempt: {
     status: "blocked" | "applied" | "already_applied" | "reversed";

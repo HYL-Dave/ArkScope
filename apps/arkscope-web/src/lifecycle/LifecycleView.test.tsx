@@ -755,6 +755,37 @@ describe("Lifecycle workflow", () => {
     expect(apiMocks.cancelTickerIdentityTransition).toHaveBeenCalledWith("transition-1");
   });
 
+  it.each(["approved", "needs_review", "applied"])(
+    "keeps the approved effects visible while a transition is %s",
+    async (status) => {
+      apiMocks.getTickerIdentityTransitionPreview.mockResolvedValue({
+        ...TRANSITION_PREVIEW,
+        caveats: [],
+      });
+      apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+        ticker_transition: {
+          transition_id: `transition-${status}`,
+          kind: "symbol_continuation",
+          status,
+          source_ticker: "QBTS",
+          successor_ticker: "QBTS.B",
+          execute_on: "2026-09-01",
+          approved_preview_sha256: "b".repeat(64),
+          approved_preview: TRANSITION_PREVIEW,
+          updated_at: "2026-08-23T10:00:00Z",
+          latest_attempt: null,
+        },
+      }));
+
+      await mountLifecycle();
+
+      expect(document.body.textContent).toContain("The old broker position remains on QBTS");
+      expect(document.body.textContent).toContain(
+        "Seeking Alpha tracking stays with the provider-owned source",
+      );
+    },
+  );
+
   it("reports a changed preview and never treats the stale approval as successful", async () => {
     apiMocks.approveTickerIdentityTransition.mockRejectedValue(Object.assign(
       new Error("stale preview"),
@@ -797,7 +828,9 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).toContain(
       "Seeking Alpha tracking stays with the provider-owned source",
     );
-    expect(document.body.textContent).toContain("Historical notes, evidence, prices, and filings are not rewritten");
+    expect(document.body.textContent).toContain(
+      "Historical notes, evidence, prices, and filings are not rewritten",
+    );
     await click("Reverse transition");
     await click("Confirm reversal");
     expect(document.body.textContent).toContain(

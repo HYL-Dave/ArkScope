@@ -252,8 +252,6 @@ class TickerIdentityService:
                     unhide_successor=bool(transition["unhide_successor"]),
                 ),
             )
-            if preview["preview_sha256"] != preview_sha256:
-                raise TickerIdentityConflict("transition_preview_changed")
             before_write()
             return store.apply(
                 transition_id,

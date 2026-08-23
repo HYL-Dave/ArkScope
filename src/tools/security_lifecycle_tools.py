@@ -76,7 +76,8 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
         transitions: dict[str, dict] = {}
         rows = conn.execute(
             "SELECT transition_id,case_id,kind,status,source_ticker,"
-            "successor_ticker,execute_on,approved_preview_sha256,updated_at "
+            "successor_ticker,execute_on,approved_preview_sha256,"
+            "approved_preview_json,updated_at "
             "FROM ticker_identity_transitions "
             "ORDER BY case_id,updated_at DESC,transition_id DESC"
         ).fetchall()
@@ -104,6 +105,16 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
                     "block_reasons": block_reasons,
                     "attempted_at": str(attempt[2]),
                 }
+            approved_preview = json.loads(str(row[8]))
+            if not isinstance(approved_preview, dict):
+                raise ValueError("transition_approved_preview")
+            from src.ticker_identity_transition import profile_snapshot_sha256
+
+            if (
+                approved_preview.get("preview_sha256") != str(row[7])
+                or profile_snapshot_sha256(approved_preview) != str(row[7])
+            ):
+                raise ValueError("transition_approved_preview")
             transitions[case_id] = {
                 "transition_id": transition_id,
                 "kind": str(row[2]),
@@ -112,7 +123,8 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
                 "successor_ticker": str(row[5]) if row[5] is not None else None,
                 "execute_on": str(row[6]),
                 "approved_preview_sha256": str(row[7]),
-                "updated_at": str(row[8]),
+                "approved_preview": approved_preview,
+                "updated_at": str(row[9]),
                 "latest_attempt": latest_attempt,
             }
         return transitions

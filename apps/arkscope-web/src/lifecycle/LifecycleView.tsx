@@ -250,6 +250,64 @@ function requireCompletedTransitionAttempt(
   throw Object.assign(new Error(code), { code });
 }
 
+function TransitionEffectsSummary({
+  preview,
+}: {
+  preview: TickerIdentityTransitionPreview;
+}) {
+  const { t } = useTranslation("explore");
+  const unknown = t(($) => $.lifecycle.states.unknownValue);
+  const caveatLabels = transitionCaveatLabels(t, preview.source_ticker);
+  const effectLabels = {
+    add: t(($) => $.lifecycle.transition.effects.add),
+    archive: t(($) => $.lifecycle.transition.effects.archive),
+    reactivate: t(($) => $.lifecycle.transition.effects.reactivate),
+    unchanged: t(($) => $.lifecycle.transition.effects.unchanged),
+  } satisfies Record<(typeof EFFECT_ACTIONS)[number], string>;
+
+  return (
+    <>
+      {EFFECT_ACTIONS.flatMap((action) => preview.effects.watchlists[action].map((item) => (
+        <p key={`watchlist-${action}-${item.list_id}-${item.ticker}`}>
+          <strong>{t(($) => $.lifecycle.transition.fields.watchlists)}</strong>
+          <span aria-hidden="true"> · </span>
+          {effectLabels[action]}: {item.list_name} · <span className="mono">{item.ticker}</span>
+        </p>
+      )))}
+      {EFFECT_ACTIONS.flatMap((action) => (
+        preview.effects.legacy_config_seed[action].map((item) => (
+          <p key={`legacy-${action}-${item.ticker}`}>
+            <strong>{t(($) => $.lifecycle.transition.fields.legacySeed)}</strong>
+            <span aria-hidden="true"> · </span>
+            {effectLabels[action]}: <span className="mono">{item.ticker}</span>
+          </p>
+        ))
+      ))}
+      {preview.effects.editable_tags_to_copy.map((item) => (
+        <p key={`${item.facet}-${item.source}-${item.value}`}>
+          <strong>{t(($) => $.lifecycle.transition.fields.tags)}</strong>
+          <span aria-hidden="true"> · </span>
+          {item.facet}: {item.value} · <span className="mono">{item.ticker}</span>
+        </p>
+      ))}
+      {preview.caveats.length > 0 ? (
+        <div>
+          <strong>{t(($) => $.lifecycle.transition.fields.caveats)}</strong>
+          {preview.caveats.map((caveat) => (
+            <p key={caveat}>{tickerTransitionCaveatLabel(
+              caveat,
+              caveatLabels,
+              unknown,
+            )}</p>
+          ))}
+        </div>
+      ) : null}
+      <p>{t(($) => $.lifecycle.transition.noHistoricalRewrite)}</p>
+      <p>{t(($) => $.lifecycle.transition.approvalConsequence)}</p>
+    </>
+  );
+}
+
 function TransitionPreviewContent({
   preview,
   dateValue,
@@ -270,13 +328,6 @@ function TransitionPreviewContent({
   const { t } = useTranslation("explore");
   const unknown = t(($) => $.lifecycle.states.unknownValue);
   const kindLabels = transitionKindLabels(t);
-  const caveatLabels = transitionCaveatLabels(t, preview.source_ticker);
-  const effectLabels = {
-    add: t(($) => $.lifecycle.transition.effects.add),
-    archive: t(($) => $.lifecycle.transition.effects.archive),
-    reactivate: t(($) => $.lifecycle.transition.effects.reactivate),
-    unchanged: t(($) => $.lifecycle.transition.effects.unchanged),
-  } satisfies Record<(typeof EFFECT_ACTIONS)[number], string>;
   const priority = preview.effects.priority;
   const hasPriorityChoice = priority.source_value !== null
     && priority.successor_value !== null
@@ -355,37 +406,7 @@ function TransitionPreviewContent({
         </label>
       ) : null}
 
-      {EFFECT_ACTIONS.flatMap((action) => preview.effects.watchlists[action].map((item) => (
-        <p key={`watchlist-${action}-${item.list_id}-${item.ticker}`}>
-          <strong>{t(($) => $.lifecycle.transition.fields.watchlists)}</strong>
-          <span aria-hidden="true"> · </span>
-          {effectLabels[action]}: {item.list_name} · <span className="mono">{item.ticker}</span>
-        </p>
-      )))}
-      {EFFECT_ACTIONS.flatMap((action) => preview.effects.legacy_config_seed[action].map((item) => (
-        <p key={`legacy-${action}-${item.ticker}`}>
-          <strong>{t(($) => $.lifecycle.transition.fields.legacySeed)}</strong>
-          <span aria-hidden="true"> · </span>
-          {effectLabels[action]}: <span className="mono">{item.ticker}</span>
-        </p>
-      )))}
-      {preview.effects.editable_tags_to_copy.map((item) => (
-        <p key={`${item.facet}-${item.source}-${item.value}`}>
-          <strong>{t(($) => $.lifecycle.transition.fields.tags)}</strong>
-          <span aria-hidden="true"> · </span>
-          {item.facet}: {item.value} · <span className="mono">{item.ticker}</span>
-        </p>
-      ))}
-      {preview.caveats.length > 0 ? (
-        <div>
-          <strong>{t(($) => $.lifecycle.transition.fields.caveats)}</strong>
-          {preview.caveats.map((caveat) => (
-            <p key={caveat}>{tickerTransitionCaveatLabel(caveat, caveatLabels, unknown)}</p>
-          ))}
-        </div>
-      ) : null}
-      <p>{t(($) => $.lifecycle.transition.noHistoricalRewrite)}</p>
-      <p>{t(($) => $.lifecycle.transition.approvalConsequence)}</p>
+      <TransitionEffectsSummary preview={preview} />
     </div>
   );
 }
@@ -1309,6 +1330,9 @@ export function LifecycleView({
                       detail.ticker_transition.execute_on
                     }
                   </p>
+                  <TransitionEffectsSummary
+                    preview={detail.ticker_transition.approved_preview}
+                  />
                   {detail.ticker_transition.latest_attempt ? (
                     <div>
                       <strong>{t(($) => $.lifecycle.transition.fields.latestAttempt)}</strong>

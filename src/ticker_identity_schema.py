@@ -185,6 +185,28 @@ def verify_ticker_identity_connection(conn: sqlite3.Connection) -> None:
     if set(actual_indexes) != set(IDENTITY_INDEX_SQL):
         raise TickerIdentitySchemaMismatch("ticker identity index set mismatch")
 
+    expected_objects = expected_tables | set(IDENTITY_INDEX_SQL)
+    owned_objects = []
+    placeholders = ",".join("?" for _ in expected_tables)
+    for object_type, name, table_name, sql in conn.execute(
+        "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE "
+        "name LIKE 'ticker_identity_%' OR "
+        "name LIKE 'idx_ticker_identity_%' OR "
+        f"tbl_name IN ({placeholders})",
+        tuple(sorted(expected_tables)),
+    ):
+        if (
+            str(object_type) == "index"
+            and str(name).startswith("sqlite_autoindex_")
+            and sql is None
+        ):
+            continue
+        owned_objects.append((str(object_type), str(name), str(table_name)))
+    if {
+        name for _object_type, name, _table_name in owned_objects
+    } != expected_objects:
+        raise TickerIdentitySchemaMismatch("ticker identity object set mismatch")
+
     for name, expected_sql in IDENTITY_TABLE_SQL.items():
         row = conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)

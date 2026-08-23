@@ -309,6 +309,52 @@ def _rows_as_dicts(cursor: sqlite3.Cursor) -> list[dict]:
     ]
 
 
+def _quote_identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> frozenset[str]:
+    return frozenset(
+        str(row[1])
+        for row in conn.execute(
+            f"PRAGMA table_info({_quote_identifier(table)})"
+        ).fetchall()
+    )
+
+
+def _portfolio_dependency_snapshot(
+    conn: sqlite3.Connection,
+    *,
+    source_ticker: str,
+    successor_ticker: str | None,
+) -> dict:
+    required = {
+        "portfolio_accounts": frozenset({"id", "archived_at"}),
+        "portfolio_positions": frozenset(
+            {"id", "account_id", "symbol", "asset_class", "closed_at"}
+        ),
+    }
+    columns = {table: _table_columns(conn, table) for table in required}
+    if any(
+        not expected.issubset(columns[table])
+        for table, expected in required.items()
+    ):
+        return {"available": False, "rows": []}
+
+    tickers = (source_ticker, successor_ticker or source_ticker)
+    rows = _rows_as_dicts(
+        conn.execute(
+            "SELECT p.id AS position_id,p.account_id,p.symbol,p.asset_class,"
+            "p.closed_at,a.archived_at AS account_archived_at "
+            "FROM portfolio_positions p JOIN portfolio_accounts a ON a.id=p.account_id "
+            "WHERE UPPER(TRIM(p.symbol)) IN (?,?) "
+            "ORDER BY p.id,p.account_id",
+            tickers,
+        )
+    )
+    return {"available": True, "rows": rows}
+
+
 def _profile_dependency_snapshot(
     conn: sqlite3.Connection,
     *,
@@ -353,6 +399,11 @@ def _profile_dependency_snapshot(
     return {
         "editable_tags": tags,
         "legacy_config_seed": legacy,
+        "portfolio_open_inputs": _portfolio_dependency_snapshot(
+            conn,
+            source_ticker=source_ticker,
+            successor_ticker=successor_ticker,
+        ),
         "ticker_meta": meta,
         "watchlists": watchlists,
     }
