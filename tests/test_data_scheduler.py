@@ -318,6 +318,29 @@ def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
     assert "private detail" not in json.dumps(runs[0], sort_keys=True)
 
 
+def test_tick_records_non_mapping_ticker_runner_result_as_failed_witness(
+    tmp_path,
+    monkeypatch,
+):
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = _REAL_JOB_RUNS_LOCAL_STORE(profile_path)
+    ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda *, now: None,
+    )
+    fired = []
+
+    result = ds.tick_once(_NOW, fire=fired.append)
+
+    assert result == fired == ["finnhub_news"]
+    runs = telemetry.list_runs(job_name="ticker_identity.transitions", limit=10)
+    assert [(row["status"], row["error"]) for row in runs] == [
+        ("failed", "ticker_identity_scheduler_failed")
+    ]
+
+
 def test_tick_once_defers_extra_market_writers(monkeypatch):
     now = datetime(2026, 7, 4, tzinfo=timezone.utc)
     fired = []
