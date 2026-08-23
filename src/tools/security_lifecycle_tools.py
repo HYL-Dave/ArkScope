@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+import sqlite3
 from typing import Callable, Iterable, Mapping
 
 from src.market_data_admin import resolve_market_db_path
@@ -55,6 +57,70 @@ def _store_exists(path: str, store: str) -> None:
         exists = False
     if not exists:
         raise LifecycleStoreUnavailable(store)
+
+
+def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
+    from src.ticker_identity_schema import (
+        TickerIdentitySchemaMismatch,
+        identity_schema_present,
+        verify_ticker_identity_connection,
+    )
+
+    conn: sqlite3.Connection | None = None
+    try:
+        path = Path(profile_db_path)
+        conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
+        if not identity_schema_present(conn):
+            return {}
+        verify_ticker_identity_connection(conn)
+        transitions: dict[str, dict] = {}
+        rows = conn.execute(
+            "SELECT transition_id,case_id,kind,status,source_ticker,"
+            "successor_ticker,execute_on,approved_preview_sha256,updated_at "
+            "FROM ticker_identity_transitions "
+            "ORDER BY case_id,updated_at DESC,transition_id DESC"
+        ).fetchall()
+        for row in rows:
+            case_id = str(row[1])
+            if case_id in transitions:
+                continue
+            transition_id = str(row[0])
+            attempt = conn.execute(
+                "SELECT status,block_reasons_json,attempted_at "
+                "FROM ticker_identity_transition_attempts "
+                "WHERE transition_id=? "
+                "ORDER BY attempted_at DESC,attempt_id DESC LIMIT 1",
+                (transition_id,),
+            ).fetchone()
+            latest_attempt = None
+            if attempt is not None:
+                block_reasons = json.loads(str(attempt[1]))
+                if not isinstance(block_reasons, list) or not all(
+                    isinstance(value, str) for value in block_reasons
+                ):
+                    raise ValueError("transition_attempt_block_reasons")
+                latest_attempt = {
+                    "status": str(attempt[0]),
+                    "block_reasons": block_reasons,
+                    "attempted_at": str(attempt[2]),
+                }
+            transitions[case_id] = {
+                "transition_id": transition_id,
+                "kind": str(row[2]),
+                "status": str(row[3]),
+                "source_ticker": str(row[4]),
+                "successor_ticker": str(row[5]) if row[5] is not None else None,
+                "execute_on": str(row[6]),
+                "approved_preview_sha256": str(row[7]),
+                "updated_at": str(row[8]),
+                "latest_attempt": latest_attempt,
+            }
+        return transitions
+    except (OSError, sqlite3.Error, TickerIdentitySchemaMismatch, ValueError):
+        raise LifecycleStoreUnavailable("profile") from None
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def _provider_neutral_case(case: Mapping[str, object]) -> dict:
@@ -151,6 +217,7 @@ class SecurityLifecycleReadService:
             self.market_db_path,
             self.profile_db_path,
         )["cases"]
+        ticker_transitions = _ticker_transitions_by_case(self.profile_db_path)
         rendered = []
         for case in cases:
             item = dict(case)
@@ -160,6 +227,9 @@ class SecurityLifecycleReadService:
             item.setdefault("acknowledgement_history", [])
             item.setdefault("proposals", [])
             item.setdefault("current_acknowledgement", None)
+            item["ticker_transition"] = ticker_transitions.get(
+                str(item["case_id"])
+            )
             item["active_sources"] = (
                 []
                 if sources is None

@@ -370,3 +370,39 @@ def test_transition_state_and_due_date_are_validated_before_permission(
     assert too_late.status_code == 422
     assert too_late.json()["detail"]["code"] == "transition_not_cancellable"
     assert applied_calls == calls_after_apply
+
+
+def test_case_detail_exposes_durable_transition_state_without_changing_preview(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TransitionOptions, profile_snapshot_sha256
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+    context = _build_context(tmp_path)
+    options = TransitionOptions(execute_on="2026-08-25")
+    preview = context["service"].preview_case(context["case_id"], options=options)
+    transition = context["service"].approve_case(
+        context["case_id"],
+        options=options,
+        preview_sha256=preview["preview_sha256"],
+        before_write=lambda: None,
+    )
+
+    detail = SecurityLifecycleReadService(
+        market_db_path=str(context["market_path"]),
+        profile_db_path=str(context["profile_path"]),
+        source_loader=lambda: {"OLD": ("manual_lists",)},
+    ).get_case(context["case_id"])
+
+    assert detail["ticker_transition"] == {
+        "transition_id": transition["transition_id"],
+        "kind": "symbol_continuation",
+        "status": "approved",
+        "source_ticker": "OLD",
+        "successor_ticker": "NEW",
+        "execute_on": "2026-08-25",
+        "approved_preview_sha256": preview["preview_sha256"],
+        "updated_at": "2026-08-25T13:00:00Z",
+        "latest_attempt": None,
+    }
+    assert profile_snapshot_sha256(preview) == preview["preview_sha256"]
