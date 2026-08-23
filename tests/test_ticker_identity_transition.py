@@ -626,6 +626,40 @@ def test_transition_approval_rejects_tampered_or_ineligible_preview_without_rows
         conn.close()
 
 
+def test_transition_approval_rechecks_profile_digest_inside_its_write_lock(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        conn.execute(
+            "UPDATE ticker_meta SET priority='low',updated_at=? WHERE ticker='OLD'",
+            ("2026-08-24T00:59:59Z",),
+        )
+        conn.commit()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-24T01:00:00Z",
+        )
+
+        with pytest.raises(ValueError, match="preview_changed"):
+            store.approve(
+                preview=preview,
+                approved_preview_sha256=preview["preview_sha256"],
+            )
+
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
 def test_cancel_is_idempotent_before_apply_and_removes_transition_from_due_list(
     tmp_path,
 ):

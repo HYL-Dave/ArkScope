@@ -911,6 +911,16 @@ class TickerIdentityTransitionStore:
 
         self._begin()
         try:
+            expected_profile_digest = _sha256(
+                "profile_state_sha256", preview.get("profile_state_sha256")
+            )
+            observed_profile_digest = _profile_dependency_sha256(
+                self.conn,
+                source_ticker=source_ticker,
+                successor_ticker=successor_ticker,
+            )
+            if expected_profile_digest != observed_profile_digest:
+                raise ValueError("preview_changed")
             cursor = self.conn.execute(
                 "SELECT transition_id,status,approved_preview_sha256 "
                 "FROM ticker_identity_transitions WHERE transition_dedupe_key=?",
