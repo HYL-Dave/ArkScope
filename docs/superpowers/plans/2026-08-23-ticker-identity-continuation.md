@@ -10,18 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
-**Implementation status (2026-08-23):** Tasks 0-7 and the first five
-independent-review repairs reached self-admission through `2118f0ab`, but the
-independent re-review is RED. Two blocking races were independently reproduced:
-a changed/missing provider observation can fail before a durable attempt, and a
-request carrying an old approval digest can apply a concurrently re-approved
-plan. A bounded second repair also owns TEMP-schema side-effect rejection and
-crash-durable restore installation. The earlier repaired gate (`224` focused,
-full backend `4288 passed / 12 skipped`, frontend `104 files / 1220 passed`) is
-historical evidence, not current clearance. No provider call, production
-database target, live migration, merge, or push was used. Fresh production
-preflight, backup, restore probe, and cutover remain separately gated after an
-independent GREEN.
+**Implementation status (2026-08-23):** Tasks 0-7 and both bounded
+independent-review repair rounds are implemented on the isolated branch through
+`936747b9`. Second-round RED was exact (`6 failed / 24 passed`); fresh GREEN is
+Task 7 focused `231 passed`, full backend `4295 passed / 12 skipped`
+(collection `4307`), frontend `104 files / 1220 passed`, typecheck, literal
+scan, production build, `185` routes, and the ten-screenshot bilingual browser
+matrix. Independent review of this new tip is still required, so these results
+are self-admission rather than live or merge clearance. No provider call,
+production database target, live migration, merge, or push was used. Fresh
+production preflight, backup, restore probe, and cutover remain separately
+gated after an independent GREEN.
 
 ## Global Constraints
 
@@ -821,6 +820,16 @@ The second repair is bounded as follows:
 
 All four changes are RED-first. The complete Task 7 admission and independent
 review restart from the resulting clean tip; no earlier GREEN is inherited.
+
+Second-round evidence at `936747b9`: exact RED was `6 failed / 24 passed`; the
+new minimal GREEN was `30 passed`, the complete ticker transition set was
+`72 passed`, and the cumulative Task 7 backend gate was `231 passed`. Full
+backend passed `4295 / 12 skipped` (collection `4307`), while frontend remained
+`104 files / 1220 passed`. Typecheck, literal scan, production build, and the
+`185`-route runtime owner passed. The repeated `1440x900` English and `390x844`
+Traditional Chinese browser matrix produced ten screenshots with explicit
+approved-caveat assertions and zero writes, external requests, console errors,
+page errors, or horizontal overflow. Independent re-review remains pending.
 
 - [ ] **Step 8: Stop for live authorization**
 

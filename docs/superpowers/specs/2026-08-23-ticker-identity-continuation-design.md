@@ -6,15 +6,14 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 and the first five independent-review repairs
-reached self-admission through `2118f0ab`, but independent re-review returned
-RED. A provider-observation change can still fail before durable
-`needs_review`, and a request carrying an old approval digest can apply a plan
-that was concurrently re-approved under a new digest. TEMP side-effecting
-schema objects and crash-durable restore publication are in the same bounded
-second repair. Earlier GREEN counts are historical evidence only. No live
-preflight, backup, migration, provider call, merge, or push has been performed
-for this slice.
+**Implementation:** Tasks 0-7 and both bounded independent-review repairs are
+implemented on the isolated branch through `936747b9`. The second repair was
+RED-first (`6 failed / 24 passed`) and fresh self-admission passed Task 7
+focused `231`, full backend `4295 / 12 skipped` (collection `4307`), frontend
+`104 files / 1220`, typecheck, literal scan, production build, `185` routes,
+and the bilingual desktop/mobile browser matrix. Independent review of this new
+tip remains pending, so no live preflight, backup, migration, provider call,
+merge, or push is authorized by this status.
 
 **Depends on:**
 
