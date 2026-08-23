@@ -16,11 +16,12 @@ independent-review repair rounds are implemented on the isolated branch through
 Task 7 focused `231 passed`, full backend `4295 passed / 12 skipped`
 (collection `4307`), frontend `104 files / 1220 passed`, typecheck, literal
 scan, production build, `185` routes, and the ten-screenshot bilingual browser
-matrix. Independent review of this new tip is still required, so these results
-are self-admission rather than live or merge clearance. No provider call,
-production database target, live migration, merge, or push was used. Fresh
-production preflight, backup, restore probe, and cutover remain separately
-gated after an independent GREEN.
+matrix. Independent review returned GREEN after confirming the sole raised
+concern required the explicitly excluded cross-database linearizability
+guarantee. Tasks 0-7 are review-complete, but this does not authorize live or
+merge work. No provider call, production database target, live migration,
+merge, or push was used. Fresh production preflight, backup, restore probe, and
+cutover remain separately gated by Step 8 authorization.
 
 ## Global Constraints
 
@@ -789,7 +790,7 @@ Traditional Chinese browser matrix produced ten screenshots, mechanically
 asserted retained approved caveats, and recorded zero writes, external requests,
 console errors, page errors, or horizontal overflow.
 
-- [ ] **Step 7: Repeat full admission and independent review**
+- [x] **Step 7: Repeat full admission and independent review**
 
 Run every Task 7 gate from a clean repaired tip and obtain an independent
 review with the five repair regressions in scope. Historical GREEN counts do
@@ -829,7 +830,15 @@ backend passed `4295 / 12 skipped` (collection `4307`), while frontend remained
 `185`-route runtime owner passed. The repeated `1440x900` English and `390x844`
 Traditional Chinese browser matrix produced ten screenshots with explicit
 approved-caveat assertions and zero writes, external requests, console errors,
-page errors, or horizontal overflow. Independent re-review remains pending.
+page errors, or horizontal overflow. This evidence was accepted by independent
+re-review.
+
+Independent re-review returned GREEN for `c6a0f7b7`. Its initial sole concern
+was a provider commit after the service sample but before the profile commit;
+the reviewer withdrew it after checking the approved contract, which explicitly
+classifies that as a later observation for the next reconciliation cycle rather
+than claiming cross-database linearizability. No in-contract blocking or medium
+finding remains.
 
 - [ ] **Step 8: Stop for live authorization**
 

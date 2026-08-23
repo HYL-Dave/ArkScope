@@ -12,8 +12,10 @@ RED-first (`6 failed / 24 passed`) and fresh self-admission passed Task 7
 focused `231`, full backend `4295 / 12 skipped` (collection `4307`), frontend
 `104 files / 1220`, typecheck, literal scan, production build, `185` routes,
 and the bilingual desktop/mobile browser matrix. Independent review of this new
-tip remains pending, so no live preflight, backup, migration, provider call,
-merge, or push is authorized by this status.
+tip returned GREEN after the reviewer withdrew a concern that required the
+explicitly excluded cross-database linearizability guarantee. No live
+preflight, backup, migration, provider call, merge, or push is authorized by
+this status.
 
 **Depends on:**
 
