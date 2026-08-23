@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import sqlite3
 
 import pytest
@@ -34,6 +35,126 @@ def _profile_connection(tmp_path, *, active_source: bool = True) -> sqlite3.Conn
         )
         conn.commit()
     return conn
+
+
+def _transition_connection(tmp_path, *, active_source: bool = True) -> sqlite3.Connection:
+    from src.security_lifecycle_schema import create_profile_schema
+    from src.ticker_identity_schema import create_ticker_identity_schema
+
+    conn = _profile_connection(tmp_path, active_source=active_source)
+    create_profile_schema(conn)
+    create_ticker_identity_schema(conn)
+    conn.execute(
+        "INSERT INTO security_lifecycle_cases "
+        "(case_id,source,source_ref,ticker,created_at,updated_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (
+            "slc_1",
+            "sec_edgar",
+            "0000000000-26-000001",
+            "OLD",
+            _AT,
+            _AT,
+        ),
+    )
+    conn.execute(
+        "INSERT INTO security_lifecycle_assessments "
+        "(assessment_id,case_id,revision,status,relevance,confidence,author,"
+        "conclusion,impact_summary,successor_ticker,effective_date,"
+        "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "sla_1",
+            "slc_1",
+            1,
+            "accepted",
+            "direct_tracked_security",
+            "high",
+            "human",
+            "The tracked security continues under NEW.",
+            "Tracking should continue under the successor ticker.",
+            "NEW",
+            "2026-08-25",
+            _OBSERVATION_FINGERPRINT,
+            _EVIDENCE_FINGERPRINT,
+            _AT,
+            _AT,
+        ),
+    )
+    conn.commit()
+    return conn
+
+
+def _id_factory():
+    counters: dict[str, int] = {}
+
+    def generate(prefix: str) -> str:
+        counters[prefix] = counters.get(prefix, 0) + 1
+        return f"{prefix}_{counters[prefix]}"
+
+    return generate
+
+
+def _seed_transferable_state(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "INSERT INTO universe_source_memberships "
+        "(source_key,ticker,created_at,archived_at) VALUES (?,?,?,NULL)",
+        ("legacy_config_seed", "OLD", _AT),
+    )
+    conn.executemany(
+        "INSERT INTO ticker_tags (ticker,facet,value,source,created_at) "
+        "VALUES (?,?,?,?,?)",
+        [
+            ("OLD", "theme", "AI", "user", _AT),
+            ("OLD", "category", "Core", "legacy", _AT),
+            ("OLD", "sector", "Technology", "provider:fundamentals", _AT),
+        ],
+    )
+    conn.execute(
+        "INSERT INTO ticker_meta (ticker,priority,hidden_at,updated_at) "
+        "VALUES ('OLD','high',NULL,?)",
+        (_AT,),
+    )
+    conn.commit()
+
+
+def _rows_by_table(conn: sqlite3.Connection) -> dict[str, list[tuple]]:
+    tables = (
+        "ticker_identity_links",
+        "ticker_identity_transition_attempts",
+        "ticker_identity_transitions",
+        "ticker_meta",
+        "ticker_tags",
+        "universe_source_memberships",
+        "watchlist_memberships",
+    )
+    return {
+        table: [
+            tuple(row)
+            for row in conn.execute(
+                f'SELECT * FROM "{table}" ORDER BY rowid'
+            ).fetchall()
+        ]
+        for table in tables
+    }
+
+
+def _profile_owned_rows(conn: sqlite3.Connection) -> dict[str, list[tuple]]:
+    tables = (
+        "ticker_meta",
+        "ticker_tags",
+        "universe_source_memberships",
+        "watchlist_memberships",
+    )
+    return {
+        table: [
+            tuple(row)
+            for row in conn.execute(
+                f'SELECT * FROM "{table}" ORDER BY rowid'
+            ).fetchall()
+        ]
+        for table in tables
+    }
 
 
 def _case() -> dict:
@@ -424,5 +545,634 @@ def test_preview_is_canonical_and_hashes_every_authority_input(tmp_path):
         assert first["evidence_set_sha256"] == _EVIDENCE_FINGERPRINT
         assert profile_snapshot_sha256(first) == first["preview_sha256"]
         assert len(first["preview_sha256"]) == 64
+    finally:
+        conn.close()
+
+
+def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        preview = _build(conn)
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-24T01:00:00Z",
+        )
+
+        first = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        repeated = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+
+        assert first["transition_id"] == repeated["transition_id"]
+        assert first["status"] == "approved"
+        assert first["proposal_ids"] == ["slp_1"]
+        assert first["approved_preview"] == preview
+        assert store.list_due(on_date="2026-08-24", limit=10) == []
+        assert [
+            item["transition_id"]
+            for item in store.list_due(on_date="2026-08-25", limit=10)
+        ] == [first["transition_id"]]
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
+def test_transition_approval_rejects_tampered_or_ineligible_preview_without_rows(
+    tmp_path,
+):
+    from src.ticker_identity_transition import (
+        TickerIdentityTransitionStore,
+        profile_snapshot_sha256,
+    )
+
+    conn = _transition_connection(tmp_path)
+    try:
+        preview = _build(conn)
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-24T01:00:00Z",
+        )
+
+        with pytest.raises(ValueError, match="preview_digest"):
+            store.approve(
+                preview=preview,
+                approved_preview_sha256="f" * 64,
+            )
+
+        ineligible = deepcopy(preview)
+        ineligible["eligible"] = False
+        ineligible["block_reasons"] = ["priority_resolution_required"]
+        ineligible["preview_sha256"] = profile_snapshot_sha256(ineligible)
+        with pytest.raises(ValueError, match="preview_ineligible"):
+            store.approve(
+                preview=ineligible,
+                approved_preview_sha256=ineligible["preview_sha256"],
+            )
+
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_cancel_is_idempotent_before_apply_and_removes_transition_from_due_list(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        preview = _build(conn)
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-24T01:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+
+        cancelled = store.cancel(transition["transition_id"])
+        repeated = store.cancel(transition["transition_id"])
+
+        assert cancelled["status"] == "cancelled"
+        assert repeated == cancelled
+        assert cancelled["cancelled_at"] == "2026-08-24T01:00:00Z"
+        assert store.list_due(on_date="2026-08-25", limit=10) == []
+    finally:
+        conn.close()
+
+
+def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+
+        steps: list[str] = []
+        applying = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+            _step_hook=steps.append,
+        )
+        result = applying.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="attended_user",
+        )
+
+        assert result["status"] == "applied"
+        assert steps == [
+            "successor_memberships",
+            "editable_tags",
+            "successor_priority",
+            "identity_link",
+            "source_membership_archives",
+            "suppression",
+            "transition_receipt",
+            "attempt_receipt",
+        ]
+        assert conn.execute(
+            "SELECT ticker,position,archived_at FROM watchlist_memberships "
+            "WHERE list_id=1 ORDER BY ticker"
+        ).fetchall() == [
+            ("NEW", 3, None),
+            ("OLD", 3, "2026-08-25T13:00:00Z"),
+        ]
+        assert conn.execute(
+            "SELECT ticker,archived_at FROM universe_source_memberships "
+            "WHERE source_key='legacy_config_seed' ORDER BY ticker"
+        ).fetchall() == [
+            ("NEW", None),
+            ("OLD", "2026-08-25T13:00:00Z"),
+        ]
+        assert conn.execute(
+            "SELECT facet,value,source FROM ticker_tags WHERE ticker='NEW' "
+            "ORDER BY facet,source,value"
+        ).fetchall() == [
+            ("category", "Core", "legacy"),
+            ("theme", "AI", "user"),
+        ]
+        assert conn.execute(
+            "SELECT priority,hidden_at FROM ticker_meta WHERE ticker='NEW'"
+        ).fetchone() == ("high", None)
+        assert conn.execute(
+            "SELECT hidden_at FROM ticker_meta WHERE ticker='OLD'"
+        ).fetchone() == ("2026-08-25T13:00:00Z",)
+        assert conn.execute(
+            "SELECT source_ticker,successor_ticker,relationship,reversed_at "
+            "FROM ticker_identity_links"
+        ).fetchall() == [("OLD", "NEW", "symbol_continuation", None)]
+        applied = applying.get(transition["transition_id"])
+        assert applied["status"] == "applied"
+        assert applied["before_snapshot_json"] is not None
+        assert len(applied["after_snapshot_sha256"]) == 64
+
+        repeated = applying.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="scheduler",
+        )
+        assert repeated["status"] == "already_applied"
+        assert conn.execute(
+            "SELECT status FROM ticker_identity_transition_attempts "
+            "ORDER BY rowid"
+        ).fetchall() == [("applied",), ("already_applied",)]
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("fail_after", range(1, 9))
+def test_apply_rolls_back_every_profile_and_receipt_mutation_on_failure(
+    tmp_path,
+    fail_after,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path / str(fail_after))
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        approving = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = approving.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        before = _rows_by_table(conn)
+        calls = 0
+
+        def fail_at_step(_name: str) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == fail_after:
+                raise RuntimeError("injected_failure")
+
+        applying = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+            _step_hook=fail_at_step,
+        )
+        with pytest.raises(RuntimeError, match="injected_failure"):
+            applying.apply(
+                transition["transition_id"],
+                current_preview=preview,
+                trigger="scheduler",
+            )
+
+        assert calls == fail_after
+        assert _rows_by_table(conn) == before
+        assert conn.in_transaction is False
+    finally:
+        conn.close()
+
+
+def test_apply_rechecks_profile_state_inside_write_lock_and_never_overwrites_edit(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        assert len(preview["profile_state_sha256"]) == 64
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        conn.execute(
+            "UPDATE ticker_meta SET priority='low',updated_at=? WHERE ticker='OLD'",
+            ("2026-08-25T12:59:59Z",),
+        )
+        conn.commit()
+
+        result = store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="scheduler",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["block_reasons"] == ["preview_changed"]
+        assert store.get(transition["transition_id"])["status"] == "needs_review"
+        assert conn.execute(
+            "SELECT priority FROM ticker_meta WHERE ticker='OLD'"
+        ).fetchone() == ("low",)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT status,block_reasons_json FROM ticker_identity_transition_attempts"
+        ).fetchall() == [("blocked", '["preview_changed"]')]
+    finally:
+        conn.close()
+
+
+def test_open_position_preserves_old_visibility_without_blocking_successor_tracking(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        conn.executescript(
+            """
+            CREATE TABLE portfolio_positions (id INTEGER PRIMARY KEY, symbol TEXT, quantity TEXT);
+            CREATE TABLE research_threads (id INTEGER PRIMARY KEY, ticker TEXT, body TEXT);
+            CREATE TABLE ticker_aliases (alias TEXT PRIMARY KEY, canonical TEXT NOT NULL);
+            """
+        )
+        conn.execute("INSERT INTO portfolio_positions VALUES (1,'OLD','10')")
+        conn.execute("INSERT INTO research_threads VALUES (1,'OLD','Historical work')")
+        conn.execute("INSERT INTO ticker_aliases VALUES ('OLD','OLD')")
+        conn.execute(
+            "INSERT INTO ticker_notes (ticker,body,created_at,updated_at) "
+            "VALUES ('OLD','Keep under the historical identity',?,?)",
+            (_AT, _AT),
+        )
+        conn.commit()
+        protected_tables = (
+            "portfolio_positions",
+            "research_threads",
+            "security_lifecycle_assessments",
+            "security_lifecycle_cases",
+            "ticker_aliases",
+            "ticker_notes",
+        )
+        protected_before = {
+            table: conn.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+            for table in protected_tables
+        }
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed", "portfolio_open"),
+        )
+        assert preview["eligible"] is True
+        assert preview["effects"]["suppression"]["hide_source"] is False
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        assert store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="scheduler",
+        )["status"] == "applied"
+
+        assert {
+            table: conn.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+            for table in protected_tables
+        } == protected_before
+        assert conn.execute(
+            "SELECT hidden_at FROM ticker_meta WHERE ticker='OLD'"
+        ).fetchone() == (None,)
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships "
+            "WHERE list_id=1 AND ticker='OLD'"
+        ).fetchone() == ("2026-08-25T13:00:00Z",)
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships "
+            "WHERE list_id=1 AND ticker='NEW'"
+        ).fetchone() == (None,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_tags WHERE ticker='NEW' "
+            "AND source='provider:fundamentals'"
+        ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_terminal_delisting_archives_and_suppresses_without_creating_successor(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            assessment=_assessment(outcomes=("listing_ended",), successor=None),
+            proposals=[_proposal(action_type="notify", replacement=None)],
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        result = store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="attended_user",
+        )
+
+        assert result["status"] == "applied"
+        assert conn.execute(
+            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT archived_at FROM watchlist_memberships WHERE ticker='OLD'"
+        ).fetchone() == ("2026-08-25T13:00:00Z",)
+        assert conn.execute(
+            "SELECT hidden_at FROM ticker_meta WHERE ticker='OLD'"
+        ).fetchone() == ("2026-08-25T13:00:00Z",)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_links"
+        ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_reversal_restores_exact_owned_rows_and_keeps_reversed_lineage(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        before = _profile_owned_rows(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="attended_user",
+        )
+        reversing = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-26T14:00:00Z",
+        )
+
+        result = reversing.reverse(
+            transition["transition_id"],
+            trigger="attended_user",
+        )
+
+        assert result["status"] == "reversed"
+        assert _profile_owned_rows(conn) == before
+        assert reversing.get(transition["transition_id"])["status"] == "reversed"
+        assert conn.execute(
+            "SELECT reversed_at FROM ticker_identity_links"
+        ).fetchall() == [("2026-08-26T14:00:00Z",)]
+        assert conn.execute(
+            "SELECT status FROM ticker_identity_transition_attempts ORDER BY rowid"
+        ).fetchall() == [("applied",), ("reversed",)]
+        assert reversing.lineage_for_ticker("OLD")["successors"][0][
+            "successor_ticker"
+        ] == "NEW"
+        assert reversing.lineage_for_ticker("NEW")["predecessors"][0][
+            "source_ticker"
+        ] == "OLD"
+    finally:
+        conn.close()
+
+
+def test_reversal_blocks_after_user_edit_without_overwriting_the_edit(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="scheduler",
+        )
+        conn.execute(
+            "UPDATE ticker_meta SET priority='low',updated_at=? WHERE ticker='NEW'",
+            ("2026-08-26T13:59:59Z",),
+        )
+        conn.commit()
+        before_reverse = _profile_owned_rows(conn)
+
+        result = store.reverse(
+            transition["transition_id"],
+            trigger="attended_user",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["block_reasons"] == ["reverse_state_changed"]
+        assert _profile_owned_rows(conn) == before_reverse
+        assert store.get(transition["transition_id"])["status"] == "applied"
+        assert conn.execute(
+            "SELECT reversed_at FROM ticker_identity_links"
+        ).fetchone() == (None,)
+        assert conn.execute(
+            "SELECT observed_preview_sha256 "
+            "FROM ticker_identity_transition_attempts WHERE status='blocked'"
+        ).fetchone() == (preview["preview_sha256"],)
+    finally:
+        conn.close()
+
+
+def test_reversal_blocks_when_successor_has_a_later_active_continuation(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(
+            conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            trigger="scheduler",
+        )
+        conn.execute(
+            "INSERT INTO ticker_identity_transitions "
+            "(transition_id,case_id,assessment_id,proposal_ids_json,"
+            "transition_dedupe_key,kind,status,source_ticker,successor_ticker,"
+            "execute_on,priority_resolution,unhide_successor,"
+            "approved_observation_fingerprint_sha256,"
+            "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
+            "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
+            "approved_at,updated_at,applied_at,cancelled_at,reversed_at) "
+            "VALUES (?,?,?,?,?,?,'applied',?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL)",
+            (
+                "tit_later",
+                "slc_1",
+                "sla_1",
+                '["slp_later"]',
+                "dedupe:later",
+                "symbol_continuation",
+                "NEW",
+                "THIRD",
+                "2026-08-26",
+                None,
+                0,
+                "a" * 64,
+                "b" * 64,
+                "c" * 64,
+                "{}",
+                "{}",
+                "d" * 64,
+                "2026-08-26T00:00:00Z",
+                "2026-08-26T00:00:00Z",
+                "2026-08-26T00:00:00Z",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO ticker_identity_links "
+            "(link_id,transition_id,source_ticker,successor_ticker,relationship,"
+            "effective_date,created_at,reversed_at) VALUES (?,?,?,?,?,?,?,NULL)",
+            (
+                "til_later",
+                "tit_later",
+                "NEW",
+                "THIRD",
+                "symbol_continuation",
+                "2026-08-26",
+                "2026-08-26T00:00:00Z",
+            ),
+        )
+        conn.commit()
+
+        result = store.reverse(
+            transition["transition_id"],
+            trigger="attended_user",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["block_reasons"] == ["successor_has_later_transition"]
+        assert store.get(transition["transition_id"])["status"] == "applied"
     finally:
         conn.close()
