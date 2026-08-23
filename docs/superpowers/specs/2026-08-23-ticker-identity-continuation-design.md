@@ -6,14 +6,17 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 reached local self-review on the isolated
-`ticker-identity-continuation` branch through `90027051`. Independent review
-then found blocking stale-plan and broker-position race defects plus three
-durability/safety gaps; the branch is in repair and is not review-ready. The
-earlier scratch admission (`4282 / 12 skipped`, cumulative focused `287`,
-frontend `104 files / 1217`, and `185` routes) is retained only as historical
-evidence. No live preflight, backup, migration, provider call, merge, or push
-has been performed for this slice.
+**Implementation:** Tasks 0-7 and the five independent-review repairs are
+implemented on the isolated `ticker-identity-continuation` branch through
+`42820905`. RED reproduced all five defect families (`8 failed / 21 passed`
+backend and `1 failed / 25 passed` frontend). Repaired self-admission passed
+`224` focused backend tests, full backend `4288 passed / 12 skipped`
+(collection `4300`), frontend `104 files / 1220 passed`, typecheck, literal
+scan, production build, `185` routes, and a bilingual desktop/mobile browser
+matrix with zero writes, external requests, console errors, page errors, or
+overflow. Independent review of this repaired tip remains outstanding. No live
+preflight, backup, migration, provider call, merge, or push has been performed
+for this slice.
 
 **Depends on:**
 

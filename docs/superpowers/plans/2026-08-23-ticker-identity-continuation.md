@@ -10,15 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
-**Implementation status (2026-08-23):** Tasks 0-7 were locally implemented and
-self-reviewed on the isolated `ticker-identity-continuation` branch through
-`90027051`, but independent review found two blocking correctness defects and
-three durability/safety defects. Repair is active and the prior scratch-only
-admission (`4282 passed / 12 skipped`, cumulative focused `287 passed`, frontend
-`104 files / 1217 passed`, and `185` runtime routes) is historical evidence,
-not current release clearance. No provider call, production database write,
-live migration, merge, or push occurred. Fresh production preflight, backup,
-restore probe, and cutover remain gated after repaired implementation review.
+**Implementation status (2026-08-23):** Tasks 0-7 and the five independently
+reported repairs are implemented on the isolated `ticker-identity-continuation`
+branch through `42820905`. The repair was RED-first (`8 failed / 21 passed`
+backend and `1 failed / 25 passed` frontend), then passed the repaired task gate
+(`224 passed`), full backend (`4288 passed / 12 skipped`; collection `4300`),
+frontend (`104 files / 1220 passed`), typecheck, literal scan, production build,
+`185` runtime routes, and the attended ten-screenshot browser matrix. Independent
+review of the repaired tip remains outstanding, so this is not release or live
+cutover clearance. No provider call, production database target, live migration,
+merge, or push was used. Fresh production preflight, backup, restore probe, and
+cutover remain separately gated after repaired implementation review.
 
 ## Global Constraints
 
@@ -749,7 +751,7 @@ tables/indexes and explicitly exercised profile rows differ.
 Record exact commits, counts, route inventory, mutation/rollback evidence,
 browser fixtures, and zero-network proof. Do not claim production migration.
 
-- [ ] **Step 6: Repair independent-review findings RED-first**
+- [x] **Step 6: Repair independent-review findings RED-first**
 
 The repair must prove all of the following before repeating admission:
 
@@ -777,11 +779,22 @@ apply must produce `needs_review`; a provider change after that sample is a new
 observation for the next reconciliation cycle. The implementation and docs may
 not claim cross-database linearizability.
 
+Repair evidence at `42820905`: exact RED was `8 failed / 21 passed` backend and
+`1 failed / 25 passed` frontend. GREEN was `65 passed` for the repair-focused
+backend set, `224 passed` for the cumulative Task 7 backend command,
+`4288 passed / 12 skipped` for the full backend (collection `4300`), and
+`104 files / 1220 passed` for the frontend. Typecheck, literal scan, production
+build, and `185`-route inventory passed. The `1440x900` English and `390x844`
+Traditional Chinese browser matrix produced ten screenshots, mechanically
+asserted retained approved caveats, and recorded zero writes, external requests,
+console errors, page errors, or horizontal overflow.
+
 - [ ] **Step 7: Repeat full admission and independent review**
 
 Run every Task 7 gate from a clean repaired tip and obtain an independent
 review with the five repair regressions in scope. Historical GREEN counts do
-not authorize the repaired tip.
+not authorize the repaired tip. Self-admission is complete at `42820905` with
+the evidence recorded above; independent review is the remaining Step 7 gate.
 
 - [ ] **Step 8: Stop for live authorization**
 
