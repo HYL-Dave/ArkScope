@@ -10,17 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-ticker-identity-continuation-design.md`
 
-**Implementation status (2026-08-23):** Tasks 0-7 and the five independently
-reported repairs are implemented on the isolated `ticker-identity-continuation`
-branch through `42820905`. The repair was RED-first (`8 failed / 21 passed`
-backend and `1 failed / 25 passed` frontend), then passed the repaired task gate
-(`224 passed`), full backend (`4288 passed / 12 skipped`; collection `4300`),
-frontend (`104 files / 1220 passed`), typecheck, literal scan, production build,
-`185` runtime routes, and the attended ten-screenshot browser matrix. Independent
-review of the repaired tip remains outstanding, so this is not release or live
-cutover clearance. No provider call, production database target, live migration,
-merge, or push was used. Fresh production preflight, backup, restore probe, and
-cutover remain separately gated after repaired implementation review.
+**Implementation status (2026-08-23):** Tasks 0-7 and the first five
+independent-review repairs reached self-admission through `2118f0ab`, but the
+independent re-review is RED. Two blocking races were independently reproduced:
+a changed/missing provider observation can fail before a durable attempt, and a
+request carrying an old approval digest can apply a concurrently re-approved
+plan. A bounded second repair also owns TEMP-schema side-effect rejection and
+crash-durable restore installation. The earlier repaired gate (`224` focused,
+full backend `4288 passed / 12 skipped`, frontend `104 files / 1220 passed`) is
+historical evidence, not current clearance. No provider call, production
+database target, live migration, merge, or push was used. Fresh production
+preflight, backup, restore probe, and cutover remain separately gated after an
+independent GREEN.
 
 ## Global Constraints
 
@@ -794,7 +795,32 @@ console errors, page errors, or horizontal overflow.
 Run every Task 7 gate from a clean repaired tip and obtain an independent
 review with the five repair regressions in scope. Historical GREEN counts do
 not authorize the repaired tip. Self-admission is complete at `42820905` with
-the evidence recorded above; independent review is the remaining Step 7 gate.
+the evidence recorded above, but re-review at `2118f0ab` returned RED.
+
+The second repair is bounded as follows:
+
+1. If the provider observation changes or disappears so the accepted
+   assessment is no longer current, execution must still pass an honest
+   unavailable/current-mismatch signal into the store. The store appends a
+   blocked attempt, moves the approved plan to `needs_review`, and performs no
+   profile effect.
+2. `store.apply` receives the request's expected approved-preview digest and
+   compares it again after `BEGIN IMMEDIATE`. A concurrent re-approval makes the
+   stale request a typed `transition_preview_changed` conflict; it cannot apply
+   the new plan and does not invalidate that newly approved plan.
+3. Exact object verification covers both `sqlite_master` and
+   `sqlite_temp_master`: TEMP triggers attached to identity tables and any TEMP
+   object in the reserved identity namespace are rejected. A differently named,
+   read-only view that merely selects from an identity table is an external
+   consumer, not an owned schema object, and is not rejected or parsed by this
+   component.
+4. Restore fsyncs the verified copy before publication, rechecks target and
+   sidecars immediately before install, atomically links at an absent target,
+   and fsyncs the parent directory before success. External writer quiescence
+   remains an operator prerequisite rather than a claim of automatic detection.
+
+All four changes are RED-first. The complete Task 7 admission and independent
+review restart from the resulting clean tip; no earlier GREEN is inherited.
 
 - [ ] **Step 8: Stop for live authorization**
 

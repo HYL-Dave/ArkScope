@@ -6,15 +6,13 @@ migration.
 
 **Date:** 2026-08-23
 
-**Implementation:** Tasks 0-7 and the five independent-review repairs are
-implemented on the isolated `ticker-identity-continuation` branch through
-`42820905`. RED reproduced all five defect families (`8 failed / 21 passed`
-backend and `1 failed / 25 passed` frontend). Repaired self-admission passed
-`224` focused backend tests, full backend `4288 passed / 12 skipped`
-(collection `4300`), frontend `104 files / 1220 passed`, typecheck, literal
-scan, production build, `185` routes, and a bilingual desktop/mobile browser
-matrix with zero writes, external requests, console errors, page errors, or
-overflow. Independent review of this repaired tip remains outstanding. No live
+**Implementation:** Tasks 0-7 and the first five independent-review repairs
+reached self-admission through `2118f0ab`, but independent re-review returned
+RED. A provider-observation change can still fail before durable
+`needs_review`, and a request carrying an old approval digest can apply a plan
+that was concurrently re-approved under a new digest. TEMP side-effecting
+schema objects and crash-durable restore publication are in the same bounded
+second repair. Earlier GREEN counts are historical evidence only. No live
 preflight, backup, migration, provider call, merge, or push has been performed
 for this slice.
 
@@ -393,7 +391,11 @@ backup, approval manifest, and explicit production-write authorization.
 Verification owns the complete SQLite object surface of the three identity
 tables: approved tables and indexes must match exactly, and no additional
 trigger, view, or arbitrary-named index may attach to an identity table.
-SQLite-generated autoindexes with no user SQL are the only exception.
+SQLite-generated autoindexes with no user SQL are the only exception. The same
+reserved namespace and side-effecting attachment checks apply to TEMP objects
+on the caller connection. A differently named read-only view that selects from
+an identity table is an external consumer, not part of the component's owned
+schema surface; verification does not parse arbitrary consumer SQL.
 
 ### 8.5 Restore protocol
 
@@ -402,7 +404,10 @@ an existing profile database inode. The live rollback runbook must stop all app
 and scheduler writers, move the failed target aside, and then invoke restore at
 that absent path. Restore revalidates the backup, copies it to a same-directory
 temporary file, revalidates the copy, and installs it with an atomic no-clobber
-operation. An existing or concurrently recreated target is a typed refusal.
+operation. Before publication it fsyncs the verified copy and rechecks the
+target plus SQLite sidecars; after publication it fsyncs the parent directory
+before reporting success. An existing or concurrently recreated target is a
+typed refusal. Writer quiescence remains an explicit operator prerequisite.
 
 ## 9. API and Permissions
 
@@ -448,7 +453,10 @@ The service must not turn a recomputed-preview mismatch into an ephemeral
 exception before step 4. It passes that preview into the store so the store can
 append the blocked attempt and persist `needs_review`. A request digest that
 does not match the stored approved digest remains an immediate client conflict
-and is never treated as a new approval.
+and is never treated as a new approval. Both comparisons occur again after
+`BEGIN IMMEDIATE`: a provider observation that invalidates the accepted
+assessment produces durable `needs_review`, while a concurrent re-approval
+causes the stale request to fail without invalidating or applying the new plan.
 
 Concurrent scheduler/app attempts serialize on SQLite. Re-entry after commit
 returns `already_applied`. A crash before commit leaves no partial profile
