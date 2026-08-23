@@ -243,16 +243,8 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
     tmp_path,
     monkeypatch,
 ):
-    from src.service import ticker_identity_scheduler as ticker_scheduler
-
     profile_path = tmp_path / "profile_state.db"
     telemetry = _REAL_JOB_RUNS_LOCAL_STORE(profile_path)
-    monkeypatch.setattr(
-        ticker_scheduler,
-        "_job_store",
-        lambda: telemetry,
-        raising=False,
-    )
     failure = {
         "status": "partial",
         "reason": "transition_execution_failed",
@@ -296,16 +288,8 @@ def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
     tmp_path,
     monkeypatch,
 ):
-    from src.service import ticker_identity_scheduler as ticker_scheduler
-
     profile_path = tmp_path / "profile_state.db"
     telemetry = _REAL_JOB_RUNS_LOCAL_STORE(profile_path)
-    monkeypatch.setattr(
-        ticker_scheduler,
-        "_job_store",
-        lambda: telemetry,
-        raising=False,
-    )
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
     monkeypatch.setattr(
         ds,

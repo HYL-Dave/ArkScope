@@ -122,6 +122,30 @@ def _approved_preview_sha256(service, transition_id: str) -> str:
     )
 
 
+def _scheduler_result(
+    *,
+    status: str,
+    reason: str | None,
+    applied: int = 0,
+    needs_review: int = 0,
+    already_applied: int = 0,
+    transition_ids: list[str] | None = None,
+    failed_transition_ids: list[str] | None = None,
+) -> dict:
+    ids = list(transition_ids or [])
+    failed_ids = list(failed_transition_ids or [])
+    return {
+        "status": status,
+        "reason": reason,
+        "due": len(ids),
+        "applied": applied,
+        "needs_review": needs_review,
+        "already_applied": already_applied,
+        "transition_ids": ids,
+        "failed_transition_ids": failed_ids,
+    }
+
+
 def test_due_execution_records_needs_review_when_recomputed_preview_changed(tmp_path):
     service, profile_path, transition_id = _build_due_context(tmp_path)
     digest = _approved_preview_sha256(service, transition_id)
@@ -408,6 +432,59 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
     assert len(permission_calls) == 8
 
 
+@pytest.mark.parametrize(
+    "malformed_result",
+    [None, {"status": "blocked", "transition": None}],
+)
+def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
+    malformed_result,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    class FakeService:
+        def __init__(self):
+            self.executed = []
+
+        def list_due_transitions(self, *, on_date, limit):
+            del on_date, limit
+            return [
+                {
+                    "transition_id": "slt_bad",
+                    "approved_preview_sha256": "a" * 64,
+                },
+                {
+                    "transition_id": "slt_later",
+                    "approved_preview_sha256": "b" * 64,
+                },
+            ]
+
+        def execute_transition(self, transition_id, **_kwargs):
+            self.executed.append(transition_id)
+            if transition_id == "slt_bad":
+                return malformed_result
+            return {"status": "applied"}
+
+    service = FakeService()
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    )
+
+    assert service.executed == ["slt_bad", "slt_later"]
+    assert result == {
+        "status": "partial",
+        "reason": "transition_execution_failed",
+        "due": 2,
+        "applied": 1,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": ["slt_bad", "slt_later"],
+        "failed_transition_ids": ["slt_bad"],
+    }
+
+
 def test_due_runner_is_provider_free_and_concurrent_ticks_apply_once(
     tmp_path,
     monkeypatch,
@@ -588,3 +665,257 @@ def test_scheduler_failure_witness_does_not_create_missing_profile_database(
 
     assert persisted is False
     assert not profile_path.exists()
+
+
+def test_scheduler_failure_witness_cannot_recreate_profile_deleted_before_rw_open(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    profile_path = tmp_path / "profile_state.db"
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE job_runs (
+                id INTEGER PRIMARY KEY,
+                job_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                trigger_source TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                result TEXT,
+                message TEXT,
+                error TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                duration_ms INTEGER,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    original_connect = sqlite3.connect
+
+    def delete_at_open(database, *args, **kwargs):
+        target = str(database)
+        if "mode=rw" in target:
+            profile_path.unlink(missing_ok=True)
+            return original_connect(database, *args, **kwargs)
+        connection = original_connect(database, *args, **kwargs)
+        if "mode=ro" in target:
+            profile_path.unlink()
+        return connection
+
+    monkeypatch.setattr(scheduler.sqlite3, "connect", delete_at_open)
+
+    persisted = scheduler.record_ticker_identity_scheduler_result(
+        _scheduler_result(
+            status="unavailable",
+            reason="profile_store_unavailable",
+        ),
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert persisted is False
+    assert not profile_path.exists()
+
+
+def test_scheduler_failure_witness_deduplicates_concurrent_identical_failures(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    original_list_runs = JobRunsLocalStore.list_runs
+    barrier = threading.Barrier(2)
+
+    def synchronized_list_runs(store, **kwargs):
+        rows = original_list_runs(store, **kwargs)
+        barrier.wait(timeout=5)
+        return rows
+
+    monkeypatch.setattr(JobRunsLocalStore, "list_runs", synchronized_list_runs)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        applied=1,
+        transition_ids=["slt_ok", "slt_failed"],
+        failed_transition_ids=["slt_failed"],
+    )
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        persisted = list(
+            executor.map(
+                lambda _index: scheduler.record_ticker_identity_scheduler_result(
+                    failure,
+                    now=now,
+                ),
+                range(2),
+            )
+        )
+
+    assert persisted == [True, True]
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM job_runs WHERE job_name=?",
+            ("ticker_identity.transitions",),
+        ).fetchone() == (1,)
+
+
+def test_scheduler_recovery_uses_insertion_order_when_clock_moves_backward(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    failure = _scheduler_result(
+        status="unavailable",
+        reason="profile_store_unavailable",
+    )
+    healthy = _scheduler_result(status="succeeded", reason=None)
+
+    assert scheduler.record_ticker_identity_scheduler_result(
+        failure,
+        now=datetime(2026, 8, 25, 10, 0, tzinfo=timezone.utc),
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(
+        healthy,
+        now=datetime(2026, 8, 25, 9, 0, tzinfo=timezone.utc),
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(
+        healthy,
+        now=datetime(2026, 8, 25, 9, 1, tzinfo=timezone.utc),
+    )
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            ("failed", "ticker_identity_scheduler_failure"),
+            ("succeeded", "ticker_identity_scheduler_recovered"),
+        ]
+
+
+def test_scheduler_witness_write_failure_never_logs_raw_database_text(
+    tmp_path,
+    monkeypatch,
+    caplog,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            """
+            CREATE TRIGGER reject_ticker_identity_witness
+            BEFORE INSERT ON job_runs
+            WHEN NEW.job_name = 'ticker_identity.transitions'
+            BEGIN
+                SELECT RAISE(ABORT, 'private customer detail');
+            END
+            """
+        )
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+
+    persisted = scheduler.record_ticker_identity_scheduler_result(
+        _scheduler_result(
+            status="unavailable",
+            reason="profile_store_unavailable",
+        ),
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert persisted is False
+    assert "private customer detail" not in caplog.text
+    assert "profile_store_unavailable" in caplog.text
+
+
+def test_scheduler_failure_incident_ignores_successful_companion_churn(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    base = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+
+    for index in range(5):
+        assert scheduler.record_ticker_identity_scheduler_result(
+            _scheduler_result(
+                status="partial",
+                reason="transition_execution_failed",
+                applied=1,
+                transition_ids=[f"slt_ok_{index}", "slt_stuck"],
+                failed_transition_ids=["slt_stuck"],
+            ),
+            now=base,
+        )
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM job_runs WHERE job_name=?",
+            ("ticker_identity.transitions",),
+        ).fetchone() == (1,)
+
+
+def test_scheduler_malformed_summary_records_failure_instead_of_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    assert scheduler.record_ticker_identity_scheduler_result(
+        _scheduler_result(
+            status="unavailable",
+            reason="profile_store_unavailable",
+        ),
+        now=now,
+    )
+    impossible_success = _scheduler_result(
+        status="succeeded",
+        reason=None,
+        transition_ids=["slt_unaccounted"],
+    )
+
+    assert scheduler.record_ticker_identity_scheduler_result(
+        impossible_success,
+        now=now,
+    )
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,error,message FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "profile_store_unavailable",
+                "ticker_identity_scheduler_failure",
+            ),
+            (
+                "failed",
+                "ticker_identity_scheduler_failed",
+                "ticker_identity_scheduler_failure",
+            ),
+        ]
