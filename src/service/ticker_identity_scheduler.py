@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 import logging
 from pathlib import Path
@@ -67,25 +68,27 @@ def ticker_identity_scheduler_failure(reason: str) -> dict:
     return _empty_summary(status="unavailable", reason=reason)
 
 
-def _job_store():
-    """Open existing telemetry only; failure reporting must never create storage."""
+def _job_runs_connection() -> sqlite3.Connection | None:
+    """Open existing telemetry without any create-capable filesystem operation."""
 
     from src.app_records_store import resolve_profile_state_db_path
-    from src.service.job_runs_store import JobRunsLocalStore
 
     path = Path(resolve_profile_state_db_path(None))
-    if not path.is_file():
-        return None
+    conn: sqlite3.Connection | None = None
     try:
-        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as conn:
-            present = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_runs'"
-            ).fetchone()
+        conn = sqlite3.connect(
+            f"{path.resolve().as_uri()}?mode=rw",
+            uri=True,
+            timeout=5.0,
+            isolation_level=None,
+        )
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")
     except (OSError, sqlite3.Error):
+        if conn is not None:
+            conn.close()
         return None
-    if present is None:
-        return None
-    return JobRunsLocalStore(path)
+    return conn
 
 
 def _bounded_result(result: Mapping[str, object]) -> dict:
@@ -133,7 +136,89 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
         bounded["due"] != 0 or transition_ids
     ):
         raise ValueError("transition_ids")
+    if bounded["due"] != len(transition_ids):
+        raise ValueError("due")
+    terminal_count = (
+        bounded["applied"]
+        + bounded["needs_review"]
+        + bounded["already_applied"]
+        + len(failed_ids)
+    )
+    if bounded["due"] != terminal_count:
+        raise ValueError("due")
     return bounded
+
+
+def _failure_incident_key(result: Mapping[str, object]) -> tuple:
+    return (
+        result["status"],
+        result["reason"],
+        tuple(sorted(result["failed_transition_ids"])),
+    )
+
+
+def _stored_result(raw: object) -> dict | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            return None
+        return _bounded_result(parsed)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def _iso_at(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def _insert_witness(
+    conn: sqlite3.Connection,
+    *,
+    bounded: Mapping[str, object],
+    now: datetime,
+) -> None:
+    failed = bounded["status"] in {"partial", "unavailable"}
+    at = _iso_at(now)
+    conn.execute(
+        """
+        INSERT INTO job_runs (
+            job_name,status,trigger_source,payload,result,message,error,
+            started_at,finished_at,duration_ms,created_at,updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            _JOB_NAME,
+            "failed" if failed else "succeeded",
+            "scheduler",
+            "{}",
+            json.dumps(bounded, sort_keys=True, separators=(",", ":")),
+            (
+                "ticker_identity_scheduler_failure"
+                if failed
+                else "ticker_identity_scheduler_recovered"
+            ),
+            str(bounded["reason"]) if failed else None,
+            at,
+            at,
+            None,
+            at,
+            at,
+        ),
+    )
+
+
+def _log_witness_unavailable(bounded: Mapping[str, object]) -> None:
+    logger.warning(
+        "ticker identity scheduler witness unavailable status=%s reason=%s "
+        "failed_transition_ids=%s",
+        bounded["status"],
+        bounded["reason"],
+        ",".join(bounded["failed_transition_ids"]),
+    )
 
 
 def record_ticker_identity_scheduler_result(
@@ -143,76 +228,71 @@ def record_ticker_identity_scheduler_result(
 ) -> bool:
     """Persist one deduplicated failure or recovery when telemetry is writable."""
 
-    bounded = _bounded_result(result)
+    try:
+        bounded = _bounded_result(result)
+    except Exception:  # malformed runner output must become a typed witness
+        logger.warning("ticker identity scheduler returned an invalid result")
+        bounded = ticker_identity_scheduler_failure(
+            "ticker_identity_scheduler_failed"
+        )
     status = str(bounded["status"])
     if status == "not_installed":
         return True
 
-    try:
-        store = _job_store()
-    except Exception:  # telemetry must not stop provider scheduling
-        store = None
-    if store is None:
-        if status in {"partial", "unavailable"}:
-            logger.warning(
-                "ticker identity scheduler witness unavailable status=%s reason=%s "
-                "failed_transition_ids=%s",
-                status,
-                bounded["reason"],
-                ",".join(bounded["failed_transition_ids"]),
-            )
-            return False
-        return True
-
-    latest_rows = store.list_runs(job_name=_JOB_NAME, limit=1)
-    latest = latest_rows[0] if latest_rows else None
-    if status in {"partial", "unavailable"}:
-        if (
-            latest is not None
-            and latest.get("status") == "failed"
-            and latest.get("error") == bounded["reason"]
-            and latest.get("result") == bounded
-        ):
-            return True
-        run_id = store.record_completed_run(
-            _JOB_NAME,
-            status="failed",
-            started_at=now,
-            finished_at=now,
-            trigger_source="scheduler",
-            result=bounded,
-            message="ticker_identity_scheduler_failure",
-            error=str(bounded["reason"]),
-        )
-        if run_id is None:
-            logger.warning(
-                "ticker identity scheduler witness unavailable status=%s reason=%s "
-                "failed_transition_ids=%s",
-                status,
-                bounded["reason"],
-                ",".join(bounded["failed_transition_ids"]),
-            )
-            return False
-        return True
-
-    if latest is None or latest.get("status") != "failed":
-        return True
-    run_id = store.record_completed_run(
-        _JOB_NAME,
-        status="succeeded",
-        started_at=now,
-        finished_at=now,
-        trigger_source="scheduler",
-        result=bounded,
-        message="ticker_identity_scheduler_recovered",
-    )
-    if run_id is None:
-        logger.warning(
-            "ticker identity scheduler recovery witness unavailable reason=%s",
-            latest.get("error"),
-        )
+    conn = _job_runs_connection()
+    if conn is None:
+        _log_witness_unavailable(bounded)
         return False
-    return True
+
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        present = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_runs'"
+        ).fetchone()
+        if present is None:
+            conn.rollback()
+            if status in {"partial", "unavailable"}:
+                _log_witness_unavailable(bounded)
+                return False
+            return True
+        latest = conn.execute(
+            "SELECT status,result FROM job_runs WHERE job_name=? "
+            "ORDER BY id DESC LIMIT 1",
+            (_JOB_NAME,),
+        ).fetchone()
+        failed = status in {"partial", "unavailable"}
+        if failed:
+            latest_result = (
+                _stored_result(latest["result"])
+                if latest is not None and latest["status"] == "failed"
+                else None
+            )
+            if (
+                latest_result is not None
+                and _failure_incident_key(latest_result)
+                == _failure_incident_key(bounded)
+            ):
+                conn.commit()
+                return True
+            _insert_witness(conn, bounded=bounded, now=now)
+            conn.commit()
+            return True
+
+        if latest is None or latest["status"] != "failed":
+            conn.commit()
+            return True
+        _insert_witness(conn, bounded=bounded, now=now)
+        conn.commit()
+        return True
+    except (OSError, sqlite3.Error):
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+        _log_witness_unavailable(bounded)
+        return False
+    finally:
+        conn.close()
 
 
 def run_due_ticker_identity_transitions(
@@ -254,6 +334,18 @@ def run_due_ticker_identity_transitions(
                     )
                 ),
             )
+            status = str(result.get("status") or "")
+            if status == "applied":
+                summary["applied"] += 1
+            elif status == "already_applied":
+                summary["already_applied"] += 1
+            elif (
+                status == "blocked"
+                and result.get("transition", {}).get("status") == "needs_review"
+            ):
+                summary["needs_review"] += 1
+            else:
+                raise ValueError("unsupported_transition_result")
         except Exception as exc:  # one plan must never stop later plans
             logger.warning(
                 "ticker transition execution failed transition_id=%s code=%s",
@@ -262,22 +354,6 @@ def run_due_ticker_identity_transitions(
             )
             summary["failed_transition_ids"].append(transition_id)
             continue
-        status = str(result.get("status") or "")
-        if status == "applied":
-            summary["applied"] += 1
-        elif status == "already_applied":
-            summary["already_applied"] += 1
-        elif (
-            status == "blocked"
-            and result.get("transition", {}).get("status") == "needs_review"
-        ):
-            summary["needs_review"] += 1
-        else:
-            logger.warning(
-                "ticker transition returned unsupported status transition_id=%s",
-                transition_id,
-            )
-            summary["failed_transition_ids"].append(transition_id)
     if summary["failed_transition_ids"]:
         summary["status"] = "partial"
         summary["reason"] = "transition_execution_failed"
