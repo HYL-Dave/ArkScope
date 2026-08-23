@@ -1,0 +1,213 @@
+"""Additive profile-side schema for approved ticker identity transitions."""
+
+from __future__ import annotations
+
+import re
+import sqlite3
+
+
+TRANSITION_KINDS = frozenset({"symbol_continuation", "terminal_delisting"})
+TRANSITION_STATUSES = frozenset(
+    {"approved", "needs_review", "applied", "cancelled", "reversed"}
+)
+ATTEMPT_TRIGGERS = frozenset({"attended_user", "scheduler"})
+ATTEMPT_STATUSES = frozenset({"blocked", "applied", "already_applied", "reversed"})
+PRIORITY_RESOLUTIONS = frozenset({"source", "successor"})
+
+
+class TickerIdentitySchemaMismatch(RuntimeError):
+    """The ticker identity component is missing, extended, or drifted."""
+
+
+def _quoted(values: frozenset[str]) -> str:
+    return ", ".join(f"'{value}'" for value in sorted(values))
+
+
+IDENTITY_TABLE_SQL = {
+    "ticker_identity_transitions": f"""
+        CREATE TABLE ticker_identity_transitions (
+            transition_id TEXT PRIMARY KEY CHECK (length(transition_id) BETWEEN 1 AND 120),
+            case_id TEXT NOT NULL REFERENCES security_lifecycle_cases(case_id) ON DELETE CASCADE,
+            assessment_id TEXT NOT NULL REFERENCES security_lifecycle_assessments(assessment_id) ON DELETE RESTRICT,
+            proposal_ids_json TEXT NOT NULL CHECK (length(proposal_ids_json) BETWEEN 2 AND 8192),
+            transition_dedupe_key TEXT NOT NULL UNIQUE CHECK (length(transition_dedupe_key) BETWEEN 1 AND 500 AND instr(transition_dedupe_key, char(0)) = 0),
+            kind TEXT NOT NULL CHECK (kind IN ({_quoted(TRANSITION_KINDS)})),
+            status TEXT NOT NULL CHECK (status IN ({_quoted(TRANSITION_STATUSES)})),
+            source_ticker TEXT NOT NULL CHECK (length(source_ticker) BETWEEN 1 AND 20 AND instr(source_ticker, char(0)) = 0),
+            successor_ticker TEXT CHECK (successor_ticker IS NULL OR (length(successor_ticker) BETWEEN 1 AND 20 AND instr(successor_ticker, char(0)) = 0)),
+            execute_on TEXT NOT NULL CHECK (length(execute_on) = 10),
+            priority_resolution TEXT CHECK (priority_resolution IS NULL OR priority_resolution IN ({_quoted(PRIORITY_RESOLUTIONS)})),
+            unhide_successor INTEGER NOT NULL CHECK (unhide_successor IN (0, 1)),
+            approved_observation_fingerprint_sha256 TEXT NOT NULL CHECK (length(approved_observation_fingerprint_sha256) = 64),
+            approved_assessment_fingerprint_sha256 TEXT NOT NULL CHECK (length(approved_assessment_fingerprint_sha256) = 64),
+            approved_preview_sha256 TEXT NOT NULL CHECK (length(approved_preview_sha256) = 64),
+            approved_preview_json TEXT NOT NULL CHECK (length(approved_preview_json) BETWEEN 2 AND 65536),
+            before_snapshot_json TEXT CHECK (before_snapshot_json IS NULL OR length(before_snapshot_json) BETWEEN 2 AND 65536),
+            after_snapshot_sha256 TEXT CHECK (after_snapshot_sha256 IS NULL OR length(after_snapshot_sha256) = 64),
+            approved_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            applied_at TEXT,
+            cancelled_at TEXT,
+            reversed_at TEXT,
+            CHECK (
+                (kind = 'symbol_continuation' AND successor_ticker IS NOT NULL AND successor_ticker <> source_ticker)
+                OR (kind = 'terminal_delisting' AND successor_ticker IS NULL)
+            ),
+            CHECK (
+                kind = 'symbol_continuation'
+                OR (priority_resolution IS NULL AND unhide_successor = 0)
+            ),
+            CHECK (
+                (status IN ('approved', 'needs_review')
+                    AND before_snapshot_json IS NULL
+                    AND after_snapshot_sha256 IS NULL
+                    AND applied_at IS NULL
+                    AND cancelled_at IS NULL
+                    AND reversed_at IS NULL)
+                OR (status = 'applied'
+                    AND before_snapshot_json IS NOT NULL
+                    AND after_snapshot_sha256 IS NOT NULL
+                    AND applied_at IS NOT NULL
+                    AND cancelled_at IS NULL
+                    AND reversed_at IS NULL)
+                OR (status = 'cancelled'
+                    AND before_snapshot_json IS NULL
+                    AND after_snapshot_sha256 IS NULL
+                    AND applied_at IS NULL
+                    AND cancelled_at IS NOT NULL
+                    AND reversed_at IS NULL)
+                OR (status = 'reversed'
+                    AND before_snapshot_json IS NOT NULL
+                    AND after_snapshot_sha256 IS NOT NULL
+                    AND applied_at IS NOT NULL
+                    AND cancelled_at IS NULL
+                    AND reversed_at IS NOT NULL)
+            )
+        )
+    """,
+    "ticker_identity_transition_attempts": f"""
+        CREATE TABLE ticker_identity_transition_attempts (
+            attempt_id TEXT PRIMARY KEY CHECK (length(attempt_id) BETWEEN 1 AND 120),
+            transition_id TEXT NOT NULL REFERENCES ticker_identity_transitions(transition_id) ON DELETE CASCADE,
+            trigger TEXT NOT NULL CHECK (trigger IN ({_quoted(ATTEMPT_TRIGGERS)})),
+            status TEXT NOT NULL CHECK (status IN ({_quoted(ATTEMPT_STATUSES)})),
+            block_reasons_json TEXT NOT NULL CHECK (length(block_reasons_json) BETWEEN 2 AND 8192),
+            observed_preview_sha256 TEXT CHECK (observed_preview_sha256 IS NULL OR length(observed_preview_sha256) = 64),
+            attempted_at TEXT NOT NULL
+        )
+    """,
+    "ticker_identity_links": """
+        CREATE TABLE ticker_identity_links (
+            link_id TEXT PRIMARY KEY CHECK (length(link_id) BETWEEN 1 AND 120),
+            transition_id TEXT NOT NULL UNIQUE REFERENCES ticker_identity_transitions(transition_id) ON DELETE CASCADE,
+            source_ticker TEXT NOT NULL CHECK (length(source_ticker) BETWEEN 1 AND 20 AND instr(source_ticker, char(0)) = 0),
+            successor_ticker TEXT NOT NULL CHECK (length(successor_ticker) BETWEEN 1 AND 20 AND instr(successor_ticker, char(0)) = 0),
+            relationship TEXT NOT NULL CHECK (relationship = 'symbol_continuation'),
+            effective_date TEXT NOT NULL CHECK (length(effective_date) = 10),
+            created_at TEXT NOT NULL,
+            reversed_at TEXT,
+            CHECK (successor_ticker <> source_ticker)
+        )
+    """,
+}
+
+
+IDENTITY_INDEX_SQL = {
+    "idx_ticker_identity_transitions_due": """
+        CREATE INDEX idx_ticker_identity_transitions_due
+        ON ticker_identity_transitions(status, execute_on)
+    """,
+    "idx_ticker_identity_attempts_transition": """
+        CREATE INDEX idx_ticker_identity_attempts_transition
+        ON ticker_identity_transition_attempts(transition_id, attempted_at)
+    """,
+    "idx_ticker_identity_links_source": """
+        CREATE INDEX idx_ticker_identity_links_source
+        ON ticker_identity_links(source_ticker, reversed_at)
+    """,
+    "idx_ticker_identity_links_successor": """
+        CREATE INDEX idx_ticker_identity_links_successor
+        ON ticker_identity_links(successor_ticker, reversed_at)
+    """,
+}
+
+
+def create_ticker_identity_schema(conn: sqlite3.Connection) -> None:
+    """Create the component in a caller-owned profile connection."""
+
+    conn.execute("PRAGMA foreign_keys = ON")
+    with conn:
+        for statement in IDENTITY_TABLE_SQL.values():
+            conn.execute(statement)
+        for statement in IDENTITY_INDEX_SQL.values():
+            conn.execute(statement)
+
+
+def identity_schema_present(conn: sqlite3.Connection) -> bool:
+    """Return whether any ticker identity table exists without creating one."""
+
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' "
+        "AND name LIKE 'ticker_identity_%' LIMIT 1"
+    ).fetchone()
+    return row is not None
+
+
+def _normalize_sql(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+    normalized = normalized.replace("create table if not exists", "create table")
+    normalized = normalized.replace("create index if not exists", "create index")
+    normalized = normalized.replace("create unique index if not exists", "create unique index")
+    return normalized
+
+
+def verify_ticker_identity_connection(conn: sqlite3.Connection) -> None:
+    """Fail closed unless the caller-owned connection has the exact component."""
+
+    expected_tables = set(IDENTITY_TABLE_SQL)
+    actual_tables = {
+        str(row[0])
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name LIKE 'ticker_identity_%'"
+        )
+    }
+    if actual_tables != expected_tables:
+        raise TickerIdentitySchemaMismatch("ticker identity table set mismatch")
+
+    actual_indexes = {
+        str(row[0]): str(row[1])
+        for row in conn.execute(
+            "SELECT name,sql FROM sqlite_master WHERE type='index' "
+            "AND name LIKE 'idx_ticker_identity_%' AND sql IS NOT NULL"
+        )
+    }
+    if set(actual_indexes) != set(IDENTITY_INDEX_SQL):
+        raise TickerIdentitySchemaMismatch("ticker identity index set mismatch")
+
+    for name, expected_sql in IDENTITY_TABLE_SQL.items():
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)
+        ).fetchone()
+        if row is None or _normalize_sql(row[0]) != _normalize_sql(expected_sql):
+            raise TickerIdentitySchemaMismatch(f"ticker identity table mismatch: {name}")
+
+    for name, expected_sql in IDENTITY_INDEX_SQL.items():
+        if _normalize_sql(actual_indexes[name]) != _normalize_sql(expected_sql):
+            raise TickerIdentitySchemaMismatch(f"ticker identity index mismatch: {name}")
+
+    if conn.execute("PRAGMA foreign_key_check").fetchall():
+        raise TickerIdentitySchemaMismatch("ticker identity foreign key mismatch")
+
+
+__all__ = [
+    "ATTEMPT_STATUSES",
+    "ATTEMPT_TRIGGERS",
+    "PRIORITY_RESOLUTIONS",
+    "TRANSITION_KINDS",
+    "TRANSITION_STATUSES",
+    "TickerIdentitySchemaMismatch",
+    "create_ticker_identity_schema",
+    "identity_schema_present",
+    "verify_ticker_identity_connection",
+]
