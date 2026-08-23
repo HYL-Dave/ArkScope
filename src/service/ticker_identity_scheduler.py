@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 from datetime import datetime, timezone
 import logging
 from pathlib import Path
 import sqlite3
-from typing import Mapping
 from zoneinfo import ZoneInfo
 
 from src.api.permissions import require_profile_state_write
@@ -92,6 +92,8 @@ def _job_runs_connection() -> sqlite3.Connection | None:
 
 
 def _bounded_result(result: Mapping[str, object]) -> dict:
+    if not isinstance(result, Mapping):
+        raise ValueError("result")
     status = str(result.get("status") or "")
     if status not in _RUNNER_STATUSES:
         raise ValueError("status")
@@ -175,14 +177,33 @@ def _iso_at(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
+def _witness_started_at(value: datetime, not_before: object) -> str:
+    candidate = value
+    if candidate.tzinfo is None:
+        candidate = candidate.replace(tzinfo=timezone.utc)
+    candidate = candidate.astimezone(timezone.utc)
+    if isinstance(not_before, str):
+        try:
+            boundary = datetime.fromisoformat(not_before.replace("Z", "+00:00"))
+            if boundary.tzinfo is None:
+                boundary = boundary.replace(tzinfo=timezone.utc)
+            boundary = boundary.astimezone(timezone.utc)
+            if boundary > candidate:
+                candidate = boundary
+        except ValueError:
+            pass
+    return _iso_at(candidate)
+
+
 def _insert_witness(
     conn: sqlite3.Connection,
     *,
     bounded: Mapping[str, object],
     now: datetime,
+    not_before: object,
 ) -> None:
     failed = bounded["status"] in {"partial", "unavailable"}
-    at = _iso_at(now)
+    at = _witness_started_at(now, not_before)
     conn.execute(
         """
         INSERT INTO job_runs (
@@ -256,7 +277,7 @@ def record_ticker_identity_scheduler_result(
                 return False
             return True
         latest = conn.execute(
-            "SELECT status,result FROM job_runs WHERE job_name=? "
+            "SELECT status,result,started_at FROM job_runs WHERE job_name=? "
             "ORDER BY id DESC LIMIT 1",
             (_JOB_NAME,),
         ).fetchone()
@@ -274,14 +295,24 @@ def record_ticker_identity_scheduler_result(
             ):
                 conn.commit()
                 return True
-            _insert_witness(conn, bounded=bounded, now=now)
+            _insert_witness(
+                conn,
+                bounded=bounded,
+                now=now,
+                not_before=latest["started_at"] if latest is not None else None,
+            )
             conn.commit()
             return True
 
         if latest is None or latest["status"] != "failed":
             conn.commit()
             return True
-        _insert_witness(conn, bounded=bounded, now=now)
+        _insert_witness(
+            conn,
+            bounded=bounded,
+            now=now,
+            not_before=latest["started_at"],
+        )
         conn.commit()
         return True
     except (OSError, sqlite3.Error):
@@ -334,6 +365,8 @@ def run_due_ticker_identity_transitions(
                     )
                 ),
             )
+            if not isinstance(result, Mapping):
+                raise ValueError("unsupported_transition_result")
             status = str(result.get("status") or "")
             if status == "applied":
                 summary["applied"] += 1
