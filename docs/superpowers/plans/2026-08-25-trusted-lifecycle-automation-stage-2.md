@@ -100,7 +100,7 @@ Stage 2 stores the complete destination vocabulary but does not emit an automati
 
 **Primary files:** `src/security_lifecycle_schema.py`, `src/ticker_identity_schema.py`, `src/security_lifecycle_investigation.py`, `src/security_lifecycle_manual_evidence.py`, `src/ticker_identity_transition.py`, `src/ticker_identity_service.py`, their schema/core tests.
 
-- [ ] Add the six schema additions and evolve the four named exact-schema owners before product edits.
+- [ ] Add the six schema additions and evolve every named T1 owner before product edits. The exact-schema owners establish V2 authority; the investigation owners replace dormant Tavily vocabulary with the surviving attended/manual contract without weakening their original assertions.
 - [ ] Run only schema/core nodes and record exact RED. Expected failures are missing tables/columns/vocabulary/coherence, never fixture SQL syntax.
 - [ ] Preserve named `V1_PROFILE_TABLE_SQL`, `V1_PROFILE_INDEX_SQL`, `verify_v1_profile_connection`, `V1_IDENTITY_TABLE_SQL`, `V1_IDENTITY_INDEX_SQL`, and `verify_v1_ticker_identity_connection`; current unqualified builders/verifiers become V2 only.
 - [ ] Implement all §Schema Mapping Authority objects and constraints. JSON columns are bounded and validated canonically by application code; digest columns require 64 lowercase hex characters, not length alone.
