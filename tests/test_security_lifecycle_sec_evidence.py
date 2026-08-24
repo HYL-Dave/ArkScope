@@ -1,0 +1,278 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import date, timedelta
+from pathlib import Path
+
+
+_FIXTURE = Path(__file__).parent / "fixtures" / "security_lifecycle_automation_sec.json"
+
+
+def _case(name: str) -> dict:
+    payload = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+    assert payload["fixture_kind"] == "synthetic_sec_source_shape"
+    return payload["cases"][name]
+
+
+def _submissions(case: dict, *, filings: list[dict] | None = None) -> dict:
+    rows = filings or [case["filing"]]
+    fields = (
+        "form",
+        "filingDate",
+        "accessionNumber",
+        "primaryDocument",
+        "primaryDocDescription",
+        "items",
+        "cik",
+        "ticker",
+    )
+    recent = {field: [row.get(field, "") for row in rows] for field in fields}
+    return {
+        "cik": case["observation"]["cik"],
+        "name": case["observation"]["issuer_name"],
+        "filings": {"recent": recent},
+    }
+
+
+class _FixtureTransport:
+    def __init__(self, case: dict, *, filings: list[dict] | None = None):
+        self.case = case
+        self.submissions = _submissions(case, filings=filings)
+        self.calls: list[tuple[str, object]] = []
+
+    def get_json(self, url: str, *, budget=None, **_kwargs):
+        encoded = json.dumps(self.submissions, separators=(",", ":")).encode()
+        if budget is not None:
+            budget.reserve_attempt()
+            budget.record_body(len(encoded))
+        self.calls.append(("json", budget))
+        return self.submissions
+
+    def get(self, url: str, *, budget=None, document=False, max_bytes=None, **_kwargs):
+        from data_sources.sec_transport import SecResponse
+
+        assert document is True
+        body = self.case["document"].encode()
+        if budget is not None:
+            budget.reserve_document(max_bytes or budget.max_document_bytes)
+            budget.reserve_attempt()
+            available = budget.available_body_bytes(max_bytes or len(body))
+            if len(body) > available:
+                from data_sources.sec_transport import SecTransportFailure
+
+                raise SecTransportFailure("sec_request_budget_exhausted")
+            budget.record_body(len(body))
+        self.calls.append(("document", budget))
+        return SecResponse(200, body, "utf-8")
+
+
+def _context(name: str):
+    from src.security_lifecycle_sec_evidence import build_identity_context
+
+    case = _case(name)
+    return build_identity_context(
+        case_id=case["case_id"],
+        observation=case["observation"],
+        ticker_aliases=case["aliases"],
+        ibkr_conids=case["conids"],
+    )
+
+
+def _collect(name: str):
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case(name)
+    transport = _FixtureTransport(case)
+    result = collect_sec_evidence(
+        context=_context(name),
+        transport=transport,
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+    return case, transport, result
+
+
+def _values(result, fact_type: str) -> set[str]:
+    return {fact.value for fact in result.facts if fact.fact_type == fact_type}
+
+
+def test_identity_context_uses_cik_aliases_and_bounded_dates_never_ticker_alone():
+    from src.security_lifecycle_sec_evidence import select_filing_chain
+
+    context = _context("HAPN")
+    assert context.cik == "0001409970"
+    assert context.ticker_aliases == ("HAPN", "LC")
+    assert context.ibkr_conids == (112233,)
+    assert context.primary_start == "2026-05-28"
+    assert context.primary_end == "2026-08-11"
+
+    case = _case("HAPN")
+    good = dict(case["filing"], ticker="LC")
+    wrong_identity = dict(
+        case["filing"],
+        accessionNumber="0009999999-26-000001",
+        cik="0009999999",
+        ticker="HAPN",
+    )
+    selected = select_filing_chain(context, _submissions(case, filings=[wrong_identity, good]))
+    assert [item.accession for item in selected.filings] == [good["accessionNumber"]]
+
+
+def test_chain_uses_primary_window_and_at_most_one_120_day_widening():
+    from src.security_lifecycle_sec_evidence import select_filing_chain
+
+    context = _context("HAPN")
+    case = _case("HAPN")
+    anchor = date.fromisoformat(context.filing_date)
+
+    primary = dict(case["filing"], filingDate=str(anchor + timedelta(days=40)))
+    result = select_filing_chain(context, _submissions(case, filings=[primary]))
+    assert result.window == "primary"
+    assert result.widen_count == 0
+
+    widened = dict(case["filing"], filingDate=str(anchor + timedelta(days=90)))
+    result = select_filing_chain(context, _submissions(case, filings=[widened]))
+    assert result.window == "widened_120_day"
+    assert result.widen_count == 1
+
+    outside = dict(case["filing"], filingDate=str(anchor + timedelta(days=121)))
+    result = select_filing_chain(context, _submissions(case, filings=[outside]))
+    assert result.filings == ()
+    assert result.window == "widened_120_day"
+    assert result.widen_count == 1
+    assert result.blockers == ("sec_evidence_insufficient",)
+
+
+def test_chain_admits_only_reviewed_identity_forms_and_same_cik():
+    from src.security_lifecycle_sec_evidence import select_filing_chain
+
+    context = _context("HAPN")
+    case = _case("HAPN")
+    base = case["filing"]
+
+    def row(form, accession, *, items="", cik="0001409970"):
+        return dict(
+            base,
+            form=form,
+            accessionNumber=accession,
+            primaryDocument=f"{accession}.htm",
+            items=items,
+            cik=cik,
+        )
+
+    rows = [
+        row("25-NSE", "a"),
+        row("8-K/A", "b", items="3.01"),
+        row("8-A12B", "c"),
+        row("8-K12B", "d"),
+        row("DEFM14A", "e"),
+        row("8-K", "f", items="2.01"),
+        row("8-K", "g", items="5.02"),
+        row("10-K", "h"),
+        row("25", "i", cik="0009999999"),
+    ]
+    selected = select_filing_chain(context, _submissions(case, filings=rows))
+    assert {item.accession for item in selected.filings} == {"a", "b", "c", "d", "e", "f"}
+
+
+def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts():
+    case, transport, result = _collect("HAPN")
+    assert result.blockers == ()
+    assert len(result.evidence) == 1
+    evidence = result.evidence[0]
+    assert len(evidence.excerpt.encode("utf-8")) <= 4096
+    assert evidence.content_sha256 == hashlib.sha256(evidence.excerpt.encode()).hexdigest()
+    assert evidence.document_sha256 == hashlib.sha256(case["document"].encode()).hexdigest()
+    assert evidence.source_locator["accession"] == case["filing"]["accessionNumber"]
+    assert evidence.source_locator["rule_version"] == "1"
+    assert transport.calls[0][1] is transport.calls[1][1]
+
+    for fact in result.facts:
+        assert fact.evidence_id == evidence.evidence_id
+        cited = evidence.excerpt.encode()[fact.span_start_byte : fact.span_end_byte]
+        assert cited.decode() == fact.cited_text
+        assert fact.cited_text_sha256 == hashlib.sha256(cited).hexdigest()
+
+
+def test_hapn_fixture_extracts_symbol_and_venue_change_without_a_to_a_transition():
+    _case_data, _transport, result = _collect("HAPN")
+    assert _values(result, "source_ticker") == {"LC"}
+    assert _values(result, "successor_ticker") == {"HAPN"}
+    assert _values(result, "source_venue") == {"NYSE"}
+    assert _values(result, "destination_venue") == {"NASDAQ"}
+    assert _values(result, "effective_date") == {"2026-06-27"}
+    assert _values(result, "tracked_security_effect") == {"symbol_and_venue_change"}
+    assert ("HAPN", "HAPN") not in result.symbol_transitions
+    assert result.symbol_transitions == (("LC", "HAPN"),)
+
+
+def test_qbts_fixture_extracts_venue_only_with_unchanged_symbol():
+    _case_data, _transport, result = _collect("QBTS")
+    assert _values(result, "source_ticker") == {"QBTS"}
+    assert _values(result, "successor_ticker") == set()
+    assert _values(result, "source_venue") == {"NYSE"}
+    assert _values(result, "destination_venue") == {"NASDAQ"}
+    assert _values(result, "tracked_security_effect") == {"venue_change_only"}
+    assert result.symbol_transitions == ()
+
+
+def test_ccl_fixture_extracts_no_tracked_security_identity_change():
+    _case_data, _transport, result = _collect("CCL")
+    assert _values(result, "source_ticker") == {"CCL"}
+    assert _values(result, "successor_ticker") == set()
+    assert _values(result, "transaction_structure") == {"corporate_unification"}
+    assert _values(result, "tracked_security_effect") == {"no_identity_change"}
+    assert result.symbol_transitions == ()
+
+
+def test_blbd_fixture_extracts_asset_acquisition_without_registrant_change():
+    _case_data, _transport, result = _collect("BLBD")
+    assert _values(result, "source_ticker") == {"BLBD"}
+    assert _values(result, "successor_ticker") == set()
+    assert _values(result, "transaction_structure") == {"asset_acquisition"}
+    assert _values(result, "tracked_security_effect") == {
+        "asset_acquisition_no_registrant_change"
+    }
+    assert result.symbol_transitions == ()
+
+
+def test_incompatible_current_values_emit_typed_conflicts_not_majority():
+    from dataclasses import replace
+
+    from src.security_lifecycle_sec_evidence import detect_fact_conflicts
+
+    _case_data, _transport, result = _collect("HAPN")
+    successor = next(f for f in result.facts if f.fact_type == "successor_ticker")
+    facts = (*result.facts, successor, replace(successor, value="WRONG"))
+    assert detect_fact_conflicts(facts) == {
+        "successor_ticker": ("HAPN", "WRONG")
+    }
+
+
+def test_chain_stops_at_shared_request_document_and_byte_budgets():
+    from data_sources.sec_transport import SecRequestBudget
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("HAPN")
+    duplicate = dict(
+        case["filing"],
+        accessionNumber="0001409970-26-000132",
+        primaryDocument="lc-20260628.htm",
+    )
+    transport = _FixtureTransport(case, filings=[case["filing"], duplicate])
+    budget = SecRequestBudget(
+        max_attempts=3,
+        max_documents=1,
+        max_document_bytes=1_048_576,
+        max_total_bytes=12 * 1_048_576,
+    )
+    result = collect_sec_evidence(
+        context=_context("HAPN"),
+        transport=transport,
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+        budget=budget,
+    )
+    assert result.blockers == ("sec_request_budget_exhausted",)
+    assert len(result.evidence) == 1
+    assert [kind for kind, _budget in transport.calls] == ["json", "document"]
+    assert {id(shared) for _kind, shared in transport.calls} == {id(budget)}

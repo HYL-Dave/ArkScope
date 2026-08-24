@@ -1,0 +1,106 @@
+{
+  "fixture_kind": "synthetic_sec_source_shape",
+  "notice": "All filing text in this fixture is synthetic test data, not captured live SEC source bytes.",
+  "cases": {
+    "HAPN": {
+      "case_id": "case-hapn",
+      "observation": {
+        "ticker": "HAPN",
+        "cik": "1409970",
+        "issuer_name": "Happify Network, Inc.",
+        "filing_date": "2026-06-27",
+        "source_ref": "0001409970-26-000131",
+        "filing_form": "8-K",
+        "filing_items": ["3.01"],
+        "event_kinds": ["listing_status_review"]
+      },
+      "aliases": ["LC", "HAPN"],
+      "conids": [112233],
+      "filing": {
+        "form": "8-K",
+        "filingDate": "2026-06-27",
+        "accessionNumber": "0001409970-26-000131",
+        "primaryDocument": "lc-20260627.htm",
+        "primaryDocDescription": "Current report",
+        "items": "3.01",
+        "cik": "0001409970"
+      },
+      "document": "<html><body>CIK 0001409970. The same common stock will transfer from the New York Stock Exchange to the Nasdaq Global Select Market and begin trading under the new ticker symbol HAPN, replacing LC, effective June 27, 2026.</body></html>"
+    },
+    "QBTS": {
+      "case_id": "case-qbts",
+      "observation": {
+        "ticker": "QBTS",
+        "cik": "1907982",
+        "issuer_name": "Quantum Systems, Inc.",
+        "filing_date": "2026-08-05",
+        "source_ref": "0001907982-26-000055",
+        "filing_form": "8-K",
+        "filing_items": ["3.01"],
+        "event_kinds": ["listing_status_review"]
+      },
+      "aliases": ["QBTS"],
+      "conids": [223344],
+      "filing": {
+        "form": "8-K",
+        "filingDate": "2026-08-05",
+        "accessionNumber": "0001907982-26-000055",
+        "primaryDocument": "qbts-20260805.htm",
+        "primaryDocDescription": "Current report",
+        "items": "3.01",
+        "cik": "0001907982"
+      },
+      "document": "<html><body>CIK 0001907982. The same common stock will transfer from the New York Stock Exchange to the Nasdaq Capital Market effective August 5, 2026 and will continue to trade under ticker symbol QBTS.</body></html>"
+    },
+    "CCL": {
+      "case_id": "case-ccl",
+      "observation": {
+        "ticker": "CCL",
+        "cik": "815097",
+        "issuer_name": "Carnival Corporation & plc",
+        "filing_date": "2026-08-01",
+        "source_ref": "0000815097-26-000099",
+        "filing_form": "8-K",
+        "filing_items": ["2.01"],
+        "event_kinds": ["acquisition_completed", "listing_status_review"]
+      },
+      "aliases": ["CCL"],
+      "conids": [334455],
+      "filing": {
+        "form": "8-K",
+        "filingDate": "2026-08-01",
+        "accessionNumber": "0000815097-26-000099",
+        "primaryDocument": "ccl-20260801.htm",
+        "primaryDocDescription": "Current report",
+        "items": "2.01",
+        "cik": "0000815097"
+      },
+      "document": "<html><body>CIK 0000815097. The corporate unification was completed. CCL common stock continues to trade under ticker symbol CCL, and the filing states that there is no tracked-security identity change.</body></html>"
+    },
+    "BLBD": {
+      "case_id": "case-blbd",
+      "observation": {
+        "ticker": "BLBD",
+        "cik": "1589526",
+        "issuer_name": "Blue Bird Corporation",
+        "filing_date": "2026-07-15",
+        "source_ref": "0001589526-26-000077",
+        "filing_form": "8-K",
+        "filing_items": ["2.01"],
+        "event_kinds": ["acquisition_completed"]
+      },
+      "aliases": ["BLBD"],
+      "conids": [445566],
+      "filing": {
+        "form": "8-K",
+        "filingDate": "2026-07-15",
+        "accessionNumber": "0001589526-26-000077",
+        "primaryDocument": "blbd-20260715.htm",
+        "primaryDocDescription": "Current report",
+        "items": "2.01",
+        "cik": "0001589526"
+      },
+      "document": "<html><body>CIK 0001589526. The transaction is an asset acquisition. The registrant Blue Bird Corporation and its BLBD common stock are unchanged, so the transaction does not change the tracked security identity.</body></html>"
+    }
+  }
+}
