@@ -512,7 +512,7 @@ Evolve `TestSkillRegistry.test_all_skills_have_required_fields` without adding a
 
 Apply these exact replacements:
 
-- earnings-prep, full-analysis, sector-rotation, earnings-analysis, idea-generation, comps-analysis, and dcf-model: remove `tavily_search`; retain their existing SEC/news/analyst/SA/price tools.
+- earnings-prep, full-analysis, sector-rotation, earnings-analysis, idea-generation, comps-analysis, and dcf-model: remove `tavily_search`; retain their existing SEC/news/analyst/SA/price tools. The Task 6 RED also exposed the pre-existing required `get_iv_analysis` reference in earnings-prep after that tool was retired by `0c458aab`; replace that required source with the live `get_option_chain` tool so the packaged-skill invariant is truthful.
 - catalyst-calendar: replace required `tavily_search` with `get_ticker_news` and describe local news as corroboration.
 - competitive-analysis: replace required `tavily_search` with `get_peer_comparison` and `get_ticker_news`; keep fundamentals required.
 
