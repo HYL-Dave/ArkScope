@@ -7,6 +7,7 @@ import pytest
 
 IDENTITY_TABLES = {
     "ticker_identity_links",
+    "ticker_identity_transition_activity",
     "ticker_identity_transition_attempts",
     "ticker_identity_transitions",
 }
@@ -15,6 +16,8 @@ IDENTITY_INDEXES = {
     "idx_ticker_identity_attempts_transition",
     "idx_ticker_identity_links_source",
     "idx_ticker_identity_links_successor",
+    "idx_ticker_identity_activity_transition",
+    "idx_ticker_identity_activity_unacknowledged",
     "idx_ticker_identity_transitions_due",
 }
 
@@ -61,8 +64,9 @@ def _seed_case_and_assessment(conn: sqlite3.Connection) -> None:
         "INSERT INTO security_lifecycle_assessments "
         "(assessment_id,case_id,revision,status,relevance,confidence,author,"
         "conclusion,impact_summary,successor_ticker,effective_date,"
-        "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at,"
+        "acceptance_authority) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             "sla_1",
             "slc_case",
@@ -79,6 +83,7 @@ def _seed_case_and_assessment(conn: sqlite3.Connection) -> None:
             "b" * 64,
             "2026-08-23T00:00:00Z",
             "2026-08-23T00:00:00Z",
+            "human",
         ),
     )
 
@@ -95,6 +100,10 @@ def _insert_transition(
     applied_at: str | None = None,
     cancelled_at: str | None = None,
     reversed_at: str | None = None,
+    approval_authority: str = "attended_user",
+    automation_policy_version: str | None = None,
+    rule_id: str | None = None,
+    rule_version: str | None = None,
 ) -> None:
     conn.execute(
         "INSERT INTO ticker_identity_transitions "
@@ -104,8 +113,10 @@ def _insert_transition(
         "approved_observation_fingerprint_sha256,"
         "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
         "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
-        "approved_at,updated_at,applied_at,cancelled_at,reversed_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+        "approval_authority,automation_policy_version,rule_id,rule_version,"
+        "decision_provenance_sha256) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             transition_id,
             "slc_case",
@@ -130,6 +141,11 @@ def _insert_transition(
             applied_at,
             cancelled_at,
             reversed_at,
+            approval_authority,
+            automation_policy_version,
+            rule_id,
+            rule_version,
+            "e" * 64,
         ),
     )
 
@@ -174,6 +190,11 @@ def test_identity_schema_is_additive_exact_and_foreign_key_clean(tmp_path):
             "applied_at",
             "cancelled_at",
             "reversed_at",
+            "approval_authority",
+            "automation_policy_version",
+            "rule_id",
+            "rule_version",
+            "decision_provenance_sha256",
         ]
         assert _columns(conn, "ticker_identity_transition_attempts") == [
             "attempt_id",
@@ -193,6 +214,23 @@ def test_identity_schema_is_additive_exact_and_foreign_key_clean(tmp_path):
             "effective_date",
             "created_at",
             "reversed_at",
+        ]
+        assert _columns(conn, "ticker_identity_transition_activity") == [
+            "activity_id",
+            "transition_id",
+            "activity_type",
+            "source_ticker",
+            "successor_ticker",
+            "effective_date",
+            "user_owned_changes_json",
+            "provider_owned_retained_json",
+            "state_sha256",
+            "rule_id",
+            "rule_version",
+            "decision_provenance_sha256",
+            "occurred_at",
+            "acknowledged_at",
+            "created_at",
         ]
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
@@ -339,6 +377,18 @@ def test_identity_schema_enforces_closed_shapes_and_coherent_terminal_states(tmp
                 transition_id="tit_applied_without_snapshot",
                 status="applied",
                 applied_at="2026-08-24T00:00:00Z",
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_transition(
+                conn,
+                transition_id="tit_unknown_authority",
+                approval_authority="scheduler",
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_transition(
+                conn,
+                transition_id="tit_automation_without_rule",
+                approval_authority="automation_policy",
             )
 
         conn.execute(

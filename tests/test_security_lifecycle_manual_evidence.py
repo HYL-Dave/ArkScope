@@ -53,9 +53,11 @@ def test_manual_adapter_adds_bounded_text_and_https_urls_with_zero_network(
             item["evidence_id"]: item for item in store.list_evidence(case_id)
         }
         assert evidence[text_id]["kind"] == "manual_text"
+        assert evidence[text_id]["source_family"] == "manual"
         assert evidence[text_id]["excerpt"] == "x" * 16_000
         assert evidence[text_id]["source_url"] is None
         assert evidence[url_id]["kind"] == "manual_url"
+        assert evidence[url_id]["source_family"] == "manual"
         assert evidence[url_id]["source_url"] == (
             "https://example.com/issuer-notice"
         )

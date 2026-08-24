@@ -13,7 +13,11 @@ MARKET_TABLES = {
 PROFILE_TABLES = {
     "security_lifecycle_cases",
     "security_lifecycle_investigation_runs",
+    "security_lifecycle_automation_runs",
+    "security_lifecycle_automation_run_blockers",
     "security_lifecycle_evidence",
+    "security_lifecycle_automation_facts",
+    "security_lifecycle_evidence_translations",
     "security_lifecycle_assessments",
     "security_lifecycle_assessment_outcomes",
     "security_lifecycle_assessment_evidence",
@@ -101,6 +105,8 @@ def test_profile_schema_matches_the_exact_case_evidence_and_proposal_contract(tm
             "evidence_id",
             "case_id",
             "run_id",
+            "automation_run_id",
+            "source_family",
             "kind",
             "source_url",
             "title",
@@ -111,6 +117,9 @@ def test_profile_schema_matches_the_exact_case_evidence_and_proposal_contract(tm
             "adapter",
             "excerpt",
             "content_sha256",
+            "source_document_sha256",
+            "source_locator_json",
+            "evidence_dedupe_key",
             "mime_type",
             "document_status",
             "created_at",
@@ -169,23 +178,45 @@ def test_profile_foreign_keys_and_closed_vocabularies_reject_invalid_rows(tmp_pa
                 "2026-08-20T00:00:00Z",
             ),
         )
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO security_lifecycle_investigation_runs "
+                "(run_id,case_id,trigger,adapter,status,query_plan_json,query_count,"
+                "result_count,fetch_count,usage_json,failure_code,finished_at,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    "run_retired",
+                    "slc_case",
+                    "attended_user",
+                    "tavily",
+                    "failed",
+                    "[]",
+                    0,
+                    None,
+                    0,
+                    "{}",
+                    "adapter_unavailable",
+                    "2026-08-20T00:00:00Z",
+                    "2026-08-20T00:00:00Z",
+                ),
+            )
         conn.execute(
             "INSERT INTO security_lifecycle_investigation_runs "
             "(run_id,case_id,trigger,adapter,status,query_plan_json,query_count,"
             "result_count,fetch_count,usage_json,failure_code,finished_at,created_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
-                "run_usage",
+                "run_manual_failure",
                 "slc_case",
                 "attended_user",
-                "tavily",
+                "manual",
                 "failed",
                 "[]",
                 0,
                 None,
                 0,
                 "{}",
-                "usage_limit_reached",
+                "adapter_unavailable",
                 "2026-08-20T00:00:00Z",
                 "2026-08-20T00:00:00Z",
             ),
@@ -200,7 +231,7 @@ def test_profile_foreign_keys_and_closed_vocabularies_reject_invalid_rows(tmp_pa
                     "run_unknown",
                     "slc_case",
                     "attended_user",
-                    "tavily",
+                    "manual",
                     "failed",
                     "[]",
                     0,

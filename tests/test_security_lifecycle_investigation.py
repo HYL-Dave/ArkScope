@@ -207,6 +207,10 @@ def test_accepting_assessment_requires_conclusion_citation_and_human_author(tmp_
         accepted = _accept(store, _draft(store, case_id))
         assert accepted["status"] == "accepted"
         assert accepted["author"] == "human"
+        assert accepted["acceptance_authority"] == "human"
+        assert accepted["automation_method"] is None
+        assert accepted["automation_run_id"] is None
+        assert accepted["decision_provenance_sha256"] is None
     finally:
         conn.close()
 
@@ -396,6 +400,10 @@ def test_draft_accept_and_supersede_preserve_version_history(tmp_path):
         ]
         assert history[1]["accepted_at"] == _LATER
         assert history[1]["superseded_at"] == _LATER
+        assert [item["acceptance_authority"] for item in history] == [
+            "human",
+            "human",
+        ]
         projected = store.project_proposals(
             case_id,
             observation_fingerprint_sha256=_FINGERPRINT,
@@ -436,15 +444,15 @@ def test_failed_run_alone_cannot_acknowledge_a_case(tmp_path):
         run_id = store.create_investigation_run(
             case_id=case_id,
             trigger="attended_user",
-            adapter="tavily",
-            query_plan=["EA delisting"],
+            adapter="manual",
+            query_plan=[],
             at=_AT,
         )
         store.start_investigation_run(run_id, at=_AT)
         store.fail_investigation_run(
             run_id,
-            failure_code="network_error",
-            usage={"requests": 0},
+            failure_code="adapter_unavailable",
+            usage={},
             at=_LATER,
         )
         with pytest.raises(ValueError, match="investigation evidence"):
@@ -610,6 +618,14 @@ def test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary(tmp_pat
             store.create_investigation_run(
                 case_id=case_id,
                 trigger="scheduled",
+                adapter="manual",
+                query_plan=[],
+                at=_AT,
+            )
+        with pytest.raises(ValueError, match="adapter"):
+            store.create_investigation_run(
+                case_id=case_id,
+                trigger="attended_user",
                 adapter="tavily",
                 query_plan=[],
                 at=_AT,
@@ -759,8 +775,8 @@ def test_successful_zero_result_run_can_support_inconclusive_acknowledgement(tmp
         run_id = store.create_investigation_run(
             case_id=case_id,
             trigger="attended_user",
-            adapter="tavily",
-            query_plan=["EA listing status"],
+            adapter="manual",
+            query_plan=[],
             at=_AT,
         )
         store.start_investigation_run(run_id, at=_AT)
@@ -768,7 +784,7 @@ def test_successful_zero_result_run_can_support_inconclusive_acknowledgement(tmp
             run_id,
             result_count=0,
             fetch_count=0,
-            usage={"search_requests": 1},
+            usage={},
             at=_LATER,
         )
         acknowledgement_id = store.acknowledge_case(

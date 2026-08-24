@@ -572,6 +572,11 @@ def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_
 
         assert first["transition_id"] == repeated["transition_id"]
         assert first["status"] == "approved"
+        assert first["approval_authority"] == "attended_user"
+        assert first["automation_policy_version"] is None
+        assert first["rule_id"] is None
+        assert first["rule_version"] is None
+        assert first["decision_provenance_sha256"] == _ASSESSMENT_FINGERPRINT
         assert first["proposal_ids"] == ["slp_1"]
         assert first["approved_preview"] == preview
         assert store.list_due(on_date="2026-08-24", limit=10) == []
