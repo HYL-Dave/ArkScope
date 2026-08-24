@@ -1,11 +1,11 @@
 # ArkScope Provider Catalog (canonical)
 
-**Date**: 2026-06-04
-**Status**: CANONICAL provider authority (draft pending reviewer adoption — all 11 connected-provider entries complete; gpt-5.5 round-2 refinements folded in). Second of three canonical docs (ProductSpec → **ProviderCatalog** → ToolCatalog).
+**Date**: 2026-08-24
+**Status**: CANONICAL provider authority (nine connected-provider entries plus one retired-provider record). Second of three canonical docs (ProductSpec → **ProviderCatalog** → ToolCatalog).
 
 **Authority**: this doc owns **per-provider facts** — what each data source gives, its latency/streaming, history depth, cost, auth/config, limits, quirks, what it's good/bad for, and the **app Settings fields** that expose it. Architecture/storage = `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`; product/agent boundaries = `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`; the registry tools that *consume* these providers = `ARKSCOPE_TOOL_CATALOG.md`.
 
-> 中文摘要：每個資料源的「能拿什麼／延遲／是否即時／歷史多深／費用／怎麼設定／限制／適合做什麼」一覽，直接餵 app Settings UI。價格一律帶 `verified_at`，且**以來源文件日期為準、未重新上網查證**（見 §0.2）。**基本盤＝IBKR＋Seeking Alpha＋web search（含政治/國際/戰爭等一般時事），其餘為支援層**（見 §0.4）。
+> 中文摘要：每個資料源的「能拿什麼／延遲／是否即時／歷史多深／費用／怎麼設定／限制／適合做什麼」一覽，直接餵 app Settings UI。價格一律帶 `verified_at`，且**以來源文件日期為準、未重新上網查證**（見 §0.2）。**基本盤＝IBKR＋SEC EDGAR＋Seeking Alpha；一般搜尋只是在明確資料缺口下可選用的補查能力，不是基本盤**（見 §0.4）。
 
 ---
 
@@ -19,8 +19,8 @@ Every full entry carries these fields:
 
 Three fields use **controlled vocabularies** (added round-2 so future readers don't misread the catalog):
 
-- **`implementation_status`** ∈ `live` (wired + usable now) · `optional-live` (wired but paid / toggle-gated, may be off) · `protected-pipeline` (the SA extension→native-host path — operational, **must not break**) · `planned` (catalogued, not yet wired) · `reference-only`. Guards against "appears in catalog ⇒ fully productised."
-- **`connected_via`** — the concrete wiring: a `data_sources/<client>.py`, a `src/tools/<tool>.py`, the `extension→native-host` pipeline, or `planned settings`. Makes explicit that the 11 providers are *not* the same kind of thing (local socket vs public REST vs scraped vs tool).
+- **`implementation_status`** ∈ `live` (wired + usable now) · `optional-live` (wired but paid / toggle-gated, may be off) · `protected-pipeline` (the SA extension→native-host path — operational, **must not break**) · `planned` (catalogued, not yet wired) · `reference-only` · `retired` (no current request path; retained only to explain stored history). Guards against "appears in catalog ⇒ fully productised."
+- **`connected_via`** — the concrete wiring: a `data_sources/<client>.py`, a `src/tools/<tool>.py`, the `extension→native-host` pipeline, or `planned settings`. Makes explicit that cataloged providers are *not* the same kind of thing (local socket vs public REST vs scraped vs tool).
 - **`streaming`** ∈ `none` · `realtime_quote` (live last price, **no** bar stream) · `realtime_bars` (streamed OHLC — **charting-grade**) · `websocket_streaming` · `extension_capture` (scraped, not a feed). **Charting feasibility derives from this**: only `realtime_bars` / `websocket_streaming` support stable low-latency price/volume charts. Per ProductSpec §5, **only IBKR clears this bar in-stack.** *This is a fact about the **currently-connected stack**, not a permanent market claim — if Polygon/Massive or another provider is later wired as true `realtime_bars` / `websocket_streaming`, update its enum value and this line.*
 
 ### 0.2 Freshness rule (IMPORTANT — read before trusting any price)
@@ -38,18 +38,23 @@ Three fields use **controlled vocabularies** (added round-2 so future readers do
 | **Fundamentals** | SEC EDGAR (free), IBKR (snapshot ratios), Financial Datasets (paid), EODHD |
 | **Macro / calendar** | FRED (macro series), Finnhub (earnings/IPO/economic calendar) |
 | **Curated research (scraped)** | Seeking Alpha — Alpha Picks + comments + market news, via browser extension → Native Messaging host (PROTECTED; not an API) |
-| **Web / world search (agent)** | Tavily |
+| **Web / world search (agent)** | No connected provider. Provider-neutral hosted adapters are planned and task-gated. |
 
 ### 0.4 Foundation tier (基本盤 — already in use) vs supporting providers
 
-The project's **load-bearing sources are the three already in daily use.** The catalog will grow, but **incrementally** — a few well-known providers at a time — NOT via another research-everything-first sweep like the project's past.
+The project's **load-bearing sources are structured, provider-native evidence**.
+The catalog will grow incrementally — a few well-known providers at a time —
+not through another research-everything-first sweep.
 
 | Tier | Providers | Why |
 |------|-----------|-----|
-| **Foundation (基本盤)** | **IBKR** (everything obtainable, free + paid) · **Seeking Alpha** (everything knowable via capture) · **web search** (Tavily — general world context: politics / international / geopolitics / war, **not finance-only**) | Already in use; the real spine of the product |
-| **Supporting** | Polygon · Finnhub · Alpha Vantage · EODHD · SEC EDGAR · Financial Datasets · FRED | Fallbacks, breadth, free fundamentals, macro — valuable but swappable |
+| **Foundation (基本盤)** | **IBKR** (market/contract/account facts) · **SEC EDGAR** (issuer filings and authoritative lifecycle evidence) · **Seeking Alpha** (captured research/news/community context) | Structured and source-labelled evidence already used by core workflows |
+| **Supporting** | Polygon · Finnhub · Alpha Vantage · EODHD · Financial Datasets · FRED | Fallbacks, breadth, fundamentals, macro — valuable but admitted per proven gap |
 
-**Effort priority follows this**: strengthen **IBKR + SA + web-search** coverage first; treat the supporting tier as fallback/enrichment. New providers enter as "supporting" unless they deepen the foundation.
+**Effort priority follows this**: strengthen structured internal/provider coverage
+first. General search is optional fallback/context only after a provider-neutral
+adapter proves its capability, provenance, cost, and evidence contract. New data
+providers enter as "supporting" unless they deepen the foundation.
 
 ### 0.5 Provider Admission Tiers (which providers to wire, in what order)
 
@@ -57,17 +62,20 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 
 | Tier | Definition | Current members | Policy |
 |------|-----------|-----------------|--------|
-| **0 — Foundation** | The basic spine, already in daily use | IBKR (free Gateway access), Seeking Alpha, Tavily | Strengthen stability + UX **first**; everything else is secondary |
-| **1 — Free / Free-Enough** | Fully free, or free quota sufficient for personal use | SEC EDGAR, FRED/ALFRED, Finnhub, Alpha Vantage* | **Prioritise into Settings** — near-zero cost to admit. *(\*Alpha Vantage free = 25 req/day, quota-constrained — admit but flag.)* |
+| **0 — Foundation** | The basic structured-evidence spine, already in daily use | IBKR (Gateway access), SEC EDGAR, Seeking Alpha | Strengthen stability + UX **first**; everything else is secondary |
+| **1 — Free / Free-Enough** | Fully free, or free quota sufficient for personal use | FRED/ALFRED, Finnhub, Alpha Vantage* | **Prioritise into Settings** — near-zero cost to admit. *(\*Alpha Vantage free = 25 req/day, quota-constrained — admit but flag.)* |
 | **2 — Cheap High-Value** | Cheap, fills an obvious gap or has hard-to-replace data | Polygon/Massive (~$29), EODHD ($19.99–99), Financial Datasets (PAYG ~$30), **IBKR paid streaming add-on (~$4.50)** | Admit when the gap is real; gate spend via `metered_spend` / paid toggles |
 | **3 — Expensive / Specialist** | Pricey but unique: deep options flow, institutional fundamentals, alt-data, international markets, fixed-income / commodity / crypto | *(none connected yet)* | **Do NOT pre-connect** — pulled only by an explicit feature requirement |
 | **Reject / Defer** | High overlap with existing data, unstable API, licensing friction, free quota too low to use, un-cacheable, or high Settings complexity for low analytic gain | — | Document the reason; revisit only if conditions change |
 
-**Admission principle**: the 10 current providers already cover Tiers 0–2 and are **enough to build the desktop shell + ToolCatalog** — no new survey now. New providers enter as Tier 1/2 "supporting" unless they deepen the foundation (Tier 0).
+**Admission principle**: the current structured providers cover Tiers 0–2 and
+are enough to build the desktop shell + ToolCatalog. New providers enter as Tier
+1/2 "supporting" unless they deepen the foundation; general-search adapters are
+admitted separately as task capabilities, not presumed data foundations.
 
 ---
 
-## 1. Provider summary table (all 10 connected sources)
+## 1. Provider summary table (nine connected sources + one retired record)
 
 > One-line orientation; full entries below. **Streaming** column shows the §0.1 enum + whether it's charting-grade. **Status** = §0.1 `implementation_status`.
 
@@ -82,7 +90,7 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 | **Financial Datasets** | optional-live (paid, toggle) | US equities (fundamentals) | `none` | quarterly/annual/TTM | paid ≈$30/mo | fundamentals fallback; unique **Segmented Revenue** | 2026-01 |
 | **FRED** | live | macro series | `none` | decades | **free** | macro w/ **point-in-time** (anti-lookahead) | 2026-04 |
 | **Seeking Alpha** | **protected-pipeline** | US equities (curated) | `extension_capture` | per-capture | account + extension | **Alpha Picks**, **comment intelligence**, SA news | 2026-05 |
-| **Tavily** | live | **web / world** (any topic) | `none` (live fetch) | live | paid; free 1000 credits/mo | **general web/world context** (incl. politics/geopolitics) | 2026-03 |
+| **Tavily** | **retired 2026-08-24** | historical web/world search evidence only | `none` | retained stored history | no current runtime spend | no current request path | 2026-08 |
 
 ---
 
@@ -305,39 +313,43 @@ dated evaluations and git history are context, not runnable integration assets.
 | **source_links** | `docs/design/SA_EXTENSION_ROADMAP.md`, `docs/design/SA_ALPHA_PICKS_CONTENT_CAPTURE.md`, `docs/design/SA_COMMENT_INTELLIGENCE_PLAN.md`, `data_sources/DATA_SOURCE_QUIRKS.md`. |
 | **app_settings_fields** | `sa.enabled` (toggle), extension install status (read-only), native-host health (read-only ping), last-refresh timestamp. (No key field — account-gated in-browser.) |
 
-### 3.10 Tavily (web / world search) **[FOUNDATION]**
+### 3.10 Tavily (web / world search) **[RETIRED 2026-08-24]**
 
 | Field | Value |
 |-------|-------|
-| **provider** | Tavily. Surfaced as agent tools `web_search` / `web_fetch` (`src/tools/web_tools.py`); cataloged here as an external source. |
-| **implementation_status** | **live** (foundation tier). |
-| **connected_via** | `src/tools/web_tools.py` (tool, lazy-init client). |
-| **asset_classes** | **Web / world (any topic)** — deliberately **not finance-only**. |
-| **data_types** | Keyword web search with AI summary; URL content extraction (paginated). Covers **general world context: politics, international affairs, geopolitics, war** — events that move markets but aren't in financial feeds. |
-| **history_depth** | Live web. |
-| **latency** | Real-time fetch. |
+| **provider** | Tavily, retained here only to identify historical stored investigation runs/evidence. |
+| **implementation_status** | **retired** on 2026-08-24. |
+| **connected_via** | No current request path. The generic tools, lifecycle adapter/route/UI, reducer, dependency, and runtime configuration were removed together. |
+| **asset_classes** | Historical web/world search evidence only. |
+| **data_types** | Previously keyword search and URL extraction; no current product command emits new Tavily evidence. |
+| **history_depth** | Existing stored history remains readable; no new fetches. |
+| **latency** | Not applicable. |
 | **streaming** | `none` (request/response fetch). |
-| **cost** | API key; **free 1000 credits/mo**, paid above. Billable → heavy use gated by `metered_spend`; the egress itself gated by `external_web_access` (ProductSpec §4.3). |
-| **auth/config** | `TAVILY_API_KEY`. Config flag `tavily: true`. |
-| **limits** | Credit-based monthly quota. |
-| **known_quirks** | Subject to **`external_web_access`** gate (network egress), distinct from `external_browser_automation`. It is a search/fetch API, **not** browser automation — do not conflate with the deferred CloakBrowser spike or the SA extension. |
-| **best_for** | **General world/geopolitical context** + filling gaps local providers can't (breaking news, qualitative context, primary-source lookup). A foundation source — basic, broad situational awareness. |
-| **not_good_for** | Structured/authoritative financial data (the providers above are better + cheaper). |
-| **verified_at** | 2026-03. |
-| **source_links** | `config/user_profile.yaml` (`tavily: true`), `src/tools/web_tools.py`. |
-| **app_settings_fields** | `tavily.enabled` (toggle), `tavily.api_key` (secret), quota/credits status (read-only). |
+| **cost** | No current runtime spend. Historical pricing is not a current product contract. |
+| **auth/config** | None in tracked current configuration. User-owned untracked secret cleanup is a separate action. |
+| **limits** | Not applicable. |
+| **known_quirks** | The lifecycle schema retains the literal adapter value solely so any historical rows remain valid and inspectable; retention is not a live capability. |
+| **best_for** | No current use. Future general search is provider-neutral hosted-adapter work and remains optional/fallback. |
+| **not_good_for** | Any structured fact already available from SEC, IBKR, local news, or another source-specific provider. |
+| **verified_at** | 2026-08-24 retirement. |
+| **source_links** | `docs/superpowers/plans/2026-08-24-tavily-retirement.md`; Git history for removed implementation. |
+| **app_settings_fields** | None. |
 
 ---
 
 ## 4. Composition guidance (why the stack has overlap)
 
-The providers are **deliberately layered** for fallback + cross-validation — this drives the agent's source-selection and the Settings "which providers do I need?" UX. **Foundation sources (IBKR, SA, Tavily) are the spine; the rest fill specific gaps:**
+The providers are deliberately layered for fallback and cross-validation. The
+structured foundation (IBKR, SEC EDGAR, and Seeking Alpha) is the spine; the
+rest fill specific gaps:
 
 - **Prices**: real-time = **IBKR**; historical and qualified completed-session bars = local `market_data.db` through the DAL.
 - **Fundamentals**: local IBKR snapshot → SEC EDGAR (free) → Financial Datasets (paid, cached).
 - **News**: **IBKR** (real-time, shallow) + Polygon (deep archive + AI sentiment) + Finnhub (quick, ~7d) — different depth/latency trade-offs.
 - **Macro/calendar**: FRED (series) + Finnhub (events).
 - **Curated**: **Seeking Alpha** (Alpha Picks + community signal) — unique, not API-replaceable.
-- **World context**: **Tavily** (politics / international / geopolitics, beyond finance feeds).
+- **World context**: future provider-neutral hosted search may supply optional
+  context when structured/internal sources leave a typed gap; it is not a
+  current provider or a prerequisite for ordinary research.
 
 This composition is what lets the agent **prefer provider-native signals** (ProductSpec §3) and pick the right source per question — and it tells the Settings UI which providers are foundational vs optional (§0.4).

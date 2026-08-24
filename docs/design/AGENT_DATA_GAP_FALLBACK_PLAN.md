@@ -6,18 +6,19 @@
 
 ## 1. Why This Exists
 
-The agent already has many data tools, including SEC EDGAR tools and web-search
-tools. The gap found on 2026-06-19 is not "no tool exists"; it is that a failed
-data primitive does not always produce a structured reason or trigger a reliable
-fallback path.
+The agent already has many structured data tools, including SEC EDGAR, local
+news, and provider-backed market-data tools. The gap found on 2026-06-19 is not
+"no tool exists"; it is that a failed data primitive does not always produce a
+structured reason or trigger a reliable fallback path.
 
 Concrete trigger:
 
 - Sidecar log showed `SEC_CONTACT_EMAIL not set`.
 - SEC lookup for `SNDK` failed with `Could not find CIK for SNDK`.
 - SEC-dependent tools repeated `No SEC data found for SNDK`.
-- Web search was available to the agent, but no deterministic workflow required
-  it to resolve the missing CIK or fill the evidence gap.
+- At the time, general web search was available to the agent, but no
+  deterministic workflow required it to resolve the missing CIK or fill the
+  evidence gap.
 
 For a research workbench, this must be explicit. Missing data is acceptable;
 silent repetition, ambiguous empty results, and unsupported speculation are not.
@@ -32,8 +33,10 @@ Current code behavior:
 - SEC ticker-to-CIK lookup currently returns empty on a miss and logs a warning.
 - `SEC_CONTACT_EMAIL` is read from env/config and missing values use a
   placeholder User-Agent, which can be rejected or rate-limited by SEC.
-- Tavily web tools and provider-native web-search tools are registered for the
-  agent, but they are model-selected tools, not a forced tool-level fallback.
+- Tavily search/fetch retired on 2026-08-24. No current registry tool provides
+  general search; `web_browse` remains a separately gated browser-automation
+  capability, not a search fallback. Provider-neutral hosted-search adapters
+  remain future work and must declare support per provider/auth/harness path.
 
 Current prompt behavior:
 
@@ -47,12 +50,13 @@ Data primitives should return structured absence, not only empty arrays or stder
 logs. Agent orchestration can then decide whether to:
 
 1. retry with a resolved identifier,
-2. use a lower-fidelity web/evidence fallback,
+2. use an enabled, lower-fidelity external-evidence fallback,
 3. show a visible data gap, or
 4. stop and say the evidence is insufficient.
 
-The agent may use web search, but critical fallback paths should not depend only
-on the model remembering to do so.
+General search may be allowed for a task, but critical fallback paths must first
+use structured internal/provider sources and must not depend only on the model
+remembering to search.
 
 ## 4. Scope
 
@@ -61,7 +65,8 @@ on the model remembering to do so.
 - SEC User-Agent/contact hygiene.
 - Structured SEC failure reasons.
 - Ticker/CIK identity resolution.
-- Web-search fallback for missing filings/fundamentals evidence.
+- A provider-neutral hosted-search fallback policy for typed evidence gaps;
+  implementation remains separately reviewed and capability-gated.
 - Per-turn deduping so the same failed SEC lookup is not repeated several times.
 - Agent-facing evidence-gap messages that are visible in AI Research.
 - Tests that prove fallback behavior without live SEC/web calls.
@@ -132,23 +137,25 @@ Acceptance:
 - A CIK miss produces one resolver attempt, one structured result, and no repeated
   blind SEC retries in the same turn.
 
-### Slice DG-3 — Web Evidence Fallback Policy
+### Slice DG-3 — External Evidence Fallback Policy
 
-Goal: make web search a controlled fallback, not an accidental model choice.
+Goal: make general search a controlled, provider-neutral fallback rather than an
+accidental model choice or a substitute for structured provider data.
 
 Tasks:
 
-- Add prompt/tool policy: if SEC returns `cik_not_found` or
-  `sec_rejected_or_rate_limited` and the user asks for filings/fundamentals or an
-  unexplained event, call web search or explicitly report insufficient evidence.
+- Add prompt/tool policy: if structured SEC, identity, and enabled provider
+  sources return a typed evidence gap, use general search only when the selected
+  provider/auth/harness path supports it and task policy allows it; otherwise
+  explicitly report insufficient evidence.
 - Prefer source-specific queries such as `"<ticker> SEC CIK 10-K"` and company
   investor-relations pages before broad news queries.
 - Keep web results lower confidence than structured SEC data.
 
 Acceptance:
 
-- A missing SEC identity can lead to a visible web-search attempt or a visible
-  refusal to speculate.
+- A missing SEC identity can lead to a visible general-search attempt through a
+  supported adapter or a visible refusal to speculate.
 - Web evidence is labeled as web-derived, not SEC-derived.
 
 ### Slice DG-4 — Data-Gap Telemetry

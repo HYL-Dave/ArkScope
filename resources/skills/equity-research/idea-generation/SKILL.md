@@ -8,7 +8,7 @@ category: equity-research
 auto_apply: false
 data_sources:
   required: [get_sector_performance, get_watchlist_overview]
-  optional: [tavily_search, get_sa_alpha_picks, get_ticker_news, get_price_change]
+  optional: [get_sa_alpha_picks, get_ticker_news, get_price_change]
 output: report
 ---
 
@@ -24,9 +24,8 @@ combining quantitative screening with qualitative analysis.
 1. **get_sector_performance** — Identify sectors with momentum or mean-reversion potential
 2. **get_watchlist_overview** — Current holdings context to avoid overlap
 3. **get_sa_alpha_picks** — Seeking Alpha curated picks with ratings
-4. **tavily_search** — Thematic trends, emerging sectors, contrarian opportunities
-5. **get_ticker_news** — Recent catalysts for screened candidates
-6. **get_price_change** — Price momentum/value screening for candidates
+4. **get_ticker_news** — Recent catalysts for screened candidates
+5. **get_price_change** — Price momentum/value screening for candidates
 
 ## Workflow
 

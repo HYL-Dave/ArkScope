@@ -1,8 +1,8 @@
 # ArkScope Tool Catalog (canonical)
 
-**Updated**: 2026-08-21
+**Updated**: 2026-08-24
 **Status**: CANONICAL current registry authority
-**Live registry**: 52 tools; agent bridges add `delegate_to_subagent` for 53
+**Live registry**: 50 tools; agent bridges add `delegate_to_subagent` for 51
 
 This document describes the current `ToolRegistry`, not removed implementations
 or possible future products. Historical catalog versions remain recoverable from
@@ -27,7 +27,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 
 ## 1. Live registry
 
-### 1.1 All 52 tools
+### 1.1 All 50 tools
 
 | Tool | Category | Parameters | Current role |
 |---|---|---|---|
@@ -110,11 +110,13 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 
 ### 1.4 Retire-adapt
 
-The former ArkScope scoring, composite recommendation, offline RL, and Phase D
-recommendation-shaped implementations are retired. Git history is their only
-archive. Reintroducing a capability requires a new reviewed semantic and current
-data/provider contract; it must not restore old modules, tables, fields, prompts,
-or aliases.
+The former ArkScope scoring, composite recommendation, offline RL, Phase D
+recommendation-shaped implementations, and Tavily search/fetch request surfaces
+are retired. Tavily retired on 2026-08-24; historical lifecycle run rows remain
+readable, but no registry tool or lifecycle command can issue a new request. Git
+history is the implementation archive. Reintroducing a capability requires a
+new reviewed semantic and current data/provider contract; it must not restore
+old modules, tables, fields, prompts, or aliases.
 
 The following concepts remain intentional future work, without runnable legacy
 scaffolds:

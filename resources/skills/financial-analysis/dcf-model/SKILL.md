@@ -7,7 +7,7 @@ aliases: [dcf, valuation]
 category: financial-analysis
 data_sources:
   required: [get_detailed_financials, get_fundamentals_analysis]
-  optional: [get_sec_filings, tavily_search, get_analyst_consensus]
+  optional: [get_sec_filings, get_analyst_consensus]
 output: report
 ---
 
@@ -24,7 +24,6 @@ to estimate intrinsic value and margin of safety.
 2. **get_fundamentals_analysis** — Current market data (market cap, shares outstanding)
 3. **get_sec_filings** — Management guidance, segment data, capex plans
 4. **get_analyst_consensus** — Consensus estimates for revenue/earnings growth
-5. **tavily_search** — Industry growth rates, WACC benchmarks, recent analyst models
 
 ## Workflow
 

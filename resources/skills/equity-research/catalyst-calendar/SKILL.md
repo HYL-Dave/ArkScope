@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [catalysts, cat]
 category: equity-research
 data_sources:
-  required: [get_analyst_consensus, tavily_search]
-  optional: [get_sec_filings, get_ticker_news, get_iv_analysis, get_earnings_impact]
+  required: [get_analyst_consensus, get_ticker_news]
+  optional: [get_sec_filings, get_iv_analysis, get_earnings_impact]
 output: report
 ---
 
@@ -21,16 +21,15 @@ assess their potential impact, and provide a timeline for monitoring.
 ## Data Source Priority
 
 1. **get_analyst_consensus** — Earnings dates, estimate revisions, price target changes
-2. **tavily_search** — Product launches, FDA decisions, conferences, regulatory events
-3. **get_ticker_news** — Recent announcements and upcoming events
-4. **get_sec_filings** — Scheduled filings, shareholder meetings, proxy events
-5. **get_iv_analysis** — Options market pricing of upcoming events
-6. **get_earnings_impact** — Historical earnings reaction patterns
+2. **get_ticker_news** — Corroborate recent announcements, product launches, regulatory decisions, conferences, and other dated events in ArkScope's local news store
+3. **get_sec_filings** — Scheduled filings, shareholder meetings, proxy events
+4. **get_iv_analysis** — Options market pricing of upcoming events
+5. **get_earnings_impact** — Historical earnings reaction patterns
 
 ## Workflow
 
 ### Step 1: Event Discovery
-Search for upcoming catalysts across categories:
+Review available structured and local-news evidence for upcoming catalysts across categories:
 
 **Scheduled Events**:
 - Earnings report date (next and following quarter)

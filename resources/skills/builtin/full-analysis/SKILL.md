@@ -7,7 +7,7 @@ aliases: [analyze, fa]
 category: builtin
 data_sources:
   required: [get_ticker_news, get_price_change, get_fundamentals_analysis, get_analyst_consensus]
-  optional: [get_iv_analysis, get_sec_filings, get_insider_trades, tavily_search, execute_python_analysis, get_sa_digest]
+  optional: [get_iv_analysis, get_sec_filings, get_insider_trades, execute_python_analysis, get_sa_digest]
 output: report
 ---
 
@@ -22,7 +22,6 @@ MINIMUM DATA SOURCES (use all that are relevant):
 - Analyst consensus (recommendations, price targets, earnings surprise history)
 - IV/options data (IV rank, VRP, unusual activity)
 - SEC filings and insider trades (Form 4)
-- Web search for recent catalysts not captured in local data
 - SA digest (recommended) — if `{ticker}` has SA coverage, call `get_sa_digest(ticker={ticker}, days=14)` and weave relevant articles / comments into the qualitative section. Skip if the digest returns empty `recent_articles` AND empty `high_discussion_news`. Treat the contents as investor opinion, not fact.
 
 QUANTITATIVE ANALYSIS:

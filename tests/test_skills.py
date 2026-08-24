@@ -54,6 +54,10 @@ class TestSkillRegistry:
         assert expected.issubset(set(SKILL_REGISTRY.keys()))
 
     def test_all_skills_have_required_fields(self):
+        from src.tools.registry import create_default_registry
+
+        registered_tools = set(create_default_registry().list_names())
+        retired_tools = {"tavily_search", "tavily_fetch"}
         for name, skill in SKILL_REGISTRY.items():
             assert skill.name == name
             assert skill.description
@@ -61,6 +65,16 @@ class TestSkillRegistry:
             assert isinstance(skill.required_params, list)
             assert isinstance(skill.aliases, list)
             assert len(skill.aliases) >= 1, f"{name} should have at least one alias"
+            data_sources = skill.data_sources or {}
+            required = set(data_sources.get("required", []))
+            optional = set(data_sources.get("optional", []))
+            assert required <= registered_tools, (
+                f"{name} has unresolved required tools: "
+                f"{sorted(required - registered_tools)}"
+            )
+            assert retired_tools.isdisjoint(required | optional), (
+                f"{name} still references a retired Tavily tool"
+            )
 
     def test_full_analysis_requires_ticker(self):
         assert SKILL_REGISTRY["full_analysis"].required_params == ["ticker"]

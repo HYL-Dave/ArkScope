@@ -7,7 +7,7 @@ aliases: [earnings_review, er]
 category: equity-research
 data_sources:
   required: [get_detailed_financials, get_analyst_consensus]
-  optional: [get_sec_filings, get_earnings_impact, tavily_search, get_ticker_news]
+  optional: [get_sec_filings, get_earnings_impact, get_ticker_news]
 output: report
 ---
 
@@ -25,7 +25,6 @@ identify trends, and evaluate forward guidance against expectations.
 3. **get_earnings_impact** — Price reaction and historical earnings patterns
 4. **get_sec_filings** — Actual 10-Q/10-K for detailed segment data
 5. **get_ticker_news** — Post-earnings analyst commentary
-6. **tavily_search** — Earnings call transcript highlights, management commentary
 
 ## Workflow
 

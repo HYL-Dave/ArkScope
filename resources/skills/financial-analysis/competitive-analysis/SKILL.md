@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [competitive, moat]
 category: financial-analysis
 data_sources:
-  required: [get_fundamentals_analysis, tavily_search]
-  optional: [get_detailed_financials, get_peer_comparison, get_sec_filings]
+  required: [get_fundamentals_analysis, get_peer_comparison, get_ticker_news]
+  optional: [get_detailed_financials, get_sec_filings]
 output: report
 ---
 
@@ -20,9 +20,9 @@ durability of competitive advantages (moat), and identify emerging threats.
 
 ## Data Source Priority
 
-1. **tavily_search** — Industry reports, competitor news, market share data
-2. **get_fundamentals_analysis** — Financial metrics for comparison
-3. **get_peer_comparison** — Quantitative peer benchmarking
+1. **get_fundamentals_analysis** — Financial metrics for comparison
+2. **get_peer_comparison** — Quantitative peer benchmarking
+3. **get_ticker_news** — Company-specific competitive developments in ArkScope's local news store
 4. **get_detailed_financials** — Margin trends, R&D intensity, SBC
 5. **get_sec_filings** — Management commentary on competition, risk factors
 
@@ -34,7 +34,8 @@ durability of competitive advantages (moat), and identify emerging threats.
   - Direct competitors (same product/service)
   - Indirect competitors (substitute products)
   - Potential entrants (adjacent companies expanding)
-- Search for recent industry reports and market share data
+- Use SEC competition disclosures, peer metrics, and local news to identify
+  reported market-share changes and competitive developments
 
 ### Step 2: Moat Assessment (Porter's Five Forces + Buffett Framework)
 Evaluate each moat source:

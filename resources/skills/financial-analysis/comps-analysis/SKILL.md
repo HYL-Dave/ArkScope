@@ -7,7 +7,7 @@ aliases: [comps, comp]
 category: financial-analysis
 data_sources:
   required: [get_fundamentals_analysis, get_detailed_financials]
-  optional: [tavily_search, get_sec_filings, get_peer_comparison]
+  optional: [get_sec_filings, get_peer_comparison]
 output: report
 ---
 
@@ -24,7 +24,6 @@ and comparing valuation multiples to determine relative value.
 2. **get_fundamentals_analysis** — IBKR snapshot (P/E, P/B, P/S, market cap, real-time)
 3. **get_peer_comparison** — Pre-built peer group with comparative metrics
 4. **get_sec_filings** — Recent 10-K/10-Q for segment data and guidance
-5. **tavily_search** — Industry reports, recent analyst notes on peer group
 
 ## Workflow
 
