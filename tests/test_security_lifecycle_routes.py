@@ -12,22 +12,6 @@ _AT = "2026-08-20T00:00:00Z"
 _SOURCE_REF = "0000712515-26-000042"
 
 
-class _SearchAdapter:
-    identity = "tavily"
-
-    def __init__(self):
-        self.search_calls: list[tuple[str, int]] = []
-        self.fetch_calls: list[str] = []
-
-    def search(self, *, query, max_results):
-        self.search_calls.append((query, max_results))
-        return {"results": [], "usage": {"search_requests": 1}}
-
-    def fetch(self, *, target, max_bytes, redirect_guard):
-        self.fetch_calls.append(target.url)
-        return None
-
-
 def _build_context(
     tmp_path,
     *,
@@ -105,7 +89,7 @@ def _build_context(
     }
 
 
-def _client(context, monkeypatch, *, adapter=None, permissions=None):
+def _client(context, monkeypatch, *, permissions=None):
     from src.api import dependencies
     from src.api.routes import security_lifecycle as routes
 
@@ -117,22 +101,10 @@ def _client(context, monkeypatch, *, adapter=None, permissions=None):
     app.dependency_overrides[dependencies.get_security_lifecycle_store] = (
         lambda: context["store"]
     )
-    search_adapter = adapter or _SearchAdapter()
-    app.dependency_overrides[dependencies.get_security_lifecycle_search_adapter] = (
-        lambda: search_adapter
-    )
-    app.dependency_overrides[dependencies.get_security_lifecycle_resolver] = (
-        lambda: (lambda _host: ("93.184.216.34",))
-    )
     monkeypatch.setattr(routes, "_utc_now", lambda: _AT)
     if permissions is not None:
         monkeypatch.setattr(routes, "require_db_write", permissions)
-        monkeypatch.setattr(
-            routes,
-            "require_permission",
-            lambda permission, action, detail: permissions(action, detail),
-        )
-    return TestClient(app), search_adapter
+    return TestClient(app)
 
 
 def _add_manual(client, case_id):
@@ -170,7 +142,7 @@ def _create_draft(client, context, evidence_id):
 def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
-        client, _ = _client(context, monkeypatch)
+        client = _client(context, monkeypatch)
         evidence_id = _add_manual(client, context["case_id"])
         assessment_id = _create_draft(client, context, evidence_id)
         response = client.post(
@@ -192,7 +164,7 @@ def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, m
 def test_acknowledge_and_reopen_routes_preserve_distinct_workflow_commands(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
-        client, _ = _client(context, monkeypatch)
+        client = _client(context, monkeypatch)
         _add_manual(client, context["case_id"])
         acknowledged = client.post(
             f"/security-lifecycle/cases/{context['case_id']}/acknowledgements",
@@ -234,7 +206,6 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("POST", "/security-lifecycle/cases/{case_id}/acknowledgements"),
         ("POST", "/security-lifecycle/cases/{case_id}/assessments"),
         ("POST", "/security-lifecycle/cases/{case_id}/evidence"),
-        ("POST", "/security-lifecycle/cases/{case_id}/investigations"),
         ("GET", "/security-lifecycle/cases/{case_id}/transition-preview"),
         ("POST", "/security-lifecycle/cases/{case_id}/approve-transition"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/cancel"),
@@ -242,7 +213,11 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("POST", "/security-lifecycle/transitions/{transition_id}/reverse"),
     }
     assert expected <= rows
-    assert len(rows) == 185
+    assert len(rows) == 184
+    assert (
+        "POST",
+        "/security-lifecycle/cases/{case_id}/investigations",
+    ) not in rows
     assert {
         ("GET", "/market-data/security-lifecycle"),
         ("PUT", "/market-data/security-lifecycle/events/{event_id}"),
@@ -253,7 +228,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
 def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
-        client, _ = _client(context, monkeypatch)
+        client = _client(context, monkeypatch)
         evidence_id = _add_manual(client, context["case_id"])
         assessment_id = _create_draft(client, context, evidence_id)
         assert client.post(
@@ -276,7 +251,7 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
 def test_case_list_composes_both_stores_in_stable_order_without_read_side_writes(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
-        client, _ = _client(context, monkeypatch)
+        client = _client(context, monkeypatch)
         before = (
             hashlib.sha256(context["market_path"].read_bytes()).hexdigest(),
             hashlib.sha256(context["profile_path"].read_bytes()).hexdigest(),
@@ -336,7 +311,7 @@ def test_case_write_routes_call_db_write_before_persistence(tmp_path, monkeypatc
         calls.append(action)
 
     try:
-        client, _ = _client(context, monkeypatch, permissions=permission)
+        client = _client(context, monkeypatch, permissions=permission)
         assert context["profile_conn"].execute(
             "SELECT COUNT(*) FROM security_lifecycle_cases"
         ).fetchone()[0] == 0
@@ -360,17 +335,12 @@ def test_case_write_routes_call_db_write_before_persistence(tmp_path, monkeypatc
         assert client.post(
             f"/security-lifecycle/action-proposals/{proposal_id}/dismiss"
         ).status_code == 200
-        assert client.post(
-            f"/security-lifecycle/cases/{context['case_id']}/investigations",
-            json={"adapter": "tavily"},
-        ).status_code == 200
         assert calls.count("security_lifecycle_add_evidence") == 1
         assert calls.count("security_lifecycle_create_assessment") == 1
         assert calls.count("security_lifecycle_accept_assessment") == 1
         assert calls.count("security_lifecycle_acknowledge_case") == 1
         assert calls.count("security_lifecycle_reopen_acknowledgement") == 1
         assert calls.count("security_lifecycle_dismiss_proposal") == 1
-        assert calls.count("security_lifecycle_investigation") == 3
     finally:
         context["profile_conn"].close()
 
@@ -385,7 +355,7 @@ def test_dismiss_proposal_route_does_not_apply_any_profile_action(tmp_path, monk
             "INSERT INTO universe_sentinel VALUES ('EA','unchanged')"
         )
         context["profile_conn"].commit()
-        client, _ = _client(context, monkeypatch)
+        client = _client(context, monkeypatch)
         evidence_id = _add_manual(client, context["case_id"])
         assessment_id = _create_draft(client, context, evidence_id)
         proposal_id = client.post(
@@ -406,29 +376,6 @@ def test_dismiss_proposal_route_does_not_apply_any_profile_action(tmp_path, monk
         context["profile_conn"].close()
 
 
-def test_investigation_route_requires_one_explicit_attended_command(tmp_path, monkeypatch):
-    context = _build_context(tmp_path, materialize_profile_case=False)
-    try:
-        adapter = _SearchAdapter()
-        client, _ = _client(context, monkeypatch, adapter=adapter)
-        assert context["profile_conn"].execute(
-            "SELECT COUNT(*) FROM security_lifecycle_cases"
-        ).fetchone()[0] == 0
-        response = client.post(
-            f"/security-lifecycle/cases/{context['case_id']}/investigations",
-            json={"adapter": "tavily"},
-        )
-        assert response.status_code == 200
-        assert response.json()["trigger"] == "attended_user"
-        assert context["profile_conn"].execute(
-            "SELECT COUNT(*) FROM security_lifecycle_cases"
-        ).fetchone()[0] == 1
-        assert len(context["store"].list_investigation_runs(context["case_id"])) == 1
-        assert len(adapter.search_calls) in {2, 3}
-    finally:
-        context["profile_conn"].close()
-
-
 def test_manual_evidence_route_adds_url_or_text_without_network_access(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     socket_calls: list[object] = []
@@ -438,7 +385,7 @@ def test_manual_evidence_route_adds_url_or_text_without_network_access(tmp_path,
         lambda *args, **kwargs: socket_calls.append((args, kwargs)),
     )
     try:
-        client, _ = _client(
+        client = _client(
             context,
             monkeypatch,
             permissions=lambda action, _detail: permission_calls.append(action),
@@ -550,7 +497,7 @@ def test_route_failure_is_typed_and_never_falls_back_to_one_store(tmp_path, monk
     permission_calls = []
     try:
         context["market_path"].unlink()
-        client, _ = _client(
+        client = _client(
             context,
             monkeypatch,
             permissions=lambda action, _detail: permission_calls.append(action),
@@ -582,7 +529,7 @@ def test_route_writes_do_not_mutate_universe_portfolio_sa_or_market_history(tmp_
         )
         context["profile_conn"].commit()
         market_before = hashlib.sha256(context["market_path"].read_bytes()).hexdigest()
-        client, _ = _client(context, monkeypatch)
+        client = _client(context, monkeypatch)
         _add_manual(client, context["case_id"])
         assert [
             tuple(row)
@@ -611,7 +558,7 @@ def test_source_missing_case_detail_remains_queryable(tmp_path, monkeypatch):
     context = _build_context(tmp_path, with_observation=False)
     permission_calls: list[str] = []
     try:
-        client, _ = _client(
+        client = _client(
             context,
             monkeypatch,
             permissions=lambda action, _detail: permission_calls.append(action),
@@ -641,10 +588,6 @@ def test_source_missing_case_detail_remains_queryable(tmp_path, monkeypatch):
 
         attempts = [
             client.post(
-                f"/security-lifecycle/cases/{context['case_id']}/investigations",
-                json={"adapter": "tavily"},
-            ),
-            client.post(
                 f"/security-lifecycle/cases/{context['case_id']}/assessments",
                 json={
                     "relevance": "direct_tracked_security",
@@ -665,7 +608,7 @@ def test_source_missing_case_detail_remains_queryable(tmp_path, monkeypatch):
                 json={"reason": "evidence_insufficient", "note": None},
             ),
         ]
-        assert [item.status_code for item in attempts] == [422, 422, 422]
+        assert [item.status_code for item in attempts] == [422, 422]
         assert {
             item.json()["detail"]["code"] for item in attempts
         } == {"source_observation_missing"}
@@ -678,7 +621,7 @@ def test_unknown_or_conflicting_assessment_payload_is_rejected_before_write(tmp_
     context = _build_context(tmp_path, materialize_profile_case=False)
     permission_calls: list[str] = []
     try:
-        client, _ = _client(
+        client = _client(
             context,
             monkeypatch,
             permissions=lambda action, _detail: permission_calls.append(action),

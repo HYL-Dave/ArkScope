@@ -166,7 +166,7 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 185
+    assert len(observed["routes"]) == 184
     assert observed["active_owners"] == {
         "data-scheduler",
         "portfolio-capture-scheduler",

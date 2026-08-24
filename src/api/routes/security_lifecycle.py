@@ -11,11 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from src.api.dependencies import (
     get_security_lifecycle_read_service,
-    get_security_lifecycle_resolver,
-    get_security_lifecycle_search_adapter,
     get_security_lifecycle_store,
 )
-from src.api.permissions import require_db_write, require_permission
+from src.api.permissions import require_db_write
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     LifecycleWritesUnavailable,
@@ -23,11 +21,9 @@ from src.security_lifecycle_investigation import (
     canonical_assessment_decimal,
     observation_fingerprint,
 )
-from src.security_lifecycle_search import (
-    LifecycleSearchAdapter,
+from src.security_lifecycle_manual_evidence import (
     add_manual_evidence,
     canonical_manual_https_url,
-    run_tavily_investigation,
 )
 from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
 
@@ -63,12 +59,6 @@ def _case_identity(case: dict) -> dict[str, str]:
         "source_ref": str(case["source_ref"]),
         "ticker": str(case["ticker"]),
     }
-
-
-class InvestigationRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    adapter: Literal["tavily"]
 
 
 class ManualEvidenceRequest(BaseModel):
@@ -318,45 +308,6 @@ def get_investigation(
         return store.get_investigation_run(run_id)
     except KeyError as exc:
         raise _not_found(exc) from None
-
-
-@router.post("/cases/{case_id}/investigations")
-def investigate_case(
-    case_id: str,
-    body: InvestigationRequest,
-    service: SecurityLifecycleReadService = Depends(
-        get_security_lifecycle_read_service
-    ),
-    store: SecurityLifecycleInvestigationStore = Depends(
-        get_security_lifecycle_store
-    ),
-    adapter: LifecycleSearchAdapter = Depends(
-        get_security_lifecycle_search_adapter
-    ),
-    resolver=Depends(get_security_lifecycle_resolver),
-):
-    try:
-        case = service.get_case(case_id)
-        observation = case.get("observation")
-        if observation is None:
-            raise ValueError("source_observation_missing")
-        detail = {"case_id": case_id, "adapter": body.adapter}
-        require_db_write("security_lifecycle_investigation", detail)
-        return run_tavily_investigation(
-            store=store,
-            case_id=case_id,
-            observation=observation,
-            adapter=adapter,
-            permission=require_permission,
-            resolver=resolver,
-            at=_utc_now(),
-        )
-    except LifecycleStoreUnavailable as exc:
-        raise _store_error(exc) from None
-    except KeyError as exc:
-        raise _not_found(exc) from None
-    except (LifecycleWritesUnavailable, ValueError) as exc:
-        raise _invalid(exc) from None
 
 
 @router.post("/cases/{case_id}/evidence")
