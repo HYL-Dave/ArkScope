@@ -284,6 +284,7 @@ git commit -m "refactor: retire lifecycle Tavily investigation"
 - Modify: `src/agents/shared/prompts.py`
 - Modify: `src/agents/shared/subagent.py`
 - Modify: `src/api/routes/config_routes.py`
+- Modify: `docs/design/ARKSCOPE_TOOL_CATALOG.md` (live tool table only)
 - Modify: `config/user_profile.yaml`
 - Modify: `config/.env.template`
 - Modify: `requirements.txt`
@@ -339,6 +340,14 @@ Remove `web_tavily` from `AgentConfig` and YAML loading. Remove the YAML toggle,
 
 Remove Tavily from subagent tool lists. Code analyst remains local/numerical; deep researcher uses internal news/SEC/fundamentals plus `web_browse` for a known URL; reviewer uses internal ticker news. Rewrite prompt instructions to prefer ArkScope structured tools and browse only a known URL, without claiming generic search exists.
 
+Synchronize the Tool Catalog's live table in this task. The existing
+`test_tool_catalog_live_table_matches_registry` owner is part of the Task 3
+focused stream and requires the live table to change atomically with the
+registry. Leave provider-retirement history and broader catalog prose to Task
+6. This amendment follows a measured pre-implementation replay: after the
+product edits, the original Task 3 stream produced `1 failed / 323 passed`,
+with that catalog owner as the only failure.
+
 - [ ] **Step 4: Run registration GREEN and inventory scripts**
 
 Run:
@@ -354,7 +363,7 @@ Also instantiate `create_openai_tools(DataAccessLayer())` and assert 51 unique n
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/tools/web_tools.py src/tools/registry.py src/agents src/api/routes/config_routes.py config/user_profile.yaml config/.env.template requirements.txt tests/test_web_tools.py tests/test_api.py tests/test_agents.py tests/test_subagent.py tests/test_tools.py tests/test_analyst_tools.py tests/test_memory_tools.py tests/test_sec_tools.py tests/test_portfolio_tools.py tests/test_sa_tools.py
+git add src/tools/web_tools.py src/tools/registry.py src/agents src/api/routes/config_routes.py docs/design/ARKSCOPE_TOOL_CATALOG.md config/user_profile.yaml config/.env.template requirements.txt tests/test_web_tools.py tests/test_api.py tests/test_agents.py tests/test_subagent.py tests/test_tools.py tests/test_analyst_tools.py tests/test_memory_tools.py tests/test_sec_tools.py tests/test_portfolio_tools.py tests/test_sa_tools.py
 git commit -m "refactor: retire generic Tavily tools"
 ```
 
