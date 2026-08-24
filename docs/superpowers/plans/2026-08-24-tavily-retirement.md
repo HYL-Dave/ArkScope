@@ -534,7 +534,18 @@ git grep -n -i tavily -- src apps config/.env.template config/user_profile.yaml 
 git grep -n 'TAVILY_API_KEY' -- src apps config/.env.template config/user_profile.yaml requirements.txt resources
 ```
 
-Expected: first grep has exactly the dormant legacy storage authority in `src/security_lifecycle_schema.py`; second grep has no matches. It must not inspect `config/.env`.
+Expected: the first grep is closed to three non-requesting ownership classes:
+
+1. the dormant legacy storage authority in `src/security_lifecycle_schema.py`;
+2. the explicit read-only retirement authority in
+   `src/security_lifecycle_retirement.py`; and
+3. UI tests that assert the retired name is absent.
+
+No request client, route, tool, reducer, skill, configuration, resource copy, or
+dependency may match. The second grep has no matches. Neither command may
+inspect `config/.env`. This corrects the earlier impossible "schema only"
+expectation, which conflicted with Task 1's required retirement API and Task 5's
+required visible-absence assertions.
 
 - [ ] **Step 5: Commit**
 
