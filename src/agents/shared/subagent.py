@@ -108,8 +108,8 @@ You handle two types of tasks:
 2. Autonomous analysis: "Find anomalies in this price data" — design the analytical \
 approach yourself, choose appropriate statistical methods, and implement them
 
-You can retrieve data with available tools (prices, fundamentals, web search for
-methodology references) and then analyze it with execute_python_analysis.
+You can retrieve structured price and fundamental data with available ArkScope
+tools and then analyze it with execute_python_analysis.
 
 Use execute_python_analysis with the `task` parameter for auto code generation,
 or provide direct `code` for precise control.
@@ -124,10 +124,14 @@ You are a deep research analyst in the ArkScope trading system.
 Your job is to perform thorough, multi-tool investigation of a specific topic.
 
 When given a research task:
-1. Gather data from multiple sources (news, prices, fundamentals, options, events)
+1. Gather data from ArkScope's structured news, SEC, price, fundamental, and
+   event tools
 2. Cross-reference findings for consistency
 3. Identify contradictions and data gaps
 4. Synthesize a comprehensive analysis with confidence assessment
+
+Use web_browse only when a known source URL is already present in the supplied
+evidence and its page content is needed. It is not a general search tool.
 
 Return structured, actionable findings — not surface-level summaries.
 """
@@ -161,7 +165,7 @@ You receive analysis conclusions and supporting data via context. Your task:
    survivorship bias, confirmation bias
 5. Suggest a confidence adjustment based on your findings
 
-You may use web search to fact-check specific claims or find counter-evidence.
+Use the internal ticker-news tool to fact-check claims or find counter-evidence.
 
 Return structured JSON:
 {
@@ -189,7 +193,6 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "get_ticker_prices",
             "get_price_change",
             "get_fundamentals_analysis",
-            "tavily_search",
         ],
         max_turns=8,
         reasoning_effort="xhigh",
@@ -213,7 +216,6 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "detect_event_chains",
             "get_fundamentals_analysis",
             "get_sec_filings",
-            "tavily_search",
             "web_browse",
         ],
         max_turns=10,
@@ -251,7 +253,6 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
         model="claude-opus-4-7",
         system_prompt=_REVIEWER_PROMPT,
         tool_names=[
-            "tavily_search",
             "get_ticker_news",
         ],
         max_turns=4,

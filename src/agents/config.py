@@ -121,7 +121,6 @@ class AgentConfig(BaseModel):
 
     # Web search providers (Phase 10)
     # Each can be independently enabled/disabled for cost control
-    web_tavily: bool = True           # Tavily search + fetch (free 1000 credits/month)
     web_claude_search: bool = False   # Claude server-side web search ($10/1K, off by default)
     web_openai_search: bool = True    # OpenAI SDK WebSearchTool (included in API cost)
     web_playwright: bool = True       # Playwright headless browser (free, local)
@@ -333,8 +332,6 @@ def get_agent_config() -> AgentConfig:
 
     # Web search overrides (Phase 10)
     web_prefs = profile.get("web_search", {})
-    if "tavily" in web_prefs:
-        config.web_tavily = web_prefs["tavily"]
     if "claude_search" in web_prefs:
         config.web_claude_search = web_prefs["claude_search"]
     if "claude_search_max_uses" in web_prefs:

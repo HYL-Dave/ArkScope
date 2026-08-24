@@ -399,9 +399,6 @@ report_preferences:
 # 11. Web Search 設定 (Phase 10)
 # ============================================
 web_search:
-  # Tavily（免費 1000 credits/月，API key from TAVILY_API_KEY env）
-  tavily: true
-
   # Claude 原生 web search（$10/1K searches，只對 Anthropic agent 有效）
   # 預設關閉，需要時手動開啟或用 CLI toggle
   claude_search: false

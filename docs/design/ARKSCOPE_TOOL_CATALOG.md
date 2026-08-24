@@ -78,8 +78,6 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `recall_memories` | memory | query?, category?, tickers?, tags?, days?, limit? | memory search |
 | `list_memories` | memory | category?, days?, limit? | memory index read |
 | `delete_memory` | memory | memory_id* | permission-gated memory delete |
-| `tavily_search` | web | query*, max_results?, search_depth?, topic?, days? | public web search API |
-| `tavily_fetch` | web | url*, extract_depth?, offset?, max_chars? | public content fetch API |
 | `web_browse` | web | url*, wait_for?, extract_links?, offset?, max_chars? | browser automation |
 | `execute_python_analysis` | execution | code?, task?, data_json?, timeout?, background? | permission-gated local analysis |
 | `scan_alerts` | monitor | tickers? | current monitor scan |

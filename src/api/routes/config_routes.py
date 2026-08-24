@@ -265,7 +265,6 @@ def runtime_config(
             "polygon": key_set("POLYGON_API_KEY"),
             "financial_datasets": key_set("FINANCIAL_DATASETS_API_KEY"),
             "fred": key_set("FRED_API_KEY"),
-            "tavily": key_set("TAVILY_API_KEY"),
         },
     }
 

@@ -337,4 +337,4 @@ class TestMemoryToolRegistry:
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
         # Includes macro/calendar, SA, and local coverage diagnostics.
-        assert len(registry.list_all()) == 52
+        assert len(registry.list_all()) == 50

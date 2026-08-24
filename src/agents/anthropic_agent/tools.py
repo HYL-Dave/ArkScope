@@ -21,8 +21,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
     Get tool definitions in Anthropic format.
 
     Returns list of tool schemas for messages.create(tools=[...]).
-    Web tools (tavily_search, tavily_fetch, web_browse) are conditionally
-    included based on AgentConfig flags.
+    The local browser tool is conditionally included based on AgentConfig.
     """
     from ..config import get_agent_config
     config = get_agent_config()
@@ -677,59 +676,13 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ]
 
-    # ── Conditional web tools (Phase 10) ─────────────────────────
-    if config.web_tavily:
-        tools.extend([
-            {
-                "name": "tavily_search",
-                "description": (
-                    "Search the web for real-time information using Tavily. "
-                    "Returns AI summary and ranked results with relevance scores. "
-                    "Use topic='finance' for financial queries, topic='news' for current events."
-                ),
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Search query"},
-                        "max_results": {"type": "integer", "description": "Max results 1-10 (default: 5)"},
-                        "search_depth": {"type": "string", "enum": ["basic", "advanced"],
-                                         "description": "basic (1 credit) or advanced (2 credits)"},
-                        "topic": {"type": "string", "enum": ["general", "news", "finance"],
-                                  "description": "Search topic category (default: general)"},
-                        "days": {"type": "integer",
-                                 "description": "Limit to results from last N days (0=no limit)"},
-                    },
-                    "required": ["query"],
-                },
-            },
-            {
-                "name": "tavily_fetch",
-                "description": (
-                    "Fetch and extract content from a specific URL using Tavily. "
-                    "Supports pagination via offset/max_chars for long pages. "
-                    "Check was_truncated and use offset to read more."
-                ),
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "url": {"type": "string", "description": "URL to fetch content from"},
-                        "extract_depth": {"type": "string", "enum": ["basic", "advanced"],
-                                          "description": "Extraction depth (default: basic)"},
-                        "offset": {"type": "integer",
-                                   "description": "Start position in chars for pagination (default: 0)"},
-                        "max_chars": {"type": "integer",
-                                      "description": "Max chars to return per call (default: 3000)"},
-                    },
-                    "required": ["url"],
-                },
-            },
-        ])
+    # ── Conditional local browser tool (Phase 10) ────────────────
     if config.web_playwright:
         tools.append({
             "name": "web_browse",
             "description": (
                 "Browse a URL with headless Chromium browser (Playwright). "
-                "Handles JavaScript-rendered pages that Tavily cannot extract. "
+                "Reads a known JavaScript-rendered page. "
                 "Supports pagination via offset/max_chars."
             ),
             "input_schema": {
@@ -1375,7 +1328,7 @@ def execute_tool(
         get_insider_trades,
     )
     from src.tools.code_executor import execute_python_code
-    from src.tools.web_tools import web_search, web_fetch, web_browse
+    from src.tools.web_tools import web_browse
     from src.tools.analyst_tools import get_analyst_consensus
     from src.tools.report_tools import save_report, list_reports, get_report
     from src.tools.memory_tools import (
@@ -1529,20 +1482,7 @@ def execute_tool(
             ticker=tool_input["ticker"],
             quarters=tool_input.get("quarters", 4),
         ),
-        # Web tools (Phase 10) — no DAL needed
-        "tavily_search": lambda: web_search(
-            query=tool_input["query"],
-            max_results=tool_input.get("max_results", 5),
-            search_depth=tool_input.get("search_depth", "basic"),
-            topic=tool_input.get("topic", "general"),
-            days=tool_input.get("days", 0),
-        ),
-        "tavily_fetch": lambda: web_fetch(
-            url=tool_input["url"],
-            extract_depth=tool_input.get("extract_depth", "basic"),
-            offset=tool_input.get("offset", 0),
-            max_chars=tool_input.get("max_chars", 3000),
-        ),
+        # Local browser tool (Phase 10) — no DAL needed
         "web_browse": lambda: web_browse(
             url=tool_input["url"],
             wait_for=tool_input.get("wait_for", "networkidle"),

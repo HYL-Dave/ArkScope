@@ -118,12 +118,26 @@ class TestSubagentRegistry:
         assert len(cfg.tool_names) <= 3  # reviewer relies on reasoning
         assert "delegate_to_subagent" not in cfg.tool_names
 
-    def test_code_analyst_has_enhanced_tools(self):
-        """code_analyst should have fundamentals and web search tools."""
+    def test_all_configured_tools_resolve_without_retired_tavily_names(self):
+        from src.tools.registry import create_default_registry
+
+        registry_names = {
+            tool.name for tool in create_default_registry().list_all()
+        }
+        configured_names = {
+            tool_name
+            for config in SUBAGENT_REGISTRY.values()
+            for tool_name in config.tool_names
+        }
+        assert {"tavily_search", "tavily_fetch"}.isdisjoint(configured_names)
+        assert configured_names <= registry_names
+
         cfg = SUBAGENT_REGISTRY["code_analyst"]
         assert "execute_python_analysis" in cfg.tool_names
         assert "get_fundamentals_analysis" in cfg.tool_names
-        assert "tavily_search" in cfg.tool_names
+        assert "web_browse" not in cfg.tool_names
+        assert "web_browse" in SUBAGENT_REGISTRY["deep_researcher"].tool_names
+        assert SUBAGENT_REGISTRY["reviewer"].tool_names == ["get_ticker_news"]
 
 
 # ============================================================
