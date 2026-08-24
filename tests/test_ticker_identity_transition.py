@@ -61,8 +61,8 @@ def _transition_connection(tmp_path, *, active_source: bool = True) -> sqlite3.C
         "INSERT INTO security_lifecycle_assessments "
         "(assessment_id,case_id,revision,status,relevance,confidence,author,"
         "conclusion,impact_summary,successor_ticker,effective_date,"
-        "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at,"
+        "acceptance_authority) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             "sla_1",
             "slc_1",
@@ -79,6 +79,7 @@ def _transition_connection(tmp_path, *, active_source: bool = True) -> sqlite3.C
             _EVIDENCE_FINGERPRINT,
             _AT,
             _AT,
+            "human",
         ),
     )
     conn.commit()
@@ -678,8 +679,10 @@ def test_transition_approval_rechecks_assessment_authority_inside_write_lock(
             sources=("manual_lists", "legacy_config_seed"),
         )
         conn.execute(
-            "UPDATE security_lifecycle_assessments SET status='superseded' "
-            "WHERE assessment_id='sla_1'"
+            "UPDATE security_lifecycle_assessments "
+            "SET status='superseded',superseded_at=? "
+            "WHERE assessment_id='sla_1'",
+            (_AT,),
         )
         conn.commit()
         store = TickerIdentityTransitionStore(
@@ -955,8 +958,10 @@ def test_apply_rechecks_accepted_assessment_inside_write_lock(tmp_path):
             approved_preview_sha256=preview["preview_sha256"],
         )
         conn.execute(
-            "UPDATE security_lifecycle_assessments SET status='superseded' "
-            "WHERE assessment_id='sla_1'"
+            "UPDATE security_lifecycle_assessments "
+            "SET status='superseded',superseded_at=? "
+            "WHERE assessment_id='sla_1'",
+            (_AT,),
         )
         conn.commit()
 
@@ -1251,8 +1256,11 @@ def test_reversal_blocks_when_successor_has_a_later_active_continuation(tmp_path
             "approved_observation_fingerprint_sha256,"
             "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
             "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
-            "approved_at,updated_at,applied_at,cancelled_at,reversed_at) "
-            "VALUES (?,?,?,?,?,?,'applied',?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL)",
+            "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+            "approval_authority,automation_policy_version,rule_id,rule_version,"
+            "decision_provenance_sha256) "
+            "VALUES (?,?,?,?,?,?,'applied',?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,"
+            "'attended_user',NULL,NULL,NULL,?)",
             (
                 "tit_later",
                 "slc_1",
@@ -1274,6 +1282,7 @@ def test_reversal_blocks_when_successor_has_a_later_active_continuation(tmp_path
                 "2026-08-26T00:00:00Z",
                 "2026-08-26T00:00:00Z",
                 "2026-08-26T00:00:00Z",
+                "b" * 64,
             ),
         )
         conn.execute(

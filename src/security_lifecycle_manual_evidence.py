@@ -106,6 +106,7 @@ def add_manual_evidence(
             document_status=None,
             at=at,
             case_identity=case_identity,
+            source_family="manual",
         )
     source_url = canonical_manual_https_url(url)
     return store.add_evidence(
@@ -124,6 +125,7 @@ def add_manual_evidence(
         document_status=None,
         at=at,
         case_identity=case_identity,
+        source_family="manual",
     )
 
 

@@ -469,9 +469,10 @@ def _seed_ticker_identity_lineage(path: Path) -> None:
             "INSERT INTO security_lifecycle_assessments "
             "(assessment_id,case_id,revision,status,relevance,confidence,author,"
             "conclusion,impact_summary,successor_ticker,effective_date,"
-            "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at) "
+            "observation_fingerprint_sha256,evidence_set_sha256,created_at,accepted_at,"
+            "acceptance_authority) "
             "VALUES ('sla_lineage','slc_lineage',1,'accepted',"
-            "'direct_tracked_security','high','human',?,?,?,?,?,?,?,?)",
+            "'direct_tracked_security','high','human',?,?,?,?,?,?,?,?,'human')",
             (
                 "OLD continues as NEW.",
                 "Keep the user's tracking intent.",
@@ -491,10 +492,13 @@ def _seed_ticker_identity_lineage(path: Path) -> None:
             "approved_observation_fingerprint_sha256,"
             "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
             "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
-            "approved_at,updated_at,applied_at,cancelled_at,reversed_at) "
+            "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+            "approval_authority,automation_policy_version,rule_id,rule_version,"
+            "decision_provenance_sha256) "
             "VALUES ('slt_1','slc_lineage','sla_lineage','[\"slp_1\"]',"
             "'lineage-dedupe','symbol_continuation','applied','OLD','NEW',"
-            "'2026-07-20',NULL,0,?,?,?,?,?,?,?, ?,?,NULL,NULL)",
+            "'2026-07-20',NULL,0,?,?,?,?,?,?,?, ?,?,NULL,NULL,"
+            "'attended_user',NULL,NULL,NULL,?)",
             (
                 "a" * 64,
                 "c" * 64,
@@ -505,6 +509,7 @@ def _seed_ticker_identity_lineage(path: Path) -> None:
                 ROUTE_NOW_TEXT,
                 ROUTE_NOW_TEXT,
                 ROUTE_NOW_TEXT,
+                "c" * 64,
             ),
         )
         conn.execute(

@@ -20,8 +20,11 @@ from src.security_lifecycle_schema import (
     ASSESSMENT_CONFIDENCE,
     ASSESSMENT_OUTCOMES,
     ASSESSMENT_RELEVANCE,
+    AUTOMATION_METHODS,
     DOCUMENT_STATUSES,
+    EVIDENCE_ADAPTERS,
     EVIDENCE_KINDS,
+    EVIDENCE_SOURCE_FAMILIES,
     PROPOSAL_ACTIONS,
     RUN_ADAPTERS,
     RUN_FAILURE_CODES,
@@ -487,13 +490,33 @@ class SecurityLifecycleInvestigationStore:
         document_status: str | None,
         at: str,
         case_identity: Mapping[str, object] | None = None,
+        source_family: str | None = None,
+        automation_run_id: str | None = None,
+        source_document_sha256: str | None = None,
+        source_locator: Mapping[str, object] | None = None,
+        evidence_dedupe_key: str | None = None,
     ) -> str:
         self._assert_write()
         identity = self._case_identity_for_write(case_id, case_identity)
         if kind not in EVIDENCE_KINDS:
             raise ValueError("evidence_kind")
-        if adapter not in RUN_ADAPTERS:
+        if adapter not in EVIDENCE_ADAPTERS or adapter == "hosted_search":
             raise ValueError("adapter")
+        adapter_contract = {
+            "manual": ("manual", {"manual_url", "manual_text", "document_reference"}),
+            "sec_edgar": ("regulator", {"regulator_excerpt"}),
+            "internal_news": ("publisher", {"publisher_excerpt"}),
+            "ibkr_contract": (
+                "market_infrastructure",
+                {"market_infrastructure_snapshot"},
+            ),
+        }
+        expected_family, expected_kinds = adapter_contract[adapter]
+        family = source_family or expected_family
+        if family not in EVIDENCE_SOURCE_FAMILIES or family != expected_family:
+            raise ValueError("source_family")
+        if kind not in expected_kinds:
+            raise ValueError("evidence_kind")
         if document_status is not None and document_status not in DOCUMENT_STATUSES:
             raise ValueError("document_status")
         if kind == "document_reference" and document_status is None:
@@ -502,8 +525,21 @@ class SecurityLifecycleInvestigationStore:
             raise ValueError("document_status")
         if run_id is not None:
             run = self.get_investigation_run(run_id)
-            if run["case_id"] != case_id:
+            if run["case_id"] != case_id or run["adapter"] != "manual":
                 raise ValueError("run_case")
+        if automation_run_id is not None:
+            run = self.conn.execute(
+                "SELECT case_id FROM security_lifecycle_automation_runs WHERE run_id=?",
+                (automation_run_id,),
+            ).fetchone()
+            if run is None or str(run["case_id"]) != case_id:
+                raise ValueError("automation_run_case")
+        if run_id is not None and automation_run_id is not None:
+            raise ValueError("run_identity")
+        if adapter == "manual" and automation_run_id is not None:
+            raise ValueError("automation_run_id")
+        if adapter != "manual" and (run_id is not None or automation_run_id is None):
+            raise ValueError("automation_run_id")
         excerpt_text = _bounded_text(
             "excerpt", excerpt, max_length=16000, required=True
         )
@@ -511,19 +547,43 @@ class SecurityLifecycleInvestigationStore:
         if source_url_text is not None and not source_url_text.startswith("https://"):
             raise ValueError("source_url")
         evidence_id = self._new_id("sle")
+        excerpt_sha256 = hashlib.sha256(excerpt_text.encode("utf-8")).hexdigest()
+        document_sha256 = (
+            None
+            if source_document_sha256 is None
+            else _canonical_sha256("source_document_sha256", source_document_sha256)
+        )
+        locator_json = (
+            None
+            if source_locator is None
+            else _canonical_json(source_locator, max_bytes=4096, name="source_locator")
+        )
+        if adapter == "sec_edgar" and (
+            document_sha256 is None or locator_json is None
+        ):
+            raise ValueError("source_locator")
+        dedupe_key = _bounded_text(
+            "evidence_dedupe_key",
+            evidence_dedupe_key or f"evidence:{evidence_id}",
+            max_length=500,
+            required=True,
+        )
         with self.conn:
             if identity is not None:
                 self._upsert_case_row(case_id, identity, at=at)
             self.conn.execute(
                 "INSERT INTO security_lifecycle_evidence "
-                "(evidence_id,case_id,run_id,kind,source_url,title,publisher,domain,"
-                "source_published_at,retrieved_at,adapter,excerpt,content_sha256,"
-                "mime_type,document_status,created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "(evidence_id,case_id,run_id,automation_run_id,source_family,kind,"
+                "source_url,title,publisher,domain,source_published_at,retrieved_at,"
+                "adapter,excerpt,content_sha256,source_document_sha256,"
+                "source_locator_json,evidence_dedupe_key,mime_type,document_status,"
+                "created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     evidence_id,
                     case_id,
                     run_id,
+                    automation_run_id,
+                    family,
                     kind,
                     source_url_text,
                     _bounded_text("title", title, max_length=500),
@@ -533,7 +593,10 @@ class SecurityLifecycleInvestigationStore:
                     retrieved_at,
                     adapter,
                     excerpt_text,
-                    hashlib.sha256(excerpt_text.encode("utf-8")).hexdigest(),
+                    excerpt_sha256,
+                    document_sha256,
+                    locator_json,
+                    dedupe_key,
                     _bounded_text("mime_type", mime_type, max_length=127),
                     document_status,
                     at,
@@ -574,6 +637,11 @@ class SecurityLifecycleInvestigationStore:
         cash_per_security_decimal: object = None,
         exchange_ratio_decimal: object = None,
         case_identity: Mapping[str, object] | None = None,
+        automation_method: str | None = None,
+        automation_run_id: str | None = None,
+        rule_id: str | None = None,
+        rule_version: str | None = None,
+        decision_provenance_sha256: str | None = None,
     ) -> str:
         self._assert_write()
         identity = self._case_identity_for_write(case_id, case_identity)
@@ -583,6 +651,39 @@ class SecurityLifecycleInvestigationStore:
             raise ValueError("confidence")
         if author not in ASSESSMENT_AUTHORS:
             raise ValueError("author")
+        if author == "automation":
+            if automation_method not in AUTOMATION_METHODS:
+                raise ValueError("automation_method")
+            run = self.conn.execute(
+                "SELECT case_id FROM security_lifecycle_automation_runs WHERE run_id=?",
+                (automation_run_id,),
+            ).fetchone()
+            if run is None or str(run["case_id"]) != case_id:
+                raise ValueError("automation_run_id")
+            automation_rule_id = _bounded_text(
+                "rule_id", rule_id, max_length=160, required=True
+            )
+            automation_rule_version = _bounded_text(
+                "rule_version", rule_version, max_length=120, required=True
+            )
+            automation_provenance = _canonical_sha256(
+                "decision_provenance", decision_provenance_sha256
+            )
+        else:
+            if any(
+                value is not None
+                for value in (
+                    automation_method,
+                    automation_run_id,
+                    rule_id,
+                    rule_version,
+                    decision_provenance_sha256,
+                )
+            ):
+                raise ValueError("automation_provenance")
+            automation_rule_id = None
+            automation_rule_version = None
+            automation_provenance = None
         outcome_values = tuple(sorted(set(str(value) for value in outcomes)))
         if not outcome_values or any(value not in ASSESSMENT_OUTCOMES for value in outcome_values):
             raise ValueError("outcome")
@@ -640,8 +741,10 @@ class SecurityLifecycleInvestigationStore:
                 "counterparty_cik,successor_ticker,destination_venue,effective_date,"
                 "consideration_currency,cash_per_security_decimal,"
                 "exchange_ratio_decimal,observation_fingerprint_sha256,"
-                "evidence_set_sha256,created_at,accepted_at,superseded_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "evidence_set_sha256,created_at,accepted_at,superseded_at,"
+                "automation_method,acceptance_authority,automation_run_id,rule_id,"
+                "rule_version,decision_provenance_sha256) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     assessment_id,
                     case_id,
@@ -672,6 +775,12 @@ class SecurityLifecycleInvestigationStore:
                     at,
                     None,
                     None,
+                    automation_method,
+                    None,
+                    automation_run_id,
+                    automation_rule_id,
+                    automation_rule_version,
+                    automation_provenance,
                 ),
             )
             self.conn.executemany(
@@ -770,6 +879,11 @@ class SecurityLifecycleInvestigationStore:
         ):
             raise ValueError("stale_assessment")
         with self.conn:
+            acceptance_authority = (
+                "legacy_migration"
+                if assessment["author"] == "legacy_review"
+                else "human"
+            )
             self.conn.execute(
                 "UPDATE security_lifecycle_assessments SET status='superseded',"
                 "superseded_at=? WHERE case_id=? AND status='accepted'",
@@ -777,8 +891,8 @@ class SecurityLifecycleInvestigationStore:
             )
             self.conn.execute(
                 "UPDATE security_lifecycle_assessments SET status='accepted',"
-                "accepted_at=? WHERE assessment_id=?",
-                (at, assessment_id),
+                "accepted_at=?,acceptance_authority=? WHERE assessment_id=?",
+                (at, acceptance_authority, assessment_id),
             )
         return self.get_assessment(assessment_id)
 

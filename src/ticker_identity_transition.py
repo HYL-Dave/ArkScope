@@ -1036,8 +1036,10 @@ class TickerIdentityTransitionStore:
                     "successor_ticker=?,execute_on=?,priority_resolution=?,"
                     "unhide_successor=?,approved_observation_fingerprint_sha256=?,"
                     "approved_assessment_fingerprint_sha256=?,"
-                    "approved_preview_sha256=?,approved_preview_json=?,approved_at=?,"
-                    "updated_at=? WHERE transition_id=?",
+                    "approved_preview_sha256=?,approved_preview_json=?,"
+                    "approval_authority='attended_user',automation_policy_version=NULL,"
+                    "rule_id=NULL,rule_version=NULL,decision_provenance_sha256=?,"
+                    "approved_at=?,updated_at=? WHERE transition_id=?",
                     (
                         proposal_ids_json,
                         source_ticker,
@@ -1049,6 +1051,7 @@ class TickerIdentityTransitionStore:
                         current_assessment_fingerprint,
                         digest,
                         preview_json,
+                        current_assessment_fingerprint,
                         now,
                         now,
                         transition_id,
@@ -1064,8 +1067,11 @@ class TickerIdentityTransitionStore:
                     "approved_observation_fingerprint_sha256,"
                     "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
                     "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
-                    "approved_at,updated_at,applied_at,cancelled_at,reversed_at) "
-                    "VALUES (?,?,?,?,?,?,'approved',?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,NULL,NULL,NULL)",
+                    "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+                    "approval_authority,automation_policy_version,rule_id,rule_version,"
+                    "decision_provenance_sha256) "
+                    "VALUES (?,?,?,?,?,?,'approved',?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,"
+                    "NULL,NULL,NULL,'attended_user',NULL,NULL,NULL,?)",
                     (
                         transition_id,
                         case_id,
@@ -1084,6 +1090,7 @@ class TickerIdentityTransitionStore:
                         preview_json,
                         now,
                         now,
+                        current_assessment_fingerprint,
                     ),
                 )
             self.conn.commit()
