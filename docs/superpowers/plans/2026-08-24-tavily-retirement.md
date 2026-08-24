@@ -598,7 +598,16 @@ Assert 184 routes, 50 registry tools, 51 tools in each bridge, one local web too
 
 - [ ] **Step 5: Verify no unauthorized state or egress**
 
-Compare git status and production database stat/hash metadata recorded before this plan's execution by the existing operator packet; no product test may open production paths. Confirm no provider-call receipt, live preflight report, migration report, `.env` diff, merge, or push exists.
+Prove that the worktree's resolved `data/` root and both pytest `--basetemp`
+roots are under `/tmp/arkscope-lifecycle-automation` or the named `/tmp`
+admission directories, and that no test command receives a production path.
+Confirm the tracked diff contains no database, `config/.env`, provider-call
+receipt, live preflight report, or migration report, and that no merge or push
+exists. Do not read or hash the running production databases for this gate: the
+App remains open by prior user decision and its ordinary scheduler writes make
+byte/stat equality with an earlier operator packet a moving, non-attributable
+signal. The existing operator packet remains historical corroboration, not a
+byte-equality authority for this offline worktree stage.
 
 - [ ] **Step 6: Write evidence and commit the closeout**
 
