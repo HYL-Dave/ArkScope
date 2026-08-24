@@ -1,7 +1,8 @@
 # Trusted Security Lifecycle Automation Design
 
-**Status:** Proposed authority. Implementation and live migration remain
-blocked until this written design is reviewed.
+**Status:** Reviewed design authority. Implementation proceeds only through a
+reviewed RED-first plan. Provider calls and live migration remain separately
+authorized operations.
 
 **Date:** 2026-08-24
 
@@ -158,6 +159,46 @@ The primary filing-chain window is 30 days before through 45 days after the
 case filing date. If required identity facts are absent, SEC may widen once to
 120 days. Every action is recorded; no provider query is unbounded.
 
+### 4.5 Shared SEC transport authority
+
+SEC's [current fair-access guidance](https://www.sec.gov/about/developer-resources)
+limits one user to ten requests per second in total, regardless of how many
+machines issue them. The existing
+`SECEdgarDataSource` limiter is per instance, so it is not an admissible
+authority once the collector, automation worker, financial clients, and CLI
+can overlap.
+
+Before the automation worker is enabled, every app-owned SEC request must use
+one transport governor shared by all `SECEdgarDataSource` instances. It has an
+in-process lock and a fail-closed cross-process `flock`/state-file twin under
+the configured ArkScope lock directory. Request starts are spaced by at least
+200 ms across the installation. No profile or market transaction may be held
+while waiting for the governor. An unavailable, corrupt, or unsupported shared
+governor produces `sec_governor_unavailable`; it never degrades to an
+instance-local limiter.
+
+This is an installation-wide guarantee, not a distributed lease. Two ArkScope
+installations that share one declared SEC identity must not run SEC collectors
+concurrently unless they are placed behind a separately reviewed shared
+coordinator. This deployment constraint reflects the SEC's user-wide limit
+rather than pretending a local file lock coordinates different machines.
+
+One lifecycle automation run is bounded to 16 SEC HTTP attempts, including
+retries, at most 12 filing documents, at most 1 MiB per document, and at most
+12 MiB of response bodies in aggregate. One scheduler tick starts at most two
+cases. A 429 may receive at most one bounded retry, honoring `Retry-After` only
+up to 30 seconds; recursive retry is forbidden. Exhaustion is recorded as
+`sec_request_budget_exhausted` or `sec_rate_limited`, never as absent evidence.
+
+The shared transport validates a configured, non-placeholder
+[declared User-Agent](https://www.sec.gov/about/webmaster-frequently-asked-questions)
+before any network syscall. Missing or placeholder identity yields
+`sec_identity_unconfigured`; 403, transport failure, and an unavailable
+document remain separately typed. Diagnostics may record the configuration
+source and outcome but never the contact value. The authority is the
+app-managed `sec_edgar/user_agent` setting with the existing explicit legacy
+environment aliases.
+
 ## 5. Evidence Acquisition
 
 ### 5.1 SEC
@@ -301,6 +342,10 @@ transition only for eligible `verified_automatic` results.
 Provider, parser, schema, and internal failures remain distinct. Program errors
 are never relabeled as network errors.
 
+Run diagnostics include SEC attempts, documents, bytes, throttling wait,
+retries, and remaining budget. Counts come from the shared transport, not from
+caller estimates, and are bounded integers with no URL, contact, or body data.
+
 Runs may emit `sec_evidence_insufficient`, `market_confirmation_missing`,
 `source_conflict`, or `impact_context_requested` plus their bounded query
 context. A later hosted-search adapter consumes that contract and stores
@@ -394,6 +439,24 @@ Old and new apps use different exact schema authorities. Cutover order is:
 6. run merged-tree gates; and
 7. start the app.
 
+This migration removes the rollback independence of the prior additive ticker
+schema migration. Rebuilding `security_lifecycle_assessments` and adding exact
+lifecycle objects causes the old authority to reject the new profile schema.
+Under this design a code-only rollback is unsupported: rollback means stopping
+the new app, restoring the explicitly authorized pre-migration profile backup,
+then starting the old product tree. A forward/down-conversion migration is not
+implicitly available. Restoring that backup also discards profile writes made
+after cutover, and the live authorization packet must state that consequence.
+
+Before live authorization, the restore probe must do more than compare bytes.
+It restores the approved backup to a scratch path, clones that exact restored
+state, and boots base `64af5092` against explicit scratch profile and market
+paths with schedulers disabled and provider/network access denied. The old
+schema verifier and old lifecycle read surface must succeed, including the four
+accepted legacy assessments. The probe must prove no production path was
+opened. Failure blocks migration; a successful new-code gate is not evidence
+that old-code rollback works.
+
 Implementation, merge, provider canary, and live migration approvals remain
 separate decisions.
 
@@ -413,6 +476,14 @@ Fixtures cover:
 - conflicting successor/date: `review_suggested`;
 - provider unavailable: typed retryable result; and
 - source citation plus translation: original remains authoritative.
+- two concurrent SEC clients: one shared start schedule below the aggregate
+  limit;
+- a second process contending for the SEC governor: serialized or typed
+  fail-closed, never instance-local fallback;
+- missing/placeholder SEC identity: zero network calls and
+  `sec_identity_unconfigured`; and
+- request, retry, document, and byte budget boundaries, including a terminal
+  429 with no recursive retry.
 
 ### 12.2 Scratch execution
 
@@ -497,7 +568,8 @@ Implementation has five independently rejectable stages:
 1. **Tavily retirement:** lifecycle and generic-agent surfaces, exact inventory
    repairs, and a no-stored-Tavily preflight condition.
 2. **Evidence/fact kernel:** schema authority, migration tooling, SEC chain,
-   internal-news/IBKR adapters, typed families, facts, and fixtures.
+   shared SEC transport authority and budgets, internal-news/IBKR adapters,
+   typed families, facts, and fixtures.
 3. **Decision automation:** two-tier policy, honest assessment authorship,
    complete prefill, staleness, proposals, and scheduler witnesses.
 4. **Reversible visibility:** transition authority, activity/history,
