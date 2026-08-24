@@ -7,7 +7,7 @@
   "session_id": "fixture_p1_4_l0_overflow",
   "turn_id": 1,
   "system_prompt_hash": "0000000000000000",
-  "user_input": "Find recent NVDA news.",
+  "user_input": "Read the NVDA investor-relations earnings page.",
   "tools_available": [
     "web_browse",
     "get_ticker_news"
@@ -17,23 +17,27 @@
       "index": 0,
       "name": "web_browse",
       "arguments": {
-        "max_results": 5,
-        "query": "NVDA earnings preview"
+        "extract_links": true,
+        "max_chars": 40000,
+        "url": "https://investor.nvidia.com/"
       },
       "arguments_digest": "0000000000000000",
       "result_digest": "1111111111111111",
       "result_shape": {
-        "answer": "str",
-        "query": "str",
-        "result_count": "int",
-        "results": [
+        "content": "str",
+        "links": [
           {
-            "content": "str",
-            "score": "float",
-            "title": "str",
-            "url": "str"
+            "href": "str",
+            "text": "str"
           }
-        ]
+        ],
+        "offset": "int",
+        "remaining_chars": "int",
+        "success": "bool",
+        "title": "str",
+        "total_chars": "int",
+        "url": "str",
+        "was_truncated": "bool"
       },
       "compression": {
         "layer": 0,
