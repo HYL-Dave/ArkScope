@@ -20,6 +20,7 @@
 - The user authorized continuous offline progress through Stage 2, with a schema-authority checkpoint before Stage 3.
 - This plan does **not** authorize provider/network calls, production database reads or writes, live preflight/backup/migration/restore, app restart, merge, push, or rollback.
 - Stop and amend before continuing on any product-semantic change, unexpected schema/data shape, unlisted changed path, unexpected test-node drift, or provider/live-path requirement.
+- A post-T3 broad offline replay exposed one T1 ledger omission: `test_tools_return_observation_and_profile_facts_without_provider_fields` was already in the focused path set but its fixture still created a retired `tavily` run. The node and path are now explicitly owned so that only the fixture adapter/query/usage shape may evolve to the surviving attended `manual` run; its provider-neutral projection, truncation, read-only, and secret-exclusion assertions remain unchanged. This amendment adds no node and changes no product authority or collection target.
 
 ## Mechanical Authorities
 
@@ -103,6 +104,7 @@ Stage 2 stores the complete destination vocabulary but does not emit an automati
 **Primary files:** `src/security_lifecycle_schema.py`, `src/ticker_identity_schema.py`, `src/security_lifecycle_investigation.py`, `src/security_lifecycle_manual_evidence.py`, `src/ticker_identity_transition.py`, `src/ticker_identity_service.py`, their schema/core tests.
 
 - [ ] Add the six schema additions and evolve every named T1 owner before product edits. The exact-schema owners establish V2 authority; the investigation owners replace dormant Tavily vocabulary with the surviving attended/manual contract without weakening their original assertions.
+- [ ] Evolve the provider-neutral lifecycle-tool fixture to create an attended `manual` run rather than a retired `tavily` run. Preserve its node ID and every projection/truncation/read-only/secret-exclusion assertion.
 - [ ] Run only schema/core nodes and record exact RED. Expected failures are missing tables/columns/vocabulary/coherence, never fixture SQL syntax.
 - [ ] Preserve named `V1_PROFILE_TABLE_SQL`, `V1_PROFILE_INDEX_SQL`, `verify_v1_profile_connection`, `V1_IDENTITY_TABLE_SQL`, `V1_IDENTITY_INDEX_SQL`, and `verify_v1_ticker_identity_connection`; current unqualified builders/verifiers become V2 only.
 - [ ] Implement all §Schema Mapping Authority objects and constraints. JSON columns are bounded and validated canonically by application code; digest columns require 64 lowercase hex characters, not length alone.
