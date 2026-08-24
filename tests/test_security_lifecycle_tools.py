@@ -318,8 +318,8 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
         run_id = store.create_investigation_run(
             case_id=case_id,
             trigger="attended_user",
-            adapter="tavily",
-            query_plan=("EA listing",),
+            adapter="manual",
+            query_plan=(),
             at=_AT,
         )
         store.start_investigation_run(run_id, at=_AT)
@@ -327,7 +327,7 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
             run_id,
             result_count=0,
             fetch_count=0,
-            usage={"search_requests": 1},
+            usage={},
             at=_AT,
         )
         for index in range(25):
