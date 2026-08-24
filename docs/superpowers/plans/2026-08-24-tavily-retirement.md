@@ -475,7 +475,7 @@ Run:
 ```bash
 npm --prefix apps/arkscope-web test -- --run
 npm --prefix apps/arkscope-web run typecheck
-node apps/arkscope-web/scripts/check-visible-literals.mjs
+npm --prefix apps/arkscope-web run check:i18n-literals
 npm --prefix apps/arkscope-web run build
 ```
 
