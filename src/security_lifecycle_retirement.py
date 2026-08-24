@@ -8,7 +8,7 @@ import sqlite3
 
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
-    verify_profile_connection,
+    verify_v1_profile_connection as verify_profile_connection,
 )
 
 

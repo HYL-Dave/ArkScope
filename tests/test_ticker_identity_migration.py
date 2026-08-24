@@ -22,13 +22,13 @@ def _sha(path: Path) -> str:
 
 
 def _profile_database(tmp_path: Path) -> Path:
-    from src.security_lifecycle_schema import create_profile_schema
+    from src.security_lifecycle_schema import create_v1_profile_schema
 
     tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / "profile.db"
     conn = sqlite3.connect(path)
     try:
-        create_profile_schema(conn)
+        create_v1_profile_schema(conn)
         conn.execute(
             "CREATE TABLE unrelated_profile_state "
             "(key TEXT PRIMARY KEY, value TEXT NOT NULL)"
@@ -101,7 +101,7 @@ def test_migration_is_additive_exact_and_idempotent(tmp_path):
         migrate_ticker_identity_schema,
         preflight_ticker_identity_migration,
     )
-    from src.ticker_identity_schema import verify_ticker_identity_connection
+    from src.ticker_identity_schema import verify_v1_ticker_identity_connection
 
     profile_path = _profile_database(tmp_path)
     before = preflight_ticker_identity_migration(profile_path=profile_path)
@@ -125,7 +125,7 @@ def test_migration_is_additive_exact_and_idempotent(tmp_path):
 
     conn = sqlite3.connect(profile_path)
     try:
-        verify_ticker_identity_connection(conn)
+        verify_v1_ticker_identity_connection(conn)
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:

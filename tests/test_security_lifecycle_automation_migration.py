@@ -523,7 +523,9 @@ def test_migration_rebuilds_exact_owned_components_and_preserves_unrelated_rows(
     finally:
         conn.close()
     from src.security_lifecycle_automation_migration import (
+        AutomationMigrationRejected,
         migrate_automation_profile_schema,
+        preflight_automation_migration,
     )
 
     second = migrate_automation_profile_schema(
@@ -532,6 +534,16 @@ def test_migration_rebuilds_exact_owned_components_and_preserves_unrelated_rows(
     )
     assert second.changed is False
     assert second.source_schema_version == "v2"
+
+    dependent = tmp_path / "dependent-view.db"
+    _seed_v1(dependent)
+    with sqlite3.connect(dependent) as conn:
+        conn.execute(
+            "CREATE VIEW lifecycle_case_projection AS "
+            "SELECT case_id FROM SECURITY_LIFECYCLE_CASES"
+        )
+    with pytest.raises(AutomationMigrationRejected, match="unowned_owned_dependency"):
+        preflight_automation_migration(profile_path=dependent)
 
 
 def test_migration_revalidates_owned_digest_under_begin_immediate(tmp_path):

@@ -15,13 +15,13 @@ from typing import Callable
 
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
-    verify_profile_connection,
+    verify_v1_profile_connection as verify_profile_connection,
 )
 from src.ticker_identity_schema import (
-    IDENTITY_INDEX_SQL,
-    IDENTITY_TABLE_SQL,
+    V1_IDENTITY_INDEX_SQL as IDENTITY_INDEX_SQL,
+    V1_IDENTITY_TABLE_SQL as IDENTITY_TABLE_SQL,
     TickerIdentitySchemaMismatch,
-    verify_ticker_identity_connection,
+    verify_v1_ticker_identity_connection as verify_ticker_identity_connection,
 )
 
 

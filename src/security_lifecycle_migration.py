@@ -21,10 +21,10 @@ from src.security_lifecycle_schema import (
     MARKET_INDEX_SQL,
     MARKET_TABLE_SQL,
     OBSERVATION_KINDS,
-    PROFILE_TABLE_SQL,
-    create_profile_schema,
+    V1_PROFILE_TABLE_SQL as PROFILE_TABLE_SQL,
+    create_v1_profile_schema as create_profile_schema,
     verify_market_connection,
-    verify_profile_connection,
+    verify_v1_profile_connection as verify_profile_connection,
 )
 
 

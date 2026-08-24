@@ -11,10 +11,10 @@ _AT = "2026-08-24T00:00:00Z"
 
 
 def _create_profile(path):
-    from src.security_lifecycle_schema import create_profile_schema
+    from src.security_lifecycle_schema import create_v1_profile_schema
 
     connection = sqlite3.connect(path)
-    create_profile_schema(connection)
+    create_v1_profile_schema(connection)
     connection.execute(
         "INSERT INTO security_lifecycle_cases "
         "(case_id,source,source_ref,ticker,created_at,updated_at) "
