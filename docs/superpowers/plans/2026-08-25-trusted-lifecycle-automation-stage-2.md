@@ -42,6 +42,8 @@ The schema checkpoint reviews these literals, not paraphrases:
 - fact types: `source_ticker`, `successor_ticker`, `source_venue`, `destination_venue`, `effective_date`, `security_class`, `issuer_cik`, `transaction_structure`, `tracked_security_effect`;
 - automation modes: `live`, `historical`;
 - run statuses: `queued`, `running`, `succeeded`, `blocked`, `failed`, `cancelled`;
+- automation blockers: `sec_identity_unconfigured`, `sec_governor_unavailable`, `sec_request_budget_exhausted`, `sec_rate_limited`, `sec_access_denied`, `sec_transport_unavailable`, `sec_document_unavailable`, `sec_evidence_insufficient`, `internal_news_unavailable`, `internal_news_schema_mismatch`, `ibkr_gateway_unavailable`, `ibkr_contract_missing`, `ibkr_contract_ambiguous`, `ibkr_entitlement_denied`, `market_confirmation_missing`, `source_conflict`, `impact_context_requested`;
+- automation failure codes: `source_payload_invalid`, `extractor_failed`, `profile_schema_mismatch`, `persistence_failed`, `internal_error`;
 - decision tiers: `verified_automatic`, `review_suggested`;
 - action readiness: `not_applicable`, `waiting_effective_date`, `waiting_market_confirmation`, `transition_eligible`, `action_blocked`;
 - assessment authors: `human`, `legacy_review`, `automation`;
@@ -66,7 +68,7 @@ Stage 2 stores the complete destination vocabulary but does not emit an automati
 ### Current exact authority
 
 - `security_lifecycle_investigation_runs` remains the attended/manual acquisition history surface. Its trigger/adapter vocabulary evolves without recreating a Tavily executor.
-- `security_lifecycle_automation_runs` owns durable automation identity, bounded blocker/query/diagnostic JSON, retry time, decision tier, action readiness, and timestamps.
+- `security_lifecycle_automation_runs` owns durable automation identity, bounded query/diagnostic JSON, retry time, decision tier, action readiness, and timestamps. `security_lifecycle_automation_run_blockers` stores zero or more closed blocker rows with bounded context; blocker vocabulary is database-constrained rather than hidden inside JSON.
 - `security_lifecycle_automation_facts` owns cited normalized facts. Each row binds one evidence ID, half-open UTF-8 byte offsets that must land on code-point boundaries, exact cited-text SHA-256, rule ID/version, and canonical value JSON.
 - `security_lifecycle_evidence` gains required source family, optional automation run, optional source-document digest/locator, and a dedupe key. The existing `content_sha256` remains the digest of the stored verbatim excerpt.
 - `security_lifecycle_evidence_translations` is derived storage keyed to evidence hash/locale with provider/model/harness provenance; it is never referenceable by assessment evidence.
