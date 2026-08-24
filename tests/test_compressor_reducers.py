@@ -237,7 +237,7 @@ class TestRegistry:
         assert "get_iv_history_data" not in reg
         assert reg["execute_python_analysis"] is python_output_reducer
 
-    def test_web_browse_uses_default(self):
+    def test_demoted_web_tools_use_default(self):
         """The browser payload uses default head+tail truncation."""
         reg = default_registry()
         assert "web_browse" not in reg

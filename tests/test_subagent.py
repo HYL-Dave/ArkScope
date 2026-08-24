@@ -118,7 +118,7 @@ class TestSubagentRegistry:
         assert len(cfg.tool_names) <= 3  # reviewer relies on reasoning
         assert "delegate_to_subagent" not in cfg.tool_names
 
-    def test_all_configured_tools_resolve_without_retired_tavily_names(self):
+    def test_code_analyst_has_enhanced_tools(self):
         from src.tools.registry import create_default_registry
 
         registry_names = {
