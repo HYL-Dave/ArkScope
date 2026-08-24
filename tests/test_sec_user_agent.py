@@ -44,7 +44,11 @@ def test_sec_clients_use_canonical_user_agent(monkeypatch):
     import data_sources.sec_filings as filings
     import data_sources.sec_insider_trades as insider
 
-    assert SECEdgarDataSource().user_agent == "ArkScope ops@arkscope.test"
+    source = SECEdgarDataSource()
+    assert source.user_agent == "ArkScope ops@arkscope.test"
+    assert source.transport.user_agent == "ArkScope ops@arkscope.test"
+    assert earnings.SECEarningsReleases().transport.user_agent == "ArkScope ops@arkscope.test"
+    assert insider.SECInsiderTrades().transport.user_agent == "ArkScope ops@arkscope.test"
     assert filings._get_sec_user_agent() == "ArkScope ops@arkscope.test"
     assert earnings._get_sec_user_agent() == "ArkScope ops@arkscope.test"
     assert insider._get_sec_user_agent() == "ArkScope ops@arkscope.test"
