@@ -183,7 +183,7 @@ def test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separatel
 
     state, lock = _lock_recorder()
     unavailable = _read(
-        _Gateway(responses=(RuntimeError("gateway stopped"),), lock_state=state),
+        _Gateway(responses=(ConnectionError("gateway stopped"),), lock_state=state),
         lock,
     )
     assert unavailable.blockers == ("ibkr_gateway_unavailable",)
@@ -217,4 +217,3 @@ def test_ibkr_adapter_reports_entitlement_denied_without_empty_success():
     assert result.evidence == ()
     assert result.source_families == ()
     assert result.requests_made == 1
-
