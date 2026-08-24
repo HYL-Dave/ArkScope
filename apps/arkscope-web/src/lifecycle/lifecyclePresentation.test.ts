@@ -78,7 +78,7 @@ describe("Lifecycle presentation", () => {
     const { lifecycleErrorPresentation } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
 
     expect(lifecycleErrorPresentation({ code: "credential_missing" }, "en").message)
-      .toBe("Tavily credentials are not configured");
+      .toBe("Search credentials are not configured");
     expect(lifecycleErrorPresentation({ code: "permission_denied" }, "en").message)
       .toBe("Web search permission was denied");
     expect(lifecycleErrorPresentation({ code: "network_error" }, "en").message)

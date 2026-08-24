@@ -224,8 +224,6 @@ const explore = {
     },
     actions: {
       refresh: "Refresh cases",
-      search: "Search with Tavily",
-      searching: "Searching with Tavily...",
       addText: "Add text evidence",
       addUrl: "Add URL evidence",
       saveAssessment: "Save assessment draft",
@@ -325,7 +323,7 @@ const explore = {
       usageLimitReached: "Search usage limit reached",
       rateLimited: "Search rate limit reached",
       adapterUnavailable: "Search adapter is unavailable",
-      credentialMissing: "Tavily credentials are not configured",
+      credentialMissing: "Search credentials are not configured",
       permissionDenied: "Web search permission was denied",
       networkError: "The search service could not be reached",
       extractFailed: "Search results could not be extracted",

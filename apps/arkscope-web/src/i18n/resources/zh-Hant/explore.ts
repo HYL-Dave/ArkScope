@@ -224,8 +224,6 @@ const explore = {
     },
     actions: {
       refresh: "重新整理案件",
-      search: "使用 Tavily 搜尋",
-      searching: "Tavily 搜尋中…",
       addText: "加入文字證據",
       addUrl: "加入網址證據",
       saveAssessment: "儲存判定草稿",
@@ -325,7 +323,7 @@ const explore = {
       usageLimitReached: "搜尋額度已用完",
       rateLimited: "搜尋速率受限",
       adapterUnavailable: "搜尋服務目前無法使用",
-      credentialMissing: "尚未設定 Tavily 憑證",
+      credentialMissing: "尚未設定搜尋憑證",
       permissionDenied: "未取得 Web 搜尋權限",
       networkError: "無法連線至搜尋服務",
       extractFailed: "無法擷取搜尋結果",

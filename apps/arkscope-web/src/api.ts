@@ -2737,17 +2737,6 @@ export function getSecurityLifecycleInvestigation(
   );
 }
 
-export function startSecurityLifecycleInvestigation(
-  caseId: string,
-  body: { adapter: "tavily" },
-): Promise<SecurityLifecycleInvestigationRun> {
-  return sendJSON(
-    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/investigations`,
-    "POST",
-    body,
-  );
-}
-
 export function addSecurityLifecycleEvidence(
   caseId: string,
   body: { text: string | null; url: string | null },

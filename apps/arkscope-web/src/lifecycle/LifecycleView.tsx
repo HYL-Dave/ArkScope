@@ -8,7 +8,6 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Search,
   X,
 } from "lucide-react";
 
@@ -26,7 +25,6 @@ import {
   reopenSecurityLifecycleAcknowledgement,
   retryTickerIdentityTransition,
   reverseTickerIdentityTransition,
-  startSecurityLifecycleInvestigation,
   type SecurityLifecycleCaseDetail,
   type SecurityLifecycleCaseFilters,
   type SecurityLifecycleCaseSummary,
@@ -930,18 +928,6 @@ export function LifecycleView({
               ) : null}
               {detail.source_presence === "present" ? (
                 <div className="lifecycle-commands">
-                  <Button
-                    size="compact"
-                    icon={<Search size={15} />}
-                    busy={busy === "search"}
-                    onClick={() => void runCommand("search", () => (
-                      startSecurityLifecycleInvestigation(detail.case_id, { adapter: "tavily" })
-                    ))}
-                  >
-                    {busy === "search"
-                      ? t(($) => $.lifecycle.actions.searching)
-                      : t(($) => $.lifecycle.actions.search)}
-                  </Button>
                   <label>{t(($) => $.lifecycle.fields.manualText)}
                     <textarea
                       aria-label={t(($) => $.lifecycle.fields.manualText)}

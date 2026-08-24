@@ -21,7 +21,6 @@ const apiMocks = vi.hoisted(() => ({
   reopenSecurityLifecycleAcknowledgement: vi.fn(),
   retryTickerIdentityTransition: vi.fn(),
   reverseTickerIdentityTransition: vi.fn(),
-  startSecurityLifecycleInvestigation: vi.fn(),
 }));
 
 vi.mock("../api", async (importOriginal) => ({
@@ -289,11 +288,6 @@ beforeEach(async () => {
     data_integrity: { source_missing_count: 1 },
   });
   apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail());
-  apiMocks.startSecurityLifecycleInvestigation.mockResolvedValue({
-    run_id: "run-new",
-    status: "succeeded",
-    result_count: 0,
-  });
   apiMocks.addSecurityLifecycleEvidence.mockResolvedValue({ evidence_id: "evidence-new" });
   apiMocks.createSecurityLifecycleAssessment.mockResolvedValue({
     assessment_id: "assessment-new",
@@ -368,7 +362,6 @@ describe("Lifecycle workflow", () => {
       [CASE_ID, { text: "Issuer investor-relations statement.", url: null }],
       [CASE_ID, { text: null, url: "https://example.com/issuer-notice" }],
     ]);
-    expect(apiMocks.startSecurityLifecycleInvestigation).not.toHaveBeenCalled();
   });
 
   it("blocks proposal controls when a portfolio position requires review", async () => {
@@ -393,13 +386,17 @@ describe("Lifecycle workflow", () => {
     }));
   });
 
-  it("keeps prior evidence and shows a typed safe error when search fails", async () => {
-    apiMocks.startSecurityLifecycleInvestigation.mockRejectedValue(Object.assign(
-      new Error("token=private /home/private"),
-      { code: "usage_limit_reached", diagnostic: "secret traceback" },
-    ));
+  it("keeps prior evidence and shows a typed safe historical run error", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      investigation_runs: [{
+        run_id: "run-failed",
+        status: "failed",
+        result_count: 0,
+        failure_code: "usage_limit_reached",
+        created_at: "2026-08-20T00:00:00Z",
+      }],
+    }));
     await mountLifecycle();
-    await click("Search with Tavily");
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
     expect(document.body.textContent).toContain("Search usage limit reached");
     expect(document.body.textContent).not.toMatch(/token=private|\/home\/private|traceback/);
@@ -422,27 +419,24 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).toContain("Prior accepted conclusion");
     expect(document.body.textContent).toContain("Revalidation required");
     expect(document.body.textContent).not.toMatch(
-      /Search with Tavily|Record insufficient evidence|Accept assessment/,
+      /Record insufficient evidence|Accept assessment/,
     );
   });
 
-  it("names Tavily and sends exactly one bounded request after the explicit search click", async () => {
+  it("omits the retired search command while manual evidence remains reachable", async () => {
     await mountLifecycle();
-    expect(apiMocks.startSecurityLifecycleInvestigation).not.toHaveBeenCalled();
-    await click("Search with Tavily");
-    expect(apiMocks.startSecurityLifecycleInvestigation).toHaveBeenCalledOnce();
-    expect(apiMocks.startSecurityLifecycleInvestigation).toHaveBeenCalledWith(CASE_ID, {
-      adapter: "tavily",
-    });
+    expect(document.body.textContent).not.toContain("Tavily");
+    expect(document.body.textContent).toContain("Add text evidence");
+    expect(document.body.textContent).toContain("Add URL evidence");
   });
 
-  it("opening refreshing focusing and switching tabs issue zero investigation requests", async () => {
+  it("opening refreshing focusing and switching tabs keep search retired", async () => {
     await mountLifecycle();
     window.dispatchEvent(new Event("focus"));
     await click("Refresh cases");
     await click("Data integrity");
     await click("Security events");
-    expect(apiMocks.startSecurityLifecycleInvestigation).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("Tavily");
   });
 
   it("opens a drawer with source evidence acknowledgement assessment and proposal sections", async () => {
