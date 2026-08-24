@@ -44,6 +44,7 @@ from dataclasses import dataclass, asdict
 import pandas as pd
 
 from .sec_edgar_source import SECEdgarDataSource
+from .sec_transport import SecTransport
 from .sec_user_agent import get_sec_user_agent
 
 logger = logging.getLogger(__name__)
@@ -912,18 +913,12 @@ class SECEdgarFinancials:
             >>> tickers[0]
             {'ticker': 'NVDA', 'cik': 1045810, 'title': 'NVIDIA CORP'}
         """
-        import requests
-        
-        headers = {
-            'User-Agent': _get_sec_user_agent(),
-            'Accept': 'application/json'
-        }
-        
         url = 'https://www.sec.gov/files/company_tickers.json'
-        resp = requests.get(url, headers=headers, timeout=30)
-        resp.raise_for_status()
-        
-        data = resp.json()
+        transport = SecTransport(user_agent=_get_sec_user_agent())
+        try:
+            data = transport.get_json(url, timeout=30)
+        finally:
+            transport.close()
         
         return [
             {

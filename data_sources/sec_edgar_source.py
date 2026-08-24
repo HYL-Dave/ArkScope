@@ -15,13 +15,10 @@ Rate Limits:
 Documentation: https://www.sec.gov/edgar/sec-api-documentation
 """
 
-import time
 import logging
 import re
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional, Any
-import requests
-
 from .base import (
     BaseDataSource,
     DataSourceType,
@@ -30,6 +27,7 @@ from .base import (
     SECFiling,
 )
 from .sec_user_agent import get_sec_user_agent
+from .sec_transport import SecTransport, SecTransportFailure
 
 logger = logging.getLogger(__name__)
 
@@ -92,10 +90,12 @@ class SECEdgarDataSource(BaseDataSource):
     COMPANY_FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts"
     FULL_TEXT_SEARCH_URL = "https://efts.sec.gov/LATEST/search-index"
 
-    # Rate limiting: 10 requests per second max
-    REQUEST_DELAY = 0.15  # 150ms between requests to be safe
-
-    def __init__(self, user_agent: Optional[str] = None):
+    def __init__(
+        self,
+        user_agent: Optional[str] = None,
+        *,
+        transport: Optional[SecTransport] = None,
+    ):
         """
         Initialize SEC EDGAR data source.
 
@@ -107,14 +107,7 @@ class SECEdgarDataSource(BaseDataSource):
         super().__init__(api_key=None)  # No API key needed
 
         self.user_agent = user_agent or get_sec_user_agent()
-
-        self._session = requests.Session()
-        self._session.headers.update({
-            'User-Agent': self.user_agent,
-            'Accept-Encoding': 'gzip, deflate',
-            'Accept': 'application/json',
-        })
-        self._last_request_time = 0
+        self.transport = transport or SecTransport(user_agent=self.user_agent)
 
         # Cache for CIK lookups
         self._cik_cache: Dict[str, str] = TICKER_TO_CIK.copy()
@@ -140,13 +133,6 @@ class SECEdgarDataSource(BaseDataSource):
     def supports_sec_filings(self) -> bool:
         return True
 
-    def _rate_limit_wait(self):
-        """Wait to respect rate limits (10 req/sec)."""
-        elapsed = time.time() - self._last_request_time
-        if elapsed < self.REQUEST_DELAY:
-            time.sleep(self.REQUEST_DELAY - elapsed)
-        self._last_request_time = time.time()
-
     def _make_request(
         self,
         url: str,
@@ -162,26 +148,20 @@ class SECEdgarDataSource(BaseDataSource):
         Returns:
             JSON response or None on error.
         """
-        self._rate_limit_wait()
-
         try:
-            response = self._session.get(url, params=params, timeout=30)
+            response = self.transport.get(url, params=params, timeout=30)
 
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
                 logger.warning(f"Resource not found: {url}")
                 return None
-            elif response.status_code == 429:
-                logger.warning("Rate limit exceeded. Waiting 10 seconds...")
-                time.sleep(10)
-                return self._make_request(url, params)
             else:
-                logger.error(f"SEC API error {response.status_code}: {response.text[:200]}")
+                logger.error("SEC API error %s", response.status_code)
                 return None
 
-        except requests.RequestException as e:
-            logger.error(f"Request failed: {e}")
+        except SecTransportFailure as exc:
+            logger.error("SEC request failed: %s", exc.code)
             return None
 
     def validate_credentials(self) -> bool:
@@ -394,35 +374,21 @@ class SECEdgarDataSource(BaseDataSource):
             raise ValueError("unsupported SEC filing URL")
         if isinstance(max_bytes, bool) or not 1024 <= int(max_bytes) <= 5_242_880:
             raise ValueError("invalid max_bytes")
-        self._rate_limit_wait()
         try:
-            response = self._session.get(url, timeout=30, stream=True)
-            try:
-                if response.status_code != 200:
-                    logger.warning(
-                        "SEC filing document unavailable (%s): %s",
-                        response.status_code,
-                        url,
-                    )
-                    return None
-                chunks = []
-                total = 0
-                for chunk in response.iter_content(chunk_size=65536):
-                    if not chunk:
-                        continue
-                    remaining = int(max_bytes) - total
-                    if remaining <= 0:
-                        break
-                    chunks.append(chunk[:remaining])
-                    total += min(len(chunk), remaining)
-                    if total >= int(max_bytes):
-                        break
-                encoding = response.encoding or 'utf-8'
-                return b''.join(chunks).decode(encoding, errors='replace')
-            finally:
-                response.close()
-        except requests.RequestException as exc:
-            logger.warning("Failed to fetch SEC filing document: %s", exc)
+            response = self.transport.get(
+                url,
+                timeout=30,
+                max_bytes=int(max_bytes),
+                document=True,
+            )
+            if response.status_code != 200:
+                logger.warning(
+                    "SEC filing document unavailable (%s)", response.status_code
+                )
+                return None
+            return response.text
+        except SecTransportFailure as exc:
+            logger.warning("Failed to fetch SEC filing document: %s", exc.code)
             return None
 
     def fetch_company_facts(self, ticker: str) -> Optional[Dict[str, Any]]:
@@ -507,8 +473,7 @@ class SECEdgarDataSource(BaseDataSource):
 
     def close(self) -> None:
         """Close the underlying HTTP session."""
-        if hasattr(self, '_session'):
-            self._session.close()
+        self.transport.close()
 
     def __del__(self):
         """Clean up session on deletion."""

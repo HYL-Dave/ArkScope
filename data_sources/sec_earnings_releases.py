@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-import requests
 from bs4 import BeautifulSoup
+from .sec_transport import SecTransport
 from .sec_user_agent import get_sec_user_agent
 
 logger = logging.getLogger(__name__)
@@ -50,12 +50,8 @@ class EarningsPressRelease:
 class SECEarningsReleases:
     """Parse SEC 8-K filings to extract earnings press releases."""
 
-    def __init__(self):
-        self._session = requests.Session()
-        self._session.headers.update({
-            'User-Agent': _get_sec_user_agent(),
-            'Accept': 'application/json, application/xml, text/html',
-        })
+    def __init__(self, *, transport: SecTransport | None = None):
+        self.transport = transport or SecTransport(user_agent=_get_sec_user_agent())
         self._cik_cache: dict[str, str] = {}
 
     def _get_cik(self, ticker: str) -> Optional[str]:
@@ -65,7 +61,7 @@ class SECEarningsReleases:
 
         # Use SEC company_tickers.json
         url = 'https://www.sec.gov/files/company_tickers.json'
-        resp = self._session.get(url, timeout=30)
+        resp = self.transport.get(url, timeout=30)
         resp.raise_for_status()
 
         data = resp.json()
@@ -80,7 +76,7 @@ class SECEarningsReleases:
     def _get_8k_filings(self, cik: str, limit: int = 20) -> list[dict]:
         """Get list of 8-K filings for a CIK."""
         url = f'https://data.sec.gov/submissions/CIK{cik.zfill(10)}.json'
-        resp = self._session.get(url, timeout=30)
+        resp = self.transport.get(url, timeout=30)
         resp.raise_for_status()
 
         data = resp.json()
@@ -107,7 +103,7 @@ class SECEarningsReleases:
         accession_clean = accession.replace('-', '')
         index_url = f'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_clean}/{accession}-index.html'
 
-        resp = self._session.get(index_url, timeout=30)
+        resp = self.transport.get(index_url, timeout=30)
         if resp.status_code != 200:
             return None
 
@@ -235,7 +231,7 @@ class SECEarningsReleases:
                 continue
 
             try:
-                resp = self._session.get(exhibit_url, timeout=30)
+                resp = self.transport.get(exhibit_url, timeout=30)
                 if resp.status_code != 200:
                     continue
 
@@ -280,7 +276,7 @@ def get_earnings_press_releases(ticker: str, limit: int = 5) -> list[dict]:
     return _get_singleton().get_earnings_press_releases(ticker, limit)
 
 
-# Module-level singleton — keeps CIK cache + requests.Session across calls
+# Module-level singleton keeps the CIK cache and shared SEC transport across calls.
 _singleton: Optional[SECEarningsReleases] = None
 _singleton_lock = threading.Lock()
 

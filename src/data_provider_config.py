@@ -563,15 +563,33 @@ def run_connection_test(provider: str) -> Dict[str, Any]:
             ok_statuses=(200,))
 
     if provider == "sec_edgar":
-        # free + key-less, but SEC rejects generic User-Agents — reuse the SEC
-        # client's own UA builder (SEC_CONTACT_EMAIL from config/.env) and probe
-        # the same endpoint the client actually uses.
-        from data_sources.sec_edgar_financials import _get_sec_user_agent
+        from data_sources.sec_transport import SecTransport, SecTransportFailure
 
-        return _http_probe(
-            "https://www.sec.gov/files/company_tickers.json",
-            headers={"User-Agent": _get_sec_user_agent(), "Accept": "application/json"},
-            auth_hint="被 SEC 拒絕 — User-Agent 需含聯絡 email（設定 SEC_CONTACT_EMAIL）")
+        t0 = time.monotonic()
+        transport = SecTransport()
+        try:
+            response = transport.get(
+                "https://www.sec.gov/files/company_tickers.json",
+                timeout=_TEST_TIMEOUT_S,
+            )
+            ms = int((time.monotonic() - t0) * 1000)
+            if response.status_code == 200:
+                return {"ok": True, "latency_ms": ms, "detail": "HTTP 200"}
+            if response.status_code in (401, 403):
+                return {
+                    "ok": False,
+                    "latency_ms": ms,
+                    "detail": f"HTTP {response.status_code} — 被 SEC 拒絕",
+                }
+            return {
+                "ok": False,
+                "latency_ms": ms,
+                "detail": f"HTTP {response.status_code}",
+            }
+        except SecTransportFailure as exc:
+            return {"ok": False, "latency_ms": None, "detail": exc.code}
+        finally:
+            transport.close()
 
     if provider == "financial_datasets":
         key = os.getenv("FINANCIAL_DATASETS_API_KEY")

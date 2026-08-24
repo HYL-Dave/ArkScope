@@ -15,25 +15,23 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
+from data_sources.sec_transport import SecTransport
+from data_sources.sec_user_agent import get_sec_user_agent
 from src.active_universe import ActiveUniverseUnavailable, build_active_universe_snapshot
 
 _SEC_URL = "https://www.sec.gov/files/company_tickers.json"
 _TTL_SECONDS = 30 * 86_400  # refresh monthly
-# SEC's fair-access policy REJECTS (HTTP 403) a UA without a contact — it must
-# include an email-like token. Override with a real contact via the env var.
-_DEFAULT_UA = "ArkScope/0.1 (arkscope@example.com)"
 logger = logging.getLogger(__name__)
 
 
 def _user_agent() -> str:
-    return os.environ.get("ARKSCOPE_SEC_USER_AGENT") or _DEFAULT_UA
+    return get_sec_user_agent()
 
 
 _lock = threading.Lock()
@@ -95,15 +93,11 @@ def _load_sec(force: bool) -> dict[str, str]:
     try:
         if fresh and not force:
             return _parse_sec(json.loads(path.read_text(encoding="utf-8")))
-        import requests
-
-        resp = requests.get(
-            _SEC_URL,
-            headers={"User-Agent": _user_agent(), "Accept-Encoding": "gzip, deflate"},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        raw = resp.json()
+        transport = SecTransport(user_agent=_user_agent())
+        try:
+            raw = transport.get_json(_SEC_URL, timeout=30)
+        finally:
+            transport.close()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(raw), encoding="utf-8")
         return _parse_sec(raw)
