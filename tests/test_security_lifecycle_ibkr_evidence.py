@@ -6,6 +6,7 @@ import json
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+import pytest
 from ib_insync import RequestError
 
 
@@ -123,6 +124,16 @@ def test_ibkr_adapter_requires_injected_gateway_and_shared_lock():
     assert result.evidence == ()
     assert state == {"held": False, "timeouts": [30.0]}
     assert gateway.requests == []
+
+    state, lock = _lock_recorder()
+    with pytest.raises(TypeError, match="programmer fault"):
+        _read(
+            _Gateway(
+                responses=(TypeError("programmer fault"),),
+                lock_state=state,
+            ),
+            lock,
+        )
 
 
 def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
