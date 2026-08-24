@@ -176,6 +176,8 @@ def test_chain_admits_only_reviewed_identity_forms_and_same_cik():
 
 
 def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts():
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
     case, transport, result = _collect("HAPN")
     assert result.blockers == ()
     assert len(result.evidence) == 1
@@ -192,6 +194,23 @@ def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts(
         cited = evidence.excerpt.encode()[fact.span_start_byte : fact.span_end_byte]
         assert cited.decode() == fact.cited_text
         assert fact.cited_text_sha256 == hashlib.sha256(cited).hexdigest()
+
+    delayed = dict(case)
+    delayed["document"] = (
+        "<html><body><p>" + ("Background material " * 400) + "</p><p>"
+        "CIK 0001409970. The same common stock will transfer from the New York "
+        "Stock Exchange to the Nasdaq Global Select Market and begin trading "
+        "under the new ticker symbol HAPN, replacing LC, effective June 27, 2026."
+        "</p></body></html>"
+    )
+    delayed_result = collect_sec_evidence(
+        context=_context("HAPN"),
+        transport=_FixtureTransport(delayed),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+    assert _values(delayed_result, "successor_ticker") == {"HAPN"}
+    assert all(len(item.excerpt.encode()) <= 4096 for item in delayed_result.evidence)
+    assert all("Background material" not in item.excerpt for item in delayed_result.evidence)
 
 
 def test_hapn_fixture_extracts_symbol_and_venue_change_without_a_to_a_transition():
