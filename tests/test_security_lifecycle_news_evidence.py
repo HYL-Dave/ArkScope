@@ -194,12 +194,16 @@ def _read(normalized, sa, **kwargs):
 
 
 def test_news_adapter_requires_explicit_borrowed_connections_and_never_creates_schema():
+    import src.security_lifecycle_news_evidence as module
     from src.security_lifecycle_news_evidence import read_local_publisher_evidence
 
     signature = inspect.signature(read_local_publisher_evidence)
     assert signature.parameters["normalized_conn"].default is inspect.Parameter.empty
     assert signature.parameters["sa_conn"].default is inspect.Parameter.empty
     assert all(param.kind is inspect.Parameter.KEYWORD_ONLY for param in signature.parameters.values())
+    source = inspect.getsource(module)
+    assert "sqlite3.connect" not in source
+    assert "CREATE TABLE" not in source
 
     normalized = _normalized_conn()
     sa = _sa_conn()
