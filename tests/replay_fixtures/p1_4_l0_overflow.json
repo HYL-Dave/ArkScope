@@ -9,13 +9,13 @@
   "system_prompt_hash": "0000000000000000",
   "user_input": "Find recent NVDA news.",
   "tools_available": [
-    "tavily_search",
+    "web_browse",
     "get_ticker_news"
   ],
   "tool_calls": [
     {
       "index": 0,
-      "name": "tavily_search",
+      "name": "web_browse",
       "arguments": {
         "max_results": 5,
         "query": "NVDA earnings preview"
@@ -52,5 +52,5 @@
     "input_tokens": 4200,
     "output_tokens": 95
   },
-  "notes": "P1.4 commit 4 fixture: oversized tavily_search payload triggered Layer 0 (raw 32K bytes -> compressed 1.8K, with on-disk overflow record). The compression block carries raw/compressed digests + overflow_record_id so an analyst can reconcile this trace against data/overflow/<session>/<record_id>.json. Hand-crafted shape; digests + record_id are illustrative, not real hashes."
+  "notes": "P1.4 commit 4 fixture: oversized web_browse payload triggered Layer 0 (raw 32K bytes -> compressed 1.8K, with on-disk overflow record). The compression block carries raw/compressed digests + overflow_record_id so an analyst can reconcile this trace against data/overflow/<session>/<record_id>.json. Hand-crafted shape; digests + record_id are illustrative, not real hashes."
 }

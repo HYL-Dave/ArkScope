@@ -1,6 +1,6 @@
 """Per-tool result reducers (P1.4 commit 2).
 
-Reducer protocol + a default truncate-with-marker reducer + 4 specific
+Reducer protocol + a default truncate-with-marker reducer + 2 specific
 reducers for the largest-output tools we ship today. See P1_4_SPEC §4.
 
 Every reducer is **fail-open**: if anything goes wrong (JSON parse
@@ -89,77 +89,6 @@ def truncate_with_marker(payload: str, *, budget: int) -> Tuple[str, Dict[str, A
         "head_chars": head_len,
         "tail_chars": tail_len,
     }
-
-
-# ---------------------------------------------------------------------------
-# tavily_search_reducer  (only `tavily_search` — others have non-results shapes)
-# ---------------------------------------------------------------------------
-
-
-def tavily_search_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
-    """For ``tavily_search``: keep query + answer + per-result title/url/snippet.
-
-    Real shape (from ``src/tools/web_tools.py``):
-
-    .. code-block:: text
-
-        {"query": str, "answer": str, "result_count": int,
-         "results": [{"title", "url", "content", ...}, ...]}
-
-    Falls through to ``truncate_with_marker`` on any shape deviation.
-
-    NOTE: ``tavily_fetch`` / ``web_browse`` have different shapes (single
-    ``content`` field, not a results list); they use the default truncate
-    reducer.
-    """
-    if len(payload) <= budget:
-        return payload, {}
-
-    try:
-        data = json.loads(payload)
-    except (json.JSONDecodeError, TypeError):
-        return truncate_with_marker(payload, budget=budget)
-
-    if not isinstance(data, dict):
-        return truncate_with_marker(payload, budget=budget)
-
-    results = data.get("results")
-    if not isinstance(results, list):
-        return truncate_with_marker(payload, budget=budget)
-
-    snippet_chars = 500
-    answer_chars = 1000
-    pruned: List[Dict[str, Any]] = []
-    for r in results:
-        if not isinstance(r, dict):
-            continue
-        content = str(r.get("content") or "")[:snippet_chars]
-        pruned.append({
-            "title":   str(r.get("title") or "")[:200],
-            "url":     str(r.get("url") or ""),
-            "snippet": content,
-        })
-
-    out = {
-        "query": str(data.get("query") or "")[:200],
-        "answer": str(data.get("answer") or "")[:answer_chars],
-        "result_count": len(results),
-        "results": pruned,
-    }
-    summary = json.dumps(out, ensure_ascii=False)
-
-    if len(summary) > budget:
-        return truncate_with_marker(summary, budget=budget)
-
-    return summary, {
-        "dropped_chars": len(payload) - len(summary),
-        "kept_results": len(pruned),
-        "snippet_chars": snippet_chars,
-    }
-
-
-# Backwards-compat alias (commit 2 used this name)
-web_result_reducer = tavily_search_reducer
 
 
 # ---------------------------------------------------------------------------
@@ -339,11 +268,6 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 
 
 _DEFAULT_REGISTRY: Dict[str, ToolReducer] = {
-    # tavily_search has a `results: [...]` shape that we know how to slice.
-    # tavily_fetch / web_browse both return a single `content` field — the
-    # default head+tail reducer is already a good fit; adding a custom one
-    # would just risk shape drift.
-    "tavily_search":           tavily_search_reducer,
     # Options
     "get_option_chain":        option_chain_reducer,
     # Python analysis (CodeExecutionResult.output / .error / .generated_code)

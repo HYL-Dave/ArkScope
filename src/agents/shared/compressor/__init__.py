@@ -15,8 +15,7 @@ Public API:
 
   - **Reducers**:
     :data:`ToolReducer`, :func:`truncate_with_marker`,
-    :func:`web_result_reducer`, :func:`option_chain_reducer`,
-    :func:`python_output_reducer`,
+    :func:`option_chain_reducer`, :func:`python_output_reducer`,
     :func:`get_reducer`, :func:`register_reducer`,
     :func:`default_registry`.
 
@@ -74,9 +73,7 @@ from .reducers import (
     option_chain_reducer,
     python_output_reducer,
     register_reducer,
-    tavily_search_reducer,
     truncate_with_marker,
-    web_result_reducer,  # backwards-compat alias for tavily_search_reducer
 )
 from .summary_callers import (
     DEFAULT_ANTHROPIC_MAX_TOKENS,
@@ -115,9 +112,7 @@ __all__ = [
     "option_chain_reducer",
     "python_output_reducer",
     "register_reducer",
-    "tavily_search_reducer",
     "truncate_with_marker",
-    "web_result_reducer",
     # Layers
     "apply_layer_0",
     "apply_layer_1",

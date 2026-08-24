@@ -175,26 +175,26 @@ class TestDefaultOffPreservesLegacy:
 
 class TestLayer0HookOnAnthropicLoop:
     def test_oversized_wrapped_tool_result_compressed(self, tmp_path):
-        """maybe_apply_layer_0 with a real wrapped tavily payload over budget
-        returns compressed content (envelope preserved, urls kept)."""
+        """maybe_apply_layer_0 with a real wrapped browser payload over budget
+        returns default-truncated content with its envelope preserved."""
         ctx = _make_ctx(tmp_path, layer_0_budget_chars=4_000)
         inner = json.dumps({
-            "query": "find me NVDA",
-            "answer": "NVIDIA earnings preview",
-            "result_count": 3,
-            "results": [
-                {"title": f"R{i}", "url": f"https://x/{i}", "content": "y" * 10_000}
-                for i in range(3)
-            ],
+            "url": "https://example.test/report",
+            "title": "Known report",
+            "content": "y" * 30_000,
+            "success": True,
         })
-        wrapped = _wrapped(inner, "tavily_search")
-        out = ctx.maybe_apply_layer_0("tavily_search", {"query": "find me NVDA"}, wrapped)
+        wrapped = _wrapped(inner, "web_browse")
+        out = ctx.maybe_apply_layer_0(
+            "web_browse",
+            {"url": "https://example.test/report"},
+            wrapped,
+        )
         assert isinstance(out, str)
         # Envelope preserved on output
-        assert out.startswith('<tool_output tool="tavily_search">\n')
-        # URLs preserved by the specific reducer (proof reducer ran on inner)
-        for i in range(3):
-            assert f"https://x/{i}" in out
+        assert out.startswith('<tool_output tool="web_browse">\n')
+        assert "https://example.test/report" in out
+        assert "chars dropped" in out
         # overflow_record marker present, OUTSIDE envelope
         assert "[overflow_record=" in out
         ref_idx = out.index("[overflow_record=")
@@ -203,8 +203,8 @@ class TestLayer0HookOnAnthropicLoop:
 
     def test_under_budget_passthrough(self, tmp_path):
         ctx = _make_ctx(tmp_path, layer_0_budget_chars=10_000)
-        small = _wrapped('{"ok": true}', "tavily_search")
-        out = ctx.maybe_apply_layer_0("tavily_search", {}, small)
+        small = _wrapped('{"ok": true}', "web_browse")
+        out = ctx.maybe_apply_layer_0("web_browse", {}, small)
         assert out == small
 
     def test_overflow_round_trip_byte_perfect(self, tmp_path):
@@ -212,8 +212,8 @@ class TestLayer0HookOnAnthropicLoop:
         original_payload is the EXACT wrapped input — byte-for-byte."""
         ctx = _make_ctx(tmp_path, layer_0_budget_chars=2_000)
         inner = json.dumps({"results": [{"url": "u", "content": "z" * 50_000}]})
-        wrapped = _wrapped(inner, "tavily_search")
-        out = ctx.maybe_apply_layer_0("tavily_search", {}, wrapped)
+        wrapped = _wrapped(inner, "web_browse")
+        out = ctx.maybe_apply_layer_0("web_browse", {}, wrapped)
 
         import re
         m = re.search(r"\[overflow_record=([0-9a-f]{16})", out)
@@ -242,8 +242,8 @@ class TestNativeBlockHygiene:
         tool_result block, the block keeps only type/tool_use_id/content —
         record_id rides along inside the content marker."""
         ctx = _make_ctx(tmp_path, layer_0_budget_chars=2_000)
-        wrapped = _wrapped("y" * 10_000, "tavily_search")
-        compressed = ctx.maybe_apply_layer_0("tavily_search", {}, wrapped)
+        wrapped = _wrapped("y" * 10_000, "web_browse")
+        compressed = ctx.maybe_apply_layer_0("web_browse", {}, wrapped)
         # Simulate the agent.py / cli.py call site
         block = {
             "type": "tool_result",
@@ -392,18 +392,18 @@ class TestL1L3IndependentOfTokenThreshold:
         ungate; this test calls compact_messages directly to lock the
         ContextManager-level contract.)"""
         formatted = json.dumps({"results": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]}, indent=2)
-        wrapped = _wrapped(formatted, "tavily_search")
+        wrapped = _wrapped(formatted, "web_browse")
         msgs = [
             {"role": "user", "content": "Q"},
-            {"role": "assistant", "content": [_FakeToolUseBlock(id="t1", name="tavily_search", input={})]},
+            {"role": "assistant", "content": [_FakeToolUseBlock(id="t1", name="web_browse", input={})]},
             {"role": "user", "content": [{
                 "type": "tool_result", "tool_use_id": "t1", "content": wrapped,
             }]},
-            {"role": "assistant", "content": [_FakeToolUseBlock(id="t2", name="tavily_search", input={})]},
+            {"role": "assistant", "content": [_FakeToolUseBlock(id="t2", name="web_browse", input={})]},
             {"role": "user", "content": [{
                 "type": "tool_result", "tool_use_id": "t2", "content": "RECENT",
             }]},
-            {"role": "assistant", "content": [_FakeToolUseBlock(id="t3", name="tavily_search", input={})]},
+            {"role": "assistant", "content": [_FakeToolUseBlock(id="t3", name="web_browse", input={})]},
             {"role": "user", "content": [{
                 "type": "tool_result", "tool_use_id": "t3", "content": "RECENT2",
             }]},
@@ -416,8 +416,8 @@ class TestL1L3IndependentOfTokenThreshold:
         out, stats = ctx.compact_messages(msgs)
         # Old tool_result minified (wrapped -> wrapped, but JSON minified inside)
         old_content = out[2]["content"][0]["content"]
-        assert old_content.startswith('<tool_output tool="tavily_search">\n')
-        inner = old_content[len('<tool_output tool="tavily_search">\n'):
+        assert old_content.startswith('<tool_output tool="web_browse">\n')
+        inner = old_content[len('<tool_output tool="web_browse">\n'):
                             -len("\n</tool_output>")]
         assert "\n" not in inner  # minified
         assert json.loads(inner) == {"results": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]}
@@ -482,18 +482,18 @@ class TestStatsShape:
     def test_compressor_path_stats_have_legacy_keys(self, tmp_path):
         """Compressor path must surface compacted/chars_saved/
         compaction_count/total_chars_saved AND a new events list."""
-        wrapped = _wrapped(json.dumps({"a": 1}, indent=2), "tavily_search")
+        wrapped = _wrapped(json.dumps({"a": 1}, indent=2), "web_browse")
         msgs = [
             {"role": "user", "content": "Q"},
-            {"role": "assistant", "content": [_FakeToolUseBlock(id="t1", name="tavily_search", input={})]},
+            {"role": "assistant", "content": [_FakeToolUseBlock(id="t1", name="web_browse", input={})]},
             {"role": "user", "content": [{
                 "type": "tool_result", "tool_use_id": "t1", "content": wrapped,
             }]},
-            {"role": "assistant", "content": [_FakeToolUseBlock(id="t2", name="tavily_search", input={})]},
+            {"role": "assistant", "content": [_FakeToolUseBlock(id="t2", name="web_browse", input={})]},
             {"role": "user", "content": [{
                 "type": "tool_result", "tool_use_id": "t2", "content": "R",
             }]},
-            {"role": "assistant", "content": [_FakeToolUseBlock(id="t3", name="tavily_search", input={})]},
+            {"role": "assistant", "content": [_FakeToolUseBlock(id="t3", name="web_browse", input={})]},
             {"role": "user", "content": [{
                 "type": "tool_result", "tool_use_id": "t3", "content": "R2",
             }]},
@@ -864,9 +864,9 @@ class TestL0CallgraphRegression:
         # Mirror agent.py / cli.py call sequence
         oversize = json.dumps({"x": "y" * 30_000})
         compressed, compression = ctx.compress_tool_result(
-            "tavily_search", {"q": "x"}, oversize,
+            "web_browse", {"q": "x"}, oversize,
         )
-        assert observed_inputs == [("tavily_search", {"q": "x"}, oversize)]
+        assert observed_inputs == [("web_browse", {"q": "x"}, oversize)]
         assert compression["raw_bytes"] == len(oversize.encode("utf-8"))
         assert compression["compressed"] is True
 

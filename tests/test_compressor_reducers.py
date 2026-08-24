@@ -29,9 +29,7 @@ from src.agents.shared.compressor import (
     option_chain_reducer,
     python_output_reducer,
     register_reducer,
-    tavily_search_reducer,
     truncate_with_marker,
-    web_result_reducer,
 )
 
 
@@ -75,73 +73,6 @@ class TestTruncateWithMarker:
         # Reducer accepts whatever; should not raise even on weird input
         out, _meta = truncate_with_marker("plain", budget=10)
         assert isinstance(out, str)
-
-
-# ============================================================
-# tavily_search_reducer (real shape from src/tools/web_tools.py)
-# ============================================================
-
-
-class TestTavilySearchReducer:
-    def _real_tavily_payload(self, n_results: int = 5, body_chars: int = 5000) -> str:
-        # Real shape: {"query", "answer", "result_count", "results"}
-        return json.dumps({
-            "query": "find me NVDA earnings news",
-            "answer": "NVIDIA's Q3 earnings beat estimates with revenue of $35B...",
-            "result_count": n_results,
-            "results": [
-                {
-                    "title": f"Result {i} title",
-                    "url": f"https://example.com/{i}",
-                    "content": "x" * body_chars,
-                }
-                for i in range(n_results)
-            ],
-        })
-
-    def test_short_payload_passes_through(self):
-        payload = json.dumps({
-            "query": "small",
-            "answer": "short",
-            "result_count": 1,
-            "results": [{"title": "t", "url": "u", "content": "c"}],
-        })
-        out, meta = tavily_search_reducer(payload, budget=10_000)
-        assert out == payload
-        assert meta == {}
-
-    def test_long_payload_keeps_titles_urls_answer_drops_bodies(self):
-        payload = self._real_tavily_payload(n_results=4, body_chars=10_000)
-        out, meta = tavily_search_reducer(payload, budget=8000)
-        assert len(out) <= 8000
-        # Answer field preserved (truncated to 1000 chars max)
-        assert "earnings beat" in out
-        # Titles + URLs preserved
-        for i in range(4):
-            assert f"Result {i} title" in out
-            assert f"https://example.com/{i}" in out
-        # Body content NOT preserved verbatim — snippet ≤500 chars per result
-        assert out.count("x" * 1000) == 0
-        assert meta["kept_results"] == 4
-        assert meta["snippet_chars"] == 500
-
-    def test_falls_back_to_default_on_invalid_json(self):
-        garbage = "not valid json {" * 1000
-        out, _meta = tavily_search_reducer(garbage, budget=500)
-        assert "chars dropped" in out
-        assert len(out) <= 500
-
-    def test_falls_back_when_results_missing(self):
-        # tavily_fetch / web_browse have no "results" field. The reducer
-        # should fall through to default truncation.
-        payload = json.dumps({"url": "x", "content": "y" * 10_000, "success": True})
-        out, _meta = tavily_search_reducer(payload, budget=500)
-        assert len(out) <= 500
-        assert "chars dropped" in out
-
-    def test_web_result_reducer_alias_still_works(self):
-        """Backwards-compat: web_result_reducer is an alias."""
-        assert web_result_reducer is tavily_search_reducer
 
 
 # ============================================================
@@ -301,32 +232,29 @@ class TestPythonOutputReducer:
 class TestRegistry:
     def test_known_tools_route_to_specific_reducers(self):
         reg = default_registry()
-        # tavily_search has a results[] shape we know how to slice.
-        assert reg["tavily_search"] is tavily_search_reducer
+        assert "tavily_search" not in reg
         assert reg["get_option_chain"] is option_chain_reducer
         assert "get_iv_history_data" not in reg
         assert reg["execute_python_analysis"] is python_output_reducer
 
-    def test_demoted_web_tools_use_default(self):
-        """tavily_fetch / web_browse have non-results shapes; the default
-        head+tail truncation handles their content fields without risking
-        shape drift."""
+    def test_web_browse_uses_default(self):
+        """The browser payload uses default head+tail truncation."""
         reg = default_registry()
-        for tool in ("tavily_fetch", "web_browse"):
-            assert tool not in reg
+        assert "web_browse" not in reg
+        assert get_reducer("web_browse") is truncate_with_marker
 
     def test_unknown_tool_returns_default(self):
         assert get_reducer("nonexistent_tool") is truncate_with_marker
 
     def test_get_reducer_uses_provided_registry(self):
-        local = {"my_tool": tavily_search_reducer}
-        assert get_reducer("my_tool", local) is tavily_search_reducer
+        local = {"my_tool": option_chain_reducer}
+        assert get_reducer("my_tool", local) is option_chain_reducer
         assert get_reducer("other_tool", local) is truncate_with_marker
 
     def test_register_reducer_to_local_registry(self):
         local = {}
-        register_reducer("my_tool", tavily_search_reducer, registry=local)
-        assert local["my_tool"] is tavily_search_reducer
+        register_reducer("my_tool", option_chain_reducer, registry=local)
+        assert local["my_tool"] is option_chain_reducer
 
     def test_default_registry_returns_copy(self):
         a = default_registry()

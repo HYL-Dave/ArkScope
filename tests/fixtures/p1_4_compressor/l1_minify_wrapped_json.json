@@ -12,7 +12,7 @@
     {
       "role": "assistant",
       "content": [
-        {"type": "tool_use", "id": "tu_1", "name": "tavily_search", "input": {"q": "x"}}
+        {"type": "tool_use", "id": "tu_1", "name": "web_browse", "input": {"q": "x"}}
       ]
     },
     {
@@ -21,14 +21,14 @@
         {
           "type": "tool_result",
           "tool_use_id": "tu_1",
-          "content": "<tool_output tool=\"tavily_search\">\n{\n  \"results\": [\n    {\n      \"a\": 1,\n      \"b\": [1, 2, 3]\n    }\n  ]\n}\n</tool_output>"
+          "content": "<tool_output tool=\"web_browse\">\n{\n  \"results\": [\n    {\n      \"a\": 1,\n      \"b\": [1, 2, 3]\n    }\n  ]\n}\n</tool_output>"
         }
       ]
     },
     {
       "role": "assistant",
       "content": [
-        {"type": "tool_use", "id": "tu_2", "name": "tavily_search", "input": {}}
+        {"type": "tool_use", "id": "tu_2", "name": "web_browse", "input": {}}
       ]
     },
     {
@@ -40,7 +40,7 @@
     {
       "role": "assistant",
       "content": [
-        {"type": "tool_use", "id": "tu_3", "name": "tavily_search", "input": {}}
+        {"type": "tool_use", "id": "tu_3", "name": "web_browse", "input": {}}
       ]
     },
     {

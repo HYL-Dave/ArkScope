@@ -114,10 +114,10 @@ class TestCompressToolResultShape:
         ctx = _make_ctx(tmp_path, layer_0_budget_chars=2_000)
         wrapped = _wrapped(
             json.dumps({"results": [{"url": "u", "content": "y" * 30_000}]}),
-            "tavily_search",
+            "web_browse",
         )
         out, meta = ctx.compress_tool_result(
-            "tavily_search", {"query": "q"}, wrapped,
+            "web_browse", {"query": "q"}, wrapped,
         )
         assert meta["compressed"] is True
         assert meta["raw_bytes"] > meta["compressed_bytes"]
@@ -208,7 +208,7 @@ class TestScratchpadCompression:
             "raw_digest": "deadbeef" * 2, "compressed_digest": "cafebabe" * 2,
             "overflow_record_id": "abcdef0123456789",
         }
-        pad.log_tool_result("tavily_search",
+        pad.log_tool_result("web_browse",
                             result_data="<compressed>",
                             tool_input={"q": "x"},
                             compression=compression)
@@ -430,12 +430,12 @@ class TestPipelineConsistency:
         record: replay.compression.raw_digest must match sha256 of the
         overflow record's original_payload."""
         ctx = _make_ctx(tmp_path, layer_0_budget_chars=2_000)
-        big = _wrapped(json.dumps({"x": "y" * 30_000}), "tavily_search")
-        _out, compression = ctx.compress_tool_result("tavily_search", {}, big)
+        big = _wrapped(json.dumps({"x": "y" * 30_000}), "web_browse")
+        _out, compression = ctx.compress_tool_result("web_browse", {}, big)
 
         cap = ReplayCapture(provider="anthropic", model="claude-opus-4-7", entrypoint="test")
-        cap.set_initial(question="Q", system_prompt="P", tools_available=["tavily_search"])
-        cap.record_tool_call("tavily_search", {}, "x", compression=compression)
+        cap.set_initial(question="Q", system_prompt="P", tools_available=["web_browse"])
+        cap.record_tool_call("web_browse", {}, "x", compression=compression)
 
         rec_id = cap.to_trace().tool_calls[0].compression["overflow_record_id"]
         record_files = list(tmp_path.glob(f"*/{rec_id}.json"))

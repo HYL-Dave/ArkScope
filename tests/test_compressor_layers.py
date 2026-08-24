@@ -157,26 +157,26 @@ class TestLayer0:
         assert retrieved.original_payload == big
 
     def test_specific_reducer_dispatched_for_known_tool(self, tmp_path):
-        """tavily_search payload should hit web_result_reducer (preserves URLs)."""
+        """A supplied per-tool reducer is dispatched for its known tool."""
         store = OverflowStore(tmp_path, session_id="s1")
-        payload = json.dumps({
-            "query": "find me x",
-            "results": [
-                {"title": f"R{i}", "url": f"https://e.com/{i}", "content": "y" * 5000}
-                for i in range(5)
-            ],
-        })
+        payload = "x" * 20_000
+        observed = []
+
+        def specific_reducer(value, *, budget):
+            observed.append((value, budget))
+            return "SPECIFIC", {"specific": True}
+
         out, record = apply_layer_0(
-            tool_name="tavily_search",
-            args={"query": "find me x"},
+            tool_name="known_tool",
+            args={},
             payload=payload,
             overflow_store=store,
             budget_chars=5000,
+            registry={"known_tool": specific_reducer},
         )
         assert record is not None
-        # All 5 URLs survive (web_result_reducer keeps them)
-        for i in range(5):
-            assert f"https://e.com/{i}" in out
+        assert observed == [(payload, 5000)]
+        assert out.startswith("SPECIFIC")
 
     def test_unknown_tool_uses_default_reducer(self, tmp_path):
         store = OverflowStore(tmp_path, session_id="s1")
@@ -233,41 +233,37 @@ class TestLayer0:
 
     def test_unwraps_tool_output_envelope_before_reducer(self, tmp_path):
         """Bridge wraps tool output as <tool_output tool="X">JSON</tool_output>.
-        Layer 0 must unwrap before calling the reducer (otherwise JSON parse
-        fails and reducer falls back to truncate_with_marker, losing the
-        ability to preserve titles / URLs / etc.)."""
+        Layer 0 must unwrap before calling a per-tool reducer and then restore
+        the envelope around the reducer output."""
         from src.agents.shared.security import wrap_tool_result
 
         store = OverflowStore(tmp_path, session_id="s1")
-        # Real tavily_search shape, then wrapped by the bridge
         inner = json.dumps({
-            "query": "find me NVDA",
-            "answer": "NVIDIA reports earnings...",
-            "result_count": 3,
-            "results": [
-                {"title": f"R{i}", "url": f"https://x/{i}", "content": "y" * 10_000}
-                for i in range(3)
-            ],
+            "url": "https://example.test/report",
+            "content": "y" * 30_000,
+            "success": True,
         })
-        wrapped = wrap_tool_result(inner, "tavily_search")
+        wrapped = wrap_tool_result(inner, "known_tool")
+        observed = []
+
+        def specific_reducer(value, *, budget):
+            observed.append((value, budget))
+            return '{"reduced":true}', {"specific": True}
 
         out, record = apply_layer_0(
-            tool_name="tavily_search",
-            args={"query": "find me NVDA"},
+            tool_name="known_tool",
+            args={},
             payload=wrapped,
             overflow_store=store,
             budget_chars=4_000,
+            registry={"known_tool": specific_reducer},
         )
         assert record is not None
+        assert observed == [(inner, 4_000)]
         # Output is re-wrapped — agent's parser still sees the envelope
-        assert out.startswith('<tool_output tool="tavily_search">\n')
+        assert out.startswith('<tool_output tool="known_tool">\n')
+        assert '{"reduced":true}' in out
         assert "</tool_output>" in out
-        # The reducer DID run on inner content (URLs preserved)
-        for i in range(3):
-            assert f"https://x/{i}" in out
-        # No 1000-char body runs survived (specific reducer was used,
-        # NOT the default head+tail)
-        assert out.count("y" * 1000) == 0
         # overflow_record reference appended OUTSIDE the envelope
         assert "[overflow_record=" in out
         ref_idx = out.index("[overflow_record=")
@@ -286,10 +282,10 @@ class TestLayer0:
             "result_count": 1,
             "results": [{"title": "T", "url": "U", "content": "z" * 50_000}],
         })
-        wrapped = wrap_tool_result(inner, "tavily_search")
+        wrapped = wrap_tool_result(inner, "web_browse")
 
         _out, record = apply_layer_0(
-            tool_name="tavily_search",
+            tool_name="web_browse",
             args={},
             payload=wrapped,
             overflow_store=store,
@@ -377,20 +373,20 @@ class TestLayer1:
             {"results": [{"a": 1, "b": [2, 3]}, {"a": 4, "b": [5, 6]}]},
             indent=2,
         )
-        wrapped = wrap_tool_result(formatted, "tavily_search")
+        wrapped = wrap_tool_result(formatted, "web_browse")
         msgs = [
             {"role": "user", "content": "u1"},
-            {"role": "tool_result", "tool_name": "tavily_search", "content": wrapped},
+            {"role": "tool_result", "tool_name": "web_browse", "content": wrapped},
             {"role": "user", "content": "u2"},
             {"role": "user", "content": "u3"},
         ]
         out = apply_layer_1(msgs, keep_recent_turns=2)
         new_content = out[1]["content"]
         # Re-wrapped — envelope preserved on output
-        assert new_content.startswith('<tool_output tool="tavily_search">\n')
+        assert new_content.startswith('<tool_output tool="web_browse">\n')
         assert new_content.endswith("\n</tool_output>")
         # Inner JSON minified (no pretty-print indents, no ", " separator)
-        inner = new_content[len('<tool_output tool="tavily_search">\n'):-len("\n</tool_output>")]
+        inner = new_content[len('<tool_output tool="web_browse">\n'):-len("\n</tool_output>")]
         assert "\n" not in inner
         assert ", " not in inner
         assert json.loads(inner) == {"results": [{"a": 1, "b": [2, 3]}, {"a": 4, "b": [5, 6]}]}
