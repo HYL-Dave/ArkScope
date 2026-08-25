@@ -28,6 +28,8 @@ _DETAIL_HISTORY_LIMIT = 20
 _DETAIL_EXCERPT_LIMIT = 2000
 _HISTORY_ORDER_FIELDS = {
     "investigation_runs": ("created_at", "run_id"),
+    "automation_runs": ("created_at", "run_id"),
+    "automation_facts": ("created_at", "fact_id"),
     "evidence": ("created_at", "evidence_id"),
     "assessment_history": ("created_at", "assessment_id"),
     "acknowledgement_history": ("acknowledged_at", "acknowledgement_id"),
@@ -139,6 +141,8 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
     item = dict(case)
     histories = {
         "investigation_runs": [],
+        "automation_runs": [],
+        "automation_facts": [],
         "evidence": [],
         "assessment_history": [],
         "acknowledgement_history": [],
@@ -165,8 +169,43 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
                     for key, field in value.items()
                     if key not in {"adapter", "query_plan_json", "usage_json"}
                 }
+            elif name == "automation_runs":
+                for key in (
+                    "run_key",
+                    "query_context",
+                    "query_context_json",
+                    "diagnostics",
+                    "diagnostics_json",
+                ):
+                    value.pop(key, None)
+                value["blockers"] = [
+                    {
+                        "blocker_code": blocker.get("blocker_code"),
+                        "retryable": bool(blocker.get("retryable")),
+                    }
+                    for blocker in value.get("blockers", [])
+                ]
+            elif name == "automation_facts":
+                value = {
+                    key: value.get(key)
+                    for key in (
+                        "fact_id",
+                        "automation_run_id",
+                        "evidence_id",
+                        "source_family",
+                        "fact_type",
+                        "normalized_value",
+                        "source_span_start",
+                        "source_span_end",
+                        "cited_text_sha256",
+                        "extractor_rule_id",
+                        "extractor_rule_version",
+                        "created_at",
+                    )
+                }
             elif name == "evidence":
                 value.pop("adapter", None)
+                value.pop("source_locator_json", None)
                 value["excerpt"] = str(value.get("excerpt") or "")[
                     :_DETAIL_EXCERPT_LIMIT
                 ]
@@ -179,6 +218,8 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
 
 def _case_summary(case: Mapping[str, object]) -> dict:
     observation = case.get("observation") or {}
+    automation_runs = list(case.get("automation_runs", []))
+    current_automation = automation_runs[0] if automation_runs else {}
     return {
         "case_id": case["case_id"],
         "source": case["source"],
@@ -195,6 +236,14 @@ def _case_summary(case: Mapping[str, object]) -> dict:
         "source_context": case.get("source_context"),
         "components": dict(case.get("components", {})),
         "investigation_run_count": len(case.get("investigation_runs", [])),
+        "automation_run_count": int(
+            case.get("automation_run_count", len(automation_runs))
+        ),
+        "automation_fact_count": int(
+            case.get("automation_fact_count", len(case.get("automation_facts", [])))
+        ),
+        "automation_tier": current_automation.get("decision_tier"),
+        "action_readiness": current_automation.get("action_readiness"),
         "evidence_count": len(case.get("evidence", [])),
         "assessment_count": len(case.get("assessment_history", [])),
         "acknowledgement_count": len(case.get("acknowledgement_history", [])),

@@ -1529,6 +1529,84 @@ def create_automation_assessment(
     )
 
 
+_AUTOMATION_DETAIL_LIMIT = 100
+
+
+def _decoded_json(value: object, *, mapping: bool = False) -> object:
+    try:
+        decoded = json.loads(str(value))
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise LifecycleSchemaMismatch("invalid lifecycle automation JSON") from exc
+    if mapping and not isinstance(decoded, dict):
+        raise LifecycleSchemaMismatch("invalid lifecycle automation object")
+    return decoded
+
+
+def _automation_history(
+    store: SecurityLifecycleInvestigationStore,
+    case_id: str,
+) -> tuple[list[dict], list[dict], int, int]:
+    run_total = int(
+        store.conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_automation_runs WHERE case_id=?",
+            (case_id,),
+        ).fetchone()[0]
+    )
+    fact_total = int(
+        store.conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_automation_facts WHERE case_id=?",
+            (case_id,),
+        ).fetchone()[0]
+    )
+    run_rows = store.conn.execute(
+        "SELECT * FROM security_lifecycle_automation_runs WHERE case_id=? "
+        "ORDER BY created_at DESC,rowid DESC LIMIT ?",
+        (case_id, _AUTOMATION_DETAIL_LIMIT),
+    ).fetchall()
+    runs: list[dict] = []
+    for row in run_rows:
+        item = dict(row)
+        item["query_context"] = _decoded_json(
+            item.pop("query_context_json"),
+            mapping=True,
+        )
+        item["diagnostics"] = _decoded_json(
+            item.pop("diagnostics_json"),
+            mapping=True,
+        )
+        blockers = []
+        for blocker_row in store.conn.execute(
+            "SELECT blocker_code,retryable,context_json,created_at "
+            "FROM security_lifecycle_automation_run_blockers "
+            "WHERE automation_run_id=? ORDER BY blocker_code",
+            (item["run_id"],),
+        ):
+            blocker = dict(blocker_row)
+            blocker["retryable"] = bool(blocker["retryable"])
+            blocker["context"] = _decoded_json(
+                blocker.pop("context_json"),
+                mapping=True,
+            )
+            blockers.append(blocker)
+        item["blockers"] = blockers
+        runs.append(item)
+
+    fact_rows = store.conn.execute(
+        "SELECT f.*,e.source_family FROM security_lifecycle_automation_facts f "
+        "JOIN security_lifecycle_evidence e ON e.evidence_id=f.evidence_id "
+        "WHERE f.case_id=? ORDER BY f.created_at DESC,f.fact_id DESC LIMIT ?",
+        (case_id, _AUTOMATION_DETAIL_LIMIT),
+    ).fetchall()
+    facts: list[dict] = []
+    for row in fact_rows:
+        item = dict(row)
+        item["normalized_value"] = _decoded_json(
+            item.pop("normalized_value_json")
+        )
+        facts.append(item)
+    return runs, facts, run_total, fact_total
+
+
 def _read_profile(
     path: Path,
     *,
@@ -1560,6 +1638,9 @@ def _read_profile(
             )
             runs = store.list_investigation_runs(case_id)
             evidence = store.list_evidence(case_id)
+            automation_runs, automation_facts, run_total, fact_total = (
+                _automation_history(store, case_id)
+            )
             proposals = store.project_proposals(
                 case_id,
                 observation_fingerprint_sha256=fingerprint,
@@ -1568,6 +1649,8 @@ def _read_profile(
                 (
                     runs,
                     evidence,
+                    automation_runs,
+                    automation_facts,
                     state["assessment_history"],
                     state["acknowledgement_history"],
                     proposals,
@@ -1578,6 +1661,10 @@ def _read_profile(
                     **state,
                     "investigation_runs": runs,
                     "evidence": evidence,
+                    "automation_runs": automation_runs,
+                    "automation_facts": automation_facts,
+                    "automation_run_count": run_total,
+                    "automation_fact_count": fact_total,
                     "proposals": proposals,
                 }
         return cases, projections
