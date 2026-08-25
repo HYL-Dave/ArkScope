@@ -191,14 +191,14 @@ listed; node and target counts remain unchanged.
 
 **Interfaces:** Adds compile-time closed API types/presentations, a first-view activity band, complete automation/fact views, suggestion prefill, and adjacent translation controls.
 
-- [ ] Add the seven frontend nodes. RED must be confined to the named additions/evolved owners; another unlisted resource owner or unrelated visible-literal failure is an amendment stop.
-- [ ] Add exact TypeScript unions/interfaces for decision tier, readiness, author/method/acceptance authority, source family, facts, blockers, translations, transition approval, and activity. Unknown boundary values render as unknown, never another known label.
-- [ ] Render unacknowledged automatic activity before filters/table. Each item states old/new or terminal action, effective/applied time, changed user-owned categories, retained provider-owned data, rule/version, acknowledgement, Reverse, or exact reverse blocker. Render does not call acknowledgement.
-- [ ] Keep acknowledged activity in recent history and case detail. Acknowledge only lowers prominence; it is not approval/consent and does not hide Reverse.
-- [ ] Group evidence by typed source family. Always show verbatim source excerpt, URL, publisher/time, and extraction facts. Show machine translation adjacent with provider/model provenance and a clear derived label; loading/error never removes original text.
-- [ ] Render automation tier, action readiness, author, acceptance authority, rule/version, citations, structured assessment fields, facts, and typed blockers. Prefill the edit form from the newest automation draft; accepting unchanged uses the existing accept command, while saving edits creates the existing human revision.
-- [ ] Keep manual text/URL controls secondary. Preserve exhaustive status/outcome/proposal mappings and source-language content.
-- [ ] Run focused frontend `60`, typecheck, visible-literal scanner, and production build. Commit tests before product/UI code.
+- [x] Add the seven frontend nodes. RED was exactly `8 failed / 52 passed`: seven additions plus the named migrated-legacy evolved owner, with no unrelated failure.
+- [x] Add exact TypeScript unions/interfaces for decision tier, readiness, author/method/acceptance authority, source family, facts, blockers, translations, transition approval, and activity. Unknown boundary values render as unknown, never another known label.
+- [x] Render unacknowledged automatic activity before filters/table. Each item states old/new or terminal action, effective/applied time, changed user-owned categories, retained provider-owned data, rule/version, acknowledgement, Reverse, or exact reverse blocker. Render does not call acknowledgement.
+- [x] Keep acknowledged activity in recent history and case detail. Acknowledge only lowers prominence; it is not approval/consent and does not hide Reverse.
+- [x] Group evidence by typed source family. Always show verbatim source excerpt, URL, publisher/time, and extraction facts. Show machine translation adjacent with provider/model provenance and a clear derived label; loading/error never removes original text.
+- [x] Render automation tier, action readiness, author, acceptance authority, rule/version, citations, structured assessment fields, facts, and typed blockers. Prefill the edit form from the newest automation draft; accepting unchanged uses the existing accept command, while saving edits creates the existing human revision.
+- [x] Keep manual text/URL controls secondary. Preserve exhaustive status/outcome/proposal mappings and source-language content.
+- [x] Run focused frontend `60`, typecheck, visible-literal scanner, production build, and full frontend exact `105` files / `1227` tests. Tests commit `7ca81964` precedes product/UI commit `55caf0d1`.
 
 ## Task 5: Scratch Apply, Acknowledge, And Reverse
 
