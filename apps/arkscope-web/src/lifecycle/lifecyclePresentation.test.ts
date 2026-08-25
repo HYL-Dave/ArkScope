@@ -22,6 +22,38 @@ describe("Lifecycle presentation", () => {
     expect(formatAssessmentDecimal(null, "USD")).toBe("Unknown");
   });
 
+  it("labels closed automation fact values without exposing storage codes", async () => {
+    const { lifecycleFactValueLabel } = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    );
+
+    expect(lifecycleFactValueLabel(
+      "tracked_security_effect",
+      "symbol_and_venue_change",
+      "en",
+    )).toBe("Ticker and trading venue changed");
+    expect(lifecycleFactValueLabel(
+      "tracked_security_effect",
+      "symbol_and_venue_change",
+      "zh-Hant",
+    )).toBe("標的代號與交易市場皆已變更");
+    expect(lifecycleFactValueLabel("security_class", "common_stock", "en"))
+      .toBe("Common stock");
+    expect(lifecycleFactValueLabel("transaction_structure", "asset_acquisition", "en"))
+      .toBe("Asset acquisition");
+    expect(lifecycleFactValueLabel(
+      "tracked_security_effect",
+      "future_effect",
+      "en",
+    )).toBe("Unrecognized value");
+    expect(lifecycleFactValueLabel("source_ticker", "HAPN", "en")).toBeNull();
+    expect(lifecycleFactValueLabel(
+      "transaction_structure",
+      { kind: "mixed" },
+      "en",
+    )).toBeNull();
+  });
+
   it("rejects unsafe evidence links before rendering an external action", async () => {
     const { safeEvidenceUrl } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
 

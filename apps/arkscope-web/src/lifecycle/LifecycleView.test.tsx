@@ -739,6 +739,19 @@ describe("Lifecycle workflow", () => {
         extractor_rule_id: "ibkr-venue",
         extractor_rule_version: "1",
         created_at: "2026-08-25T10:00:00Z",
+      }, {
+        fact_id: "fact-effect",
+        automation_run_id: "automation-run-1",
+        evidence_id: "evidence-sec",
+        source_family: "regulator",
+        fact_type: "tracked_security_effect",
+        normalized_value: "symbol_and_venue_change",
+        source_span_start: 20,
+        source_span_end: 36,
+        cited_text_sha256: "3".repeat(64),
+        extractor_rule_id: "sec-effect",
+        extractor_rule_version: "1",
+        created_at: "2026-08-25T10:00:00Z",
       }],
     }));
 
@@ -756,10 +769,13 @@ describe("Lifecycle workflow", () => {
       "LC",
       "Destination venue",
       "NASDAQ",
+      "Tracked-security effect",
+      "Ticker and trading venue changed",
       "Conflicting source facts",
       "Observation citation",
       "Evidence citation",
     ]) expect(document.body.textContent).toContain(value);
+    expect(document.body.textContent).not.toContain("symbol_and_venue_change");
   });
 
   it("prefills the newest automation suggestion without rewriting its authorship", async () => {
