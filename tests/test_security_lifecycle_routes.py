@@ -139,6 +139,95 @@ def _create_draft(client, context, evidence_id):
     return response.json()["assessment_id"]
 
 
+def _create_automation_draft(context):
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.security_lifecycle_fact_kernel import (
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+    from src.security_lifecycle_investigation import create_automation_assessment
+
+    kernel = SecurityLifecycleFactKernel(context["store"])
+    claim = kernel.reserve_run(
+        case_id=context["case_id"],
+        observation_fingerprint_sha256=context["fingerprint"],
+        policy_version=AUTOMATION_POLICY_VERSION,
+        mode="historical",
+        query_context={"case_id": context["case_id"], "ticker": "EA"},
+        diagnostics={"sec_attempts": 0},
+        at=_AT,
+    )
+    excerpt = "The tracked security may continue under ticker EA2."
+    evidence = AutomationEvidence(
+        evidence_id="sec-evidence",
+        source_family="regulator",
+        adapter="sec_edgar",
+        kind="regulator_excerpt",
+        source_url="https://www.sec.gov/Archives/example/ea-8k.htm",
+        title="EA filing",
+        publisher="SEC EDGAR",
+        domain="sec.gov",
+        source_published_at="2026-08-20",
+        retrieved_at=_AT,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        source_document_sha256="d" * 64,
+        source_locator={"accession": _SOURCE_REF},
+        evidence_dedupe_key="sec:route",
+    )
+    start = excerpt.encode().index(b"EA2")
+    fact = AutomationFact(
+        evidence_id=evidence.evidence_id,
+        fact_type="successor_ticker",
+        normalized_value="EA2",
+        source_span_start=start,
+        source_span_end=start + 3,
+        cited_text_sha256=hashlib.sha256(b"EA2").hexdigest(),
+        extractor_rule_id="sec.symbol_change",
+        extractor_rule_version="1",
+    )
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(fact,),
+        blockers=(),
+        decision_tier="review_suggested",
+        action_readiness="action_blocked",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_AT,
+    )
+    return create_automation_assessment(
+        store=context["store"],
+        run_id=claim.run_id,
+        decision={
+            "decision_tier": "review_suggested",
+            "action_readiness": "action_blocked",
+            "relevance": "direct_tracked_security",
+            "confidence": "medium",
+            "outcomes": ("symbol_changed",),
+            "conclusion": "The tracked security may continue under ticker EA2.",
+            "impact_summary": "Review the cited identity evidence.",
+            "successor_ticker": "EA2",
+            "destination_venue": "NASDAQ",
+            "effective_date": "2026-08-25",
+            "counterparty_name": None,
+            "counterparty_ticker": None,
+            "counterparty_cik": None,
+            "consideration_currency": None,
+            "cash_per_security_decimal": None,
+            "exchange_ratio_decimal": None,
+            "rule_id": "lifecycle.simple_symbol_continuation",
+            "rule_version": "1",
+            "decision_issues": ("preview:successor_hidden",),
+            "transition_requested": False,
+        },
+        observation_fingerprint_sha256=context["fingerprint"],
+        at=_AT,
+    )
+
+
 def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
@@ -157,6 +246,32 @@ def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, m
         }
         assert all(item["status"] == "proposed" for item in payload["proposals"])
         assert not hasattr(context["store"], "apply_action_proposal")
+    finally:
+        context["profile_conn"].close()
+
+
+def test_accepting_automation_suggestion_retains_automation_authorship_and_human_authority(
+    tmp_path,
+    monkeypatch,
+):
+    context = _build_context(tmp_path)
+    try:
+        assessment_id = _create_automation_draft(context)
+        client = _client(context, monkeypatch)
+
+        response = client.post(
+            f"/security-lifecycle/assessments/{assessment_id}/accept"
+        )
+
+        assert response.status_code == 200
+        assessment = response.json()["assessment"]
+        assert assessment["status"] == "accepted"
+        assert assessment["author"] == "automation"
+        assert assessment["acceptance_authority"] == "human"
+        assert assessment["automation_method"] == "deterministic_rule"
+        assert assessment["automation_run_id"] is not None
+        assert assessment["rule_id"] == "lifecycle.simple_symbol_continuation"
+        assert response.json()["proposals"]
     finally:
         context["profile_conn"].close()
 

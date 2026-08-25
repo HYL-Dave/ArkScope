@@ -94,6 +94,101 @@ def _accept(store, assessment_id, *, fingerprint=_FINGERPRINT):
     )
 
 
+def _automation_run(
+    store,
+    case_id,
+    *,
+    decision_tier="verified_automatic",
+    action_readiness="transition_eligible",
+    mode="historical",
+):
+    import hashlib
+
+    from src.security_lifecycle_fact_kernel import (
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+
+    kernel = SecurityLifecycleFactKernel(store)
+    claim = kernel.reserve_run(
+        case_id=case_id,
+        observation_fingerprint_sha256=_FINGERPRINT,
+        policy_version=AUTOMATION_POLICY_VERSION,
+        mode=mode,
+        query_context={"case_id": case_id, "ticker": "EA"},
+        diagnostics={"sec_attempts": 0},
+        at=_AT,
+    )
+    excerpt = "The tracked security will continue under ticker EA2."
+    evidence = AutomationEvidence(
+        evidence_id="sec-evidence",
+        source_family="regulator",
+        adapter="sec_edgar",
+        kind="regulator_excerpt",
+        source_url="https://www.sec.gov/Archives/example/ea-8k.htm",
+        title="EA filing",
+        publisher="SEC EDGAR",
+        domain="sec.gov",
+        source_published_at="2026-08-20",
+        retrieved_at=_AT,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        source_document_sha256="d" * 64,
+        source_locator={"accession": "0000712515-26-000042"},
+        evidence_dedupe_key=f"sec:{mode}",
+    )
+    start = excerpt.encode().index(b"EA2")
+    fact = AutomationFact(
+        evidence_id=evidence.evidence_id,
+        fact_type="successor_ticker",
+        normalized_value="EA2",
+        source_span_start=start,
+        source_span_end=start + 3,
+        cited_text_sha256=hashlib.sha256(b"EA2").hexdigest(),
+        extractor_rule_id="sec.symbol_change",
+        extractor_rule_version="1",
+    )
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(fact,),
+        blockers=(),
+        decision_tier=decision_tier,
+        action_readiness=action_readiness,
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+    return claim, result
+
+
+def _automation_decision(*, tier="verified_automatic", readiness="transition_eligible"):
+    return {
+        "decision_tier": tier,
+        "action_readiness": readiness,
+        "relevance": "direct_tracked_security",
+        "confidence": "high" if tier == "verified_automatic" else "medium",
+        "outcomes": ("symbol_changed",),
+        "conclusion": "The tracked security continues under ticker EA2.",
+        "impact_summary": "Preserve tracking intent under the successor ticker.",
+        "successor_ticker": "EA2",
+        "destination_venue": "NASDAQ",
+        "effective_date": "2026-08-25",
+        "counterparty_name": None,
+        "counterparty_ticker": None,
+        "counterparty_cik": None,
+        "consideration_currency": None,
+        "cash_per_security_decimal": None,
+        "exchange_ratio_decimal": None,
+        "rule_id": "lifecycle.simple_symbol_continuation",
+        "rule_version": "1",
+        "decision_issues": (),
+        "transition_requested": tier == "verified_automatic",
+    }
+
+
 def _composed_context(tmp_path):
     from src.security_lifecycle import (
         LifecycleObservation,
@@ -411,6 +506,246 @@ def test_draft_accept_and_supersede_preserve_version_history(tmp_path):
         assert {
             proposal["projected_block_reason"] for proposal in projected
         } == {"stale_assessment"}
+    finally:
+        conn.close()
+
+
+def test_automation_policy_acceptance_requires_verified_current_run_and_matching_provenance(
+    tmp_path,
+):
+    import inspect
+
+    from src.security_lifecycle_investigation import create_automation_assessment
+
+    conn, store, case_id = _context(tmp_path)
+    try:
+        claim, _result = _automation_run(store, case_id)
+        assessment_id = create_automation_assessment(
+            store=store,
+            run_id=claim.run_id,
+            decision=_automation_decision(),
+            observation_fingerprint_sha256=_FINGERPRINT,
+            at=_LATER,
+        )
+        parameter = inspect.signature(store.accept_assessment).parameters[
+            "acceptance_authority"
+        ]
+        assert parameter.default is inspect.Parameter.empty
+        with pytest.raises(TypeError):
+            store.accept_assessment(
+                assessment_id,
+                observation_fingerprint_sha256=_FINGERPRINT,
+                at=_LATER,
+            )
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_runs "
+            "SET decision_tier='review_suggested',action_readiness='action_blocked' "
+            "WHERE run_id=?",
+            (claim.run_id,),
+        )
+        conn.commit()
+        with pytest.raises(ValueError, match="automation_run_not_verified"):
+            store.accept_assessment(
+                assessment_id,
+                observation_fingerprint_sha256=_FINGERPRINT,
+                acceptance_authority="automation_policy",
+                at=_LATER,
+            )
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_runs "
+            "SET decision_tier='verified_automatic',"
+            "action_readiness='transition_eligible' WHERE run_id=?",
+            (claim.run_id,),
+        )
+        conn.execute(
+            "UPDATE security_lifecycle_automation_facts "
+            "SET extractor_rule_version='2' WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+        conn.commit()
+        with pytest.raises(ValueError, match="automation_provenance_stale"):
+            store.accept_assessment(
+                assessment_id,
+                observation_fingerprint_sha256=_FINGERPRINT,
+                acceptance_authority="automation_policy",
+                at=_LATER,
+            )
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_facts "
+            "SET extractor_rule_version='1' WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+        conn.commit()
+        accepted = store.accept_assessment(
+            assessment_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            acceptance_authority="automation_policy",
+            at=_LATER,
+        )
+        assert accepted["status"] == "accepted"
+        assert accepted["author"] == "automation"
+        assert accepted["acceptance_authority"] == "automation_policy"
+        assert accepted["automation_run_id"] == claim.run_id
+    finally:
+        conn.close()
+
+
+def test_human_accepts_unchanged_automation_draft_without_rewriting_author(tmp_path):
+    from src.security_lifecycle_investigation import create_automation_assessment
+
+    conn, store, case_id = _context(tmp_path)
+    try:
+        claim, _result = _automation_run(
+            store,
+            case_id,
+            decision_tier="review_suggested",
+            action_readiness="action_blocked",
+        )
+        assessment_id = create_automation_assessment(
+            store=store,
+            run_id=claim.run_id,
+            decision=_automation_decision(
+                tier="review_suggested",
+                readiness="action_blocked",
+            ),
+            observation_fingerprint_sha256=_FINGERPRINT,
+            at=_LATER,
+        )
+        before = store.get_assessment(assessment_id)
+
+        accepted = store.accept_assessment(
+            assessment_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            acceptance_authority="human",
+            at=_LATER,
+        )
+
+        assert accepted["status"] == "accepted"
+        assert accepted["author"] == "automation"
+        assert accepted["acceptance_authority"] == "human"
+        assert accepted["revision"] == before["revision"]
+        assert accepted["automation_method"] == "deterministic_rule"
+        assert accepted["automation_run_id"] == claim.run_id
+        assert accepted["rule_id"] == before["rule_id"]
+        assert accepted["rule_version"] == before["rule_version"]
+        assert accepted["decision_provenance_sha256"] == before[
+            "decision_provenance_sha256"
+        ]
+    finally:
+        conn.close()
+
+
+def test_automation_assessment_stales_on_policy_rule_or_fact_provenance_change(
+    tmp_path,
+):
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.security_lifecycle_investigation import create_automation_assessment
+
+    conn, store, case_id = _context(tmp_path)
+    try:
+        claim, _result = _automation_run(store, case_id)
+        assessment_id = create_automation_assessment(
+            store=store,
+            run_id=claim.run_id,
+            decision=_automation_decision(),
+            observation_fingerprint_sha256=_FINGERPRINT,
+            at=_LATER,
+        )
+        store.accept_assessment(
+            assessment_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            acceptance_authority="automation_policy",
+            at=_LATER,
+        )
+        assert store.project_case_state(
+            case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+        )["current_assessment"]["assessment_id"] == assessment_id
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_runs SET policy_version='old' "
+            "WHERE run_id=?",
+            (claim.run_id,),
+        )
+        conn.commit()
+        assert store.project_case_state(
+            case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+        )["current_assessment"] is None
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_runs SET policy_version=? "
+            "WHERE run_id=?",
+            (AUTOMATION_POLICY_VERSION, claim.run_id),
+        )
+        conn.execute(
+            "UPDATE security_lifecycle_assessments SET rule_version='0' "
+            "WHERE assessment_id=?",
+            (assessment_id,),
+        )
+        conn.commit()
+        assert store.project_case_state(
+            case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+        )["current_assessment"] is None
+
+        conn.execute(
+            "UPDATE security_lifecycle_assessments SET rule_version='1' "
+            "WHERE assessment_id=?",
+            (assessment_id,),
+        )
+        conn.execute(
+            "UPDATE security_lifecycle_automation_facts "
+            "SET extractor_rule_version='2' WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+        conn.commit()
+        state = store.project_case_state(
+            case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+        )
+        assert state["current_assessment"] is None
+        assert state["assessment_history"][0]["stale"] is True
+    finally:
+        conn.close()
+
+
+def test_proposal_specs_match_persisted_automatic_proposals(tmp_path):
+    from src.security_lifecycle_investigation import derive_action_proposal_specs
+
+    conn, store, case_id = _context(tmp_path)
+    try:
+        assessment_id = _draft(
+            store,
+            case_id,
+            outcomes=("symbol_changed",),
+            successor_ticker="EA2",
+        )
+        assessment = _accept(store, assessment_id)
+        sources = ("manual_lists", "portfolio_open")
+        specs = derive_action_proposal_specs(
+            case={"ticker": "EA"},
+            assessment=assessment,
+            sources=sources,
+        )
+        persisted = store.generate_action_proposals(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            sources_by_ticker={"EA": sources},
+            at=_LATER,
+        )["proposals"]
+
+        assert [
+            {
+                "action_type": item["action_type"],
+                "replacement_ticker": item["replacement_ticker"],
+                "block_reason": item["block_reason"],
+            }
+            for item in persisted
+        ] == list(specs)
     finally:
         conn.close()
 
