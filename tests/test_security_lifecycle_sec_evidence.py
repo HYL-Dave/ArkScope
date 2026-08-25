@@ -279,7 +279,7 @@ def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts(
     assert evidence.content_sha256 == hashlib.sha256(evidence.excerpt.encode()).hexdigest()
     assert evidence.document_sha256 == hashlib.sha256(case["document"].encode()).hexdigest()
     assert evidence.source_locator["accession"] == case["filing"]["accessionNumber"]
-    assert evidence.source_locator["rule_version"] == "1"
+    assert evidence.source_locator["rule_version"] == "2"
     assert transport.calls[0][1] is transport.calls[1][1]
 
     for fact in result.facts:
