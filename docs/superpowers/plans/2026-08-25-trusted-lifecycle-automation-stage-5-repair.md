@@ -88,13 +88,13 @@ section 16.
 - [x] Preserve the browser witness that exposed historical blockers beside the
   latest run, then bind visible blockers to that displayed run instead of
   aggregating superseded reasons without provenance.
-- [ ] Run exact additions and focused suites, then collection twice and full
+- [x] Run exact additions and focused suites, then collection twice and full
   backend twice with isolated basetemp roots.
-- [ ] Run frontend full, typecheck, literal scanner, production build, and the
+- [x] Run frontend full, typecheck, literal scanner, production build, and the
   bilingual browser matrix with all network/write requests denied.
-- [ ] Rebuild the Stage 5 packet at the repaired product/test authority and mark
+- [x] Rebuild the Stage 5 packet at the repaired product/test authority and mark
   real SEC source bytes plus read-only IBKR shape as separately unauthorized.
-- [ ] Stop for independent review before any hard stop.
+- [x] Stop for independent review before any hard stop.
 
 ## Post-Repair Authorization Boundary
 
