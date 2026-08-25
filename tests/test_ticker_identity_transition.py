@@ -37,7 +37,9 @@ def _profile_connection(tmp_path, *, active_source: bool = True) -> sqlite3.Conn
     return conn
 
 
-def _transition_connection(tmp_path, *, active_source: bool = True) -> sqlite3.Connection:
+def _transition_connection(
+    tmp_path, *, active_source: bool = True
+) -> sqlite3.Connection:
     from src.security_lifecycle_schema import create_profile_schema
     from src.ticker_identity_schema import create_ticker_identity_schema
 
@@ -284,7 +286,10 @@ def _build(
     priority_resolution: str | None = None,
     unhide_successor: bool = False,
 ) -> dict:
-    from src.ticker_identity_transition import TransitionOptions, build_transition_preview
+    from src.ticker_identity_transition import (
+        TransitionOptions,
+        build_transition_preview,
+    )
 
     return build_transition_preview(
         conn,
@@ -347,9 +352,19 @@ def test_terminal_delisting_is_blocked_by_open_portfolio(tmp_path):
     ("assessment_changes", "sources", "execute_on", "expected_reason"),
     [
         ({"effective_date": None}, ("manual_lists",), "", "execution_date_required"),
-        ({"status": "draft"}, ("manual_lists",), "2026-08-25", "assessment_not_accepted"),
+        (
+            {"status": "draft"},
+            ("manual_lists",),
+            "2026-08-25",
+            "assessment_not_accepted",
+        ),
         ({"stale": True}, ("manual_lists",), "2026-08-25", "stale_assessment"),
-        ({"citations": []}, ("manual_lists",), "2026-08-25", "observation_citation_required"),
+        (
+            {"citations": []},
+            ("manual_lists",),
+            "2026-08-25",
+            "observation_citation_required",
+        ),
     ],
 )
 def test_preview_rejects_missing_or_stale_authority(
@@ -527,9 +542,7 @@ def test_preview_lists_exact_profile_owned_effects_and_retained_facts(tmp_path):
         assert preview["effects"]["legacy_config_seed"] == {
             "add": [],
             "archive": [{"source_key": "legacy_config_seed", "ticker": "OLD"}],
-            "reactivate": [
-                {"source_key": "legacy_config_seed", "ticker": "NEW"}
-            ],
+            "reactivate": [{"source_key": "legacy_config_seed", "ticker": "NEW"}],
             "unchanged": [],
         }
         assert preview["effects"]["editable_tags_to_copy"] == [
@@ -633,9 +646,12 @@ def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_
             item["transition_id"]
             for item in store.list_due(on_date="2026-08-25", limit=10)
         ] == [first["transition_id"]]
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 1
+        assert (
+            conn.execute("SELECT COUNT(*) FROM ticker_identity_transitions").fetchone()[
+                0
+            ]
+            == 1
+        )
     finally:
         conn.close()
 
@@ -729,9 +745,12 @@ def test_automation_transition_approval_rejects_incoherent_or_stale_authority(
                 approved_preview_sha256=preview["preview_sha256"],
             )
 
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute("SELECT COUNT(*) FROM ticker_identity_transitions").fetchone()[
+                0
+            ]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -769,9 +788,12 @@ def test_transition_approval_rejects_tampered_or_ineligible_preview_without_rows
                 approved_preview_sha256=ineligible["preview_sha256"],
             )
 
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute("SELECT COUNT(*) FROM ticker_identity_transitions").fetchone()[
+                0
+            ]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -803,9 +825,12 @@ def test_transition_approval_rechecks_profile_digest_inside_its_write_lock(tmp_p
                 approved_preview_sha256=preview["preview_sha256"],
             )
 
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute("SELECT COUNT(*) FROM ticker_identity_transitions").fetchone()[
+                0
+            ]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -841,9 +866,12 @@ def test_transition_approval_rechecks_assessment_authority_inside_write_lock(
                 approved_preview_sha256=preview["preview_sha256"],
             )
 
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute("SELECT COUNT(*) FROM ticker_identity_transitions").fetchone()[
+                0
+            ]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -969,8 +997,7 @@ def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
         )
         assert repeated["status"] == "already_applied"
         assert conn.execute(
-            "SELECT status FROM ticker_identity_transition_attempts "
-            "ORDER BY rowid"
+            "SELECT status FROM ticker_identity_transition_attempts " "ORDER BY rowid"
         ).fetchall() == [("applied",), ("already_applied",)]
     finally:
         conn.close()
@@ -1016,12 +1043,12 @@ def test_apply_rolls_back_every_profile_and_receipt_mutation_on_failure(
             _step_hook=fail_at_step,
         )
         with pytest.raises(RuntimeError, match="injected_failure"):
-                applying.apply(
-                    transition["transition_id"],
-                    current_preview=preview,
-                    expected_preview_sha256=preview["preview_sha256"],
-                    trigger="scheduler",
-                )
+            applying.apply(
+                transition["transition_id"],
+                current_preview=preview,
+                expected_preview_sha256=preview["preview_sha256"],
+                trigger="scheduler",
+            )
 
         assert calls == fail_after
         assert _rows_by_table(conn) == before
@@ -1072,9 +1099,12 @@ def test_apply_rechecks_profile_state_inside_write_lock_and_never_overwrites_edi
         assert conn.execute(
             "SELECT priority FROM ticker_meta WHERE ticker='OLD'"
         ).fetchone() == ("low",)
-        assert conn.execute(
-            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+            ).fetchone()[0]
+            == 0
+        )
         assert conn.execute(
             "SELECT status,block_reasons_json FROM ticker_identity_transition_attempts"
         ).fetchall() == [("blocked", '["preview_changed"]')]
@@ -1119,9 +1149,12 @@ def test_apply_rechecks_accepted_assessment_inside_write_lock(tmp_path):
         assert result["status"] == "blocked"
         assert result["block_reasons"] == ["preview_changed"]
         assert result["transition"]["status"] == "needs_review"
-        assert conn.execute(
-            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+            ).fetchone()[0]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -1178,12 +1211,15 @@ def test_open_position_preserves_old_visibility_without_blocking_successor_track
             preview=preview,
             approved_preview_sha256=preview["preview_sha256"],
         )
-        assert store.apply(
-            transition["transition_id"],
-            current_preview=preview,
-            expected_preview_sha256=preview["preview_sha256"],
-            trigger="scheduler",
-        )["status"] == "applied"
+        assert (
+            store.apply(
+                transition["transition_id"],
+                current_preview=preview,
+                expected_preview_sha256=preview["preview_sha256"],
+                trigger="scheduler",
+            )["status"]
+            == "applied"
+        )
 
         assert {
             table: conn.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
@@ -1200,10 +1236,13 @@ def test_open_position_preserves_old_visibility_without_blocking_successor_track
             "SELECT archived_at FROM watchlist_memberships "
             "WHERE list_id=1 AND ticker='NEW'"
         ).fetchone() == (None,)
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_tags WHERE ticker='NEW' "
-            "AND source='provider:fundamentals'"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) FROM ticker_tags WHERE ticker='NEW' "
+                "AND source='provider:fundamentals'"
+            ).fetchone()[0]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -1240,18 +1279,22 @@ def test_terminal_delisting_archives_and_suppresses_without_creating_successor(
         )
 
         assert result["status"] == "applied"
-        assert conn.execute(
-            "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) FROM watchlist_memberships WHERE ticker='NEW'"
+            ).fetchone()[0]
+            == 0
+        )
         assert conn.execute(
             "SELECT archived_at FROM watchlist_memberships WHERE ticker='OLD'"
         ).fetchone() == ("2026-08-25T13:00:00Z",)
         assert conn.execute(
             "SELECT hidden_at FROM ticker_meta WHERE ticker='OLD'"
         ).fetchone() == ("2026-08-25T13:00:00Z",)
-        assert conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_links"
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute("SELECT COUNT(*) FROM ticker_identity_links").fetchone()[0]
+            == 0
+        )
     finally:
         conn.close()
 
@@ -1303,12 +1346,14 @@ def test_reversal_restores_exact_owned_rows_and_keeps_reversed_lineage(tmp_path)
         assert conn.execute(
             "SELECT status FROM ticker_identity_transition_attempts ORDER BY rowid"
         ).fetchall() == [("applied",), ("reversed",)]
-        assert reversing.lineage_for_ticker("OLD")["successors"][0][
-            "successor_ticker"
-        ] == "NEW"
-        assert reversing.lineage_for_ticker("NEW")["predecessors"][0][
-            "source_ticker"
-        ] == "OLD"
+        assert (
+            reversing.lineage_for_ticker("OLD")["successors"][0]["successor_ticker"]
+            == "NEW"
+        )
+        assert (
+            reversing.lineage_for_ticker("NEW")["predecessors"][0]["source_ticker"]
+            == "OLD"
+        )
     finally:
         conn.close()
 
