@@ -93,6 +93,13 @@ gain discriminating subcases without changing node IDs or counts. Fact-kernel
 product/test paths expand from `T1` to `T1/T4`; no path, schema column, closed
 vocabulary, route, or collection identity is added.
 
+This docs-only amendment also advances the protected byte authority for
+`docs/superpowers/specs/2026-08-24-trusted-lifecycle-automation-design.md` to
+commit `f6871270` (blob `a3b036eb09d5756c4e415c7ad94406ef71675bbf`).
+That file is byte-protected from this amended authority onward. The other 16
+protected entries retain their original Stage 3 authority; no product or test
+protected byte is reopened.
+
 ### Task 7 IBKR client-id projection owner amendment
 
 The first full-suite admission run ended `4372 passed / 1 failed / 12 skipped`.
