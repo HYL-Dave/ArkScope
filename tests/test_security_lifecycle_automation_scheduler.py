@@ -243,22 +243,16 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
         "effective_date": "2026-08-25",
         "outcomes": ("symbol_changed",),
     }
-    assert (
-        scheduler._transition_preview(
-            case=case,
-            request=request,
-            sources=("manual_lists",),
-        )["eligible"]
-        is True
-    )
-    assert (
-        scheduler._transition_approver(
-            case=case,
-            request=request,
-            sources=("manual_lists",),
-        )["transition_id"]
-        == "tit_1"
-    )
+    assert scheduler._transition_preview(
+        case=case,
+        request=request,
+        sources=("manual_lists",),
+    )["eligible"] is True
+    assert scheduler._transition_approver(
+        case=case,
+        request=request,
+        sources=("manual_lists",),
+    )["transition_id"] == "tit_1"
 
     scheduler._worker()
     assert captured_worker["transition_preview"] is scheduler._transition_preview

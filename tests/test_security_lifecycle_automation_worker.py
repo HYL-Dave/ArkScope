@@ -85,7 +85,9 @@ def _evidence(case, *, family, payload, kind, locator):
         adapter="sec_edgar" if family == "regulator" else "ibkr_contract",
         kind=kind,
         source_url=(
-            case["observation"]["evidence_url"] if family == "regulator" else None
+            case["observation"]["evidence_url"]
+            if family == "regulator"
+            else None
         ),
         title=f"{family} evidence",
         publisher="SEC EDGAR" if family == "regulator" else "Interactive Brokers",
@@ -148,7 +150,8 @@ def _bundle(
             locator={"filing_chain_complete": True},
         )
         facts = tuple(
-            _fact(regulator, regulator_payload, key, key) for key in regulator_payload
+            _fact(regulator, regulator_payload, key, key)
+            for key in regulator_payload
         )
         evidence = [regulator]
         if market_absent:
@@ -240,7 +243,10 @@ def _bundle(
                 _fact(regulator, regulator_payload, key, key)
                 for key in regulator_payload
             ),
-            *(_fact(market, market_payload, key, key) for key in market_payload),
+            *(
+                _fact(market, market_payload, key, key)
+                for key in market_payload
+            ),
         ),
         blockers=(),
         diagnostics={"sec_attempts": 1, "ibkr_requests": 1},
@@ -335,10 +341,9 @@ class _Harness:
             transition_preview=self.transition_preview,
             clock=self.clock,
         )
-        if (
-            "transition_approver"
-            in inspect.signature(LifecycleAutomationWorker).parameters
-        ):
+        if "transition_approver" in inspect.signature(
+            LifecycleAutomationWorker
+        ).parameters:
             kwargs["transition_approver"] = self.transition_approver
         return LifecycleAutomationWorker(**kwargs)
 
@@ -377,12 +382,9 @@ def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_pa
         assert result["selected"] == 2
         assert result["processed"] == 2
         assert [item[0] for item in harness.evidence_calls] == expected
-        assert (
-            harness.conn.execute(
-                "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
-            ).fetchone()[0]
-            == 2
-        )
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
+        ).fetchone()[0] == 2
     finally:
         harness.conn.close()
 
@@ -404,9 +406,7 @@ def test_verified_result_persists_automation_assessment_acceptance_and_proposals
         assert assessment["automation_method"] == "deterministic_rule"
         assert assessment["rule_id"] == "lifecycle.simple_symbol_continuation"
         assert assessment["decision_provenance_sha256"]
-        assert {
-            row["action_type"] for row in store.list_proposals(case["case_id"])
-        } == {
+        assert {row["action_type"] for row in store.list_proposals(case["case_id"])} == {
             "notify",
             "remap_symbol",
         }
@@ -480,13 +480,10 @@ def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_pat
             "notify",
             "remap_symbol",
         )
-        assert (
-            harness.conn.execute(
-                "SELECT COUNT(*) FROM sqlite_master "
-                "WHERE type='table' AND name='ticker_identity_transitions'"
-            ).fetchone()[0]
-            == 0
-        )
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM sqlite_master "
+            "WHERE type='table' AND name='ticker_identity_transitions'"
+        ).fetchone()[0] == 0
     finally:
         harness.conn.close()
 
@@ -579,7 +576,9 @@ def test_program_error_fails_run_without_network_classification(
     acquire_case = _case(1)
     assessment_case = _case(2)
     harness = _Harness(tmp_path, [acquire_case, assessment_case])
-    harness.bundles[acquire_case["case_id"]] = TypeError("fixture programmer fault")
+    harness.bundles[acquire_case["case_id"]] = TypeError(
+        "fixture programmer fault"
+    )
     monkeypatch.setattr(
         worker_module,
         "create_automation_assessment",
@@ -622,12 +621,9 @@ def test_current_assessment_is_not_reprocessed(tmp_path):
         assert second["processed"] == 0
         assert second["skipped_current"] == 1
         assert harness.evidence_calls == calls
-        assert (
-            harness.conn.execute(
-                "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
-            ).fetchone()[0]
-            == 1
-        )
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
+        ).fetchone()[0] == 1
     finally:
         harness.conn.close()
 
