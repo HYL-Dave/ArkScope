@@ -67,6 +67,9 @@ def test_scheduler_runs_bounded_worker_batch_and_returns_sanitized_summary(
 
 def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch):
     from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    real_worker = scheduler._worker
 
     class Worker:
         def run(self, limit, mode):
@@ -88,6 +91,24 @@ def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch)
         now=_NOW,
     )
     assert not profile_path.exists()
+
+    pre_cutover_path = tmp_path / "pre-cutover.db"
+    JobRunsLocalStore(pre_cutover_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(pre_cutover_path))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market.db"))
+    monkeypatch.setattr(scheduler, "_worker", real_worker)
+    monkeypatch.setattr(
+        scheduler,
+        "_load_sources",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("source loader reached before schema gate")
+        ),
+    )
+
+    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _summary(
+        status="not_installed",
+        reason="automation_schema_absent",
+    )
 
 
 def test_scheduler_witness_deduplicates_failure_and_records_recovery(
