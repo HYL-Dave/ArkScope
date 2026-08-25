@@ -1,5 +1,6 @@
 path
 tests/test_ibkr_client_id.py
+tests/test_data_provider_config.py
 tests/test_security_lifecycle_fact_kernel.py
 tests/test_security_lifecycle_decision_policy.py
 tests/test_security_lifecycle_investigation.py

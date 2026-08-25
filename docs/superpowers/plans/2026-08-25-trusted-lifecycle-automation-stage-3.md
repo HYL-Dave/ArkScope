@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - Product base is exactly `5d88e1b301e62a61211e3343165ef37be90b0250`; Stage 2 product authority remains `ab6654c0c9cd7586b883a10ea4f40255fa5e3249`.
-- Backend baseline collection is exactly `4348`; the amended focused pre-addition collection is exactly `190` nodes (`156` originally admitted plus `34` existing direct-caller nodes).
-- This stage adds exactly `37` backend nodes and removes none. Target collection is `4385`; target focused collection is `227`.
+- Backend baseline collection is exactly `4348`; the fully amended focused pre-addition collection is exactly `234` nodes (`156` originally admitted plus `34` existing direct-caller nodes plus the `44`-node provider-config owner file).
+- This stage adds exactly `37` backend nodes and removes none. Target collection is `4385`; target focused collection is `271`.
 - Automation policy version is `trusted-lifecycle-automation-v1`; deterministic rule IDs and version `1` are closed in this plan.
 - One worker tick admits at most two cases. A current non-stale accepted human/legacy/automation assessment is not overwritten.
 - `verified_automatic` requires deterministic regulator facts and every rule-specific independent condition. `review_suggested` is a complete draft, never an accepted conclusion or profile-mutation authority.
@@ -93,6 +93,25 @@ gain discriminating subcases without changing node IDs or counts. Fact-kernel
 product/test paths expand from `T1` to `T1/T4`; no path, schema column, closed
 vocabulary, route, or collection identity is added.
 
+### Task 7 IBKR client-id projection owner amendment
+
+The first full-suite admission run ended `4372 passed / 1 failed / 12 skipped`.
+Its sole failure was the existing
+`tests/test_data_provider_config.py::test_view_exposes_client_id_domains`: the
+Stage 3 `lifecycle=80` read-only domain correctly appeared in the app-managed
+provider projection, while this exact-list owner still expected the eight
+pre-Stage-3 domains. The focused and ownership ledgers had omitted that
+downstream owner.
+
+The file is byte-identical to the product base at `716` lines and SHA-256
+`9c291a9ea5ad99132b29915c27d955b0315636484f44c4763c89915e9671386e`; it
+collects exactly `44` existing nodes. Stage 3 owns only the one existing node's
+literal domain, offset, effective-ID, label, and guard-copy expectations. No
+node, product path, client-id value, capability, schema, route, or backend
+collection identity changes. The focused baseline is therefore `234` and the
+final target is `271`. The rejected first full run remains evidence and
+canonical admission restarts after the tests-only owner correction.
+
 ## Closed Decision Contract
 
 The pure policy returns `AutomationDecision` with these fields:
@@ -143,7 +162,7 @@ Closed rule identities are:
 
 - [ ] Verify clean branch `trusted-lifecycle-automation-stages3-5` at `5d88e1b3`, with `ab6654c0` as its parent product checkpoint and no merge commit.
 - [ ] Verify every modify pin in the owned ledger and every add path is absent.
-- [ ] Collect backend `4348` twice. The original focused ledger collected `156` existing nodes; the Task 3 direct-caller amendment independently collected `34`, for an amended baseline of exactly `190`.
+- [ ] Collect backend `4348` twice. The original focused ledger collected `156` existing nodes; the Task 3 direct-caller amendment independently collected `34`, and the Task 7 provider-config owner amendment adds `44`, for a final amended baseline of exactly `234`.
 - [ ] Confirm every protected path is byte-identical and no production path/provider is opened.
 
 ## Task 1: Make Run Decisions Reproducible And Conflict-Aware
@@ -215,6 +234,7 @@ Closed rule identities are:
 - Modify: `src/security_lifecycle_ibkr_evidence.py`
 - Create: `src/security_lifecycle_automation_worker.py`
 - Modify: `tests/test_ibkr_client_id.py`
+- Modify: `tests/test_data_provider_config.py` (one existing projection owner only)
 - Modify: `tests/test_security_lifecycle_ibkr_evidence.py`
 - Create: `tests/test_security_lifecycle_automation_worker.py`
 
@@ -223,7 +243,7 @@ Closed rule identities are:
 - Produces: `LifecycleAutomationEvidenceBundle` and `LifecycleAutomationWorker.run(limit=2, mode="live")`.
 - Adds: dedicated IBKR client-id domain `lifecycle=80`; it remains read-only and under `ibkr_gateway_lock`.
 
-- [ ] Add the worker's ten nodes, two IBKR nodes, and one client-id node. RED must fail on missing interfaces, not on a provider call.
+- [ ] Add the worker's ten nodes, two IBKR nodes, and one client-id node. Evolve the existing provider-config projection owner to include the lifecycle domain. RED must fail on missing interfaces, not on a provider call.
 - [ ] Convert successful contract snapshots to cited `successor_ticker`, `destination_venue`, and `security_class` facts only when the canonical snapshot supports them. A typed contract-missing result remains distinct and may satisfy terminal market absence only after the effective date; gateway/entitlement/ambiguity never does.
 - [ ] The worker scans stable present cases, skips a current non-stale accepted assessment, admits at most two changed/due cases, and reserves the durable run before acquisition.
 - [ ] Evidence acquisition, profile connections, source context, preview evaluator, and clock are constructor-injected. Core tests prove no default path or socket is reachable.
@@ -271,7 +291,7 @@ Closed rule identities are:
 ## Task 7: Stage 3 Offline Admission
 
 - [ ] Run exact additions: `37 passed`.
-- [ ] Run focused paths: exact `190 + 37 = 227` node identity.
+- [ ] Run focused paths: exact `234 + 37 = 271` node identity.
 - [ ] Run backend collection twice and require `4385` both times.
 - [ ] Run full backend twice with unique `--basetemp`; expected arithmetic is `4336 passed / 12 skipped + 37 = 4373 passed / 12 skipped`.
 - [ ] Run route inventory, scheduler network-denial tests, direct-provider scan, default-path scan, schema verifier, `foreign_key_check`, and `integrity_check` against scratch databases only.

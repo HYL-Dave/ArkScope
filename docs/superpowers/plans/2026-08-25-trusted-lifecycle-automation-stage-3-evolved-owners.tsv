@@ -5,4 +5,5 @@ tests/test_security_lifecycle_investigation.py::test_draft_accept_and_supersede_
 tests/test_security_lifecycle_routes.py::test_accept_assessment_route_keeps_action_execution_out_of_scope	T3	The route passes explicit human authority and still creates recommendations only.
 tests/test_security_lifecycle_routes.py::test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal	T6	Case detail gains bounded automation run/fact sections without collapsing existing sections.
 tests/test_security_lifecycle_ibkr_evidence.py::test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separately	T4	Contract absence gains an honest typed absence outcome while remaining distinct from gateway failure.
+tests/test_data_provider_config.py::test_view_exposes_client_id_domains	T4	The exact app-managed IBKR client-id projection includes the new read-only lifecycle domain and effective ID.
 tests/test_data_scheduler.py::test_tick_runs_due_ticker_transitions_before_provider_dispatch	T5	Lifecycle decision automation is inserted before due transition execution and ordinary providers.
