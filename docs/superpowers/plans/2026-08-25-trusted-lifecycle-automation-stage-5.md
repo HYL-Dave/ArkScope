@@ -194,18 +194,18 @@ translated.
 
 ## Task 6: Stage 5 Offline Admission
 
-- [ ] Run additions exact `6 passed`; focused exact `38`; collection twice
+- [x] Run additions exact `6 passed`; focused exact `38`; collection twice
   `4411`; full backend twice with unique `--basetemp` roots at
   `4399 passed / 12 skipped / 0 failed`.
-- [ ] Run frontend full `105 files / 1228 tests`, typecheck, visible-literal
+- [x] Run frontend full `105 files / 1228 tests`, typecheck, visible-literal
   scanner, production build, and the four-entry browser matrix.
-- [ ] Verify unchanged route/tool inventories, exact protected bytes, complete
+- [x] Verify unchanged route/tool inventories, exact protected bytes, complete
   ownership, linear clean unpublished branch, and zero provider/production
   operations.
-- [ ] Produce a checksummed Stage 5 packet containing node streams, shadow
+- [x] Produce a checksummed Stage 5 packet containing node streams, shadow
   report, browser artifacts, network classification, ownership/protected
   reports, and the unexecuted migration authorization template.
-- [ ] Stop before merge, push, production preflight, backup, migration,
+- [x] Stop before merge, push, production preflight, backup, migration,
   provider call, or app cutover and request independent review.
 
 ## Non-Goals And Hard Stops
