@@ -1,0 +1,6 @@
+runner	path
+backend	tests/test_security_lifecycle_sec_evidence.py
+backend	tests/test_security_lifecycle_decision_policy.py
+backend	tests/test_security_lifecycle_ibkr_evidence.py
+backend	tests/test_security_lifecycle_automation_scheduler.py
+backend	tests/test_security_lifecycle_grounded_shadow.py

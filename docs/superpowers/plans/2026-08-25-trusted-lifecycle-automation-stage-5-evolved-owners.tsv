@@ -1,0 +1,2 @@
+node_id	reason
+tests/test_security_lifecycle_sec_evidence.py::test_qbts_fixture_extracts_venue_only_with_unchanged_symbol	explicit same-symbol continuation now emits both source and successor identity facts while still forbidding an A-to-A transition
