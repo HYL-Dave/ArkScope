@@ -123,14 +123,14 @@ def translate_evidence(
 
 **Interfaces:** Produces activity list/acknowledge reads and routes, reverse readiness, and transition activity in case detail.
 
-- [ ] Add the six Task 2 nodes. Evolve both exact route-count owners from `184` to `186` and lifecycle route count from `14` to `16` after the two activity-route RED is admitted; Task 3 adds the translation route and reaches the final `187` / `17` inventory.
-- [ ] In the same apply transaction, append one `applied` activity containing bounded typed change counts, retained provider facts, post-state digest, rule identity, provenance, and time. Add the row before commit; rollback removes it.
-- [ ] In the same reverse transaction, append one `reversed` activity bound to the restored state digest. Blocked reverse creates an attempt but no activity.
-- [ ] Factor reverse blockers into a read-only `reverse_readiness` used by both reverse and presentation. It must report exact state drift and later-lineage blockers without mutating attempts.
-- [ ] List activity newest-first with total/unacknowledged counts. Acknowledge by explicit command only; repeated acknowledgement returns the original timestamp and leaves transition/activity payload and reversal readiness unchanged.
-- [ ] Add `GET /security-lifecycle/transition-activity` and `POST /security-lifecycle/transition-activity/{activity_id}/acknowledge`, with read-before-permission validation and typed 404/422/503 errors.
-- [ ] Add approval provenance and bounded activity history to the existing case-detail transition projection. Provider-neutral tools may expose typed provenance/activity but never raw snapshot JSON.
-- [ ] Run exact Task 2 RED/GREEN, intermediate route inventory `186` with `16` lifecycle routes, and provider-free read/write boundary tests. Commit tests before product code.
+- [x] Add the six Task 2 nodes. Evolve both exact route-count owners from `184` to `186` and lifecycle route count from `14` to `16` after the two activity-route RED is admitted; Task 3 adds the translation route and reaches the final `187` / `17` inventory.
+- [x] In the same apply transaction, append one `applied` activity containing bounded typed change counts, retained provider facts, post-state digest, rule identity, provenance, and time. Add the row before commit; rollback removes it.
+- [x] In the same reverse transaction, append one `reversed` activity bound to the restored state digest. Blocked reverse creates an attempt but no activity.
+- [x] Factor reverse blockers into a read-only `reverse_readiness` used by both reverse and presentation. It must report exact state drift and later-lineage blockers without mutating attempts.
+- [x] List activity newest-first with total/unacknowledged counts. Acknowledge by explicit command only; repeated acknowledgement returns the original timestamp and leaves transition/activity payload and reversal readiness unchanged.
+- [x] Add `GET /security-lifecycle/transition-activity` and `POST /security-lifecycle/transition-activity/{activity_id}/acknowledge`, with read-before-permission validation and typed 404/422/503 errors.
+- [x] Add approval provenance and bounded activity history to the existing case-detail transition projection. Provider-neutral tools may expose typed provenance/activity but never raw snapshot JSON.
+- [x] Run exact Task 2 RED/GREEN, intermediate route inventory `186` with `16` lifecycle routes, and provider-free read/write boundary tests. Commit tests before product code.
 
 ## Task 3: Add Hash-Bound On-Demand Evidence Translation
 
