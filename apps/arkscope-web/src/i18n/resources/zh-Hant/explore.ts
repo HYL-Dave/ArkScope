@@ -442,6 +442,17 @@ const explore = {
       transactionStructure: "交易結構",
       trackedSecurityEffect: "對追蹤證券的影響",
     },
+    factValues: {
+      commonStock: "普通股",
+      assetAcquisition: "資產收購",
+      corporateUnification: "公司統一",
+      terminalDelisting: "終止上市",
+      symbolChange: "標的代號變更",
+      venueChangeOnly: "交易市場已變更，代號未變",
+      symbolAndVenueChange: "標的代號與交易市場皆已變更",
+      noIdentityChange: "追蹤證券身分未變",
+      assetAcquisitionNoRegistrantChange: "資產收購；申報主體身分未變",
+    },
     automationBlockers: {
       secIdentityUnconfigured: "尚未設定 SEC 聯絡身分",
       secGovernorUnavailable: "SEC 共用請求控制無法使用",

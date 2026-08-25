@@ -67,6 +67,7 @@ import {
   lifecycleEventLabel,
   lifecycleEvidenceSourceFamilyLabel,
   lifecycleFactTypeLabel,
+  lifecycleFactValueLabel,
   lifecycleOutcomeLabel,
   lifecycleDecisionTierLabel,
   lifecycleProposalLabel,
@@ -643,7 +644,11 @@ function AutomationTruth({
                 {familyFacts.map((fact) => (
                   <div key={fact.fact_id}>
                     <dt>{lifecycleFactTypeLabel(fact.fact_type, locale)}</dt>
-                    <dd>{factValue(fact.normalized_value)}</dd>
+                    <dd>{lifecycleFactValueLabel(
+                      fact.fact_type,
+                      fact.normalized_value,
+                      locale,
+                    ) ?? factValue(fact.normalized_value)}</dd>
                     <dd className="tiny mono">{t(($) => $.lifecycle.fields.extractionRule)}: {
                       t(($) => $.lifecycle.activity.ruleVersion, {
                         rule: fact.extractor_rule_id,

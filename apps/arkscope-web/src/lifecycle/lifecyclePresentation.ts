@@ -131,6 +131,47 @@ export function lifecycleFactTypeLabel(
   }, locale);
 }
 
+type SecurityClassFactValue = "common_stock";
+type TransactionStructureFactValue = "asset_acquisition" | "corporate_unification";
+type TrackedSecurityEffectFactValue =
+  | "terminal_delisting"
+  | "symbol_change"
+  | "venue_change_only"
+  | "symbol_and_venue_change"
+  | "no_identity_change"
+  | "asset_acquisition_no_registrant_change";
+
+export function lifecycleFactValueLabel(
+  factType: string,
+  value: unknown,
+  locale: LifecycleLocale,
+): string | null {
+  if (typeof value !== "string") return null;
+  const copy = lifecycleCopy(locale).factValues;
+  if (factType === "security_class") {
+    return closedLifecycleLabel<SecurityClassFactValue>(value, {
+      common_stock: copy.commonStock,
+    }, locale);
+  }
+  if (factType === "transaction_structure") {
+    return closedLifecycleLabel<TransactionStructureFactValue>(value, {
+      asset_acquisition: copy.assetAcquisition,
+      corporate_unification: copy.corporateUnification,
+    }, locale);
+  }
+  if (factType === "tracked_security_effect") {
+    return closedLifecycleLabel<TrackedSecurityEffectFactValue>(value, {
+      terminal_delisting: copy.terminalDelisting,
+      symbol_change: copy.symbolChange,
+      venue_change_only: copy.venueChangeOnly,
+      symbol_and_venue_change: copy.symbolAndVenueChange,
+      no_identity_change: copy.noIdentityChange,
+      asset_acquisition_no_registrant_change: copy.assetAcquisitionNoRegistrantChange,
+    }, locale);
+  }
+  return null;
+}
+
 export function lifecycleAutomationBlockerLabel(
   value: string,
   locale: LifecycleLocale,

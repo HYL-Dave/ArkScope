@@ -442,6 +442,17 @@ const explore = {
       transactionStructure: "Transaction structure",
       trackedSecurityEffect: "Tracked-security effect",
     },
+    factValues: {
+      commonStock: "Common stock",
+      assetAcquisition: "Asset acquisition",
+      corporateUnification: "Corporate unification",
+      terminalDelisting: "Terminal delisting",
+      symbolChange: "Ticker symbol changed",
+      venueChangeOnly: "Trading venue changed; ticker unchanged",
+      symbolAndVenueChange: "Ticker and trading venue changed",
+      noIdentityChange: "Tracked-security identity unchanged",
+      assetAcquisitionNoRegistrantChange: "Asset acquisition; registrant identity unchanged",
+    },
     automationBlockers: {
       secIdentityUnconfigured: "SEC contact identity is not configured",
       secGovernorUnavailable: "Shared SEC request control is unavailable",
