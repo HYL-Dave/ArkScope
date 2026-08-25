@@ -94,7 +94,7 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 194,
+      lifecycle: 290,
       news: 44,
       tickerDetail: 89,
       aiCard: 67,
@@ -264,7 +264,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(581);
+      expect(flattened.size, `${locale}.explore`).toBe(677);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -723,7 +723,7 @@ describe("bundled i18n resources", () => {
       shell: 37,
       settings: 796,
       research: 207,
-      explore: 581,
+      explore: 677,
       portfolio: 374,
       system: 24,
     } as const;
@@ -792,7 +792,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2080);
+      expect(total, `${locale}.total`).toBe(2176);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(

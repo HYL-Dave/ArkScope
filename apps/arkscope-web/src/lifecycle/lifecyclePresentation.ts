@@ -1,8 +1,15 @@
 import type {
   SecurityLifecycleActionProposal,
+  SecurityLifecycleAcceptanceAuthority,
+  SecurityLifecycleActionReadiness,
   SecurityLifecycleAssessment,
+  SecurityLifecycleAssessmentAuthor,
+  SecurityLifecycleAutomationBlockerCode,
+  SecurityLifecycleAutomationMethod,
   SecurityLifecycleConfidence,
   SecurityLifecycleEventType,
+  SecurityLifecycleEvidenceSourceFamily,
+  SecurityLifecycleFactType,
   SecurityLifecycleInvestigationRun,
   SecurityLifecycleOutcome,
   SecurityLifecycleProposalBlockReason,
@@ -11,6 +18,7 @@ import type {
   SecurityLifecycleSourcePresence,
   SecurityLifecycleTrackingSource,
   SecurityLifecycleWorkflowState,
+  SecurityLifecycleDecisionTier,
 } from "../api";
 import enExplore from "../i18n/resources/en/explore";
 import zhHantExplore from "../i18n/resources/zh-Hant/explore";
@@ -19,6 +27,134 @@ export type LifecycleLocale = "en" | "zh-Hant";
 
 function lifecycleCopy(locale: LifecycleLocale) {
   return locale === "en" ? enExplore.lifecycle : zhHantExplore.lifecycle;
+}
+
+function closedLifecycleLabel<Value extends string>(
+  value: string,
+  labels: Record<Value, string>,
+  locale: LifecycleLocale,
+): string {
+  return Object.prototype.hasOwnProperty.call(labels, value)
+    ? labels[value as Value]
+    : lifecycleCopy(locale).states.unknownValue;
+}
+
+export function lifecycleDecisionTierLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).decisionTiers;
+  return closedLifecycleLabel<SecurityLifecycleDecisionTier>(value, {
+    verified_automatic: copy.verifiedAutomatic,
+    review_suggested: copy.reviewSuggested,
+  }, locale);
+}
+
+export function lifecycleActionReadinessLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).actionReadiness;
+  return closedLifecycleLabel<SecurityLifecycleActionReadiness>(value, {
+    not_applicable: copy.notApplicable,
+    waiting_effective_date: copy.waitingEffectiveDate,
+    waiting_market_confirmation: copy.waitingMarketConfirmation,
+    transition_eligible: copy.transitionEligible,
+    action_blocked: copy.actionBlocked,
+  }, locale);
+}
+
+export function lifecycleAssessmentAuthorLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).assessmentAuthors;
+  return closedLifecycleLabel<SecurityLifecycleAssessmentAuthor>(value, {
+    human: copy.human,
+    legacy_review: copy.legacyReview,
+    automation: copy.automation,
+  }, locale);
+}
+
+export function lifecycleAutomationMethodLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).automationMethods;
+  return closedLifecycleLabel<SecurityLifecycleAutomationMethod>(value, {
+    deterministic_rule: copy.deterministicRule,
+    model_assisted: copy.modelAssisted,
+  }, locale);
+}
+
+export function lifecycleAcceptanceAuthorityLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).acceptanceAuthorities;
+  return closedLifecycleLabel<SecurityLifecycleAcceptanceAuthority>(value, {
+    human: copy.human,
+    automation_policy: copy.automationPolicy,
+    legacy_migration: copy.legacyMigration,
+  }, locale);
+}
+
+export function lifecycleEvidenceSourceFamilyLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).evidenceFamilies;
+  return closedLifecycleLabel<SecurityLifecycleEvidenceSourceFamily>(value, {
+    regulator: copy.regulator,
+    market_infrastructure: copy.marketInfrastructure,
+    publisher: copy.publisher,
+    general_web: copy.generalWeb,
+    manual: copy.manual,
+  }, locale);
+}
+
+export function lifecycleFactTypeLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).factTypes;
+  return closedLifecycleLabel<SecurityLifecycleFactType>(value, {
+    source_ticker: copy.sourceTicker,
+    successor_ticker: copy.successorTicker,
+    source_venue: copy.sourceVenue,
+    destination_venue: copy.destinationVenue,
+    effective_date: copy.effectiveDate,
+    security_class: copy.securityClass,
+    issuer_cik: copy.issuerCik,
+    transaction_structure: copy.transactionStructure,
+    tracked_security_effect: copy.trackedSecurityEffect,
+  }, locale);
+}
+
+export function lifecycleAutomationBlockerLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).automationBlockers;
+  return closedLifecycleLabel<SecurityLifecycleAutomationBlockerCode>(value, {
+    sec_identity_unconfigured: copy.secIdentityUnconfigured,
+    sec_governor_unavailable: copy.secGovernorUnavailable,
+    sec_request_budget_exhausted: copy.secRequestBudgetExhausted,
+    sec_rate_limited: copy.secRateLimited,
+    sec_access_denied: copy.secAccessDenied,
+    sec_transport_unavailable: copy.secTransportUnavailable,
+    sec_document_unavailable: copy.secDocumentUnavailable,
+    sec_evidence_insufficient: copy.secEvidenceInsufficient,
+    internal_news_unavailable: copy.internalNewsUnavailable,
+    internal_news_schema_mismatch: copy.internalNewsSchemaMismatch,
+    ibkr_gateway_unavailable: copy.ibkrGatewayUnavailable,
+    ibkr_contract_missing: copy.ibkrContractMissing,
+    ibkr_contract_ambiguous: copy.ibkrContractAmbiguous,
+    ibkr_entitlement_denied: copy.ibkrEntitlementDenied,
+    market_confirmation_missing: copy.marketConfirmationMissing,
+    source_conflict: copy.sourceConflict,
+    impact_context_requested: copy.impactContextRequested,
+  }, locale);
 }
 
 export function lifecycleWorkflowLabel(

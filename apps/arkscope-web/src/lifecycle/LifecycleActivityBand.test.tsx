@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { withTestUiLocale } from "../test/testUiLocale";
@@ -68,7 +69,10 @@ async function click(label: string) {
   await act(async () => button.click());
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(async () => {
+  await i18n.changeLanguage("en");
+  vi.clearAllMocks();
+});
 
 afterEach(() => {
   if (root) act(() => root!.unmount());

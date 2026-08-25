@@ -13,6 +13,7 @@ import {
 
 import {
   acceptSecurityLifecycleAssessment,
+  acknowledgeTickerIdentityTransitionActivity,
   acknowledgeSecurityLifecycleCase,
   addSecurityLifecycleEvidence,
   approveTickerIdentityTransition,
@@ -21,28 +22,34 @@ import {
   dismissSecurityLifecycleProposal,
   getSecurityLifecycleCase,
   getTickerIdentityTransitionPreview,
+  listTickerIdentityTransitionActivity,
   listSecurityLifecycleCases,
   reopenSecurityLifecycleAcknowledgement,
   retryTickerIdentityTransition,
   reverseTickerIdentityTransition,
+  translateSecurityLifecycleEvidence,
   type SecurityLifecycleCaseDetail,
   type SecurityLifecycleCaseFilters,
   type SecurityLifecycleCaseSummary,
   type SecurityLifecycleAssessment,
+  type SecurityLifecycleAutomationFact,
   type SecurityLifecycleAssessmentOutcome,
   type SecurityLifecycleConfidence,
   type SecurityLifecycleEventType,
+  type SecurityLifecycleEvidence,
   type SecurityLifecycleProposalType,
   type SecurityLifecycleRelevance,
   type SecurityLifecycleSourcePresence,
   type SecurityLifecycleWorkflowState,
   type TickerIdentityPriorityResolution,
   type TickerIdentityTransitionAttemptResult,
+  type TickerIdentityTransitionApprovalAuthority,
   type TickerIdentityTransitionBlockReason,
   type TickerIdentityTransitionCaveat,
   type TickerIdentityTransitionKind,
   type TickerIdentityTransitionPreview,
   type TickerIdentityTransitionStatus,
+  type TickerIdentityTransitionActivity,
 } from "../api";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -50,10 +57,18 @@ import {
   actionProposalPresentation,
   formatAssessmentDecimal,
   lifecycleAssessmentStatusLabel,
+  lifecycleAcceptanceAuthorityLabel,
+  lifecycleActionReadinessLabel,
+  lifecycleAssessmentAuthorLabel,
+  lifecycleAutomationBlockerLabel,
+  lifecycleAutomationMethodLabel,
   lifecycleConfidenceLabel,
   lifecycleErrorPresentation,
   lifecycleEventLabel,
+  lifecycleEvidenceSourceFamilyLabel,
+  lifecycleFactTypeLabel,
   lifecycleOutcomeLabel,
+  lifecycleDecisionTierLabel,
   lifecycleProposalLabel,
   lifecycleRelevanceLabel,
   lifecycleRunStatusLabel,
@@ -63,11 +78,16 @@ import {
   safeEvidenceUrl,
   type LifecycleLocale,
 } from "./lifecyclePresentation";
+import {
+  LifecycleActivityBand,
+  type LifecycleActivityItem,
+} from "./LifecycleActivityBand";
 import { LifecycleCaseDrawer, LifecycleCaseSection } from "./LifecycleCaseDrawer";
 import {
   tickerTransitionBlockReasonLabel,
   tickerTransitionCaveatLabel,
   tickerTransitionKindLabel,
+  tickerTransitionApprovalAuthorityLabel,
   tickerTransitionStatusLabel,
 } from "./tickerIdentityPresentation";
 
@@ -142,6 +162,15 @@ function transitionKindLabels(
   return {
     symbol_continuation: t(($) => $.lifecycle.transition.kinds.symbolContinuation),
     terminal_delisting: t(($) => $.lifecycle.transition.kinds.terminalDelisting),
+  };
+}
+
+function transitionAuthorityLabels(
+  t: TFunction<"explore">,
+): Record<TickerIdentityTransitionApprovalAuthority, string> {
+  return {
+    attended_user: t(($) => $.lifecycle.activity.authorities.attendedUser),
+    automation_policy: t(($) => $.lifecycle.activity.authorities.automationPolicy),
   };
 }
 
@@ -450,18 +479,50 @@ function AssessmentHistory({
       <div className="lifecycle-assessment-heading">
         <strong>{assessment.author === "legacy_review"
           ? t(($) => $.lifecycle.states.legacy)
-          : assessment.conclusion}</strong>
+          : assessment.author === "automation"
+            ? t(($) => $.lifecycle.states.automationAssessment)
+            : assessment.conclusion}</strong>
         <span className="lifecycle-state">
           {lifecycleAssessmentStatusLabel(assessment.status, locale)}
         </span>
       </div>
-      {assessment.author === "legacy_review" ? (
+      {assessment.author === "legacy_review" || assessment.author === "automation" ? (
         <>
           <p>{assessment.conclusion}</p>
-          <p>{t(($) => $.lifecycle.states.limitedProvenance)}</p>
+          {assessment.author === "legacy_review" ? (
+            <p>{t(($) => $.lifecycle.states.limitedProvenance)}</p>
+          ) : null}
         </>
       ) : null}
       <dl className="lifecycle-assessment-facts">
+        <div>
+          <dt>{t(($) => $.lifecycle.fields.assessmentAuthor)}</dt>
+          <dd>{lifecycleAssessmentAuthorLabel(assessment.author, locale)}</dd>
+        </div>
+        {assessment.acceptance_authority ? (
+          <div>
+            <dt>{t(($) => $.lifecycle.fields.acceptanceAuthority)}</dt>
+            <dd>{lifecycleAcceptanceAuthorityLabel(
+              assessment.acceptance_authority,
+              locale,
+            )}</dd>
+          </div>
+        ) : null}
+        {assessment.automation_method ? (
+          <div>
+            <dt>{t(($) => $.lifecycle.fields.automationMethod)}</dt>
+            <dd>{lifecycleAutomationMethodLabel(assessment.automation_method, locale)}</dd>
+          </div>
+        ) : null}
+        {assessment.rule_id && assessment.rule_version ? (
+          <div>
+            <dt>{t(($) => $.lifecycle.fields.rule)}</dt>
+            <dd>{t(($) => $.lifecycle.activity.ruleVersion, {
+              rule: assessment.rule_id,
+              version: assessment.rule_version,
+            })}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>{t(($) => $.lifecycle.fields.relevance)}</dt>
           <dd>{lifecycleRelevanceLabel(assessment.relevance, locale)}</dd>
@@ -479,13 +540,197 @@ function AssessmentHistory({
           <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
         ))}
       </dl>
+      {assessment.citations && assessment.citations.length > 0 ? (
+        <div className="lifecycle-citation-summary">
+          <strong>{t(($) => $.lifecycle.fields.citations)}</strong>
+          {assessment.citations.map((citation, index) => (
+            <p className="tiny" key={`${citation.reference_kind}-${index}`}>
+              {citation.reference_kind === "observation"
+                ? t(($) => $.lifecycle.citationKinds.observation)
+                : t(($) => $.lifecycle.citationKinds.evidence)}
+              <span aria-hidden="true"> · </span>
+              <span className="mono">{citation.evidence_id ?? citation.cited_content_sha256}</span>
+            </p>
+          ))}
+        </div>
+      ) : null}
       <p>{assessment.impact_summary}</p>
       {assessment.stale ? <p>{t(($) => $.lifecycle.states.revalidation)}</p> : null}
       {canAccept ? (
         <Button size="compact" icon={<Check size={15} />} onClick={onAccept}>
-          {t(($) => $.lifecycle.actions.acceptAssessment)}
+          {assessment.author === "automation"
+            ? t(($) => $.lifecycle.actions.acceptSuggestion)
+            : t(($) => $.lifecycle.actions.acceptAssessment)}
         </Button>
       ) : null}
+    </article>
+  );
+}
+
+function factValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+function AutomationTruth({
+  detail,
+  locale,
+  t,
+}: {
+  detail: SecurityLifecycleCaseDetail;
+  locale: LifecycleLocale;
+  t: TFunction<"explore">;
+}) {
+  const run = detail.automation_runs?.[0];
+  const blockers = [...new Map(
+    (detail.automation_runs ?? []).flatMap((item) => item.blockers)
+      .map((blocker) => [blocker.blocker_code, blocker]),
+  ).values()];
+  const facts = detail.automation_facts ?? [];
+  if (!run && facts.length === 0) return null;
+  const grouped = facts.reduce<Map<string, SecurityLifecycleAutomationFact[]>>(
+    (result, fact) => {
+      const values = result.get(fact.source_family) ?? [];
+      values.push(fact);
+      result.set(fact.source_family, values);
+      return result;
+    },
+    new Map(),
+  );
+
+  return (
+    <LifecycleCaseSection title={t(($) => $.lifecycle.sections.automation)}>
+      {run ? (
+        <>
+          <dl className="lifecycle-assessment-facts">
+            {run.decision_tier ? (
+              <div>
+                <dt>{t(($) => $.lifecycle.fields.decisionTier)}</dt>
+                <dd>{lifecycleDecisionTierLabel(run.decision_tier, locale)}</dd>
+              </div>
+            ) : null}
+            {run.action_readiness ? (
+              <div>
+                <dt>{t(($) => $.lifecycle.fields.actionReadiness)}</dt>
+                <dd>{lifecycleActionReadinessLabel(run.action_readiness, locale)}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>{t(($) => $.lifecycle.fields.policy)}</dt>
+              <dd className="mono">{run.policy_version}</dd>
+            </div>
+          </dl>
+          {blockers.map((blocker) => (
+            <p className="lifecycle-blocker" key={blocker.blocker_code}>
+              {lifecycleAutomationBlockerLabel(blocker.blocker_code, locale)}
+            </p>
+          ))}
+        </>
+      ) : null}
+      {facts.length > 0 ? (
+        <div className="lifecycle-fact-groups">
+          <h4>{t(($) => $.lifecycle.sections.facts)}</h4>
+          {[...grouped.entries()].map(([family, familyFacts]) => (
+            <section className="lifecycle-fact-group" key={family}>
+              <h5>{lifecycleEvidenceSourceFamilyLabel(family, locale)}</h5>
+              <dl className="lifecycle-assessment-facts">
+                {familyFacts.map((fact) => (
+                  <div key={fact.fact_id}>
+                    <dt>{lifecycleFactTypeLabel(fact.fact_type, locale)}</dt>
+                    <dd>{factValue(fact.normalized_value)}</dd>
+                    <dd className="tiny mono">{t(($) => $.lifecycle.fields.extractionRule)}: {
+                      t(($) => $.lifecycle.activity.ruleVersion, {
+                        rule: fact.extractor_rule_id,
+                        version: fact.extractor_rule_version,
+                      })
+                    }</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+      ) : null}
+    </LifecycleCaseSection>
+  );
+}
+
+function translationErrorMessage(
+  code: string,
+  t: TFunction<"explore">,
+): string {
+  if (code === "translation_timeout") return t(($) => $.lifecycle.translation.timeout);
+  if (code === "translation_output_invalid") {
+    return t(($) => $.lifecycle.translation.outputInvalid);
+  }
+  if (code === "evidence_changed") return t(($) => $.lifecycle.translation.evidenceChanged);
+  return t(($) => $.lifecycle.translation.failed);
+}
+
+function EvidenceItem({
+  evidence,
+  locale,
+  busy,
+  errorCode,
+  onTranslate,
+  t,
+}: {
+  evidence: SecurityLifecycleEvidence;
+  locale: LifecycleLocale;
+  busy: boolean;
+  errorCode: string | null;
+  onTranslate: () => void;
+  t: TFunction<"explore">;
+}) {
+  const translation = (evidence.translations ?? []).find(
+    (item) => item.locale === locale,
+  );
+  return (
+    <article className="lifecycle-history-row lifecycle-evidence-item">
+      <div className="lifecycle-assessment-heading">
+        <strong>{evidence.title || t(($) => $.lifecycle.states.originalEvidence)}</strong>
+        <span className="lifecycle-state">{
+          lifecycleEvidenceSourceFamilyLabel(evidence.source_family, locale)
+        }</span>
+      </div>
+      {evidence.publisher || evidence.source_published_at ? (
+        <p className="tiny">{[evidence.publisher, evidence.source_published_at]
+          .filter(Boolean).join(" · ")}</p>
+      ) : null}
+      <strong className="tiny">{t(($) => $.lifecycle.states.originalEvidence)}</strong>
+      <p className="lifecycle-provider-evidence">{evidence.excerpt}</p>
+      {safeEvidenceUrl(evidence.source_url) ? (
+        <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">
+          <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
+        </a>
+      ) : null}
+      {translation ? (
+        <div className="lifecycle-derived-translation">
+          <strong>{t(($) => $.lifecycle.states.machineTranslation)}</strong>
+          <p>{translation.translated_text}</p>
+          <p className="tiny mono">{t(($) => $.lifecycle.translation.provenance, {
+            provider: translation.provider,
+            model: translation.model,
+            harness: translation.harness,
+          })}</p>
+        </div>
+      ) : (
+        <Button
+          size="compact"
+          tone="ghost"
+          disabled={busy}
+          onClick={onTranslate}
+        >
+          {t(($) => $.lifecycle.actions.translateEvidence)}
+        </Button>
+      )}
+      {errorCode ? <p className="errorbox">{translationErrorMessage(errorCode, t)}</p> : null}
     </article>
   );
 }
@@ -558,6 +803,11 @@ export function LifecycleView({
   const [filters, setFilters] = useState<SecurityLifecycleCaseFilters>({ limit: 200 });
   const [cases, setCases] = useState<SecurityLifecycleCaseSummary[] | null>(null);
   const [sourceMissingCount, setSourceMissingCount] = useState(0);
+  const [activityItems, setActivityItems] = useState<LifecycleActivityItem[]>([]);
+  const [activityError, setActivityError] = useState<ReturnType<
+    typeof lifecycleErrorPresentation
+  > | null>(null);
+  const [activityBusy, setActivityBusy] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(initialCaseId);
   const [detail, setDetail] = useState<SecurityLifecycleCaseDetail | null>(null);
   const [listError, setListError] = useState<ReturnType<typeof lifecycleErrorPresentation> | null>(null);
@@ -586,6 +836,8 @@ export function LifecycleView({
   const [citeObservation, setCiteObservation] = useState(false);
   const [citedEvidence, setCitedEvidence] = useState<string[]>([]);
   const [citationError, setCitationError] = useState(false);
+  const [translationBusy, setTranslationBusy] = useState<string | null>(null);
+  const [translationErrors, setTranslationErrors] = useState<Record<string, string>>({});
   const [transitionPreview, setTransitionPreview] = useState<TickerIdentityTransitionPreview | null>(
     null,
   );
@@ -612,6 +864,34 @@ export function LifecycleView({
       setListError(lifecycleErrorPresentation(error, locale));
     }
   }, [filters, locale, sourcePresence]);
+
+  const loadActivity = useCallback(async () => {
+    try {
+      const response = await listTickerIdentityTransitionActivity({ limit: 50 });
+      const caseReads = new Map<string, Promise<SecurityLifecycleCaseDetail | null>>();
+      for (const item of response.items) {
+        if (item.activity_type !== "applied" || item.reverse_readiness) continue;
+        if (!caseReads.has(item.case_id)) {
+          caseReads.set(item.case_id, getSecurityLifecycleCase(item.case_id).catch(() => null));
+        }
+      }
+      const items = await Promise.all(response.items.map(async (item) => {
+        if (item.activity_type !== "applied" || item.reverse_readiness) return item;
+        const activityCase = await caseReads.get(item.case_id);
+        const transition = activityCase?.ticker_transition;
+        return {
+          ...item,
+          reverse_readiness: transition?.transition_id === item.transition_id
+            ? transition.reverse_readiness
+            : null,
+        };
+      }));
+      setActivityItems(items);
+      setActivityError(null);
+    } catch (error) {
+      setActivityError(lifecycleErrorPresentation(error, locale));
+    }
+  }, [locale]);
 
   const loadDetail = useCallback(async (caseId: string) => {
     try {
@@ -654,6 +934,7 @@ export function LifecycleView({
   }, [locale, t]);
 
   useEffect(() => { void loadCases(); }, [loadCases]);
+  useEffect(() => { void loadActivity(); }, [loadActivity]);
   useEffect(() => {
     if (selectedCaseId) void loadDetail(selectedCaseId);
     else setDetail(null);
@@ -691,6 +972,8 @@ export function LifecycleView({
     setCiteObservation(false);
     setCitedEvidence([]);
     setCitationError(false);
+    setTranslationBusy(null);
+    setTranslationErrors({});
     setTransitionPreview(null);
     setTransitionPreviewLoading(false);
     setTransitionDate("");
@@ -698,6 +981,40 @@ export function LifecycleView({
     setTransitionUnhideSuccessor(false);
     setTransitionDialog(null);
   }, [selectedCaseId]);
+  const automationSuggestion = useMemo(() => detail?.assessment_history.find(
+    (assessment) => assessment.author === "automation" && assessment.status === "draft",
+  ) ?? null, [detail]);
+  useEffect(() => {
+    if (!automationSuggestion) return;
+    const editableOutcomes = automationSuggestion.outcomes.filter(
+      (value): value is SecurityLifecycleAssessmentOutcome => (
+        ASSESSMENT_OUTCOMES.includes(value as SecurityLifecycleAssessmentOutcome)
+      ),
+    );
+    setConclusion(automationSuggestion.conclusion);
+    setImpact(automationSuggestion.impact_summary);
+    setRelevance(automationSuggestion.relevance);
+    setConfidence(automationSuggestion.confidence);
+    setOutcomes(editableOutcomes.length > 0 ? editableOutcomes : ["undetermined"]);
+    setCounterpartyName(automationSuggestion.counterparty_name ?? "");
+    setCounterpartyTicker(automationSuggestion.counterparty_ticker ?? "");
+    setCounterpartyCik(automationSuggestion.counterparty_cik ?? "");
+    setSuccessorTicker(automationSuggestion.successor_ticker ?? "");
+    setDestinationVenue(automationSuggestion.destination_venue ?? "");
+    setEffectiveDate(automationSuggestion.effective_date ?? "");
+    setConsiderationCurrency(automationSuggestion.consideration_currency ?? "");
+    setCashPerSecurity(automationSuggestion.cash_per_security_decimal ?? "");
+    setExchangeRatio(automationSuggestion.exchange_ratio_decimal ?? "");
+    setCiteObservation(Boolean(automationSuggestion.citations?.some(
+      (citation) => citation.reference_kind === "observation",
+    )));
+    setCitedEvidence((automationSuggestion.citations ?? []).flatMap((citation) => (
+      citation.reference_kind === "evidence" && citation.evidence_id
+        ? [citation.evidence_id]
+        : []
+    )));
+    setCitationError(false);
+  }, [automationSuggestion]);
   useEffect(() => {
     if (initialCaseId) {
       setDetail(null);
@@ -727,7 +1044,59 @@ export function LifecycleView({
     }
   };
 
+  const runActivityCommand = async (
+    name: string,
+    command: () => Promise<unknown>,
+  ) => {
+    if (activityBusy) return;
+    setActivityBusy(name);
+    setActivityError(null);
+    try {
+      await command();
+      await Promise.all([
+        loadActivity(),
+        loadCases(),
+        selectedCaseId ? loadDetail(selectedCaseId) : Promise.resolve(),
+      ]);
+    } catch (error) {
+      setActivityError(commandErrorPresentation(error, locale, t));
+    } finally {
+      setActivityBusy(null);
+    }
+  };
+
+  const runTranslation = async (evidenceId: string) => {
+    if (!selectedCaseId || translationBusy) return;
+    setTranslationBusy(evidenceId);
+    setTranslationErrors((current) => {
+      const next = { ...current };
+      delete next[evidenceId];
+      return next;
+    });
+    try {
+      await translateSecurityLifecycleEvidence(evidenceId, locale);
+      await loadDetail(selectedCaseId);
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error
+        && typeof error.code === "string"
+        ? error.code
+        : "translation_failed";
+      setTranslationErrors((current) => ({ ...current, [evidenceId]: code }));
+    } finally {
+      setTranslationBusy(null);
+    }
+  };
+
   const currentEvidence = detail?.evidence ?? [];
+  const evidenceGroups = useMemo(() => currentEvidence.reduce<
+    Map<string, SecurityLifecycleEvidence[]>
+  >((groups, evidence) => {
+    const family = evidence.source_family || "manual";
+    const values = groups.get(family) ?? [];
+    values.push(evidence);
+    groups.set(family, values);
+    return groups;
+  }, new Map()), [currentEvidence]);
   const evidenceCitations = useMemo(() => currentEvidence.filter(
     (item) => Boolean(item.evidence_id),
   ), [currentEvidence]);
@@ -747,6 +1116,7 @@ export function LifecycleView({
 
   const statusLabels = transitionStatusLabels(t);
   const kindLabels = transitionKindLabels(t);
+  const authorityLabels = transitionAuthorityLabels(t);
   const blockLabels = transitionBlockLabels(t);
   const unknownTransitionValue = t(($) => $.lifecycle.states.unknownValue);
 
@@ -785,6 +1155,24 @@ export function LifecycleView({
           {t(($) => $.lifecycle.actions.refresh)}
         </Button>
       </div>
+
+      {activityError ? (
+        <p className="errorbox" data-error-code={activityError.code}>{activityError.message}</p>
+      ) : null}
+      <LifecycleActivityBand
+        items={activityItems}
+        busyAction={activityBusy}
+        onAcknowledge={(activityId) => void runActivityCommand(
+          `acknowledge-${activityId}`,
+          () => acknowledgeTickerIdentityTransitionActivity(activityId),
+        )}
+        onReverse={(transitionId) => void runActivityCommand(
+          `reverse-${transitionId}`,
+          async () => requireCompletedTransitionAttempt(
+            await reverseTickerIdentityTransition(transitionId),
+          ),
+        )}
+      />
 
       <div className="lifecycle-view-switch" role="group" aria-label={t(($) => $.lifecycle.aria)}>
         <Button
@@ -896,15 +1284,21 @@ export function LifecycleView({
             </LifecycleCaseSection>
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.evidence)}>
-              {detail.evidence.map((item) => (
-                <article className="lifecycle-history-row" key={item.evidence_id}>
-                  <p className="lifecycle-provider-evidence">{item.excerpt}</p>
-                  {safeEvidenceUrl(item.source_url) ? (
-                    <a href={safeEvidenceUrl(item.source_url)!} target="_blank" rel="noreferrer">
-                      <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
-                    </a>
-                  ) : null}
-                </article>
+              {[...evidenceGroups.entries()].map(([family, items]) => (
+                <section className="lifecycle-evidence-group" key={family}>
+                  <h4>{lifecycleEvidenceSourceFamilyLabel(family, locale)}</h4>
+                  {items.map((item) => (
+                    <EvidenceItem
+                      evidence={item}
+                      locale={locale}
+                      busy={translationBusy === item.evidence_id}
+                      errorCode={translationErrors[item.evidence_id] ?? null}
+                      onTranslate={() => void runTranslation(item.evidence_id)}
+                      t={t}
+                      key={item.evidence_id}
+                    />
+                  ))}
+                </section>
               ))}
               {detail.investigation_runs.length > 0 ? (
                 <div>
@@ -927,7 +1321,7 @@ export function LifecycleView({
                 </div>
               ) : null}
               {detail.source_presence === "present" ? (
-                <div className="lifecycle-commands">
+                <div className="lifecycle-commands lifecycle-manual-supplement">
                   <label>{t(($) => $.lifecycle.fields.manualText)}
                     <textarea
                       aria-label={t(($) => $.lifecycle.fields.manualText)}
@@ -973,6 +1367,8 @@ export function LifecycleView({
                 </div>
               ) : null}
             </LifecycleCaseSection>
+
+            <AutomationTruth detail={detail} locale={locale} t={t} />
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.acknowledgement)}>
               {detail.acknowledgement_history.map((item) => (
@@ -1247,7 +1643,9 @@ export function LifecycleView({
                       ));
                     }}
                   >
-                    {t(($) => $.lifecycle.actions.saveAssessment)}
+                    {automationSuggestion
+                      ? t(($) => $.lifecycle.actions.saveHumanRevision)
+                      : t(($) => $.lifecycle.actions.saveAssessment)}
                   </Button>
                 </div>
               ) : null}
@@ -1316,6 +1714,19 @@ export function LifecycleView({
                       detail.ticker_transition.execute_on
                     }
                   </p>
+                  {detail.ticker_transition.approval_authority ? (
+                    <p>{tickerTransitionApprovalAuthorityLabel(
+                      detail.ticker_transition.approval_authority,
+                      authorityLabels,
+                      unknownTransitionValue,
+                    )}</p>
+                  ) : null}
+                  {detail.ticker_transition.rule_id && detail.ticker_transition.rule_version ? (
+                    <p className="tiny mono">{t(($) => $.lifecycle.activity.ruleVersion, {
+                      rule: detail.ticker_transition!.rule_id,
+                      version: detail.ticker_transition!.rule_version,
+                    })}</p>
+                  ) : null}
                   <TransitionEffectsSummary
                     preview={detail.ticker_transition.approved_preview}
                   />
@@ -1396,6 +1807,27 @@ export function LifecycleView({
                       </Button>
                     ) : null}
                   </div>
+                  {(detail.ticker_transition.activity_history ?? []).length > 0 ? (
+                    <LifecycleActivityBand
+                      items={detail.ticker_transition.activity_history.map((item) => ({
+                        ...item,
+                        reverse_readiness: item.activity_type === "applied"
+                          ? detail.ticker_transition!.reverse_readiness
+                          : null,
+                      }))}
+                      busyAction={activityBusy}
+                      onAcknowledge={(activityId) => void runActivityCommand(
+                        `acknowledge-${activityId}`,
+                        () => acknowledgeTickerIdentityTransitionActivity(activityId),
+                      )}
+                      onReverse={(transitionId) => void runActivityCommand(
+                        `reverse-${transitionId}`,
+                        async () => requireCompletedTransitionAttempt(
+                          await reverseTickerIdentityTransition(transitionId),
+                        ),
+                      )}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 

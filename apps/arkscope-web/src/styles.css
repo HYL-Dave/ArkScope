@@ -2027,6 +2027,77 @@ table.lifecycle-table tbody tr:last-child td {
   border-radius: 6px;
   background: var(--panel2);
 }
+.lifecycle-activity-band {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.lifecycle-activity-band h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.lifecycle-activity-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.lifecycle-activity-row {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel2));
+}
+.lifecycle-activity-row.is-acknowledged {
+  border-color: var(--border);
+  background: var(--panel2);
+}
+.lifecycle-activity-row p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+.lifecycle-evidence-group + .lifecycle-evidence-group,
+.lifecycle-fact-group + .lifecycle-fact-group {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.lifecycle-evidence-item {
+  padding-left: 10px;
+}
+.lifecycle-derived-translation {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.lifecycle-derived-translation p {
+  white-space: pre-wrap;
+}
+.lifecycle-fact-groups > h4,
+.lifecycle-fact-group h5 {
+  margin: 10px 0 7px;
+}
+.lifecycle-fact-group h5 {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.lifecycle-blocker {
+  padding: 7px 9px;
+  border-left: 3px solid var(--wait);
+  background: color-mix(in srgb, var(--wait) 7%, transparent);
+}
+.lifecycle-citation-summary {
+  margin-top: 9px;
+}
+.lifecycle-manual-supplement {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
 
 .universe-hint {
   margin: 2px 0 8px;
@@ -2073,6 +2144,9 @@ table.lifecycle-table tbody tr:last-child td {
 @media (max-width: 900px) {
   .lifecycle-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lifecycle-activity-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -2435,6 +2435,68 @@ export type SecurityLifecycleInvestigationFailureCode =
   | "network_error"
   | "extract_failed"
   | "unsupported_content";
+export type SecurityLifecycleDecisionTier =
+  | "verified_automatic"
+  | "review_suggested";
+export type SecurityLifecycleActionReadiness =
+  | "not_applicable"
+  | "waiting_effective_date"
+  | "waiting_market_confirmation"
+  | "transition_eligible"
+  | "action_blocked";
+export type SecurityLifecycleAssessmentAuthor =
+  | "human"
+  | "legacy_review"
+  | "automation";
+export type SecurityLifecycleAutomationMethod =
+  | "deterministic_rule"
+  | "model_assisted";
+export type SecurityLifecycleAcceptanceAuthority =
+  | "human"
+  | "automation_policy"
+  | "legacy_migration";
+export type SecurityLifecycleEvidenceSourceFamily =
+  | "regulator"
+  | "market_infrastructure"
+  | "publisher"
+  | "general_web"
+  | "manual";
+export type SecurityLifecycleAutomationMode = "live" | "historical";
+export type SecurityLifecycleAutomationRunStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "blocked"
+  | "failed"
+  | "cancelled";
+export type SecurityLifecycleAutomationBlockerCode =
+  | "sec_identity_unconfigured"
+  | "sec_governor_unavailable"
+  | "sec_request_budget_exhausted"
+  | "sec_rate_limited"
+  | "sec_access_denied"
+  | "sec_transport_unavailable"
+  | "sec_document_unavailable"
+  | "sec_evidence_insufficient"
+  | "internal_news_unavailable"
+  | "internal_news_schema_mismatch"
+  | "ibkr_gateway_unavailable"
+  | "ibkr_contract_missing"
+  | "ibkr_contract_ambiguous"
+  | "ibkr_entitlement_denied"
+  | "market_confirmation_missing"
+  | "source_conflict"
+  | "impact_context_requested";
+export type SecurityLifecycleFactType =
+  | "source_ticker"
+  | "successor_ticker"
+  | "source_venue"
+  | "destination_venue"
+  | "effective_date"
+  | "security_class"
+  | "issuer_cik"
+  | "transaction_structure"
+  | "tracked_security_effect";
 
 export interface SecurityLifecycleObservationKind {
   event_type: SecurityLifecycleEventType;
@@ -2460,7 +2522,13 @@ export interface SecurityLifecycleObservation {
 export interface SecurityLifecycleAssessment {
   assessment_id: string;
   status: "draft" | "accepted" | "superseded";
-  author: string;
+  author: SecurityLifecycleAssessmentAuthor;
+  automation_method?: SecurityLifecycleAutomationMethod | null;
+  acceptance_authority?: SecurityLifecycleAcceptanceAuthority | null;
+  automation_run_id?: string | null;
+  rule_id?: string | null;
+  rule_version?: string | null;
+  decision_provenance_sha256?: string | null;
   relevance: SecurityLifecycleRelevance;
   confidence: SecurityLifecycleConfidence;
   conclusion: string;
@@ -2477,6 +2545,11 @@ export interface SecurityLifecycleAssessment {
   counterparty_ticker?: string | null;
   counterparty_cik?: string | null;
   effective_date?: string | null;
+  citations?: Array<{
+    reference_kind: "observation" | "evidence";
+    evidence_id: string | null;
+    cited_content_sha256: string;
+  }>;
 }
 
 export interface SecurityLifecycleAcknowledgement {
@@ -2496,8 +2569,56 @@ export interface SecurityLifecycleInvestigationRun {
   created_at: string;
 }
 
+export interface SecurityLifecycleAutomationRun {
+  run_id: string;
+  case_id: string;
+  mode: SecurityLifecycleAutomationMode;
+  status: SecurityLifecycleAutomationRunStatus;
+  policy_version: string;
+  decision_tier: SecurityLifecycleDecisionTier | null;
+  action_readiness: SecurityLifecycleActionReadiness | null;
+  failure_code: string | null;
+  blockers: Array<{
+    blocker_code: SecurityLifecycleAutomationBlockerCode;
+    retryable: boolean;
+  }>;
+  retry_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SecurityLifecycleAutomationFact {
+  fact_id: string;
+  automation_run_id: string;
+  evidence_id: string;
+  source_family: SecurityLifecycleEvidenceSourceFamily;
+  fact_type: SecurityLifecycleFactType;
+  normalized_value: unknown;
+  source_span_start: number;
+  source_span_end: number;
+  cited_text_sha256: string;
+  extractor_rule_id: string;
+  extractor_rule_version: string;
+  created_at: string;
+}
+
+export interface SecurityLifecycleEvidenceTranslation {
+  evidence_id: string;
+  evidence_content_sha256: string;
+  locale: "en" | "zh-Hant";
+  translated_text: string;
+  provider: string;
+  model: string;
+  harness: string;
+  translated_at: string;
+  cached?: boolean;
+}
+
 export interface SecurityLifecycleEvidence {
   evidence_id: string;
+  source_family: SecurityLifecycleEvidenceSourceFamily;
   kind: string;
   excerpt: string;
   source_url: string | null;
@@ -2506,6 +2627,8 @@ export interface SecurityLifecycleEvidence {
   title?: string | null;
   publisher?: string | null;
   source_published_at?: string | null;
+  source_document_sha256?: string | null;
+  translations: SecurityLifecycleEvidenceTranslation[];
 }
 
 export interface SecurityLifecycleActionProposal {
@@ -2555,6 +2678,55 @@ export type TickerIdentityTransitionCaveat =
   | "portfolio_position_retained"
   | "successor_already_tracked";
 export type TickerIdentityPriorityResolution = "source" | "successor";
+export type TickerIdentityTransitionApprovalAuthority =
+  | "attended_user"
+  | "automation_policy";
+export type TickerIdentityTransitionActivityType = "applied" | "reversed";
+export type TickerIdentityTransitionActivityChangeType =
+  | "editable_tag_copied"
+  | "legacy_membership_added"
+  | "legacy_membership_archived"
+  | "legacy_membership_reactivated"
+  | "priority_updated"
+  | "source_hidden"
+  | "successor_unhidden"
+  | "watchlist_membership_added"
+  | "watchlist_membership_archived"
+  | "watchlist_membership_reactivated";
+
+export interface TickerIdentityReverseReadiness {
+  reversible: boolean;
+  block_reasons: TickerIdentityTransitionBlockReason[];
+}
+
+export interface TickerIdentityTransitionActivity {
+  activity_id: string;
+  transition_id: string;
+  case_id: string;
+  activity_type: TickerIdentityTransitionActivityType;
+  source_ticker: string;
+  successor_ticker: string | null;
+  effective_date: string;
+  user_owned_changes: Array<{
+    change_type: TickerIdentityTransitionActivityChangeType;
+    count: number;
+  }>;
+  provider_owned_retained: string[];
+  state_sha256: string;
+  rule_id: string | null;
+  rule_version: string | null;
+  decision_provenance_sha256: string;
+  occurred_at: string;
+  acknowledged_at: string | null;
+  created_at: string;
+  reverse_readiness?: TickerIdentityReverseReadiness | null;
+}
+
+export interface TickerIdentityTransitionActivityResponse {
+  items: TickerIdentityTransitionActivity[];
+  count: number;
+  unacknowledged_count: number;
+}
 
 export interface TickerIdentityWatchlistEffect {
   list_id: number;
@@ -2629,12 +2801,21 @@ export interface TickerIdentityTransitionState {
   execute_on: string;
   approved_preview_sha256: string;
   approved_preview: TickerIdentityTransitionPreview;
+  approval_authority: TickerIdentityTransitionApprovalAuthority;
+  automation_policy_version: string | null;
+  rule_id: string | null;
+  rule_version: string | null;
+  decision_provenance_sha256: string;
   updated_at: string;
   latest_attempt: {
     status: "blocked" | "applied" | "already_applied" | "reversed";
     block_reasons: string[];
     attempted_at: string;
   } | null;
+  reverse_readiness: TickerIdentityReverseReadiness | null;
+  activity_history: TickerIdentityTransitionActivity[];
+  activity_count: number;
+  unacknowledged_activity_count: number;
 }
 
 export interface TickerIdentityTransitionRecord {
@@ -2670,6 +2851,10 @@ export interface SecurityLifecycleCaseSummary {
   source_context: "available" | "unavailable";
   components: Record<string, unknown>;
   investigation_run_count: number;
+  automation_run_count: number;
+  automation_fact_count: number;
+  automation_tier: SecurityLifecycleDecisionTier | null;
+  action_readiness: SecurityLifecycleActionReadiness | null;
   evidence_count: number;
   assessment_count: number;
   acknowledgement_count: number;
@@ -2680,6 +2865,8 @@ export interface SecurityLifecycleCaseDetail extends SecurityLifecycleCaseSummar
   observation: SecurityLifecycleObservation | null;
   observation_fingerprint_sha256: string | null;
   investigation_runs: SecurityLifecycleInvestigationRun[];
+  automation_runs: SecurityLifecycleAutomationRun[];
+  automation_facts: SecurityLifecycleAutomationFact[];
   evidence: SecurityLifecycleEvidence[];
   assessment_history: SecurityLifecycleAssessment[];
   acknowledgement_history: SecurityLifecycleAcknowledgement[];
@@ -2745,6 +2932,17 @@ export function addSecurityLifecycleEvidence(
     `/security-lifecycle/cases/${encodeURIComponent(caseId)}/evidence`,
     "POST",
     body,
+  );
+}
+
+export function translateSecurityLifecycleEvidence(
+  evidenceId: string,
+  locale: "en" | "zh-Hant",
+): Promise<SecurityLifecycleEvidenceTranslation> {
+  return sendJSON<SecurityLifecycleEvidenceTranslation>(
+    `/security-lifecycle/evidence/${encodeURIComponent(evidenceId)}/translations`,
+    "POST",
+    { locale },
   );
 }
 
@@ -2890,6 +3088,29 @@ export function reverseTickerIdentityTransition(
 ): Promise<TickerIdentityTransitionAttemptResult> {
   return sendJSON<TickerIdentityTransitionAttemptResult>(
     `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/reverse`,
+    "POST",
+  );
+}
+
+export function listTickerIdentityTransitionActivity(
+  options: { limit?: number; unacknowledged_only?: boolean } = {},
+): Promise<TickerIdentityTransitionActivityResponse> {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.unacknowledged_only !== undefined) {
+    params.set("unacknowledged_only", String(options.unacknowledged_only));
+  }
+  const query = params.toString();
+  return getJSON<TickerIdentityTransitionActivityResponse>(
+    `/security-lifecycle/transition-activity${query ? `?${query}` : ""}`,
+  );
+}
+
+export function acknowledgeTickerIdentityTransitionActivity(
+  activityId: string,
+): Promise<TickerIdentityTransitionActivity> {
+  return sendJSON<TickerIdentityTransitionActivity>(
+    `/security-lifecycle/transition-activity/${encodeURIComponent(activityId)}/acknowledge`,
     "POST",
   );
 }

@@ -1,4 +1,7 @@
 import type {
+  TickerIdentityTransitionActivityChangeType,
+  TickerIdentityTransitionActivityType,
+  TickerIdentityTransitionApprovalAuthority,
   TickerIdentityTransitionBlockReason,
   TickerIdentityTransitionCaveat,
   TickerIdentityTransitionKind,
@@ -18,6 +21,30 @@ function closedLabel<Value extends string>(
 export function tickerTransitionStatusLabel(
   value: string,
   labels: Record<TickerIdentityTransitionStatus, string>,
+  unknownValue: string,
+): string {
+  return closedLabel(value, labels, unknownValue);
+}
+
+export function tickerTransitionActivityTypeLabel(
+  value: string,
+  labels: Record<TickerIdentityTransitionActivityType, string>,
+  unknownValue: string,
+): string {
+  return closedLabel(value, labels, unknownValue);
+}
+
+export function tickerTransitionApprovalAuthorityLabel(
+  value: string,
+  labels: Record<TickerIdentityTransitionApprovalAuthority, string>,
+  unknownValue: string,
+): string {
+  return closedLabel(value, labels, unknownValue);
+}
+
+export function tickerTransitionActivityChangeLabel(
+  value: string,
+  labels: Record<TickerIdentityTransitionActivityChangeType, string>,
   unknownValue: string,
 ): string {
   return closedLabel(value, labels, unknownValue);
