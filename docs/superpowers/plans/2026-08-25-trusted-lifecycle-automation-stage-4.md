@@ -165,6 +165,15 @@ now listed explicitly in the evolved-owner ledger. This changes no product or
 test bytes, adds no test node, and leaves the focused/full frontend targets at
 `60` and `105` files / `1227` tests.
 
+The first product-copy replay then exposed the second count owner,
+`contains the reviewed remaining-surface namespace inventory in both locales`.
+It independently pins the Explore namespace and all-resource totals, so the
+same exact `+96` bilingual lifecycle-key delta necessarily evolves it. The
+observed focused result was `4 failed / 56 passed`: three new activity nodes
+were displaying the configured zh-Hant locale, while this one unlisted owner
+failed on `Explore 581 -> 677` and total resources `2080 -> 2176`. It is now
+listed; node and target counts remain unchanged.
+
 **Files:**
 - Modify: `apps/arkscope-web/src/api.ts`
 - Create: `apps/arkscope-web/src/lifecycle/LifecycleActivityBand.tsx`
