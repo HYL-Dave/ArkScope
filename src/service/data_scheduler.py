@@ -65,6 +65,11 @@ from src.service.ticker_identity_scheduler import (
     run_due_ticker_identity_transitions,
     ticker_identity_scheduler_failure,
 )
+from src.service.security_lifecycle_automation_scheduler import (
+    record_security_lifecycle_automation_result,
+    run_security_lifecycle_automation,
+    security_lifecycle_automation_failure,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1529,6 +1534,23 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     for testability; ``fire`` defaults to a thread-offloaded run_source."""
     now = now or datetime.now(timezone.utc)
     fired = []
+    try:
+        automation_result = run_security_lifecycle_automation(limit=2, now=now)
+    except Exception as exc:  # lifecycle work must not stop later schedulers
+        logger.warning(
+            "security lifecycle automation tick failed code=%s",
+            type(exc).__name__,
+        )
+        automation_result = security_lifecycle_automation_failure(
+            "automation_scheduler_failed"
+        )
+    try:
+        record_security_lifecycle_automation_result(automation_result, now=now)
+    except Exception as exc:  # telemetry must not stop later schedulers
+        logger.warning(
+            "security lifecycle automation result recording failed code=%s",
+            type(exc).__name__,
+        )
     try:
         transition_result = run_due_ticker_identity_transitions(now=now)
     except Exception as exc:  # lifecycle work must not stop provider scheduling
