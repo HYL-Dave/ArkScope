@@ -677,6 +677,15 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
                 "sec.derived_explicit_identity_shape",
             )
         elif venues and len(source) == 1 and not successor:
+            ticker = next(iter(source))
+            continuity_start, continuity_end = support["source_ticker"]
+            emit(
+                "successor_ticker",
+                ticker,
+                continuity_start,
+                continuity_end,
+                "sec.derived_explicit_identity_shape",
+            )
             start, end = support["destination_venue"]
             emit(
                 "tracked_security_effect",

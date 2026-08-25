@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import logging
 from pathlib import Path
+import re
 import sqlite3
 from typing import Iterator
 
@@ -67,6 +68,13 @@ _RETRYABLE_BLOCKERS = frozenset(
         "ibkr_contract_missing",
     }
 )
+_IDENTITY_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
+_MAX_HINT_TICKERS = 256
+_MAX_ALIAS_EDGES = 512
+_MAX_ALIASES_PER_TICKER = 64
+_MAX_IBKR_POSITION_ROWS = 512
+_MAX_IBKR_CONIDS_PER_TICKER = 32
+_SQL_BATCH = 200
 
 
 class LifecycleAutomationNotInstalled(RuntimeError):
@@ -142,6 +150,169 @@ def _automation_schema_state(conn: sqlite3.Connection) -> None:
 
 
 @contextmanager
+def _read_only_connection(path: Path) -> Iterator[sqlite3.Connection]:
+    conn = sqlite3.connect(
+        f"{path.resolve().as_uri()}?mode=ro",
+        uri=True,
+        timeout=10.0,
+    )
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> frozenset[str]:
+    present = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone()
+    if present is None:
+        return frozenset()
+    return frozenset(str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})"))
+
+
+def _hint_ticker(value: object) -> str:
+    ticker = str(value or "").strip().upper()
+    if not _IDENTITY_TICKER.fullmatch(ticker):
+        raise ValueError("identity_hint_ticker")
+    return ticker
+
+
+def _alias_closures(
+    conn: sqlite3.Connection,
+    requested: tuple[str, ...],
+) -> dict[str, tuple[str, ...]]:
+    columns = _table_columns(conn, "ticker_aliases")
+    if not columns:
+        return {ticker: (ticker,) for ticker in requested}
+    if not {"alias", "canonical"} <= columns:
+        raise ValueError("ticker_aliases_schema")
+
+    graph: dict[str, set[str]] = {ticker: {ticker} for ticker in requested}
+    queried: set[str] = set()
+    frontier = set(requested)
+    edges: set[tuple[str, str]] = set()
+    while frontier:
+        batch = tuple(sorted(frontier))
+        queried.update(batch)
+        frontier.clear()
+        for offset in range(0, len(batch), _SQL_BATCH):
+            current = batch[offset : offset + _SQL_BATCH]
+            placeholders = ",".join("?" for _ in current)
+            rows = conn.execute(
+                "SELECT alias,canonical FROM ticker_aliases "
+                f"WHERE UPPER(alias) IN ({placeholders}) "
+                f"OR UPPER(canonical) IN ({placeholders}) "
+                "ORDER BY alias,canonical LIMIT ?",
+                (*current, *current, _MAX_ALIAS_EDGES + 1),
+            ).fetchall()
+            if len(rows) > _MAX_ALIAS_EDGES:
+                raise ValueError("ticker_aliases_exceed_limit")
+            for raw_alias, raw_canonical in rows:
+                alias = _hint_ticker(raw_alias)
+                canonical = _hint_ticker(raw_canonical)
+                edge = (alias, canonical)
+                if edge in edges:
+                    continue
+                edges.add(edge)
+                if len(edges) > _MAX_ALIAS_EDGES:
+                    raise ValueError("ticker_aliases_exceed_limit")
+                graph.setdefault(alias, {alias}).add(canonical)
+                graph.setdefault(canonical, {canonical}).add(alias)
+                for value in edge:
+                    if value not in queried:
+                        frontier.add(value)
+
+    closures: dict[str, tuple[str, ...]] = {}
+    for ticker in requested:
+        found = {ticker}
+        pending = [ticker]
+        while pending:
+            current = pending.pop()
+            for adjacent in graph.get(current, ()):
+                if adjacent not in found:
+                    found.add(adjacent)
+                    pending.append(adjacent)
+                    if len(found) > _MAX_ALIASES_PER_TICKER:
+                        raise ValueError("ticker_aliases_exceed_limit")
+        closures[ticker] = tuple(sorted(found))
+    return closures
+
+
+def _ibkr_conids(
+    conn: sqlite3.Connection,
+    closures: Mapping[str, tuple[str, ...]],
+) -> dict[str, tuple[int, ...]]:
+    result: dict[str, set[int]] = {ticker: set() for ticker in closures}
+    columns = _table_columns(conn, "portfolio_positions")
+    if not columns:
+        return {ticker: () for ticker in closures}
+    if not {"broker", "broker_con_id", "symbol"} <= columns:
+        raise ValueError("portfolio_positions_schema")
+
+    roots_by_alias: dict[str, set[str]] = {}
+    for ticker, aliases in closures.items():
+        for alias in aliases:
+            roots_by_alias.setdefault(alias, set()).add(ticker)
+    aliases = tuple(sorted(roots_by_alias))
+    seen_rows: set[tuple[str, str]] = set()
+    for offset in range(0, len(aliases), _SQL_BATCH):
+        current = aliases[offset : offset + _SQL_BATCH]
+        placeholders = ",".join("?" for _ in current)
+        rows = conn.execute(
+            "SELECT broker_con_id,symbol FROM portfolio_positions "
+            "WHERE LOWER(broker)='ibkr' AND broker_con_id IS NOT NULL "
+            f"AND UPPER(symbol) IN ({placeholders}) "
+            "ORDER BY symbol,broker_con_id LIMIT ?",
+            (*current, _MAX_IBKR_POSITION_ROWS + 1),
+        ).fetchall()
+        if len(rows) > _MAX_IBKR_POSITION_ROWS:
+            raise ValueError("ibkr_identity_candidates_exceed_limit")
+        for raw_conid, raw_symbol in rows:
+            symbol = _hint_ticker(raw_symbol)
+            conid_text = str(raw_conid or "").strip()
+            if not conid_text.isdigit() or int(conid_text) <= 0:
+                raise ValueError("ibkr_conid")
+            row = (conid_text, symbol)
+            if row in seen_rows:
+                continue
+            seen_rows.add(row)
+            if len(seen_rows) > _MAX_IBKR_POSITION_ROWS:
+                raise ValueError("ibkr_identity_candidates_exceed_limit")
+            conid = int(conid_text)
+            for ticker in roots_by_alias.get(symbol, ()):
+                result[ticker].add(conid)
+                if len(result[ticker]) > _MAX_IBKR_CONIDS_PER_TICKER:
+                    raise ValueError("ibkr_identity_candidates_exceed_limit")
+    return {ticker: tuple(sorted(values)) for ticker, values in result.items()}
+
+
+def _load_local_identity_hints(
+    *,
+    market_path: Path,
+    profile_path: Path,
+    tickers: tuple[str, ...],
+) -> dict[str, dict[str, tuple[object, ...]]]:
+    requested = tuple(sorted({_hint_ticker(value) for value in tickers}))
+    if len(requested) > _MAX_HINT_TICKERS:
+        raise ValueError("identity_hint_tickers_exceed_limit")
+    if not requested:
+        return {}
+    with _read_only_connection(market_path) as market_conn:
+        closures = _alias_closures(market_conn, requested)
+    with _read_only_connection(profile_path) as profile_conn:
+        conids = _ibkr_conids(profile_conn, closures)
+    return {
+        ticker: {
+            "ticker_aliases": closures[ticker],
+            "ibkr_conids": conids[ticker],
+        }
+        for ticker in requested
+    }
+
+
+@contextmanager
 def _profile_connection() -> Iterator[sqlite3.Connection]:
     path = _profile_path()
     if not path.is_file():
@@ -175,9 +346,15 @@ def _load_cases() -> tuple[dict[str, object], ...]:
     ) as conn:
         _automation_schema_state(conn)
     cases = compose_security_lifecycle(str(market_path), str(profile_path))["cases"]
+    hints = _load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=tuple(str(case["ticker"]) for case in cases),
+    )
     rendered: list[dict[str, object]] = []
     for case in cases:
         item = dict(case)
+        item.update(hints[_hint_ticker(case["ticker"])])
         observation = item.get("observation")
         item["observation_fingerprint_sha256"] = (
             observation_fingerprint(dict(observation))
@@ -271,6 +448,8 @@ def _identity_context(case: Mapping[str, object]):
     return build_identity_context(
         case_id=str(case["case_id"]),
         observation=observation,
+        ticker_aliases=tuple(case.get("ticker_aliases", ())),
+        ibkr_conids=tuple(case.get("ibkr_conids", ())),
     )
 
 

@@ -179,7 +179,10 @@ def _fact_value(value: object) -> Any:
         return raw
     raw_json = _field(value, "normalized_value_json", None)
     if raw_json is None:
-        raise ValueError("fact_normalized_value")
+        raw = _field(value, "value", None)
+        if raw is None:
+            raise ValueError("fact_normalized_value")
+        return raw
     try:
         return json.loads(str(raw_json))
     except json.JSONDecodeError as exc:
@@ -520,7 +523,10 @@ def evaluate_automation_decision(
             transition_requested=requested,
         )
 
-    if regulator_effect == "no_identity_change":
+    if regulator_effect in {
+        "no_identity_change",
+        "asset_acquisition_no_registrant_change",
+    }:
         missing = []
         if regulator_source is None:
             missing.append("regulator_source_ticker_missing")
