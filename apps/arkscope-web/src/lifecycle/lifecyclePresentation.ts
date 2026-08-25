@@ -189,7 +189,7 @@ export function lifecycleFactValueLabel(
       },
       locale,
     );
-    return `${kind} · ${terms}`;
+    return [kind, terms].join(copy.transactionSummarySeparator);
   }
   if (typeof value !== "string") return null;
   if (factType === "security_class") {

@@ -456,6 +456,7 @@ const explore = {
       termsNotExtracted: "Terms not extracted",
       termsPartial: "Some terms extracted",
       termsComplete: "Terms extraction complete",
+      transactionSummarySeparator: " · ",
       terminalDelisting: "Terminal delisting",
       symbolChange: "Ticker symbol changed",
       venueChangeOnly: "Trading venue changed; ticker unchanged",

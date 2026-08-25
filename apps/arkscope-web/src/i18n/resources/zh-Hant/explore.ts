@@ -456,6 +456,7 @@ const explore = {
       termsNotExtracted: "尚未抽取交易條件",
       termsPartial: "已抽取部分交易條件",
       termsComplete: "交易條件抽取完成",
+      transactionSummarySeparator: " · ",
       terminalDelisting: "終止上市",
       symbolChange: "標的代號變更",
       venueChangeOnly: "交易市場已變更，代號未變",

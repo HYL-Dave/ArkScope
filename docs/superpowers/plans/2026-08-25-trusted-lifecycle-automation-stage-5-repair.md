@@ -82,6 +82,9 @@ section 16.
 
 ## Task 4: Offline Readmission
 
+- [x] Preserve the rejected full-frontend witness that exposed a dynamic
+  transaction-summary literal, then move the separator into the static resource
+  owner without adding scanner debt or an allowlist exception.
 - [ ] Run exact additions and focused suites, then collection twice and full
   backend twice with isolated basetemp roots.
 - [ ] Run frontend full, typecheck, literal scanner, production build, and the

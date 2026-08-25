@@ -8,3 +8,4 @@ apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > contains 
 apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > keeps locale namespace and recursive key paths identical	both locales add the same readiness and blocker paths
 apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > requires every resource leaf to be a non-empty string	new lifecycle copy remains non-empty
 apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts::Lifecycle presentation > labels closed automation fact values without exposing storage codes	transaction mappings render kind and extraction status while invalid scalar values fail closed
+apps/arkscope-web/src/i18n/foundationBoundaries.test.ts::I18N-0 foundation boundaries > closes remaining localization with global src scope and exact empty-debt arithmetic	transaction summary composition remains resource-owned and migrated-scope literal debt stays empty

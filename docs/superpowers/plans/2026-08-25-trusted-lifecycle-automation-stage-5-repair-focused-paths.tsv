@@ -8,3 +8,4 @@ backend	tests/test_security_lifecycle_ibkr_evidence.py
 backend	tests/test_security_lifecycle_grounded_shadow.py
 frontend	apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts
 frontend	apps/arkscope-web/src/i18n/resources.test.ts
+frontend	apps/arkscope-web/src/i18n/foundationBoundaries.test.ts
