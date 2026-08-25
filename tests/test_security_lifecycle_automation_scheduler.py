@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import hashlib
 import json
+import sqlite3
 
 
 _NOW = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
@@ -259,3 +261,91 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
     assert captured_worker["transition_approver"] is scheduler._transition_approver
     assert calls[0][0] == "preview"
     assert calls[-1] == ("approve", "slc_1", request)
+
+
+def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+        conn.executemany(
+            "INSERT INTO ticker_aliases VALUES (?,?)",
+            (("LC", "HAPN"), ("HAPN.PRE", "LC"), ("OLD", "OTHER")),
+        )
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO portfolio_positions VALUES (?,?,?)",
+            (
+                ("ibkr", "1001", "HAPN"),
+                ("ibkr", "1002", "LC"),
+                ("ibkr", "2001", "QBTS"),
+                ("manual", "ignored", "HAPN"),
+            ),
+        )
+    before = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (market_path, profile_path)
+    }
+
+    hints = scheduler._load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=("HAPN", "QBTS"),
+    )
+
+    assert hints == {
+        "HAPN": {
+            "ticker_aliases": ("HAPN", "HAPN.PRE", "LC"),
+            "ibkr_conids": (1001, 1002),
+        },
+        "QBTS": {
+            "ticker_aliases": ("QBTS",),
+            "ibkr_conids": (2001,),
+        },
+    }
+    case = {
+        "case_id": "case-hapn",
+        "source": "sec_edgar",
+        "ticker": "HAPN",
+        "ticker_aliases": hints["HAPN"]["ticker_aliases"],
+        "ibkr_conids": hints["HAPN"]["ibkr_conids"],
+        "observation": {
+            "ticker": "HAPN",
+            "cik": "0001409970",
+            "issuer_name": "Happen, Inc.",
+            "filing_date": "2026-06-18",
+            "source_ref": "0001409970-26-000131",
+            "filing_form": "25",
+            "filing_items": [],
+            "kinds": [
+                {"event_type": "listing_removal_notice", "effective_date": None}
+            ],
+        },
+    }
+    monkeypatch.setattr(scheduler, "_market_path", lambda: market_path)
+    monkeypatch.setattr(scheduler, "_profile_path", lambda: profile_path)
+    monkeypatch.setattr(scheduler, "_automation_schema_state", lambda _conn: None)
+    monkeypatch.setattr(
+        scheduler,
+        "compose_security_lifecycle",
+        lambda _market, _profile: {"cases": [case]},
+    )
+
+    loaded = scheduler._load_cases()
+    assert len(loaded) == 1
+    context = scheduler._identity_context(loaded[0])
+    assert context.ticker_aliases == ("HAPN", "HAPN.PRE", "LC")
+    assert context.ibkr_conids == (1001, 1002)
+    assert {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (market_path, profile_path)
+    } == before

@@ -1,0 +1,126 @@
+{
+  "fixture_kind": "reviewed_historical_shadow_manifest",
+  "case_identity_authority": "tests/fixtures/security_lifecycle_legacy_37.json",
+  "source_shape_authority": "tests/fixtures/security_lifecycle_automation_sec.json",
+  "source_text_provenance": "synthetic_source_shape_not_captured_provider_bytes",
+  "market_snapshot_provenance": "synthetic_ibkr_contract_shape",
+  "network_calls": 0,
+  "historical_a_to_b_coverage": 1,
+  "execution_coverage_authority": "stage_4_scratch_apply_ack_reverse",
+  "cases": {
+    "HAPN": {
+      "historical_identity_change": true,
+      "snapshot_rows": [
+        {
+          "cik": "0001409970",
+          "source_ref": "0001409970-26-000087",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/1409970/000140997026000087/lc-20260602.htm",
+          "event_type": "listing_status_review"
+        },
+        {
+          "cik": "0001409970",
+          "source_ref": "0001409970-26-000131",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/1409970/000140997026000131/form25asfiledon61826.htm",
+          "event_type": "listing_removal_notice"
+        }
+      ],
+      "market_snapshot": {
+        "symbol": "HAPN",
+        "local_symbol": "HAPN",
+        "con_id": 112233,
+        "security_type": "STK",
+        "primary_exchange": "NASDAQ",
+        "valid_exchanges": "SMART,NASDAQ,NYSE",
+        "currency": "USD"
+      },
+      "expected": {
+        "decision_tier": "verified_automatic",
+        "action_readiness": "not_applicable",
+        "outcomes": ["symbol_changed", "venue_transfer"],
+        "rule_id": "lifecycle.simple_symbol_continuation",
+        "successor_ticker": "HAPN",
+        "transition_requested": false
+      }
+    },
+    "QBTS": {
+      "historical_identity_change": false,
+      "snapshot_rows": [
+        {
+          "cik": "0001907982",
+          "source_ref": "0001907982-26-000099",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/1907982/000190798226000099/qbts-20260714.htm",
+          "event_type": "listing_status_review"
+        },
+        {
+          "cik": "0001907982",
+          "source_ref": "0001907982-26-000114",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/1907982/000190798226000114/form25.htm",
+          "event_type": "listing_removal_notice"
+        }
+      ],
+      "market_snapshot": {
+        "symbol": "QBTS",
+        "local_symbol": "QBTS",
+        "con_id": 223344,
+        "security_type": "STK",
+        "primary_exchange": "NASDAQ",
+        "valid_exchanges": "SMART,NASDAQ,NYSE",
+        "currency": "USD"
+      },
+      "expected": {
+        "decision_tier": "verified_automatic",
+        "action_readiness": "not_applicable",
+        "outcomes": ["venue_transfer"],
+        "rule_id": "lifecycle.venue_transfer",
+        "successor_ticker": "QBTS",
+        "transition_requested": false
+      }
+    },
+    "CCL": {
+      "historical_identity_change": false,
+      "snapshot_rows": [
+        {
+          "cik": "0000815097",
+          "source_ref": "0001104659-26-057200",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/815097/000110465926057200/tm2613680d1_8k.htm",
+          "event_type": "acquisition_completed"
+        },
+        {
+          "cik": "0000815097",
+          "source_ref": "0001104659-26-057200",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/815097/000110465926057200/tm2613680d1_8k.htm",
+          "event_type": "listing_status_review"
+        }
+      ],
+      "market_snapshot": null,
+      "expected": {
+        "decision_tier": "verified_automatic",
+        "action_readiness": "not_applicable",
+        "outcomes": ["no_tracked_security_change"],
+        "rule_id": "lifecycle.no_identity_change",
+        "successor_ticker": null,
+        "transition_requested": false
+      }
+    },
+    "BLBD": {
+      "historical_identity_change": false,
+      "snapshot_rows": [
+        {
+          "cik": "0001589526",
+          "source_ref": "0001589526-26-000044",
+          "evidence_url": "https://www.sec.gov/Archives/edgar/data/1589526/000158952626000044/blbd-20260731.htm",
+          "event_type": "merger_agreement"
+        }
+      ],
+      "market_snapshot": null,
+      "expected": {
+        "decision_tier": "verified_automatic",
+        "action_readiness": "not_applicable",
+        "outcomes": ["no_tracked_security_change"],
+        "rule_id": "lifecycle.no_identity_change",
+        "successor_ticker": null,
+        "transition_requested": false
+      }
+    }
+  }
+}

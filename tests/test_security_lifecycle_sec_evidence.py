@@ -228,7 +228,7 @@ def test_hapn_fixture_extracts_symbol_and_venue_change_without_a_to_a_transition
 def test_qbts_fixture_extracts_venue_only_with_unchanged_symbol():
     _case_data, _transport, result = _collect("QBTS")
     assert _values(result, "source_ticker") == {"QBTS"}
-    assert _values(result, "successor_ticker") == set()
+    assert _values(result, "successor_ticker") == {"QBTS"}
     assert _values(result, "source_venue") == {"NYSE"}
     assert _values(result, "destination_venue") == {"NASDAQ"}
     assert _values(result, "tracked_security_effect") == {"venue_change_only"}
