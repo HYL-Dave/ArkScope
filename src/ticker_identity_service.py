@@ -1,4 +1,4 @@
-"""Application service for attended ticker identity transitions."""
+"""Application service for governed ticker identity transitions."""
 
 from __future__ import annotations
 
@@ -220,6 +220,57 @@ class TickerIdentityService:
                     raise TickerIdentityConflict(
                         "transition_preview_changed"
                     ) from None
+                raise
+
+    def approve_automation_case(
+        self,
+        case_id: str,
+        *,
+        request: Mapping[str, object],
+    ) -> dict:
+        effective_date = str(request.get("effective_date") or "")
+        with self._profile_connection(write=True) as conn:
+            preview = self._preview_with_connection(
+                conn,
+                case_id=case_id,
+                options=TransitionOptions(execute_on=effective_date),
+            )
+            expected = {
+                "transition_kind": str(request.get("transition_kind") or ""),
+                "source_ticker": str(request.get("source_ticker") or "").upper(),
+                "successor_ticker": (
+                    str(request["successor_ticker"]).upper()
+                    if request.get("successor_ticker")
+                    else None
+                ),
+                "execute_on": effective_date,
+                "outcomes": sorted(
+                    {str(value) for value in request.get("outcomes") or ()}
+                ),
+            }
+            observed = {
+                key: preview.get(key)
+                for key in (
+                    "transition_kind",
+                    "source_ticker",
+                    "successor_ticker",
+                    "execute_on",
+                    "outcomes",
+                )
+            }
+            if observed != expected or preview.get("eligible") is not True:
+                raise TickerIdentityConflict("transition_preview_changed")
+            try:
+                return self._store(conn).approve_automation(
+                    preview=preview,
+                    approved_preview_sha256=str(preview["preview_sha256"]),
+                )
+            except ValueError as exc:
+                if str(exc) in {
+                    "preview_changed",
+                    "automation_authority_changed",
+                }:
+                    raise TickerIdentityConflict("transition_preview_changed") from None
                 raise
 
     def cancel_transition(

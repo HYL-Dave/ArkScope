@@ -118,6 +118,26 @@ def _query_context(case: Mapping[str, object], *, mode: str) -> dict[str, object
     }
 
 
+def _transition_request(
+    case: Mapping[str, object],
+    decision: object,
+) -> dict[str, object]:
+    outcomes = tuple(str(value) for value in _field(decision, "outcomes", ()))
+    if outcomes == ("listing_ended",):
+        transition_kind = "terminal_delisting"
+    elif "symbol_changed" in outcomes:
+        transition_kind = "symbol_continuation"
+    else:
+        raise ValueError("automation_transition_request")
+    return {
+        "transition_kind": transition_kind,
+        "source_ticker": str(case.get("ticker") or "").upper(),
+        "successor_ticker": _field(decision, "successor_ticker"),
+        "effective_date": _field(decision, "effective_date"),
+        "outcomes": outcomes,
+    }
+
+
 def _persisted_material(
     conn: sqlite3.Connection,
     run_id: str,
@@ -149,6 +169,8 @@ def _failure_code(exc: Exception, *, phase: str) -> str:
     if isinstance(exc, sqlite3.Error):
         return "persistence_failed"
     if isinstance(exc, ValueError):
+        if phase == "approve":
+            return "persistence_failed"
         return "source_payload_invalid" if phase == "acquire" else "extractor_failed"
     return "internal_error"
 
@@ -162,6 +184,7 @@ class LifecycleAutomationWorker:
         evidence_loader: Callable[..., LifecycleAutomationEvidenceBundle],
         source_loader: Callable[[], Mapping[str, Iterable[str]]],
         transition_preview: Callable[..., Mapping[str, object]],
+        transition_approver: Callable[..., Mapping[str, object]],
         clock: Callable[[], str],
     ):
         dependencies = {
@@ -170,6 +193,7 @@ class LifecycleAutomationWorker:
             "evidence_loader": evidence_loader,
             "source_loader": source_loader,
             "transition_preview": transition_preview,
+            "transition_approver": transition_approver,
             "clock": clock,
         }
         if any(not callable(value) for value in dependencies.values()):
@@ -179,6 +203,7 @@ class LifecycleAutomationWorker:
         self._evidence_loader = evidence_loader
         self._source_loader = source_loader
         self._transition_preview = transition_preview
+        self._transition_approver = transition_approver
         self._clock = clock
 
     @staticmethod
@@ -333,6 +358,19 @@ class LifecycleAutomationWorker:
                     sources_by_ticker={str(case["ticker"]): sources},
                     at=at,
                 )
+                if decision.transition_requested:
+                    phase = "approve"
+                    approved = self._transition_approver(
+                        case=case,
+                        request=_transition_request(case, decision),
+                        sources=sources,
+                    )
+                    if (
+                        not isinstance(approved, Mapping)
+                        or approved.get("status") != "approved"
+                        or approved.get("approval_authority") != "automation_policy"
+                    ):
+                        raise RuntimeError("automation_transition_approval")
                 return "accepted"
             return "drafted"
         except Exception as exc:

@@ -11,7 +11,10 @@ from typing import Callable, Iterable, Mapping
 import uuid
 
 from src.profile_state import EDITABLE_TAG_SOURCES
-from src.security_lifecycle_investigation import assessment_fingerprint
+from src.security_lifecycle_investigation import (
+    assessment_fingerprint,
+    derive_action_proposal_specs,
+)
 from src.ticker_identity_schema import (
     ATTEMPT_TRIGGERS,
     PRIORITY_RESOLUTIONS,
@@ -828,6 +831,112 @@ def build_transition_preview(
     return payload
 
 
+def build_automation_transition_preflight(
+    conn: sqlite3.Connection,
+    *,
+    case: Mapping[str, object],
+    request: Mapping[str, object],
+    sources: Iterable[str],
+) -> dict:
+    """Project a rule request without inventing durable assessment identities."""
+
+    case_id = str(case.get("case_id") or "")
+    source_ticker = _ticker(request.get("source_ticker"))
+    case_ticker = _ticker(case.get("ticker"))
+    successor_ticker = _ticker(request.get("successor_ticker"))
+    transition_kind = str(request.get("transition_kind") or "")
+    effective_date = str(request.get("effective_date") or "")
+    outcomes = tuple(sorted({str(value) for value in request.get("outcomes") or ()}))
+    observation_fingerprint = _sha256(
+        "observation_fingerprint_sha256",
+        case.get("observation_fingerprint_sha256"),
+    )
+    if not case_id or source_ticker is None or case_ticker is None:
+        raise ValueError("transition_authority_identity")
+    if transition_kind not in {"symbol_continuation", "terminal_delisting"}:
+        raise ValueError("transition_kind")
+
+    material = {
+        "case_id": case_id,
+        "effective_date": effective_date,
+        "outcomes": outcomes,
+        "source_ticker": source_ticker,
+        "successor_ticker": successor_ticker,
+        "transition_kind": transition_kind,
+    }
+    seed = hashlib.sha256(_canonical_json(material).encode("utf-8")).hexdigest()
+    assessment_id = f"sla_preflight_{seed[:32]}"
+    evidence_set_sha256 = hashlib.sha256(
+        f"automation-transition-preflight\0{seed}".encode("utf-8")
+    ).hexdigest()
+    assessment = {
+        "assessment_id": assessment_id,
+        "case_id": case_id,
+        "status": "accepted",
+        "relevance": "direct_tracked_security",
+        "successor_ticker": successor_ticker,
+        "effective_date": effective_date,
+        "observation_fingerprint_sha256": observation_fingerprint,
+        "evidence_set_sha256": evidence_set_sha256,
+        "outcomes": outcomes,
+        "citations": (
+            {
+                "reference_kind": "observation",
+                "cited_content_sha256": observation_fingerprint,
+            },
+        ),
+        "stale": False,
+    }
+    fingerprint = assessment_fingerprint(assessment)
+    proposal_specs = derive_action_proposal_specs(
+        case=case,
+        assessment=assessment,
+        sources=sources,
+    )
+    proposals = []
+    for index, spec in enumerate(proposal_specs):
+        proposal_seed = hashlib.sha256(
+            f"{seed}\0{index}\0{_canonical_json(spec)}".encode("utf-8")
+        ).hexdigest()
+        proposals.append(
+            {
+                "proposal_id": f"slp_preflight_{proposal_seed[:32]}",
+                "case_id": case_id,
+                "assessment_id": assessment_id,
+                "action_type": spec["action_type"],
+                "status": "proposed",
+                "source_ticker": case_ticker,
+                "replacement_ticker": spec.get("replacement_ticker"),
+                "assessment_fingerprint_sha256": fingerprint,
+                "projected_block_reason": spec.get("block_reason"),
+            }
+        )
+
+    preview = build_transition_preview(
+        conn,
+        case=case,
+        assessment=assessment,
+        proposals=proposals,
+        observation_fingerprint_sha256=observation_fingerprint,
+        sources=sources,
+        options=TransitionOptions(execute_on=effective_date),
+    )
+    mismatches = []
+    if case_ticker != source_ticker:
+        mismatches.append("source_ticker_mismatch")
+    if preview.get("transition_kind") != transition_kind:
+        mismatches.append("transition_kind_mismatch")
+    if _ticker(preview.get("successor_ticker")) != successor_ticker:
+        mismatches.append("successor_ticker_mismatch")
+    if mismatches:
+        preview["eligible"] = False
+        preview["block_reasons"] = sorted(
+            {*preview.get("block_reasons", ()), *mismatches}
+        )
+        preview["preview_sha256"] = profile_snapshot_sha256(preview)
+    return preview
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
         "+00:00", "Z"
@@ -868,6 +977,116 @@ def _assessment_authority_matches(
         and current["evidence_set_sha256"] == evidence_set_sha256
         and assessment_fingerprint(current) == assessment_fingerprint_sha256
     )
+
+
+def _automation_authority(
+    conn: sqlite3.Connection,
+    *,
+    preview: Mapping[str, object],
+    proposal_ids: list[str],
+) -> tuple[str, str, str, str]:
+    from src.security_lifecycle_decision_policy import (
+        AUTOMATION_POLICY_VERSION,
+        RULE_VERSIONS,
+    )
+    from src.security_lifecycle_fact_kernel import (
+        persisted_decision_provenance_sha256,
+    )
+
+    assessment_id = str(preview.get("assessment_id") or "")
+    cursor = conn.execute(
+        "SELECT a.case_id AS assessment_case_id,a.status AS assessment_status,"
+        "a.author,a.automation_method,"
+        "a.automation_run_id,a.acceptance_authority,a.rule_id,a.rule_version,"
+        "a.decision_provenance_sha256,"
+        "a.observation_fingerprint_sha256 AS assessment_observation_sha256,"
+        "a.evidence_set_sha256,r.case_id AS run_case_id,"
+        "r.status AS run_status,"
+        "r.observation_fingerprint_sha256 AS run_observation_sha256,"
+        "r.policy_version,r.decision_tier,r.action_readiness "
+        "FROM security_lifecycle_assessments AS a "
+        "LEFT JOIN security_lifecycle_automation_runs AS r "
+        "ON r.run_id=a.automation_run_id WHERE a.assessment_id=?",
+        (assessment_id,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        raise ValueError("automation_authority_changed")
+    names = [str(item[0]) for item in cursor.description or ()]
+    authority = {name: row[index] for index, name in enumerate(names)}
+    run_id = str(authority.get("automation_run_id") or "")
+    rule_id = str(authority.get("rule_id") or "")
+    rule_version = str(authority.get("rule_version") or "")
+    policy_version = str(authority.get("policy_version") or "")
+    provenance = str(authority.get("decision_provenance_sha256") or "")
+    expected = {
+        "case_id": str(preview.get("case_id") or ""),
+        "observation_fingerprint_sha256": str(
+            preview.get("observation_fingerprint_sha256") or ""
+        ),
+        "evidence_set_sha256": str(preview.get("evidence_set_sha256") or ""),
+    }
+    assessment_current = {
+        "assessment_id": assessment_id,
+        "observation_fingerprint_sha256": str(
+            authority.get("assessment_observation_sha256") or ""
+        ),
+        "evidence_set_sha256": str(authority.get("evidence_set_sha256") or ""),
+    }
+    coherent = (
+        authority.get("assessment_case_id") == expected["case_id"]
+        and authority.get("assessment_status") == "accepted"
+        and authority.get("author") == "automation"
+        and authority.get("automation_method") == "deterministic_rule"
+        and authority.get("acceptance_authority") == "automation_policy"
+        and run_id
+        and authority.get("run_case_id") == expected["case_id"]
+        and authority.get("run_status") == "succeeded"
+        and authority.get("run_observation_sha256")
+        == expected["observation_fingerprint_sha256"]
+        and authority.get("policy_version") == AUTOMATION_POLICY_VERSION
+        and authority.get("decision_tier") == "verified_automatic"
+        and authority.get("action_readiness") == "transition_eligible"
+        and RULE_VERSIONS.get(rule_id) == rule_version
+        and assessment_current["observation_fingerprint_sha256"]
+        == expected["observation_fingerprint_sha256"]
+        and assessment_current["evidence_set_sha256"] == expected["evidence_set_sha256"]
+        and assessment_fingerprint(assessment_current)
+        == preview.get("assessment_fingerprint_sha256")
+    )
+    if not coherent:
+        raise ValueError("automation_authority_changed")
+    if conn.execute(
+        "SELECT COUNT(*) FROM security_lifecycle_automation_run_blockers "
+        "WHERE automation_run_id=?",
+        (run_id,),
+    ).fetchone()[0]:
+        raise ValueError("automation_authority_changed")
+    try:
+        observed_provenance = persisted_decision_provenance_sha256(conn, run_id)
+    except (KeyError, ValueError):
+        raise ValueError("automation_authority_changed") from None
+    if provenance != observed_provenance:
+        raise ValueError("automation_authority_changed")
+
+    placeholders = ",".join("?" for _ in proposal_ids)
+    rows = conn.execute(
+        "SELECT proposal_id,case_id,assessment_id,status,source_ticker,"
+        "assessment_fingerprint_sha256 FROM security_lifecycle_action_proposals "
+        f"WHERE proposal_id IN ({placeholders}) ORDER BY proposal_id",
+        tuple(proposal_ids),
+    ).fetchall()
+    expected_proposals = sorted(proposal_ids)
+    if [str(row[0]) for row in rows] != expected_proposals or any(
+        str(row[1]) != expected["case_id"]
+        or str(row[2]) != assessment_id
+        or str(row[3]) != "proposed"
+        or _ticker(row[4]) != _ticker(preview.get("source_ticker"))
+        or str(row[5]) != preview.get("assessment_fingerprint_sha256")
+        for row in rows
+    ):
+        raise ValueError("automation_authority_changed")
+    return policy_version, rule_id, rule_version, provenance
 
 
 class TickerIdentityTransitionStore:
@@ -950,15 +1169,14 @@ class TickerIdentityTransitionStore:
             raise ValueError("preview_execute_on") from exc
         return kind, execute_on
 
-    def approve(
+    def _approve(
         self,
         *,
         preview: Mapping[str, object],
         approved_preview_sha256: str,
+        automation: bool,
     ) -> dict:
-        kind, execute_on = self._validate_preview(
-            preview, approved_preview_sha256
-        )
+        kind, execute_on = self._validate_preview(preview, approved_preview_sha256)
         case_id = str(preview.get("case_id") or "")
         assessment_id = str(preview.get("assessment_id") or "")
         source_ticker = _ticker(preview.get("source_ticker"))
@@ -968,7 +1186,9 @@ class TickerIdentityTransitionStore:
         proposal_ids = sorted(
             {str(value) for value in preview.get("proposal_ids") or ()}
         )
-        if not proposal_ids or any(not value or "\0" in value for value in proposal_ids):
+        if not proposal_ids or any(
+            not value or "\0" in value for value in proposal_ids
+        ):
             raise ValueError("preview_proposals")
         observation_fingerprint = _sha256(
             "observation_fingerprint_sha256",
@@ -994,6 +1214,11 @@ class TickerIdentityTransitionStore:
         )
         dedupe_key = self._dedupe_key(preview)
         now = self._clock()
+        approval_authority = "attended_user"
+        automation_policy_version: str | None = None
+        rule_id: str | None = None
+        rule_version: str | None = None
+        decision_provenance = current_assessment_fingerprint
 
         self._begin()
         try:
@@ -1006,6 +1231,18 @@ class TickerIdentityTransitionStore:
                 assessment_fingerprint_sha256=current_assessment_fingerprint,
             ):
                 raise ValueError("preview_changed")
+            if automation:
+                (
+                    automation_policy_version,
+                    rule_id,
+                    rule_version,
+                    decision_provenance,
+                ) = _automation_authority(
+                    self.conn,
+                    preview=preview,
+                    proposal_ids=proposal_ids,
+                )
+                approval_authority = "automation_policy"
             expected_profile_digest = _sha256(
                 "profile_state_sha256", preview.get("profile_state_sha256")
             )
@@ -1037,8 +1274,8 @@ class TickerIdentityTransitionStore:
                     "unhide_successor=?,approved_observation_fingerprint_sha256=?,"
                     "approved_assessment_fingerprint_sha256=?,"
                     "approved_preview_sha256=?,approved_preview_json=?,"
-                    "approval_authority='attended_user',automation_policy_version=NULL,"
-                    "rule_id=NULL,rule_version=NULL,decision_provenance_sha256=?,"
+                    "approval_authority=?,automation_policy_version=?,"
+                    "rule_id=?,rule_version=?,decision_provenance_sha256=?,"
                     "approved_at=?,updated_at=? WHERE transition_id=?",
                     (
                         proposal_ids_json,
@@ -1051,7 +1288,11 @@ class TickerIdentityTransitionStore:
                         current_assessment_fingerprint,
                         digest,
                         preview_json,
-                        current_assessment_fingerprint,
+                        approval_authority,
+                        automation_policy_version,
+                        rule_id,
+                        rule_version,
+                        decision_provenance,
                         now,
                         now,
                         transition_id,
@@ -1071,7 +1312,7 @@ class TickerIdentityTransitionStore:
                     "approval_authority,automation_policy_version,rule_id,rule_version,"
                     "decision_provenance_sha256) "
                     "VALUES (?,?,?,?,?,?,'approved',?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,"
-                    "NULL,NULL,NULL,'attended_user',NULL,NULL,NULL,?)",
+                    "NULL,NULL,NULL,?,?,?,?,?)",
                     (
                         transition_id,
                         case_id,
@@ -1090,7 +1331,11 @@ class TickerIdentityTransitionStore:
                         preview_json,
                         now,
                         now,
-                        current_assessment_fingerprint,
+                        approval_authority,
+                        automation_policy_version,
+                        rule_id,
+                        rule_version,
+                        decision_provenance,
                     ),
                 )
             self.conn.commit()
@@ -1098,6 +1343,30 @@ class TickerIdentityTransitionStore:
             self.conn.rollback()
             raise
         return self.get(transition_id)
+
+    def approve(
+        self,
+        *,
+        preview: Mapping[str, object],
+        approved_preview_sha256: str,
+    ) -> dict:
+        return self._approve(
+            preview=preview,
+            approved_preview_sha256=approved_preview_sha256,
+            automation=False,
+        )
+
+    def approve_automation(
+        self,
+        *,
+        preview: Mapping[str, object],
+        approved_preview_sha256: str,
+    ) -> dict:
+        return self._approve(
+            preview=preview,
+            approved_preview_sha256=approved_preview_sha256,
+            automation=True,
+        )
 
     def list_due(self, *, on_date: str, limit: int) -> list[dict]:
         try:

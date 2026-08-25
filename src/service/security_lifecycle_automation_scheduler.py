@@ -216,12 +216,44 @@ def _transition_preview(
     request: Mapping[str, object],
     sources: tuple[str, ...],
 ) -> dict[str, object]:
-    del case, sources
-    return {
-        "eligible": False,
-        "block_reasons": ("action_executor_not_available",),
-        "transition_kind": request.get("transition_kind"),
-    }
+    from src.ticker_identity_transition import (
+        build_automation_transition_preflight,
+    )
+
+    with _profile_connection() as conn:
+        return build_automation_transition_preflight(
+            conn,
+            case=case,
+            request=request,
+            sources=sources,
+        )
+
+
+def _transition_approver(
+    *,
+    case: Mapping[str, object],
+    request: Mapping[str, object],
+    sources: tuple[str, ...],
+) -> dict[str, object]:
+    from src.ticker_identity_service import (
+        TickerIdentityConflict,
+        TickerIdentityService,
+    )
+
+    del sources
+    service = TickerIdentityService(
+        market_db_path=str(_market_path()),
+        profile_db_path=str(_profile_path()),
+        source_loader=_load_sources,
+        clock=_clock,
+    )
+    try:
+        return service.approve_automation_case(
+            str(case.get("case_id") or ""),
+            request=request,
+        )
+    except TickerIdentityConflict:
+        raise ValueError("transition_preview_changed") from None
 
 
 def _identity_context(case: Mapping[str, object]):
@@ -462,6 +494,7 @@ def _worker() -> LifecycleAutomationWorker:
         evidence_loader=_load_evidence,
         source_loader=_load_sources,
         transition_preview=_transition_preview,
+        transition_approver=_transition_approver,
         clock=_clock,
     )
 
