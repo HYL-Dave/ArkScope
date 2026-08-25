@@ -591,6 +591,10 @@ def render_card_markdown(card: ResultCard) -> str:
 # ── on-demand translation ─────────────────────────────────────────────────────
 
 _LANG_NAMES = {"zh-Hant": "Traditional Chinese (繁體中文)", "zh-Hans": "Simplified Chinese"}
+_TEXT_TRANSLATION_LANG_NAMES = {
+    "en": "English",
+    "zh-Hant": "Traditional Chinese (繁體中文)",
+}
 _TRANSLATABLE_FIELDS = (
     "question",
     "conclusion",
@@ -605,6 +609,114 @@ _TRANSLATABLE_FIELDS = (
     "divergence",
     "confidence_rationale",
 )
+
+
+class TextTranslationOutputInvalid(ValueError):
+    """The fixed one-field translation response did not match its contract."""
+
+
+def _translation_harness(provider: Provider) -> str:
+    from src.auth_drivers.live_resolver import resolve_live_auth
+
+    resolution = resolve_live_auth(provider)
+    if resolution.source == "oauth_driver_unwired":
+        return (
+            "chatgpt_subscription_structured_output"
+            if provider == "openai"
+            else "claude_subscription_structured_output"
+        )
+    return f"{provider}_sdk"
+
+
+def translate_text(
+    text: str,
+    *,
+    model_timeout_s: float,
+    lang: str,
+    provider: Optional[Provider] = None,
+    model: Optional[str] = None,
+) -> dict[str, str]:
+    """Translate one bounded source excerpt with the fixed card-translation route."""
+
+    if lang not in _TEXT_TRANSLATION_LANG_NAMES:
+        raise ValueError("translation_locale")
+    if (
+        not isinstance(text, str)
+        or not text.strip()
+        or len(text) > 16000
+        or "\0" in text
+    ):
+        raise ValueError("translation_source_text")
+
+    ensure_env_loaded()
+    route = task_route("card_translation")
+    provider = provider or route.provider
+    model = model or route.model
+    target = _TEXT_TRANSLATION_LANG_NAMES[lang]
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"translated_text": {"type": "string"}},
+        "required": ["translated_text"],
+    }
+    system_base = (
+        f"You are a precise financial translator. Translate source text into {target}. "
+        "Keep issuer names, tickers, numbers, currency, dates, and identifiers exact. "
+        "Return the complete translation without commentary or omitted claims."
+    )
+    system = system_base + " Respond ONLY via the emit_translation tool."
+    subscription_system = (
+        system_base
+        + " Return ONLY one JSON object matching the required output schema; do not call tools."
+    )
+    user = json.dumps(
+        {"text": text},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    effort = route.effort if provider == route.provider else "default"
+    harness = _translation_harness(provider)
+
+    if provider == "anthropic":
+        translated = _translate_anthropic(
+            model,
+            system,
+            user,
+            schema,
+            target,
+            effort,
+            subscription_system=subscription_system,
+            model_timeout_s=model_timeout_s,
+        )
+    elif provider == "openai":
+        translated = _translate_openai(
+            model,
+            system,
+            user,
+            schema,
+            target,
+            effort,
+            model_timeout_s=model_timeout_s,
+        )
+    else:
+        raise ValueError(f"unknown provider: {provider}")
+
+    if not isinstance(translated, dict) or set(translated) != {"translated_text"}:
+        raise TextTranslationOutputInvalid("translation_output_invalid")
+    translated_text = translated.get("translated_text")
+    if (
+        not isinstance(translated_text, str)
+        or not translated_text.strip()
+        or len(translated_text) > 16000
+        or "\0" in translated_text
+    ):
+        raise TextTranslationOutputInvalid("translation_output_invalid")
+    return {
+        "translated_text": translated_text,
+        "provider": provider,
+        "model": model,
+        "harness": harness,
+    }
 
 
 def translate_card(

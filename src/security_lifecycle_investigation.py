@@ -713,8 +713,87 @@ class SecurityLifecycleInvestigationStore:
             )
         return evidence_id
 
+    def get_evidence(self, evidence_id: str) -> dict:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_evidence WHERE evidence_id=?",
+            (evidence_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError("evidence_not_found")
+        return dict(row)
+
+    def get_evidence_translation(
+        self,
+        *,
+        evidence_id: str,
+        evidence_content_sha256: str,
+        locale: str,
+    ) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_evidence_translations "
+            "WHERE evidence_id=? AND evidence_content_sha256=? AND locale=?",
+            (evidence_id, evidence_content_sha256, locale),
+        ).fetchone()
+        return None if row is None else dict(row)
+
+    def assert_translation_write_available(self) -> None:
+        self._assert_write()
+
+    def save_evidence_translation(
+        self,
+        *,
+        evidence_id: str,
+        evidence_content_sha256: str,
+        locale: str,
+        translated_text: str,
+        provider: str,
+        model: str,
+        harness: str,
+        at: str,
+    ) -> tuple[dict, bool]:
+        self._assert_write()
+        current = self.get_evidence(evidence_id)
+        digest = _canonical_sha256(
+            "evidence_content_sha256", evidence_content_sha256
+        )
+        if current["content_sha256"] != digest:
+            raise ValueError("evidence_changed")
+        if locale not in {"en", "zh-Hant"}:
+            raise ValueError("translation_locale")
+        values = (
+            evidence_id,
+            digest,
+            locale,
+            _bounded_text(
+                "translated_text", translated_text, max_length=16000, required=True
+            ),
+            _bounded_text("provider", provider, max_length=64, required=True),
+            _bounded_text("model", model, max_length=160, required=True),
+            _bounded_text("harness", harness, max_length=160, required=True),
+            at,
+        )
+        try:
+            with self.conn:
+                cursor = self.conn.execute(
+                    "INSERT INTO security_lifecycle_evidence_translations "
+                    "(evidence_id,evidence_content_sha256,locale,translated_text,"
+                    "provider,model,harness,translated_at) VALUES (?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(evidence_id,evidence_content_sha256,locale) DO NOTHING",
+                    values,
+                )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("evidence_changed") from exc
+        saved = self.get_evidence_translation(
+            evidence_id=evidence_id,
+            evidence_content_sha256=digest,
+            locale=locale,
+        )
+        if saved is None:
+            raise ValueError("evidence_changed")
+        return saved, cursor.rowcount == 1
+
     def list_evidence(self, case_id: str) -> list[dict]:
-        return [
+        evidence = [
             dict(row)
             for row in self.conn.execute(
                 "SELECT * FROM security_lifecycle_evidence "
@@ -722,6 +801,24 @@ class SecurityLifecycleInvestigationStore:
                 (case_id,),
             )
         ]
+        translations_by_evidence: dict[str, list[dict]] = {}
+        for row in self.conn.execute(
+            "SELECT t.* FROM security_lifecycle_evidence_translations t "
+            "JOIN security_lifecycle_evidence e "
+            "ON e.evidence_id=t.evidence_id "
+            "AND e.content_sha256=t.evidence_content_sha256 "
+            "WHERE e.case_id=? ORDER BY t.evidence_id,t.locale,t.translated_at",
+            (case_id,),
+        ):
+            translation = dict(row)
+            translations_by_evidence.setdefault(
+                str(translation["evidence_id"]), []
+            ).append(translation)
+        for item in evidence:
+            item["translations"] = translations_by_evidence.get(
+                str(item["evidence_id"]), []
+            )
+        return evidence
 
     def create_assessment(
         self,

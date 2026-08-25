@@ -14,6 +14,8 @@ from src.api.dependencies import (
     get_security_lifecycle_store,
 )
 from src.api.permissions import require_db_write
+from src.card_synthesis import translate_text
+from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     LifecycleWritesUnavailable,
@@ -24,6 +26,13 @@ from src.security_lifecycle_investigation import (
 from src.security_lifecycle_manual_evidence import (
     add_manual_evidence,
     canonical_manual_https_url,
+)
+from src.security_lifecycle_translation import (
+    EvidenceTranslationConflict,
+    EvidenceTranslationFailure,
+    EvidenceTranslationResult,
+    prepare_evidence_translation,
+    translate_evidence,
 )
 from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
 
@@ -225,6 +234,22 @@ class AcknowledgementRequest(BaseModel):
         return _request_text(value, name="note", required=False)
 
 
+class EvidenceTranslationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    locale: Literal["en", "zh-Hant"]
+
+
+def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResult:
+    runtime = resolve_fixed_task_runtime("card_translation")
+    result = translate_text(
+        text,
+        lang=locale,
+        model_timeout_s=runtime.model_timeout_s,
+    )
+    return EvidenceTranslationResult(**result)
+
+
 def _store_error(exc: LifecycleStoreUnavailable) -> HTTPException:
     return HTTPException(
         status_code=503,
@@ -337,6 +362,43 @@ def create_manual_evidence(
         raise _store_error(exc) from None
     except KeyError as exc:
         raise _not_found(exc) from None
+    except (LifecycleWritesUnavailable, ValueError) as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/evidence/{evidence_id}/translations")
+def translate_evidence_route(
+    evidence_id: str,
+    body: EvidenceTranslationRequest,
+    store: SecurityLifecycleInvestigationStore = Depends(
+        get_security_lifecycle_store
+    ),
+):
+    try:
+        _, cached = prepare_evidence_translation(
+            store,
+            evidence_id=evidence_id,
+            locale=body.locale,
+        )
+        if cached is not None:
+            return {**cached, "cached": True}
+        require_db_write(
+            "security_lifecycle_translate_evidence",
+            {"evidence_id": evidence_id, "locale": body.locale},
+        )
+        return translate_evidence(
+            store,
+            evidence_id=evidence_id,
+            locale=body.locale,
+            translator=_translate_evidence_text,
+            at=_utc_now(),
+        )
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except EvidenceTranslationConflict as exc:
+        raise HTTPException(status_code=409, detail={"code": exc.code}) from None
+    except EvidenceTranslationFailure as exc:
+        raise HTTPException(status_code=502, detail={"code": exc.code}) from None
     except (LifecycleWritesUnavailable, ValueError) as exc:
         raise _invalid(exc) from None
 

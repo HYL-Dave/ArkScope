@@ -230,6 +230,14 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
             elif name == "evidence":
                 value.pop("adapter", None)
                 value.pop("source_locator_json", None)
+                value["translations"] = [
+                    {
+                        key: field
+                        for key, field in translation.items()
+                        if key != "translated_text"
+                    }
+                    for translation in value.get("translations", [])
+                ]
                 value["excerpt"] = str(value.get("excerpt") or "")[
                     :_DETAIL_EXCERPT_LIMIT
                 ]
