@@ -696,10 +696,10 @@ describe("Lifecycle workflow", () => {
         mode: "historical",
         status: "blocked",
         policy_version: "lifecycle-automation-v1",
-        decision_tier: "review_suggested",
-        action_readiness: "action_blocked",
+        decision_tier: "verified_automatic",
+        action_readiness: "waiting_transition_revalidation",
         failure_code: null,
-        blockers: [],
+        blockers: [{ blocker_code: "transition_approval_changed", retryable: true }],
         created_at: "2026-08-25T10:00:00Z",
       }, {
         run_id: "automation-run-blocked",
@@ -757,8 +757,9 @@ describe("Lifecycle workflow", () => {
 
     await mountLifecycle();
     for (const value of [
-      "Review suggested",
-      "Action blocked",
+      "Verified automatic",
+      "Waiting to revalidate tracking transition",
+      "Transition approval inputs changed; revalidation is scheduled",
       "Automation-generated assessment",
       "Accepted by automation policy",
       "Deterministic rule",
@@ -771,10 +772,10 @@ describe("Lifecycle workflow", () => {
       "NASDAQ",
       "Tracked-security effect",
       "Ticker and trading venue changed",
-      "Conflicting source facts",
       "Observation citation",
       "Evidence citation",
     ]) expect(document.body.textContent).toContain(value);
+    expect(document.body.textContent).not.toContain("Conflicting source facts");
     expect(document.body.textContent).not.toContain("symbol_and_venue_change");
   });
 
