@@ -312,13 +312,14 @@ def test_changed_observation_evidence_or_rule_version_changes_provenance():
 
     _conn, store, kernel, case_id = _context()
     first = _reserve(kernel, case_id)
-    _succeed(kernel, first)
+    _succeed(kernel, first, evidence=(evidence,), facts=(fact,))
     second = _reserve(
         kernel,
         case_id,
         observation_fingerprint_sha256="b" * 64,
+        at="2026-08-25T03:00:00Z",
     )
-    _succeed(kernel, second)
+    _succeed(kernel, second, evidence=(evidence,), facts=(fact,))
     assert second.run_id != first.run_id
     assert [row["run_id"] for row in store.list_automation_runs(case_id)] == [
         second.run_id,
@@ -396,4 +397,3 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
                 query_context=query_context,
                 diagnostics=diagnostics,
             )
-
