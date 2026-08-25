@@ -565,7 +565,12 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
             and fact["normalized_value"] == "EA2"
             and fact["evidence_id"]
             and fact["cited_text_sha256"] == cited_digest
+            and "fact_dedupe_key" not in fact
             for fact in case["automation_facts"]
+        )
+        assert all(
+            "adapter" not in evidence and "source_locator_json" not in evidence
+            for evidence in case["evidence"]
         )
         assert "query_context" not in rendered
         assert "diagnostics" not in rendered
