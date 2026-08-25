@@ -54,6 +54,30 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
+    automation_result = {
+        "status": "succeeded",
+        "reason": None,
+        "selected": 0,
+        "processed": 0,
+        "accepted": 0,
+        "drafted": 0,
+        "blocked": 0,
+        "failed": 0,
+        "skipped_current": 0,
+        "case_ids": [],
+    }
+    monkeypatch.setattr(
+        ds,
+        "run_security_lifecycle_automation",
+        lambda *, limit, now: automation_result,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_security_lifecycle_automation_result",
+        lambda result, *, now: True,
+        raising=False,
+    )
     # v1.2: isolate the durable scheduler-state store to a per-test DB (never the real
     # profile_state.db). Set ARKSCOPE_PROFILE_DB so BOTH the write store (_state_store) and the
     # v1.4a no-create read (resolve_profile_state_db_path) resolve to this tmp path.
@@ -204,6 +228,18 @@ def test_tick_fires_only_enabled_and_due():
 def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    automation_result = {
+        "status": "succeeded",
+        "reason": None,
+        "selected": 0,
+        "processed": 0,
+        "accepted": 0,
+        "drafted": 0,
+        "blocked": 0,
+        "failed": 0,
+        "skipped_current": 0,
+        "case_ids": [],
+    }
     transition_result = {
         "status": "succeeded",
         "reason": None,
@@ -214,6 +250,19 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
         "transition_ids": [],
         "failed_transition_ids": [],
     }
+    monkeypatch.setattr(
+        ds,
+        "run_security_lifecycle_automation",
+        lambda *, limit, now: events.append(("automation", limit, now))
+        or automation_result,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_security_lifecycle_automation_result",
+        lambda result, *, now: events.append(("automation-result", result, now)),
+        raising=False,
+    )
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
@@ -233,8 +282,146 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
 
     assert fired == ["finnhub_news"]
     assert events == [
+        ("automation", 2, _NOW),
+        ("automation-result", automation_result, _NOW),
         ("transitions", _NOW),
         ("transition-result", transition_result, _NOW),
+        ("provider", "finnhub_news"),
+    ]
+
+
+def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch(
+    monkeypatch,
+):
+    events = []
+    ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    monkeypatch.setattr(
+        ds,
+        "run_security_lifecycle_automation",
+        lambda *, limit, now: events.append(("automation", limit, now))
+        or {
+            "status": "succeeded",
+            "reason": None,
+            "selected": 0,
+            "processed": 0,
+            "accepted": 0,
+            "drafted": 0,
+            "blocked": 0,
+            "failed": 0,
+            "skipped_current": 0,
+            "case_ids": [],
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_security_lifecycle_automation_result",
+        lambda result, *, now: events.append(("automation-result", now)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda *, now: events.append(("transitions", now))
+        or {
+            "status": "succeeded",
+            "reason": None,
+            "due": 0,
+            "applied": 0,
+            "needs_review": 0,
+            "already_applied": 0,
+            "transition_ids": [],
+            "failed_transition_ids": [],
+        },
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_ticker_identity_scheduler_result",
+        lambda result, *, now: events.append(("transition-result", now)),
+    )
+
+    fired = ds.tick_once(
+        _NOW,
+        fire=lambda source: events.append(("provider", source)),
+    )
+
+    assert fired == ["finnhub_news"]
+    assert events == [
+        ("automation", 2, _NOW),
+        ("automation-result", _NOW),
+        ("transitions", _NOW),
+        ("transition-result", _NOW),
+        ("provider", "finnhub_news"),
+    ]
+
+
+def test_tick_records_lifecycle_automation_failure_and_continues(monkeypatch):
+    events = []
+    ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
+    failure = {
+        "status": "unavailable",
+        "reason": "automation_scheduler_failed",
+        "selected": 0,
+        "processed": 0,
+        "accepted": 0,
+        "drafted": 0,
+        "blocked": 0,
+        "failed": 0,
+        "skipped_current": 0,
+        "case_ids": [],
+    }
+    monkeypatch.setattr(
+        ds,
+        "run_security_lifecycle_automation",
+        lambda *, limit, now: (_ for _ in ()).throw(
+            RuntimeError("private scheduler detail")
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "security_lifecycle_automation_failure",
+        lambda reason: events.append(("automation-failure", reason)) or failure,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_security_lifecycle_automation_result",
+        lambda result, *, now: events.append(("automation-result", result, now)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda *, now: events.append(("transitions", now))
+        or {
+            "status": "succeeded",
+            "reason": None,
+            "due": 0,
+            "applied": 0,
+            "needs_review": 0,
+            "already_applied": 0,
+            "transition_ids": [],
+            "failed_transition_ids": [],
+        },
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_ticker_identity_scheduler_result",
+        lambda result, *, now: events.append(("transition-result", now)),
+    )
+
+    fired = ds.tick_once(
+        _NOW,
+        fire=lambda source: events.append(("provider", source)),
+    )
+
+    assert fired == ["finnhub_news"]
+    assert events == [
+        ("automation-failure", "automation_scheduler_failed"),
+        ("automation-result", failure, _NOW),
+        ("transitions", _NOW),
+        ("transition-result", _NOW),
         ("provider", "finnhub_news"),
     ]
 
