@@ -85,7 +85,7 @@ def _evidence(
 def _fact(evidence, value="HAPN", *, rule_version="1"):
     from src.security_lifecycle_fact_kernel import AutomationFact
 
-    cited = "HAPN"
+    cited = value
     encoded = evidence.excerpt.encode()
     start = encoded.index(cited.encode())
     return AutomationFact(

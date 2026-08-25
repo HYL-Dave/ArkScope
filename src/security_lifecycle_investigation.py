@@ -261,6 +261,10 @@ class SecurityLifecycleInvestigationStore:
         if not self._allow_incomplete_migration:
             assert_lifecycle_writes_available(self.conn)
 
+    def assert_automation_write_available(self) -> None:
+        """Expose the existing lifecycle receipt guard to the automation kernel."""
+        self._assert_write()
+
     def _new_id(self, prefix: str) -> str:
         ordinal = self._id_ordinals.get(prefix, 0) + 1
         self._id_ordinals[prefix] = ordinal
@@ -323,6 +327,9 @@ class SecurityLifecycleInvestigationStore:
         if row is None:
             raise KeyError("case_not_found")
         return row
+
+    def get_case_identity(self, case_id: str) -> dict:
+        return dict(self._case_row(case_id))
 
     def _evidence_set_sha256(self, case_id: str) -> str:
         return _digest_rows(
@@ -405,6 +412,33 @@ class SecurityLifecycleInvestigationStore:
                 (case_id,),
             )
         ]
+
+    def get_automation_run(self, run_id: str) -> dict:
+        row = self.conn.execute(
+            "SELECT * FROM security_lifecycle_automation_runs WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError("automation_run_not_found")
+        result = dict(row)
+        result["blockers"] = [
+            dict(blocker)
+            for blocker in self.conn.execute(
+                "SELECT * FROM security_lifecycle_automation_run_blockers "
+                "WHERE automation_run_id=? ORDER BY blocker_code",
+                (run_id,),
+            )
+        ]
+        return result
+
+    def list_automation_runs(self, case_id: str) -> list[dict]:
+        self._case_row(case_id)
+        rows = self.conn.execute(
+            "SELECT run_id FROM security_lifecycle_automation_runs "
+            "WHERE case_id=? ORDER BY created_at DESC,rowid DESC",
+            (case_id,),
+        ).fetchall()
+        return [self.get_automation_run(str(row["run_id"])) for row in rows]
 
     def start_investigation_run(self, run_id: str, *, at: str) -> None:
         self._assert_write()
