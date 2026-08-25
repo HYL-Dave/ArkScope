@@ -103,14 +103,21 @@ provider projection, while this exact-list owner still expected the eight
 pre-Stage-3 domains. The focused and ownership ledgers had omitted that
 downstream owner.
 
-The file is byte-identical to the product base at `716` lines and SHA-256
+The test file is byte-identical to the product base at `716` lines and SHA-256
 `9c291a9ea5ad99132b29915c27d955b0315636484f44c4763c89915e9671386e`; it
-collects exactly `44` existing nodes. Stage 3 owns only the one existing node's
-literal domain, offset, effective-ID, label, and guard-copy expectations. No
-node, product path, client-id value, capability, schema, route, or backend
-collection identity changes. The focused baseline is therefore `234` and the
-final target is `271`. The rejected first full run remains evidence and
-canonical admission restarts after the tests-only owner correction.
+collects exactly `44` existing nodes. Follow-up inspection of that owner found
+the corresponding product boundary was also stale: app-managed validation and
+guard copy still allowed base IDs through `29`, while `lifecycle=+80` requires
+the shared base to stay at or below `19` to remain outside the legacy `100+`
+band. `src/data_provider_config.py` is therefore owned at its exact product-base
+pin (`604` lines, SHA-256
+`bfd97f197e6fdc372b658f588713ec3cf2338d80e5ef0f55ee6daca7c4a30a8d`).
+Stage 3 evolves the projection owner and its existing normalization owner,
+updates the shared app-managed limit/copy, and changes no node, client-id
+offset, schema, route, or backend collection identity. The focused baseline is
+therefore `234` and the final target is `271`. The rejected first full run
+remains evidence and canonical admission restarts after the RED-first owner and
+product correction.
 
 ## Closed Decision Contract
 
@@ -231,6 +238,7 @@ Closed rule identities are:
 
 **Files:**
 - Modify: `data_sources/ibkr_client_id.py`
+- Modify: `src/data_provider_config.py`
 - Modify: `src/security_lifecycle_ibkr_evidence.py`
 - Create: `src/security_lifecycle_automation_worker.py`
 - Modify: `tests/test_ibkr_client_id.py`
@@ -243,7 +251,7 @@ Closed rule identities are:
 - Produces: `LifecycleAutomationEvidenceBundle` and `LifecycleAutomationWorker.run(limit=2, mode="live")`.
 - Adds: dedicated IBKR client-id domain `lifecycle=80`; it remains read-only and under `ibkr_gateway_lock`.
 
-- [ ] Add the worker's ten nodes, two IBKR nodes, and one client-id node. Evolve the existing provider-config projection owner to include the lifecycle domain. RED must fail on missing interfaces, not on a provider call.
+- [ ] Add the worker's ten nodes, two IBKR nodes, and one client-id node. Evolve the existing provider-config projection and normalization owners to include the lifecycle domain and cap the shared app-managed base at `19`. RED must fail on missing interfaces, not on a provider call.
 - [ ] Convert successful contract snapshots to cited `successor_ticker`, `destination_venue`, and `security_class` facts only when the canonical snapshot supports them. A typed contract-missing result remains distinct and may satisfy terminal market absence only after the effective date; gateway/entitlement/ambiguity never does.
 - [ ] The worker scans stable present cases, skips a current non-stale accepted assessment, admits at most two changed/due cases, and reserves the durable run before acquisition.
 - [ ] Evidence acquisition, profile connections, source context, preview evaluator, and clock are constructor-injected. Core tests prove no default path or socket is reachable.

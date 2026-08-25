@@ -1,5 +1,6 @@
 path	task	action	base_lines	base_sha256
 data_sources/ibkr_client_id.py	T4	modify	79	60e53af57f7f45d6d064a15ca5ed3a1aef998957ccf6be9d65579fe6f3fcfd83
+src/data_provider_config.py	T4	modify	604	bfd97f197e6fdc372b658f588713ec3cf2338d80e5ef0f55ee6daca7c4a30a8d
 src/security_lifecycle_fact_kernel.py	T1/T4	modify	1000	9f54934e7195ca104106dd31f671cbbd3dfa233f8ff5be25a2aa828d8c4f0ea9
 src/security_lifecycle_decision_policy.py	T2	add	0	ABSENT
 src/security_lifecycle_investigation.py	T3/T6	modify	1403	0e346cf311b07a37c2afe4dceb2ac0b5e7fc811e6e25b68a192246fd9f5741b7
