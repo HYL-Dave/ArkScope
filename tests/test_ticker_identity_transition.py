@@ -645,6 +645,9 @@ def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_
 
 def test_automation_transition_approval_binds_policy_rule_and_provenance(tmp_path):
     from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.security_lifecycle_fact_kernel import (
+        persisted_decision_provenance_sha256,
+    )
     from src.ticker_identity_transition import (
         TickerIdentityTransitionStore,
         build_automation_transition_preflight,
@@ -673,6 +676,36 @@ def test_automation_transition_approval_binds_policy_rule_and_provenance(tmp_pat
         assert conn.total_changes == before_changes
 
         provenance = _seed_automation_authority(conn)
+        excerpt = '"OLD"'
+        excerpt_sha256 = hashlib.sha256(excerpt.encode()).hexdigest()
+        conn.execute(
+            "INSERT INTO security_lifecycle_evidence "
+            "(evidence_id,case_id,run_id,automation_run_id,source_family,kind,"
+            "source_url,title,publisher,domain,source_published_at,retrieved_at,"
+            "adapter,excerpt,content_sha256,source_document_sha256,"
+            "source_locator_json,evidence_dedupe_key,mime_type,document_status,"
+            "created_at) VALUES "
+            "('sle_1','slc_1',NULL,'slar_1','regulator','regulator_excerpt',"
+            "NULL,NULL,NULL,NULL,NULL,?,'sec_edgar',?,?,?,?,?,NULL,NULL,?)",
+            (_AT, excerpt, excerpt_sha256, "d" * 64, "{}", "regulator:slc_1", _AT),
+        )
+        conn.execute(
+            "INSERT INTO security_lifecycle_automation_facts "
+            "(fact_id,automation_run_id,case_id,evidence_id,fact_type,"
+            "normalized_value_json,source_span_start,source_span_end,"
+            "cited_text_sha256,extractor_rule_id,extractor_rule_version,"
+            "fact_dedupe_key,created_at) VALUES "
+            "('slf_1','slar_1','slc_1','sle_1','source_ticker',?,0,5,?,"
+            "'fixture.source_ticker','1','fact:slc_1:source_ticker',?)",
+            (excerpt, excerpt_sha256, _AT),
+        )
+        provenance = persisted_decision_provenance_sha256(conn, "slar_1")
+        conn.execute(
+            "UPDATE security_lifecycle_assessments "
+            "SET decision_provenance_sha256=? WHERE assessment_id='sla_1'",
+            (provenance,),
+        )
+        conn.commit()
         preview = _build(conn)
         approved = TickerIdentityTransitionStore(
             conn,
