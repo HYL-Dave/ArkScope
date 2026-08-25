@@ -1,6 +1,7 @@
 node_id	task	reason
 tests/test_ticker_identity_transition.py::test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically	T2	The exact transactional step order gains the activity receipt before commit.
 tests/test_security_lifecycle_automation_worker.py::test_verified_result_persists_automation_assessment_acceptance_and_proposals	T1	The worker factory gains a required transition approver while its existing accepted/proposal assertions remain.
+tests/test_security_lifecycle_automation_worker.py::test_worker_uses_only_injected_evidence_sources_and_paths	T1	The exact required-dependency assertion gains transition_approver while preserving the provider-free boundary.
 tests/test_security_lifecycle_routes.py::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes	T2/T3	The exact lifecycle route set gains activity list/acknowledgement and evidence translation only.
 tests/test_security_lifecycle_routes.py::test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal	T3	Evidence gains adjacent derived translations without collapsing existing sections.
 tests/test_security_lifecycle_tools.py::test_case_detail_projects_automation_runs_facts_and_typed_blockers	T2/T3	Provider-neutral detail gains transition authority/activity while omitting translated prose.
