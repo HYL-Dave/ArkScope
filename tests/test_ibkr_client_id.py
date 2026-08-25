@@ -6,7 +6,11 @@ convention — changing it would silently re-identify live connections.
 """
 import pytest
 
-from data_sources.ibkr_client_id import DOMAIN_OFFSETS, ibkr_client_id_for
+from data_sources.ibkr_client_id import (
+    DOMAIN_LABELS_ZH,
+    DOMAIN_OFFSETS,
+    ibkr_client_id_for,
+)
 
 
 def test_domain_ids_pinned_with_default_base(monkeypatch):
@@ -60,3 +64,16 @@ def test_offsets_are_distinct_and_spaced():
     values = sorted(DOMAIN_OFFSETS.values())
     assert len(set(values)) == len(values)
     assert all(b - a >= 10 for a, b in zip(values, values[1:]))
+
+
+def test_lifecycle_domain_has_a_distinct_read_only_gateway_identity(monkeypatch):
+    monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
+    assert DOMAIN_OFFSETS["lifecycle"] == 80
+    assert DOMAIN_LABELS_ZH["lifecycle"] == "標的事件"
+    assert ibkr_client_id_for("lifecycle") == 81
+
+    monkeypatch.setenv("IBKR_CLIENT_ID", "19")
+    assert ibkr_client_id_for("lifecycle") == 99
+    monkeypatch.setenv("IBKR_CLIENT_ID", "20")
+    with pytest.raises(ValueError, match="lifecycle.*0 through 19"):
+        ibkr_client_id_for("lifecycle")

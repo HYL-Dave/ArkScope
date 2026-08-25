@@ -228,3 +228,62 @@ def test_ibkr_adapter_reports_entitlement_denied_without_empty_success():
     assert result.evidence == ()
     assert result.source_families == ()
     assert result.requests_made == 1
+
+
+def test_contract_snapshot_emits_exact_cited_market_facts():
+    from src.security_lifecycle_ibkr_evidence import contract_snapshot_facts
+
+    state, lock = _lock_recorder()
+    result = _read(
+        _Gateway(
+            responses=([_details()], [_details()], [_details()]),
+            lock_state=state,
+        ),
+        lock,
+    )
+    evidence = result.evidence[0]
+
+    facts = contract_snapshot_facts(
+        evidence,
+        regulator_successors=("HAPN",),
+    )
+
+    assert [
+        (fact.fact_type, fact.normalized_value)
+        for fact in facts
+    ] == [
+        ("destination_venue", "NASDAQ"),
+        ("security_class", "common_stock"),
+        ("successor_ticker", "HAPN"),
+    ]
+    encoded = evidence.excerpt.encode()
+    for fact in facts:
+        cited = encoded[fact.source_span_start : fact.source_span_end]
+        assert hashlib.sha256(cited).hexdigest() == fact.cited_text_sha256
+        assert json.loads(cited.decode()) in {"HAPN", "NASDAQ", "STK"}
+        assert fact.evidence_id == evidence.evidence_id
+        assert fact.extractor_rule_version == "1"
+    assert contract_snapshot_facts(
+        evidence,
+        regulator_successors=("OTHER",),
+    ) == ()
+
+
+def test_contract_missing_is_typed_absence_not_a_fake_contract_snapshot():
+    from src.security_lifecycle_ibkr_evidence import contract_snapshot_facts
+
+    state, lock = _lock_recorder()
+    result = _read(_Gateway(responses=([], [], []), lock_state=state), lock)
+
+    assert result.contract_status == "missing"
+    assert result.blockers == ("ibkr_contract_missing",)
+    assert len(result.evidence) == 1
+    receipt = result.evidence[0]
+    assert receipt.kind == "document_reference"
+    assert receipt.source_locator["contract_status"] == "missing"
+    assert "snapshot" not in receipt.source_locator
+    assert json.loads(receipt.excerpt)["contract_status"] == "missing"
+    assert contract_snapshot_facts(
+        receipt,
+        regulator_successors=("HAPN",),
+    ) == ()
