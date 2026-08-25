@@ -204,6 +204,22 @@ listed; node and target counts remain unchanged.
 
 **Files:** test/evidence artifacts only; no production path.
 
+**Scratch replay amendment (2026-08-25):** The first end-to-end replay found
+that a real automation run with persisted evidence/facts could not reach
+transition approval. `persisted_decision_provenance_sha256()` indexed query
+rows by column name even when its caller-owned connection used SQLite's default
+tuple row factory. Earlier approval tests used an empty evidence/fact set, so
+the invalid indexing never executed. The existing Task 1 addition owner
+`test_automation_transition_approval_binds_policy_rule_and_provenance` now
+includes non-empty persisted evidence and facts and produced the exact expected
+`TypeError` RED. This amendment moves the unchanged 1,244-line
+`src/security_lifecycle_fact_kernel.py` authority from protected to Task 5
+ownership at SHA-256
+`101ebf9057601d1af63ea914730859d23eea4e3ec86380ce15a83d50ffb35c10`.
+The repair may only normalize cursor rows independent of caller row factory;
+it may not alter schema, provenance inputs, decision policy, node identity, or
+provider behavior.
+
 - [ ] Build explicit scratch market/profile databases with the reviewed schema and a synthetic eligible `OLD -> NEW` case.
 - [ ] Execute observation -> facts/evidence -> verified automation assessment -> proposals -> automation-policy transition approval -> due scheduler apply -> activity read -> explicit acknowledgement -> exact reverse.
 - [ ] Prove user-owned rows after reverse are byte-for-byte equal to the pre-apply snapshot, provider-owned/history rows never changed, acknowledgement survives as history, and no activity rendered itself acknowledged.

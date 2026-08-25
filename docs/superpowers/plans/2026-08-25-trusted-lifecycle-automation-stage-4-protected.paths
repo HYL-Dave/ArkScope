@@ -5,7 +5,6 @@ src/security_lifecycle_automation_migration.py
 src/security_lifecycle_sec_evidence.py
 src/security_lifecycle_news_evidence.py
 src/security_lifecycle_ibkr_evidence.py
-src/security_lifecycle_fact_kernel.py
 src/security_lifecycle_decision_policy.py
 src/ticker_identity_schema.py
 src/ticker_identity_migration.py
