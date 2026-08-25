@@ -240,6 +240,7 @@ def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, m
         assert response.status_code == 200
         payload = response.json()
         assert payload["assessment"]["status"] == "accepted"
+        assert payload["assessment"]["acceptance_authority"] == "human"
         assert {item["action_type"] for item in payload["proposals"]} == {
             "archive_manual_memberships",
             "notify",

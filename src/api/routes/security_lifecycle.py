@@ -401,6 +401,7 @@ def accept_assessment(
         assessment = store.accept_assessment(
             assessment_id,
             observation_fingerprint_sha256=fingerprint,
+            acceptance_authority="human",
             at=at,
         )
         proposal_result = store.generate_action_proposals(

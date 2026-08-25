@@ -90,6 +90,7 @@ def _accept(store, assessment_id, *, fingerprint=_FINGERPRINT):
     return store.accept_assessment(
         assessment_id,
         observation_fingerprint_sha256=fingerprint,
+        acceptance_authority="human",
         at=_LATER,
     )
 

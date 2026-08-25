@@ -93,6 +93,7 @@ def _build_context(
     investigation.accept_assessment(
         assessment_id,
         observation_fingerprint_sha256=fingerprint,
+        acceptance_authority="human",
         at=_AT,
     )
     investigation.generate_action_proposals(

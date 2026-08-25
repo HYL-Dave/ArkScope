@@ -262,6 +262,7 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
         profile_store.accept_assessment(
             assessment_id,
             observation_fingerprint_sha256=fingerprint,
+            acceptance_authority="legacy_migration",
             at="2026-08-06T00:00:00Z",
         )
         assert not hasattr(profile_store, "insert_legacy_assessment")

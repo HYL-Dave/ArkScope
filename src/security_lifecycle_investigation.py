@@ -8,7 +8,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import sqlite3
-from typing import Callable, Iterable, Mapping, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 import uuid
 
 from src.security_lifecycle import read_market_observations
@@ -20,6 +20,7 @@ from src.security_lifecycle_schema import (
     ASSESSMENT_CONFIDENCE,
     ASSESSMENT_OUTCOMES,
     ASSESSMENT_RELEVANCE,
+    ACCEPTANCE_AUTHORITIES,
     AUTOMATION_METHODS,
     DOCUMENT_STATUSES,
     EVIDENCE_ADAPTERS,
@@ -226,6 +227,80 @@ def assessment_fingerprint(assessment: Mapping[str, object]) -> str:
             )
         ).encode("utf-8")
     ).hexdigest()
+
+
+def derive_action_proposal_specs(
+    *,
+    case: Mapping[str, object],
+    assessment: Mapping[str, object],
+    sources: Iterable[str],
+) -> tuple[dict[str, str | None], ...]:
+    """Derive recommendations without reading or mutating profile state."""
+
+    source_values = tuple(sorted(set(str(value) for value in sources)))
+    outcomes = {str(value) for value in assessment.get("outcomes", ())}
+    relevance = str(assessment.get("relevance") or "")
+    case_ticker = str(case.get("ticker") or "").strip()
+    rows: list[dict[str, str | None]] = []
+
+    def add(
+        action_type: str,
+        replacement_ticker: str | None = None,
+        block_reason: str | None = None,
+    ) -> None:
+        if action_type not in PROPOSAL_ACTIONS:
+            raise ValueError("proposal_action")
+        rows.append(
+            {
+                "action_type": action_type,
+                "replacement_ticker": replacement_ticker,
+                "block_reason": block_reason,
+            }
+        )
+
+    if relevance == "issuer_related":
+        add("notify")
+        add("keep_tracking")
+    elif relevance == "unrelated":
+        add("no_action")
+    elif relevance == "direct_tracked_security":
+        add("notify")
+        if "portfolio_open" in source_values:
+            add("review_portfolio_position", block_reason="portfolio_position_open")
+        successor_ticker = str(assessment.get("successor_ticker") or "").strip()
+        if (
+            "symbol_changed" in outcomes
+            and not outcomes
+            & {
+                "acquisition_cash",
+                "acquisition_stock",
+                "acquisition_mixed",
+                "acquisition_terms_unknown",
+                "listing_ended",
+                "symbol_or_venue_changed",
+                "undetermined",
+            }
+            and successor_ticker
+            and successor_ticker.upper() != case_ticker.upper()
+        ):
+            add("remap_symbol", replacement_ticker=successor_ticker)
+        if outcomes == {"venue_transfer"}:
+            add("keep_tracking")
+        if "portfolio_open" not in source_values and outcomes & {
+            "listing_ended",
+            "acquisition_cash",
+            "acquisition_stock",
+            "acquisition_mixed",
+            "acquisition_terms_unknown",
+        }:
+            if "manual_lists" in source_values:
+                add("archive_manual_memberships")
+            if set(source_values) & {
+                "sa_alpha_picks_current",
+                "legacy_config_seed",
+            }:
+                add("hide_from_active_universe")
+    return tuple(rows)
 
 
 def _component_tables(conn: sqlite3.Connection) -> set[str]:
@@ -875,11 +950,71 @@ class SecurityLifecycleInvestigationStore:
             )
         ]
 
+    def _automation_assessment_error(
+        self,
+        assessment: Mapping[str, object],
+        *,
+        require_verified: bool,
+    ) -> str | None:
+        if assessment.get("author") != "automation":
+            return None
+        from src.security_lifecycle_decision_policy import (
+            AUTOMATION_POLICY_VERSION,
+            RULE_VERSIONS,
+        )
+        from src.security_lifecycle_fact_kernel import (
+            persisted_decision_provenance_sha256,
+        )
+
+        run_id = str(assessment.get("automation_run_id") or "")
+        try:
+            run = self.get_automation_run(run_id)
+        except KeyError:
+            return "automation_run_missing"
+        if run["case_id"] != assessment.get("case_id"):
+            return "automation_run_case_mismatch"
+        if run["status"] != "succeeded":
+            return "automation_run_not_current"
+        if run["policy_version"] != AUTOMATION_POLICY_VERSION:
+            return "automation_policy_stale"
+        rule_id = str(assessment.get("rule_id") or "")
+        if RULE_VERSIONS.get(rule_id) != assessment.get("rule_version"):
+            return "automation_rule_stale"
+        if assessment.get("automation_method") != "deterministic_rule":
+            return "automation_method_unsupported"
+        try:
+            current_provenance = persisted_decision_provenance_sha256(
+                self.conn,
+                run_id,
+            )
+        except (KeyError, ValueError):
+            return "automation_provenance_stale"
+        if current_provenance != assessment.get("decision_provenance_sha256"):
+            return "automation_provenance_stale"
+        blockers = {
+            str(row["blocker_code"])
+            for row in run.get("blockers", ())
+        }
+        has_conflict = "source_conflict" in blockers
+        if has_conflict != (rule_id == "lifecycle.source_conflict"):
+            return "automation_conflict_state_changed"
+        if require_verified and (
+            run["decision_tier"] != "verified_automatic" or blockers
+        ):
+            return "automation_run_not_verified"
+        if run["decision_tier"] not in {
+            "verified_automatic",
+            "review_suggested",
+        }:
+            return "automation_run_not_current"
+        return None
+
     def accept_assessment(
         self,
         assessment_id: str,
         *,
         observation_fingerprint_sha256: str,
+        acceptance_authority: str,
         at: str,
     ) -> dict:
         self._assert_write()
@@ -888,6 +1023,21 @@ class SecurityLifecycleInvestigationStore:
             raise ValueError("assessment_not_draft")
         if assessment["author"] not in ASSESSMENT_AUTHORS:
             raise ValueError("author")
+        if acceptance_authority not in ACCEPTANCE_AUTHORITIES:
+            raise ValueError("acceptance_authority")
+        allowed_authorities = {
+            "human": {"human"},
+            "legacy_review": {"legacy_migration"},
+            "automation": {"human", "automation_policy"},
+        }
+        if acceptance_authority not in allowed_authorities[assessment["author"]]:
+            raise ValueError("acceptance_authority")
+        automation_error = self._automation_assessment_error(
+            assessment,
+            require_verified=acceptance_authority == "automation_policy",
+        )
+        if automation_error is not None:
+            raise ValueError(automation_error)
         if assessment["relevance"] == "undetermined" or not any(
             outcome != "undetermined" for outcome in assessment["outcomes"]
         ):
@@ -913,11 +1063,6 @@ class SecurityLifecycleInvestigationStore:
         ):
             raise ValueError("stale_assessment")
         with self.conn:
-            acceptance_authority = (
-                "legacy_migration"
-                if assessment["author"] == "legacy_review"
-                else "human"
-            )
             self.conn.execute(
                 "UPDATE security_lifecycle_assessments SET status='superseded',"
                 "superseded_at=? WHERE case_id=? AND status='accepted'",
@@ -1019,6 +1164,28 @@ class SecurityLifecycleInvestigationStore:
             )
         ]
 
+    def _assessment_is_stale(
+        self,
+        assessment: Mapping[str, object],
+        *,
+        observation_fingerprint_sha256: str,
+        evidence_set_sha256: str,
+    ) -> bool:
+        if (
+            assessment["observation_fingerprint_sha256"]
+            != observation_fingerprint_sha256
+            or assessment["evidence_set_sha256"] != evidence_set_sha256
+        ):
+            return True
+        if assessment.get("author") != "automation":
+            return False
+        return self._automation_assessment_error(
+            assessment,
+            require_verified=(
+                assessment.get("acceptance_authority") == "automation_policy"
+            ),
+        ) is not None
+
     def project_case_state(
         self,
         case_id: str,
@@ -1033,10 +1200,12 @@ class SecurityLifecycleInvestigationStore:
         rendered_assessments = [
             {
                 **assessment,
-                "stale": (
-                    assessment["observation_fingerprint_sha256"]
-                    != observation_fingerprint_sha256
-                    or assessment["evidence_set_sha256"] != evidence_digest
+                "stale": self._assessment_is_stale(
+                    assessment,
+                    observation_fingerprint_sha256=(
+                        observation_fingerprint_sha256
+                    ),
+                    evidence_set_sha256=evidence_digest,
                 ),
             }
             for assessment in assessments
@@ -1119,57 +1288,17 @@ class SecurityLifecycleInvestigationStore:
             return {"proposals": [], "block_reason": "source_context_unavailable"}
         sources = tuple(sorted(set(sources_by_ticker.get(str(case["ticker"]), ()))))
         source_json = _canonical_json(list(sources), max_bytes=4096, name="sources")
-        outcomes = set(assessment["outcomes"])
-        action_rows: list[tuple[str, str | None, str | None]] = []
-        if assessment["relevance"] == "issuer_related":
-            action_rows = [("notify", None, None), ("keep_tracking", None, None)]
-        elif assessment["relevance"] == "unrelated":
-            action_rows = [("no_action", None, None)]
-        elif assessment["relevance"] == "direct_tracked_security":
-            action_rows.append(("notify", None, None))
-            if "portfolio_open" in sources:
-                action_rows.append(
-                    ("review_portfolio_position", None, "portfolio_position_open")
-                )
-            successor_ticker = str(assessment["successor_ticker"] or "").strip()
-            if (
-                "symbol_changed" in outcomes
-                and not outcomes
-                & {
-                    "acquisition_cash",
-                    "acquisition_stock",
-                    "acquisition_mixed",
-                    "acquisition_terms_unknown",
-                    "listing_ended",
-                    "symbol_or_venue_changed",
-                    "undetermined",
-                }
-                and successor_ticker
-                and successor_ticker.upper() != str(case["ticker"]).upper()
-            ):
-                action_rows.append(("remap_symbol", successor_ticker, None))
-            if outcomes == {"venue_transfer"}:
-                action_rows.append(("keep_tracking", None, None))
-            if "portfolio_open" not in sources:
-                if outcomes & {
-                    "listing_ended",
-                    "acquisition_cash",
-                    "acquisition_stock",
-                    "acquisition_mixed",
-                    "acquisition_terms_unknown",
-                }:
-                    if "manual_lists" in sources:
-                        action_rows.append(("archive_manual_memberships", None, None))
-                    if sources and set(sources) & {
-                        "sa_alpha_picks_current",
-                        "legacy_config_seed",
-                    }:
-                        action_rows.append(("hide_from_active_universe", None, None))
+        action_rows = derive_action_proposal_specs(
+            case=dict(case),
+            assessment=assessment,
+            sources=sources,
+        )
         current_assessment_fingerprint = assessment_fingerprint(assessment)
         created: list[dict] = []
-        for action_type, replacement_ticker, block_reason in action_rows:
-            if action_type not in PROPOSAL_ACTIONS:
-                raise ValueError("proposal_action")
+        for spec in action_rows:
+            action_type = str(spec["action_type"])
+            replacement_ticker = spec["replacement_ticker"]
+            block_reason = spec["block_reason"]
             dedupe_key = "\0".join(
                 (
                     assessment["assessment_id"],
@@ -1278,6 +1407,126 @@ class SecurityLifecycleInvestigationStore:
                 }
             )
         return rendered
+
+
+def _decision_value(decision: object, name: str) -> Any:
+    if isinstance(decision, Mapping):
+        return decision.get(name)
+    return getattr(decision, name)
+
+
+def create_automation_assessment(
+    *,
+    store: SecurityLifecycleInvestigationStore,
+    run_id: str,
+    decision: object,
+    observation_fingerprint_sha256: str,
+    at: str,
+) -> str:
+    """Create a draft bound to one terminal automation run and its citations."""
+
+    from src.security_lifecycle_decision_policy import (
+        AUTOMATION_POLICY_VERSION,
+        RULE_VERSIONS,
+    )
+    from src.security_lifecycle_fact_kernel import (
+        persisted_decision_provenance_sha256,
+    )
+
+    run = store.get_automation_run(run_id)
+    if run["status"] != "succeeded":
+        raise ValueError("automation_run_not_current")
+    if run["policy_version"] != AUTOMATION_POLICY_VERSION:
+        raise ValueError("automation_policy_stale")
+    decision_tier = str(_decision_value(decision, "decision_tier") or "")
+    action_readiness = str(_decision_value(decision, "action_readiness") or "")
+    if run["decision_tier"] != decision_tier:
+        raise ValueError("automation_decision_tier_mismatch")
+    if run["action_readiness"] != action_readiness:
+        raise ValueError("automation_action_readiness_mismatch")
+    rule_id = str(_decision_value(decision, "rule_id") or "")
+    rule_version = str(_decision_value(decision, "rule_version") or "")
+    if RULE_VERSIONS.get(rule_id) != rule_version:
+        raise ValueError("automation_rule_stale")
+    blockers = {
+        str(row["blocker_code"])
+        for row in run.get("blockers", ())
+    }
+    has_conflict = "source_conflict" in blockers
+    if has_conflict != (rule_id == "lifecycle.source_conflict"):
+        raise ValueError("automation_conflict_state_changed")
+    fingerprint = _canonical_sha256(
+        "observation_fingerprint",
+        observation_fingerprint_sha256,
+    )
+    if run["observation_fingerprint_sha256"] != fingerprint:
+        raise ValueError("stale_assessment")
+    evidence_ids = [
+        str(row[0])
+        for row in store.conn.execute(
+            "SELECT evidence_id FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? ORDER BY evidence_id",
+            (run_id,),
+        )
+    ]
+    fact_count = int(
+        store.conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_automation_facts "
+            "WHERE automation_run_id=?",
+            (run_id,),
+        ).fetchone()[0]
+    )
+    if not evidence_ids or fact_count == 0:
+        raise ValueError("automation_run_evidence_missing")
+    provenance = persisted_decision_provenance_sha256(store.conn, run_id)
+    citations = [
+        {
+            "reference_kind": "observation",
+            "cited_content_sha256": fingerprint,
+        },
+        *(
+            {
+                "reference_kind": "evidence",
+                "evidence_id": evidence_id,
+            }
+            for evidence_id in evidence_ids
+        ),
+    ]
+    return store.create_assessment(
+        case_id=str(run["case_id"]),
+        relevance=str(_decision_value(decision, "relevance") or ""),
+        confidence=str(_decision_value(decision, "confidence") or ""),
+        author="automation",
+        conclusion=str(_decision_value(decision, "conclusion") or ""),
+        impact_summary=str(_decision_value(decision, "impact_summary") or ""),
+        outcomes=tuple(_decision_value(decision, "outcomes") or ()),
+        citations=citations,
+        observation_fingerprint_sha256=fingerprint,
+        counterparty_name=_decision_value(decision, "counterparty_name"),
+        counterparty_ticker=_decision_value(decision, "counterparty_ticker"),
+        counterparty_cik=_decision_value(decision, "counterparty_cik"),
+        successor_ticker=_decision_value(decision, "successor_ticker"),
+        destination_venue=_decision_value(decision, "destination_venue"),
+        effective_date=_decision_value(decision, "effective_date"),
+        consideration_currency=_decision_value(
+            decision,
+            "consideration_currency",
+        ),
+        cash_per_security_decimal=_decision_value(
+            decision,
+            "cash_per_security_decimal",
+        ),
+        exchange_ratio_decimal=_decision_value(
+            decision,
+            "exchange_ratio_decimal",
+        ),
+        automation_method="deterministic_rule",
+        automation_run_id=run_id,
+        rule_id=rule_id,
+        rule_version=rule_version,
+        decision_provenance_sha256=provenance,
+        at=at,
+    )
 
 
 def _read_profile(

@@ -93,6 +93,7 @@ def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
     investigation.accept_assessment(
         assessment_id,
         observation_fingerprint_sha256=fingerprint,
+        acceptance_authority="human",
         at="2026-08-23T00:00:00Z",
     )
     investigation.generate_action_proposals(
