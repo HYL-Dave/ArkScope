@@ -183,12 +183,12 @@ translated.
 
 ## Task 5: Prepare, But Do Not Execute, Live Migration Authorization
 
-- [ ] Produce a bounded runbook/manifest template bound to the final reviewed
+- [x] Produce a bounded runbook/manifest template bound to the final reviewed
   tree, exact migration module/schema authority, expected legacy four-row
   mapping, restore/old-code boot requirement, and rollback data-loss warning.
-- [ ] Leave live database path/digests, app-quiesced witness, backup identity,
+- [x] Leave live database path/digests, app-quiesced witness, backup identity,
   restore result, and approval digest explicitly `UNAUTHORIZED/NOT_RUN`.
-- [ ] Do not read production to fill any field. Fresh preflight, backup, restore
+- [x] Do not read production to fill any field. Fresh preflight, backup, restore
   probe, digest approval, migration, merge, and restart remain future explicit
   authorization events in the reviewed cutover order.
 
