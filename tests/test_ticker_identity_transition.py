@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
+import json
 import sqlite3
 
 import pytest
@@ -170,6 +172,7 @@ def _seed_transferable_state(conn: sqlite3.Connection) -> None:
 def _rows_by_table(conn: sqlite3.Connection) -> dict[str, list[tuple]]:
     tables = (
         "ticker_identity_links",
+        "ticker_identity_transition_activity",
         "ticker_identity_transition_attempts",
         "ticker_identity_transitions",
         "ticker_meta",
@@ -924,6 +927,7 @@ def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
             "suppression",
             "transition_receipt",
             "attempt_receipt",
+            "activity_receipt",
         ]
         assert conn.execute(
             "SELECT ticker,position,archived_at FROM watchlist_memberships "
@@ -976,7 +980,7 @@ def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
         conn.close()
 
 
-@pytest.mark.parametrize("fail_after", range(1, 9))
+@pytest.mark.parametrize("fail_after", range(1, 10))
 def test_apply_rolls_back_every_profile_and_receipt_mutation_on_failure(
     tmp_path,
     fail_after,
@@ -1453,5 +1457,356 @@ def test_reversal_blocks_when_successor_has_a_later_active_continuation(tmp_path
         assert result["status"] == "blocked"
         assert result["block_reasons"] == ["successor_has_later_transition"]
         assert store.get(transition["transition_id"])["status"] == "applied"
+    finally:
+        conn.close()
+
+
+def test_apply_and_reverse_append_truthful_activity_in_same_transaction(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path / "success")
+    try:
+        _seed_transferable_state(conn)
+        provenance = _seed_automation_authority(conn)
+        preview = _build(
+            conn,
+            sources=(
+                "manual_lists",
+                "legacy_config_seed",
+                "sa_alpha_picks_current",
+            ),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve_automation(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        applied = store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
+            trigger="scheduler",
+        )
+
+        assert applied["status"] == "applied"
+        activity = store.list_activity(limit=10)
+        assert activity["count"] == 1
+        assert activity["unacknowledged_count"] == 1
+        applied_activity = activity["items"][0]
+        assert applied_activity == {
+            "activity_id": applied_activity["activity_id"],
+            "transition_id": transition["transition_id"],
+            "case_id": "slc_1",
+            "activity_type": "applied",
+            "source_ticker": "OLD",
+            "successor_ticker": "NEW",
+            "effective_date": "2026-08-25",
+            "user_owned_changes": [
+                {"change_type": "editable_tag_copied", "count": 2},
+                {"change_type": "legacy_membership_added", "count": 1},
+                {"change_type": "legacy_membership_archived", "count": 1},
+                {"change_type": "priority_updated", "count": 1},
+                {"change_type": "source_hidden", "count": 1},
+                {"change_type": "watchlist_membership_added", "count": 1},
+                {"change_type": "watchlist_membership_archived", "count": 1},
+            ],
+            "provider_owned_retained": ["sa_alpha_picks_current"],
+            "state_sha256": applied["transition"]["after_snapshot_sha256"],
+            "rule_id": "lifecycle.simple_symbol_continuation",
+            "rule_version": "1",
+            "decision_provenance_sha256": provenance,
+            "occurred_at": "2026-08-25T13:00:00Z",
+            "acknowledged_at": None,
+            "created_at": "2026-08-25T13:00:00Z",
+        }
+
+        reversing = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-26T14:00:00Z",
+        )
+        reversed_result = reversing.reverse(
+            transition["transition_id"],
+            trigger="attended_user",
+        )
+        rows = reversing.list_activity(limit=10)["items"]
+        before_snapshot = json.loads(
+            str(reversed_result["transition"]["before_snapshot_json"])
+        )
+        restored_digest = hashlib.sha256(
+            json.dumps(
+                before_snapshot,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        assert [row["activity_type"] for row in rows] == ["reversed", "applied"]
+        assert rows[0]["state_sha256"] == restored_digest
+        assert rows[0]["user_owned_changes"] == applied_activity["user_owned_changes"]
+        assert rows[0]["provider_owned_retained"] == ["sa_alpha_picks_current"]
+        assert rows[0]["decision_provenance_sha256"] == provenance
+    finally:
+        conn.close()
+
+    apply_conn = _transition_connection(tmp_path / "apply-rollback")
+    try:
+        _seed_transferable_state(apply_conn)
+        preview = _build(
+            apply_conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        store = TickerIdentityTransitionStore(
+            apply_conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        before = _profile_owned_rows(apply_conn)
+        apply_conn.execute(
+            "CREATE TRIGGER reject_transition_activity BEFORE INSERT ON "
+            "ticker_identity_transition_activity BEGIN "
+            "SELECT RAISE(ABORT, 'activity_rejected'); END"
+        )
+        with pytest.raises(sqlite3.IntegrityError, match="activity_rejected"):
+            store.apply(
+                transition["transition_id"],
+                current_preview=preview,
+                expected_preview_sha256=preview["preview_sha256"],
+                trigger="scheduler",
+            )
+        assert _profile_owned_rows(apply_conn) == before
+        assert store.get(transition["transition_id"])["status"] == "approved"
+        assert apply_conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts"
+        ).fetchone() == (0,)
+    finally:
+        apply_conn.close()
+
+    reverse_conn = _transition_connection(tmp_path / "reverse-rollback")
+    try:
+        _seed_transferable_state(reverse_conn)
+        preview = _build(
+            reverse_conn,
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            reverse_conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
+            trigger="scheduler",
+        )
+        before_reverse = _profile_owned_rows(reverse_conn)
+        reverse_conn.execute(
+            "CREATE TRIGGER reject_reversed_activity BEFORE INSERT ON "
+            "ticker_identity_transition_activity WHEN NEW.activity_type='reversed' "
+            "BEGIN SELECT RAISE(ABORT, 'reverse_activity_rejected'); END"
+        )
+        with pytest.raises(sqlite3.IntegrityError, match="reverse_activity_rejected"):
+            store.reverse(transition["transition_id"], trigger="attended_user")
+        assert _profile_owned_rows(reverse_conn) == before_reverse
+        assert store.get(transition["transition_id"])["status"] == "applied"
+        assert reverse_conn.execute(
+            "SELECT activity_type FROM ticker_identity_transition_activity"
+        ).fetchall() == [("applied",)]
+    finally:
+        reverse_conn.close()
+
+
+def test_activity_acknowledgement_is_explicit_idempotent_and_preserves_reverse(
+    tmp_path,
+):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(conn, sources=("manual_lists", "legacy_config_seed"))
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
+            trigger="scheduler",
+        )
+        initial = store.list_activity(limit=10, unacknowledged_only=True)
+        item = initial["items"][0]
+        readiness = store.reverse_readiness(transition["transition_id"])
+
+        acknowledged = store.acknowledge_activity(
+            item["activity_id"],
+            at="2026-08-26T08:00:00Z",
+        )
+        repeated = store.acknowledge_activity(
+            item["activity_id"],
+            at="2026-08-27T09:00:00Z",
+        )
+
+        assert acknowledged["acknowledged_at"] == "2026-08-26T08:00:00Z"
+        assert repeated == acknowledged
+        assert store.list_activity(
+            limit=10,
+            unacknowledged_only=True,
+        )["items"] == []
+        assert store.list_activity(limit=10)["items"] == [acknowledged]
+        assert store.reverse_readiness(transition["transition_id"]) == readiness
+        assert store.reverse(
+            transition["transition_id"],
+            trigger="attended_user",
+        )["status"] == "reversed"
+        all_activity = store.list_activity(limit=10)
+        assert all_activity["count"] == 2
+        assert all_activity["unacknowledged_count"] == 1
+        assert [row["acknowledged_at"] for row in all_activity["items"]] == [
+            None,
+            "2026-08-26T08:00:00Z",
+        ]
+    finally:
+        conn.close()
+
+
+def test_reverse_readiness_reports_state_and_later_transition_blockers(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        preview = _build(conn, sources=("manual_lists", "legacy_config_seed"))
+        ids = _id_factory()
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=ids,
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
+            trigger="scheduler",
+        )
+        attempt_count = conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts"
+        ).fetchone()[0]
+
+        ready = store.reverse_readiness(transition["transition_id"])
+
+        assert ready == {
+            "transition_id": transition["transition_id"],
+            "reversible": True,
+            "block_reasons": [],
+            "expected_state_sha256": store.get(transition["transition_id"])[
+                "after_snapshot_sha256"
+            ],
+            "observed_state_sha256": store.get(transition["transition_id"])[
+                "after_snapshot_sha256"
+            ],
+        }
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts"
+        ).fetchone()[0] == attempt_count
+
+        conn.execute(
+            "INSERT INTO ticker_identity_transitions "
+            "(transition_id,case_id,assessment_id,proposal_ids_json,"
+            "transition_dedupe_key,kind,status,source_ticker,successor_ticker,"
+            "execute_on,priority_resolution,unhide_successor,"
+            "approved_observation_fingerprint_sha256,"
+            "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
+            "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
+            "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+            "approval_authority,automation_policy_version,rule_id,rule_version,"
+            "decision_provenance_sha256) "
+            "VALUES (?,?,?,?,?,?,'applied',?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,"
+            "'attended_user',NULL,NULL,NULL,?)",
+            (
+                "tit_later",
+                "slc_1",
+                "sla_1",
+                '["slp_later"]',
+                "dedupe:later-readiness",
+                "symbol_continuation",
+                "NEW",
+                "THIRD",
+                "2026-08-26",
+                None,
+                0,
+                "a" * 64,
+                "b" * 64,
+                "c" * 64,
+                "{}",
+                "{}",
+                "d" * 64,
+                "2026-08-26T00:00:00Z",
+                "2026-08-26T00:00:00Z",
+                "2026-08-26T00:00:00Z",
+                "b" * 64,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO ticker_identity_links "
+            "(link_id,transition_id,source_ticker,successor_ticker,relationship,"
+            "effective_date,created_at,reversed_at) VALUES (?,?,?,?,?,?,?,NULL)",
+            (
+                "til_later",
+                "tit_later",
+                "NEW",
+                "THIRD",
+                "symbol_continuation",
+                "2026-08-26",
+                "2026-08-26T00:00:00Z",
+            ),
+        )
+        conn.commit()
+        assert store.reverse_readiness(transition["transition_id"])[
+            "block_reasons"
+        ] == ["successor_has_later_transition"]
+
+        conn.execute(
+            "UPDATE ticker_meta SET priority='low',updated_at=? WHERE ticker='NEW'",
+            ("2026-08-26T13:59:59Z",),
+        )
+        conn.commit()
+        blocked = store.reverse_readiness(transition["transition_id"])
+        assert blocked["reversible"] is False
+        assert blocked["block_reasons"] == [
+            "reverse_state_changed",
+            "successor_has_later_transition",
+        ]
+        assert blocked["observed_state_sha256"] != blocked["expected_state_sha256"]
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts"
+        ).fetchone()[0] == attempt_count
     finally:
         conn.close()

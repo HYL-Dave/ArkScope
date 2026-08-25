@@ -404,7 +404,148 @@ def test_case_detail_exposes_durable_transition_state_without_changing_preview(
         "execute_on": "2026-08-25",
         "approved_preview_sha256": preview["preview_sha256"],
         "approved_preview": preview,
+        "approval_authority": "attended_user",
+        "automation_policy_version": None,
+        "rule_id": None,
+        "rule_version": None,
+        "decision_provenance_sha256": transition[
+            "decision_provenance_sha256"
+        ],
         "updated_at": "2026-08-25T13:00:00Z",
         "latest_attempt": None,
+        "reverse_readiness": None,
+        "activity_history": [],
+        "activity_count": 0,
+        "unacknowledged_activity_count": 0,
     }
     assert profile_snapshot_sha256(preview) == preview["preview_sha256"]
+
+
+def test_activity_routes_list_acknowledge_and_keep_reverse_separate(
+    tmp_path,
+    monkeypatch,
+):
+    context = _build_context(tmp_path)
+    permission_calls: list[tuple[str, dict | None]] = []
+    client = _client(context, monkeypatch, permission_calls)
+    preview = client.get(
+        f"/security-lifecycle/cases/{context['case_id']}/transition-preview"
+    ).json()
+    transition = client.post(
+        f"/security-lifecycle/cases/{context['case_id']}/approve-transition",
+        json={
+            "execute_on": "2026-08-25",
+            "preview_sha256": preview["preview_sha256"],
+        },
+    ).json()
+    assert client.post(
+        f"/security-lifecycle/transitions/{transition['transition_id']}/retry",
+        json={"preview_sha256": preview["preview_sha256"]},
+    ).status_code == 200
+
+    listed = client.get(
+        "/security-lifecycle/transition-activity",
+        params={"limit": 10, "unacknowledged_only": True},
+    )
+    assert listed.status_code == 200
+    assert listed.json()["count"] == 1
+    assert listed.json()["unacknowledged_count"] == 1
+    item = listed.json()["items"][0]
+    calls_before_missing = list(permission_calls)
+
+    missing = client.post(
+        "/security-lifecycle/transition-activity/missing/acknowledge"
+    )
+    assert missing.status_code == 404
+    assert missing.json()["detail"]["code"] == "transition_activity_not_found"
+    assert permission_calls == calls_before_missing
+
+    acknowledged = client.post(
+        "/security-lifecycle/transition-activity/"
+        f"{item['activity_id']}/acknowledge"
+    )
+    assert acknowledged.status_code == 200
+    assert acknowledged.json()["acknowledged_at"] == "2026-08-25T13:00:00Z"
+    assert permission_calls[-1] == (
+        "security_lifecycle_acknowledge_transition_activity",
+        {"activity_id": item["activity_id"]},
+    )
+
+    with sqlite3.connect(context["profile_path"]) as conn:
+        assert conn.execute(
+            "SELECT status FROM ticker_identity_transitions WHERE transition_id=?",
+            (transition["transition_id"],),
+        ).fetchone() == ("applied",)
+    reversed_response = client.post(
+        f"/security-lifecycle/transitions/{transition['transition_id']}/reverse"
+    )
+    assert reversed_response.status_code == 200
+    assert reversed_response.json()["status"] == "reversed"
+    history = client.get("/security-lifecycle/transition-activity?limit=10").json()
+    assert [row["activity_type"] for row in history["items"]] == [
+        "reversed",
+        "applied",
+    ]
+    assert history["items"][1]["acknowledged_at"] == "2026-08-25T13:00:00Z"
+
+
+def test_case_detail_includes_transition_authority_and_activity_history(tmp_path):
+    from src.ticker_identity_transition import TransitionOptions
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+    context = _build_context(tmp_path)
+    options = TransitionOptions(execute_on="2026-08-25")
+    preview = context["service"].preview_case(context["case_id"], options=options)
+    transition = context["service"].approve_case(
+        context["case_id"],
+        options=options,
+        preview_sha256=preview["preview_sha256"],
+        before_write=lambda: None,
+    )
+    context["service"].execute_transition(
+        transition["transition_id"],
+        preview_sha256=preview["preview_sha256"],
+        before_write=lambda: None,
+    )
+
+    detail = SecurityLifecycleReadService(
+        market_db_path=str(context["market_path"]),
+        profile_db_path=str(context["profile_path"]),
+        source_loader=lambda: {"OLD": ("manual_lists",)},
+    ).get_case(context["case_id"])
+    projected = detail["ticker_transition"]
+
+    assert projected["approval_authority"] == "attended_user"
+    assert projected["decision_provenance_sha256"] == transition[
+        "decision_provenance_sha256"
+    ]
+    assert projected["reverse_readiness"]["reversible"] is True
+    assert projected["activity_count"] == 1
+    assert projected["unacknowledged_activity_count"] == 1
+    assert projected["activity_history"][0]["activity_type"] == "applied"
+    assert projected["activity_history"][0]["case_id"] == context["case_id"]
+    assert "before_snapshot_json" not in projected
+    assert "user_owned_changes_json" not in projected["activity_history"][0]
+
+
+def test_activity_read_failure_is_typed_without_creating_schema(
+    tmp_path,
+    monkeypatch,
+):
+    context = _build_context(tmp_path, identity_schema="absent")
+    permission_calls: list[tuple[str, dict | None]] = []
+    client = _client(context, monkeypatch, permission_calls)
+
+    response = client.get("/security-lifecycle/transition-activity")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "code": "ticker_identity_profile_store_unavailable",
+        "store": "profile",
+    }
+    assert permission_calls == []
+    with sqlite3.connect(context["profile_path"]) as conn:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name LIKE 'ticker_identity_%'"
+        ).fetchall() == []

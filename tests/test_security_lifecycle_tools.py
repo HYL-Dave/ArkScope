@@ -532,6 +532,134 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
             at="2026-08-20T00:01:00Z",
         )
 
+        assessment_id = store.create_assessment(
+            case_id=case_id,
+            relevance="direct_tracked_security",
+            confidence="high",
+            author="human",
+            conclusion="EA continues under EA2.",
+            impact_summary="Preserve the tracked identity.",
+            outcomes=("symbol_changed",),
+            citations=(
+                {
+                    "reference_kind": "observation",
+                    "cited_content_sha256": fingerprint,
+                },
+            ),
+            observation_fingerprint_sha256=fingerprint,
+            successor_ticker="EA2",
+            effective_date="2026-08-25",
+            at="2026-08-20T00:02:00Z",
+        )
+        store.accept_assessment(
+            assessment_id,
+            observation_fingerprint_sha256=fingerprint,
+            acceptance_authority="human",
+            at="2026-08-20T00:02:00Z",
+        )
+        from src.ticker_identity_schema import create_ticker_identity_schema
+        from src.ticker_identity_transition import profile_snapshot_sha256
+
+        create_ticker_identity_schema(profile)
+        preview = {
+            "case_id": case_id,
+            "source_ticker": "EA",
+            "successor_ticker": "EA2",
+        }
+        preview["preview_sha256"] = profile_snapshot_sha256(preview)
+        empty_snapshot = {
+            "keys": {
+                "ticker_meta": [],
+                "ticker_tags": [],
+                "universe_source_memberships": [],
+                "watchlist_memberships": [],
+            },
+            "rows": {
+                "ticker_meta": [],
+                "ticker_tags": [],
+                "universe_source_memberships": [],
+                "watchlist_memberships": [],
+            },
+            "version": 1,
+        }
+        empty_state_sha256 = hashlib.sha256(
+            json.dumps(
+                empty_snapshot,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        profile.execute(
+            "INSERT INTO ticker_identity_transitions "
+            "(transition_id,case_id,assessment_id,proposal_ids_json,"
+            "transition_dedupe_key,kind,status,source_ticker,successor_ticker,"
+            "execute_on,priority_resolution,unhide_successor,"
+            "approved_observation_fingerprint_sha256,"
+            "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
+            "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
+            "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+            "approval_authority,automation_policy_version,rule_id,rule_version,"
+            "decision_provenance_sha256) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                "tit_ea",
+                case_id,
+                assessment_id,
+                "[]",
+                "automation:ea",
+                "symbol_continuation",
+                "applied",
+                "EA",
+                "EA2",
+                "2026-08-25",
+                None,
+                0,
+                fingerprint,
+                "a" * 64,
+                preview["preview_sha256"],
+                json.dumps(preview, sort_keys=True, separators=(",", ":")),
+                json.dumps(empty_snapshot, sort_keys=True, separators=(",", ":")),
+                empty_state_sha256,
+                "2026-08-20T00:03:00Z",
+                "2026-08-20T00:03:00Z",
+                "2026-08-20T00:03:00Z",
+                None,
+                None,
+                "automation_policy",
+                "lifecycle.v1",
+                "lifecycle.simple_symbol_continuation",
+                "1",
+                "c" * 64,
+            ),
+        )
+        profile.execute(
+            "INSERT INTO ticker_identity_transition_activity "
+            "(activity_id,transition_id,activity_type,source_ticker,successor_ticker,"
+            "effective_date,user_owned_changes_json,provider_owned_retained_json,"
+            "state_sha256,rule_id,rule_version,decision_provenance_sha256,"
+            "occurred_at,acknowledged_at,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)",
+            (
+                "tiact_ea",
+                "tit_ea",
+                "applied",
+                "EA",
+                "EA2",
+                "2026-08-25",
+                '[{"change_type":"watchlist_membership_added","count":1}]',
+                '["sa_alpha_picks_current"]',
+                empty_state_sha256,
+                "lifecycle.simple_symbol_continuation",
+                "1",
+                "c" * 64,
+                "2026-08-20T00:03:00Z",
+                "2026-08-20T00:03:00Z",
+            ),
+        )
+        profile.commit()
+
         tools = _configure(monkeypatch, market_path, profile_path)
         payload = tools.get_security_lifecycle_case(case_id)
         case = payload["case"]
@@ -539,6 +667,7 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
             {
                 "automation_runs": case["automation_runs"],
                 "automation_facts": case["automation_facts"],
+                "ticker_transition": case["ticker_transition"],
             },
             sort_keys=True,
         )
@@ -572,9 +701,38 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
             "adapter" not in evidence and "source_locator_json" not in evidence
             for evidence in case["evidence"]
         )
+        assert case["ticker_transition"]["approval_authority"] == (
+            "automation_policy"
+        )
+        assert case["ticker_transition"]["rule_id"] == (
+            "lifecycle.simple_symbol_continuation"
+        )
+        assert case["ticker_transition"]["reverse_readiness"]["reversible"] is True
+        assert case["ticker_transition"]["activity_history"][0] == {
+            "activity_id": "tiact_ea",
+            "transition_id": "tit_ea",
+            "case_id": case_id,
+            "activity_type": "applied",
+            "source_ticker": "EA",
+            "successor_ticker": "EA2",
+            "effective_date": "2026-08-25",
+            "user_owned_changes": [
+                {"change_type": "watchlist_membership_added", "count": 1}
+            ],
+            "provider_owned_retained": ["sa_alpha_picks_current"],
+            "state_sha256": empty_state_sha256,
+            "rule_id": "lifecycle.simple_symbol_continuation",
+            "rule_version": "1",
+            "decision_provenance_sha256": "c" * 64,
+            "occurred_at": "2026-08-20T00:03:00Z",
+            "acknowledged_at": None,
+            "created_at": "2026-08-20T00:03:00Z",
+        }
         assert "query_context" not in rendered
         assert "diagnostics" not in rendered
         assert "sec_edgar" not in rendered
         assert "source_locator" not in rendered
+        assert "before_snapshot_json" not in rendered
+        assert "user_owned_changes_json" not in rendered
     finally:
         profile.close()
