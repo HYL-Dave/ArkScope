@@ -7,3 +7,10 @@ tests/test_security_lifecycle_automation_scheduler.py	T1	modify	261	4acf852a54a4
 tests/test_security_lifecycle_grounded_shadow.py	T1	add	0	ABSENT
 tests/fixtures/security_lifecycle_grounded_shadow.json	T1	add	0	ABSENT
 docs/design/PROJECT_PRIORITY_MAP.md	T0/T6	modify	1419	46f8a0614741c81d22d2164d7059e74c63c3663ff19b85842f37c0d44da9e337
+apps/arkscope-web/src/lifecycle/LifecycleView.tsx	T4A	modify	2021	1804767141d6cc3d7c5f33a439d0f3ff4015344c11c1dd884fccd12cab5f6a1f
+apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx	T4A	modify	1143	1af7dbd00130ed14582a76be7392e1ac2f9f09717247197b83040d017381dfbd
+apps/arkscope-web/src/lifecycle/lifecyclePresentation.ts	T4A	modify	395	3873f32d734fb62c682307029cfc16b706c765d8e560f8501a22926519f28343
+apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts	T4A	modify	108	829c1a00e66b02c271853b6ba975619a48c1559efb32af3bc3a2f48459f220e6
+apps/arkscope-web/src/i18n/resources/en/explore.ts	T4A	modify	802	90d271ed5ed99c5a9cdf65240942249fa5466b6f9c63af2cec023dff4094b91c
+apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts	T4A	modify	799	7fcc96381032de9baca174ba97ad4ba7e36d6f944cfc9498c46757feed7350c7
+apps/arkscope-web/src/i18n/resources.test.ts	T4A	modify	1278	89e2a5eeb64739b8c691bb2f19de517b82c8d26fb6ab3d7e426a6a9ec54df091

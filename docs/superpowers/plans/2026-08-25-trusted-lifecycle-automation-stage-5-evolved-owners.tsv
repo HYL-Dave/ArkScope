@@ -1,2 +1,8 @@
 node_id	reason
 tests/test_security_lifecycle_sec_evidence.py::test_qbts_fixture_extracts_venue_only_with_unchanged_symbol	explicit same-symbol continuation now emits both source and successor identity facts while still forbidding an A-to-A transition
+apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow > renders automation provenance grouped facts and typed blockers	known closed fact values render as reviewed bilingual labels instead of storage codes
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > contains the exact Explore subtree inventory in both locales	the lifecycle and Explore leaf counts gain exactly nine bilingual fact-value labels
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > keeps Explore resources statically bundled and free of source values	the nine fact-value labels remain static resource-owned copy
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > keeps locale namespace and recursive key paths identical	both locales gain the same nine fact-value paths
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > requires every resource leaf to be a non-empty string	every new fact-value label remains non-empty
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > contains the reviewed remaining-surface namespace inventory in both locales	Explore and total resource counts increase by exactly nine

@@ -1,10 +1,6 @@
 apps/arkscope-web/src/api.ts
 apps/arkscope-web/src/lifecycle/LifecycleActivityBand.tsx
-apps/arkscope-web/src/lifecycle/LifecycleView.tsx
-apps/arkscope-web/src/lifecycle/lifecyclePresentation.ts
 apps/arkscope-web/src/lifecycle/tickerIdentityPresentation.ts
-apps/arkscope-web/src/i18n/resources/en/explore.ts
-apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts
 apps/arkscope-web/src/styles.css
 src/security_lifecycle_automation_migration.py
 src/security_lifecycle_fact_kernel.py

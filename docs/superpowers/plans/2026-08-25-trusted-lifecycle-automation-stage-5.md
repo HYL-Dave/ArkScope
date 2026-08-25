@@ -12,12 +12,14 @@ the final bilingual UI with fixture-only browsers, and prepare a separately
 authorized live-migration packet without opening production data.
 
 **Architecture:** Stage 5 adds no runtime capability, route, tool, schema,
-provider, model, or UI behavior. Historical case identity is grounded by the
+provider, or model behavior. Historical case identity is grounded by the
 reviewed repository snapshot of real CIK/accession/URL rows. Filing prose and
 IBKR replies remain synthetic source-shape fixtures because provider calls are
 not authorized. The report must keep those two evidence strengths separate:
 it proves integration against reviewed facts and parser-shaped inputs, not a
-fresh source-byte replay or broad A-to-B precision.
+fresh source-byte replay or broad A-to-B precision. T4A closes one discovered
+presentation gap by labeling known closed fact values instead of exposing
+their storage codes.
 
 **Tech Stack:** Python 3.10, stdlib `sqlite3`, existing SEC/IBKR lifecycle
 adapters, pytest, React 18, TypeScript, Vite, Playwright.
@@ -33,10 +35,12 @@ adapters, pytest, React 18, TypeScript, Vite, Playwright.
   stage adds exactly six nodes and removes none, for target collection `4411`
   and full execution `4399 passed / 12 skipped`.
 - Backend focused baseline is `32`; the six additions produce target `38`.
-- Frontend remains exactly `105` files / `1227` tests. Routes remain `187`,
-  lifecycle routes `17`, and registry/bridge inventories `50 / 51 / 51`.
-- No schema, migration, assessment-authority, transition-state, route, tool,
-  visible-copy, or UI product byte may change.
+- Frontend remains exactly `105` files and grows from `1227` to `1228` tests.
+  Routes remain `187`, lifecycle routes `17`, and registry/bridge inventories
+  remain `50 / 51 / 51`.
+- No schema, migration, assessment-authority, transition-state, route, or tool
+  byte may change. The T4A amendment owns only the reviewed closed fact-value
+  labels and their presentation call site.
 - The Stage 2 parser fixture remains explicitly synthetic. A report may call
   the case identities grounded only because their CIK/accession/URL tuples are
   mechanically bound to `security_lifecycle_legacy_37.json` and the reviewed
@@ -55,6 +59,8 @@ adapters, pytest, React 18, TypeScript, Vite, Playwright.
   `docs/superpowers/plans/2026-08-25-trusted-lifecycle-automation-stage-5-focused-paths.tsv`
 - Additions:
   `docs/superpowers/plans/2026-08-25-trusted-lifecycle-automation-stage-5-additions.nodes`
+- Frontend addition:
+  `docs/superpowers/plans/2026-08-25-trusted-lifecycle-automation-stage-5-frontend-additions.tests`
 - Evolved owners:
   `docs/superpowers/plans/2026-08-25-trusted-lifecycle-automation-stage-5-evolved-owners.tsv`
 - Protected paths:
@@ -141,6 +147,27 @@ product owner is a stop, not a full-suite repair.
 
 ## Task 4: Fixture-Only Bilingual Browser Matrix
 
+### T4A Amendment: Closed Fact Values Must Not Leak Storage Codes
+
+The first browser replay rendered `tracked_security_effect` value
+`symbol_and_venue_change` verbatim. That is a user-visible storage code, not
+rule provenance. The rule ID `lifecycle.simple_symbol_continuation` remains
+verbatim and is excluded from the raw-enum scan because provenance must not be
+translated.
+
+- [ ] Add one frontend RED node for a closed fact-value presenter and evolve
+  the existing LifecycleView owner to render a real tracked-effect fact.
+- [ ] Add exactly nine bilingual resource leaves: `common_stock`,
+  `asset_acquisition`, `corporate_unification`, `terminal_delisting`,
+  `symbol_change`, `venue_change_only`, `symbol_and_venue_change`,
+  `no_identity_change`, and `asset_acquisition_no_registrant_change`.
+- [ ] Render those known strings through the closed presenter. Preserve raw
+  ticker, venue, date, CIK, and structured transaction objects; an unknown
+  closed string renders the existing explicit unknown label, never the code.
+- [ ] Keep the browser raw-enum check strict outside `.mono` rule/policy
+  provenance. This amendment changes no decision, fact storage, transition,
+  route, tool, or schema behavior.
+
 - [ ] Start only a feature-tree Vite server. Intercept every API request in
   Playwright; abort and fail on every non-loopback request. Do not start the
   production backend or App scheduler.
@@ -170,7 +197,7 @@ product owner is a stop, not a full-suite repair.
 - [ ] Run additions exact `6 passed`; focused exact `38`; collection twice
   `4411`; full backend twice with unique `--basetemp` roots at
   `4399 passed / 12 skipped / 0 failed`.
-- [ ] Run frontend full `105 files / 1227 tests`, typecheck, visible-literal
+- [ ] Run frontend full `105 files / 1228 tests`, typecheck, visible-literal
   scanner, production build, and the four-entry browser matrix.
 - [ ] Verify unchanged route/tool inventories, exact protected bytes, complete
   ownership, linear clean unpublished branch, and zero provider/production
@@ -188,6 +215,7 @@ product owner is a stop, not a full-suite repair.
 - No schema/migration change, live migration, backup, restore, or production DB
   read of any kind.
 - No new automation rule, source family, fact type, adapter, author, authority,
-  transition status, route, tool, UI control, or visible copy.
+  transition status, route, tool, or UI control. Visible copy is limited to the
+  nine T4A closed fact-value labels.
 - No real transition execution; Stage 4 scratch evidence remains its authority.
 - No app restart against the feature tree, merge, or push.
