@@ -535,7 +535,13 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
         tools = _configure(monkeypatch, market_path, profile_path)
         payload = tools.get_security_lifecycle_case(case_id)
         case = payload["case"]
-        rendered = json.dumps(case, sort_keys=True)
+        rendered = json.dumps(
+            {
+                "automation_runs": case["automation_runs"],
+                "automation_facts": case["automation_facts"],
+            },
+            sort_keys=True,
+        )
 
         assert case["automation_run_count"] == 2
         assert case["automation_fact_count"] == 2
