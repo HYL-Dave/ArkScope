@@ -11,6 +11,7 @@ from typing import Any, ContextManager, Protocol
 
 from ib_insync import Contract, RequestError, Stock
 
+from src.security_lifecycle_fact_kernel import AutomationFact
 from src.security_lifecycle_sec_evidence import IdentityContext
 
 
@@ -54,6 +55,7 @@ class IbkrContractEvidenceResult:
     source_families: tuple[str, ...]
     corroboration_family_count: int
     requests_made: int
+    contract_status: str
 
 
 def _timestamp(value: str) -> str:
@@ -162,7 +164,163 @@ def _queries(context: IdentityContext, *, max_queries: int) -> tuple[Contract, .
 
 
 def _blocked(code: str, *, requests_made: int) -> IbkrContractEvidenceResult:
-    return IbkrContractEvidenceResult((), (code,), (), 0, requests_made)
+    statuses = {
+        "ibkr_gateway_unavailable": "unavailable",
+        "ibkr_contract_ambiguous": "ambiguous",
+        "ibkr_entitlement_denied": "entitlement_denied",
+    }
+    return IbkrContractEvidenceResult(
+        (),
+        (code,),
+        (),
+        0,
+        requests_made,
+        statuses[code],
+    )
+
+
+def _contract_missing(
+    context: IdentityContext,
+    *,
+    retrieved_at: str,
+    requests_made: int,
+) -> IbkrContractEvidenceResult:
+    payload = {
+        "contract_status": "missing",
+        "queried_ticker": context.current_ticker,
+    }
+    excerpt = json.dumps(
+        payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    content_digest = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
+    receipt_digest = hashlib.sha256(
+        f"{content_digest}\0{retrieved_at}".encode("utf-8")
+    ).hexdigest()
+    evidence = IbkrContractEvidence(
+        evidence_id="sle_" + receipt_digest[:32],
+        source_family="market_infrastructure",
+        adapter="ibkr_contract",
+        kind="market_infrastructure_snapshot",
+        source_url=None,
+        title=f"IBKR contract lookup: {context.current_ticker}",
+        publisher="Interactive Brokers",
+        domain=None,
+        source_published_at=None,
+        retrieved_at=retrieved_at,
+        excerpt=excerpt,
+        content_sha256=content_digest,
+        source_document_sha256=None,
+        source_locator=payload,
+        evidence_dedupe_key=f"ibkr_contract_missing:{receipt_digest}",
+    )
+    return IbkrContractEvidenceResult(
+        evidence=(evidence,),
+        blockers=("ibkr_contract_missing",),
+        source_families=("market_infrastructure",),
+        corroboration_family_count=1,
+        requests_made=requests_made,
+        contract_status="missing",
+    )
+
+
+def _json_value_span(excerpt: str, key: str) -> tuple[int, int]:
+    marker = json.dumps(key, ensure_ascii=True) + ":"
+    marker_start = excerpt.find(marker)
+    if marker_start < 0:
+        raise ValueError("ibkr_contract_snapshot_shape")
+    value_start = marker_start + len(marker)
+    try:
+        _, consumed = json.JSONDecoder().raw_decode(excerpt[value_start:])
+    except json.JSONDecodeError as exc:
+        raise ValueError("ibkr_contract_snapshot_shape") from exc
+    start = len(excerpt[:value_start].encode("utf-8"))
+    end = len(excerpt[: value_start + consumed].encode("utf-8"))
+    return start, end
+
+
+def contract_snapshot_facts(
+    evidence: object,
+    *,
+    regulator_successors: Iterable[str],
+) -> tuple[AutomationFact, ...]:
+    """Extract exact cited identity facts from one canonical found snapshot."""
+    if (
+        getattr(evidence, "adapter", None) != "ibkr_contract"
+        or getattr(evidence, "source_family", None) != "market_infrastructure"
+        or getattr(evidence, "kind", None) != "market_infrastructure_snapshot"
+    ):
+        return ()
+    locator = getattr(evidence, "source_locator", None)
+    if not isinstance(locator, Mapping):
+        raise ValueError("ibkr_contract_source_locator")
+    snapshot = locator.get("snapshot")
+    if snapshot is None:
+        return ()
+    if not isinstance(snapshot, Mapping):
+        raise ValueError("ibkr_contract_snapshot_shape")
+    excerpt = str(getattr(evidence, "excerpt", ""))
+    try:
+        decoded = json.loads(excerpt)
+    except json.JSONDecodeError as exc:
+        raise ValueError("ibkr_contract_snapshot_shape") from exc
+    if decoded != dict(snapshot):
+        raise ValueError("ibkr_contract_snapshot_shape")
+    content_digest = str(getattr(evidence, "content_sha256", ""))
+    if hashlib.sha256(excerpt.encode("utf-8")).hexdigest() != content_digest:
+        raise ValueError("ibkr_contract_snapshot_digest")
+
+    allowed_successors = {
+        str(value or "").strip().upper()
+        for value in regulator_successors
+        if str(value or "").strip()
+    }
+    symbol = _text(
+        snapshot.get("symbol"),
+        field="symbol",
+        limit=32,
+        required=True,
+    ).upper()
+    if symbol not in allowed_successors:
+        return ()
+    venue = _text(
+        snapshot.get("primaryExchange"),
+        field="primary_exchange",
+        limit=80,
+        required=True,
+    ).upper()
+    security_types = {"STK": "common_stock"}
+    sec_type = _text(
+        snapshot.get("secType"),
+        field="security_type",
+        limit=20,
+        required=True,
+    ).upper()
+    security_class = security_types.get(sec_type)
+    if security_class is None:
+        return ()
+
+    rows = (
+        ("destination_venue", "primaryExchange", venue),
+        ("security_class", "secType", security_class),
+        ("successor_ticker", "symbol", symbol),
+    )
+    encoded = excerpt.encode("utf-8")
+    return tuple(
+        AutomationFact(
+            evidence_id=str(getattr(evidence, "evidence_id")),
+            fact_type=fact_type,
+            normalized_value=value,
+            source_span_start=(span := _json_value_span(excerpt, key))[0],
+            source_span_end=span[1],
+            cited_text_sha256=hashlib.sha256(encoded[span[0] : span[1]]).hexdigest(),
+            extractor_rule_id=f"ibkr.contract_snapshot.{fact_type}",
+            extractor_rule_version="1",
+        )
+        for fact_type, key, value in rows
+    )
 
 
 def _entitlement_failure(exc: RequestError) -> bool:
@@ -231,7 +389,11 @@ def read_ibkr_contract_evidence(
         for detail in detail_rows
     }
     if not snapshots:
-        return _blocked("ibkr_contract_missing", requests_made=requests_made)
+        return _contract_missing(
+            context,
+            retrieved_at=at,
+            requests_made=requests_made,
+        )
     if len(snapshots) != 1:
         return _blocked("ibkr_contract_ambiguous", requests_made=requests_made)
 
@@ -263,4 +425,5 @@ def read_ibkr_contract_evidence(
         source_families=("market_infrastructure",),
         corroboration_family_count=1,
         requests_made=requests_made,
+        contract_status="found",
     )

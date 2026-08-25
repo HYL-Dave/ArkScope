@@ -286,17 +286,23 @@ def automation_run_key(
     observation_fingerprint_sha256: str,
     policy_version: str,
     mode: str,
+    input_evidence_set_sha256: str,
 ) -> str:
     case = _text("case_id", case_id, max_bytes=200, required=True)
     fingerprint = _sha256(
         "observation_fingerprint_sha256", observation_fingerprint_sha256
     )
     policy = _text("policy_version", policy_version, max_bytes=120, required=True)
+    input_evidence = _sha256(
+        "input_evidence_set_sha256",
+        input_evidence_set_sha256,
+    )
     if mode not in AUTOMATION_MODES:
         raise ValueError("mode")
     payload = json.dumps(
         {
             "case_id": case,
+            "input_evidence_set_sha256": input_evidence,
             "mode": mode,
             "observation_fingerprint_sha256": fingerprint,
             "policy_version": policy,
@@ -306,6 +312,22 @@ def automation_run_key(
         sort_keys=True,
     )
     return "lifecycle-automation-v1:" + hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _input_evidence_set_sha256(
+    conn: sqlite3.Connection,
+    case_id: str,
+) -> str:
+    rows = sorted(
+        (str(row[0]), str(row[1]))
+        for row in conn.execute(
+            "SELECT evidence_id,content_sha256 FROM security_lifecycle_evidence "
+            "WHERE case_id=? AND automation_run_id IS NULL",
+            (case_id,),
+        )
+    )
+    payload = "".join(f"{evidence_id}\t{digest}\n" for evidence_id, digest in rows)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _normalize_evidence(values: Iterable[object]) -> tuple[_EvidenceRow, ...]:
@@ -764,11 +786,13 @@ class SecurityLifecycleFactKernel:
     ) -> AutomationRunClaim:
         self.store.assert_automation_write_available()
         self.store.get_case_identity(case_id)
+        input_evidence_digest = _input_evidence_set_sha256(self.conn, case_id)
         run_key = automation_run_key(
             case_id=case_id,
             observation_fingerprint_sha256=observation_fingerprint_sha256,
             policy_version=policy_version,
             mode=mode,
+            input_evidence_set_sha256=input_evidence_digest,
         )
         fingerprint = _sha256(
             "observation_fingerprint_sha256", observation_fingerprint_sha256
@@ -777,8 +801,17 @@ class SecurityLifecycleFactKernel:
             "policy_version", policy_version, max_bytes=120, required=True
         )
         assert policy is not None
+        if not isinstance(query_context, Mapping):
+            raise ValueError("query_context")
+        caller_digest = query_context.get("input_evidence_set_sha256")
+        if caller_digest is not None and caller_digest != input_evidence_digest:
+            raise ValueError("input_evidence_set_sha256")
+        effective_query_context = {
+            **dict(query_context),
+            "input_evidence_set_sha256": input_evidence_digest,
+        }
         query_json = _canonical_json(
-            query_context,
+            effective_query_context,
             name="query_context",
             max_bytes=16_384,
         )
@@ -1181,11 +1214,27 @@ class SecurityLifecycleFactKernel:
         timestamp = _timestamp("at", at)
         with _immediate_transaction(self.conn):
             current = self.conn.execute(
-                "SELECT status FROM security_lifecycle_automation_runs WHERE run_id=?",
+                "SELECT status,started_at FROM security_lifecycle_automation_runs "
+                "WHERE run_id=?",
                 (run_id,),
             ).fetchone()
-            if current is None or str(current["status"]) != "running":
+            if current is None or str(current["status"]) not in {
+                "running",
+                "succeeded",
+            }:
                 raise ValueError("automation_run_not_running")
+            if str(current["status"]) == "succeeded":
+                started_at = _instant(str(current["started_at"]))
+                assessment_times = self.conn.execute(
+                    "SELECT created_at FROM security_lifecycle_assessments "
+                    "WHERE automation_run_id=?",
+                    (run_id,),
+                ).fetchall()
+                if any(
+                    _instant(str(row["created_at"])) >= started_at
+                    for row in assessment_times
+                ):
+                    raise ValueError("automation_run_has_current_assessment")
             self.conn.execute(
                 "UPDATE security_lifecycle_automation_runs SET status='failed',"
                 "decision_tier=NULL,action_readiness=NULL,diagnostics_json=?,"
