@@ -589,10 +589,7 @@ function AutomationTruth({
   t: TFunction<"explore">;
 }) {
   const run = detail.automation_runs?.[0];
-  const blockers = [...new Map(
-    (detail.automation_runs ?? []).flatMap((item) => item.blockers)
-      .map((blocker) => [blocker.blocker_code, blocker]),
-  ).values()];
+  const blockers = run?.blockers ?? [];
   const facts = detail.automation_facts ?? [];
   if (!run && facts.length === 0) return null;
   const grouped = facts.reduce<Map<string, SecurityLifecycleAutomationFact[]>>(

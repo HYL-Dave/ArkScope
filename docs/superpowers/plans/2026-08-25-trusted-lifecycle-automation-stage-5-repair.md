@@ -85,7 +85,7 @@ section 16.
 - [x] Preserve the rejected full-frontend witness that exposed a dynamic
   transaction-summary literal, then move the separator into the static resource
   owner without adding scanner debt or an allowlist exception.
-- [ ] Preserve the browser witness that exposed historical blockers beside the
+- [x] Preserve the browser witness that exposed historical blockers beside the
   latest run, then bind visible blockers to that displayed run instead of
   aggregating superseded reasons without provenance.
 - [ ] Run exact additions and focused suites, then collection twice and full
