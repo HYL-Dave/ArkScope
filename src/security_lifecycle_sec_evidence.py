@@ -23,22 +23,46 @@ _ACCESSION = re.compile(r"^[A-Za-z0-9.\-]{1,160}$")
 _IDENTITY_FORMS = frozenset({"25", "25-NSE", "8-A12B", "8-K12B"})
 _M_AND_A_FORMS = frozenset({"DEFM14A", "DEFA14A"})
 _MAX_EXCERPT_BYTES = 4096
-_RULE_VERSION = "1"
-_MONTH_DATE = re.compile(
-    r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+"
-    r"(\d{1,2}),\s+(\d{4})\b",
+_RULE_VERSION = "2"
+_MONTH_NAME = (
+    r"(?:January|February|March|April|May|June|July|August|September|October|"
+    r"November|December)"
+)
+_MONTH_DATE_TEXT = rf"{_MONTH_NAME}\s+\d{{1,2}},\s+\d{{4}}"
+_EFFECTIVE_MONTH_DATE = re.compile(
+    rf"\beffective(?:\s+(?:as of|on))?\s+(?P<date>{_MONTH_DATE_TEXT})\b",
     re.IGNORECASE,
 )
-_ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+_EFFECTIVE_ISO_DATE = re.compile(
+    r"\beffective(?:\s+(?:as of|on))?\s+(?P<date>\d{4}-\d{2}-\d{2})\b",
+    re.IGNORECASE,
+)
+_TRADING_BEGIN_DATE = re.compile(
+    rf"\btrading will begin\b.{{0,160}}?\bon\s+"
+    rf"(?P<date>{_MONTH_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
 _NEW_REPLACING = re.compile(
     r"\bnew ticker symbol\s+(?P<new>[A-Z][A-Z0-9.\-]{0,19})\s*,?\s*"
     r"replacing\s+(?P<old>[A-Z][A-Z0-9.\-]{0,19})\b",
     re.IGNORECASE,
 )
 _CONTINUES_TICKER = re.compile(
-    r"\bcontinue(?:s)? to trade under (?:the )?ticker symbol\s+"
-    r"(?P<ticker>[A-Z][A-Z0-9.\-]{0,19})\b",
+    r"\bcontinue(?:s)? to trade under (?:(?:its|the) current|the)?\s*"
+    r"ticker symbol\s*,?\s*[\u201c\"']?"
+    r"(?P<ticker>[A-Z][A-Z0-9.\-]{0,19})[\u201d\"']?\b",
     re.IGNORECASE,
+)
+_POSTFIX_TICKER = re.compile(
+    r"\bunder\s+(?:the\s+)?[\u201c\"']"
+    r"(?P<ticker>[A-Z][A-Z0-9.\-]{0,19})[\u201d\"']\s+ticker symbol\b",
+    re.IGNORECASE,
+)
+_REGISTERED_COMMON_SECURITY = re.compile(
+    r"(?i:\bcommon (?:stock|shares)\b).{0,240}?\b"
+    r"(?P<ticker>[A-Z][A-Z0-9.\-]{0,19})\b\s+"
+    r"(?i:(?:New York Stock Exchange|NASDAQ Global Market|"
+    r"Nasdaq Global Select Market|Nasdaq Capital Market|Nasdaq Stock Market))"
 )
 _UNCHANGED_COMMON_STOCK = re.compile(
     r"\b(?P<ticker>[A-Z][A-Z0-9.\-]{0,19}) common stock (?:is|are) unchanged\b",
@@ -50,6 +74,24 @@ _TERMINAL_DELISTING = re.compile(
     re.IGNORECASE,
 )
 _CIK_IN_TEXT = re.compile(r"\bCIK\s+(?P<cik>\d{1,10})\b", re.IGNORECASE)
+_ASSET_PURCHASE = re.compile(
+    r"\b(?:asset acquisition|asset purchase agreement|"
+    r"agreement to acquire certain assets)\b",
+    re.IGNORECASE,
+)
+_ASSET_COUNTERPARTY = re.compile(
+    r"\bagreement to acquire certain assets of\s+"
+    r"(?P<name>[A-Z][A-Za-z0-9&.' \-]{1,120}?)(?=,\s+(?:a|an)\b)"
+)
+_CORPORATE_UNIFICATION = re.compile(
+    r"\b(?:corporate unification|completed the unification of "
+    r"(?:their )?dual listed company structure)\b",
+    re.IGNORECASE,
+)
+_SAME_NUMBER_COMMON_SHARES = re.compile(
+    r"\brepresent the same number of common shares\b",
+    re.IGNORECASE,
+)
 _VENUES = (
     (re.compile(r"\bNew York Stock Exchange\b", re.IGNORECASE), "NYSE"),
     (re.compile(r"\bNYSE\b", re.IGNORECASE), "NYSE"),
@@ -420,15 +462,27 @@ def _candidate_sentence(sentence: str, context: IdentityContext) -> bool:
         return True
     if _CONTINUES_TICKER.search(sentence) is not None:
         return True
+    if _POSTFIX_TICKER.search(sentence) is not None:
+        return True
+    if _REGISTERED_COMMON_SECURITY.search(sentence) is not None:
+        return True
     if _UNCHANGED_COMMON_STOCK.search(sentence) is not None:
         return True
     if _TERMINAL_DELISTING.search(sentence) is not None:
         return True
     if "transfer from" in folded or "common stock" in folded:
         return True
-    if _MONTH_DATE.search(sentence) is not None and "effective" in folded:
+    if _EFFECTIVE_MONTH_DATE.search(sentence) is not None:
         return True
-    if _ISO_DATE.search(sentence) is not None and "effective" in folded:
+    if _EFFECTIVE_ISO_DATE.search(sentence) is not None:
+        return True
+    if _TRADING_BEGIN_DATE.search(sentence) is not None:
+        return True
+    if _ASSET_PURCHASE.search(sentence) is not None:
+        return True
+    if _CORPORATE_UNIFICATION.search(sentence) is not None:
+        return True
+    if _SAME_NUMBER_COMMON_SHARES.search(sentence) is not None:
         return True
     return any(
         marker in folded
@@ -451,14 +505,18 @@ def _focused_candidate(
         _CIK_IN_TEXT,
         _NEW_REPLACING,
         _CONTINUES_TICKER,
+        _POSTFIX_TICKER,
+        _REGISTERED_COMMON_SECURITY,
         _UNCHANGED_COMMON_STOCK,
         _TERMINAL_DELISTING,
-        _MONTH_DATE,
-        _ISO_DATE,
+        _EFFECTIVE_MONTH_DATE,
+        _EFFECTIVE_ISO_DATE,
+        _TRADING_BEGIN_DATE,
+        _ASSET_PURCHASE,
+        _CORPORATE_UNIFICATION,
+        _SAME_NUMBER_COMMON_SHARES,
         re.compile(r"\bcommon stock\b", re.IGNORECASE),
         re.compile(r"\btransfer from\b", re.IGNORECASE),
-        re.compile(r"\basset acquisition\b", re.IGNORECASE),
-        re.compile(r"\bcorporate unification\b", re.IGNORECASE),
         re.compile(r"\bno tracked-security identity change\b", re.IGNORECASE),
         re.compile(r"\bdoes not change the tracked security identity\b", re.IGNORECASE),
     ):
@@ -537,8 +595,8 @@ def _fact(
     )
 
 
-def _normalized_month_date(match: re.Match[str]) -> str:
-    return datetime.strptime(match.group(0), "%B %d, %Y").date().isoformat()
+def _normalized_month_date_text(value: str) -> str:
+    return datetime.strptime(value, "%B %d, %Y").date().isoformat()
 
 
 def _venue_mentions(sentence: str) -> tuple[tuple[int, str], ...]:
@@ -571,11 +629,51 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
         support.setdefault(fact_type, (start, end))
 
     for start, end, sentence in _sentence_spans(evidence.excerpt):
+        folded = sentence.casefold()
         cik_match = _CIK_IN_TEXT.search(sentence)
         if cik_match is not None:
             cik = _normalized_cik(cik_match.group("cik"))
             if cik == context.cik:
                 emit("issuer_cik", cik, start, end, "sec.explicit_cik")
+        elif "issuer_cik" not in support:
+            context_cik = re.search(
+                rf"(?<!\d){re.escape(context.cik)}(?!\d)", sentence
+            )
+            if context_cik is not None:
+                emit(
+                    "issuer_cik",
+                    context.cik,
+                    start,
+                    end,
+                    "sec.inline_xbrl_cik_token",
+                )
+
+        registered = _REGISTERED_COMMON_SECURITY.search(sentence)
+        if registered is not None:
+            ticker = registered.group("ticker").upper()
+            if ticker in context.ticker_aliases:
+                emit(
+                    "source_ticker",
+                    ticker,
+                    start,
+                    end,
+                    "sec.registered_security_symbol",
+                )
+                support.setdefault("registered_current_security", (start, end))
+                registered_venues = tuple(
+                    dict.fromkeys(
+                        value
+                        for _position, value in _venue_mentions(registered.group(0))
+                    )
+                )
+                if len(registered_venues) == 1:
+                    emit(
+                        "source_venue",
+                        registered_venues[0],
+                        start,
+                        end,
+                        "sec.registered_security_venue",
+                    )
 
         transition = _NEW_REPLACING.search(sentence)
         if transition is not None:
@@ -586,6 +684,22 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
             ):
                 emit("source_ticker", old, start, end, "sec.explicit_symbol_change")
                 emit("successor_ticker", new, start, end, "sec.explicit_symbol_change")
+
+        postfix_ticker = _POSTFIX_TICKER.search(sentence)
+        if postfix_ticker is not None:
+            ticker = postfix_ticker.group("ticker").upper()
+            fact_type = (
+                "source_ticker"
+                if ticker in context.ticker_aliases
+                else "successor_ticker"
+            )
+            emit(
+                fact_type,
+                ticker,
+                start,
+                end,
+                "sec.explicit_postfix_ticker_symbol",
+            )
 
         continuation = _CONTINUES_TICKER.search(sentence)
         if continuation is not None:
@@ -603,18 +717,42 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
             emit("security_class", "common_stock", start, end, "sec.explicit_security_class")
 
         terminal = _TERMINAL_DELISTING.search(sentence)
-        explicit_effective_date = (
-            "effective" in sentence.casefold()
-            and (
-                _MONTH_DATE.search(sentence) is not None
-                or _ISO_DATE.search(sentence) is not None
+        trading_begin_date = _TRADING_BEGIN_DATE.search(sentence)
+        effective_month_date = _EFFECTIVE_MONTH_DATE.search(sentence)
+        effective_iso_date = _EFFECTIVE_ISO_DATE.search(sentence)
+        identity_date_context = any(
+            marker in folded
+            for marker in (
+                "common shares",
+                "common stock",
+                "delist",
+                "listing",
+                "ticker symbol",
+                "trading",
             )
         )
+        date_value = None
+        date_rule = None
+        if trading_begin_date is not None:
+            date_value = _normalized_month_date_text(
+                trading_begin_date.group("date")
+            )
+            date_rule = "sec.explicit_trading_start_date"
+        elif identity_date_context and effective_month_date is not None:
+            date_value = _normalized_month_date_text(
+                effective_month_date.group("date")
+            )
+            date_rule = "sec.explicit_effective_date"
+        elif identity_date_context and effective_iso_date is not None:
+            date_value = _normalized_date(
+                "effective_date", effective_iso_date.group("date")
+            )
+            date_rule = "sec.explicit_effective_date"
         if (
             terminal is not None
             and str(evidence.source_locator.get("form") or "").upper() in {"25", "25-NSE"}
             and evidence.source_locator.get("filing_chain_complete") is True
-            and explicit_effective_date
+            and date_value is not None
         ):
             ticker = terminal.group("ticker").upper()
             if ticker in context.ticker_aliases:
@@ -627,47 +765,57 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
                     "sec.explicit_terminal_delisting",
                 )
 
-        if "transfer from" in sentence.casefold():
-            venues = _venue_mentions(sentence)
-            if len(venues) >= 2 and venues[0][1] != venues[1][1]:
-                emit("source_venue", venues[0][1], start, end, "sec.explicit_venue_transfer")
+        if "transfer from" in folded or (
+            "transfer" in folded and "listing" in folded
+        ):
+            venues = tuple(
+                dict.fromkeys(value for _position, value in _venue_mentions(sentence))
+            )
+            if len(venues) >= 2 and venues[0] != venues[1]:
+                emit("source_venue", venues[0], start, end, "sec.explicit_venue_transfer")
                 emit(
                     "destination_venue",
-                    venues[1][1],
+                    venues[1],
                     start,
                     end,
                     "sec.explicit_venue_transfer",
                 )
 
-        month_date = _MONTH_DATE.search(sentence)
-        iso_date = _ISO_DATE.search(sentence)
-        if month_date is not None and "effective" in sentence.casefold():
+        if date_value is not None and date_rule is not None:
             emit(
                 "effective_date",
-                _normalized_month_date(month_date),
+                date_value,
                 start,
                 end,
-                "sec.explicit_effective_date",
-            )
-        elif iso_date is not None and "effective" in sentence.casefold():
-            emit(
-                "effective_date",
-                _normalized_date("effective_date", iso_date.group(0)),
-                start,
-                end,
-                "sec.explicit_effective_date",
+                date_rule,
             )
 
-        folded = sentence.casefold()
-        if "asset acquisition" in folded:
+        asset_purchase = _ASSET_PURCHASE.search(sentence)
+        if asset_purchase is not None and "transaction_structure" not in support:
+            counterparty = _ASSET_COUNTERPARTY.search(sentence)
+            transaction: dict[str, str] = {
+                "kind": "asset_acquisition",
+                "terms_status": "not_extracted",
+            }
+            if counterparty is not None:
+                transaction = {
+                    "kind": "asset_acquisition",
+                    "terms_status": "partial",
+                    "counterparty_name": re.sub(
+                        r"\s+", " ", counterparty.group("name")
+                    ).strip(),
+                }
             emit(
                 "transaction_structure",
-                {"kind": "asset_acquisition", "terms_status": "not_extracted"},
+                transaction,
                 start,
                 end,
                 "sec.explicit_asset_acquisition",
             )
-        elif "corporate unification" in folded:
+        elif (
+            _CORPORATE_UNIFICATION.search(sentence) is not None
+            and "transaction_structure" not in support
+        ):
             emit(
                 "transaction_structure",
                 {"kind": "corporate_unification", "terms_status": "not_extracted"},
@@ -675,6 +823,9 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
                 end,
                 "sec.explicit_corporate_unification",
             )
+
+        if _SAME_NUMBER_COMMON_SHARES.search(sentence) is not None:
+            support.setdefault("same_share_continuity", (start, end))
 
         if "no tracked-security identity change" in folded:
             emit(
@@ -703,7 +854,44 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
         source = values.get("source_ticker", set())
         successor = values.get("successor_ticker", set())
         venues = values.get("destination_venue", set())
-        if len(source) == len(successor) == 1 and source != successor:
+        transactions = [
+            fact.value
+            for fact in facts
+            if fact.fact_type == "transaction_structure"
+            and isinstance(fact.value, Mapping)
+        ]
+        transaction_kinds = {
+            str(transaction.get("kind") or "") for transaction in transactions
+        }
+        registered_continuity = (
+            source == {context.current_ticker}
+            and "registered_current_security" in support
+            and not successor
+            and not venues
+        )
+        if registered_continuity and "asset_acquisition" in transaction_kinds:
+            start, end = support["transaction_structure"]
+            emit(
+                "tracked_security_effect",
+                "asset_acquisition_no_registrant_change",
+                start,
+                end,
+                "sec.derived_asset_purchase_registrant_continuity",
+            )
+        elif (
+            registered_continuity
+            and "corporate_unification" in transaction_kinds
+            and "same_share_continuity" in support
+        ):
+            start, end = support["same_share_continuity"]
+            emit(
+                "tracked_security_effect",
+                "no_identity_change",
+                start,
+                end,
+                "sec.derived_unification_share_continuity",
+            )
+        elif len(source) == len(successor) == 1 and source != successor:
             key = "successor_ticker"
             effect = "symbol_and_venue_change" if venues else "symbol_change"
             start, end = support[key]

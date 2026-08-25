@@ -386,6 +386,8 @@ def test_blbd_fixture_extracts_asset_acquisition_without_registrant_change():
 
 
 def test_real_hapn_first_discovery_extracts_declared_identity_facts():
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+
     case, result = _collect_real("HAPN")
 
     assert case["aliases"] == ["LC"]
@@ -399,6 +401,44 @@ def test_real_hapn_first_discovery_extracts_declared_identity_facts():
         "symbol_and_venue_change"
     }
     assert result.symbol_transitions == (("LC", "HAPN"),)
+
+    canary = json.loads(
+        (_REAL_SOURCE_ROOT / "canary-report.json").read_text(encoding="utf-8")
+    )
+    preview_calls = []
+
+    def preview(request):
+        preview_calls.append(request)
+        return {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": "symbol_continuation",
+        }
+
+    decision = evaluate_automation_decision(
+        case={"ticker": "LC", "cik": case["observation"]["cik"]},
+        evidence=(*result.evidence, *canary["ibkr"]["evidence"]),
+        facts=(*result.facts, *canary["ibkr"]["facts"]),
+        current_date="2026-08-25",
+        active_sources=("manual_lists",),
+        transition_preview=preview,
+    )
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "transition_eligible"
+    assert decision.rule_id == "lifecycle.simple_symbol_continuation"
+    assert decision.successor_ticker == "HAPN"
+    assert decision.destination_venue == "NASDAQ"
+    assert decision.effective_date == "2026-06-22"
+    assert decision.transition_requested is True
+    assert preview_calls == [
+        {
+            "transition_kind": "symbol_continuation",
+            "source_ticker": "LC",
+            "successor_ticker": "HAPN",
+            "effective_date": "2026-06-22",
+            "outcomes": ("symbol_changed", "venue_transfer"),
+        }
+    ]
 
 
 def test_real_qbts_extracts_symbol_continuity_and_venue_transfer():
