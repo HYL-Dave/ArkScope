@@ -185,11 +185,17 @@ def test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separatel
     state, lock = _lock_recorder()
     disconnected = _read(_Gateway(connected=False, lock_state=state), lock)
     assert disconnected.blockers == ("ibkr_gateway_unavailable",)
+    assert disconnected.contract_status == "unavailable"
 
     state, lock = _lock_recorder()
     missing = _read(_Gateway(responses=([], [], []), lock_state=state), lock)
     assert missing.blockers == ("ibkr_contract_missing",)
-    assert missing.evidence == ()
+    assert missing.contract_status == "missing"
+    assert len(missing.evidence) == 1
+    assert missing.evidence[0].source_locator == {
+        "contract_status": "missing",
+        "queried_ticker": "HAPN",
+    }
     assert missing.requests_made == 3
 
     state, lock = _lock_recorder()
@@ -198,6 +204,7 @@ def test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separatel
         lock,
     )
     assert unavailable.blockers == ("ibkr_gateway_unavailable",)
+    assert unavailable.contract_status == "unavailable"
     assert unavailable.evidence == ()
 
 
