@@ -155,30 +155,30 @@ rule provenance. The rule ID `lifecycle.simple_symbol_continuation` remains
 verbatim and is excluded from the raw-enum scan because provenance must not be
 translated.
 
-- [ ] Add one frontend RED node for a closed fact-value presenter and evolve
+- [x] Add one frontend RED node for a closed fact-value presenter and evolve
   the existing LifecycleView owner to render a real tracked-effect fact.
-- [ ] Add exactly nine bilingual resource leaves: `common_stock`,
+- [x] Add exactly nine bilingual resource leaves: `common_stock`,
   `asset_acquisition`, `corporate_unification`, `terminal_delisting`,
   `symbol_change`, `venue_change_only`, `symbol_and_venue_change`,
   `no_identity_change`, and `asset_acquisition_no_registrant_change`.
-- [ ] Render those known strings through the closed presenter. Preserve raw
+- [x] Render those known strings through the closed presenter. Preserve raw
   ticker, venue, date, CIK, and structured transaction objects; an unknown
   closed string renders the existing explicit unknown label, never the code.
-- [ ] Keep the browser raw-enum check strict outside `.mono` rule/policy
+- [x] Keep the browser raw-enum check strict outside `.mono` rule/policy
   provenance. This amendment changes no decision, fact storage, transition,
   route, tool, or schema behavior.
 
-- [ ] Start only a feature-tree Vite server. Intercept every API request in
+- [x] Start only a feature-tree Vite server. Intercept every API request in
   Playwright; abort and fail on every non-loopback request. Do not start the
   production backend or App scheduler.
-- [ ] Exercise English and Traditional Chinese at `1440x900` and `390x844`.
+- [x] Exercise English and Traditional Chinese at `1440x900` and `390x844`.
   Render the activity band, an automation-accepted case, a complete suggested
   review, grouped regulator/market/publisher evidence, original source text,
   adjacent labeled translation, facts, blockers, and reversal availability.
-- [ ] Assert zero write requests, external requests, console errors, page
+- [x] Assert zero write requests, external requests, console errors, page
   errors, page/body horizontal overflow, incoherent overlap, raw enum leakage,
   and source/translation substitution. Rendering must not acknowledge activity.
-- [ ] Capture screenshots and mechanically inspect dimensions/nonblank pixels;
+- [x] Capture screenshots and mechanically inspect dimensions/nonblank pixels;
   visually inspect every screenshot before admission.
 
 ## Task 5: Prepare, But Do Not Execute, Live Migration Authorization
