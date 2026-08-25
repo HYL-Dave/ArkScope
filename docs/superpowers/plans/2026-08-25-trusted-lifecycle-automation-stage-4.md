@@ -228,14 +228,14 @@ provider behavior.
 
 ## Task 6: Stage 4 Offline Admission
 
-- [ ] Run exact backend additions `20 passed`; focused backend exact identity `126 + 20 = 146`; collection twice `4405`.
-- [ ] Run full backend twice with unique `--basetemp`; expected `4393 passed / 12 skipped / 0 failed`.
-- [ ] Run frontend focused `60`, full `105 files / 1227 tests`, typecheck, visible-literal scanner, and production build.
-- [ ] Verify route inventory `187`, lifecycle routes `17`, and unchanged tool/bridge inventories.
-- [ ] Run owned backend additions under network syscall denial/trace; no provider connection is permitted. Loopback test harness binds must be classified, not mislabeled.
-- [ ] Prove every changed non-governance path is owned, all protected bytes match, branch is linear/clean/unpublished, and production/provider counters remain zero.
-- [ ] Produce a Stage 4 evidence packet with exact node streams, activity/authority matrix, translation cache/failure report, scratch apply/ack/reverse report, frontend artifacts, and a checksummed manifest.
-- [ ] Continue directly to Stage 5 grounded admission unless a hard stop or amendment condition occurs. Do not merge or push.
+- [x] Run exact backend additions `20 passed`; focused backend exact identity `126 + 20 = 146`; collection twice `4405`.
+- [x] Run full backend twice with unique `--basetemp`; expected `4393 passed / 12 skipped / 0 failed`.
+- [x] Run frontend focused `60`, full `105 files / 1227 tests`, typecheck, visible-literal scanner, and production build.
+- [x] Verify route inventory `187`, lifecycle routes `17`, and unchanged tool/bridge inventories.
+- [x] Run owned backend additions under network syscall denial/trace; no provider connection is permitted. Loopback test harness binds must be classified, not mislabeled.
+- [x] Prove every changed non-governance path is owned, all protected bytes match, branch is linear/clean/unpublished, and production/provider counters remain zero.
+- [x] Produce a Stage 4 evidence packet with exact node streams, activity/authority matrix, translation cache/failure report, scratch apply/ack/reverse report, frontend artifacts, and a checksummed manifest.
+- [x] Continue directly to Stage 5 grounded admission unless a hard stop or amendment condition occurs. Do not merge or push.
 
 ## Non-Goals And Hard Stops
 
