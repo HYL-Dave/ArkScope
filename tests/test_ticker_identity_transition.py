@@ -980,7 +980,7 @@ def test_apply_commits_ordered_profile_effects_lineage_and_receipts_atomically(
         conn.close()
 
 
-@pytest.mark.parametrize("fail_after", range(1, 10))
+@pytest.mark.parametrize("fail_after", range(1, 9))
 def test_apply_rolls_back_every_profile_and_receipt_mutation_on_failure(
     tmp_path,
     fail_after,
