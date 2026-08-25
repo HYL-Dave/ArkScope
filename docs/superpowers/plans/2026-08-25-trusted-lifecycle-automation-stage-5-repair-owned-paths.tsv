@@ -18,6 +18,8 @@ tests/fixtures/security_lifecycle_grounded_shadow.json	T2/T4	modify	126	f7e8b003
 apps/arkscope-web/src/api.ts	T3	modify	3734	418db787bc4573c3a76c6638d0779e30305ea07b63bb673835b082569dd69962
 apps/arkscope-web/src/lifecycle/lifecyclePresentation.ts	T3	modify	436	7eabf719fe3e20a83a983b00729e2ecfeb8ef2d8dac0613ae105102ff73d2bff
 apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts	T1/T3	modify	140	b35294ba2d541b44b1f52ff7032a3ac2e3924177732fc194fcc78700de6f087a
+apps/arkscope-web/src/lifecycle/LifecycleView.tsx	T3/T4	modify	2026	0013fe5ee665acf4bcf136a6553c8d2138f1790e4d38fe713fa83fe7aa261f53
+apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx	T1/T3/T4	modify	1159	21ebb9b781ba6394571073760c990caeaddd58d6bc4a4ec1e0f21612edb4d6e7
 apps/arkscope-web/src/i18n/resources/en/explore.ts	T3	modify	813	611b0c6d7f85a6b8a953820ef40840196d0a0b703374aafa02509017a5e9f529
 apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts	T3	modify	810	6041d749efb3ff5c42511ca03c6df3e5d6a63f1965704d94a39f2c72b4bdf4f1
 apps/arkscope-web/src/i18n/resources.test.ts	T3	modify	1278	7e3768d23d0101e68b34568582c653aa10021bb994316d08cb00e95eeb859527
