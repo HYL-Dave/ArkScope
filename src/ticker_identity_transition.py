@@ -25,6 +25,21 @@ from src.ticker_identity_schema import (
 _LEGACY_SOURCE_KEY = "legacy_config_seed"
 _PROFILE_SOURCE_KEYS = frozenset({"manual_lists", _LEGACY_SOURCE_KEY})
 _SYMBOL_OUTCOMES = frozenset({"symbol_changed", "venue_transfer"})
+_ACTIVITY_CHANGE_TYPES = frozenset(
+    {
+        "editable_tag_copied",
+        "legacy_membership_added",
+        "legacy_membership_archived",
+        "legacy_membership_reactivated",
+        "priority_updated",
+        "source_hidden",
+        "successor_unhidden",
+        "watchlist_membership_added",
+        "watchlist_membership_archived",
+        "watchlist_membership_reactivated",
+    }
+)
+_ACTIVITY_HISTORY_LIMIT = 100
 
 
 @dataclass(frozen=True)
@@ -77,6 +92,68 @@ def _sha256(name: str, value: object) -> str:
     if len(text) != 64 or any(char not in "0123456789abcdef" for char in text):
         raise ValueError(name)
     return text
+
+
+def _activity_json(name: str, value: object) -> str:
+    encoded = _canonical_json(value)
+    if len(encoded.encode("utf-8")) > 32768:
+        raise ValueError(name)
+    return encoded
+
+
+def _activity_changes(preview: Mapping[str, object]) -> list[dict]:
+    effects = preview.get("effects")
+    if not isinstance(effects, Mapping):
+        raise ValueError("transition_activity_effects")
+    watchlists = effects.get("watchlists")
+    legacy = effects.get("legacy_config_seed")
+    priority = effects.get("priority")
+    suppression = effects.get("suppression")
+    if not all(
+        isinstance(value, Mapping)
+        for value in (watchlists, legacy, priority, suppression)
+    ):
+        raise ValueError("transition_activity_effects")
+
+    counts = {
+        "editable_tag_copied": len(effects.get("editable_tags_to_copy") or ()),
+        "legacy_membership_added": len(legacy.get("add") or ()),
+        "legacy_membership_archived": len(legacy.get("archive") or ()),
+        "legacy_membership_reactivated": len(legacy.get("reactivate") or ()),
+        "priority_updated": int(bool(priority.get("write_successor"))),
+        "source_hidden": int(bool(suppression.get("hide_source"))),
+        "successor_unhidden": int(bool(suppression.get("unhide_successor"))),
+        "watchlist_membership_added": len(watchlists.get("add") or ()),
+        "watchlist_membership_archived": len(watchlists.get("archive") or ()),
+        "watchlist_membership_reactivated": len(
+            watchlists.get("reactivate") or ()
+        ),
+    }
+    if any(
+        isinstance(count, bool) or not isinstance(count, int) or count > 100000
+        for count in counts.values()
+    ):
+        raise ValueError("transition_activity_changes")
+    return [
+        {"change_type": change_type, "count": count}
+        for change_type, count in sorted(counts.items())
+        if count
+    ]
+
+
+def _provider_owned_retained(preview: Mapping[str, object]) -> list[str]:
+    raw = preview.get("provider_owned_sources") or ()
+    if not isinstance(raw, (list, tuple, set, frozenset)):
+        raise ValueError("transition_activity_provider_sources")
+    values = list(raw)
+    if any(not isinstance(value, str) for value in values):
+        raise ValueError("transition_activity_provider_sources")
+    values = sorted(set(values))
+    if len(values) > 100 or any(
+        len(value) > 160 or "\0" in value for value in values
+    ):
+        raise ValueError("transition_activity_provider_sources")
+    return values
 
 
 def _execution_date(
@@ -1131,6 +1208,211 @@ class TickerIdentityTransitionStore:
             raise KeyError("transition_not_found")
         return item
 
+    @classmethod
+    def _activity_item(cls, cursor: sqlite3.Cursor, row) -> dict:
+        item = cls._row(cursor, row)
+        try:
+            changes = json.loads(str(item.pop("user_owned_changes_json")))
+            retained = json.loads(str(item.pop("provider_owned_retained_json")))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("transition_activity_payload") from exc
+        if (
+            not isinstance(changes, list)
+            or len(changes) > len(_ACTIVITY_CHANGE_TYPES)
+            or any(
+                not isinstance(change, dict)
+                or set(change) != {"change_type", "count"}
+                or change.get("change_type") not in _ACTIVITY_CHANGE_TYPES
+                or isinstance(change.get("count"), bool)
+                or not isinstance(change.get("count"), int)
+                or not 1 <= int(change["count"]) <= 100000
+                for change in changes
+            )
+            or [change["change_type"] for change in changes]
+            != sorted({change["change_type"] for change in changes})
+        ):
+            raise ValueError("transition_activity_changes")
+        if (
+            not isinstance(retained, list)
+            or len(retained) > 100
+            or any(
+                not isinstance(value, str)
+                or not value
+                or len(value) > 160
+                or "\0" in value
+                for value in retained
+            )
+            or retained != sorted(set(retained))
+        ):
+            raise ValueError("transition_activity_provider_sources")
+        item["user_owned_changes"] = changes
+        item["provider_owned_retained"] = retained
+        return item
+
+    def _get_activity(self, activity_id: str) -> dict | None:
+        cursor = self.conn.execute(
+            "SELECT a.*,t.case_id FROM ticker_identity_transition_activity a "
+            "JOIN ticker_identity_transitions t ON t.transition_id=a.transition_id "
+            "WHERE a.activity_id=?",
+            (activity_id,),
+        )
+        row = cursor.fetchone()
+        return None if row is None else self._activity_item(cursor, row)
+
+    def get_activity(self, activity_id: str) -> dict:
+        item = self._get_activity(activity_id)
+        if item is None:
+            raise KeyError("transition_activity_not_found")
+        return item
+
+    def _activity_counts(self, transition_id: str | None = None) -> tuple[int, int]:
+        where = "" if transition_id is None else " WHERE transition_id=?"
+        params = () if transition_id is None else (transition_id,)
+        row = self.conn.execute(
+            "SELECT COUNT(*),COALESCE(SUM(acknowledged_at IS NULL),0) "
+            f"FROM ticker_identity_transition_activity{where}",
+            params,
+        ).fetchone()
+        return int(row[0]), int(row[1])
+
+    def _list_activity_items(
+        self,
+        *,
+        limit: int,
+        unacknowledged_only: bool,
+        transition_id: str | None = None,
+    ) -> list[dict]:
+        clauses: list[str] = []
+        params: list[object] = []
+        if transition_id is not None:
+            clauses.append("a.transition_id=?")
+            params.append(transition_id)
+        if unacknowledged_only:
+            clauses.append("a.acknowledged_at IS NULL")
+        where = "" if not clauses else " WHERE " + " AND ".join(clauses)
+        cursor = self.conn.execute(
+            "SELECT a.*,t.case_id FROM ticker_identity_transition_activity a "
+            "JOIN ticker_identity_transitions t ON t.transition_id=a.transition_id"
+            f"{where} ORDER BY a.occurred_at DESC,a.activity_id DESC LIMIT ?",
+            (*params, limit),
+        )
+        return [self._activity_item(cursor, row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def _activity_limit(limit: int) -> int:
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or not 1 <= limit <= _ACTIVITY_HISTORY_LIMIT
+        ):
+            raise ValueError("limit")
+        return limit
+
+    def list_activity(
+        self,
+        *,
+        limit: int,
+        unacknowledged_only: bool = False,
+    ) -> dict:
+        bounded_limit = self._activity_limit(limit)
+        if not isinstance(unacknowledged_only, bool):
+            raise ValueError("unacknowledged_only")
+        count, unacknowledged_count = self._activity_counts()
+        return {
+            "items": self._list_activity_items(
+                limit=bounded_limit,
+                unacknowledged_only=unacknowledged_only,
+            ),
+            "count": count,
+            "unacknowledged_count": unacknowledged_count,
+        }
+
+    def list_transition_activity(self, transition_id: str, *, limit: int) -> dict:
+        if self._get(transition_id) is None:
+            raise KeyError("transition_not_found")
+        bounded_limit = self._activity_limit(limit)
+        count, unacknowledged_count = self._activity_counts(transition_id)
+        return {
+            "items": self._list_activity_items(
+                limit=bounded_limit,
+                unacknowledged_only=False,
+                transition_id=transition_id,
+            ),
+            "count": count,
+            "unacknowledged_count": unacknowledged_count,
+        }
+
+    def acknowledge_activity(self, activity_id: str, *, at: str) -> dict:
+        timestamp = str(at or "")
+        if not timestamp or len(timestamp) > 100 or "\0" in timestamp:
+            raise ValueError("acknowledged_at")
+        self._begin()
+        try:
+            item = self._get_activity(activity_id)
+            if item is None:
+                raise KeyError("transition_activity_not_found")
+            if item["acknowledged_at"] is None:
+                self.conn.execute(
+                    "UPDATE ticker_identity_transition_activity "
+                    "SET acknowledged_at=? WHERE activity_id=? "
+                    "AND acknowledged_at IS NULL",
+                    (timestamp, activity_id),
+                )
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return self.get_activity(activity_id)
+
+    def _insert_activity(
+        self,
+        *,
+        transition: Mapping[str, object],
+        activity_type: str,
+        state_sha256: str,
+        at: str,
+    ) -> str:
+        if activity_type not in {"applied", "reversed"}:
+            raise ValueError("activity_type")
+        preview = transition.get("approved_preview")
+        if not isinstance(preview, Mapping):
+            raise ValueError("transition_activity_preview")
+        activity_id = self._id_factory("tiact")
+        self.conn.execute(
+            "INSERT INTO ticker_identity_transition_activity "
+            "(activity_id,transition_id,activity_type,source_ticker,successor_ticker,"
+            "effective_date,user_owned_changes_json,provider_owned_retained_json,"
+            "state_sha256,rule_id,rule_version,decision_provenance_sha256,"
+            "occurred_at,acknowledged_at,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)",
+            (
+                activity_id,
+                transition["transition_id"],
+                activity_type,
+                transition["source_ticker"],
+                transition["successor_ticker"],
+                transition["execute_on"],
+                _activity_json(
+                    "transition_activity_changes",
+                    _activity_changes(preview),
+                ),
+                _activity_json(
+                    "transition_activity_provider_sources",
+                    _provider_owned_retained(preview),
+                ),
+                _sha256("transition_activity_state", state_sha256),
+                transition["rule_id"],
+                transition["rule_version"],
+                _sha256(
+                    "transition_activity_provenance",
+                    transition["decision_provenance_sha256"],
+                ),
+                at,
+                at,
+            ),
+        )
+        return activity_id
+
     def _begin(self) -> None:
         if self.conn.in_transaction:
             raise RuntimeError("caller_transaction_open")
@@ -1468,6 +1750,49 @@ class TickerIdentityTransitionStore:
             "status": "blocked",
         }
 
+    def reverse_readiness(self, transition_id: str) -> dict:
+        transition = self._get(transition_id)
+        if transition is None:
+            raise KeyError("transition_not_found")
+        if transition["status"] != "applied":
+            raise ValueError("transition_not_reversible")
+        try:
+            before_snapshot = json.loads(str(transition["before_snapshot_json"]))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("transition_snapshot") from exc
+        if not isinstance(before_snapshot, Mapping):
+            raise ValueError("transition_snapshot")
+        current_snapshot = _affected_snapshot(
+            self.conn,
+            keys=before_snapshot.get("keys"),
+        )
+        observed_digest = _affected_snapshot_sha256(current_snapshot)
+        expected_digest = _sha256(
+            "transition_after_snapshot",
+            transition["after_snapshot_sha256"],
+        )
+        blockers: list[str] = []
+        if observed_digest != expected_digest:
+            blockers.append("reverse_state_changed")
+        successor_ticker = _ticker(transition["successor_ticker"])
+        if successor_ticker is not None:
+            later = self.conn.execute(
+                "SELECT 1 FROM ticker_identity_links "
+                "WHERE source_ticker=? AND reversed_at IS NULL "
+                "AND transition_id<>? LIMIT 1",
+                (successor_ticker, transition_id),
+            ).fetchone()
+            if later is not None:
+                blockers.append("successor_has_later_transition")
+        blockers.sort()
+        return {
+            "transition_id": transition_id,
+            "reversible": not blockers,
+            "block_reasons": blockers,
+            "expected_state_sha256": expected_digest,
+            "observed_state_sha256": observed_digest,
+        }
+
     def apply(
         self,
         transition_id: str,
@@ -1747,6 +2072,13 @@ class TickerIdentityTransitionStore:
                 at=now,
             )
             self._step("attempt_receipt")
+            self._insert_activity(
+                transition=transition,
+                activity_type="applied",
+                state_sha256=after_digest,
+                at=now,
+            )
+            self._step("activity_receipt")
             self.conn.commit()
         except Exception:
             self.conn.rollback()
@@ -1770,24 +2102,8 @@ class TickerIdentityTransitionStore:
             if transition["status"] != "applied":
                 raise ValueError("transition_not_reversible")
             before_snapshot = json.loads(str(transition["before_snapshot_json"]))
-            current_snapshot = _affected_snapshot(
-                self.conn,
-                keys=before_snapshot["keys"],
-            )
-            current_digest = _affected_snapshot_sha256(current_snapshot)
-            blockers: list[str] = []
-            if current_digest != transition["after_snapshot_sha256"]:
-                blockers.append("reverse_state_changed")
-            successor_ticker = _ticker(transition["successor_ticker"])
-            if successor_ticker is not None:
-                later = self.conn.execute(
-                    "SELECT 1 FROM ticker_identity_links "
-                    "WHERE source_ticker=? AND reversed_at IS NULL "
-                    "AND transition_id<>? LIMIT 1",
-                    (successor_ticker, transition_id),
-                ).fetchone()
-                if later is not None:
-                    blockers.append("successor_has_later_transition")
+            readiness = self.reverse_readiness(transition_id)
+            blockers = readiness["block_reasons"]
             if blockers:
                 attempt_id = self._insert_attempt(
                     transition_id=transition_id,
@@ -1800,7 +2116,7 @@ class TickerIdentityTransitionStore:
                 self.conn.commit()
                 return {
                     "attempt_id": attempt_id,
-                    "block_reasons": sorted(blockers),
+                    "block_reasons": blockers,
                     "status": "blocked",
                     "transition": self.get(transition_id),
                 }
@@ -1812,6 +2128,7 @@ class TickerIdentityTransitionStore:
             )
             if restored != before_snapshot:
                 raise RuntimeError("reverse_restore_mismatch")
+            restored_digest = _affected_snapshot_sha256(restored)
             self.conn.execute(
                 "UPDATE ticker_identity_links SET reversed_at=? "
                 "WHERE transition_id=? AND reversed_at IS NULL",
@@ -1828,6 +2145,12 @@ class TickerIdentityTransitionStore:
                 status="reversed",
                 block_reasons=(),
                 observed_preview_sha256=transition["approved_preview_sha256"],
+                at=now,
+            )
+            self._insert_activity(
+                transition=transition,
+                activity_type="reversed",
+                state_sha256=restored_digest,
                 at=now,
             )
             self.conn.commit()

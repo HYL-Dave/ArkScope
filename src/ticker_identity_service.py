@@ -191,6 +191,33 @@ class TickerIdentityService:
         with self._profile_connection(write=False) as conn:
             return self._store(conn).list_due(on_date=on_date, limit=limit)
 
+    def list_transition_activity(
+        self,
+        *,
+        limit: int,
+        unacknowledged_only: bool = False,
+    ) -> dict:
+        with self._profile_connection(write=False) as conn:
+            return self._store(conn).list_activity(
+                limit=limit,
+                unacknowledged_only=unacknowledged_only,
+            )
+
+    def acknowledge_transition_activity(
+        self,
+        activity_id: str,
+        *,
+        before_write: Callable[[], None],
+    ) -> dict:
+        with self._profile_connection(write=True) as conn:
+            store = self._store(conn)
+            store.get_activity(activity_id)
+            before_write()
+            at = self._clock() if self._clock is not None else datetime.now(
+                timezone.utc
+            ).isoformat(timespec="seconds").replace("+00:00", "Z")
+            return store.acknowledge_activity(activity_id, at=at)
+
     def approve_case(
         self,
         case_id: str,

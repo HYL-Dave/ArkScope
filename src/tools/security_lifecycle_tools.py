@@ -75,11 +75,18 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
         if not identity_schema_present(conn):
             return {}
         verify_ticker_identity_connection(conn)
+        from src.ticker_identity_transition import (
+            TickerIdentityTransitionStore,
+            profile_snapshot_sha256,
+        )
+
+        store = TickerIdentityTransitionStore(conn)
         transitions: dict[str, dict] = {}
         rows = conn.execute(
             "SELECT transition_id,case_id,kind,status,source_ticker,"
             "successor_ticker,execute_on,approved_preview_sha256,"
-            "approved_preview_json,updated_at "
+            "approved_preview_json,approval_authority,automation_policy_version,"
+            "rule_id,rule_version,decision_provenance_sha256,updated_at "
             "FROM ticker_identity_transitions "
             "ORDER BY case_id,updated_at DESC,transition_id DESC"
         ).fetchall()
@@ -110,13 +117,17 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
             approved_preview = json.loads(str(row[8]))
             if not isinstance(approved_preview, dict):
                 raise ValueError("transition_approved_preview")
-            from src.ticker_identity_transition import profile_snapshot_sha256
-
             if (
                 approved_preview.get("preview_sha256") != str(row[7])
                 or profile_snapshot_sha256(approved_preview) != str(row[7])
             ):
                 raise ValueError("transition_approved_preview")
+            activity = store.list_transition_activity(transition_id, limit=20)
+            reverse_readiness = (
+                store.reverse_readiness(transition_id)
+                if str(row[3]) == "applied"
+                else None
+            )
             transitions[case_id] = {
                 "transition_id": transition_id,
                 "kind": str(row[2]),
@@ -126,8 +137,21 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
                 "execute_on": str(row[6]),
                 "approved_preview_sha256": str(row[7]),
                 "approved_preview": approved_preview,
-                "updated_at": str(row[9]),
+                "approval_authority": str(row[9]),
+                "automation_policy_version": (
+                    str(row[10]) if row[10] is not None else None
+                ),
+                "rule_id": str(row[11]) if row[11] is not None else None,
+                "rule_version": str(row[12]) if row[12] is not None else None,
+                "decision_provenance_sha256": str(row[13]),
+                "updated_at": str(row[14]),
                 "latest_attempt": latest_attempt,
+                "reverse_readiness": reverse_readiness,
+                "activity_history": activity["items"],
+                "activity_count": activity["count"],
+                "unacknowledged_activity_count": activity[
+                    "unacknowledged_count"
+                ],
             }
         return transitions
     except (OSError, sqlite3.Error, TickerIdentitySchemaMismatch, ValueError):

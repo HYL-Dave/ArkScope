@@ -78,6 +78,44 @@ def _conflict(exc: TickerIdentityConflict) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": exc.code})
 
 
+@router.get("/transition-activity")
+def list_transition_activity(
+    limit: int = Query(default=50, ge=1, le=100),
+    unacknowledged_only: bool = Query(default=False),
+    service: TickerIdentityService = Depends(get_ticker_identity_service),
+):
+    try:
+        return service.list_transition_activity(
+            limit=limit,
+            unacknowledged_only=unacknowledged_only,
+        )
+    except TickerIdentityStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except ValueError as exc:
+        raise _invalid(exc) from None
+
+
+@router.post("/transition-activity/{activity_id}/acknowledge")
+def acknowledge_transition_activity(
+    activity_id: str,
+    service: TickerIdentityService = Depends(get_ticker_identity_service),
+):
+    try:
+        return service.acknowledge_transition_activity(
+            activity_id,
+            before_write=lambda: require_profile_state_write(
+                "security_lifecycle_acknowledge_transition_activity",
+                {"activity_id": activity_id},
+            ),
+        )
+    except TickerIdentityStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except ValueError as exc:
+        raise _invalid(exc) from None
+
+
 @router.get("/cases/{case_id}/transition-preview")
 def transition_preview(
     case_id: str,
