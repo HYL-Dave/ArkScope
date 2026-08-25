@@ -174,10 +174,10 @@ Closed rule identities are:
 
 **Files:** governance files only.
 
-- [ ] Verify clean branch `trusted-lifecycle-automation-stages3-5` at `5d88e1b3`, with `ab6654c0` as its parent product checkpoint and no merge commit.
-- [ ] Verify every modify pin in the owned ledger and every add path is absent.
-- [ ] Collect backend `4348` twice. The original focused ledger collected `156` existing nodes; the Task 3 direct-caller amendment independently collected `34`, and the Task 7 provider-config owner amendment adds `44`, for a final amended baseline of exactly `234`.
-- [ ] Confirm every protected path is byte-identical and no production path/provider is opened.
+- [x] Verify clean branch `trusted-lifecycle-automation-stages3-5` at `5d88e1b3`, with `ab6654c0` as its parent product checkpoint and no merge commit.
+- [x] Verify every modify pin in the owned ledger and every add path is absent.
+- [x] Collect backend `4348` twice. The original focused ledger collected `156` existing nodes; the Task 3 direct-caller amendment independently collected `34`, and the Task 7 provider-config owner amendment adds `44`, for a final amended baseline of exactly `234`.
+- [x] Confirm every protected path is byte-identical and no production path/provider is opened.
 
 ## Task 1: Make Run Decisions Reproducible And Conflict-Aware
 
@@ -190,11 +190,11 @@ Closed rule identities are:
 - Produces: `SecurityLifecycleFactKernel.reserve_readiness_recheck(...) -> AutomationRunClaim` for a due `waiting_effective_date|waiting_market_confirmation` run only.
 - Evolves: `complete_run` permits only `source_conflict` beside a successful `review_suggested/action_blocked` result; every other blocker remains terminal `blocked`.
 
-- [ ] Add the two named tests and evolve the conflict owner. RED must show that current provenance depends on caller-local evidence IDs and that conflict currently becomes a blocked run.
-- [ ] Canonicalize provenance from persisted evidence/fact content and source bindings, never caller-local IDs. Recompute it after the transaction and require exact equality before an automation assessment is written.
-- [ ] Preserve cited evidence/facts across a readiness recheck. Append idempotently, recompute provenance over the complete run, and never delete evidence referenced by an assessment.
-- [ ] A conflict persists all facts and a `source_conflict` row, returns `succeeded/review_suggested/action_blocked`, and never selects a majority value.
-- [ ] Run Task 1 RED/GREEN and commit tests before product code.
+- [x] Add the two named tests and evolve the conflict owner. RED must show that current provenance depends on caller-local evidence IDs and that conflict currently becomes a blocked run.
+- [x] Canonicalize provenance from persisted evidence/fact content and source bindings, never caller-local IDs. Recompute it after the transaction and require exact equality before an automation assessment is written.
+- [x] Preserve cited evidence/facts across a readiness recheck. Append idempotently, recompute provenance over the complete run, and never delete evidence referenced by an assessment.
+- [x] A conflict persists all facts and a `source_conflict` row, returns `succeeded/review_suggested/action_blocked`, and never selects a majority value.
+- [x] Run Task 1 RED/GREEN and commit tests before product code.
 
 ## Task 2: Implement The Pure Two-Tier Decision Policy
 
@@ -207,14 +207,14 @@ Closed rule identities are:
 - Produces: `RULE_VERSIONS: Mapping[str, str]` and `AutomationDecision`.
 - Produces: `evaluate_automation_decision(*, case, evidence, facts, current_date, active_sources, transition_preview) -> AutomationDecision`.
 
-- [ ] Add all ten policy nodes. Initial RED must be import failure only.
-- [ ] Implement exact fact-family grouping. Regulator, market-infrastructure, publisher, general-web, and manual are source-family votes; multiple rows in one family remain one family.
-- [ ] Simple A-to-B requires one non-conflicting regulator old/new/date/CIK/security-class shape, one matching market-infrastructure successor/security-class/venue shape, no prohibited transaction structure, and an eligible unblocked preview. Already-normalized successor cases return verified/non-mutating and forbid A-to-A.
-- [ ] Venue-only and explicit no-identity-change cases are verified/non-mutating. M&A cash/stock/mixed/unknown/spin/class-change is always a fully prefilled suggestion.
-- [ ] Terminal delisting accepts the regulator conclusion before its date but returns `waiting_effective_date`; after the date it returns `waiting_market_confirmation` until a typed market-absence confirmation exists, then requests a terminal preview.
-- [ ] Conflicting facts return `review_suggested/action_blocked`; missing regulator identity facts return the same tier without invented fields. Publisher/manual/general-web never authorize a mutation.
-- [ ] Templates are deterministic and bounded. No model prose or translation is called.
-- [ ] Run all ten policy nodes GREEN and commit tests before product code.
+- [x] Add all ten policy nodes. Initial RED must be import failure only.
+- [x] Implement exact fact-family grouping. Regulator, market-infrastructure, publisher, general-web, and manual are source-family votes; multiple rows in one family remain one family.
+- [x] Simple A-to-B requires one non-conflicting regulator old/new/date/CIK/security-class shape, one matching market-infrastructure successor/security-class/venue shape, no prohibited transaction structure, and an eligible unblocked preview. Already-normalized successor cases return verified/non-mutating and forbid A-to-A.
+- [x] Venue-only and explicit no-identity-change cases are verified/non-mutating. M&A cash/stock/mixed/unknown/spin/class-change is always a fully prefilled suggestion.
+- [x] Terminal delisting accepts the regulator conclusion before its date but returns `waiting_effective_date`; after the date it returns `waiting_market_confirmation` until a typed market-absence confirmation exists, then requests a terminal preview.
+- [x] Conflicting facts return `review_suggested/action_blocked`; missing regulator identity facts return the same tier without invented fields. Publisher/manual/general-web never authorize a mutation.
+- [x] Templates are deterministic and bounded. No model prose or translation is called.
+- [x] Run all ten policy nodes GREEN and commit tests before product code.
 
 ## Task 3: Enforce Honest Assessment And Proposal Authority
 
@@ -232,14 +232,14 @@ Closed rule identities are:
 - Produces: `derive_action_proposal_specs(*, case, assessment, sources) -> tuple[dict, ...]` used by both preview and persistence.
 - Produces: `create_automation_assessment(...)` orchestration helper that binds current run provenance and persisted citations.
 
-- [ ] Add four investigation nodes and one route node. Initial RED is exactly those five additions against unchanged existing callers.
-- [ ] After the five-node RED is admitted, update every existing direct caller in the five owned test/route locations with its literal authority. The three collateral test files keep every node body and assertion unchanged.
-- [ ] Human/legacy/automation acceptance authorities are explicit and coherent. `automation_policy` requires an automation deterministic-rule draft, current matching run, `verified_automatic`, matching observation/rule/provenance, and no non-review blocker.
-- [ ] Human acceptance of an unchanged automation draft keeps the automation author/run/rule/provenance. The existing edit route creates a new human draft and never updates the automation row.
-- [ ] Project an automation assessment stale when observation/evidence, policy version, rule version, run status, persisted provenance, or conflict state changes.
-- [ ] Extract proposal derivation into one pure function without changing existing human proposal behavior. Preview and persisted proposals must consume the same action specs.
-- [ ] The attended API passes `acceptance_authority="human"`; it never inherits automation authority.
-- [ ] Run Task 3 RED/GREEN and commit tests before product code.
+- [x] Add four investigation nodes and one route node. Initial RED is exactly those five additions against unchanged existing callers.
+- [x] After the five-node RED is admitted, update every existing direct caller in the five owned test/route locations with its literal authority. The three collateral test files keep every node body and assertion unchanged.
+- [x] Human/legacy/automation acceptance authorities are explicit and coherent. `automation_policy` requires an automation deterministic-rule draft, current matching run, `verified_automatic`, matching observation/rule/provenance, and no non-review blocker.
+- [x] Human acceptance of an unchanged automation draft keeps the automation author/run/rule/provenance. The existing edit route creates a new human draft and never updates the automation row.
+- [x] Project an automation assessment stale when observation/evidence, policy version, rule version, run status, persisted provenance, or conflict state changes.
+- [x] Extract proposal derivation into one pure function without changing existing human proposal behavior. Preview and persisted proposals must consume the same action specs.
+- [x] The attended API passes `acceptance_authority="human"`; it never inherits automation authority.
+- [x] Run Task 3 RED/GREEN and commit tests before product code.
 
 ## Task 4: Wire Strict IBKR Facts And A Bounded Worker
 
@@ -258,14 +258,14 @@ Closed rule identities are:
 - Produces: `LifecycleAutomationEvidenceBundle` and `LifecycleAutomationWorker.run(limit=2, mode="live")`.
 - Adds: dedicated IBKR client-id domain `lifecycle=80`; it remains read-only and under `ibkr_gateway_lock`.
 
-- [ ] Add the worker's ten nodes, two IBKR nodes, and one client-id node. Evolve the existing provider-config projection and normalization owners to include the lifecycle domain and cap the shared app-managed base at `19`. RED must fail on missing interfaces, not on a provider call.
-- [ ] Convert successful contract snapshots to cited `successor_ticker`, `destination_venue`, and `security_class` facts only when the canonical snapshot supports them. A typed contract-missing result remains distinct and may satisfy terminal market absence only after the effective date; gateway/entitlement/ambiguity never does.
-- [ ] The worker scans stable present cases, skips a current non-stale accepted assessment, admits at most two changed/due cases, and reserves the durable run before acquisition.
-- [ ] Evidence acquisition, profile connections, source context, preview evaluator, and clock are constructor-injected. Core tests prove no default path or socket is reachable.
-- [ ] Persist evidence/facts first. Build a complete automation assessment from persisted citations. Verified results accept by `automation_policy` and generate proposals; suggestions remain drafts. Preview drift downgrades to suggestion rather than mutating.
-- [ ] Provider outcomes retain typed blocker/retry semantics. Program/schema errors use closed automation failure codes and are never relabeled as network failures.
-- [ ] Due readiness rechecks are bounded and isolated from unrelated cases.
-- [ ] Run Task 4 RED/GREEN and commit tests before product code.
+- [x] Add the worker's ten nodes, two IBKR nodes, and one client-id node. Evolve the existing provider-config projection and normalization owners to include the lifecycle domain and cap the shared app-managed base at `19`. RED must fail on missing interfaces, not on a provider call.
+- [x] Convert successful contract snapshots to cited `successor_ticker`, `destination_venue`, and `security_class` facts only when the canonical snapshot supports them. A typed contract-missing result remains distinct and may satisfy terminal market absence only after the effective date; gateway/entitlement/ambiguity never does.
+- [x] The worker scans stable present cases, skips a current non-stale accepted assessment, admits at most two changed/due cases, and reserves the durable run before acquisition.
+- [x] Evidence acquisition, profile connections, source context, preview evaluator, and clock are constructor-injected. Core tests prove no default path or socket is reachable.
+- [x] Persist evidence/facts first. Build a complete automation assessment from persisted citations. Verified results accept by `automation_policy` and generate proposals; suggestions remain drafts. Preview drift downgrades to suggestion rather than mutating.
+- [x] Provider outcomes retain typed blocker/retry semantics. Program/schema errors use closed automation failure codes and are never relabeled as network failures.
+- [x] Due readiness rechecks are bounded and isolated from unrelated cases.
+- [x] Run Task 4 RED/GREEN and commit tests before product code.
 
 ## Task 5: Add Scheduler Witnesses Without Hiding Provider Failures
 
@@ -280,11 +280,11 @@ Closed rule identities are:
 - Produces: `record_security_lifecycle_automation_result(result, *, now) -> bool`.
 - Produces: `security_lifecycle_automation_failure(reason) -> dict`.
 
-- [ ] Add four scheduler nodes and two parent-scheduler nodes. The hermetic fixture stubs the new runner/witness by default; no existing scheduler test may open lifecycle stores.
-- [ ] Return only bounded status/reason/count/case-ID fields. Schema absence before live cutover is `not_installed`; exact-schema/store failure is `unavailable`; one case failure is `partial` and does not stop the second case or ordinary provider scheduling.
-- [ ] Persist deduplicated failure/recovery witnesses in `job_runs` under `security_lifecycle.automation`. Raw exception text, paths, URLs, evidence, contact, or payloads are never stored.
-- [ ] Parent tick order is lifecycle automation, due transition execution, then ordinary provider dispatch. Each subsystem records its own result and cannot mask another.
-- [ ] Run Task 5 RED/GREEN and commit tests before product code.
+- [x] Add four scheduler nodes and two parent-scheduler nodes. The hermetic fixture stubs the new runner/witness by default; no existing scheduler test may open lifecycle stores.
+- [x] Return only bounded status/reason/count/case-ID fields. Schema absence before live cutover is `not_installed`; exact-schema/store failure is `unavailable`; one case failure is `partial` and does not stop the second case or ordinary provider scheduling.
+- [x] Persist deduplicated failure/recovery witnesses in `job_runs` under `security_lifecycle.automation`. Raw exception text, paths, URLs, evidence, contact, or payloads are never stored.
+- [x] Parent tick order is lifecycle automation, due transition execution, then ordinary provider dispatch. Each subsystem records its own result and cannot mask another.
+- [x] Run Task 5 RED/GREEN and commit tests before product code.
 
 ## Task 6: Project Automation Truth Through Existing Reads
 
@@ -298,21 +298,27 @@ Closed rule identities are:
 - Case detail adds bounded `automation_runs`, `automation_facts`, and each run's typed blockers; list summaries add counts/current tier/readiness only.
 - Provider-neutral tools remove adapter/query internals but retain source family, citation, rule, tier, readiness, and blocker codes.
 
-- [ ] Add the one tool node and evolve the case-detail owner.
-- [ ] Include automation history in `has_history`, workflow projection, truncation metadata, and current-state staleness. Do not expose secrets or unbounded source bodies.
-- [ ] Keep route/tool inventories unchanged and reads provider-free/write-free.
-- [ ] Run route/tool GREEN.
+- [x] Add the one tool node and evolve the case-detail owner.
+- [x] Include automation history in `has_history`, workflow projection, truncation metadata, and current-state staleness. Do not expose secrets or unbounded source bodies.
+- [x] Keep route/tool inventories unchanged and reads provider-free/write-free.
+- [x] Run route/tool GREEN.
 
 ## Task 7: Stage 3 Offline Admission
 
-- [ ] Run exact additions: `37 passed`.
-- [ ] Run focused paths: exact `234 + 37 = 271` node identity.
-- [ ] Run backend collection twice and require `4385` both times.
-- [ ] Run full backend twice with unique `--basetemp`; expected arithmetic is `4336 passed / 12 skipped + 37 = 4373 passed / 12 skipped`.
-- [ ] Run route inventory, scheduler network-denial tests, direct-provider scan, default-path scan, schema verifier, `foreign_key_check`, and `integrity_check` against scratch databases only.
-- [ ] Prove changed paths are a subset of the owned ledger, protected paths are byte-identical, and no provider/production path was opened.
-- [ ] Produce a Stage 3 packet with exact nodes, policy matrix, assessment-authority report, scheduler witness report, and scratch decision/proposal report.
-- [ ] Continue directly to the separately ledgered Stage 4 plan unless a hard stop or amendment condition occurs. Do not merge or push.
+- [x] Run exact additions: `37 passed`.
+- [x] Run focused paths: exact `234 + 37 = 271` node identity.
+- [x] Run backend collection twice and require `4385` both times.
+- [x] Run full backend twice with unique `--basetemp`; expected arithmetic is `4336 passed / 12 skipped + 37 = 4373 passed / 12 skipped`.
+- [x] Run route inventory, scheduler network-denial tests, direct-provider scan, default-path scan, schema verifier, `foreign_key_check`, and `integrity_check` against scratch databases only.
+- [x] Prove changed paths are a subset of the owned ledger, protected paths are byte-identical, and no provider/production path was opened.
+- [x] Produce a Stage 3 packet with exact nodes, policy matrix, assessment-authority report, scheduler witness report, and scratch decision/proposal report.
+- [x] Continue directly to the separately ledgered Stage 4 plan unless a hard stop or amendment condition occurs. Do not merge or push.
+
+### Stage 3 Offline Checkpoint
+
+Stage 3 product and test bytes are fixed at `f57457e48018ec212d9d92a0b4c52b3a23eaf6ea`; the docs-only governance tip before this closeout is `ecad42a014a3af276539747b7ba9e33946aac901`. Canonical admission produced exactly `37` additions, `271` focused nodes (`234 + 37`), and backend collection `4385` twice. Two isolated full runs each produced `4373 passed / 12 skipped / 0 failed`. The rejected first full run (`4372 passed / 1 failed / 12 skipped`) remains in the packet because it exposed the omitted provider-config owner and the invalid app-managed IBKR base range.
+
+The evidence packet is `/tmp/trusted-lifecycle-automation-stage3-f57457e4/`. Its `SHA256SUMS` covers `36` payloads, verifies cleanly, and has SHA-256 `d6e7e13a358bde67dc9bb6b75db7b82480f0c969cb4ce5f6d1a8877c1c953176`. Scratch schema, foreign-key, integrity, policy, proposal, scheduler-witness, route, ownership, protected-byte, and network-denial checks all passed. The network trace contains no `connect`, `listen`, or `accept`; pytest itself created one loopback ephemeral bind and two local UNIX socket pairs. No provider call, production database operation, app restart, merge, or push occurred.
 
 ## Non-Goals And Hard Stops
 
