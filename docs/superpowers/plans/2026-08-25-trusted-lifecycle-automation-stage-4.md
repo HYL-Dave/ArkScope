@@ -147,13 +147,13 @@ def translate_evidence(
 
 **Interfaces:** Produces `translate_text` for a one-field fixed translation, `EvidenceTranslationResult`, `translate_evidence`, and `POST /security-lifecycle/evidence/{evidence_id}/translations`.
 
-- [ ] Add the eight Task 3 backend nodes. Initial RED is missing translation interfaces/routes only.
-- [ ] Reuse the existing `card_translation` model route and timeout. Translate one bounded excerpt field, preserve source text byte-for-byte, and return explicit provider/model/harness provenance.
-- [ ] Validate locale (`en | zh-Hant`) and evidence identity before permission/provider work. Return a current hash-bound cache hit without permission or translator invocation.
-- [ ] On a miss, read and close any write transaction before translator invocation, then re-read the evidence hash before insertion. Changed/deleted evidence rejects the result; provider failure stores nothing and does not change workflow state.
-- [ ] Mask provider exception text behind closed `translation_timeout | translation_failed | translation_output_invalid` API codes. Never store prompts, credentials, raw frames, or untranslated source bodies beyond the existing excerpt.
-- [ ] Project translations adjacent to their source evidence in the UI read DTO. Provider-neutral agent tools omit translated text so it cannot be mistaken for authoritative evidence.
-- [ ] Run exact Task 3 RED/GREEN and card-translation regression tests with all model calls faked. Commit tests before product code.
+- [x] Add the eight Task 3 backend nodes. Initial RED is missing translation interfaces/routes only.
+- [x] Reuse the existing `card_translation` model route and timeout. Translate one bounded excerpt field, preserve source text byte-for-byte, and return explicit provider/model/harness provenance.
+- [x] Validate locale (`en | zh-Hant`) and evidence identity before permission/provider work. Return a current hash-bound cache hit without permission or translator invocation.
+- [x] On a miss, read and close any write transaction before translator invocation, then re-read the evidence hash before insertion. Changed/deleted evidence rejects the result; provider failure stores nothing and does not change workflow state.
+- [x] Mask provider exception text behind closed `translation_timeout | translation_failed | translation_output_invalid` API codes. Never store prompts, credentials, raw frames, or untranslated source bodies beyond the existing excerpt.
+- [x] Project translations adjacent to their source evidence in the UI read DTO. Provider-neutral agent tools omit translated text so it cannot be mistaken for authoritative evidence.
+- [x] Run exact Task 3 RED/GREEN and card-translation regression tests with all model calls faked. Commit tests before product code.
 
 ## Task 4: Render Complete Decision Truth And Reversible Visibility
 
