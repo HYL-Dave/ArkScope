@@ -65,7 +65,7 @@ def test_scheduler_runs_bounded_worker_batch_and_returns_sanitized_summary(
     assert "private" not in json.dumps(result)
 
 
-def test_scheduler_reports_schema_absent_as_not_installed(monkeypatch):
+def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch):
     from src.service import security_lifecycle_automation_scheduler as scheduler
 
     class Worker:
@@ -75,10 +75,19 @@ def test_scheduler_reports_schema_absent_as_not_installed(monkeypatch):
 
     monkeypatch.setattr(scheduler, "_worker", Worker)
 
-    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _summary(
+    result = scheduler.run_security_lifecycle_automation(now=_NOW)
+
+    assert result == _summary(
         status="not_installed",
         reason="automation_schema_absent",
     )
+    profile_path = tmp_path / "missing" / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    assert scheduler.record_security_lifecycle_automation_result(
+        result,
+        now=_NOW,
+    )
+    assert not profile_path.exists()
 
 
 def test_scheduler_witness_deduplicates_failure_and_records_recovery(
