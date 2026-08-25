@@ -1,0 +1,8 @@
+node_id	task	reason
+tests/test_security_lifecycle_fact_kernel.py::test_conflicting_current_facts_are_typed_and_never_majority_resolved	T1	Conflict becomes a typed successful review suggestion rather than a blocked/no-decision run.
+tests/test_security_lifecycle_investigation.py::test_accepting_assessment_requires_conclusion_citation_and_human_author	T3	Acceptance authority becomes an explicit required argument while preserving attended behavior.
+tests/test_security_lifecycle_investigation.py::test_draft_accept_and_supersede_preserve_version_history	T3	The shared attended helper passes explicit human authority; revision behavior remains unchanged.
+tests/test_security_lifecycle_routes.py::test_accept_assessment_route_keeps_action_execution_out_of_scope	T3	The route passes explicit human authority and still creates recommendations only.
+tests/test_security_lifecycle_routes.py::test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal	T6	Case detail gains bounded automation run/fact sections without collapsing existing sections.
+tests/test_security_lifecycle_ibkr_evidence.py::test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separately	T4	Contract absence gains an honest typed absence outcome while remaining distinct from gateway failure.
+tests/test_data_scheduler.py::test_tick_runs_due_ticker_transitions_before_provider_dispatch	T5	Lifecycle decision automation is inserted before due transition execution and ordinary providers.
