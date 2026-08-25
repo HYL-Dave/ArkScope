@@ -102,12 +102,12 @@ def translate_evidence(
 
 **Interfaces:** Produces `build_automation_transition_preflight`, `approve_automation`, `TickerIdentityService.approve_automation_case`, and the worker's required `transition_approver` seam.
 
-- [ ] Add the six Task 1 nodes named in the additions ledger. RED may show missing interfaces or the current `action_executor_not_available`; it may not open a provider or production path.
-- [ ] Build a prospective preview from the same profile-effect functions as the durable preview. Synthetic assessment/proposal identities are permitted only inside this read-only preflight and are never stored.
-- [ ] Keep attended `approve(...)` behavior unchanged. `approve_automation(...)` derives and verifies author, acceptance authority, policy, rule, and provenance from current persisted assessment/run rows; caller claims cannot replace them.
-- [ ] Wire the worker so only `verified_automatic + transition_eligible + transition_requested` invokes the approver after accepted assessment and proposal persistence. Non-mutating verified decisions and suggestions never approve a transition.
-- [ ] Replace the scheduler's unavailable preview stub with the real provider-free preflight and approver. Preview drift or authority mismatch is typed and cannot apply profile changes.
-- [ ] Run the exact Task 1 RED/GREEN set, then its full owned backend files. Commit tests before product code.
+- [x] Add the six Task 1 nodes named in the additions ledger. RED may show missing interfaces or the current `action_executor_not_available`; it may not open a provider or production path.
+- [x] Build a prospective preview from the same profile-effect functions as the durable preview. Synthetic assessment/proposal identities are permitted only inside this read-only preflight and are never stored.
+- [x] Keep attended `approve(...)` behavior unchanged. `approve_automation(...)` derives and verifies author, acceptance authority, policy, rule, and provenance from current persisted assessment/run rows; caller claims cannot replace them.
+- [x] Wire the worker so only `verified_automatic + transition_eligible + transition_requested` invokes the approver after accepted assessment and proposal persistence. Non-mutating verified decisions and suggestions never approve a transition.
+- [x] Replace the scheduler's unavailable preview stub with the real provider-free preflight and approver. Preview drift or authority mismatch is typed and cannot apply profile changes.
+- [x] Run the exact Task 1 RED/GREEN set, then its full owned backend files. Commit tests before product code.
 
 ## Task 2: Append And Expose Reversible Activity
 
