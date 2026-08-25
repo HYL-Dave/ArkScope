@@ -57,6 +57,26 @@ caller arguments change. The focused baseline therefore becomes `190` and the
 final focused target becomes `227`; backend collection and the `37` additions
 remain unchanged. Product work stopped before touching any unlisted path.
 
+### Task 4 contract-missing RED correction
+
+The first Task 4 tests-only RED incorrectly required an IBKR
+`document_reference` row for a typed missing-contract lookup. That shape
+contradicts the reviewed Stage 2 schema authority: `ibkr_contract` evidence is
+closed to `source_family='market_infrastructure'` and
+`kind='market_infrastructure_snapshot'`, while this stage explicitly forbids a
+schema change. Product work had not started.
+
+The corrected contract stores a snapshot of the **lookup outcome**, not a fake
+contract: `kind='market_infrastructure_snapshot'`,
+`source_locator.contract_status='missing'`, an excerpt containing the same
+typed status and queried ticker, and no `source_locator.snapshot` or invented
+contract fields. `contract_snapshot_facts(...)` returns no facts for this
+shape. The `ibkr_contract_missing` blocker remains distinct; only the
+post-effective terminal-delisting rule may consume the persisted absence as
+market confirmation. Node identity, additions, focused/collection arithmetic,
+schema bytes, and owned product paths remain unchanged. The corrected 13-node
+RED must be replayed before product code.
+
 ## Closed Decision Contract
 
 The pure policy returns `AutomationDecision` with these fields:
