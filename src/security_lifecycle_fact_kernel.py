@@ -639,10 +639,23 @@ def _provenance(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _mapped_rows(cursor: sqlite3.Cursor) -> tuple[dict[str, Any], ...]:
+    names = tuple(str(item[0]) for item in cursor.description or ())
+    return tuple(
+        {name: row[index] for index, name in enumerate(names)}
+        for row in cursor.fetchall()
+    )
+
+
 def _persisted_evidence_rows(
     conn: sqlite3.Connection,
     run_id: str,
 ) -> tuple[_EvidenceRow, ...]:
+    cursor = conn.execute(
+        "SELECT * FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=? ORDER BY evidence_id",
+        (run_id,),
+    )
     return tuple(
         _EvidenceRow(
             local_id=str(row["evidence_id"]),
@@ -650,11 +663,15 @@ def _persisted_evidence_rows(
             adapter=str(row["adapter"]),
             kind=str(row["kind"]),
             source_url=(
-                None if row["source_url"] is None else str(row["source_url"])
+                None
+                if row["source_url"] is None
+                else str(row["source_url"])
             ),
             title=None if row["title"] is None else str(row["title"]),
             publisher=(
-                None if row["publisher"] is None else str(row["publisher"])
+                None
+                if row["publisher"] is None
+                else str(row["publisher"])
             ),
             domain=None if row["domain"] is None else str(row["domain"]),
             source_published_at=(
@@ -673,11 +690,7 @@ def _persisted_evidence_rows(
             source_locator_json=str(row["source_locator_json"]),
             evidence_dedupe_key=str(row["evidence_dedupe_key"]),
         )
-        for row in conn.execute(
-            "SELECT * FROM security_lifecycle_evidence "
-            "WHERE automation_run_id=? ORDER BY evidence_id",
-            (run_id,),
-        )
+        for row in _mapped_rows(cursor)
     )
 
 
@@ -685,6 +698,11 @@ def _persisted_fact_rows(
     conn: sqlite3.Connection,
     run_id: str,
 ) -> tuple[_FactRow, ...]:
+    cursor = conn.execute(
+        "SELECT * FROM security_lifecycle_automation_facts "
+        "WHERE automation_run_id=? ORDER BY fact_id",
+        (run_id,),
+    )
     return tuple(
         _FactRow(
             local_evidence_id=str(row["evidence_id"]),
@@ -696,11 +714,7 @@ def _persisted_fact_rows(
             extractor_rule_id=str(row["extractor_rule_id"]),
             extractor_rule_version=str(row["extractor_rule_version"]),
         )
-        for row in conn.execute(
-            "SELECT * FROM security_lifecycle_automation_facts "
-            "WHERE automation_run_id=? ORDER BY fact_id",
-            (run_id,),
-        )
+        for row in _mapped_rows(cursor)
     )
 
 
