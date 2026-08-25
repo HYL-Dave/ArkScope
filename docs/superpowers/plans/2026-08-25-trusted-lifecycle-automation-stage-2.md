@@ -18,6 +18,7 @@
 - This plan adds exactly 54 backend nodes and removes none. Target collection is `4348`; target focused collection is `333`.
 - Stage 1 Tavily retirement is complete. No executable Tavily route/tool/adapter may return.
 - The user authorized continuous offline progress through Stage 2, with a schema-authority checkpoint before Stage 3.
+- Stage 2 product/test tip is exactly `ab6654c0c9cd7586b883a10ea4f40255fa5e3249`. Offline admission is complete: additions `54 passed`, focused `333 passed` with exact `279 + 54` node identity, collection `4348` twice, and two isolated full runs each `4336 passed / 12 skipped / 0 failed`. The checkpoint packet is `/tmp/trusted-lifecycle-automation-stage2-ab6654c0/`; `SHA256SUMS` is bound by `7c174f01c2aad14436b19913252792693be9ba147ed25f89d43c6534956c3b57`. Stage 3 has not started.
 - This plan does **not** authorize provider/network calls, production database reads or writes, live preflight/backup/migration/restore, app restart, merge, push, or rollback.
 - Stop and amend before continuing on any product-semantic change, unexpected schema/data shape, unlisted changed path, unexpected test-node drift, or provider/live-path requirement.
 - A post-T3 broad offline replay exposed one T1 ledger omission: `test_tools_return_observation_and_profile_facts_without_provider_fields` was already in the focused path set but its fixture still created a retired `tavily` run. The node and path are now explicitly owned so that only the fixture adapter/query/usage shape may evolve to the surviving attended `manual` run; its provider-neutral projection, truncation, read-only, and secret-exclusion assertions remain unchanged. This amendment adds no node and changes no product authority or collection target.
@@ -179,14 +180,14 @@ Stage 2 stores the complete destination vocabulary but does not emit an automati
 
 ## Task 8: Offline Admission And Stage 3 Checkpoint
 
-- [ ] Run the exact additions ledger: `54 passed`.
-- [ ] Run the focused ledger: `333 passed` with no skips unless the 279-node baseline already contained them; compare exact node set.
-- [ ] Run full backend collection twice and require `4348` both times.
-- [ ] Run full backend execution twice using unique `--basetemp` roots and no overlapping pytest sessions. Expected arithmetic is baseline `4282 passed / 12 skipped + 54 = 4336 passed / 12 skipped`.
-- [ ] Run static direct-SEC scan, default-path signature scan, network-denial tests, `PRAGMA integrity_check`, `foreign_key_check`, and scratch V1/V2 verifier cross-rejection.
-- [ ] Prove changed paths are a subset of the owned ledger, every owned changed path differs from its pin, protected paths are unchanged, and no production DB/config secret/provider was opened.
-- [ ] Produce a Stage 2 evidence packet with node lists, exact schema SQL hashes, V1 mapping report, governor budget report, and scratch migration/restore report.
-- [ ] **Stop before Stage 3.** Present the schema authority, legacy row mapping, dormant Tavily/web handling, SEC lock ownership, and numeric request budgets for the agreed checkpoint. No Stage 3 code starts until that checkpoint is GREEN.
+- [x] Run the exact additions ledger: `54 passed`.
+- [x] Run the focused ledger: `333 passed` with no skips unless the 279-node baseline already contained them; compare exact node set.
+- [x] Run full backend collection twice and require `4348` both times.
+- [x] Run full backend execution twice using unique `--basetemp` roots and no overlapping pytest sessions. Expected arithmetic is baseline `4282 passed / 12 skipped + 54 = 4336 passed / 12 skipped`.
+- [x] Run static direct-SEC scan, default-path signature scan, network-denial tests, `PRAGMA integrity_check`, `foreign_key_check`, and scratch V1/V2 verifier cross-rejection.
+- [x] Prove changed paths are a subset of the owned ledger, every owned changed path differs from its pin, protected paths are unchanged, and no production DB/config secret/provider was opened.
+- [x] Produce a Stage 2 evidence packet with node lists, exact schema SQL hashes, V1 mapping report, governor budget report, and scratch migration/restore report.
+- [x] **Stop before Stage 3.** Present the schema authority, legacy row mapping, dormant Tavily/web handling, SEC lock ownership, and numeric request budgets for the agreed checkpoint. No Stage 3 code starts until that checkpoint is GREEN.
 
 ## Non-Goals And Hard Stops
 
