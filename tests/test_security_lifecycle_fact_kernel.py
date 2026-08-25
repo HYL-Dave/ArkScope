@@ -242,12 +242,144 @@ def test_conflicting_current_facts_are_typed_and_never_majority_resolved():
         facts=(first_fact, second_fact),
     )
 
-    assert result.status == "blocked"
+    assert result.status == "succeeded"
+    assert result.decision_tier == "review_suggested"
+    assert result.action_readiness == "action_blocked"
     assert result.conflicts == {"successor_ticker": ('"HAPN"', '"OTHER"')}
     row = store.get_automation_run(claim.run_id)
-    assert row["decision_tier"] is None
-    assert row["action_readiness"] is None
+    assert row["decision_tier"] == "review_suggested"
+    assert row["action_readiness"] == "action_blocked"
     assert [item["blocker_code"] for item in row["blockers"]] == ["source_conflict"]
+
+
+def test_persisted_decision_provenance_recomputes_from_database_rows():
+    from src.security_lifecycle_fact_kernel import (
+        persisted_decision_provenance_sha256,
+    )
+
+    conn, _store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+    fact = _fact(evidence)
+
+    result = _succeed(kernel, claim, evidence=(evidence,), facts=(fact,))
+
+    assert persisted_decision_provenance_sha256(conn, claim.run_id) == (
+        result.decision_provenance_sha256
+    )
+    conn.execute(
+        "UPDATE security_lifecycle_automation_facts "
+        "SET extractor_rule_version='2' WHERE automation_run_id=?",
+        (claim.run_id,),
+    )
+    conn.commit()
+    assert persisted_decision_provenance_sha256(
+        conn, claim.run_id
+    ) != result.decision_provenance_sha256
+
+
+def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
+    from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
+
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    regulator = _evidence()
+    regulator_fact = _fact(regulator)
+    first = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(regulator,),
+        facts=(regulator_fact,),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="waiting_effective_date",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+    persisted_regulator_id = conn.execute(
+        "SELECT evidence_id FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=?",
+        (claim.run_id,),
+    ).fetchone()[0]
+    assessment_id = store.create_assessment(
+        case_id=case_id,
+        relevance="direct_tracked_security",
+        confidence="high",
+        author="human",
+        conclusion="The symbol will change.",
+        impact_summary="Wait for the effective date.",
+        outcomes=("symbol_changed",),
+        citations=(
+            {
+                "reference_kind": "observation",
+                "cited_content_sha256": _FINGERPRINT,
+            },
+            {"reference_kind": "evidence", "evidence_id": persisted_regulator_id},
+        ),
+        observation_fingerprint_sha256=_FINGERPRINT,
+        successor_ticker="HAPN",
+        effective_date="2026-08-26",
+        at=_LATER,
+    )
+
+    assert kernel.reserve_readiness_recheck(
+        run_id=claim.run_id,
+        due_at="2026-08-26T00:00:00Z",
+        at="2026-08-25T23:59:59Z",
+    ).should_execute is False
+    recheck = kernel.reserve_readiness_recheck(
+        run_id=claim.run_id,
+        due_at="2026-08-26T00:00:00Z",
+        at="2026-08-26T00:00:00Z",
+    )
+    assert recheck.should_execute is True
+    assert store.get_assessment(assessment_id)["citations"][1]["evidence_id"] == (
+        persisted_regulator_id
+    )
+
+    excerpt = '{"primaryExchange":"NASDAQ","secType":"STK","symbol":"HAPN"}'
+    market = AutomationEvidence(
+        evidence_id="market-a",
+        source_family="market_infrastructure",
+        adapter="ibkr_contract",
+        kind="market_infrastructure_snapshot",
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        retrieved_at="2026-08-26T00:00:00Z",
+        source_locator={"snapshot_kind": "contract"},
+        evidence_dedupe_key="market:a",
+    )
+    start = excerpt.encode().index(b"HAPN")
+    market_fact = AutomationFact(
+        evidence_id=market.evidence_id,
+        fact_type="successor_ticker",
+        normalized_value="HAPN",
+        source_span_start=start,
+        source_span_end=start + len(b"HAPN"),
+        cited_text_sha256=hashlib.sha256(b"HAPN").hexdigest(),
+        extractor_rule_id="ibkr.contract_symbol",
+        extractor_rule_version="1",
+    )
+    second = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(market,),
+        facts=(market_fact,),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="transition_eligible",
+        retry_at=None,
+        diagnostics={"ibkr_requests": 1},
+        at="2026-08-26T00:01:00Z",
+    )
+
+    assert second.evidence_count == 2
+    assert second.fact_count == 2
+    assert second.decision_provenance_sha256 != first.decision_provenance_sha256
+    assert conn.execute(
+        "SELECT count(*) FROM security_lifecycle_assessment_evidence "
+        "WHERE assessment_id=?",
+        (assessment_id,),
+    ).fetchone()[0] == 2
 
 
 def test_source_family_set_is_derived_from_evidence_not_article_count():
