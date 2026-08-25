@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - Product base is exactly `5d88e1b301e62a61211e3343165ef37be90b0250`; Stage 2 product authority remains `ab6654c0c9cd7586b883a10ea4f40255fa5e3249`.
-- Backend baseline collection is exactly `4348`; focused pre-addition collection is exactly `156` nodes.
-- This stage adds exactly `37` backend nodes and removes none. Target collection is `4385`; target focused collection is `193`.
+- Backend baseline collection is exactly `4348`; the amended focused pre-addition collection is exactly `190` nodes (`156` originally admitted plus `34` existing direct-caller nodes).
+- This stage adds exactly `37` backend nodes and removes none. Target collection is `4385`; target focused collection is `227`.
 - Automation policy version is `trusted-lifecycle-automation-v1`; deterministic rule IDs and version `1` are closed in this plan.
 - One worker tick admits at most two cases. A current non-stale accepted human/legacy/automation assessment is not overwritten.
 - `verified_automatic` requires deterministic regulator facts and every rule-specific independent condition. `review_suggested` is a complete draft, never an accepted conclusion or profile-mutation authority.
@@ -35,6 +35,27 @@
 - Protected paths: `docs/superpowers/plans/2026-08-25-trusted-lifecycle-automation-stage-3-protected.paths`
 
 Every changed non-governance path must be listed before product edits. New test node IDs and existing node IDs are immutable. RED is admitted only when its failing set is exactly additions plus named evolved owners and each failure is caused by the missing/evolved behavior.
+
+### Task 3 direct-caller amendment
+
+A pre-edit caller census after Task 2 found three existing test helpers/direct
+callers outside the original owned ledger. They invoke
+`SecurityLifecycleInvestigationStore.accept_assessment(...)` directly and must
+pass an explicit authority once its new required argument lands:
+
+- `tests/test_security_lifecycle.py` preserves the legacy migration caller and
+  passes `legacy_migration`;
+- `tests/test_ticker_identity_routes.py` preserves its attended human fixture
+  and passes `human`; and
+- `tests/test_ticker_identity_scheduler.py` preserves its attended human
+  fixture and passes `human`.
+
+All three files are byte-identical to product base at the pins now recorded in
+the owned ledger. Their exact current collection is `8 + 6 + 20 = 34` nodes.
+They add no node, route, state, schema, or behavior; only the shared/direct
+caller arguments change. The focused baseline therefore becomes `190` and the
+final focused target becomes `227`; backend collection and the `37` additions
+remain unchanged. Product work stopped before touching any unlisted path.
 
 ## Closed Decision Contract
 
@@ -86,7 +107,7 @@ Closed rule identities are:
 
 - [ ] Verify clean branch `trusted-lifecycle-automation-stages3-5` at `5d88e1b3`, with `ab6654c0` as its parent product checkpoint and no merge commit.
 - [ ] Verify every modify pin in the owned ledger and every add path is absent.
-- [ ] Collect backend `4348` twice. Collect the focused path ledger as exactly `156` existing nodes.
+- [ ] Collect backend `4348` twice. The original focused ledger collected `156` existing nodes; the Task 3 direct-caller amendment independently collected `34`, for an amended baseline of exactly `190`.
 - [ ] Confirm every protected path is byte-identical and no production path/provider is opened.
 
 ## Task 1: Make Run Decisions Reproducible And Conflict-Aware
@@ -133,13 +154,17 @@ Closed rule identities are:
 - Modify: `src/api/routes/security_lifecycle.py`
 - Modify: `tests/test_security_lifecycle_investigation.py`
 - Modify: `tests/test_security_lifecycle_routes.py`
+- Modify: `tests/test_security_lifecycle.py` (legacy caller argument only)
+- Modify: `tests/test_ticker_identity_routes.py` (human fixture argument only)
+- Modify: `tests/test_ticker_identity_scheduler.py` (human fixture argument only)
 
 **Interfaces:**
 - Evolves: `accept_assessment(..., acceptance_authority: str)` has no default.
 - Produces: `derive_action_proposal_specs(*, case, assessment, sources) -> tuple[dict, ...]` used by both preview and persistence.
 - Produces: `create_automation_assessment(...)` orchestration helper that binds current run provenance and persisted citations.
 
-- [ ] Add four investigation nodes and one route node; update only the module helper for existing human tests before RED.
+- [ ] Add four investigation nodes and one route node. Initial RED is exactly those five additions against unchanged existing callers.
+- [ ] After the five-node RED is admitted, update every existing direct caller in the five owned test/route locations with its literal authority. The three collateral test files keep every node body and assertion unchanged.
 - [ ] Human/legacy/automation acceptance authorities are explicit and coherent. `automation_policy` requires an automation deterministic-rule draft, current matching run, `verified_automatic`, matching observation/rule/provenance, and no non-review blocker.
 - [ ] Human acceptance of an unchanged automation draft keeps the automation author/run/rule/provenance. The existing edit route creates a new human draft and never updates the automation row.
 - [ ] Project an automation assessment stale when observation/evidence, policy version, rule version, run status, persisted provenance, or conflict state changes.
@@ -210,7 +235,7 @@ Closed rule identities are:
 ## Task 7: Stage 3 Offline Admission
 
 - [ ] Run exact additions: `37 passed`.
-- [ ] Run focused paths: exact `156 + 37 = 193` node identity.
+- [ ] Run focused paths: exact `190 + 37 = 227` node identity.
 - [ ] Run backend collection twice and require `4385` both times.
 - [ ] Run full backend twice with unique `--basetemp`; expected arithmetic is `4336 passed / 12 skipped + 37 = 4373 passed / 12 skipped`.
 - [ ] Run route inventory, scheduler network-denial tests, direct-provider scan, default-path scan, schema verifier, `foreign_key_check`, and `integrity_check` against scratch databases only.

@@ -8,4 +8,7 @@ tests/test_security_lifecycle_ibkr_evidence.py
 tests/test_security_lifecycle_automation_worker.py
 tests/test_security_lifecycle_automation_scheduler.py
 tests/test_data_scheduler.py
+tests/test_security_lifecycle.py
 tests/test_security_lifecycle_tools.py
+tests/test_ticker_identity_routes.py
+tests/test_ticker_identity_scheduler.py
