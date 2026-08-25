@@ -546,27 +546,47 @@ def _provenance(
     evidence: tuple[_EvidenceRow, ...],
     facts: tuple[_FactRow, ...],
 ) -> str:
+    evidence_refs: dict[str, str] = {}
+    evidence_payload: list[dict[str, object]] = []
+    for row in evidence:
+        material = {
+            "adapter": row.adapter,
+            "content_sha256": row.content_sha256,
+            "kind": row.kind,
+            "source_document_sha256": row.source_document_sha256,
+            "source_family": row.source_family,
+            "source_locator_json": row.source_locator_json,
+            "source_url": row.source_url,
+        }
+        reference = hashlib.sha256(
+            json.dumps(
+                material,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        evidence_refs[row.local_id] = reference
+        evidence_payload.append({"evidence_ref": reference, **material})
+
     payload = {
         "case_id": case_id,
         "mode": mode,
         "observation_fingerprint_sha256": observation_fingerprint_sha256,
         "policy_version": policy_version,
-        "evidence": [
-            {
-                "adapter": row.adapter,
-                "content_sha256": row.content_sha256,
-                "evidence_id": row.local_id,
-                "kind": row.kind,
-                "source_document_sha256": row.source_document_sha256,
-                "source_family": row.source_family,
-                "source_locator_json": row.source_locator_json,
-            }
-            for row in evidence
-        ],
+        "evidence": sorted(
+            evidence_payload,
+            key=lambda item: json.dumps(
+                item,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ),
+        ),
         "facts": [
             {
                 "cited_text_sha256": row.cited_text_sha256,
-                "evidence_id": row.local_evidence_id,
+                "evidence_ref": evidence_refs[row.local_evidence_id],
                 "extractor_rule_id": row.extractor_rule_id,
                 "extractor_rule_version": row.extractor_rule_version,
                 "fact_type": row.fact_type,
@@ -574,7 +594,18 @@ def _provenance(
                 "source_span_end": row.source_span_end,
                 "source_span_start": row.source_span_start,
             }
-            for row in facts
+            for row in sorted(
+                facts,
+                key=lambda item: (
+                    item.fact_type,
+                    item.normalized_value_json,
+                    evidence_refs[item.local_evidence_id],
+                    item.source_span_start,
+                    item.source_span_end,
+                    item.extractor_rule_id,
+                    item.extractor_rule_version,
+                ),
+            )
         ],
     }
     encoded = json.dumps(
@@ -584,6 +615,92 @@ def _provenance(
         sort_keys=True,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _persisted_evidence_rows(
+    conn: sqlite3.Connection,
+    run_id: str,
+) -> tuple[_EvidenceRow, ...]:
+    return tuple(
+        _EvidenceRow(
+            local_id=str(row["evidence_id"]),
+            source_family=str(row["source_family"]),
+            adapter=str(row["adapter"]),
+            kind=str(row["kind"]),
+            source_url=(
+                None if row["source_url"] is None else str(row["source_url"])
+            ),
+            title=None if row["title"] is None else str(row["title"]),
+            publisher=(
+                None if row["publisher"] is None else str(row["publisher"])
+            ),
+            domain=None if row["domain"] is None else str(row["domain"]),
+            source_published_at=(
+                None
+                if row["source_published_at"] is None
+                else str(row["source_published_at"])
+            ),
+            retrieved_at=str(row["retrieved_at"]),
+            excerpt=str(row["excerpt"]),
+            content_sha256=str(row["content_sha256"]),
+            source_document_sha256=(
+                None
+                if row["source_document_sha256"] is None
+                else str(row["source_document_sha256"])
+            ),
+            source_locator_json=str(row["source_locator_json"]),
+            evidence_dedupe_key=str(row["evidence_dedupe_key"]),
+        )
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? ORDER BY evidence_id",
+            (run_id,),
+        )
+    )
+
+
+def _persisted_fact_rows(
+    conn: sqlite3.Connection,
+    run_id: str,
+) -> tuple[_FactRow, ...]:
+    return tuple(
+        _FactRow(
+            local_evidence_id=str(row["evidence_id"]),
+            fact_type=str(row["fact_type"]),
+            normalized_value_json=str(row["normalized_value_json"]),
+            source_span_start=int(row["source_span_start"]),
+            source_span_end=int(row["source_span_end"]),
+            cited_text_sha256=str(row["cited_text_sha256"]),
+            extractor_rule_id=str(row["extractor_rule_id"]),
+            extractor_rule_version=str(row["extractor_rule_version"]),
+        )
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_automation_facts "
+            "WHERE automation_run_id=? ORDER BY fact_id",
+            (run_id,),
+        )
+    )
+
+
+def persisted_decision_provenance_sha256(
+    conn: sqlite3.Connection,
+    run_id: str,
+) -> str:
+    row = conn.execute(
+        "SELECT case_id,observation_fingerprint_sha256,policy_version,mode "
+        "FROM security_lifecycle_automation_runs WHERE run_id=?",
+        (run_id,),
+    ).fetchone()
+    if row is None:
+        raise KeyError("automation_run_not_found")
+    return _provenance(
+        case_id=str(row[0]),
+        observation_fingerprint_sha256=str(row[1]),
+        policy_version=str(row[2]),
+        mode=str(row[3]),
+        evidence=_persisted_evidence_rows(conn, run_id),
+        facts=_persisted_fact_rows(conn, run_id),
+    )
 
 
 def decision_provenance_sha256(
@@ -749,6 +866,48 @@ class SecurityLifecycleFactKernel:
                 False,
             )
 
+    def reserve_readiness_recheck(
+        self,
+        *,
+        run_id: str,
+        due_at: str,
+        at: str,
+    ) -> AutomationRunClaim:
+        self.store.assert_automation_write_available()
+        due_timestamp = _timestamp("due_at", due_at)
+        timestamp = _timestamp("at", at)
+        with _immediate_transaction(self.conn):
+            row = self.conn.execute(
+                "SELECT run_key,status,action_readiness FROM "
+                "security_lifecycle_automation_runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError("automation_run_not_found")
+            run_key = str(row["run_key"])
+            status = str(row["status"])
+            readiness = row["action_readiness"]
+            if (
+                status != "succeeded"
+                or readiness
+                not in {"waiting_effective_date", "waiting_market_confirmation"}
+                or _instant(timestamp) < _instant(due_timestamp)
+            ):
+                return AutomationRunClaim(run_id, run_key, status, False)
+            self.conn.execute(
+                "DELETE FROM security_lifecycle_automation_run_blockers "
+                "WHERE automation_run_id=?",
+                (run_id,),
+            )
+            self.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "status='running',decision_tier=NULL,action_readiness=NULL,"
+                "retry_at=NULL,failure_code=NULL,started_at=?,finished_at=NULL,"
+                "updated_at=? WHERE run_id=?",
+                (timestamp, timestamp, run_id),
+            )
+            return AutomationRunClaim(run_id, run_key, "running", True)
+
     def complete_run(
         self,
         *,
@@ -769,8 +928,13 @@ class SecurityLifecycleFactKernel:
         normalized_evidence = _normalize_evidence(evidence)
         normalized_facts = _normalize_facts(facts, normalized_evidence)
         normalized_blockers = list(_normalize_blockers(blockers))
-        conflicts = _conflicts(normalized_facts)
-        if conflicts and not any(row[0] == "source_conflict" for row in normalized_blockers):
+        existing_evidence = _persisted_evidence_rows(self.conn, run_id)
+        existing_facts = _persisted_fact_rows(self.conn, run_id)
+        conflicts = _conflicts((*existing_facts, *normalized_facts))
+        normalized_blockers = [
+            row for row in normalized_blockers if row[0] != "source_conflict"
+        ]
+        if conflicts:
             normalized_blockers.append(
                 (
                     "source_conflict",
@@ -795,34 +959,33 @@ class SecurityLifecycleFactKernel:
             None if retry_at is None else _timestamp("retry_at", retry_at)
         )
 
-        if normalized_blockers:
+        terminal_blockers = [
+            row for row in normalized_blockers if row[0] != "source_conflict"
+        ]
+        if terminal_blockers:
             status = "blocked"
             terminal_tier = None
             terminal_readiness = None
-            all_retryable = all(row[1] for row in normalized_blockers)
+            all_retryable = all(row[1] for row in terminal_blockers)
             if all_retryable != (retry_timestamp is not None):
                 raise ValueError("retry_at")
             if retry_timestamp is not None and _instant(retry_timestamp) <= _instant(timestamp):
                 raise ValueError("retry_at")
         else:
-            if not normalized_evidence or not normalized_facts:
+            if not (normalized_evidence or existing_evidence) or not (
+                normalized_facts or existing_facts
+            ):
                 raise ValueError("successful_run_requires_evidence_and_facts")
             if decision_tier is None or action_readiness is None or retry_timestamp is not None:
                 raise ValueError("successful_run_terminal_shape")
             status = "succeeded"
-            terminal_tier = decision_tier
-            terminal_readiness = action_readiness
+            if conflicts:
+                terminal_tier = "review_suggested"
+                terminal_readiness = "action_blocked"
+            else:
+                terminal_tier = decision_tier
+                terminal_readiness = action_readiness
 
-        provenance = _provenance(
-            case_id=str(run["case_id"]),
-            observation_fingerprint_sha256=str(
-                run["observation_fingerprint_sha256"]
-            ),
-            policy_version=str(run["policy_version"]),
-            mode=str(run["mode"]),
-            evidence=normalized_evidence,
-            facts=normalized_facts,
-        )
         persisted_ids: dict[str, str] = {}
 
         with _immediate_transaction(self.conn):
@@ -841,8 +1004,9 @@ class SecurityLifecycleFactKernel:
                 dedupe_digest = hashlib.sha256(
                     row.evidence_dedupe_key.encode("utf-8")
                 ).hexdigest()
+                persisted_dedupe_key = f"automation:{run_id}:{dedupe_digest}"
                 self.conn.execute(
-                    "INSERT INTO security_lifecycle_evidence "
+                    "INSERT OR IGNORE INTO security_lifecycle_evidence "
                     "(evidence_id,case_id,run_id,automation_run_id,source_family,kind,"
                     "source_url,title,publisher,domain,source_published_at,retrieved_at,"
                     "adapter,excerpt,content_sha256,source_document_sha256,"
@@ -866,12 +1030,32 @@ class SecurityLifecycleFactKernel:
                         row.content_sha256,
                         row.source_document_sha256,
                         row.source_locator_json,
-                        f"automation:{run_id}:{dedupe_digest}",
+                        persisted_dedupe_key,
                         None,
                         None,
                         timestamp,
                     ),
                 )
+                persisted = self.conn.execute(
+                    "SELECT case_id,automation_run_id,source_family,adapter,kind,"
+                    "content_sha256,source_document_sha256,source_locator_json,"
+                    "evidence_dedupe_key FROM security_lifecycle_evidence "
+                    "WHERE evidence_id=?",
+                    (persisted_id,),
+                ).fetchone()
+                expected = (
+                    str(run["case_id"]),
+                    run_id,
+                    row.source_family,
+                    row.adapter,
+                    row.kind,
+                    row.content_sha256,
+                    row.source_document_sha256,
+                    row.source_locator_json,
+                    persisted_dedupe_key,
+                )
+                if persisted is None or tuple(persisted) != expected:
+                    raise RuntimeError("automation_evidence_identity_conflict")
             for row in normalized_facts:
                 material = json.dumps(
                     {
@@ -888,14 +1072,16 @@ class SecurityLifecycleFactKernel:
                 fact_digest = hashlib.sha256(
                     f"{run_id}\0{material}".encode()
                 ).hexdigest()
+                fact_id = "slf_" + fact_digest[:32]
+                fact_dedupe_key = f"automation:{run_id}:fact:{fact_digest}"
                 self.conn.execute(
-                    "INSERT INTO security_lifecycle_automation_facts "
+                    "INSERT OR IGNORE INTO security_lifecycle_automation_facts "
                     "(fact_id,automation_run_id,case_id,evidence_id,fact_type,"
                     "normalized_value_json,source_span_start,source_span_end,"
                     "cited_text_sha256,extractor_rule_id,extractor_rule_version,"
                     "fact_dedupe_key,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
-                        "slf_" + fact_digest[:32],
+                        fact_id,
                         run_id,
                         run["case_id"],
                         persisted_ids[row.local_evidence_id],
@@ -906,10 +1092,33 @@ class SecurityLifecycleFactKernel:
                         row.cited_text_sha256,
                         row.extractor_rule_id,
                         row.extractor_rule_version,
-                        f"automation:{run_id}:fact:{fact_digest}",
+                        fact_dedupe_key,
                         timestamp,
                     ),
                 )
+                persisted = self.conn.execute(
+                    "SELECT automation_run_id,case_id,evidence_id,fact_type,"
+                    "normalized_value_json,source_span_start,source_span_end,"
+                    "cited_text_sha256,extractor_rule_id,extractor_rule_version,"
+                    "fact_dedupe_key FROM security_lifecycle_automation_facts "
+                    "WHERE fact_id=?",
+                    (fact_id,),
+                ).fetchone()
+                expected = (
+                    run_id,
+                    str(run["case_id"]),
+                    persisted_ids[row.local_evidence_id],
+                    row.fact_type,
+                    row.normalized_value_json,
+                    row.source_span_start,
+                    row.source_span_end,
+                    row.cited_text_sha256,
+                    row.extractor_rule_id,
+                    row.extractor_rule_version,
+                    fact_dedupe_key,
+                )
+                if persisted is None or tuple(persisted) != expected:
+                    raise RuntimeError("automation_fact_identity_conflict")
             for code, retryable, context_json in normalized_blockers:
                 self.conn.execute(
                     "INSERT INTO security_lifecycle_automation_run_blockers "
@@ -941,23 +1150,9 @@ class SecurityLifecycleFactKernel:
                 (run_id,),
             )
         )
-        persisted_facts = tuple(
-            _FactRow(
-                local_evidence_id=str(row["evidence_id"]),
-                fact_type=str(row["fact_type"]),
-                normalized_value_json=str(row["normalized_value_json"]),
-                source_span_start=int(row["source_span_start"]),
-                source_span_end=int(row["source_span_end"]),
-                cited_text_sha256=str(row["cited_text_sha256"]),
-                extractor_rule_id=str(row["extractor_rule_id"]),
-                extractor_rule_version=str(row["extractor_rule_version"]),
-            )
-            for row in self.conn.execute(
-                "SELECT * FROM security_lifecycle_automation_facts "
-                "WHERE automation_run_id=?",
-                (run_id,),
-            )
-        )
+        persisted_evidence = _persisted_evidence_rows(self.conn, run_id)
+        persisted_facts = _persisted_fact_rows(self.conn, run_id)
+        provenance = persisted_decision_provenance_sha256(self.conn, run_id)
         return AutomationRunResult(
             run_id=run_id,
             status=status,
@@ -965,8 +1160,8 @@ class SecurityLifecycleFactKernel:
             action_readiness=terminal_readiness,
             source_families=families,
             corroboration_family_count=len(families),
-            evidence_count=len(normalized_evidence),
-            fact_count=len(normalized_facts),
+            evidence_count=len(persisted_evidence),
+            fact_count=len(persisted_facts),
             conflicts=_conflicts(persisted_facts),
             decision_provenance_sha256=provenance,
         )
