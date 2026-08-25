@@ -1,0 +1,1 @@
+tests/test_security_lifecycle_sec_evidence.py::test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts	T1	The real-source parser revision advances SEC evidence/fact rule_version from 1 to 2 while preserving citation and bound assertions.

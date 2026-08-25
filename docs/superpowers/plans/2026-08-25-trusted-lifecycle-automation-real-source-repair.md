@@ -14,6 +14,8 @@ The live run is consumed and may not be repeated without new authorization.
   `2026-08-25-trusted-lifecycle-automation-real-source-repair-owned-paths.tsv`.
 - New test nodes are exactly the four rows in
   `2026-08-25-trusted-lifecycle-automation-real-source-repair-additions.nodes`.
+- The one existing test whose expectation evolves is listed in
+  `2026-08-25-trusted-lifecycle-automation-real-source-repair-evolved-owners.tsv`.
 - The four captured SEC response bodies are immutable public evidence fixtures:
   HAPN `48ebd4ef...b732f`, QBTS `bf1046a3...bc43`, CCL
   `892bb9f6...39a8`, and BLBD `14bc6500...298e`.
@@ -41,6 +43,8 @@ The live run is consumed and may not be repeated without new authorization.
 7. Dates are extracted only from clauses that bind the date to the tracked
    identity/listing event. A different agreement's `effective` clause may not
    become the security transition date.
+8. SEC evidence/fact extractor rule versions advance from `1` to `2`; this is
+   a semantic parser revision, not a byte-preserving refactor.
 
 ## RED / GREEN
 
