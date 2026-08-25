@@ -1,0 +1,17 @@
+config/.env
+data_sources/sec_transport.py
+src/security_lifecycle_schema.py
+src/security_lifecycle_automation_migration.py
+src/security_lifecycle_sec_evidence.py
+src/security_lifecycle_news_evidence.py
+src/security_lifecycle_ibkr_evidence.py
+src/security_lifecycle_fact_kernel.py
+src/security_lifecycle_decision_policy.py
+src/ticker_identity_schema.py
+src/ticker_identity_migration.py
+src/service/ticker_identity_scheduler.py
+src/auth_drivers
+src/agents
+src/tools/registry.py
+tests/fixtures/security_lifecycle_automation_sec.json
+docs/superpowers/specs/2026-08-24-trusted-lifecycle-automation-design.md

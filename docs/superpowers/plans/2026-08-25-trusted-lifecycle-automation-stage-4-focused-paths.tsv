@@ -1,0 +1,15 @@
+runner	path
+backend	tests/test_ticker_identity_transition.py
+backend	tests/test_ticker_identity_routes.py
+backend	tests/test_security_lifecycle_automation_worker.py
+backend	tests/test_security_lifecycle_automation_scheduler.py
+backend	tests/test_security_lifecycle_translation.py
+backend	tests/test_security_lifecycle_routes.py
+backend	tests/test_security_lifecycle_tools.py
+backend	tests/test_card_synthesis.py
+backend	tests/test_api.py
+frontend	apps/arkscope-web/src/lifecycle/LifecycleActivityBand.test.tsx
+frontend	apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx
+frontend	apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts
+frontend	apps/arkscope-web/src/lifecycle/tickerIdentityPresentation.test.ts
+frontend	apps/arkscope-web/src/i18n/resources.test.ts
