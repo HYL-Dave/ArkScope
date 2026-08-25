@@ -81,25 +81,25 @@ product owner is a stop, not a full-suite repair.
 - Add: `tests/test_security_lifecycle_grounded_shadow.py`
 - Modify: `tests/test_security_lifecycle_automation_scheduler.py`
 
-- [ ] Add one manifest node and one node for each HAPN, QBTS, CCL, and BLBD,
+- [x] Add one manifest node and one node for each HAPN, QBTS, CCL, and BLBD,
   plus one scheduler identity-context node: exactly six additions.
-- [ ] The manifest node proves each real case CIK/accession/URL tuple exists in
+- [x] The manifest node proves each real case CIK/accession/URL tuple exists in
   the reviewed 37-row repository snapshot and declares historical A-to-B
   coverage `n=1`, source prose synthetic, IBKR reply synthetic, network calls
   zero, and transition execution coverage delegated to the Stage 4 scratch
   replay.
-- [ ] Each case node passes source-shaped SEC input through the real extractor,
+- [x] Each case node passes source-shaped SEC input through the real extractor,
   synthetic market snapshots through the real IBKR adapter where applicable,
   and both outputs through the real decision policy. No test may restate the
   policy result without calling those interfaces.
-- [ ] Expected outcomes are HAPN symbol+venue/no A-to-A transition; QBTS
+- [x] Expected outcomes are HAPN symbol+venue/no A-to-A transition; QBTS
   venue-only/no transition; CCL no tracked-security identity change/no
   transition; BLBD asset acquisition without registrant identity change/no
   transition.
-- [ ] The scheduler node proves local alias closure and known positive IBKR
+- [x] The scheduler node proves local alias closure and known positive IBKR
   conIds are projected into the identity context before any provider call,
   with bounded reads and no transaction held for later I/O.
-- [ ] Commit tests before product repair and record exact RED node identity and
+- [x] Commit tests before product repair and record exact RED node identity and
   reasons. Expected initial failure is cross-stage shape/context loss, never a
   provider or production-path attempt.
 
@@ -111,31 +111,31 @@ product owner is a stop, not a full-suite repair.
 - Modify: `src/service/security_lifecycle_automation_scheduler.py`
 - Modify: `tests/test_security_lifecycle_sec_evidence.py`
 
-- [ ] Let the policy consume the SEC extractor's reviewed `value` field in
+- [x] Let the policy consume the SEC extractor's reviewed `value` field in
   addition to persisted `normalized_value[_json]` shapes. Do not weaken fact
   identity or value normalization.
-- [ ] Treat explicit same-symbol continuation as both source and successor
+- [x] Treat explicit same-symbol continuation as both source and successor
   identity facts while retaining the invariant that no `A -> A` transition is
   emitted. Evolve only the named QBTS owner.
-- [ ] Recognize the extractor's explicit
+- [x] Recognize the extractor's explicit
   `asset_acquisition_no_registrant_change` effect as the existing no-change
   decision; do not generalize M&A forms or transaction kinds into continuity.
-- [ ] Enrich scheduler cases from bounded read-only local state: transitive
+- [x] Enrich scheduler cases from bounded read-only local state: transitive
   alias pairs from `ticker_aliases` and matching positive IBKR conIds from
   current portfolio rows. Missing optional tables yield no hints; malformed or
   over-limit owned data is typed/fail-closed rather than guessed.
-- [ ] Re-run exact additions, focused `38`, and direct shape tests. No schema,
+- [x] Re-run exact additions, focused `38`, and direct shape tests. No schema,
   provider, transition execution, or UI byte changes are allowed.
 
 ## Task 3: Produce The Shadow Report
 
-- [ ] Run all four cases twice from a clean tree with sockets denied and
+- [x] Run all four cases twice from a clean tree with sockets denied and
   require byte-identical bounded JSON.
-- [ ] Record case identity, source pointers, extracted fact types, decision
+- [x] Record case identity, source pointers, extracted fact types, decision
   tier/readiness/outcomes/rule, transition request, and exact limitations. Do
   not record full source bodies, provider payloads, credentials, or production
   paths.
-- [ ] State explicitly that HAPN is the only historical A-to-B example and is
+- [x] State explicitly that HAPN is the only historical A-to-B example and is
   already keyed by HAPN, so the report does not exercise a real production
   `A -> B` apply. Bind execution/reverse evidence to the Stage 4 scratch packet.
 
