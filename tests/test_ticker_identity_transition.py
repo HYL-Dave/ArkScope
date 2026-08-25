@@ -86,6 +86,54 @@ def _transition_connection(tmp_path, *, active_source: bool = True) -> sqlite3.C
     return conn
 
 
+def _seed_automation_authority(conn: sqlite3.Connection) -> str:
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.security_lifecycle_fact_kernel import (
+        persisted_decision_provenance_sha256,
+    )
+
+    conn.execute(
+        "INSERT INTO security_lifecycle_automation_runs "
+        "(run_id,case_id,mode,observation_fingerprint_sha256,policy_version,"
+        "run_key,status,decision_tier,action_readiness,query_context_json,"
+        "diagnostics_json,retry_at,failure_code,started_at,finished_at,created_at,"
+        "updated_at) VALUES (?,?,?,?,?,?,'succeeded','verified_automatic',"
+        "'transition_eligible','{}','{}',NULL,NULL,?,?,?,?)",
+        (
+            "slar_1",
+            "slc_1",
+            "live",
+            _OBSERVATION_FINGERPRINT,
+            AUTOMATION_POLICY_VERSION,
+            "automation:slc_1:run-1",
+            _AT,
+            _AT,
+            _AT,
+            _AT,
+        ),
+    )
+    provenance = persisted_decision_provenance_sha256(conn, "slar_1")
+    conn.execute(
+        "UPDATE security_lifecycle_assessments SET author='automation',"
+        "automation_method='deterministic_rule',automation_run_id='slar_1',"
+        "acceptance_authority='automation_policy',"
+        "rule_id='lifecycle.simple_symbol_continuation',rule_version='1',"
+        "decision_provenance_sha256=? WHERE assessment_id='sla_1'",
+        (provenance,),
+    )
+    conn.execute(
+        "INSERT INTO security_lifecycle_action_proposals "
+        "(proposal_id,case_id,assessment_id,action_type,status,source_ticker,"
+        "replacement_ticker,source_snapshot_json,reason,block_reason,"
+        "assessment_fingerprint_sha256,proposal_dedupe_key,created_at,dismissed_at) "
+        "VALUES ('slp_1','slc_1','sla_1','remap_symbol','proposed','OLD','NEW',"
+        "'{}','Continue tracking the successor.',NULL,?,?,?,NULL)",
+        (_ASSESSMENT_FINGERPRINT, "automation:slc_1:remap", _AT),
+    )
+    conn.commit()
+    return provenance
+
+
 def _id_factory():
     counters: dict[str, int] = {}
 
@@ -588,6 +636,102 @@ def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_
         assert conn.execute(
             "SELECT COUNT(*) FROM ticker_identity_transitions"
         ).fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
+def test_automation_transition_approval_binds_policy_rule_and_provenance(tmp_path):
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.ticker_identity_transition import (
+        TickerIdentityTransitionStore,
+        build_automation_transition_preflight,
+    )
+
+    conn = _transition_connection(tmp_path)
+    try:
+        before_changes = conn.total_changes
+        preflight = build_automation_transition_preflight(
+            conn,
+            case={
+                **_case(),
+                "observation_fingerprint_sha256": _OBSERVATION_FINGERPRINT,
+            },
+            request={
+                "transition_kind": "symbol_continuation",
+                "source_ticker": "OLD",
+                "successor_ticker": "NEW",
+                "effective_date": "2026-08-25",
+                "outcomes": ("symbol_changed",),
+            },
+            sources=("manual_lists",),
+        )
+        assert preflight["eligible"] is True
+        assert preflight["transition_kind"] == "symbol_continuation"
+        assert conn.total_changes == before_changes
+
+        provenance = _seed_automation_authority(conn)
+        preview = _build(conn)
+        approved = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-24T01:00:00Z",
+        ).approve_automation(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+
+        assert approved["status"] == "approved"
+        assert approved["approval_authority"] == "automation_policy"
+        assert approved["automation_policy_version"] == AUTOMATION_POLICY_VERSION
+        assert approved["rule_id"] == "lifecycle.simple_symbol_continuation"
+        assert approved["rule_version"] == "1"
+        assert approved["decision_provenance_sha256"] == provenance
+    finally:
+        conn.close()
+
+
+def test_automation_transition_approval_rejects_incoherent_or_stale_authority(
+    tmp_path,
+):
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_automation_authority(conn)
+        preview = _build(conn)
+        store = TickerIdentityTransitionStore(conn)
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_runs SET policy_version='stale' "
+            "WHERE run_id='slar_1'"
+        )
+        conn.commit()
+        with pytest.raises(ValueError, match="automation_authority_changed"):
+            store.approve_automation(
+                preview=preview,
+                approved_preview_sha256=preview["preview_sha256"],
+            )
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_runs SET policy_version=? "
+            "WHERE run_id='slar_1'",
+            (AUTOMATION_POLICY_VERSION,),
+        )
+        conn.execute(
+            "UPDATE security_lifecycle_assessments SET rule_version='999' "
+            "WHERE assessment_id='sla_1'"
+        )
+        conn.commit()
+        with pytest.raises(ValueError, match="automation_authority_changed"):
+            store.approve_automation(
+                preview=preview,
+                approved_preview_sha256=preview["preview_sha256"],
+            )
+
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 0
     finally:
         conn.close()
 

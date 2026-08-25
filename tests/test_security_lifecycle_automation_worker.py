@@ -270,6 +270,8 @@ class _Harness:
         self.evidence_calls = []
         self.preview_calls = []
         self.preview_results = []
+        self.approval_calls = []
+        self.approval_error = None
         self.sources = {case["ticker"]: ("manual_lists",) for case in cases}
         self.now = _AT
 
@@ -300,10 +302,52 @@ class _Harness:
             "transition_kind": request["transition_kind"],
         }
 
+    def transition_approver(self, *, case, request, sources):
+        store = _store(self)
+        assessments = store.list_assessments(case["case_id"])
+        proposals = store.list_proposals(case["case_id"])
+        self.approval_calls.append(
+            {
+                "case_id": case["case_id"],
+                "request": dict(request),
+                "sources": tuple(sources),
+                "assessment_status": assessments[0]["status"],
+                "proposal_actions": tuple(
+                    sorted(row["action_type"] for row in proposals)
+                ),
+            }
+        )
+        if self.approval_error is not None:
+            raise self.approval_error
+        return {
+            "transition_id": "tit_automation_1",
+            "status": "approved",
+            "approval_authority": "automation_policy",
+        }
+
     def clock(self):
         return self.now
 
     def worker(self):
+        from src.security_lifecycle_automation_worker import (
+            LifecycleAutomationWorker,
+        )
+
+        kwargs = dict(
+            case_loader=self.case_loader,
+            profile_connection=self.profile_connection,
+            evidence_loader=self.evidence_loader,
+            source_loader=self.source_loader,
+            transition_preview=self.transition_preview,
+            clock=self.clock,
+        )
+        if "transition_approver" in inspect.signature(
+            LifecycleAutomationWorker
+        ).parameters:
+            kwargs["transition_approver"] = self.transition_approver
+        return LifecycleAutomationWorker(**kwargs)
+
+    def worker_with_transition_approver(self):
         from src.security_lifecycle_automation_worker import (
             LifecycleAutomationWorker,
         )
@@ -314,6 +358,7 @@ class _Harness:
             evidence_loader=self.evidence_loader,
             source_loader=self.source_loader,
             transition_preview=self.transition_preview,
+            transition_approver=self.transition_approver,
             clock=self.clock,
         )
 
@@ -365,6 +410,80 @@ def test_verified_result_persists_automation_assessment_acceptance_and_proposals
             "notify",
             "remap_symbol",
         }
+    finally:
+        harness.conn.close()
+
+
+def test_transition_eligible_verified_result_approves_automation_transition(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    try:
+        result = harness.worker_with_transition_approver().run()
+
+        assert result["accepted"] == 1
+        assert result["failed"] == 0
+        assert harness.approval_calls == [
+            {
+                "case_id": case["case_id"],
+                "request": {
+                    "transition_kind": "symbol_continuation",
+                    "source_ticker": "OLD",
+                    "successor_ticker": "OLD2",
+                    "effective_date": "2026-08-25",
+                    "outcomes": ("symbol_changed", "venue_transfer"),
+                },
+                "sources": ("manual_lists",),
+                "assessment_status": "accepted",
+                "proposal_actions": ("notify", "remap_symbol"),
+            }
+        ]
+    finally:
+        harness.conn.close()
+
+
+def test_nonmutating_and_review_suggested_results_never_approve_transition(
+    tmp_path,
+):
+    terminal = _case(1, ticker="TERM", terminal=True)
+    review = _case(2, ticker="MNA")
+    harness = _Harness(tmp_path, [terminal, review])
+    harness.bundles[terminal["case_id"]] = _bundle(terminal, terminal=True)
+    harness.bundles[review["case_id"]] = _bundle(
+        review,
+        review_structure="cash",
+    )
+    try:
+        result = harness.worker_with_transition_approver().run(limit=2)
+
+        assert result["accepted"] == 1
+        assert result["drafted"] == 1
+        assert result["failed"] == 0
+        assert harness.approval_calls == []
+    finally:
+        harness.conn.close()
+
+
+def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.approval_error = ValueError("transition_preview_changed")
+    try:
+        result = harness.worker_with_transition_approver().run()
+
+        assert result["accepted"] == 0
+        assert result["failed"] == 1
+        assert len(harness.approval_calls) == 1
+        assert harness.approval_calls[0]["assessment_status"] == "accepted"
+        assert harness.approval_calls[0]["proposal_actions"] == (
+            "notify",
+            "remap_symbol",
+        )
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM sqlite_master "
+            "WHERE type='table' AND name='ticker_identity_transitions'"
+        ).fetchone()[0] == 0
     finally:
         harness.conn.close()
 
@@ -578,6 +697,7 @@ def test_worker_uses_only_injected_evidence_sources_and_paths(tmp_path, monkeypa
         "evidence_loader",
         "source_loader",
         "transition_preview",
+        "transition_approver",
         "clock",
     ):
         assert signature.parameters[name].default is inspect.Parameter.empty

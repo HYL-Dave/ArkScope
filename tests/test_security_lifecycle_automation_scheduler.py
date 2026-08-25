@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 
@@ -180,3 +181,81 @@ def test_scheduler_program_error_is_typed_without_raw_detail(monkeypatch):
     assert "private" not in rendered
     assert "invalid" not in rendered
     assert "@" not in rendered
+
+
+def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
+    monkeypatch,
+):
+    from src import ticker_identity_service, ticker_identity_transition
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    calls = []
+    marker = object()
+
+    @contextmanager
+    def profile_connection():
+        yield marker
+
+    def build_preflight(conn, *, case, request, sources):
+        calls.append(("preview", conn, case, request, sources))
+        return {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": request["transition_kind"],
+        }
+
+    class Service:
+        def __init__(self, **kwargs):
+            calls.append(("service", kwargs))
+
+        def approve_automation_case(self, case_id, *, request):
+            calls.append(("approve", case_id, request))
+            return {
+                "transition_id": "tit_1",
+                "status": "approved",
+                "approval_authority": "automation_policy",
+            }
+
+    captured_worker = {}
+
+    class Worker:
+        def __init__(self, **kwargs):
+            captured_worker.update(kwargs)
+
+    monkeypatch.setattr(scheduler, "_profile_connection", profile_connection)
+    monkeypatch.setattr(
+        ticker_identity_transition,
+        "build_automation_transition_preflight",
+        build_preflight,
+    )
+    monkeypatch.setattr(ticker_identity_service, "TickerIdentityService", Service)
+    monkeypatch.setattr(scheduler, "_profile_path", lambda: "/profile.db")
+    monkeypatch.setattr(scheduler, "_market_path", lambda: "/market.db")
+    monkeypatch.setattr(scheduler, "_load_sources", lambda: {"OLD": ("manual_lists",)})
+    monkeypatch.setattr(scheduler, "_assert_automation_installed", lambda: None)
+    monkeypatch.setattr(scheduler, "LifecycleAutomationWorker", Worker)
+
+    case = {"case_id": "slc_1", "ticker": "OLD"}
+    request = {
+        "transition_kind": "symbol_continuation",
+        "source_ticker": "OLD",
+        "successor_ticker": "NEW",
+        "effective_date": "2026-08-25",
+        "outcomes": ("symbol_changed",),
+    }
+    assert scheduler._transition_preview(
+        case=case,
+        request=request,
+        sources=("manual_lists",),
+    )["eligible"] is True
+    assert scheduler._transition_approver(
+        case=case,
+        request=request,
+        sources=("manual_lists",),
+    )["transition_id"] == "tit_1"
+
+    scheduler._worker()
+    assert captured_worker["transition_preview"] is scheduler._transition_preview
+    assert captured_worker["transition_approver"] is scheduler._transition_approver
+    assert calls[0][0] == "preview"
+    assert calls[-1] == ("approve", "slc_1", request)
