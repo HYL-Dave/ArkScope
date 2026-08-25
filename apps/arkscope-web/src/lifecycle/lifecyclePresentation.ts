@@ -59,6 +59,7 @@ export function lifecycleActionReadinessLabel(
     not_applicable: copy.notApplicable,
     waiting_effective_date: copy.waitingEffectiveDate,
     waiting_market_confirmation: copy.waitingMarketConfirmation,
+    waiting_transition_revalidation: copy.waitingTransitionRevalidation,
     transition_eligible: copy.transitionEligible,
     action_blocked: copy.actionBlocked,
   }, locale);
@@ -132,7 +133,16 @@ export function lifecycleFactTypeLabel(
 }
 
 type SecurityClassFactValue = "common_stock";
-type TransactionStructureFactValue = "asset_acquisition" | "corporate_unification";
+type TransactionStructureFactValue =
+  | "asset_acquisition"
+  | "cash"
+  | "corporate_unification"
+  | "mixed"
+  | "security_class_change"
+  | "spin_off"
+  | "stock"
+  | "unknown";
+type TransactionTermsStatus = "not_extracted" | "partial" | "complete";
 type TrackedSecurityEffectFactValue =
   | "terminal_delisting"
   | "symbol_change"
@@ -146,17 +156,45 @@ export function lifecycleFactValueLabel(
   value: unknown,
   locale: LifecycleLocale,
 ): string | null {
-  if (typeof value !== "string") return null;
   const copy = lifecycleCopy(locale).factValues;
+  if (factType === "transaction_structure") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return lifecycleCopy(locale).states.unknownValue;
+    }
+    const transaction = value as Record<string, unknown>;
+    if (typeof transaction.kind !== "string"
+      || typeof transaction.terms_status !== "string") {
+      return lifecycleCopy(locale).states.unknownValue;
+    }
+    const kind = closedLifecycleLabel<TransactionStructureFactValue>(
+      transaction.kind,
+      {
+        asset_acquisition: copy.assetAcquisition,
+        cash: copy.cashConsideration,
+        corporate_unification: copy.corporateUnification,
+        mixed: copy.mixedConsideration,
+        security_class_change: copy.securityClassChange,
+        spin_off: copy.spinOff,
+        stock: copy.stockConsideration,
+        unknown: copy.unknownTransaction,
+      },
+      locale,
+    );
+    const terms = closedLifecycleLabel<TransactionTermsStatus>(
+      transaction.terms_status,
+      {
+        not_extracted: copy.termsNotExtracted,
+        partial: copy.termsPartial,
+        complete: copy.termsComplete,
+      },
+      locale,
+    );
+    return `${kind} · ${terms}`;
+  }
+  if (typeof value !== "string") return null;
   if (factType === "security_class") {
     return closedLifecycleLabel<SecurityClassFactValue>(value, {
       common_stock: copy.commonStock,
-    }, locale);
-  }
-  if (factType === "transaction_structure") {
-    return closedLifecycleLabel<TransactionStructureFactValue>(value, {
-      asset_acquisition: copy.assetAcquisition,
-      corporate_unification: copy.corporateUnification,
     }, locale);
   }
   if (factType === "tracked_security_effect") {
@@ -195,6 +233,8 @@ export function lifecycleAutomationBlockerLabel(
     market_confirmation_missing: copy.marketConfirmationMissing,
     source_conflict: copy.sourceConflict,
     impact_context_requested: copy.impactContextRequested,
+    transition_approval_changed: copy.transitionApprovalChanged,
+    transition_approval_unavailable: copy.transitionApprovalUnavailable,
   }, locale);
 }
 

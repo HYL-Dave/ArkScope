@@ -229,6 +229,10 @@ class LifecycleAutomationWorker:
             due_at = _utc_timestamp(
                 _instant(str(run["updated_at"])) + _MARKET_RECHECK_INTERVAL
             )
+        elif readiness == "waiting_transition_revalidation":
+            due_at = _utc_timestamp(
+                _instant(str(run["updated_at"])) + _MARKET_RECHECK_INTERVAL
+            )
         else:
             return None
         if now < _instant(due_at):
@@ -271,9 +275,34 @@ class LifecycleAutomationWorker:
         at: str,
         now: datetime,
         sources: tuple[str, ...],
+        transition_revalidation: bool = False,
     ) -> str:
         phase = "acquire"
         try:
+            if transition_revalidation:
+                phase = "approve"
+                state = store.project_case_state(
+                    str(case["case_id"]),
+                    observation_fingerprint_sha256=str(
+                        case["observation_fingerprint_sha256"]
+                    ),
+                )
+                assessment = state["current_assessment"]
+                if not isinstance(assessment, Mapping):
+                    raise ValueError("automation_assessment_not_current")
+                approved = self._transition_approver(
+                    case=case,
+                    request=_transition_request(case, assessment),
+                    sources=sources,
+                )
+                if (
+                    not isinstance(approved, Mapping)
+                    or approved.get("status") != "approved"
+                    or approved.get("approval_authority") != "automation_policy"
+                ):
+                    raise ValueError("automation_transition_approval_changed")
+                kernel.complete_transition_revalidation(run_id=run_id, at=at)
+                return "accepted"
             bundle = self._evidence_loader(case, mode=mode, at=at)
             if not isinstance(bundle, LifecycleAutomationEvidenceBundle):
                 raise TypeError("automation_evidence_bundle")
@@ -370,10 +399,25 @@ class LifecycleAutomationWorker:
                         or approved.get("status") != "approved"
                         or approved.get("approval_authority") != "automation_policy"
                     ):
-                        raise RuntimeError("automation_transition_approval")
+                        raise ValueError("automation_transition_approval_changed")
                 return "accepted"
             return "drafted"
         except Exception as exc:
+            if phase == "approve":
+                blocker_code = (
+                    "transition_approval_changed"
+                    if isinstance(exc, ValueError)
+                    else "transition_approval_unavailable"
+                )
+                try:
+                    kernel.defer_transition_revalidation(
+                        run_id=run_id,
+                        blocker_code=blocker_code,
+                        at=at,
+                    )
+                except (KeyError, ValueError, RuntimeError, sqlite3.Error):
+                    return "failed"
+                return "accepted"
             failure_code = _failure_code(exc, phase=phase)
             try:
                 kernel.fail_run(
@@ -446,12 +490,17 @@ class LifecycleAutomationWorker:
                     continue
                 if due is not None:
                     run, due_at = due
+                    transition_revalidation = (
+                        run.get("action_readiness")
+                        == "waiting_transition_revalidation"
+                    )
                     claim = kernel.reserve_readiness_recheck(
                         run_id=str(run["run_id"]),
                         due_at=due_at,
                         at=at,
                     )
                 else:
+                    transition_revalidation = False
                     claim = kernel.reserve_run(
                         case_id=case_id,
                         observation_fingerprint_sha256=fingerprint,
@@ -485,6 +534,7 @@ class LifecycleAutomationWorker:
                     at=at,
                     now=now,
                     sources=sources,
+                    transition_revalidation=transition_revalidation,
                 )
                 summary["processed"] = int(summary["processed"]) + 1
                 summary[outcome] = int(summary[outcome]) + 1

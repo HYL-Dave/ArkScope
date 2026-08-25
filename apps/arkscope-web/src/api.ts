@@ -2442,6 +2442,7 @@ export type SecurityLifecycleActionReadiness =
   | "not_applicable"
   | "waiting_effective_date"
   | "waiting_market_confirmation"
+  | "waiting_transition_revalidation"
   | "transition_eligible"
   | "action_blocked";
 export type SecurityLifecycleAssessmentAuthor =
@@ -2486,7 +2487,9 @@ export type SecurityLifecycleAutomationBlockerCode =
   | "ibkr_entitlement_denied"
   | "market_confirmation_missing"
   | "source_conflict"
-  | "impact_context_requested";
+  | "impact_context_requested"
+  | "transition_approval_changed"
+  | "transition_approval_unavailable";
 export type SecurityLifecycleFactType =
   | "source_ticker"
   | "successor_ticker"

@@ -40,7 +40,7 @@ describe("Lifecycle presentation", () => {
     expect(lifecycleFactValueLabel("security_class", "common_stock", "en"))
       .toBe("Common stock");
     expect(lifecycleFactValueLabel("transaction_structure", "asset_acquisition", "en"))
-      .toBe("Asset acquisition");
+      .toBe("Unrecognized value");
     expect(lifecycleFactValueLabel(
       "tracked_security_effect",
       "future_effect",
@@ -49,9 +49,9 @@ describe("Lifecycle presentation", () => {
     expect(lifecycleFactValueLabel("source_ticker", "HAPN", "en")).toBeNull();
     expect(lifecycleFactValueLabel(
       "transaction_structure",
-      { kind: "mixed" },
+      { kind: "mixed", terms_status: "not_extracted" },
       "en",
-    )).toBeNull();
+    )).toBe("Mixed consideration · Terms not extracted");
   });
 
   it("labels transition revalidation without collapsing it into eligibility or a generic block", async () => {

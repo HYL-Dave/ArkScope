@@ -373,6 +373,8 @@ AUTOMATION_BLOCKER_CODES = frozenset(
         "market_confirmation_missing",
         "source_conflict",
         "impact_context_requested",
+        "transition_approval_changed",
+        "transition_approval_unavailable",
     }
 )
 AUTOMATION_FAILURE_CODES = frozenset(
@@ -390,6 +392,7 @@ ACTION_READINESS = frozenset(
         "not_applicable",
         "waiting_effective_date",
         "waiting_market_confirmation",
+        "waiting_transition_revalidation",
         "transition_eligible",
         "action_blocked",
     }
@@ -405,6 +408,20 @@ FACT_TYPES = frozenset(
         "issuer_cik",
         "transaction_structure",
         "tracked_security_effect",
+    }
+)
+FACT_SCALAR_TYPES = FACT_TYPES - {"transaction_structure"}
+TRANSACTION_TERMS_STATUSES = frozenset({"not_extracted", "partial", "complete"})
+TRANSACTION_STRUCTURE_KINDS = frozenset(
+    {
+        "asset_acquisition",
+        "cash",
+        "corporate_unification",
+        "mixed",
+        "security_class_change",
+        "spin_off",
+        "stock",
+        "unknown",
     }
 )
 ASSESSMENT_AUTHORS = frozenset({"human", "legacy_review", "automation"})

@@ -566,6 +566,7 @@ def _ibkr_evidence(context, *, at: str, regulator_successors: tuple[str, ...]):
         gateway=gateway,
         gateway_lock=locked,
         context=context,
+        candidate_tickers=regulator_successors,
         retrieved_at=at,
     )
     facts = tuple(

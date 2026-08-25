@@ -9,7 +9,7 @@ import sqlite3
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
@@ -22,12 +22,18 @@ from src.security_lifecycle_schema import (
     EVIDENCE_ADAPTERS,
     EVIDENCE_KINDS,
     EVIDENCE_SOURCE_FAMILIES,
+    FACT_SCALAR_TYPES,
     FACT_TYPES,
+    TRANSACTION_STRUCTURE_KINDS,
+    TRANSACTION_TERMS_STATUSES,
 )
 
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
+_CIK = re.compile(r"^\d{10}$")
+_DECIMAL = re.compile(r"^(?:0|[1-9]\d*)(?:\.\d+)?$")
 _ADAPTER_SHAPES = {
     "sec_edgar": ("regulator", "regulator_excerpt"),
     "internal_news": ("publisher", "publisher_excerpt"),
@@ -261,6 +267,95 @@ def _canonical_json(
     return encoded
 
 
+_TRANSACTION_TERM_FIELDS = frozenset(
+    {
+        "cash_per_security_decimal",
+        "consideration_currency",
+        "counterparty_cik",
+        "counterparty_name",
+        "counterparty_ticker",
+        "exchange_ratio_decimal",
+    }
+)
+
+
+def _fact_scalar(fact_type: str, value: object) -> str:
+    if type(value) is not str:
+        raise ValueError("fact_value_shape")
+    normalized = value.strip()
+    if (
+        not normalized
+        or "\0" in normalized
+        or len(normalized.encode("utf-8")) > 512
+    ):
+        raise ValueError("fact_value_shape")
+    if fact_type in {"source_ticker", "successor_ticker"}:
+        normalized = normalized.upper()
+        if not _TICKER.fullmatch(normalized):
+            raise ValueError("fact_value_shape")
+    elif fact_type == "issuer_cik":
+        if not _CIK.fullmatch(normalized):
+            raise ValueError("fact_value_shape")
+    elif fact_type == "effective_date":
+        try:
+            if date.fromisoformat(normalized).isoformat() != normalized:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError("fact_value_shape") from exc
+    return normalized
+
+
+def _transaction_structure(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        raise ValueError("fact_value_shape")
+    allowed = {"kind", "terms_status", *_TRANSACTION_TERM_FIELDS}
+    if set(value) - allowed:
+        raise ValueError("fact_value_shape")
+    kind = _fact_scalar("transaction_structure", value.get("kind"))
+    status = _fact_scalar("transaction_structure", value.get("terms_status"))
+    if kind not in TRANSACTION_STRUCTURE_KINDS or status not in TRANSACTION_TERMS_STATUSES:
+        raise ValueError("fact_value_shape")
+    normalized = {"kind": kind, "terms_status": status}
+    for field in sorted(_TRANSACTION_TERM_FIELDS):
+        item = value.get(field)
+        if item is None:
+            continue
+        text = _fact_scalar("transaction_structure", item)
+        if field == "counterparty_ticker":
+            text = text.upper()
+            if not _TICKER.fullmatch(text):
+                raise ValueError("fact_value_shape")
+        elif field == "counterparty_cik":
+            if not _CIK.fullmatch(text):
+                raise ValueError("fact_value_shape")
+        elif field == "consideration_currency":
+            text = text.upper()
+            if not re.fullmatch(r"[A-Z]{3}", text):
+                raise ValueError("fact_value_shape")
+        elif field in {"cash_per_security_decimal", "exchange_ratio_decimal"}:
+            if not _DECIMAL.fullmatch(text):
+                raise ValueError("fact_value_shape")
+        normalized[field] = text
+    populated_terms = set(normalized) - {"kind", "terms_status"}
+    if status == "not_extracted" and populated_terms:
+        raise ValueError("fact_value_shape")
+    if status in {"partial", "complete"} and not populated_terms:
+        raise ValueError("fact_value_shape")
+    return normalized
+
+
+def normalize_automation_fact_value(fact_type: str, value: object) -> object:
+    """Validate and normalize the closed value shape for one persisted fact."""
+
+    if fact_type not in FACT_TYPES:
+        raise ValueError("fact_type")
+    if fact_type in FACT_SCALAR_TYPES:
+        return _fact_scalar(fact_type, value)
+    if fact_type == "transaction_structure":
+        return _transaction_structure(value)
+    raise ValueError("fact_value_shape")
+
+
 def _diagnostics(value: Mapping[str, object]) -> str:
     if not isinstance(value, Mapping):
         raise ValueError("diagnostics")
@@ -459,8 +554,12 @@ def _normalize_facts(
         fact_type = str(_field(value, "fact_type") or "")
         if fact_type not in FACT_TYPES:
             raise ValueError("fact_type")
-        normalized_value_json = _canonical_json(
+        normalized_value = normalize_automation_fact_value(
+            fact_type,
             _field(value, "normalized_value", _field(value, "value")),
+        )
+        normalized_value_json = _canonical_json(
+            normalized_value,
             name="normalized_value",
             max_bytes=4096,
         )
@@ -937,10 +1036,21 @@ class SecurityLifecycleFactKernel:
             if (
                 status != "succeeded"
                 or readiness
-                not in {"waiting_effective_date", "waiting_market_confirmation"}
+                not in {
+                    "waiting_effective_date",
+                    "waiting_market_confirmation",
+                    "waiting_transition_revalidation",
+                }
                 or _instant(timestamp) < _instant(due_timestamp)
             ):
                 return AutomationRunClaim(run_id, run_key, status, False)
+            if readiness == "waiting_transition_revalidation":
+                self.conn.execute(
+                    "UPDATE security_lifecycle_automation_runs SET updated_at=? "
+                    "WHERE run_id=?",
+                    (timestamp, run_id),
+                )
+                return AutomationRunClaim(run_id, run_key, status, True)
             self.conn.execute(
                 "DELETE FROM security_lifecycle_automation_run_blockers "
                 "WHERE automation_run_id=?",
@@ -954,6 +1064,84 @@ class SecurityLifecycleFactKernel:
                 (timestamp, timestamp, run_id),
             )
             return AutomationRunClaim(run_id, run_key, "running", True)
+
+    def defer_transition_revalidation(
+        self,
+        *,
+        run_id: str,
+        blocker_code: str,
+        at: str,
+    ) -> None:
+        self.store.assert_automation_write_available()
+        if blocker_code not in {
+            "transition_approval_changed",
+            "transition_approval_unavailable",
+        }:
+            raise ValueError("blocker_code")
+        timestamp = _timestamp("at", at)
+        with _immediate_transaction(self.conn):
+            row = self.conn.execute(
+                "SELECT status,action_readiness FROM "
+                "security_lifecycle_automation_runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError("automation_run_not_found")
+            if (
+                str(row["status"]) != "succeeded"
+                or str(row["action_readiness"])
+                not in {
+                    "transition_eligible",
+                    "waiting_transition_revalidation",
+                }
+            ):
+                raise ValueError("transition_revalidation_source_state")
+            self.conn.execute(
+                "DELETE FROM security_lifecycle_automation_run_blockers "
+                "WHERE automation_run_id=?",
+                (run_id,),
+            )
+            self.conn.execute(
+                "INSERT INTO security_lifecycle_automation_run_blockers "
+                "(automation_run_id,blocker_code,retryable,context_json,created_at) "
+                "VALUES (?,?,1,'{}',?)",
+                (run_id, blocker_code, timestamp),
+            )
+            self.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "action_readiness='waiting_transition_revalidation',updated_at=? "
+                "WHERE run_id=?",
+                (timestamp, run_id),
+            )
+
+    def complete_transition_revalidation(self, *, run_id: str, at: str) -> None:
+        self.store.assert_automation_write_available()
+        timestamp = _timestamp("at", at)
+        with _immediate_transaction(self.conn):
+            row = self.conn.execute(
+                "SELECT status,action_readiness FROM "
+                "security_lifecycle_automation_runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError("automation_run_not_found")
+            if (
+                str(row["status"]) != "succeeded"
+                or str(row["action_readiness"])
+                != "waiting_transition_revalidation"
+            ):
+                raise ValueError("transition_revalidation_source_state")
+            self.conn.execute(
+                "DELETE FROM security_lifecycle_automation_run_blockers "
+                "WHERE automation_run_id=? AND blocker_code IN "
+                "('transition_approval_changed','transition_approval_unavailable')",
+                (run_id,),
+            )
+            self.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "action_readiness='transition_eligible',updated_at=? WHERE run_id=?",
+                (timestamp, run_id),
+            )
 
     def complete_run(
         self,

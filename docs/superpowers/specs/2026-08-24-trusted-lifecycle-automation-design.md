@@ -633,10 +633,12 @@ The closed readiness vocabulary gains `waiting_transition_revalidation`, and
 the closed blocker vocabulary gains `transition_approval_changed` and
 `transition_approval_unavailable`. The fact kernel atomically changes the
 completed run to that readiness and writes exactly one typed blocker. The UI
-renders both. The worker rechecks it no more than once per day; a successful
-recheck removes the blocker and may approve the transition. Existing due-date
-selection already catches up transitions whose `execute_on` passed while the
-App was stopped; that mechanism is separate and unchanged.
+renders both. The worker rechecks it no more than once per day. Its bounded
+claim advances only the last-attempt timestamp, so the accepted assessment and
+proposals remain current and the blocker remains visible while approval is in
+flight. Only a successful transition revalidation removes the blocker. Existing
+due-date selection already catches up transitions whose `execute_on` passed
+while the App was stopped; that mechanism is separate and unchanged.
 
 ### 16.4 Fact-value shapes and M&A term honesty
 

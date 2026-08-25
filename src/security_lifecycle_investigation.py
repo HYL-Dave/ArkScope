@@ -1092,11 +1092,15 @@ class SecurityLifecycleInvestigationStore:
             str(row["blocker_code"])
             for row in run.get("blockers", ())
         }
+        decision_blockers = blockers - {
+            "transition_approval_changed",
+            "transition_approval_unavailable",
+        }
         has_conflict = "source_conflict" in blockers
         if has_conflict != (rule_id == "lifecycle.source_conflict"):
             return "automation_conflict_state_changed"
         if require_verified and (
-            run["decision_tier"] != "verified_automatic" or blockers
+            run["decision_tier"] != "verified_automatic" or decision_blockers
         ):
             return "automation_run_not_verified"
         if run["decision_tier"] not in {

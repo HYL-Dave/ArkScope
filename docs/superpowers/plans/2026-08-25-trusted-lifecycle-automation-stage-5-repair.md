@@ -39,44 +39,45 @@ section 16.
 
 ## Task 0: Freeze The Rejected Authority
 
-- [ ] Record the four reproduced defects and reject the original Stage 5 packet
+- [x] Record the four reproduced defects and reject the original Stage 5 packet
   for migration/cutover authority without deleting its evidence.
-- [ ] Verify every ownership pin against the exact base.
+- [x] Verify every ownership pin against the exact base.
 
 ## Task 1: Exact RED
 
-- [ ] Prove an explicit `LC -> HAPN` declaration emits HAPN when the alias set
+- [x] Prove an explicit `LC -> HAPN` declaration emits HAPN when the alias set
   contains only LC.
-- [ ] Prove only a completely fetched explicit-dated Form 25 chain emits a
+- [x] Prove only a completely fetched explicit-dated Form 25 chain emits a
   policy-usable terminal delisting.
-- [ ] Prove a regulator-declared successor is queried through IBKR without first
+- [x] Prove a regulator-declared successor is queried through IBKR without first
   appearing in persistent aliases.
-- [ ] Prove scalar `transaction_structure` and mapping-valued scalar facts are
+- [x] Prove scalar `transaction_structure` and mapping-valued scalar facts are
   rejected at the fact boundary; evolve BLBD/M&A owners to the reviewed mapping.
-- [ ] Evolve approval-drift ownership to require accepted assessment retention,
+- [x] Evolve approval-drift ownership to require accepted assessment retention,
   `waiting_transition_revalidation`, a visible typed blocker, and one-day retry.
 
 ## Task 2: Fact And Source Repair
 
-- [ ] Add one closed fact-shape normalizer used by emitters and persistence.
-- [ ] Emit structured transaction kind plus honest `terms_status`; preserve every
+- [x] Add one closed fact-shape normalizer used by emitters and persistence.
+- [x] Emit structured transaction kind plus honest `terms_status`; preserve every
   injected complete M&A term in assessment prefill.
-- [ ] Admit one-known-side explicit symbol declarations while keeping the new
+- [x] Admit one-known-side explicit symbol declarations while keeping the new
   side candidate-only.
-- [ ] Fetch the selected SEC chain before excerpt construction so every locator
+- [x] Fetch the selected SEC chain before excerpt construction so every locator
   gets a truthful chain-completeness witness.
-- [ ] Emit terminal facts only from explicit Form 25/25-NSE text with tracked
+- [x] Emit terminal facts only from explicit Form 25/25-NSE text with tracked
   alias, security class, and date support.
-- [ ] Include cited successor candidates in bounded IBKR lookup only.
+- [x] Include cited successor candidates in bounded IBKR lookup only.
 
 ## Task 3: Approval Revalidation And UI Truth
 
-- [ ] Add the closed readiness and blocker values to schema/API/presentation.
-- [ ] Add one atomic kernel operation that replaces `transition_eligible` with
+- [x] Add the closed readiness and blocker values to schema/API/presentation.
+- [x] Add one atomic kernel operation that replaces `transition_eligible` with
   waiting revalidation and writes the typed blocker.
-- [ ] Recheck at most once per day, preserve the accepted assessment/proposals,
-  and clear the blocker only when the run is reserved again.
-- [ ] Render the reason in English and Traditional Chinese through exhaustive
+- [x] Recheck at most once per day, preserve the accepted assessment/proposals,
+  keep the blocker visible during the claim, and clear it only after successful
+  transition approval.
+- [x] Render the reason in English and Traditional Chinese through exhaustive
   mappings; no fallback may map it to another known state.
 
 ## Task 4: Offline Readmission

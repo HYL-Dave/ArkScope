@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
 
+from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
+
 
 AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v1"
 RULE_VERSIONS = {
@@ -127,6 +129,7 @@ def _canonical(value: Any) -> str:
 
 
 def _normalized_fact_value(fact_type: str, value: Any) -> Any:
+    value = normalize_automation_fact_value(fact_type, value)
     if fact_type in {"source_ticker", "successor_ticker"}:
         return _ticker(value)
     if fact_type in {"source_venue", "destination_venue"}:
@@ -261,7 +264,11 @@ def _conflicts(facts: tuple[_Fact, ...]) -> tuple[str, ...]:
 
 
 def _terms(value: object) -> Mapping[str, Any]:
-    return value if isinstance(value, Mapping) else {}
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("fact_value_shape")
+    return value
 
 
 def _term(terms: Mapping[str, Any], name: str) -> str | None:
@@ -457,6 +464,20 @@ def evaluate_automation_decision(
         _one(fact_rows, "transaction_structure", family="regulator")
     )
     transaction_kind = _text(transaction.get("kind"))
+    terms_status = _text(transaction.get("terms_status"))
+    if terms_status == "not_extracted":
+        transaction_issues = ("transaction_terms_not_extracted",)
+        transaction_impact = (
+            "Counterparty and consideration terms were not deterministically extracted."
+        )
+    elif terms_status == "partial":
+        transaction_issues = ("transaction_terms_partial",)
+        transaction_impact = (
+            "Only some counterparty or consideration terms were deterministically extracted."
+        )
+    else:
+        transaction_issues = ()
+        transaction_impact = "Known transaction terms are prefilled."
 
     if regulator_effect == "terminal_delisting":
         missing = []
@@ -545,9 +566,13 @@ def evaluate_automation_decision(
             confidence="high",
             outcomes=("no_tracked_security_change",),
             conclusion="The cited event does not change the tracked security identity.",
-            impact_summary="Keep tracking the existing symbol; no transition is proposed.",
+            impact_summary=(
+                "Keep tracking the existing symbol; no transition is proposed."
+                + (f" {transaction_impact}" if transaction_kind is not None else "")
+            ),
             rule_id="lifecycle.no_identity_change",
             terms=transaction,
+            decision_issues=transaction_issues,
         )
 
     if transaction_kind is not None:
@@ -567,15 +592,15 @@ def evaluate_automation_decision(
                 "transaction requiring review."
             ),
             impact_summary=(
-                "Known transaction terms are prefilled; no ticker transition is "
-                "authorized automatically."
+                f"{transaction_impact} No ticker transition is authorized "
+                "automatically."
             ),
             successor_ticker=regulator_successor,
             destination_venue=regulator_destination,
             effective_date=regulator_date,
             terms=transaction,
             rule_id="lifecycle.ma_review",
-            decision_issues=("human_review_required",),
+            decision_issues=("human_review_required", *transaction_issues),
         )
 
     required_regulator = {

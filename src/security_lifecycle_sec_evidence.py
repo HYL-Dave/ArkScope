@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Iterable, Mapping, Sequence
@@ -13,6 +14,7 @@ from data_sources.sec_transport import (
     SecRequestBudget,
     SecTransportFailure,
 )
+from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
 
 
 _TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
@@ -40,6 +42,11 @@ _CONTINUES_TICKER = re.compile(
 )
 _UNCHANGED_COMMON_STOCK = re.compile(
     r"\b(?P<ticker>[A-Z][A-Z0-9.\-]{0,19}) common stock (?:is|are) unchanged\b",
+    re.IGNORECASE,
+)
+_TERMINAL_DELISTING = re.compile(
+    r"\b(?P<ticker>[A-Z][A-Z0-9.\-]{0,19})\s+common stock\b.*?"
+    r"\b(?:removed|withdrawn|delisted)\s+from\s+(?:listing|quotation)\b",
     re.IGNORECASE,
 )
 _CIK_IN_TEXT = re.compile(r"\bCIK\s+(?P<cik>\d{1,10})\b", re.IGNORECASE)
@@ -131,7 +138,7 @@ class SecEvidence:
 @dataclass(frozen=True)
 class SecFact:
     fact_type: str
-    value: str
+    value: Any
     evidence_id: str
     span_start_byte: int
     span_end_byte: int
@@ -415,6 +422,8 @@ def _candidate_sentence(sentence: str, context: IdentityContext) -> bool:
         return True
     if _UNCHANGED_COMMON_STOCK.search(sentence) is not None:
         return True
+    if _TERMINAL_DELISTING.search(sentence) is not None:
+        return True
     if "transfer from" in folded or "common stock" in folded:
         return True
     if _MONTH_DATE.search(sentence) is not None and "effective" in folded:
@@ -443,6 +452,7 @@ def _focused_candidate(
         _NEW_REPLACING,
         _CONTINUES_TICKER,
         _UNCHANGED_COMMON_STOCK,
+        _TERMINAL_DELISTING,
         _MONTH_DATE,
         _ISO_DATE,
         re.compile(r"\bcommon stock\b", re.IGNORECASE),
@@ -505,7 +515,7 @@ def _fact(
     *,
     evidence: SecEvidence,
     fact_type: str,
-    value: str,
+    value: Any,
     sentence_start: int,
     sentence_end: int,
     rule_id: str,
@@ -513,9 +523,10 @@ def _fact(
     cited = evidence.excerpt[sentence_start:sentence_end]
     byte_start = len(evidence.excerpt[:sentence_start].encode("utf-8"))
     byte_end = byte_start + len(cited.encode("utf-8"))
+    normalized_value = normalize_automation_fact_value(fact_type, value)
     return SecFact(
         fact_type=fact_type,
-        value=value,
+        value=normalized_value,
         evidence_id=evidence.evidence_id,
         span_start_byte=byte_start,
         span_end_byte=byte_end,
@@ -546,7 +557,7 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
     facts: list[SecFact] = []
     support: dict[str, tuple[int, int]] = {}
 
-    def emit(fact_type: str, value: str, start: int, end: int, rule_id: str) -> None:
+    def emit(fact_type: str, value: Any, start: int, end: int, rule_id: str) -> None:
         facts.append(
             _fact(
                 evidence=evidence,
@@ -570,7 +581,9 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
         if transition is not None:
             old = transition.group("old").upper()
             new = transition.group("new").upper()
-            if old in context.ticker_aliases and new in context.ticker_aliases:
+            if old != new and (
+                old in context.ticker_aliases or new in context.ticker_aliases
+            ):
                 emit("source_ticker", old, start, end, "sec.explicit_symbol_change")
                 emit("successor_ticker", new, start, end, "sec.explicit_symbol_change")
 
@@ -588,6 +601,31 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
 
         if re.search(r"\bcommon stock\b", sentence, re.IGNORECASE):
             emit("security_class", "common_stock", start, end, "sec.explicit_security_class")
+
+        terminal = _TERMINAL_DELISTING.search(sentence)
+        explicit_effective_date = (
+            "effective" in sentence.casefold()
+            and (
+                _MONTH_DATE.search(sentence) is not None
+                or _ISO_DATE.search(sentence) is not None
+            )
+        )
+        if (
+            terminal is not None
+            and str(evidence.source_locator.get("form") or "").upper() in {"25", "25-NSE"}
+            and evidence.source_locator.get("filing_chain_complete") is True
+            and explicit_effective_date
+        ):
+            ticker = terminal.group("ticker").upper()
+            if ticker in context.ticker_aliases:
+                emit("source_ticker", ticker, start, end, "sec.explicit_terminal_delisting")
+                emit(
+                    "tracked_security_effect",
+                    "terminal_delisting",
+                    start,
+                    end,
+                    "sec.explicit_terminal_delisting",
+                )
 
         if "transfer from" in sentence.casefold():
             venues = _venue_mentions(sentence)
@@ -624,7 +662,7 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
         if "asset acquisition" in folded:
             emit(
                 "transaction_structure",
-                "asset_acquisition",
+                {"kind": "asset_acquisition", "terms_status": "not_extracted"},
                 start,
                 end,
                 "sec.explicit_asset_acquisition",
@@ -632,7 +670,7 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
         elif "corporate unification" in folded:
             emit(
                 "transaction_structure",
-                "corporate_unification",
+                {"kind": "corporate_unification", "terms_status": "not_extracted"},
                 start,
                 end,
                 "sec.explicit_corporate_unification",
@@ -698,7 +736,7 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
     unique = {
         (
             fact.fact_type,
-            fact.value,
+            _canonical_fact_value(fact.value),
             fact.evidence_id,
             fact.span_start_byte,
             fact.span_end_byte,
@@ -710,7 +748,7 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
             unique.values(),
             key=lambda item: (
                 item.fact_type,
-                item.value,
+                _canonical_fact_value(item.value),
                 item.evidence_id,
                 item.span_start_byte,
             ),
@@ -718,10 +756,24 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
     )
 
 
-def _fact_values(facts: Iterable[SecFact]) -> dict[str, set[str]]:
-    result: dict[str, set[str]] = {}
+def _canonical_fact_value(value: Any) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _fact_values(facts: Iterable[SecFact]) -> dict[str, set[Any]]:
+    result: dict[str, set[Any]] = {}
     for fact in facts:
-        result.setdefault(fact.fact_type, set()).add(fact.value)
+        value = (
+            _canonical_fact_value(fact.value)
+            if isinstance(fact.value, (Mapping, list, tuple))
+            else fact.value
+        )
+        result.setdefault(fact.fact_type, set()).add(value)
     return result
 
 
@@ -780,8 +832,8 @@ def collect_sec_evidence(
         return _empty_result(context, selection, shared_budget, selection.blockers)
 
     evidence_rows: list[SecEvidence] = []
-    facts: list[SecFact] = []
     blockers: list[str] = list(selection.blockers)
+    completed_documents = 0
     for filing in selection.filings:
         try:
             response = transport.get(
@@ -805,6 +857,7 @@ def collect_sec_evidence(
         if not rendered:
             blockers.append("sec_document_unavailable")
             continue
+        completed_documents += 1
         document_digest = hashlib.sha256(response.body).hexdigest()
         for excerpt, rendered_ranges in _evidence_excerpts(rendered, context):
             excerpt_digest = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
@@ -835,7 +888,25 @@ def collect_sec_evidence(
                 },
             )
             evidence_rows.append(evidence)
-            facts.extend(_extract_facts(evidence, context))
+
+    filing_chain_complete = (
+        completed_documents == len(selection.filings) and not selection.blockers
+    )
+    evidence_rows = [
+        replace(
+            evidence,
+            source_locator={
+                **dict(evidence.source_locator),
+                "filing_chain_complete": filing_chain_complete,
+            },
+        )
+        for evidence in evidence_rows
+    ]
+    facts = [
+        fact
+        for evidence in evidence_rows
+        for fact in _extract_facts(evidence, context)
+    ]
 
     conflicts = detect_fact_conflicts(facts)
     if conflicts:

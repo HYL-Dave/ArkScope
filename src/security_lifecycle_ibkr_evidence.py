@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,7 @@ from src.security_lifecycle_sec_evidence import IdentityContext
 _ENTITLEMENT_ERROR_CODES = frozenset({354, 10089, 10090, 10091, 10167, 10168})
 _MAX_EXCERPT_BYTES = 4096
 _MAX_VALID_EXCHANGES = 32
+_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
 
 
 class IBKRContractGateway(Protocol):
@@ -151,10 +153,23 @@ def _snapshot(detail: object, *, retrieved_at: str) -> dict[str, Any]:
     }
 
 
-def _queries(context: IdentityContext, *, max_queries: int) -> tuple[Contract, ...]:
-    aliases = (context.current_ticker,) + tuple(
-        alias for alias in context.ticker_aliases if alias != context.current_ticker
-    )
+def _queries(
+    context: IdentityContext,
+    *,
+    candidate_tickers: Iterable[str],
+    max_queries: int,
+) -> tuple[Contract, ...]:
+    aliases: list[str] = []
+    for raw in (
+        context.current_ticker,
+        *context.ticker_aliases,
+        *candidate_tickers,
+    ):
+        ticker = str(raw or "").strip().upper()
+        if not _TICKER.fullmatch(ticker):
+            raise ValueError("ibkr_candidate_ticker")
+        if ticker not in aliases:
+            aliases.append(ticker)
     queries: tuple[Contract, ...] = tuple(
         Contract(conId=con_id, exchange="SMART") for con_id in context.ibkr_conids
     ) + tuple(Stock(alias, "SMART", "USD") for alias in aliases)
@@ -333,6 +348,7 @@ def read_ibkr_contract_evidence(
     gateway: IBKRContractGateway,
     gateway_lock: GatewayLock,
     context: IdentityContext,
+    candidate_tickers: Iterable[str] = (),
     retrieved_at: str,
     lock_timeout_s: float = 30.0,
     max_queries: int = 8,
@@ -352,7 +368,11 @@ def read_ibkr_contract_evidence(
         raise ValueError("max_queries")
 
     at = _timestamp(retrieved_at)
-    queries = _queries(context, max_queries=max_queries)
+    queries = _queries(
+        context,
+        candidate_tickers=candidate_tickers,
+        max_queries=max_queries,
+    )
     requests_made = 0
     detail_rows: list[object] = []
 

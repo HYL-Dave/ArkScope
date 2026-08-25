@@ -275,7 +275,13 @@ def test_ccl_fixture_extracts_no_tracked_security_identity_change():
     _case_data, _transport, result = _collect("CCL")
     assert _values(result, "source_ticker") == {"CCL"}
     assert _values(result, "successor_ticker") == set()
-    assert _values(result, "transaction_structure") == {"corporate_unification"}
+    transaction = next(
+        fact.value for fact in result.facts if fact.fact_type == "transaction_structure"
+    )
+    assert transaction == {
+        "kind": "corporate_unification",
+        "terms_status": "not_extracted",
+    }
     assert _values(result, "tracked_security_effect") == {"no_identity_change"}
     assert result.symbol_transitions == ()
 
@@ -378,6 +384,24 @@ def test_complete_explicit_form25_chain_emits_terminal_delisting_while_partial_c
     assert {row.source_locator["filing_chain_complete"] for row in partial.evidence} == {
         False
     }
+
+    no_date = collect_sec_evidence(
+        context=context,
+        transport=_FixtureTransport(
+            {
+                **case,
+                "document": (
+                    "<html><body><p>CIK 0001409970. The DROP common stock will be "
+                    "removed from listing on the Nasdaq Capital Market.</p></body></html>"
+                ),
+            }
+        ),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+    assert {row.source_locator["filing_chain_complete"] for row in no_date.evidence} == {
+        True
+    }
+    assert _values(no_date, "tracked_security_effect") == set()
 
 
 def test_incompatible_current_values_emit_typed_conflicts_not_majority():

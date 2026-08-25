@@ -506,8 +506,33 @@ def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_pat
         run = store.list_automation_runs(case["case_id"])[0]
         assert retried["accepted"] == 1
         assert len(harness.approval_calls) == 2
+        assert len(harness.evidence_calls) == 1
+        assert len(store.list_assessments(case["case_id"])) == 1
+        assert len(store.list_proposals(case["case_id"])) == 2
         assert run["action_readiness"] == "transition_eligible"
         assert run["blockers"] == []
+    finally:
+        harness.conn.close()
+
+
+def test_transition_approval_unavailable_is_visible_and_retryable(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.approval_error = ConnectionError("transition store unavailable")
+    try:
+        result = harness.worker_with_transition_approver().run()
+
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        assert result["accepted"] == 1
+        assert result["failed"] == 0
+        assert run["status"] == "succeeded"
+        assert run["action_readiness"] == "waiting_transition_revalidation"
+        assert [row["blocker_code"] for row in run["blockers"]] == [
+            "transition_approval_unavailable"
+        ]
+        assert len(store.list_assessments(case["case_id"])) == 1
+        assert len(store.list_proposals(case["case_id"])) == 2
     finally:
         harness.conn.close()
 
