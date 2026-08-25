@@ -24,19 +24,21 @@ The live run is consumed and may not be repeated without new authorization.
 
 1. A Section 12(b) cover row may establish the current registered symbol and
    source venue only when the symbol equals an existing case alias.
-2. Explicit filing prose may declare a previously unknown successor. HAPN must
+2. An inline-XBRL CIK token may establish `issuer_cik` only when the exact
+   10-digit token equals the case CIK and the cited span contains that token.
+3. Explicit filing prose may declare a previously unknown successor. HAPN must
    resolve `LC -> HAPN`, `NYSE -> NASDAQ`, effective when Nasdaq trading begins
    on `2026-06-22`; the successor must not be inserted into aliases first.
-3. QBTS must resolve a same-symbol venue transfer, `NYSE -> NASDAQ`, effective
+4. QBTS must resolve a same-symbol venue transfer, `NYSE -> NASDAQ`, effective
    when Nasdaq trading begins on `2026-07-27`, with no symbol transition.
-4. An explicit completed dual-listed-company unification plus same-share/current
+5. An explicit completed dual-listed-company unification plus same-share/current
    registered-symbol continuity resolves CCL as no tracked-security identity
    change.
-5. An explicit asset-purchase agreement plus current registered-symbol
+6. An explicit asset-purchase agreement plus current registered-symbol
    continuity resolves BLBD as an asset acquisition with no registrant identity
    change. Extract the named counterparty as partial terms; do not invent
    per-security cash, exchange ratio, or an identity effective date.
-6. Dates are extracted only from clauses that bind the date to the tracked
+7. Dates are extracted only from clauses that bind the date to the tracked
    identity/listing event. A different agreement's `effective` clause may not
    become the security transition date.
 
