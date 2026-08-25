@@ -426,3 +426,144 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
             ]
     finally:
         profile.close()
+
+
+def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.security_lifecycle_fact_kernel import (
+        AutomationBlocker,
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+
+    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    excerpt = "EA may continue under ticker EA2."
+    excerpt_digest = hashlib.sha256(excerpt.encode()).hexdigest()
+    cited_digest = hashlib.sha256(b"EA2").hexdigest()
+
+    def material(run_name):
+        evidence = AutomationEvidence(
+            evidence_id=f"evidence-{run_name}",
+            source_family="regulator",
+            adapter="sec_edgar",
+            kind="regulator_excerpt",
+            source_url="https://www.sec.gov/Archives/example/ea-8k.htm",
+            title="EA filing",
+            publisher="SEC EDGAR",
+            domain="sec.gov",
+            source_published_at="2026-08-20",
+            retrieved_at=_AT,
+            excerpt=excerpt,
+            content_sha256=excerpt_digest,
+            source_document_sha256="d" * 64,
+            source_locator={"accession": "0000712515-26-000042"},
+            evidence_dedupe_key=f"sec:{run_name}",
+        )
+        fact = AutomationFact(
+            evidence_id=evidence.evidence_id,
+            fact_type="successor_ticker",
+            normalized_value="EA2",
+            source_span_start=29,
+            source_span_end=32,
+            cited_text_sha256=cited_digest,
+            extractor_rule_id="sec.symbol_change",
+            extractor_rule_version="1",
+        )
+        return evidence, fact
+
+    try:
+        from src.security_lifecycle_investigation import observation_fingerprint
+        from src.security_lifecycle import read_market_observations
+
+        fingerprint = observation_fingerprint(
+            read_market_observations(str(market_path), limit=None)[0]
+        )
+        kernel = SecurityLifecycleFactKernel(store)
+        blocked = kernel.reserve_run(
+            case_id=case_id,
+            observation_fingerprint_sha256=fingerprint,
+            policy_version=AUTOMATION_POLICY_VERSION,
+            mode="live",
+            query_context={"case_id": case_id, "adapter": "sec_edgar"},
+            diagnostics={},
+            at=_AT,
+        )
+        blocked_evidence, blocked_fact = material("blocked")
+        kernel.complete_run(
+            run_id=blocked.run_id,
+            evidence=(blocked_evidence,),
+            facts=(blocked_fact,),
+            blockers=(
+                AutomationBlocker(
+                    code="sec_rate_limited",
+                    retryable=True,
+                    context={"provider": "sec_edgar"},
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at="2026-08-21T00:00:00Z",
+            diagnostics={"sec_attempts": 2},
+            at=_AT,
+        )
+        succeeded = kernel.reserve_run(
+            case_id=case_id,
+            observation_fingerprint_sha256=fingerprint,
+            policy_version=AUTOMATION_POLICY_VERSION,
+            mode="historical",
+            query_context={"case_id": case_id, "adapter": "sec_edgar"},
+            diagnostics={},
+            at="2026-08-20T00:01:00Z",
+        )
+        succeeded_evidence, succeeded_fact = material("succeeded")
+        kernel.complete_run(
+            run_id=succeeded.run_id,
+            evidence=(succeeded_evidence,),
+            facts=(succeeded_fact,),
+            blockers=(),
+            decision_tier="review_suggested",
+            action_readiness="action_blocked",
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at="2026-08-20T00:01:00Z",
+        )
+
+        tools = _configure(monkeypatch, market_path, profile_path)
+        payload = tools.get_security_lifecycle_case(case_id)
+        case = payload["case"]
+        rendered = json.dumps(case, sort_keys=True)
+
+        assert case["automation_run_count"] == 2
+        assert case["automation_fact_count"] == 2
+        assert case["automation_tier"] == "review_suggested"
+        assert case["action_readiness"] == "action_blocked"
+        assert case["truncation"]["automation_runs"] == {
+            "total": 2,
+            "returned": 2,
+        }
+        assert case["truncation"]["automation_facts"] == {
+            "total": 2,
+            "returned": 2,
+        }
+        assert {
+            blocker["blocker_code"]
+            for run in case["automation_runs"]
+            for blocker in run["blockers"]
+        } == {"sec_rate_limited"}
+        assert all(
+            fact["source_family"] == "regulator"
+            and fact["normalized_value"] == "EA2"
+            and fact["evidence_id"]
+            and fact["cited_text_sha256"] == cited_digest
+            for fact in case["automation_facts"]
+        )
+        assert "query_context" not in rendered
+        assert "diagnostics" not in rendered
+        assert "sec_edgar" not in rendered
+        assert "source_locator" not in rendered
+    finally:
+        profile.close()

@@ -344,6 +344,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
 def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
+        automation_assessment_id = _create_automation_draft(context)
         client = _client(context, monkeypatch)
         evidence_id = _add_manual(client, context["case_id"])
         assessment_id = _create_draft(client, context, evidence_id)
@@ -356,10 +357,26 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         assert payload["observation"]["source_ref"] == _SOURCE_REF
         assert payload["observation_fingerprint_sha256"] == context["fingerprint"]
         assert payload["active_sources"] == ["manual_lists"]
-        assert len(payload["evidence"]) == 1
+        assert len(payload["evidence"]) == 2
+        assert {row["source_family"] for row in payload["evidence"]} == {
+            "manual",
+            "regulator",
+        }
         assert payload["current_assessment"]["assessment_id"] == assessment_id
         assert payload["acknowledgement_history"] == []
         assert payload["proposals"]
+        assert len(payload["automation_runs"]) == 1
+        assert payload["automation_runs"][0]["status"] == "succeeded"
+        assert payload["automation_runs"][0]["decision_tier"] == "review_suggested"
+        assert payload["automation_runs"][0]["action_readiness"] == "action_blocked"
+        assert payload["automation_runs"][0]["blockers"] == []
+        assert len(payload["automation_facts"]) == 1
+        assert payload["automation_facts"][0]["fact_type"] == "successor_ticker"
+        assert payload["automation_facts"][0]["normalized_value"] == "EA2"
+        assert payload["automation_facts"][0]["source_family"] == "regulator"
+        assert automation_assessment_id in {
+            row["assessment_id"] for row in payload["assessment_history"]
+        }
     finally:
         context["profile_conn"].close()
 
