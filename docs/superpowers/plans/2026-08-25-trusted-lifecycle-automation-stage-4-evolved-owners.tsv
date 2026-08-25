@@ -8,6 +8,7 @@ tests/test_security_lifecycle_routes.py::test_case_detail_separates_source_evide
 tests/test_security_lifecycle_tools.py::test_case_detail_projects_automation_runs_facts_and_typed_blockers	T2/T3	Provider-neutral detail gains transition authority/activity while omitting translated prose.
 tests/test_api.py::test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes	T2/T3	The global exact route count changes from 184 to 187 for the three reviewed routes.
 apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx::preserves the accepted meaning of the real migrated legacy review in both locales	T4	The fixture gains Stage 3 automation and Stage 4 activity/translation truth while preserving source text.
+apps/arkscope-web/src/i18n/resources.test.ts::contains the exact Explore subtree inventory in both locales	T4	The exact lifecycle-subtree and Explore leaf counts increase with the reviewed Stage 4 bilingual labels.
 apps/arkscope-web/src/i18n/resources.test.ts::keeps Explore resources statically bundled and free of source values	T4	The closed bilingual lifecycle resource subtree gains Stage 4 labels.
 apps/arkscope-web/src/i18n/resources.test.ts::keeps locale namespace and recursive key paths identical	T4	Both locales gain the exact same Stage 4 keys.
 apps/arkscope-web/src/i18n/resources.test.ts::requires every resource leaf to be a non-empty string	T4	Every new Stage 4 leaf remains non-empty.

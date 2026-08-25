@@ -157,6 +157,14 @@ def translate_evidence(
 
 ## Task 4: Render Complete Decision Truth And Reversible Visibility
 
+**Pre-RED ownership amendment (2026-08-25):** The mechanical resource blast-radius
+scan found that adding any Stage 4 lifecycle leaf also evolves
+`contains the exact Explore subtree inventory in both locales`, because that
+owner pins both the lifecycle-subtree and total Explore leaf counts. The node is
+now listed explicitly in the evolved-owner ledger. This changes no product or
+test bytes, adds no test node, and leaves the focused/full frontend targets at
+`60` and `105` files / `1227` tests.
+
 **Files:**
 - Modify: `apps/arkscope-web/src/api.ts`
 - Create: `apps/arkscope-web/src/lifecycle/LifecycleActivityBand.tsx`
@@ -174,7 +182,7 @@ def translate_evidence(
 
 **Interfaces:** Adds compile-time closed API types/presentations, a first-view activity band, complete automation/fact views, suggestion prefill, and adjacent translation controls.
 
-- [ ] Add the seven frontend nodes. RED must be confined to the named additions/evolved owners; a fifth resource owner or unrelated visible-literal failure is an amendment stop.
+- [ ] Add the seven frontend nodes. RED must be confined to the named additions/evolved owners; another unlisted resource owner or unrelated visible-literal failure is an amendment stop.
 - [ ] Add exact TypeScript unions/interfaces for decision tier, readiness, author/method/acceptance authority, source family, facts, blockers, translations, transition approval, and activity. Unknown boundary values render as unknown, never another known label.
 - [ ] Render unacknowledged automatic activity before filters/table. Each item states old/new or terminal action, effective/applied time, changed user-owned categories, retained provider-owned data, rule/version, acknowledgement, Reverse, or exact reverse blocker. Render does not call acknowledgement.
 - [ ] Keep acknowledged activity in recent history and case detail. Acknowledge only lowers prominence; it is not approval/consent and does not hide Reverse.
