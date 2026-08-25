@@ -143,6 +143,72 @@ def test_detail_tool_is_local_read_only_and_returns_source_missing_history(tmp_p
         profile.close()
 
 
+def test_case_detail_projects_original_evidence_with_derived_translations(
+    tmp_path, monkeypatch
+):
+    from src.security_lifecycle_translation import (
+        EvidenceTranslationResult,
+        translate_evidence,
+    )
+
+    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    try:
+        evidence_id = store.add_evidence(
+            case_id=case_id,
+            run_id=None,
+            kind="manual_text",
+            adapter="manual",
+            excerpt="The issuer will trade under symbol EA2.",
+            source_url=None,
+            title="Issuer notice",
+            publisher=None,
+            domain=None,
+            source_published_at=None,
+            retrieved_at=None,
+            mime_type="text/plain",
+            document_status=None,
+            at=_AT,
+        )
+        translate_evidence(
+            store,
+            evidence_id=evidence_id,
+            locale="zh-Hant",
+            translator=lambda _text, _locale: EvidenceTranslationResult(
+                translated_text="發行人將以 EA2 代號交易。",
+                provider="anthropic",
+                model="claude-sonnet-5",
+                harness="claude_subscription_structured_output",
+            ),
+            at=_AT,
+        )
+        tools = _configure(monkeypatch, market_path, profile_path)
+
+        payload = tools.get_security_lifecycle_case(case_id)
+        evidence = next(
+            row
+            for row in payload["case"]["evidence"]
+            if row["evidence_id"] == evidence_id
+        )
+
+        assert evidence["excerpt"] == "The issuer will trade under symbol EA2."
+        assert evidence["translations"] == [
+            {
+                "evidence_id": evidence_id,
+                "evidence_content_sha256": hashlib.sha256(
+                    b"The issuer will trade under symbol EA2."
+                ).hexdigest(),
+                "locale": "zh-Hant",
+                "provider": "anthropic",
+                "model": "claude-sonnet-5",
+                "harness": "claude_subscription_structured_output",
+                "translated_at": _AT,
+            }
+        ]
+        assert "translated_text" not in json.dumps(evidence["translations"])
+    finally:
+        profile.close()
+
+
 def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     from src.auth_drivers.chatgpt_oauth_driver import _RESEARCH_READONLY_TOOLS as openai
     from src.auth_drivers.claude_code_sdk_driver import _RESEARCH_READONLY_TOOLS as anthropic
@@ -531,6 +597,29 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
             diagnostics={"sec_attempts": 1},
             at="2026-08-20T00:01:00Z",
         )
+        translated_evidence_id = str(
+            profile.execute(
+                "SELECT evidence_id FROM security_lifecycle_evidence "
+                "WHERE automation_run_id=?",
+                (succeeded.run_id,),
+            ).fetchone()[0]
+        )
+        profile.execute(
+            "INSERT INTO security_lifecycle_evidence_translations "
+            "(evidence_id,evidence_content_sha256,locale,translated_text,provider,"
+            "model,harness,translated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (
+                translated_evidence_id,
+                succeeded_evidence.content_sha256,
+                "zh-Hant",
+                "EA 將以 EA2 延續。",
+                "anthropic",
+                "claude-sonnet-5",
+                "claude_subscription_structured_output",
+                "2026-08-20T00:01:30Z",
+            ),
+        )
+        profile.commit()
 
         assessment_id = store.create_assessment(
             case_id=case_id,
@@ -701,6 +790,22 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
             "adapter" not in evidence and "source_locator_json" not in evidence
             for evidence in case["evidence"]
         )
+        translated = next(
+            evidence
+            for evidence in case["evidence"]
+            if evidence["evidence_id"] == translated_evidence_id
+        )
+        assert translated["translations"] == [
+            {
+                "evidence_id": translated_evidence_id,
+                "evidence_content_sha256": succeeded_evidence.content_sha256,
+                "locale": "zh-Hant",
+                "provider": "anthropic",
+                "model": "claude-sonnet-5",
+                "harness": "claude_subscription_structured_output",
+                "translated_at": "2026-08-20T00:01:30Z",
+            }
+        ]
         assert case["ticker_transition"]["approval_authority"] == (
             "automation_policy"
         )

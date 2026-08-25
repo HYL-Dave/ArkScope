@@ -332,9 +332,13 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
             "POST",
             "/security-lifecycle/transition-activity/{activity_id}/acknowledge",
         ),
+        (
+            "POST",
+            "/security-lifecycle/evidence/{evidence_id}/translations",
+        ),
     }
     assert expected <= rows
-    assert len(rows) == 186
+    assert len(rows) == 187
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",
@@ -352,6 +356,28 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         automation_assessment_id = _create_automation_draft(context)
         client = _client(context, monkeypatch)
         evidence_id = _add_manual(client, context["case_id"])
+        evidence = dict(
+            context["profile_conn"].execute(
+                "SELECT * FROM security_lifecycle_evidence WHERE evidence_id=?",
+                (evidence_id,),
+            ).fetchone()
+        )
+        context["profile_conn"].execute(
+            "INSERT INTO security_lifecycle_evidence_translations "
+            "(evidence_id,evidence_content_sha256,locale,translated_text,provider,"
+            "model,harness,translated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (
+                evidence_id,
+                evidence["content_sha256"],
+                "zh-Hant",
+                "官方發行人證據。",
+                "anthropic",
+                "claude-sonnet-5",
+                "claude_subscription_structured_output",
+                _AT,
+            ),
+        )
+        context["profile_conn"].commit()
         assessment_id = _create_draft(client, context, evidence_id)
         assert client.post(
             f"/security-lifecycle/assessments/{assessment_id}/accept"
@@ -367,6 +393,22 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
             "manual",
             "regulator",
         }
+        translated = next(
+            row for row in payload["evidence"] if row["evidence_id"] == evidence_id
+        )
+        assert translated["excerpt"] == "Official issuer evidence."
+        assert translated["translations"] == [
+            {
+                "evidence_id": evidence_id,
+                "evidence_content_sha256": evidence["content_sha256"],
+                "locale": "zh-Hant",
+                "translated_text": "官方發行人證據。",
+                "provider": "anthropic",
+                "model": "claude-sonnet-5",
+                "harness": "claude_subscription_structured_output",
+                "translated_at": _AT,
+            }
+        ]
         assert payload["current_assessment"]["assessment_id"] == assessment_id
         assert payload["acknowledgement_history"] == []
         assert payload["proposals"]
@@ -382,6 +424,113 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         assert automation_assessment_id in {
             row["assessment_id"] for row in payload["assessment_history"]
         }
+    finally:
+        context["profile_conn"].close()
+
+
+def test_evidence_translation_route_caches_and_returns_typed_provenance(
+    tmp_path, monkeypatch
+):
+    from src.api.routes import security_lifecycle as routes
+    from src.security_lifecycle_translation import EvidenceTranslationResult
+
+    context = _build_context(tmp_path)
+    permission_calls: list[str] = []
+    translator_calls: list[tuple[str, str]] = []
+
+    def permission(action, _detail):
+        permission_calls.append(action)
+
+    def translator(text: str, locale: str):
+        translator_calls.append((text, locale))
+        return EvidenceTranslationResult(
+            translated_text="官方發行人證據。",
+            provider="anthropic",
+            model="claude-sonnet-5",
+            harness="claude_subscription_structured_output",
+        )
+
+    try:
+        client = _client(context, monkeypatch, permissions=permission)
+        monkeypatch.setattr(routes, "_translate_evidence_text", translator)
+        evidence_id = _add_manual(client, context["case_id"])
+
+        first = client.post(
+            f"/security-lifecycle/evidence/{evidence_id}/translations",
+            json={"locale": "zh-Hant"},
+        )
+        second = client.post(
+            f"/security-lifecycle/evidence/{evidence_id}/translations",
+            json={"locale": "zh-Hant"},
+        )
+
+        assert first.status_code == 200
+        assert first.json() == {
+            "evidence_id": evidence_id,
+            "evidence_content_sha256": hashlib.sha256(
+                b"Official issuer evidence."
+            ).hexdigest(),
+            "locale": "zh-Hant",
+            "translated_text": "官方發行人證據。",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5",
+            "harness": "claude_subscription_structured_output",
+            "translated_at": _AT,
+            "cached": False,
+        }
+        assert second.json() == {**first.json(), "cached": True}
+        assert permission_calls.count("security_lifecycle_add_evidence") == 1
+        assert permission_calls.count("security_lifecycle_translate_evidence") == 1
+        assert translator_calls == [("Official issuer evidence.", "zh-Hant")]
+    finally:
+        context["profile_conn"].close()
+
+
+def test_evidence_translation_route_validates_before_permission_and_masks_failures(
+    tmp_path, monkeypatch
+):
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path)
+    permission_calls: list[str] = []
+    translator_calls: list[str] = []
+
+    def permission(action, _detail):
+        permission_calls.append(action)
+
+    def failed_translator(_text: str, _locale: str):
+        translator_calls.append("called")
+        raise RuntimeError("credential-secret-must-not-escape")
+
+    try:
+        client = _client(context, monkeypatch, permissions=permission)
+        monkeypatch.setattr(routes, "_translate_evidence_text", failed_translator)
+        evidence_id = _add_manual(client, context["case_id"])
+        permission_calls.clear()
+
+        invalid_locale = client.post(
+            f"/security-lifecycle/evidence/{evidence_id}/translations",
+            json={"locale": "fr"},
+        )
+        missing = client.post(
+            "/security-lifecycle/evidence/missing/translations",
+            json={"locale": "zh-Hant"},
+        )
+        failed = client.post(
+            f"/security-lifecycle/evidence/{evidence_id}/translations",
+            json={"locale": "zh-Hant"},
+        )
+
+        assert invalid_locale.status_code == 422
+        assert missing.status_code == 404
+        assert failed.status_code == 502
+        assert failed.json() == {"detail": {"code": "translation_failed"}}
+        assert "credential-secret" not in failed.text
+        assert permission_calls == ["security_lifecycle_translate_evidence"]
+        assert translator_calls == ["called"]
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_evidence_translations"
+        ).fetchone()[0] == 0
     finally:
         context["profile_conn"].close()
 

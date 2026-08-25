@@ -109,6 +109,56 @@ def test_translation_validation_rejects_list_count_change():
         _validate_translation(card, {**card, "primary_reasons": ["只剩一條"]})
 
 
+def test_translate_text_uses_fixed_translation_shape_without_card_model(monkeypatch):
+    from types import SimpleNamespace
+
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: SimpleNamespace(
+            provider="anthropic",
+            model="claude-sonnet-5",
+            effort="low",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda _provider: SimpleNamespace(source="oauth_driver_unwired"),
+    )
+    monkeypatch.setattr(
+        cs,
+        "_translate_anthropic",
+        lambda *args, **kwargs: calls.append((args, kwargs))
+        or {"translated_text": "發行人將以 EA2 交易。"},
+    )
+
+    result = cs.translate_text(
+        "The issuer will trade as EA2.",
+        lang="zh-Hant",
+        model_timeout_s=123,
+    )
+
+    assert result == {
+        "translated_text": "發行人將以 EA2 交易。",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "harness": "claude_subscription_structured_output",
+    }
+    args, kwargs = calls[0]
+    assert args[0] == "claude-sonnet-5"
+    assert args[2] == '{"text":"The issuer will trade as EA2."}'
+    assert args[3] == {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"translated_text": {"type": "string"}},
+        "required": ["translated_text"],
+    }
+    assert kwargs["model_timeout_s"] == 123
+
+
 def test_task_model_routing(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
     from src.agents.config import get_agent_config, task_model, task_route
