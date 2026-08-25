@@ -17,10 +17,13 @@ const apiMocks = vi.hoisted(() => ({
   getSecurityLifecycleCase: vi.fn(),
   getSecurityLifecycleInvestigation: vi.fn(),
   getTickerIdentityTransitionPreview: vi.fn(),
+  listTickerIdentityTransitionActivity: vi.fn(),
   listSecurityLifecycleCases: vi.fn(),
+  acknowledgeTickerIdentityTransitionActivity: vi.fn(),
   reopenSecurityLifecycleAcknowledgement: vi.fn(),
   retryTickerIdentityTransition: vi.fn(),
   reverseTickerIdentityTransition: vi.fn(),
+  translateSecurityLifecycleEvidence: vi.fn(),
 }));
 
 vi.mock("../api", async (importOriginal) => ({
@@ -39,11 +42,22 @@ const LEGACY_ASSESSMENT = {
   assessment_id: "assessment-legacy",
   status: "accepted",
   author: "legacy_review",
+  automation_method: null,
+  acceptance_authority: "legacy_migration",
+  automation_run_id: null,
+  rule_id: null,
+  rule_version: null,
+  decision_provenance_sha256: null,
   relevance: "direct_tracked_security",
   confidence: "unknown",
   conclusion: "Legacy review marked a symbol or venue change.",
   impact_summary: "The legacy label did not distinguish renaming from transfer.",
   outcomes: ["symbol_or_venue_changed"],
+  citations: [{
+    reference_kind: "observation",
+    evidence_id: null,
+    cited_content_sha256: "f".repeat(64),
+  }],
   stale: false,
   created_at: "2026-08-17T00:00:00Z",
   counterparty_name: null,
@@ -55,6 +69,43 @@ const LEGACY_ASSESSMENT = {
   consideration_currency: null,
   cash_per_security_decimal: null,
   exchange_ratio_decimal: null,
+};
+
+const AUTOMATION_DRAFT = {
+  assessment_id: "assessment-automation",
+  status: "draft",
+  author: "automation",
+  automation_method: "deterministic_rule",
+  acceptance_authority: null,
+  automation_run_id: "automation-run-1",
+  rule_id: "m-and-a-review",
+  rule_version: "2",
+  decision_provenance_sha256: "d".repeat(64),
+  relevance: "direct_tracked_security",
+  confidence: "medium",
+  conclusion: "The transaction requires review before changing tracking.",
+  impact_summary: "Confirm the successor security and consideration terms.",
+  outcomes: ["acquisition_terms_unknown"],
+  citations: [{
+    reference_kind: "observation",
+    evidence_id: null,
+    cited_content_sha256: "f".repeat(64),
+  }, {
+    reference_kind: "evidence",
+    evidence_id: "evidence-sec",
+    cited_content_sha256: "a".repeat(64),
+  }],
+  stale: false,
+  created_at: "2026-08-25T10:00:00Z",
+  counterparty_name: "Acquirer Corp.",
+  counterparty_ticker: "ACQ",
+  counterparty_cik: "0000123456",
+  successor_ticker: "NEW",
+  destination_venue: "Nasdaq",
+  effective_date: "2026-09-30",
+  consideration_currency: "USD",
+  cash_per_security_decimal: "10.50",
+  exchange_ratio_decimal: "0.25",
 };
 
 const CASES = [
@@ -179,11 +230,51 @@ function detail(overrides: Record<string, unknown> = {}) {
     }],
     evidence: [{
       evidence_id: "evidence-sec",
-      kind: "provider_document",
+      source_family: "regulator",
+      kind: "regulator_excerpt",
       excerpt: PROVIDER_EVIDENCE,
       source_url: "https://www.sec.gov/Archives/example/qbts.htm",
       content_sha256: "a".repeat(64),
+      title: "NYSE withdrawal notice",
+      publisher: "U.S. Securities and Exchange Commission",
+      source_published_at: "2026-07-24T12:00:00Z",
+      translations: [{
+        evidence_id: "evidence-sec",
+        evidence_content_sha256: "a".repeat(64),
+        locale: "en",
+        translated_text: "SEC source: Units of Beneficial Interest",
+        provider: "openai",
+        model: "gpt-5",
+        harness: "responses-api",
+        translated_at: "2026-08-25T11:00:00Z",
+      }],
       created_at: "2026-08-20T00:00:00Z",
+    }],
+    automation_runs: [{
+      run_id: "automation-run-default",
+      case_id: CASE_ID,
+      mode: "historical",
+      status: "succeeded",
+      policy_version: "lifecycle-automation-v1",
+      decision_tier: "verified_automatic",
+      action_readiness: "not_applicable",
+      failure_code: null,
+      blockers: [],
+      created_at: "2026-08-25T09:00:00Z",
+    }],
+    automation_facts: [{
+      fact_id: "fact-default",
+      automation_run_id: "automation-run-default",
+      evidence_id: "evidence-sec",
+      source_family: "regulator",
+      fact_type: "source_ticker",
+      normalized_value: "QBTS",
+      source_span_start: 0,
+      source_span_end: 4,
+      cited_text_sha256: "c".repeat(64),
+      extractor_rule_id: "sec-symbol",
+      extractor_rule_version: "1",
+      created_at: "2026-08-25T09:00:00Z",
     }],
     assessment_history: [LEGACY_ASSESSMENT],
     acknowledgement_history: [],
@@ -305,6 +396,15 @@ beforeEach(async () => {
     status: "dismissed",
   });
   apiMocks.getTickerIdentityTransitionPreview.mockResolvedValue(TRANSITION_PREVIEW);
+  apiMocks.listTickerIdentityTransitionActivity.mockResolvedValue({
+    items: [],
+    count: 0,
+    unacknowledged_count: 0,
+  });
+  apiMocks.acknowledgeTickerIdentityTransitionActivity.mockResolvedValue({
+    activity_id: "activity-1",
+    acknowledged_at: "2026-08-25T13:00:00Z",
+  });
   apiMocks.approveTickerIdentityTransition.mockResolvedValue({
     transition_id: "transition-1",
     status: "approved",
@@ -320,6 +420,17 @@ beforeEach(async () => {
   apiMocks.reverseTickerIdentityTransition.mockResolvedValue({
     transition_id: "transition-1",
     status: "reversed",
+  });
+  apiMocks.translateSecurityLifecycleEvidence.mockResolvedValue({
+    evidence_id: "evidence-sec",
+    evidence_content_sha256: "a".repeat(64),
+    locale: "en",
+    translated_text: "Translated excerpt",
+    provider: "openai",
+    model: "gpt-5",
+    harness: "responses-api",
+    translated_at: "2026-08-25T13:00:00Z",
+    cached: false,
   });
 });
 
@@ -557,13 +668,177 @@ describe("Lifecycle workflow", () => {
       .find((item) => item.textContent?.includes("Legacy review"));
     expect(legacy?.textContent).toContain("Directly concerns the tracked security");
     expect(legacy?.textContent).toContain("Symbol or trading venue changed (legacy review)");
+    expect(legacy?.textContent).toContain("Accepted through legacy migration");
     expect(legacy?.textContent).not.toContain("Undetermined");
+    expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
 
     await act(async () => { await i18n.changeLanguage("zh-Hant"); });
     await flush();
     expect(legacy?.textContent).toContain("直接涉及追蹤證券");
     expect(legacy?.textContent).toContain("代號或交易市場異動（舊覆核未區分）");
+    expect(legacy?.textContent).toContain("由舊資料遷移保留的接受結果");
     expect(legacy?.textContent).not.toContain("尚未判定");
+    expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
+  });
+
+  it("renders automation provenance grouped facts and typed blockers", async () => {
+    const automated = {
+      ...AUTOMATION_DRAFT,
+      status: "accepted",
+      acceptance_authority: "automation_policy",
+    };
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      current_assessment: automated,
+      assessment_history: [automated],
+      automation_runs: [{
+        run_id: "automation-run-1",
+        case_id: CASE_ID,
+        mode: "historical",
+        status: "blocked",
+        policy_version: "lifecycle-automation-v1",
+        decision_tier: "review_suggested",
+        action_readiness: "action_blocked",
+        failure_code: null,
+        blockers: [{ blocker_code: "source_conflict", retryable: false }],
+        created_at: "2026-08-25T10:00:00Z",
+      }],
+      automation_facts: [{
+        fact_id: "fact-source",
+        automation_run_id: "automation-run-1",
+        evidence_id: "evidence-sec",
+        source_family: "regulator",
+        fact_type: "source_ticker",
+        normalized_value: "LC",
+        source_span_start: 0,
+        source_span_end: 2,
+        cited_text_sha256: "1".repeat(64),
+        extractor_rule_id: "sec-symbol",
+        extractor_rule_version: "1",
+        created_at: "2026-08-25T10:00:00Z",
+      }, {
+        fact_id: "fact-venue",
+        automation_run_id: "automation-run-1",
+        evidence_id: "evidence-ibkr",
+        source_family: "market_infrastructure",
+        fact_type: "destination_venue",
+        normalized_value: "NASDAQ",
+        source_span_start: 12,
+        source_span_end: 18,
+        cited_text_sha256: "2".repeat(64),
+        extractor_rule_id: "ibkr-venue",
+        extractor_rule_version: "1",
+        created_at: "2026-08-25T10:00:00Z",
+      }],
+    }));
+
+    await mountLifecycle();
+    for (const value of [
+      "Review suggested",
+      "Action blocked",
+      "Automation-generated assessment",
+      "Accepted by automation policy",
+      "Deterministic rule",
+      "m-and-a-review · v2",
+      "Regulatory filing",
+      "Market infrastructure",
+      "Source ticker",
+      "LC",
+      "Destination venue",
+      "NASDAQ",
+      "Conflicting source facts",
+      "Observation citation",
+      "Evidence citation",
+    ]) expect(document.body.textContent).toContain(value);
+  });
+
+  it("prefills the newest automation suggestion without rewriting its authorship", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      current_assessment: LEGACY_ASSESSMENT,
+      assessment_history: [AUTOMATION_DRAFT, LEGACY_ASSESSMENT],
+      automation_runs: [{
+        run_id: "automation-run-1",
+        case_id: CASE_ID,
+        mode: "historical",
+        status: "succeeded",
+        policy_version: "lifecycle-automation-v1",
+        decision_tier: "review_suggested",
+        action_readiness: "action_blocked",
+        failure_code: null,
+        blockers: [],
+        created_at: "2026-08-25T10:00:00Z",
+      }],
+    }));
+
+    await mountLifecycle();
+    expect(document.body.querySelector<HTMLInputElement>(
+      '[aria-label="Successor ticker"]',
+    )?.value).toBe("NEW");
+    expect(document.body.querySelector<HTMLTextAreaElement>(
+      '[aria-label="Assessment conclusion"]',
+    )?.value).toBe(AUTOMATION_DRAFT.conclusion);
+    expect(document.body.textContent).toContain("Automation-generated assessment");
+
+    await click("Accept unchanged suggestion");
+    expect(apiMocks.acceptSecurityLifecycleAssessment).toHaveBeenCalledWith(
+      "assessment-automation",
+    );
+
+    await setField("Assessment conclusion", "Human-corrected conclusion.");
+    await click("Save as human revision");
+    expect(apiMocks.createSecurityLifecycleAssessment).toHaveBeenCalledWith(
+      CASE_ID,
+      expect.objectContaining({
+        conclusion: "Human-corrected conclusion.",
+        successor_ticker: "NEW",
+        citations: expect.arrayContaining([{
+          reference_kind: "observation",
+          cited_content_sha256: "f".repeat(64),
+        }]),
+      }),
+    );
+    expect(AUTOMATION_DRAFT.author).toBe("automation");
+  });
+
+  it("keeps original evidence visible beside machine translation and translation failure", async () => {
+    const secondExcerpt = "交易所公告原文必須保留";
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      evidence: [
+        detail().evidence[0],
+        {
+          evidence_id: "evidence-market",
+          source_family: "market_infrastructure",
+          kind: "market_infrastructure_snapshot",
+          excerpt: secondExcerpt,
+          source_url: "https://example.com/market-notice",
+          content_sha256: "9".repeat(64),
+          title: "Market notice",
+          publisher: "Exchange operator",
+          source_published_at: null,
+          translations: [],
+          created_at: "2026-08-25T10:00:00Z",
+        },
+      ],
+    }));
+    apiMocks.translateSecurityLifecycleEvidence.mockRejectedValue(Object.assign(
+      new Error("private provider failure"),
+      { code: "translation_timeout" },
+    ));
+
+    await mountLifecycle();
+    expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
+    expect(document.body.textContent).toContain("SEC source: Units of Beneficial Interest");
+    expect(document.body.textContent).toContain("Machine translation");
+    expect(document.body.textContent).toContain("openai · gpt-5 · responses-api");
+    expect(document.body.textContent).toContain(secondExcerpt);
+
+    await click("Translate evidence");
+    expect(apiMocks.translateSecurityLifecycleEvidence).toHaveBeenCalledWith(
+      "evidence-market",
+      "en",
+    );
+    expect(document.body.textContent).toContain(secondExcerpt);
+    expect(document.body.textContent).toContain("Translation timed out");
+    expect(document.body.textContent).not.toContain("private provider failure");
   });
 
   it("shows every known structured fact on an accepted assessment", async () => {

@@ -49,6 +49,39 @@ const CAVEAT_LABELS = {
 } satisfies Record<TickerIdentityTransitionCaveat, string>;
 
 describe("ticker identity presentation", () => {
+  it("keeps activity authority and type labels exhaustive with an explicit unknown value", async () => {
+    const presentation = await import("./tickerIdentityPresentation");
+    const activityLabels = {
+      applied: "Applied automatically",
+      reversed: "Reversed",
+    };
+    const authorityLabels = {
+      attended_user: "Approved by user",
+      automation_policy: "Approved by automation policy",
+    };
+
+    expect(presentation.tickerTransitionActivityTypeLabel(
+      "applied",
+      activityLabels,
+      "Unrecognized value",
+    )).toBe("Applied automatically");
+    expect(presentation.tickerTransitionActivityTypeLabel(
+      "future_activity",
+      activityLabels,
+      "Unrecognized value",
+    )).toBe("Unrecognized value");
+    expect(presentation.tickerTransitionApprovalAuthorityLabel(
+      "automation_policy",
+      authorityLabels,
+      "Unrecognized value",
+    )).toBe("Approved by automation policy");
+    expect(presentation.tickerTransitionApprovalAuthorityLabel(
+      "future_authority",
+      authorityLabels,
+      "Unrecognized value",
+    )).toBe("Unrecognized value");
+  });
+
   it("keeps every durable status distinct and uses an explicit unknown value", () => {
     expect(tickerTransitionStatusLabel("approved", STATUS_LABELS, "Unknown")).toBe(
       "Scheduled; waiting for the effective date",
