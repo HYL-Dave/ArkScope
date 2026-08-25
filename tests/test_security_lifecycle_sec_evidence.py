@@ -4,9 +4,20 @@ import hashlib
 import json
 from datetime import date, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "security_lifecycle_automation_sec.json"
+_REAL_SOURCE_ROOT = (
+    Path(__file__).parent.parent
+    / "docs/superpowers/evidence/2026-08-25-trusted-lifecycle-automation-real-source-canary"
+)
+_REAL_CASE_ACCESSIONS = {
+    "HAPN": "0001409970-26-000087",
+    "QBTS": "0001907982-26-000099",
+    "CCL": "0001104659-26-057200",
+    "BLBD": "0001589526-26-000044",
+}
 
 
 def _case(name: str) -> dict:
@@ -101,6 +112,77 @@ def _collect(name: str):
         retrieved_at="2026-08-25T01:02:03.123456Z",
     )
     return case, transport, result
+
+
+def _real_case(name: str) -> dict:
+    legacy = json.loads(
+        (
+            Path(__file__).parent
+            / "fixtures/security_lifecycle_legacy_37.json"
+        ).read_text(encoding="utf-8")
+    )["rows"]
+    accession = _REAL_CASE_ACCESSIONS[name]
+    rows = [
+        row
+        for row in legacy
+        if row["ticker"] == name and row["source_ref"] == accession
+    ]
+    assert rows
+    row = rows[0]
+    current_ticker = "LC" if name == "HAPN" else name
+    items = json.loads(row["filing_items_json"])
+    event_kinds = sorted({candidate["event_type"] for candidate in rows})
+    primary_document = Path(urlsplit(row["evidence_url"]).path).name
+    source_file = f"{name}-{accession}.html"
+    return {
+        "case_id": f"real-source:{name}:{accession}",
+        "observation": {
+            "ticker": current_ticker,
+            "cik": row["cik"],
+            "issuer_name": row["issuer_name"],
+            "filing_date": row["filing_date"],
+            "source_ref": accession,
+            "filing_form": row["filing_form"],
+            "filing_items": items,
+            "event_kinds": event_kinds,
+        },
+        "aliases": [current_ticker],
+        "conids": [],
+        "filing": {
+            "form": row["filing_form"],
+            "filingDate": row["filing_date"],
+            "accessionNumber": accession,
+            "primaryDocument": primary_document,
+            "primaryDocDescription": row["description"],
+            "items": ",".join(items),
+            "cik": row["cik"],
+            "ticker": current_ticker,
+        },
+        "document": (
+            _REAL_SOURCE_ROOT / "sec-source-bytes" / source_file
+        ).read_text(encoding="utf-8"),
+    }
+
+
+def _collect_real(name: str):
+    from src.security_lifecycle_sec_evidence import (
+        build_identity_context,
+        collect_sec_evidence,
+    )
+
+    case = _real_case(name)
+    context = build_identity_context(
+        case_id=case["case_id"],
+        observation=case["observation"],
+        ticker_aliases=case["aliases"],
+        ibkr_conids=case["conids"],
+    )
+    result = collect_sec_evidence(
+        context=context,
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-25T10:27:41.545726Z",
+    )
+    return case, result
 
 
 def _values(result, fact_type: str) -> set[str]:
@@ -301,6 +383,104 @@ def test_blbd_fixture_extracts_asset_acquisition_without_registrant_change():
         "asset_acquisition_no_registrant_change"
     }
     assert result.symbol_transitions == ()
+
+
+def test_real_hapn_first_discovery_extracts_declared_identity_facts():
+    case, result = _collect_real("HAPN")
+
+    assert case["aliases"] == ["LC"]
+    assert _values(result, "issuer_cik") == {"0001409970"}
+    assert _values(result, "source_ticker") == {"LC"}
+    assert _values(result, "successor_ticker") == {"HAPN"}
+    assert _values(result, "source_venue") == {"NYSE"}
+    assert _values(result, "destination_venue") == {"NASDAQ"}
+    assert _values(result, "effective_date") == {"2026-06-22"}
+    assert _values(result, "tracked_security_effect") == {
+        "symbol_and_venue_change"
+    }
+    assert result.symbol_transitions == (("LC", "HAPN"),)
+
+
+def test_real_qbts_extracts_symbol_continuity_and_venue_transfer():
+    _case_data, result = _collect_real("QBTS")
+
+    assert _values(result, "issuer_cik") == {"0001907982"}
+    assert _values(result, "source_ticker") == {"QBTS"}
+    assert _values(result, "successor_ticker") == {"QBTS"}
+    assert _values(result, "source_venue") == {"NYSE"}
+    assert _values(result, "destination_venue") == {"NASDAQ"}
+    assert _values(result, "effective_date") == {"2026-07-27"}
+    assert _values(result, "tracked_security_effect") == {"venue_change_only"}
+    assert result.symbol_transitions == ()
+
+
+def test_real_ccl_unification_resolves_no_tracked_security_change():
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+
+    case, result = _collect_real("CCL")
+    transaction = next(
+        fact.value for fact in result.facts if fact.fact_type == "transaction_structure"
+    )
+
+    assert _values(result, "issuer_cik") == {"0000815097"}
+    assert _values(result, "source_ticker") == {"CCL"}
+    assert _values(result, "successor_ticker") == set()
+    assert _values(result, "effective_date") == set()
+    assert transaction == {
+        "kind": "corporate_unification",
+        "terms_status": "not_extracted",
+    }
+    assert _values(result, "tracked_security_effect") == {"no_identity_change"}
+    decision = evaluate_automation_decision(
+        case={
+            "ticker": "CCL",
+            "cik": case["observation"]["cik"],
+        },
+        evidence=result.evidence,
+        facts=result.facts,
+        current_date="2026-08-25",
+        active_sources=("manual_lists",),
+        transition_preview=lambda _request: None,
+    )
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.rule_id == "lifecycle.no_identity_change"
+    assert decision.transition_requested is False
+
+
+def test_real_blbd_asset_purchase_prefills_counterparty_without_identity_change():
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+
+    case, result = _collect_real("BLBD")
+    transaction = next(
+        fact.value for fact in result.facts if fact.fact_type == "transaction_structure"
+    )
+
+    assert _values(result, "issuer_cik") == {"0001589526"}
+    assert _values(result, "source_ticker") == {"BLBD"}
+    assert _values(result, "successor_ticker") == set()
+    assert _values(result, "effective_date") == set()
+    assert transaction == {
+        "kind": "asset_acquisition",
+        "terms_status": "partial",
+        "counterparty_name": "Detroit Chassis LLC",
+    }
+    assert _values(result, "tracked_security_effect") == {
+        "asset_acquisition_no_registrant_change"
+    }
+    decision = evaluate_automation_decision(
+        case={
+            "ticker": "BLBD",
+            "cik": case["observation"]["cik"],
+        },
+        evidence=result.evidence,
+        facts=result.facts,
+        current_date="2026-08-25",
+        active_sources=("manual_lists",),
+        transition_preview=lambda _request: None,
+    )
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.rule_id == "lifecycle.no_identity_change"
+    assert decision.transition_requested is False
 
 
 def test_complete_explicit_form25_chain_emits_terminal_delisting_while_partial_chain_does_not():
