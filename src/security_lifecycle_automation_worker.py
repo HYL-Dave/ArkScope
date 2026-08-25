@@ -169,7 +169,7 @@ def _failure_code(exc: Exception, *, phase: str) -> str:
     if isinstance(exc, sqlite3.Error):
         return "persistence_failed"
     if isinstance(exc, ValueError):
-        if phase == "approve":
+        if phase in {"persist", "approve"}:
             return "persistence_failed"
         return "source_payload_invalid" if phase == "acquire" else "extractor_failed"
     return "internal_error"

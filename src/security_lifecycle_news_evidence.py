@@ -211,7 +211,7 @@ def _sa_rows(
 def _evidence(
     row: Mapping[str, Any], *, retrieved_at: str, max_excerpt_bytes: int
 ) -> PublisherEvidence:
-    excerpt = _bounded_utf8(row["body"], max_excerpt_bytes)
+    excerpt = _bounded_utf8(row["body"], max_excerpt_bytes).strip()
     content_digest = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
     body_digest = str(row.get("body_sha256") or "").lower()
     document_digest = body_digest if _SHA256.fullmatch(body_digest) else None
