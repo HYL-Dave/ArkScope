@@ -147,7 +147,7 @@ def translate_evidence(
 
 **Interfaces:** Produces `translate_text` for a one-field fixed translation, `EvidenceTranslationResult`, `translate_evidence`, and `POST /security-lifecycle/evidence/{evidence_id}/translations`.
 
-- [ ] Add the six Task 3 backend nodes. Initial RED is missing translation interfaces/routes only.
+- [ ] Add the eight Task 3 backend nodes. Initial RED is missing translation interfaces/routes only.
 - [ ] Reuse the existing `card_translation` model route and timeout. Translate one bounded excerpt field, preserve source text byte-for-byte, and return explicit provider/model/harness provenance.
 - [ ] Validate locale (`en | zh-Hant`) and evidence identity before permission/provider work. Return a current hash-bound cache hit without permission or translator invocation.
 - [ ] On a miss, read and close any write transaction before translator invocation, then re-read the evidence hash before insertion. Changed/deleted evidence rejects the result; provider failure stores nothing and does not change workflow state.
