@@ -98,8 +98,9 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             guard_reason=(
                 "Changing IBKR client_id can disturb active Gateway sessions; this is the "
                 "base id — all domains derive from it (options=+10, prices=+20, news=+30, "
-                "iv=+40, quotes=+50, holdings=+60, portfolio_capture=+70; the app-managed "
-                "base must stay at 0 through 29 (base <= 29); order placement needs another "
+                "iv=+40, quotes=+50, holdings=+60, portfolio_capture=+70, lifecycle=+80; "
+                "the app-managed base must stay at 0 through 19 (base <= 19); order "
+                "placement needs another "
                 "independently authorized id (see data_sources/ibkr_client_id.py)."
             ),
         ),
@@ -220,12 +221,12 @@ def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
         # Every domain id derives from this base (data_sources/ibkr_client_id.py); a
         # bad base would crash every IBKR connect long after the save. isdecimal (not
         # isdigit: '²'.isdigit() is True but int() rejects it), canonicalized to
-        # ASCII (int('７')==7, '007'→'7'), and bounded at 0..29 so +70 stays <=99.
+        # ASCII (int('７')==7, '007'→'7'), and bounded at 0..19 so +80 stays <=99.
         if not value.isdecimal():
             raise ValueError("IBKR client_id must be a non-negative integer")
         base = int(value)
-        if not 0 <= base <= 29:
-            raise ValueError("IBKR client_id base must be in range 0 through 29")
+        if not 0 <= base <= 19:
+            raise ValueError("IBKR client_id base must be in range 0 through 19")
         return str(base)
     return value
 
