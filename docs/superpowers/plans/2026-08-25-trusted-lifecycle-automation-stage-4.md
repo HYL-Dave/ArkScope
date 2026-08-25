@@ -220,11 +220,11 @@ The repair may only normalize cursor rows independent of caller row factory;
 it may not alter schema, provenance inputs, decision policy, node identity, or
 provider behavior.
 
-- [ ] Build explicit scratch market/profile databases with the reviewed schema and a synthetic eligible `OLD -> NEW` case.
-- [ ] Execute observation -> facts/evidence -> verified automation assessment -> proposals -> automation-policy transition approval -> due scheduler apply -> activity read -> explicit acknowledgement -> exact reverse.
-- [ ] Prove user-owned rows after reverse are byte-for-byte equal to the pre-apply snapshot, provider-owned/history rows never changed, acknowledgement survives as history, and no activity rendered itself acknowledged.
-- [ ] Run a state-drift scratch variant that blocks reverse with the exact reason and preserves the user's later edit.
-- [ ] Capture a bounded JSON report with IDs/digests/counts only; no source body, prompt, credential, path, or provider payload.
+- [x] Build explicit scratch market/profile databases with the reviewed schema and a synthetic eligible `OLD -> NEW` case.
+- [x] Execute observation -> facts/evidence -> verified automation assessment -> proposals -> automation-policy transition approval -> due scheduler apply -> activity read -> explicit acknowledgement -> exact reverse.
+- [x] Prove user-owned rows after reverse are byte-for-byte equal to the pre-apply snapshot, provider-owned/history rows never changed, acknowledgement survives as history, and no activity rendered itself acknowledged.
+- [x] Run a state-drift scratch variant that blocks reverse with the exact reason and preserves the user's later edit.
+- [x] Capture a bounded JSON report with IDs/digests/counts only; no source body, prompt, credential, path, or provider payload.
 
 ## Task 6: Stage 4 Offline Admission
 
