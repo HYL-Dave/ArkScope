@@ -182,6 +182,7 @@ def _bundle(
             "source_ticker": ticker,
             "transaction_structure": {
                 "kind": review_structure,
+                "terms_status": "complete",
                 "counterparty_name": "Buyer Corp.",
                 "counterparty_ticker": "BUY",
                 "counterparty_cik": "0000000123",
@@ -472,8 +473,12 @@ def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_pat
     try:
         result = harness.worker_with_transition_approver().run()
 
-        assert result["accepted"] == 0
-        assert result["failed"] == 1
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        assessment = store.list_assessments(case["case_id"])[0]
+
+        assert result["accepted"] == 1
+        assert result["failed"] == 0
         assert len(harness.approval_calls) == 1
         assert harness.approval_calls[0]["assessment_status"] == "accepted"
         assert harness.approval_calls[0]["proposal_actions"] == (
@@ -484,6 +489,25 @@ def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_pat
             "SELECT COUNT(*) FROM sqlite_master "
             "WHERE type='table' AND name='ticker_identity_transitions'"
         ).fetchone()[0] == 0
+        assert assessment["status"] == "accepted"
+        assert run["status"] == "succeeded"
+        assert run["action_readiness"] == "waiting_transition_revalidation"
+        assert [row["blocker_code"] for row in run["blockers"]] == [
+            "transition_approval_changed"
+        ]
+
+        immediate = harness.worker_with_transition_approver().run()
+        assert immediate["processed"] == 0
+        assert immediate["skipped_current"] == 1
+
+        harness.approval_error = None
+        harness.now = "2026-08-26T12:00:00Z"
+        retried = harness.worker_with_transition_approver().run()
+        run = store.list_automation_runs(case["case_id"])[0]
+        assert retried["accepted"] == 1
+        assert len(harness.approval_calls) == 2
+        assert run["action_readiness"] == "transition_eligible"
+        assert run["blockers"] == []
     finally:
         harness.conn.close()
 

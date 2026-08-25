@@ -170,6 +170,7 @@ def test_venue_transfer_is_verified_non_mutating_and_keeps_tracking():
 def test_explicit_no_identity_change_resolves_without_transition():
     transaction = {
         "kind": "asset_acquisition",
+        "terms_status": "complete",
         "counterparty_name": "Example Assets LLC",
         "counterparty_ticker": None,
         "counterparty_cik": None,
@@ -280,13 +281,13 @@ def test_ma_structures_are_review_suggested_with_complete_prefill():
         "mixed": "acquisition_mixed",
         "unknown": "acquisition_terms_unknown",
         "asset_acquisition": "acquisition_terms_unknown",
-        "future_structure": "acquisition_terms_unknown",
         "spin_off": "issuer_security_change",
         "security_class_change": "issuer_security_change",
     }
     for structure, outcome in structures.items():
         terms = {
             "kind": structure,
+            "terms_status": "complete",
             "counterparty_name": "Buyer Corp.",
             "counterparty_ticker": "BUY",
             "counterparty_cik": "0000000123",
@@ -314,6 +315,25 @@ def test_ma_structures_are_review_suggested_with_complete_prefill():
         assert decision.exchange_ratio_decimal == "0.75"
         assert decision.rule_id == "lifecycle.ma_review"
         assert decision.transition_requested is False
+
+    not_extracted = _evaluate(
+        case=_case(ticker="TGT", kinds=("merger_agreement",)),
+        evidence=(_evidence("sec", "regulator"),),
+        facts=(
+            _fact("sec", "source_ticker", "TGT"),
+            _fact("sec", "issuer_cik", _CIK),
+            _fact(
+                "sec",
+                "transaction_structure",
+                {"kind": "asset_acquisition", "terms_status": "not_extracted"},
+            ),
+        ),
+    )
+    assert not_extracted.decision_tier == "review_suggested"
+    assert not_extracted.counterparty_name is None
+    assert not_extracted.cash_per_security_decimal is None
+    assert "transaction_terms_not_extracted" in not_extracted.decision_issues
+    assert "not deterministically extracted" in not_extracted.impact_summary
 
 
 def test_conflicting_facts_are_review_suggested_and_never_majority_resolved():

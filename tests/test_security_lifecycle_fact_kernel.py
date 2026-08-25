@@ -220,6 +220,43 @@ def test_fact_span_and_cited_text_hash_must_match_verbatim_evidence():
         assert store.get_automation_run(claim.run_id)["status"] == "running"
 
 
+def test_each_fact_type_enforces_its_closed_value_shape_before_persistence():
+    scalar_types = {
+        "source_ticker",
+        "successor_ticker",
+        "source_venue",
+        "destination_venue",
+        "effective_date",
+        "security_class",
+        "issuer_cik",
+        "tracked_security_effect",
+    }
+    invalid_values = [
+        ("transaction_structure", "asset_acquisition"),
+        *((fact_type, {"unexpected": "mapping"}) for fact_type in scalar_types),
+    ]
+    for fact_type, value in invalid_values:
+        conn, _store, kernel, case_id = _context()
+        try:
+            claim = _reserve(kernel, case_id)
+            evidence = _evidence()
+            fact = replace(
+                _fact(evidence),
+                fact_type=fact_type,
+                normalized_value=value,
+            )
+            with pytest.raises(ValueError, match="fact_value_shape"):
+                _succeed(kernel, claim, evidence=(evidence,), facts=(fact,))
+            assert conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_evidence"
+            ).fetchone()[0] == 0
+            assert conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_automation_facts"
+            ).fetchone()[0] == 0
+        finally:
+            conn.close()
+
+
 def test_conflicting_current_facts_are_typed_and_never_majority_resolved():
     conn, store, kernel, case_id = _context()
     claim = _reserve(kernel, case_id)

@@ -253,6 +253,7 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "not_applicable",
             "waiting_effective_date",
             "waiting_market_confirmation",
+            "waiting_transition_revalidation",
             "transition_eligible",
             "action_blocked",
         }
@@ -289,7 +290,15 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "market_confirmation_missing",
             "source_conflict",
             "impact_context_requested",
+            "transition_approval_changed",
+            "transition_approval_unavailable",
         }
+    )
+    assert getattr(schema, "FACT_SCALAR_TYPES", None) == frozenset(
+        getattr(schema, "FACT_TYPES") - {"transaction_structure"}
+    )
+    assert getattr(schema, "TRANSACTION_TERMS_STATUSES", None) == frozenset(
+        {"not_extracted", "partial", "complete"}
     )
 
     conn = sqlite3.connect(tmp_path / "profile.db")

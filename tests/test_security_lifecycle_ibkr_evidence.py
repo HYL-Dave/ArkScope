@@ -181,6 +181,41 @@ def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
     assert len(gateway.requests) == 3
 
 
+def test_regulator_declared_successor_is_queried_without_persisting_an_alias():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+    from src.security_lifecycle_sec_evidence import build_identity_context
+
+    context = build_identity_context(
+        case_id="case-first-discovery",
+        observation={
+            "ticker": "LC",
+            "cik": "0001409970",
+            "issuer_name": "LendingClub Corporation",
+            "filing_date": "2026-06-27",
+            "source_ref": "0001409970-26-000131",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "event_kinds": ["listing_status_review"],
+        },
+        ticker_aliases=("LC",),
+    )
+    state, lock = _lock_recorder()
+    gateway = _Gateway(responses=([], []), lock_state=state)
+
+    result = read_ibkr_contract_evidence(
+        gateway=gateway,
+        gateway_lock=lock,
+        context=context,
+        candidate_tickers=("HAPN",),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+
+    assert [contract.symbol for contract in gateway.requests] == ["LC", "HAPN"]
+    assert result.requests_made == 2
+    assert result.blockers == ("ibkr_contract_missing",)
+    assert context.ticker_aliases == ("LC",)
+
+
 def test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separately():
     state, lock = _lock_recorder()
     disconnected = _read(_Gateway(connected=False, lock_state=state), lock)

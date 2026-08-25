@@ -36,9 +36,19 @@ def _submissions(case: dict, *, filings: list[dict] | None = None) -> dict:
 
 
 class _FixtureTransport:
-    def __init__(self, case: dict, *, filings: list[dict] | None = None):
+    def __init__(
+        self,
+        case: dict,
+        *,
+        filings: list[dict] | None = None,
+        documents: list[tuple[int, str]] | None = None,
+    ):
         self.case = case
         self.submissions = _submissions(case, filings=filings)
+        self.documents = list(
+            documents
+            or [(200, case["document"])] * len(filings or [case["filing"]])
+        )
         self.calls: list[tuple[str, object]] = []
 
     def get_json(self, url: str, *, budget=None, **_kwargs):
@@ -53,7 +63,8 @@ class _FixtureTransport:
         from data_sources.sec_transport import SecResponse
 
         assert document is True
-        body = self.case["document"].encode()
+        status, document_body = self.documents.pop(0)
+        body = document_body.encode()
         if budget is not None:
             budget.reserve_document(max_bytes or budget.max_document_bytes)
             budget.reserve_attempt()
@@ -64,7 +75,7 @@ class _FixtureTransport:
                 raise SecTransportFailure("sec_request_budget_exhausted")
             budget.record_body(len(body))
         self.calls.append(("document", budget))
-        return SecResponse(200, body, "utf-8")
+        return SecResponse(status, body, "utf-8")
 
 
 def _context(name: str):
@@ -225,6 +236,31 @@ def test_hapn_fixture_extracts_symbol_and_venue_change_without_a_to_a_transition
     assert result.symbol_transitions == (("LC", "HAPN"),)
 
 
+def test_first_discovery_emits_declared_successor_absent_from_aliases():
+    from src.security_lifecycle_sec_evidence import (
+        build_identity_context,
+        collect_sec_evidence,
+    )
+
+    case = _case("HAPN")
+    context = build_identity_context(
+        case_id=case["case_id"],
+        observation={**case["observation"], "ticker": "LC"},
+        ticker_aliases=("LC",),
+        ibkr_conids=(),
+    )
+    result = collect_sec_evidence(
+        context=context,
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+
+    assert context.ticker_aliases == ("LC",)
+    assert _values(result, "source_ticker") == {"LC"}
+    assert _values(result, "successor_ticker") == {"HAPN"}
+    assert result.symbol_transitions == (("LC", "HAPN"),)
+
+
 def test_qbts_fixture_extracts_venue_only_with_unchanged_symbol():
     _case_data, _transport, result = _collect("QBTS")
     assert _values(result, "source_ticker") == {"QBTS"}
@@ -248,11 +284,100 @@ def test_blbd_fixture_extracts_asset_acquisition_without_registrant_change():
     _case_data, _transport, result = _collect("BLBD")
     assert _values(result, "source_ticker") == {"BLBD"}
     assert _values(result, "successor_ticker") == set()
-    assert _values(result, "transaction_structure") == {"asset_acquisition"}
+    transaction = next(
+        fact.value for fact in result.facts if fact.fact_type == "transaction_structure"
+    )
+    assert transaction == {
+        "kind": "asset_acquisition",
+        "terms_status": "not_extracted",
+    }
     assert _values(result, "tracked_security_effect") == {
         "asset_acquisition_no_registrant_change"
     }
     assert result.symbol_transitions == ()
+
+
+def test_complete_explicit_form25_chain_emits_terminal_delisting_while_partial_chain_does_not():
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+    from src.security_lifecycle_sec_evidence import (
+        build_identity_context,
+        collect_sec_evidence,
+    )
+
+    base = _case("HAPN")
+    form25 = {
+        **base["filing"],
+        "form": "25-NSE",
+        "filingDate": "2026-08-20",
+        "accessionNumber": "0001409970-26-000200",
+        "primaryDocument": "form25-nse.htm",
+        "primaryDocDescription": "Form 25-NSE",
+        "items": "",
+        "ticker": "DROP",
+    }
+    document = (
+        "<html><body><p>CIK 0001409970. The DROP common stock will be removed "
+        "from listing on the Nasdaq Capital Market effective September 1, 2026."
+        "</p></body></html>"
+    )
+    case = {
+        **base,
+        "filing": form25,
+        "document": document,
+        "observation": {
+            **base["observation"],
+            "ticker": "DROP",
+            "filing_date": "2026-08-20",
+            "source_ref": form25["accessionNumber"],
+            "filing_form": "25-NSE",
+            "filing_items": [],
+            "event_kinds": ["listing_status_review"],
+        },
+    }
+    context = build_identity_context(
+        case_id=case["case_id"],
+        observation=case["observation"],
+        ticker_aliases=("DROP",),
+    )
+    complete = collect_sec_evidence(
+        context=context,
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+    assert _values(complete, "tracked_security_effect") == {"terminal_delisting"}
+    assert {row.source_locator["filing_chain_complete"] for row in complete.evidence} == {
+        True
+    }
+    decision = evaluate_automation_decision(
+        case={"ticker": "DROP", "cik": "0001409970"},
+        evidence=complete.evidence,
+        facts=complete.facts,
+        current_date="2026-08-25",
+        active_sources=("manual_lists",),
+        transition_preview=lambda _request: None,
+    )
+    assert decision.rule_id == "lifecycle.terminal_delisting"
+    assert decision.action_readiness == "waiting_effective_date"
+
+    second = {
+        **form25,
+        "accessionNumber": "0001409970-26-000201",
+        "primaryDocument": "form25-nse-amendment.htm",
+    }
+    partial = collect_sec_evidence(
+        context=context,
+        transport=_FixtureTransport(
+            case,
+            filings=[form25, second],
+            documents=[(200, document), (503, "temporarily unavailable")],
+        ),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+    assert "sec_document_unavailable" in partial.blockers
+    assert _values(partial, "tracked_security_effect") == set()
+    assert {row.source_locator["filing_chain_complete"] for row in partial.evidence} == {
+        False
+    }
 
 
 def test_incompatible_current_values_emit_typed_conflicts_not_majority():

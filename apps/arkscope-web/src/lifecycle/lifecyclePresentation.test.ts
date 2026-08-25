@@ -54,6 +54,24 @@ describe("Lifecycle presentation", () => {
     )).toBeNull();
   });
 
+  it("labels transition revalidation without collapsing it into eligibility or a generic block", async () => {
+    const {
+      lifecycleActionReadinessLabel,
+      lifecycleAutomationBlockerLabel,
+    } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
+
+    expect(lifecycleActionReadinessLabel("waiting_transition_revalidation", "en"))
+      .toBe("Waiting to revalidate tracking transition");
+    expect(lifecycleActionReadinessLabel("waiting_transition_revalidation", "zh-Hant"))
+      .toBe("等待重新驗證追蹤轉移");
+    expect(lifecycleAutomationBlockerLabel("transition_approval_changed", "en"))
+      .toBe("Transition approval inputs changed; revalidation is scheduled");
+    expect(lifecycleAutomationBlockerLabel("transition_approval_unavailable", "zh-Hant"))
+      .toBe("追蹤轉移核准暫時無法完成；已排程重新驗證");
+    expect(lifecycleActionReadinessLabel("waiting_transition_revalidation", "en"))
+      .not.toBe(lifecycleActionReadinessLabel("transition_eligible", "en"));
+  });
+
   it("rejects unsafe evidence links before rendering an external action", async () => {
     const { safeEvidenceUrl } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
 
