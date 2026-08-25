@@ -277,7 +277,10 @@ def test_contract_snapshot_emits_exact_cited_market_facts():
 
 
 def test_contract_missing_is_typed_absence_not_a_fake_contract_snapshot():
-    from src.security_lifecycle_ibkr_evidence import contract_snapshot_facts
+    from src.security_lifecycle_ibkr_evidence import (
+        contract_snapshot_facts,
+        read_ibkr_contract_evidence,
+    )
 
     state, lock = _lock_recorder()
     result = _read(_Gateway(responses=([], [], []), lock_state=state), lock)
@@ -294,3 +297,14 @@ def test_contract_missing_is_typed_absence_not_a_fake_contract_snapshot():
         receipt,
         regulator_successors=("HAPN",),
     ) == ()
+
+    state, lock = _lock_recorder()
+    later = read_ibkr_contract_evidence(
+        gateway=_Gateway(responses=([], [], []), lock_state=state),
+        gateway_lock=lock,
+        context=_context(),
+        retrieved_at="2026-08-26T01:02:03.123456Z",
+    ).evidence[0]
+    assert later.content_sha256 == receipt.content_sha256
+    assert later.evidence_id != receipt.evidence_id
+    assert later.evidence_dedupe_key != receipt.evidence_dedupe_key

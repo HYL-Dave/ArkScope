@@ -448,22 +448,44 @@ def test_provider_blockers_remain_typed_and_retryable_without_partial_assessment
         harness.conn.close()
 
 
-def test_program_error_fails_run_without_network_classification(tmp_path):
-    case = _case(1)
-    harness = _Harness(tmp_path, [case])
-    harness.bundles[case["case_id"]] = TypeError("fixture programmer fault")
+def test_program_error_fails_run_without_network_classification(
+    tmp_path,
+    monkeypatch,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+
+    acquire_case = _case(1)
+    assessment_case = _case(2)
+    harness = _Harness(tmp_path, [acquire_case, assessment_case])
+    harness.bundles[acquire_case["case_id"]] = TypeError(
+        "fixture programmer fault"
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "create_automation_assessment",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            TypeError("post-complete programmer fault")
+        ),
+    )
     try:
         result = harness.worker().run()
         store = _store(harness)
-        run = store.list_automation_runs(case["case_id"])[0]
+        runs = [
+            store.list_automation_runs(case["case_id"])[0]
+            for case in (acquire_case, assessment_case)
+        ]
 
-        assert result["failed"] == 1
-        assert run["status"] == "failed"
-        assert run["failure_code"] == "internal_error"
-        assert run["blockers"] == []
+        assert result["failed"] == 2
+        assert {run["status"] for run in runs} == {"failed"}
+        assert {run["failure_code"] for run in runs} == {"internal_error"}
+        assert all(run["blockers"] == [] for run in runs)
         assert "network" not in json.dumps(result).lower()
         assert "fixture programmer fault" not in json.dumps(result)
-        assert store.list_assessments(case["case_id"]) == []
+        assert "post-complete programmer fault" not in json.dumps(result)
+        assert all(
+            store.list_assessments(case["case_id"]) == []
+            for case in (acquire_case, assessment_case)
+        )
     finally:
         harness.conn.close()
 
@@ -497,10 +519,30 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
     harness = _Harness(tmp_path, [case])
     try:
         harness.worker().run()
+        store = _store(harness)
+        store.add_evidence(
+            case_id=case["case_id"],
+            run_id=None,
+            kind="manual_text",
+            adapter="manual",
+            excerpt="Supplemental issuer context.",
+            source_url=None,
+            title=None,
+            publisher=None,
+            domain=None,
+            source_published_at=None,
+            retrieved_at=None,
+            mime_type="text/plain",
+            document_status=None,
+            at=_AT,
+        )
+        evidence_result = harness.worker().run()
+        assert evidence_result["accepted"] == 1
+        assert len(store.list_automation_runs(case["case_id"])) == 2
+
         case["observation_fingerprint_sha256"] = "e" * 64
         harness.worker().run()
-        store = _store(harness)
-        assert len(store.list_automation_runs(case["case_id"])) == 2
+        assert len(store.list_automation_runs(case["case_id"])) == 3
 
         import src.security_lifecycle_automation_worker as worker_module
 
@@ -518,8 +560,8 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
 
         runs = store.list_automation_runs(case["case_id"])
         history = store.list_assessments(case["case_id"])
-        assert len(runs) == 3
-        assert len(history) == 3
+        assert len(runs) == 4
+        assert len(history) == 4
         assert history[0]["status"] == "accepted"
         assert all(row["status"] == "superseded" for row in history[1:])
     finally:

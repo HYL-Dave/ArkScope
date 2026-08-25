@@ -122,6 +122,7 @@ def test_automation_run_key_binds_case_observation_policy_and_mode():
         observation_fingerprint_sha256="a" * 64,
         policy_version="policy-1",
         mode="live",
+        input_evidence_set_sha256="0" * 64,
     )
     variants = {
         automation_run_key(
@@ -129,17 +130,19 @@ def test_automation_run_key_binds_case_observation_policy_and_mode():
             observation_fingerprint_sha256=fingerprint,
             policy_version=policy,
             mode=mode,
+            input_evidence_set_sha256=evidence_digest,
         )
-        for case_id, fingerprint, policy, mode in (
-            ("case-b", "a" * 64, "policy-1", "live"),
-            ("case-a", "b" * 64, "policy-1", "live"),
-            ("case-a", "a" * 64, "policy-2", "live"),
-            ("case-a", "a" * 64, "policy-1", "historical"),
+        for case_id, fingerprint, policy, mode, evidence_digest in (
+            ("case-b", "a" * 64, "policy-1", "live", "0" * 64),
+            ("case-a", "b" * 64, "policy-1", "live", "0" * 64),
+            ("case-a", "a" * 64, "policy-2", "live", "0" * 64),
+            ("case-a", "a" * 64, "policy-1", "historical", "0" * 64),
+            ("case-a", "a" * 64, "policy-1", "live", "1" * 64),
         )
     }
     assert base.startswith("lifecycle-automation-v1:")
     assert base not in variants
-    assert len(variants) == 4
+    assert len(variants) == 5
 
     _conn, store, kernel, case_id = _context()
     claim = _reserve(kernel, case_id)
@@ -509,13 +512,19 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
         diagnostics={"sec_documents": 2, "sec_attempts": 3},
     )
     row = store.get_automation_run(claim.run_id)
-    assert row["query_context_json"] == '{"a":{"ticker":"HAPN"},"z":[2,1]}'
+    assert row["query_context_json"] == (
+        '{"a":{"ticker":"HAPN"},'
+        '"input_evidence_set_sha256":'
+        '"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",'
+        '"z":[2,1]}'
+    )
     assert row["diagnostics_json"] == '{"sec_attempts":3,"sec_documents":2}'
 
     for query_context, diagnostics in (
         ({"api_key": "secret"}, {}),
         ({"ticker": "HAPN\0"}, {}),
         ({"notes": "x" * 17000}, {}),
+        ({"input_evidence_set_sha256": "1" * 64}, {}),
         ({}, {"source_url": 1}),
         ({}, {"sec_attempts": "1"}),
     ):
