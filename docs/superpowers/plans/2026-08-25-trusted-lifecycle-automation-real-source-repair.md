@@ -56,3 +56,25 @@ The live run is consumed and may not be repeated without new authorization.
    already-shipped automation/UI surfaces. No provider call is permitted.
 4. Rebuild the Stage 5 evidence packet against the repaired product authority;
    retain the canary report and exact source bytes in a separate manifest.
+
+## Completion
+
+Completed at product/test authority
+`1ec76167b70cffd3e9bd55c54de7dd2c5fd05c95`.
+
+- The four exact real-source tests were captured RED against the prior product
+  bytes and pass against extractor rule version `2`.
+- Seven focused backend files pass `70/70`; full backend passes
+  `4408/4408` with `12` skips and no failures.
+- Collection is exactly `4420` in two runs with byte-identical normalized node
+  streams (`46deb0cd...ddbf1`).
+- Frontend remains byte-identical to the pre-repair authority and passes
+  `105 files / 1229 tests`, typecheck, scanner `37/20/0/20`, and build.
+- Real-source and synthetic grounded-shadow replays each produced two
+  byte-identical reports with sockets disabled.
+- No provider rerun, production database operation, migration, app cutover,
+  merge, or push occurred after the one consumed canary.
+
+The final packet is
+`docs/superpowers/evidence/2026-08-25-trusted-lifecycle-automation-real-source-canary/`.
+Formal migration remains a separate authorization event.
