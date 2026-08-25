@@ -279,7 +279,7 @@ def test_contract_missing_is_typed_absence_not_a_fake_contract_snapshot():
     assert result.blockers == ("ibkr_contract_missing",)
     assert len(result.evidence) == 1
     receipt = result.evidence[0]
-    assert receipt.kind == "document_reference"
+    assert receipt.kind == "market_infrastructure_snapshot"
     assert receipt.source_locator["contract_status"] == "missing"
     assert "snapshot" not in receipt.source_locator
     assert json.loads(receipt.excerpt)["contract_status"] == "missing"

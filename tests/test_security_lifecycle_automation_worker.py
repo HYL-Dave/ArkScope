@@ -164,7 +164,7 @@ def _bundle(
                     case,
                     family="market_infrastructure",
                     payload=absence_payload,
-                    kind="document_reference",
+                    kind="market_infrastructure_snapshot",
                     locator={"contract_status": "missing"},
                 )
             )
