@@ -1,0 +1,10 @@
+node_id	reason
+tests/test_security_lifecycle_sec_evidence.py::test_blbd_fixture_extracts_asset_acquisition_without_registrant_change	transaction_structure now emits a reviewed mapping with explicit terms_status instead of a scalar
+tests/test_security_lifecycle_decision_policy.py::test_ma_structures_are_review_suggested_with_complete_prefill	complete and not-extracted M&A structures remain distinguishable and never become silent blank prefill
+tests/test_security_lifecycle_automation_worker.py::test_transition_approval_drift_fails_closed_without_profile_mutation	approval drift retains the accepted conclusion but records waiting revalidation and a typed visible blocker
+tests/test_security_lifecycle_automation_worker.py::test_worker_rechecks_due_action_readiness_without_reprocessing_unrelated_cases	one-day readiness replay also owns waiting_transition_revalidation
+tests/test_security_lifecycle_automation_schema.py::test_current_profile_authority_closes_automation_run_fact_translation_vocabularies	readiness blocker and fact-value shape vocabularies remain exact and closed
+tests/test_security_lifecycle_grounded_shadow.py::test_blbd_shadow_accepts_asset_acquisition_without_registrant_identity_change	grounded BLBD replay uses the structured transaction fact shape
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > contains the exact Explore subtree inventory in both locales	two bilingual lifecycle leaves are added for transition revalidation truth
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > keeps locale namespace and recursive key paths identical	both locales add the same readiness and blocker paths
+apps/arkscope-web/src/i18n/resources.test.ts::bundled i18n resources > requires every resource leaf to be a non-empty string	new lifecycle copy remains non-empty

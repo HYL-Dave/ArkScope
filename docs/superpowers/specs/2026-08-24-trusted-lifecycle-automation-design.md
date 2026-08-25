@@ -582,3 +582,84 @@ Implementation has five independently rejectable stages:
 
 General hosted search and model-authored lifecycle judgments are later provider
 adapters against these contracts, not hidden work inside these stages.
+
+## 16. Grounded-Admission Repair Authority
+
+Independent review after the first Stage 5 packet proved that four synthetic
+success outcomes were compatible with dead production paths. That packet remains
+historical evidence of the executed gates, but it is not migration authority.
+No live preflight, backup, migration, provider canary, merge, or push may use it.
+
+### 16.1 Declared successor before local alias persistence
+
+An identity filing may declare a new ticker before ArkScope has ever stored that
+ticker. An explicit `old -> new` source span is admissible when either side is in
+the case's current alias closure and the two normalized symbols are distinct.
+The other side becomes a cited candidate fact, not an alias. It may be included
+in this run's bounded IBKR lookup, but it enters alias/profile state only through
+the separately approved transition mechanism after all policy gates pass.
+
+This models a declared future identity rather than guessing one. Form 8-A12B can
+state the exchange, trading symbol, and expected commencement date. The product
+still requires source text and does not infer a symbol from a filing filename.
+
+### 16.2 Terminal delisting and filing-chain completeness
+
+For exchange delisting under Exchange Act Rule 12d2-2, Form 25 is the regulator
+record and delisting is not effective earlier than ten days after filing. Item
+3.01 of Form 8-K may provide an earlier notice, determination, transfer, or
+non-compliance signal. These facts do not mean every missing price, suspension,
+OTC move, deregistration, or provider outage is a Form 25 delisting.
+
+Automatic terminal classification therefore requires all of:
+
+1. a successfully fetched bounded same-CIK chain;
+2. an explicit Form 25/25-NSE source span tied to the tracked alias and security;
+3. an explicit effective date from source text; and
+4. no successor fact in that complete chain.
+
+Every persisted SEC locator records whether the selected chain was completely
+fetched. A partial/non-200/blocked chain records `filing_chain_complete=false`
+and cannot prove absence. The ten-day rule is not used as a generic date
+calculator in this version; an absent explicit date remains insufficient.
+
+### 16.3 Transition-approval revalidation
+
+Assessment acceptance and proposal creation can remain valid when the final
+transition approval rejects a changed preview or temporarily fails. Such a run
+must not remain `transition_eligible` or be reported as a complete action.
+
+The closed readiness vocabulary gains `waiting_transition_revalidation`, and
+the closed blocker vocabulary gains `transition_approval_changed` and
+`transition_approval_unavailable`. The fact kernel atomically changes the
+completed run to that readiness and writes exactly one typed blocker. The UI
+renders both. The worker rechecks it no more than once per day; a successful
+recheck removes the blocker and may approve the transition. Existing due-date
+selection already catches up transitions whose `execute_on` passed while the
+App was stopped; that mechanism is separate and unchanged.
+
+### 16.4 Fact-value shapes and M&A term honesty
+
+Fact type alone is not a value schema. The eight scalar fact types require a
+non-empty bounded string. `transaction_structure` requires a closed mapping with
+`kind`, `terms_status` (`not_extracted | partial | complete`), and only reviewed
+optional term fields. Every producer validates this contract when emitting, and
+the persistence kernel validates it again. A scalar transaction value or mapping
+value for a scalar fact fails closed; policy code never converts either to an
+empty value.
+
+The deterministic SEC extractor may emit a transaction kind with
+`terms_status=not_extracted`. In that case the review remains fully populated
+with every fact actually known, but its impact text explicitly says that
+counterparty/consideration terms were not extracted. It never presents blank
+fields as a completed extraction. Deterministic term extraction from real filing
+language is a separate admitted item after source-byte fixtures are authorized;
+no regex is invented from synthetic prose.
+
+### 16.5 Repair admission
+
+Exact RED must include: a first-discovery successor absent from aliases; complete
+and incomplete Form 25 chains; both invalid fact-shape directions; an IBKR query
+for a regulator-declared candidate; and transition approval drift followed by a
+bounded revalidation. Only after those owners are GREEN may the four grounded
+SEC documents and a read-only IBKR shape canary be separately authorized.

@@ -1,0 +1,10 @@
+runner	path
+backend	tests/test_security_lifecycle_automation_schema.py
+backend	tests/test_security_lifecycle_fact_kernel.py
+backend	tests/test_security_lifecycle_sec_evidence.py
+backend	tests/test_security_lifecycle_decision_policy.py
+backend	tests/test_security_lifecycle_automation_worker.py
+backend	tests/test_security_lifecycle_ibkr_evidence.py
+backend	tests/test_security_lifecycle_grounded_shadow.py
+frontend	apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts
+frontend	apps/arkscope-web/src/i18n/resources.test.ts
