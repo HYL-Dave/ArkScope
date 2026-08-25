@@ -330,8 +330,11 @@ queryable and manually reopenable.
 ## 8. Automation Runs
 
 One durable run key comprises case ID, observation fingerprint, automation
-policy version, and mode (`live | historical`). A terminal run is not repeated
-unless inputs change or a retryable provider outcome reaches its retry time.
+policy version, mode (`live | historical`), and the pre-run digest of existing
+non-automation supplemental evidence. Automation evidence written by the run
+itself is excluded from that input digest, so completing a run cannot create an
+immediate successor run. A terminal run is not repeated unless inputs change or
+a retryable provider outcome reaches its retry time.
 
 The bounded app-owned worker selects changed cases, records running state,
 acquires SEC outside profile write transactions, reads local news, optionally

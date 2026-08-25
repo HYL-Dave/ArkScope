@@ -77,6 +77,22 @@ market confirmation. Node identity, additions, focused/collection arithmetic,
 schema bytes, and owned product paths remain unchanged. The corrected 13-node
 RED must be replayed before product code.
 
+### Task 4 stale-evidence re-entry amendment
+
+Task 4 self-review found that the accepted staleness contract and the original
+four-input run key were incompatible. Adding supplemental/manual evidence makes
+an accepted assessment stale, but reserving the same case/fingerprint/policy/
+mode returned the already-terminal run and could never re-enter automation.
+
+The run key therefore also binds the pre-run digest of evidence whose
+`automation_run_id IS NULL`. The kernel computes and records that digest in
+`query_context_json`; callers cannot supply a competing value. Evidence written
+by an automation run is excluded, preventing completion from manufacturing a
+new input generation. The existing run-key owner and changed-input worker owner
+gain discriminating subcases without changing node IDs or counts. Fact-kernel
+product/test paths expand from `T1` to `T1/T4`; no path, schema column, closed
+vocabulary, route, or collection identity is added.
+
 ## Closed Decision Contract
 
 The pure policy returns `AutomationDecision` with these fields:
