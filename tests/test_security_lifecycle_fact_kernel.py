@@ -173,6 +173,50 @@ def test_automation_run_key_binds_case_observation_policy_and_mode():
     assert store.get_automation_run(retry.run_id)["status"] == "running"
 
 
+def test_current_policy_retries_a_failed_run_without_deleting_v1_history():
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+
+    _conn, store, kernel, case_id = _context()
+    failed_claim = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v1",
+    )
+    kernel.fail_run(
+        run_id=failed_claim.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at=_LATER,
+    )
+
+    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v2"
+    assert _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v1",
+        at=_LATER,
+    ).should_execute is False
+
+    retry = _reserve(
+        kernel,
+        case_id,
+        policy_version=AUTOMATION_POLICY_VERSION,
+        at=_LATER,
+    )
+    assert retry.should_execute is True
+    assert retry.run_id != failed_claim.run_id
+    assert [
+        tuple(row)
+        for row in store.conn.execute(
+            "SELECT policy_version,status FROM security_lifecycle_automation_runs "
+            "ORDER BY created_at,run_id"
+        )
+    ] == [
+        ("trusted-lifecycle-automation-v1", "failed"),
+        ("trusted-lifecycle-automation-v2", "running"),
+    ]
+
+
 def test_evidence_and_facts_persist_atomically_or_not_at_all():
     conn, store, kernel, case_id = _context()
     claim = _reserve(kernel, case_id)

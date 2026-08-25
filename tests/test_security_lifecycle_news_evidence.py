@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import sqlite3
 
@@ -282,6 +283,24 @@ def test_news_adapter_bounds_rows_excerpts_and_preserves_original_provenance():
     assert result.evidence[0].source_url == "https://news.example/4"
     assert result.evidence[0].source_locator["provider_source"] == "polygon"
     assert result.truncated is True
+
+
+def test_news_adapter_hashes_the_canonical_excerpt_when_truncation_ends_on_whitespace():
+    normalized = _normalized_conn()
+    sa = _sa_conn()
+    _insert_normalized(
+        normalized,
+        body=("x" * 63) + "\ncontent beyond the boundary",
+    )
+
+    result = _read(normalized, sa, max_excerpt_bytes=64)
+
+    evidence = result.evidence[0]
+    assert len(evidence.excerpt.encode()) == 63
+    assert evidence.excerpt == evidence.excerpt.strip()
+    assert evidence.content_sha256 == hashlib.sha256(
+        evidence.excerpt.encode()
+    ).hexdigest()
 
 
 def test_all_news_publishers_count_as_one_publisher_family():

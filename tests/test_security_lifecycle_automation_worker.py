@@ -390,6 +390,19 @@ def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_pa
         harness.conn.close()
 
 
+def test_persist_value_errors_are_classified_as_persistence_failures():
+    from src.security_lifecycle_automation_worker import _failure_code
+
+    assert (
+        _failure_code(ValueError("evidence_content_sha256"), phase="persist")
+        == "persistence_failed"
+    )
+    assert (
+        _failure_code(ValueError("fact_value_shape"), phase="evaluate")
+        == "extractor_failed"
+    )
+
+
 def test_verified_result_persists_automation_assessment_acceptance_and_proposals(
     tmp_path,
 ):
@@ -717,12 +730,12 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
         monkeypatch.setattr(
             policy_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v2",
+            "trusted-lifecycle-automation-v3",
         )
         monkeypatch.setattr(
             worker_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v2",
+            "trusted-lifecycle-automation-v3",
         )
         harness.worker().run()
 
