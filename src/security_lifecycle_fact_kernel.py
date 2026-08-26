@@ -409,6 +409,22 @@ def automation_run_key(
     return "lifecycle-automation-v1:" + hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _execution_run_key(
+    *,
+    semantic_run_key: str,
+    execution_revision: str,
+    predecessor_failed_run_id: str | None,
+) -> str:
+    payload = {
+        "execution_revision": execution_revision,
+        "predecessor_failed_run_id": predecessor_failed_run_id,
+        "semantic_run_key": semantic_run_key,
+    }
+    return "lifecycle-automation-execution-v1:" + hashlib.sha256(
+        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
 def _input_evidence_set_sha256(
     conn: sqlite3.Connection,
     case_id: str,
@@ -893,6 +909,7 @@ class SecurityLifecycleFactKernel:
         observation_fingerprint_sha256: str,
         policy_version: str,
         mode: str,
+        execution_revision: str,
         query_context: Mapping[str, object],
         diagnostics: Mapping[str, object],
         at: str,
@@ -900,7 +917,7 @@ class SecurityLifecycleFactKernel:
         self.store.assert_automation_write_available()
         self.store.get_case_identity(case_id)
         input_evidence_digest = _input_evidence_set_sha256(self.conn, case_id)
-        run_key = automation_run_key(
+        semantic_run_key = automation_run_key(
             case_id=case_id,
             observation_fingerprint_sha256=observation_fingerprint_sha256,
             policy_version=policy_version,
@@ -913,27 +930,146 @@ class SecurityLifecycleFactKernel:
         policy = _text(
             "policy_version", policy_version, max_bytes=120, required=True
         )
-        assert policy is not None
+        execution = _text(
+            "execution_revision",
+            execution_revision,
+            max_bytes=120,
+            required=True,
+        )
+        assert policy is not None and execution is not None
         if not isinstance(query_context, Mapping):
             raise ValueError("query_context")
+        if any(
+            key in query_context
+            for key in (
+                "semantic_run_key",
+                "execution_revision",
+                "predecessor_failed_run_id",
+            )
+        ):
+            raise ValueError("reserved_query_context")
         caller_digest = query_context.get("input_evidence_set_sha256")
         if caller_digest is not None and caller_digest != input_evidence_digest:
             raise ValueError("input_evidence_set_sha256")
-        effective_query_context = {
-            **dict(query_context),
-            "input_evidence_set_sha256": input_evidence_digest,
-        }
-        query_json = _canonical_json(
-            effective_query_context,
-            name="query_context",
-            max_bytes=16_384,
-        )
         diagnostics_json = _diagnostics(diagnostics)
         timestamp = _timestamp("at", at)
-        run_digest = run_key.rsplit(":", 1)[1]
-        run_id = "slar_" + run_digest[:32]
+
+        def query_json_for(predecessor_failed_run_id: str | None) -> str:
+            context = {
+                **dict(query_context),
+                "semantic_run_key": semantic_run_key,
+                "execution_revision": execution,
+                "input_evidence_set_sha256": input_evidence_digest,
+            }
+            if predecessor_failed_run_id is not None:
+                context["predecessor_failed_run_id"] = predecessor_failed_run_id
+            return _canonical_json(
+                context,
+                name="query_context",
+                max_bytes=16_384,
+            )
+
+        def stored_context(row: sqlite3.Row) -> Mapping[str, object] | None:
+            raw = row["query_context_json"]
+            if not isinstance(raw, str) or len(raw.encode("utf-8")) > 16_384:
+                return None
+            try:
+                context = json.loads(raw)
+                _safe_json_value(context, diagnostics=False)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return None
+            return context if isinstance(context, Mapping) else None
 
         with _immediate_transaction(self.conn):
+            rows = self.conn.execute(
+                "SELECT * FROM security_lifecycle_automation_runs "
+                "WHERE case_id=? AND observation_fingerprint_sha256=? "
+                "AND policy_version=? AND mode=? "
+                "ORDER BY created_at DESC,rowid DESC",
+                (case_id, fingerprint, policy, mode),
+            ).fetchall()
+            row: sqlite3.Row | None = None
+            context: Mapping[str, object] | None = None
+            for candidate in rows:
+                candidate_context = stored_context(candidate)
+                if (
+                    candidate_context is not None
+                    and candidate_context.get("input_evidence_set_sha256")
+                    == input_evidence_digest
+                ):
+                    row = candidate
+                    context = candidate_context
+                    break
+
+            if row is not None:
+                existing_id = str(row["run_id"])
+                existing_run_key = str(row["run_key"])
+                existing_revision = str(context.get("execution_revision", "unknown"))
+                if row["status"] == "blocked" and row["retry_at"] is not None:
+                    blocker_rows = self.conn.execute(
+                        "SELECT retryable FROM security_lifecycle_automation_run_blockers "
+                        "WHERE automation_run_id=?",
+                        (existing_id,),
+                    ).fetchall()
+                    retryable = bool(blocker_rows) and all(
+                        int(item["retryable"]) == 1 for item in blocker_rows
+                    )
+                    due = _instant(str(row["retry_at"])) <= _instant(timestamp)
+                    if retryable and due:
+                        predecessor = context.get("predecessor_failed_run_id")
+                        query_json = query_json_for(
+                            str(predecessor) if predecessor is not None else None
+                        )
+                        self.conn.execute(
+                            "DELETE FROM security_lifecycle_automation_facts "
+                            "WHERE automation_run_id=?",
+                            (existing_id,),
+                        )
+                        self.conn.execute(
+                            "DELETE FROM security_lifecycle_evidence "
+                            "WHERE automation_run_id=?",
+                            (existing_id,),
+                        )
+                        self.conn.execute(
+                            "DELETE FROM security_lifecycle_automation_run_blockers "
+                            "WHERE automation_run_id=?",
+                            (existing_id,),
+                        )
+                        self.conn.execute(
+                            "UPDATE security_lifecycle_automation_runs SET "
+                            "status='running',decision_tier=NULL,action_readiness=NULL,"
+                            "query_context_json=?,diagnostics_json=?,retry_at=NULL,"
+                            "failure_code=NULL,started_at=?,finished_at=NULL,updated_at=? "
+                            "WHERE run_id=?",
+                            (
+                                query_json,
+                                diagnostics_json,
+                                timestamp,
+                                timestamp,
+                                existing_id,
+                            ),
+                        )
+                        return AutomationRunClaim(
+                            existing_id, existing_run_key, "running", True
+                        )
+                if row["status"] != "failed" or existing_revision == execution:
+                    return AutomationRunClaim(
+                        existing_id,
+                        existing_run_key,
+                        str(row["status"]),
+                        False,
+                    )
+                predecessor_failed_run_id = existing_id
+            else:
+                predecessor_failed_run_id = None
+
+            run_key = _execution_run_key(
+                semantic_run_key=semantic_run_key,
+                execution_revision=execution,
+                predecessor_failed_run_id=predecessor_failed_run_id,
+            )
+            run_id = "slar_" + run_key.rsplit(":", 1)[1][:32]
+            query_json = query_json_for(predecessor_failed_run_id)
             cursor = self.conn.execute(
                 "INSERT OR IGNORE INTO security_lifecycle_automation_runs "
                 "(run_id,case_id,mode,observation_fingerprint_sha256,policy_version,"
@@ -957,58 +1093,16 @@ class SecurityLifecycleFactKernel:
             if cursor.rowcount == 1:
                 return AutomationRunClaim(run_id, run_key, "running", True)
 
-            row = self.conn.execute(
+            existing = self.conn.execute(
                 "SELECT * FROM security_lifecycle_automation_runs WHERE run_key=?",
                 (run_key,),
             ).fetchone()
-            if row is None:
+            if existing is None:
                 raise RuntimeError("automation_run_insert_lost")
-            existing_id = str(row["run_id"])
-            if row["status"] == "blocked" and row["retry_at"] is not None:
-                blocker_rows = self.conn.execute(
-                    "SELECT retryable FROM security_lifecycle_automation_run_blockers "
-                    "WHERE automation_run_id=?",
-                    (existing_id,),
-                ).fetchall()
-                retryable = bool(blocker_rows) and all(
-                    int(item["retryable"]) == 1 for item in blocker_rows
-                )
-                due = _instant(str(row["retry_at"])) <= _instant(timestamp)
-                if retryable and due:
-                    self.conn.execute(
-                        "DELETE FROM security_lifecycle_automation_facts "
-                        "WHERE automation_run_id=?",
-                        (existing_id,),
-                    )
-                    self.conn.execute(
-                        "DELETE FROM security_lifecycle_evidence "
-                        "WHERE automation_run_id=?",
-                        (existing_id,),
-                    )
-                    self.conn.execute(
-                        "DELETE FROM security_lifecycle_automation_run_blockers "
-                        "WHERE automation_run_id=?",
-                        (existing_id,),
-                    )
-                    self.conn.execute(
-                        "UPDATE security_lifecycle_automation_runs SET "
-                        "status='running',decision_tier=NULL,action_readiness=NULL,"
-                        "query_context_json=?,diagnostics_json=?,retry_at=NULL,"
-                        "failure_code=NULL,started_at=?,finished_at=NULL,updated_at=? "
-                        "WHERE run_id=?",
-                        (
-                            query_json,
-                            diagnostics_json,
-                            timestamp,
-                            timestamp,
-                            existing_id,
-                        ),
-                    )
-                    return AutomationRunClaim(existing_id, run_key, "running", True)
             return AutomationRunClaim(
-                existing_id,
-                run_key,
-                str(row["status"]),
+                str(existing["run_id"]),
+                str(existing["run_key"]),
+                str(existing["status"]),
                 False,
             )
 

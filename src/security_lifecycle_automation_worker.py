@@ -29,6 +29,7 @@ from src.security_lifecycle_schema import (
 )
 
 
+AUTOMATION_EXECUTION_REVISION = "trusted-lifecycle-execution-r1"
 _MAX_CASES_PER_TICK = 2
 @dataclass(frozen=True)
 class LifecycleAutomationEvidenceBundle:
@@ -498,6 +499,7 @@ class LifecycleAutomationWorker:
                         observation_fingerprint_sha256=fingerprint,
                         policy_version=AUTOMATION_POLICY_VERSION,
                         mode=mode,
+                        execution_revision=AUTOMATION_EXECUTION_REVISION,
                         query_context=_query_context(case, mode=mode),
                         diagnostics={},
                         at=at,

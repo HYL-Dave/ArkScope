@@ -37,6 +37,7 @@ def _reserve(kernel, case_id, **overrides):
         "observation_fingerprint_sha256": _FINGERPRINT,
         "policy_version": "trusted-lifecycle-v1",
         "mode": "historical",
+        "execution_revision": "trusted-lifecycle-execution-r1",
         "query_context": {
             "case_id": case_id,
             "cik": "0001409970",
@@ -100,7 +101,7 @@ def _fact(evidence, value="HAPN", *, rule_version="1"):
     )
 
 
-def _succeed(kernel, claim, *, evidence=(), facts=(), diagnostics=None):
+def _succeed(kernel, claim, *, evidence=(), facts=(), diagnostics=None, at=_LATER):
     return kernel.complete_run(
         run_id=claim.run_id,
         evidence=evidence,
@@ -110,12 +111,16 @@ def _succeed(kernel, claim, *, evidence=(), facts=(), diagnostics=None):
         action_readiness="transition_eligible",
         retry_at=None,
         diagnostics=diagnostics or {"sec_attempts": 1},
-        at=_LATER,
+        at=at,
     )
 
 
 def test_automation_run_key_binds_case_observation_policy_and_mode():
-    from src.security_lifecycle_fact_kernel import AutomationBlocker, automation_run_key
+    from src.security_lifecycle_fact_kernel import (
+        AutomationBlocker,
+        _execution_run_key,
+        automation_run_key,
+    )
 
     base = automation_run_key(
         case_id="case-a",
@@ -143,6 +148,18 @@ def test_automation_run_key_binds_case_observation_policy_and_mode():
     assert base.startswith("lifecycle-automation-v1:")
     assert base not in variants
     assert len(variants) == 5
+    execution = _execution_run_key(
+        semantic_run_key=base,
+        execution_revision="trusted-lifecycle-execution-r1",
+        predecessor_failed_run_id=None,
+    )
+    replay_execution = _execution_run_key(
+        semantic_run_key=base,
+        execution_revision="trusted-lifecycle-execution-r1",
+        predecessor_failed_run_id="slar_previous",
+    )
+    assert execution.startswith("lifecycle-automation-execution-v1:")
+    assert execution != replay_execution
 
     _conn, store, kernel, case_id = _context()
     claim = _reserve(kernel, case_id)
@@ -215,6 +232,300 @@ def test_current_policy_retries_a_failed_run_without_deleting_v1_history():
             ("trusted-lifecycle-automation-v1", "failed"),
             ("trusted-lifecycle-automation-v3", "running"),
         ]
+
+
+def test_failed_semantic_run_replays_once_per_execution_revision():
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    kernel.fail_run(
+        run_id=first.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at=_LATER,
+    )
+
+    replay = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:00Z",
+    )
+    duplicate = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:01Z",
+    )
+
+    assert replay.should_execute is True
+    assert replay.run_id != first.run_id
+    assert duplicate.should_execute is False
+    assert duplicate.run_id == replay.run_id
+    assert store.get_automation_run(first.run_id)["status"] == "failed"
+
+    first_row = store.get_automation_run(first.run_id)
+    replay_row = store.get_automation_run(replay.run_id)
+    assert first_row["run_key"].startswith("lifecycle-automation-execution-v1:")
+    assert replay_row["run_key"].startswith("lifecycle-automation-execution-v1:")
+    assert replay_row["run_key"] != first_row["run_key"]
+    assert json.loads(replay_row["query_context_json"])["semantic_run_key"] == (
+        json.loads(first_row["query_context_json"])["semantic_run_key"]
+    )
+    assert json.loads(replay_row["query_context_json"])["predecessor_failed_run_id"] == (
+        first.run_id
+    )
+
+
+def test_successful_replay_prevents_later_revision_fanout():
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    kernel.fail_run(
+        run_id=first.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at=_LATER,
+    )
+    replay = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:00Z",
+    )
+    evidence = _evidence()
+    _succeed(
+        kernel,
+        replay,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        at="2026-08-26T01:00:00Z",
+    )
+
+    later = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r2",
+        at="2026-08-27T00:00:00Z",
+    )
+    assert later.should_execute is False
+    assert later.run_id == replay.run_id
+    assert len(store.list_automation_runs(case_id)) == 2
+
+
+def test_legacy_failed_semantic_run_replays_once_at_current_execution_revision():
+    _conn, store, kernel, case_id = _context()
+    failed = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    row = store.get_automation_run(failed.run_id)
+    context = json.loads(row["query_context_json"])
+    del context["execution_revision"]
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), failed.run_id),
+    )
+    store.conn.commit()
+    kernel.fail_run(
+        run_id=failed.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at=_LATER,
+    )
+
+    replay = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:00Z",
+    )
+    duplicate = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:01Z",
+    )
+    assert replay.should_execute is True
+    assert duplicate.should_execute is False
+    assert duplicate.run_id == replay.run_id
+
+
+def test_current_execution_revision_does_not_replay_failed_semantic_run_later():
+    _conn, store, kernel, case_id = _context()
+    failed = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+    )
+    kernel.fail_run(
+        run_id=failed.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at=_LATER,
+    )
+
+    for at in ("2026-08-26T02:00:00Z", "2027-08-25T02:00:00Z"):
+        claim = _reserve(
+            kernel,
+            case_id,
+            policy_version="trusted-lifecycle-automation-v3",
+            execution_revision="trusted-lifecycle-execution-r1",
+            at=at,
+        )
+        assert claim.should_execute is False
+        assert claim.run_id == failed.run_id
+    assert len(store.list_automation_runs(case_id)) == 1
+
+
+def test_latest_semantic_run_statuses_do_not_fan_out_execution_revisions():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    for status in ("queued", "running", "blocked", "succeeded", "cancelled"):
+        _conn, store, kernel, case_id = _context()
+        claim = _reserve(
+            kernel,
+            case_id,
+            policy_version=f"trusted-lifecycle-{status}",
+            execution_revision="trusted-lifecycle-execution-r0",
+        )
+        if status == "blocked":
+            kernel.complete_run(
+                run_id=claim.run_id,
+                evidence=(),
+                facts=(),
+                blockers=(
+                    AutomationBlocker(
+                        code="sec_transport_unavailable",
+                        retryable=True,
+                        context={"attempts": 1},
+                    ),
+                ),
+                decision_tier=None,
+                action_readiness=None,
+                retry_at="2026-08-28T00:00:00Z",
+                diagnostics={"sec_attempts": 1},
+                at=_LATER,
+            )
+        elif status == "succeeded":
+            evidence = _evidence(status)
+            _succeed(kernel, claim, evidence=(evidence,), facts=(_fact(evidence),))
+        elif status == "queued":
+            store.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "status='queued',started_at=NULL WHERE run_id=?",
+                (claim.run_id,),
+            )
+            store.conn.commit()
+        elif status == "cancelled":
+            store.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "status='cancelled',finished_at=? WHERE run_id=?",
+                (_LATER, claim.run_id),
+            )
+            store.conn.commit()
+
+        later = _reserve(
+            kernel,
+            case_id,
+            policy_version=f"trusted-lifecycle-{status}",
+            execution_revision="trusted-lifecycle-execution-r1",
+            at="2026-08-26T00:00:00Z",
+        )
+        assert later.should_execute is False
+        assert later.run_id == claim.run_id
+        assert len(store.list_automation_runs(case_id)) == 1
+
+
+def test_due_retryable_blocked_semantic_run_reuses_its_execution_row():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    blocked = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    kernel.complete_run(
+        run_id=blocked.run_id,
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="sec_transport_unavailable",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-26T00:00:00Z",
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+
+    retry = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:00Z",
+    )
+    assert retry.should_execute is True
+    assert retry.run_id == blocked.run_id
+    assert len(store.list_automation_runs(case_id)) == 1
+
+
+def test_semantic_run_lookup_never_cross_selects_cases_with_same_fingerprint():
+    _conn, store, kernel, first_case_id = _context()
+    second_case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0001409970-26-000132",
+        ticker="HAPN2",
+        at=_AT,
+    )
+    failed = _reserve(
+        kernel,
+        first_case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    kernel.fail_run(
+        run_id=failed.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at=_LATER,
+    )
+
+    second = _reserve(
+        kernel,
+        second_case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:00Z",
+    )
+    second_context = json.loads(store.get_automation_run(second.run_id)["query_context_json"])
+    assert second.should_execute is True
+    assert second.run_id != failed.run_id
+    assert "predecessor_failed_run_id" not in second_context
 
 
 def test_evidence_and_facts_persist_atomically_or_not_at_all():
@@ -585,6 +896,8 @@ def test_expected_provider_conditions_block_while_program_errors_do_not_masquera
 
 
 def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
+    from src.security_lifecycle_fact_kernel import automation_run_key
+
     _conn, store, kernel, case_id = _context()
     claim = _reserve(
         kernel,
@@ -593,12 +906,23 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
         diagnostics={"sec_documents": 2, "sec_attempts": 3},
     )
     row = store.get_automation_run(claim.run_id)
-    assert row["query_context_json"] == (
-        '{"a":{"ticker":"HAPN"},'
-        '"input_evidence_set_sha256":'
-        '"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",'
-        '"z":[2,1]}'
-    )
+    assert json.loads(row["query_context_json"]) == {
+        "a": {"ticker": "HAPN"},
+        "execution_revision": "trusted-lifecycle-execution-r1",
+        "input_evidence_set_sha256": (
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ),
+        "semantic_run_key": automation_run_key(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            policy_version="trusted-lifecycle-v1",
+            mode="historical",
+            input_evidence_set_sha256=(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ),
+        ),
+        "z": [2, 1],
+    }
     assert row["diagnostics_json"] == '{"sec_attempts":3,"sec_documents":2}'
 
     for query_context, diagnostics in (
@@ -606,6 +930,9 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
         ({"ticker": "HAPN\0"}, {}),
         ({"notes": "x" * 17000}, {}),
         ({"input_evidence_set_sha256": "1" * 64}, {}),
+        ({"semantic_run_key": "spoofed"}, {}),
+        ({"execution_revision": "spoofed"}, {}),
+        ({"predecessor_failed_run_id": "slar_spoofed"}, {}),
         ({}, {"source_url": 1}),
         ({}, {"sec_attempts": "1"}),
     ):

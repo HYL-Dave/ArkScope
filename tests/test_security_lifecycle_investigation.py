@@ -118,6 +118,7 @@ def _automation_run(
         observation_fingerprint_sha256=_FINGERPRINT,
         policy_version=AUTOMATION_POLICY_VERSION,
         mode=mode,
+        execution_revision="trusted-lifecycle-execution-r1",
         query_context={"case_id": case_id, "ticker": "EA"},
         diagnostics={"sec_attempts": 0},
         at=_AT,

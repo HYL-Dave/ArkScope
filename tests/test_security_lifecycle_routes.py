@@ -154,6 +154,7 @@ def _create_automation_draft(context):
         observation_fingerprint_sha256=context["fingerprint"],
         policy_version=AUTOMATION_POLICY_VERSION,
         mode="historical",
+        execution_revision="trusted-lifecycle-execution-r1",
         query_context={"case_id": context["case_id"], "ticker": "EA"},
         diagnostics={"sec_attempts": 0},
         at=_AT,

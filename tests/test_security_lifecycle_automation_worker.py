@@ -769,6 +769,76 @@ def test_current_assessment_is_not_reprocessed(tmp_path):
         harness.conn.close()
 
 
+def test_worker_records_execution_revision_without_replaying_current_failed_run(
+    tmp_path,
+):
+    from src.security_lifecycle_automation_worker import (
+        AUTOMATION_EXECUTION_REVISION,
+    )
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _invalid_persistence_bundle(case)
+    try:
+        first = harness.worker().run()
+        second = harness.worker().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+        context = json.loads(run["query_context_json"])
+
+        assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v3"
+        assert context["execution_revision"] == "trusted-lifecycle-execution-r1"
+        assert AUTOMATION_EXECUTION_REVISION == "trusted-lifecycle-execution-r1"
+        assert first["failed"] == 1
+        assert second["processed"] == 0
+        assert second["skipped_current"] == 1
+        assert len(_store(harness).list_automation_runs(case["case_id"])) == 1
+    finally:
+        harness.conn.close()
+
+
+def test_execution_revision_does_not_change_decision_or_transition_authority(
+    tmp_path,
+    monkeypatch,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+
+    cases = [_case(1)]
+    r0_path = tmp_path / "r0"
+    r1_path = tmp_path / "r1"
+    r0_path.mkdir()
+    r1_path.mkdir()
+    r0 = _Harness(r0_path, cases)
+    r1 = _Harness(r1_path, cases)
+    try:
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_EXECUTION_REVISION",
+            "trusted-lifecycle-execution-r0",
+        )
+        r0.worker().run()
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_EXECUTION_REVISION",
+            "trusted-lifecycle-execution-r1",
+        )
+        r1.worker().run()
+
+        assessment_r0 = _store(r0).list_assessments(cases[0]["case_id"])[0]
+        assessment_r1 = _store(r1).list_assessments(cases[0]["case_id"])[0]
+        assert assessment_r0["decision_provenance_sha256"] == assessment_r1[
+            "decision_provenance_sha256"
+        ]
+        assert assessment_r0["rule_id"] == assessment_r1["rule_id"]
+        assert assessment_r0["rule_version"] == assessment_r1["rule_version"]
+        with open("src/ticker_identity_transition.py", encoding="utf-8") as source:
+            assert "execution_revision" not in source.read()
+        assert "execution_revision" not in json.dumps(r1.approval_calls)
+    finally:
+        r0.conn.close()
+        r1.conn.close()
+
+
 def test_changed_observation_or_policy_reenters_and_stales_old_result(
     tmp_path,
     monkeypatch,
