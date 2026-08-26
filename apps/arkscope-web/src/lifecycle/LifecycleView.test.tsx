@@ -580,6 +580,28 @@ describe("Lifecycle workflow", () => {
       },
     ];
     const counts = { attention: 1, monitoring: 2, history: 1 };
+    apiMocks.listTickerIdentityTransitionActivity.mockResolvedValue({
+      items: [{
+        activity_id: "activity-unacknowledged",
+        transition_id: "transition-reversed",
+        case_id: "case-done",
+        activity_type: "reversed",
+        source_ticker: "OLD",
+        successor_ticker: "DONE",
+        effective_date: "2026-08-25",
+        user_owned_changes: [],
+        provider_owned_retained: [],
+        state_sha256: "1".repeat(64),
+        rule_id: "lifecycle.simple_symbol_continuation",
+        rule_version: "1",
+        decision_provenance_sha256: "2".repeat(64),
+        occurred_at: "2026-08-25T08:00:00Z",
+        acknowledged_at: null,
+        created_at: "2026-08-25T08:00:00Z",
+      }],
+      count: 1,
+      unacknowledged_count: 1,
+    });
     apiMocks.listSecurityLifecycleCases.mockImplementation(
       async (filters: SecurityLifecycleCaseFilters) => {
         const bucket = filters.queue_bucket;
