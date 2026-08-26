@@ -1791,6 +1791,26 @@ table.wl tbody tr.archived td {
   gap: 6px;
   margin-bottom: 12px;
 }
+.lifecycle-queue-switch {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(8rem, 1fr));
+  gap: .4rem;
+  margin-bottom: 12px;
+}
+.lifecycle-queue-switch .ui-button {
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 42px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.lifecycle-queue-count {
+  flex: 0 0 auto;
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
 .lifecycle-filters {
   display: grid;
   grid-template-columns: repeat(5, minmax(128px, 1fr));
@@ -1897,6 +1917,27 @@ table.lifecycle-table tbody tr:last-child td {
 .lifecycle-state-resolved {
   color: var(--ok);
   border-color: color-mix(in srgb, var(--ok) 55%, var(--border));
+}
+.lifecycle-disposition-cell {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 10rem;
+}
+.lifecycle-disposition-confirmed_monitoring {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.lifecycle-disposition-confirmed_effective {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--border));
+}
+.lifecycle-disposition-not_confirmed_yet {
+  color: var(--muted);
+}
+.lifecycle-disposition-exception_required {
+  color: var(--wait);
+  border-color: color-mix(in srgb, var(--wait) 55%, var(--border));
 }
 .lifecycle-integrity-notice {
   margin: 0 0 12px;
@@ -2147,6 +2188,12 @@ table.lifecycle-table tbody tr:last-child td {
   }
   .lifecycle-activity-list {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .lifecycle-queue-switch {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

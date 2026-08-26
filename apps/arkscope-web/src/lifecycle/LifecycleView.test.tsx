@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SecurityLifecycleCaseFilters } from "../api";
 import { withTestUiLocale } from "../test/testUiLocale";
 
 const apiMocks = vi.hoisted(() => ({
@@ -133,7 +134,35 @@ const CASES = [
   active_sources: ["manual_lists"],
   source_context: "available",
   components: {},
+  disposition: workflowState === "resolved" || workflowState === "reviewed_inconclusive"
+    ? "confirmed_effective"
+    : workflowState === "evidence_ready"
+      ? "exception_required"
+      : "not_confirmed_yet",
+  queue_bucket: workflowState === "resolved" || workflowState === "reviewed_inconclusive"
+    ? "history"
+    : workflowState === "evidence_ready"
+      ? "attention"
+      : "monitoring",
+  disposition_reason: workflowState === "resolved"
+    ? "resolved_assessment"
+    : workflowState === "reviewed_inconclusive"
+      ? "reviewed_inconclusive"
+      : workflowState === "evidence_ready"
+        ? "ambiguous_event"
+        : workflowState === "investigating"
+          ? "automation_running"
+          : "awaiting_initial_automation",
+  last_checked_at: workflowState === "unresolved" ? null : "2026-08-25T09:00:00Z",
+  next_check_at: workflowState === "unresolved" || workflowState === "investigating"
+    ? "2026-08-26T09:00:00Z"
+    : null,
+  source_family_status: { regulator: "present" },
   investigation_run_count: workflowState === "investigating" ? 1 : 0,
+  automation_run_count: workflowState === "investigating" ? 1 : 0,
+  automation_fact_count: 0,
+  automation_tier: null,
+  action_readiness: null,
   evidence_count: workflowState === "evidence_ready" ? 1 : 0,
   assessment_count: workflowState === "resolved" ? 1 : 0,
   acknowledgement_count: workflowState === "reviewed_inconclusive" ? 1 : 0,
@@ -381,6 +410,7 @@ beforeEach(async () => {
   apiMocks.listSecurityLifecycleCases.mockResolvedValue({
     cases: [SUMMARY, ...CASES],
     count: 6,
+    queue_counts: { attention: 2, monitoring: 2, history: 2 },
     data_integrity: { source_missing_count: 1 },
   });
   apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail());
@@ -502,6 +532,95 @@ describe("Lifecycle workflow", () => {
     }));
   });
 
+  it("separates attention monitoring history and all without acknowledging history", async () => {
+    const queueRows = [
+      {
+        ...SUMMARY,
+        case_id: "case-conflict",
+        ticker: "CONFLICT",
+        disposition: "exception_required",
+        queue_bucket: "attention",
+        disposition_reason: "source_conflict",
+        last_checked_at: "2026-08-26T08:00:00Z",
+        next_check_at: null,
+        source_family_status: { regulator: "conflict", publisher: "present" },
+      },
+      {
+        ...SUMMARY,
+        case_id: "case-pending",
+        ticker: "PENDING",
+        disposition: "not_confirmed_yet",
+        queue_bucket: "monitoring",
+        disposition_reason: "event_completion_not_confirmed",
+        last_checked_at: "2026-08-26T08:00:00Z",
+        next_check_at: "2026-08-27T08:00:00Z",
+        source_family_status: { regulator: "present", publisher: "present" },
+      },
+      {
+        ...SUMMARY,
+        case_id: "case-waiting",
+        ticker: "WAITING",
+        disposition: "confirmed_monitoring",
+        queue_bucket: "monitoring",
+        disposition_reason: "waiting_effective_date",
+        last_checked_at: "2026-08-26T08:00:00Z",
+        next_check_at: "2026-09-01T00:00:00Z",
+        source_family_status: { regulator: "confirmed" },
+      },
+      {
+        ...SUMMARY,
+        case_id: "case-done",
+        ticker: "DONE",
+        disposition: "confirmed_effective",
+        queue_bucket: "history",
+        disposition_reason: "resolved_no_change",
+        last_checked_at: "2026-08-25T08:00:00Z",
+        next_check_at: null,
+        source_family_status: { regulator: "confirmed" },
+      },
+    ];
+    const counts = { attention: 1, monitoring: 2, history: 1 };
+    apiMocks.listSecurityLifecycleCases.mockImplementation(
+      async (filters: SecurityLifecycleCaseFilters) => {
+        const bucket = filters.queue_bucket;
+        return {
+          cases: bucket
+            ? queueRows.filter((row) => row.queue_bucket === bucket)
+            : queueRows,
+          count: bucket ? counts[bucket] : queueRows.length,
+          queue_counts: counts,
+          data_integrity: { source_missing_count: 0 },
+        };
+      },
+    );
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await mountLifecycle(null);
+
+    const renderedTickers = () => Array.from(
+      host!.querySelectorAll<HTMLElement>(".lifecycle-case-trigger .mono"),
+    ).map((node) => node.textContent);
+    const selectedTab = () => host!.querySelector<HTMLElement>(
+      '.lifecycle-queue-switch [aria-selected="true"]',
+    );
+
+    expect(selectedTab()?.textContent).toContain("需要處理");
+    expect(renderedTickers()).toEqual(["CONFLICT"]);
+
+    await click("監看中", host!);
+    expect(renderedTickers()).toEqual(["PENDING", "WAITING"]);
+    expect(host!.textContent).toContain("下次查核");
+
+    await click("歷史", host!);
+    expect(renderedTickers()).toEqual(["DONE"]);
+    expect(apiMocks.acknowledgeTickerIdentityTransitionActivity).not.toHaveBeenCalled();
+
+    await click("全部", host!);
+    expect(renderedTickers()).toEqual(["CONFLICT", "PENDING", "WAITING", "DONE"]);
+    expect(apiMocks.listSecurityLifecycleCases).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ queue_bucket: expect.anything() }),
+    );
+  });
+
   it("keeps prior evidence and shows a typed safe historical run error", async () => {
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
       investigation_runs: [{
@@ -585,6 +704,37 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).toContain("標的事件調查");
     expect(document.body.textContent).toContain("證據不足，未能定論");
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
+  });
+
+  it("renders automation conclusions from structured bilingual copy", async () => {
+    const assessment = {
+      ...AUTOMATION_DRAFT,
+      status: "accepted",
+      rule_id: "lifecycle.no_identity_change",
+      conclusion: "Stored English automation conclusion must stay out of the view.",
+      impact_summary: "Stored English automation impact must stay out of the view.",
+      successor_ticker: null,
+      destination_venue: null,
+      effective_date: null,
+      counterparty_name: null,
+      counterparty_ticker: null,
+      counterparty_cik: null,
+      consideration_currency: null,
+      cash_per_security_decimal: null,
+      exchange_ratio_decimal: null,
+    };
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      current_assessment: assessment,
+      assessment_history: [assessment],
+    }));
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await mountLifecycle();
+
+    expect(document.body.textContent).toContain(
+      "未發現 QBTS 的追蹤證券身分有變更。",
+    );
+    expect(document.body.textContent).not.toContain(assessment.conclusion);
+    expect(document.body.textContent).not.toContain(assessment.impact_summary);
   });
 
   it("renders source-aware proposals as unapplied explanations", async () => {

@@ -3,6 +3,124 @@ import { describe, expect, it } from "vitest";
 const PRESENTATION_MODULE = "./lifecyclePresentation";
 
 describe("Lifecycle presentation", () => {
+  it("labels every disposition, wait reason, and source-family state", async () => {
+    const {
+      lifecycleDispositionLabel,
+      lifecycleDispositionReasonLabel,
+      lifecycleSourceFamilyStateLabel,
+    } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
+
+    expect(lifecycleDispositionLabel("confirmed_monitoring", "zh-Hant"))
+      .toBe("已確認，持續監看");
+    expect(lifecycleDispositionLabel("confirmed_effective", "zh-Hant"))
+      .toBe("已確認完成");
+    expect(lifecycleDispositionLabel("not_confirmed_yet", "zh-Hant"))
+      .toBe("尚未確認發生");
+    expect(lifecycleDispositionLabel("exception_required", "zh-Hant"))
+      .toBe("需要複查");
+    expect(lifecycleDispositionReasonLabel("event_completion_not_confirmed", "en"))
+      .toBe("Event completion has not been confirmed");
+    expect(lifecycleDispositionReasonLabel("retryable_source_unavailable", "en"))
+      .toBe("A source is temporarily unavailable; another check is scheduled");
+    expect(lifecycleDispositionReasonLabel("event_completion_not_confirmed", "en"))
+      .not.toBe(lifecycleDispositionReasonLabel("retryable_source_unavailable", "en"));
+    expect(lifecycleSourceFamilyStateLabel("confirmed", "zh-Hant"))
+      .toBe("已確認");
+    expect(lifecycleSourceFamilyStateLabel("unavailable", "zh-Hant"))
+      .toBe("暫時無法取得");
+  });
+
+  it("derives bilingual automation narratives from structured fields", async () => {
+    const { lifecycleAutomationNarrative } = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    );
+    const storedConclusion = "Stored English must not be rendered as product copy.";
+    const base = {
+      assessment_id: "assessment-automation",
+      status: "accepted",
+      author: "automation",
+      automation_method: "deterministic_rule",
+      acceptance_authority: "automation_policy",
+      automation_run_id: "run-1",
+      rule_version: "1",
+      decision_provenance_sha256: "a".repeat(64),
+      relevance: "direct_tracked_security",
+      confidence: "high",
+      conclusion: storedConclusion,
+      impact_summary: "Stored English impact must not be rendered either.",
+      outcomes: ["symbol_changed"],
+      stale: false,
+      created_at: "2026-08-26T00:00:00Z",
+      successor_ticker: "META",
+      destination_venue: "NASDAQ",
+      effective_date: "2026-09-01",
+      counterparty_name: "Acquirer Corp.",
+      consideration_currency: "USD",
+      cash_per_security_decimal: "10.50",
+      exchange_ratio_decimal: "0.25",
+    } as const;
+    const rules = [
+      "lifecycle.terminal_delisting",
+      "lifecycle.no_identity_change",
+      "lifecycle.simple_symbol_continuation",
+      "lifecycle.venue_transfer",
+      "lifecycle.ma_review",
+      "lifecycle.source_conflict",
+      "lifecycle.insufficient_identity_facts",
+    ] as const;
+
+    for (const rule_id of rules) {
+      for (const locale of ["en", "zh-Hant"] as const) {
+        const narrative = lifecycleAutomationNarrative(
+          { ...base, rule_id },
+          "FB",
+          locale,
+        );
+        expect(narrative.conclusion).not.toBe(storedConclusion);
+        expect(narrative.impact).not.toBe(base.impact_summary);
+        expect(`${narrative.conclusion} ${narrative.impact}`).toContain("FB");
+        expect(narrative.impact).toContain("2026-09-01");
+      }
+    }
+    expect(lifecycleAutomationNarrative(
+      { ...base, rule_id: "lifecycle.simple_symbol_continuation" },
+      "FB",
+      "zh-Hant",
+    ).conclusion).toContain("META");
+    expect(lifecycleAutomationNarrative(
+      { ...base, rule_id: "lifecycle.venue_transfer" },
+      "FB",
+      "en",
+    ).conclusion).toContain("NASDAQ");
+    expect(lifecycleAutomationNarrative(
+      { ...base, rule_id: "lifecycle.future_rule" },
+      "FB",
+      "zh-Hant",
+    ).conclusion).toContain("lifecycle.future_rule");
+  });
+
+  it("preserves human and legacy assessment prose", async () => {
+    const { lifecycleAutomationNarrative } = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    );
+    const assessment = {
+      assessment_id: "assessment-human",
+      status: "accepted",
+      author: "human",
+      relevance: "direct_tracked_security",
+      confidence: "high",
+      conclusion: "Reviewed conclusion.",
+      impact_summary: "Reviewed impact.",
+      outcomes: ["no_tracked_security_change"],
+      stale: false,
+      created_at: "2026-08-26T00:00:00Z",
+    } as const;
+    expect(lifecycleAutomationNarrative(assessment, "TEST", "zh-Hant")).toEqual({
+      conclusion: "Reviewed conclusion.",
+      impact: "Reviewed impact.",
+    });
+  });
+
   it("labels source presence and workflow state without mixing their meanings", async () => {
     const { lifecycleSourcePresenceLabel, lifecycleWorkflowLabel } = await import(
       /* @vite-ignore */ PRESENTATION_MODULE

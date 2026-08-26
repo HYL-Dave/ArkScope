@@ -38,7 +38,9 @@ import {
   type SecurityLifecycleConfidence,
   type SecurityLifecycleEventType,
   type SecurityLifecycleEvidence,
+  type SecurityLifecycleEvidenceSourceFamily,
   type SecurityLifecycleProposalType,
+  type SecurityLifecycleQueueBucket,
   type SecurityLifecycleRelevance,
   type SecurityLifecycleSourcePresence,
   type SecurityLifecycleWorkflowState,
@@ -65,6 +67,7 @@ import {
   lifecycleActionReadinessLabel,
   lifecycleAssessmentAuthorLabel,
   lifecycleAutomationBlockerLabel,
+  lifecycleAutomationNarrative,
   lifecycleAutomationMethodLabel,
   lifecycleConfidenceLabel,
   lifecycleErrorPresentation,
@@ -74,10 +77,13 @@ import {
   lifecycleFactValueLabel,
   lifecycleOutcomeLabel,
   lifecycleDecisionTierLabel,
+  lifecycleDispositionLabel,
+  lifecycleDispositionReasonLabel,
   lifecycleProposalLabel,
   lifecycleRelevanceLabel,
   lifecycleRunStatusLabel,
   lifecycleSourcePresenceLabel,
+  lifecycleSourceFamilyStateLabel,
   lifecycleTrackingSourceLabel,
   lifecycleWorkflowLabel,
   safeEvidenceUrl,
@@ -102,6 +108,15 @@ const WORKFLOW_STATES: SecurityLifecycleWorkflowState[] = [
   "evidence_ready",
   "reviewed_inconclusive",
   "resolved",
+];
+const QUEUE_VIEWS = ["attention", "monitoring", "history", "all"] as const;
+type QueueView = (typeof QUEUE_VIEWS)[number];
+const SOURCE_FAMILIES: SecurityLifecycleEvidenceSourceFamily[] = [
+  "regulator",
+  "market_infrastructure",
+  "publisher",
+  "general_web",
+  "manual",
 ];
 const RELEVANCE: SecurityLifecycleRelevance[] = [
   "undetermined",
@@ -445,17 +460,20 @@ function TransitionPreviewContent({
 
 function AssessmentHistory({
   assessment,
+  ticker,
   locale,
   t,
   canAccept,
   onAccept,
 }: {
   assessment: SecurityLifecycleAssessment;
+  ticker: string;
   locale: LifecycleLocale;
   t: TFunction<"explore">;
   canAccept: boolean;
   onAccept: () => void;
 }) {
+  const narrative = lifecycleAutomationNarrative(assessment, ticker, locale);
   const transactionFacts = [
     [t(($) => $.lifecycle.fields.counterpartyName), assessment.counterparty_name],
     [t(($) => $.lifecycle.fields.counterpartyTicker), assessment.counterparty_ticker],
@@ -486,14 +504,14 @@ function AssessmentHistory({
           ? t(($) => $.lifecycle.states.legacy)
           : assessment.author === "automation"
             ? t(($) => $.lifecycle.states.automationAssessment)
-            : assessment.conclusion}</strong>
+            : narrative.conclusion}</strong>
         <span className="lifecycle-state">
           {lifecycleAssessmentStatusLabel(assessment.status, locale)}
         </span>
       </div>
       {assessment.author === "legacy_review" || assessment.author === "automation" ? (
         <>
-          <p>{assessment.conclusion}</p>
+          <p>{narrative.conclusion}</p>
           {assessment.author === "legacy_review" ? (
             <p>{t(($) => $.lifecycle.states.limitedProvenance)}</p>
           ) : null}
@@ -559,7 +577,7 @@ function AssessmentHistory({
           ))}
         </div>
       ) : null}
-      <p>{assessment.impact_summary}</p>
+      <p>{narrative.impact}</p>
       {assessment.stale ? <p>{t(($) => $.lifecycle.states.revalidation)}</p> : null}
       {canAccept ? (
         <Button size="compact" icon={<Check size={15} />} onClick={onAccept}>
@@ -924,7 +942,7 @@ function CaseTable({
           <th>{t(($) => $.lifecycle.table.ticker)}</th>
           <th>{t(($) => $.lifecycle.table.filing)}</th>
           <th>{t(($) => $.lifecycle.table.event)}</th>
-          <th>{t(($) => $.lifecycle.table.workflow)}</th>
+          <th>{t(($) => $.lifecycle.table.disposition)}</th>
           <th>{t(($) => $.lifecycle.table.relevance)}</th>
           <th>{t(($) => $.lifecycle.table.sources)}</th>
         </tr></thead>
@@ -947,9 +965,29 @@ function CaseTable({
               <td>{item.filing_date ?? "—"}</td>
               <td>{item.kinds
                 .map((kind) => lifecycleEventLabel(kind.event_type, locale)).join(" · ") || "—"}</td>
-              <td><span className={`lifecycle-state lifecycle-state-${item.workflow_state}`}>
-                {lifecycleWorkflowLabel(item.workflow_state, locale)}
-              </span></td>
+              <td>
+                <div className="lifecycle-disposition-cell">
+                  <span
+                    className={`lifecycle-state lifecycle-disposition-${item.disposition}`}
+                    data-disposition={item.disposition}
+                  >
+                    {lifecycleDispositionLabel(item.disposition, locale)}
+                  </span>
+                  <span className="tiny">
+                    {lifecycleDispositionReasonLabel(item.disposition_reason, locale)}
+                  </span>
+                  {item.last_checked_at ? (
+                    <span className="muted tiny">
+                      {t(($) => $.lifecycle.table.lastChecked)}: {item.last_checked_at}
+                    </span>
+                  ) : null}
+                  {item.next_check_at ? (
+                    <span className="muted tiny">
+                      {t(($) => $.lifecycle.table.nextCheck)}: {item.next_check_at}
+                    </span>
+                  ) : null}
+                </div>
+              </td>
               <td>{item.current_assessment
                 ? lifecycleRelevanceLabel(item.current_assessment.relevance, locale)
                 : lifecycleRelevanceLabel("undetermined", locale)}</td>
@@ -973,6 +1011,12 @@ export function LifecycleView({
   const { t, i18n } = useTranslation("explore");
   const locale = localeValue(i18n.resolvedLanguage);
   const [sourcePresence, setSourcePresence] = useState<SecurityLifecycleSourcePresence>("present");
+  const [queueView, setQueueView] = useState<QueueView>("attention");
+  const [queueCounts, setQueueCounts] = useState<Record<SecurityLifecycleQueueBucket, number>>({
+    attention: 0,
+    monitoring: 0,
+    history: 0,
+  });
   const [filters, setFilters] = useState<SecurityLifecycleCaseFilters>({ limit: 200 });
   const [cases, setCases] = useState<SecurityLifecycleCaseSummary[] | null>(null);
   const [sourceMissingCount, setSourceMissingCount] = useState(0);
@@ -1024,21 +1068,35 @@ export function LifecycleView({
   const [transitionUnhideSuccessor, setTransitionUnhideSuccessor] = useState(false);
   const [transitionDialog, setTransitionDialog] = useState<"approve" | "reverse" | null>(null);
   const transitionPreviewRequestRef = useRef(0);
+  const pendingQueueViewRef = useRef<QueueView | null>(null);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const loadCases = useCallback(async () => {
     try {
-      const response = await listSecurityLifecycleCases({
+      const requestFilters: SecurityLifecycleCaseFilters = {
         ...filters,
         source_presence: sourcePresence,
-      });
+      };
+      if (sourcePresence === "present" && queueView !== "all") {
+        requestFilters.queue_bucket = queueView;
+      }
+      const response = await listSecurityLifecycleCases(requestFilters);
       setCases(response.cases);
+      setQueueCounts(response.queue_counts);
       setSourceMissingCount(response.data_integrity.source_missing_count);
+      if (pendingQueueViewRef.current === queueView) {
+        setSelectedCaseId((caseId) => (
+          caseId && !response.cases.some((item) => item.case_id === caseId)
+            ? null
+            : caseId
+        ));
+        pendingQueueViewRef.current = null;
+      }
       setListError(null);
     } catch (error) {
       setListError(lifecycleErrorPresentation(error, locale));
     }
-  }, [filters, locale, sourcePresence]);
+  }, [filters, locale, queueView, sourcePresence]);
 
   const loadActivity = useCallback(async () => {
     try {
@@ -1293,6 +1351,22 @@ export function LifecycleView({
   const authorityLabels = transitionAuthorityLabels(t);
   const blockLabels = transitionBlockLabels(t);
   const unknownTransitionValue = t(($) => $.lifecycle.states.unknownValue);
+  const queueLabels: Record<QueueView, string> = {
+    attention: t(($) => $.lifecycle.queues.attention),
+    monitoring: t(($) => $.lifecycle.queues.monitoring),
+    history: t(($) => $.lifecycle.queues.history),
+    all: t(($) => $.lifecycle.queues.all),
+  };
+  const queueCount = (view: QueueView): number => (
+    view === "all"
+      ? queueCounts.attention + queueCounts.monitoring + queueCounts.history
+      : queueCounts[view]
+  );
+  const selectQueueView = (view: QueueView) => {
+    if (view === queueView) return;
+    pendingQueueViewRef.current = view;
+    setQueueView(view);
+  };
 
   const refreshTransitionOptions = (
     values: {
@@ -1365,6 +1439,30 @@ export function LifecycleView({
         </Button>
       </div>
 
+      {sourcePresence === "present" ? (
+        <div
+          className="lifecycle-queue-switch"
+          role="tablist"
+          aria-label={t(($) => $.lifecycle.queues.aria)}
+        >
+          {QUEUE_VIEWS.map((view) => (
+            <Button
+              className="lifecycle-queue-tab"
+              size="compact"
+              tone={queueView === view ? "primary" : "ghost"}
+              role="tab"
+              aria-selected={queueView === view}
+              data-queue-view={view}
+              onClick={() => selectQueueView(view)}
+              key={view}
+            >
+              <span>{queueLabels[view]}</span>
+              <span className="lifecycle-queue-count">{queueCount(view)}</span>
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="lifecycle-filters">
         <label>{t(($) => $.lifecycle.filters.ticker)}
           <input
@@ -1434,6 +1532,42 @@ export function LifecycleView({
             {commandError ? (
               <p className="errorbox" data-error-code={commandError.code}>{commandError.message}</p>
             ) : null}
+            <LifecycleCaseSection title={t(($) => $.lifecycle.sections.status)}>
+              <dl className="lifecycle-assessment-facts lifecycle-disposition-summary">
+                <div>
+                  <dt>{t(($) => $.lifecycle.table.disposition)}</dt>
+                  <dd>{lifecycleDispositionLabel(detail.disposition, locale)}</dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.fields.actionReadiness)}</dt>
+                  <dd>{lifecycleDispositionReasonLabel(
+                    detail.disposition_reason,
+                    locale,
+                  )}</dd>
+                </div>
+                {detail.last_checked_at ? (
+                  <div>
+                    <dt>{t(($) => $.lifecycle.table.lastChecked)}</dt>
+                    <dd><time dateTime={detail.last_checked_at}>{detail.last_checked_at}</time></dd>
+                  </div>
+                ) : null}
+                {detail.next_check_at ? (
+                  <div>
+                    <dt>{t(($) => $.lifecycle.table.nextCheck)}</dt>
+                    <dd><time dateTime={detail.next_check_at}>{detail.next_check_at}</time></dd>
+                  </div>
+                ) : null}
+                {SOURCE_FAMILIES.map((family) => {
+                  const state = detail.source_family_status[family];
+                  return state ? (
+                    <div key={family}>
+                      <dt>{lifecycleEvidenceSourceFamilyLabel(family, locale)}</dt>
+                      <dd>{lifecycleSourceFamilyStateLabel(state, locale)}</dd>
+                    </div>
+                  ) : null;
+                })}
+              </dl>
+            </LifecycleCaseSection>
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.source)}>
               <p><strong>{lifecycleSourcePresenceLabel(detail.source_presence, locale)}</strong></p>
               {detail.source_context === "unavailable" ? (
@@ -1591,6 +1725,7 @@ export function LifecycleView({
               {detail.assessment_history.map((assessment) => (
                 <AssessmentHistory
                   assessment={assessment}
+                  ticker={detail.ticker}
                   locale={locale}
                   t={t}
                   canAccept={assessment.status === "draft" && detail.source_presence === "present"}

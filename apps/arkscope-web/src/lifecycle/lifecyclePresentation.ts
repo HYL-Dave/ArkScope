@@ -19,6 +19,9 @@ import type {
   SecurityLifecycleTrackingSource,
   SecurityLifecycleWorkflowState,
   SecurityLifecycleDecisionTier,
+  SecurityLifecycleDisposition,
+  SecurityLifecycleDispositionReason,
+  SecurityLifecycleSourceFamilyState,
 } from "../api";
 import enExplore from "../i18n/resources/en/explore";
 import zhHantExplore from "../i18n/resources/zh-Hant/explore";
@@ -63,6 +66,157 @@ export function lifecycleActionReadinessLabel(
     transition_eligible: copy.transitionEligible,
     action_blocked: copy.actionBlocked,
   }, locale);
+}
+
+export function lifecycleDispositionLabel(
+  value: SecurityLifecycleDisposition,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).dispositions;
+  const labels: Record<SecurityLifecycleDisposition, string> = {
+    confirmed_monitoring: copy.confirmedMonitoring,
+    confirmed_effective: copy.confirmedEffective,
+    not_confirmed_yet: copy.notConfirmedYet,
+    exception_required: copy.exceptionRequired,
+  };
+  return labels[value] ?? lifecycleCopy(locale).states.unknownValue;
+}
+
+export function lifecycleDispositionReasonLabel(
+  value: SecurityLifecycleDispositionReason,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).dispositionReasons;
+  return closedLifecycleLabel<SecurityLifecycleDispositionReason>(value, {
+    awaiting_initial_automation: copy.awaitingInitialAutomation,
+    automation_running: copy.automationRunning,
+    waiting_effective_date: copy.waitingEffectiveDate,
+    waiting_market_confirmation: copy.waitingMarketConfirmation,
+    waiting_transition_revalidation: copy.waitingTransitionRevalidation,
+    retryable_source_unavailable: copy.retryableSourceUnavailable,
+    event_completion_not_confirmed: copy.eventCompletionNotConfirmed,
+    not_confirmed_as_of: copy.notConfirmedAsOf,
+    source_missing: copy.sourceMissing,
+    source_conflict: copy.sourceConflict,
+    ambiguous_event: copy.ambiguousEvent,
+    nonretryable_provider_failure: copy.nonretryableProviderFailure,
+    automation_failure: copy.automationFailure,
+    resolved_no_change: copy.resolvedNoChange,
+    resolved_assessment: copy.resolvedAssessment,
+    transition_applied: copy.transitionApplied,
+    transition_reversed: copy.transitionReversed,
+    transition_cancelled: copy.transitionCancelled,
+    transition_needs_review: copy.transitionNeedsReview,
+    reviewed_inconclusive: copy.reviewedInconclusive,
+  }, locale);
+}
+
+export function lifecycleSourceFamilyStateLabel(
+  value: SecurityLifecycleSourceFamilyState,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).sourceFamilyStates;
+  return closedLifecycleLabel<SecurityLifecycleSourceFamilyState>(value, {
+    confirmed: copy.confirmed,
+    present: copy.present,
+    missing: copy.missing,
+    unavailable: copy.unavailable,
+    conflict: copy.conflict,
+  }, locale);
+}
+
+type KnownAutomationRuleId =
+  | "lifecycle.terminal_delisting"
+  | "lifecycle.no_identity_change"
+  | "lifecycle.simple_symbol_continuation"
+  | "lifecycle.venue_transfer"
+  | "lifecycle.ma_review"
+  | "lifecycle.source_conflict"
+  | "lifecycle.insufficient_identity_facts";
+
+type AutomationNarrativeKey =
+  | "terminalDelisting"
+  | "noIdentityChange"
+  | "simpleSymbolContinuation"
+  | "venueTransfer"
+  | "maReview"
+  | "sourceConflict"
+  | "insufficientIdentityFacts";
+
+const AUTOMATION_NARRATIVE_KEYS: Record<KnownAutomationRuleId, AutomationNarrativeKey> = {
+  "lifecycle.terminal_delisting": "terminalDelisting",
+  "lifecycle.no_identity_change": "noIdentityChange",
+  "lifecycle.simple_symbol_continuation": "simpleSymbolContinuation",
+  "lifecycle.venue_transfer": "venueTransfer",
+  "lifecycle.ma_review": "maReview",
+  "lifecycle.source_conflict": "sourceConflict",
+  "lifecycle.insufficient_identity_facts": "insufficientIdentityFacts",
+};
+
+function narrativeTemplate(
+  template: string,
+  values: Record<string, string>,
+): string {
+  return template.replace(/\{\{([a-zA-Z]+)\}\}/g, (_, key: string) => (
+    values[key] ?? ""
+  ));
+}
+
+export function lifecycleAutomationNarrative(
+  assessment: SecurityLifecycleAssessment,
+  ticker: string,
+  locale: LifecycleLocale,
+): { conclusion: string; impact: string } {
+  if (assessment.author !== "automation") {
+    return {
+      conclusion: assessment.conclusion,
+      impact: assessment.impact_summary,
+    };
+  }
+  const copy = lifecycleCopy(locale);
+  const ruleId = assessment.rule_id ?? copy.states.unknownValue;
+  const key = Object.prototype.hasOwnProperty.call(AUTOMATION_NARRATIVE_KEYS, ruleId)
+    ? AUTOMATION_NARRATIVE_KEYS[ruleId as KnownAutomationRuleId]
+    : null;
+  const template = key
+    ? copy.automationNarratives[key]
+    : copy.automationNarratives.unknownRule;
+  const values = {
+    ticker,
+    successor: assessment.successor_ticker ?? copy.states.unknownValue,
+    venue: assessment.destination_venue ?? copy.states.unknownValue,
+    rule: ruleId,
+  };
+  const structured = [
+    [copy.fields.counterpartyName, assessment.counterparty_name],
+    [copy.fields.counterpartyTicker, assessment.counterparty_ticker],
+    [copy.fields.successorTicker, assessment.successor_ticker],
+    [copy.fields.destinationVenue, assessment.destination_venue],
+    [copy.fields.effectiveDate, assessment.effective_date],
+    [copy.fields.considerationCurrency, assessment.consideration_currency],
+    [
+      copy.fields.cashPerSecurity,
+      assessment.cash_per_security_decimal
+        ? formatAssessmentDecimal(
+          assessment.cash_per_security_decimal,
+          assessment.consideration_currency,
+          locale,
+        )
+        : null,
+    ],
+    [copy.fields.exchangeRatio, assessment.exchange_ratio_decimal],
+  ]
+    .filter((entry): entry is [string, string] => Boolean(entry[1]))
+    .map(([label, value]) => `${label}: ${value}`);
+  const impact = narrativeTemplate(template.impact, values);
+  return {
+    conclusion: narrativeTemplate(template.conclusion, values),
+    impact: structured.length > 0
+      ? `${impact} ${copy.automationNarratives.structuredPrefix} ${structured.join(
+        copy.automationNarratives.structuredSeparator,
+      )}`
+      : impact,
+  };
 }
 
 export function lifecycleAssessmentAuthorLabel(
