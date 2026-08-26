@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -479,6 +480,7 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
     assert weekly is not None
     assert weekly.context["next_check_at"] == "2026-09-20T00:00:00Z"
 
+    deadline = replace(deadline, date="2026-04-01", rule_version="4")
     final = scheduler._pending_event_monitoring(
         case,
         facts,
@@ -488,12 +490,13 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
             "publisher": "available",
         },
         source_deadlines=(deadline,),
-        at="2026-10-15T12:00:00Z",
+        at="2026-08-27T12:00:00Z",
     )
     assert final is not None
     assert final.retryable is False
     assert final.context["monitoring_reason"] == "not_confirmed_as_of"
-    assert final.context["as_of"] == "2026-10-15"
+    assert final.context["source_deadline"] == "2026-04-01"
+    assert final.context["as_of"] == "2026-08-27"
     assert final.context["source_deadline_evidence_id"] == "sle_deadline"
     assert final.context["source_deadline_rule_version"] == "4"
 

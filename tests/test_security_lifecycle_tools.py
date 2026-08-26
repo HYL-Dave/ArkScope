@@ -220,6 +220,80 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     assert len(anthropic) == 15
 
 
+def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
+    monkeypatch,
+):
+    from src.tools import security_lifecycle_tools
+
+    case = {
+        "case_id": "case-final-check",
+        "source": "sec_edgar",
+        "source_ref": "final-check-ref",
+        "ticker": "EA",
+        "source_presence": "present",
+        "workflow_state": "unresolved",
+        "observation": {
+            "issuer_name": "Electronic Arts Inc.",
+            "filing_date": "2026-04-01",
+            "kinds": [],
+            "last_observed_at": _AT,
+        },
+        "automation_runs": [
+            {
+                "run_id": "run-final-check",
+                "status": "blocked",
+                "action_readiness": None,
+                "retry_at": None,
+                "updated_at": "2026-08-27T12:00:00Z",
+                "created_at": "2026-08-27T12:00:00Z",
+                "blockers": [
+                    {
+                        "blocker_code": "sec_evidence_insufficient",
+                        "retryable": False,
+                        "context": {
+                            "monitoring_reason": "not_confirmed_as_of",
+                            "as_of": "2026-08-27",
+                            "source_deadline": "2026-04-01",
+                            "source_deadline_evidence_id": "sle_deadline",
+                            "source_deadline_span_start_byte": 0,
+                            "source_deadline_span_end_byte": 64,
+                            "source_deadline_cited_text_sha256": "a" * 64,
+                            "source_deadline_rule_id": (
+                                "sec.explicit_transaction_termination_date"
+                            ),
+                            "source_deadline_rule_version": "4",
+                        },
+                    }
+                ],
+            }
+        ],
+        "automation_facts": [],
+        "current_assessment": None,
+    }
+    monkeypatch.setattr(security_lifecycle_tools, "_store_exists", lambda *_: None)
+    monkeypatch.setattr(
+        security_lifecycle_tools, "_ticker_transitions_by_case", lambda _: {}
+    )
+    monkeypatch.setattr(
+        security_lifecycle_tools,
+        "compose_security_lifecycle",
+        lambda *_: {"cases": [case]},
+    )
+    service = security_lifecycle_tools.SecurityLifecycleReadService(
+        market_db_path="unused-market.db",
+        profile_db_path="unused-profile.db",
+        source_loader=lambda: {"EA": ("manual_lists",)},
+    )
+
+    listed = service.list_cases()
+    detailed = service.get_case("case-final-check")
+
+    assert listed["cases"][0]["disposition_as_of"] == "2026-08-27"
+    assert detailed["disposition_as_of"] == "2026-08-27"
+    assert detailed["disposition"] == "not_confirmed_yet"
+    assert detailed["queue_bucket"] == "history"
+
+
 def test_list_tool_is_local_read_only_stably_sorted_and_filters_ticker_prefixes(
     tmp_path, monkeypatch
 ):
@@ -365,6 +439,7 @@ def test_queue_filter_counts_before_bucket_and_limit_and_composes_with_ticker(
                 if bucket == "history"
                 else "awaiting_initial_automation"
             ),
+            "disposition_as_of": None,
             "last_checked_at": None,
             "next_check_at": None,
             "source_family_status": {},

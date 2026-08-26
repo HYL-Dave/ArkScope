@@ -87,6 +87,7 @@ class LifecycleDispositionProjection:
     disposition: str
     queue_bucket: str
     reason_code: str
+    disposition_as_of: str | None
     last_checked_at: str | None
     next_check_at: str | None
     source_family_status: Mapping[str, str]
@@ -183,6 +184,22 @@ def _blockers(run: Mapping[str, object] | None) -> tuple[Mapping[str, object], .
         _retryable(row)
         _blocker_context(row)
     return rows
+
+
+def _not_confirmed_disposition_as_of(
+    blockers: Iterable[Mapping[str, object]],
+) -> str:
+    contexts = []
+    for blocker in blockers:
+        context = _blocker_context(blocker)
+        if context.get("monitoring_reason") == "not_confirmed_as_of":
+            contexts.append(context)
+    if len(contexts) != 1:
+        raise ValueError("disposition_as_of")
+    try:
+        return date.fromisoformat(str(contexts[0].get("as_of") or "")).isoformat()
+    except ValueError as exc:
+        raise ValueError("disposition_as_of") from exc
 
 
 def _normalized_fact_value(fact: Mapping[str, object]) -> Any:
@@ -427,6 +444,7 @@ def project_lifecycle_disposition(
     disposition: str
     bucket: str
     reason: str
+    disposition_as_of: str | None = None
     if case.get("source_presence") != "present":
         disposition, bucket, reason = "exception_required", "attention", "source_missing"
     elif transition is not None and transition.get("status") in {
@@ -490,10 +508,11 @@ def project_lifecycle_disposition(
             }
             if "not_confirmed_as_of" in monitoring_reasons:
                 disposition, bucket, reason = (
-                    "confirmed_effective",
+                    "not_confirmed_yet",
                     "history",
                     "not_confirmed_as_of",
                 )
+                disposition_as_of = _not_confirmed_disposition_as_of(blockers)
             elif "event_completion_not_confirmed" in monitoring_reasons:
                 disposition, bucket, reason = (
                     "not_confirmed_yet",
@@ -563,6 +582,7 @@ def project_lifecycle_disposition(
         disposition=disposition,
         queue_bucket=bucket,
         reason_code=reason,
+        disposition_as_of=disposition_as_of,
         last_checked_at=last_checked_at,
         next_check_at=next_check_at,
         source_family_status=source_status,

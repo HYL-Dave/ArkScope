@@ -765,7 +765,7 @@ def _pending_event_monitoring(
     )
     if deadline_date is not None and today >= deadline_date and sources_complete:
         context["monitoring_reason"] = "not_confirmed_as_of"
-        context["as_of"] = deadline_date.isoformat()
+        context["as_of"] = today.isoformat()
         return AutomationBlocker(
             code="sec_evidence_insufficient",
             retryable=False,

@@ -226,27 +226,6 @@ def _case(
             "history",
             "reviewed_inconclusive",
         ),
-        (
-            _case(
-                automation_runs=(
-                    _run(
-                        blockers=(
-                            _blocker(
-                                "sec_evidence_insufficient",
-                                retryable=False,
-                                context={
-                                    "monitoring_reason": "not_confirmed_as_of",
-                                    "as_of": "2026-10-15",
-                                },
-                            ),
-                        )
-                    ),
-                )
-            ),
-            "confirmed_effective",
-            "history",
-            "not_confirmed_as_of",
-        ),
     ],
 )
 def test_disposition_projection_is_exhaustive(fixture, disposition, bucket, reason):
@@ -259,6 +238,83 @@ def test_disposition_projection_is_exhaustive(fixture, disposition, bucket, reas
     assert got.disposition in LIFECYCLE_DISPOSITIONS
     assert got.queue_bucket in LIFECYCLE_QUEUE_BUCKETS
     assert got.reason_code in LIFECYCLE_DISPOSITION_REASONS
+    assert got.disposition_as_of is None
+
+
+def _not_confirmed_as_of_context(**overrides: object) -> dict:
+    return {
+        "monitoring_reason": "not_confirmed_as_of",
+        "as_of": "2026-08-27",
+        "source_deadline": "2026-04-01",
+        "source_deadline_evidence_id": "sle_deadline",
+        "source_deadline_span_start_byte": 0,
+        "source_deadline_span_end_byte": 64,
+        "source_deadline_cited_text_sha256": "a" * 64,
+        "source_deadline_rule_id": "sec.explicit_transaction_termination_date",
+        "source_deadline_rule_version": "4",
+    } | overrides
+
+
+def test_not_confirmed_as_of_projects_the_actual_completed_check_date():
+    fixture = _case(
+        automation_runs=(
+            _run(
+                blockers=(
+                    _blocker(
+                        "sec_evidence_insufficient",
+                        retryable=False,
+                        context=_not_confirmed_as_of_context(),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    got = project_lifecycle_disposition(fixture)
+
+    assert (
+        got.disposition,
+        got.queue_bucket,
+        got.reason_code,
+        got.disposition_as_of,
+    ) == (
+        "not_confirmed_yet",
+        "history",
+        "not_confirmed_as_of",
+        "2026-08-27",
+    )
+    assert got.next_check_at is None
+
+
+@pytest.mark.parametrize(
+    "contexts",
+    [
+        (_not_confirmed_as_of_context(as_of=None),),
+        (_not_confirmed_as_of_context(as_of="2026-08-27T12:00:00Z"),),
+        (
+            _not_confirmed_as_of_context(as_of="2026-08-27"),
+            _not_confirmed_as_of_context(as_of="2026-08-28"),
+        ),
+    ],
+)
+def test_not_confirmed_as_of_requires_one_valid_completed_check_date(contexts):
+    fixture = _case(
+        automation_runs=(
+            _run(
+                blockers=tuple(
+                    _blocker(
+                        f"sec_evidence_insufficient_{index}",
+                        retryable=False,
+                        context=context,
+                    )
+                    for index, context in enumerate(contexts)
+                ),
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="^disposition_as_of$"):
+        project_lifecycle_disposition(fixture)
 
 
 def test_source_missing_precedes_old_accepted_assessment():
