@@ -317,13 +317,18 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-async function mountLifecycle(caseId: string | null = CASE_ID) {
+async function mountLifecycle(
+  caseId: string | null = CASE_ID,
+  onNavigate = vi.fn(),
+) {
   const { LifecycleView } = await import(/* @vite-ignore */ LIFECYCLE_VIEW_MODULE);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(withTestUiLocale(<LifecycleView initialCaseId={caseId} />));
+    root!.render(withTestUiLocale(
+      <LifecycleView initialCaseId={caseId} onNavigate={onNavigate} />,
+    ));
     await Promise.resolve();
   });
   await flush();
@@ -828,6 +833,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("keeps original evidence visible beside machine translation and translation failure", async () => {
+    const { ApiError } = await import("../api");
     const secondExcerpt = "交易所公告原文必須保留";
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
       evidence: [
@@ -847,12 +853,22 @@ describe("Lifecycle workflow", () => {
         },
       ],
     }));
-    apiMocks.translateSecurityLifecycleEvidence.mockRejectedValue(Object.assign(
-      new Error("private provider failure"),
-      { code: "translation_timeout" },
+    apiMocks.translateSecurityLifecycleEvidence.mockRejectedValue(new ApiError(
+      "private provider failure",
+      "/security-lifecycle/evidence/evidence-market/translations",
+      502,
+      "translation_auth_rejected",
+      null,
+      {
+        provider: "anthropic",
+        model: "claude-sonnet-5",
+        harness: "claude_subscription_structured_output",
+        retryable: false,
+      },
     ));
+    const onNavigate = vi.fn();
 
-    await mountLifecycle();
+    await mountLifecycle(CASE_ID, onNavigate);
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
     expect(document.body.textContent).toContain("SEC source: Units of Beneficial Interest");
     expect(document.body.textContent).toContain("Machine translation");
@@ -865,8 +881,76 @@ describe("Lifecycle workflow", () => {
       "en",
     );
     expect(document.body.textContent).toContain(secondExcerpt);
-    expect(document.body.textContent).toContain("Translation timed out");
+    expect(document.body.textContent).toContain("Anthropic · claude-sonnet-5");
+    expect(document.body.textContent).toContain(
+      "Content translation authentication was rejected. Sign in again or adjust Content Translation settings.",
+    );
+    const settings = document.body.querySelector<HTMLButtonElement>(
+      "[data-action='open-content-translation-settings']",
+    );
+    expect(settings).not.toBeNull();
+    await act(async () => settings!.click());
+    expect(onNavigate).toHaveBeenCalledWith({
+      kind: "settings_section",
+      section: "models",
+    });
     expect(document.body.textContent).not.toContain("private provider failure");
+  });
+
+  it("keeps retry available for a retryable translation failure", async () => {
+    const { ApiError } = await import("../api");
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      evidence: [{
+        ...detail().evidence[0],
+        translations: [],
+      }],
+    }));
+    apiMocks.translateSecurityLifecycleEvidence.mockRejectedValue(new ApiError(
+      "private provider failure",
+      "/security-lifecycle/evidence/evidence-sec/translations",
+      502,
+      "translation_timeout",
+      null,
+      {
+        provider: "openai",
+        model: "gpt-5.4-mini",
+        harness: "chatgpt_subscription_structured_output",
+        retryable: true,
+      },
+    ));
+
+    await mountLifecycle();
+    await click("Translate evidence");
+    expect(document.body.textContent).toContain("OpenAI · gpt-5.4-mini");
+    expect(document.body.textContent).toContain("Translation timed out. Try again.");
+    await click("Retry translation");
+    expect(apiMocks.translateSecurityLifecycleEvidence).toHaveBeenCalledTimes(2);
+  });
+
+  it("provides reviewed bilingual presentation for every closed translation failure", async () => {
+    const { translationFailurePresentation } = await import("./LifecycleView");
+    const cases = [
+      ["translation_route_unavailable", "The content translation route is unavailable.", "目前無法解析內容翻譯路由。", "settings"],
+      ["translation_credential_missing", "No credential is configured for content translation.", "尚未設定內容翻譯所需憑證。", "settings"],
+      ["translation_auth_rejected", "Content translation authentication was rejected. Sign in again or adjust Content Translation settings.", "內容翻譯認證遭拒，請重新登入或調整內容翻譯設定。", "settings"],
+      ["translation_rate_limited", "Content translation is temporarily rate limited. Try again later.", "內容翻譯目前受到速率限制，請稍後重試。", "retry"],
+      ["translation_quota_exhausted", "The selected content translation account has no remaining quota.", "所選內容翻譯帳戶的可用額度已用盡。", "settings"],
+      ["translation_model_unavailable", "The selected content translation model is unavailable.", "目前無法使用所選內容翻譯模型。", "settings"],
+      ["translation_timeout", "Translation timed out. Try again.", "翻譯逾時，請重試。", "retry"],
+      ["translation_output_invalid", "The model returned an invalid translation output. Try again.", "模型回傳的翻譯格式無效，請重試。", "retry"],
+      ["translation_provider_error", "The translation service could not complete the request. Try again.", "翻譯服務暫時無法完成要求，請重試。", "retry"],
+      ["evidence_changed", "The source evidence changed. Refresh the case before translating again.", "來源證據已變更，請重新整理案件後再翻譯。", null],
+    ] as const;
+
+    for (const locale of ["en", "zh-Hant"] as const) {
+      const t = i18n.getFixedT(locale, "explore");
+      for (const [code, english, traditionalChinese, action] of cases) {
+        expect(translationFailurePresentation(code, t)).toEqual({
+          message: locale === "en" ? english : traditionalChinese,
+          action,
+        });
+      }
+    }
   });
 
   it("shows every known structured fact on an accepted assessment", async () => {

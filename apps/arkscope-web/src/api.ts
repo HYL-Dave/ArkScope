@@ -887,6 +887,25 @@ async function fetchWithTimeout(
   }
 }
 
+export interface TranslationFailureMetadata {
+  provider: string | null;
+  model: string | null;
+  harness: string | null;
+  retryable: boolean;
+}
+
+export type TranslationFailureCode =
+  | "translation_route_unavailable"
+  | "translation_credential_missing"
+  | "translation_auth_rejected"
+  | "translation_rate_limited"
+  | "translation_quota_exhausted"
+  | "translation_model_unavailable"
+  | "translation_timeout"
+  | "translation_output_invalid"
+  | "translation_provider_error"
+  | "evidence_changed";
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -894,6 +913,7 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string | null,
     readonly diagnostic: string | null,
+    readonly metadata: TranslationFailureMetadata | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -904,23 +924,45 @@ interface ParsedResponseError {
   code: string | null;
   diagnostic: string | null;
   legacySuffix: string | null;
+  metadata: TranslationFailureMetadata | null;
+}
+
+function boundedNullableString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength || normalized.includes("\0")) {
+    return null;
+  }
+  return normalized;
+}
+
+function translationFailureMetadata(
+  value: Record<string, unknown>,
+): TranslationFailureMetadata | null {
+  if (typeof value.retryable !== "boolean") return null;
+  return {
+    provider: boundedNullableString(value.provider, 64),
+    model: boundedNullableString(value.model, 160),
+    harness: boundedNullableString(value.harness, 160),
+    retryable: value.retryable,
+  };
 }
 
 async function parseResponseError(r: Response): Promise<ParsedResponseError> {
   try {
     const body = (await r.json()) as unknown;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return { code: null, diagnostic: null, legacySuffix: null };
+      return { code: null, diagnostic: null, legacySuffix: null, metadata: null };
     }
     const detail = (body as { detail?: unknown }).detail;
     if (typeof detail === "string") {
       const diagnostic = detail.trim() || null;
-      return { code: null, diagnostic, legacySuffix: diagnostic };
+      return { code: null, diagnostic, legacySuffix: diagnostic, metadata: null };
     }
     if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
-      return { code: null, diagnostic: null, legacySuffix: null };
+      return { code: null, diagnostic: null, legacySuffix: null, metadata: null };
     }
-    const value = detail as { code?: unknown; message?: unknown };
+    const value = detail as Record<string, unknown>;
     const code = typeof value.code === "string" ? value.code.trim() || null : null;
     const diagnostic = typeof value.message === "string"
       ? value.message.trim() || null
@@ -929,12 +971,18 @@ async function parseResponseError(r: Response): Promise<ParsedResponseError> {
     const explicitDiagnostic = typeof rawDiagnostic === "string"
       ? rawDiagnostic.trim() || null
       : null;
+    const metadata = translationFailureMetadata(value);
     if (explicitDiagnostic) {
-      return { code, diagnostic: explicitDiagnostic, legacySuffix: diagnostic ?? code };
+      return {
+        code,
+        diagnostic: explicitDiagnostic,
+        legacySuffix: diagnostic ?? code,
+        metadata,
+      };
     }
-    return { code, diagnostic, legacySuffix: diagnostic ?? code };
+    return { code, diagnostic, legacySuffix: diagnostic ?? code, metadata };
   } catch {
-    return { code: null, diagnostic: null, legacySuffix: null };
+    return { code: null, diagnostic: null, legacySuffix: null, metadata: null };
   }
 }
 
@@ -948,6 +996,7 @@ async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise
       r.status,
       parsed.code,
       parsed.diagnostic,
+      parsed.metadata,
     );
   }
   return (await r.json()) as T;
@@ -973,6 +1022,7 @@ async function sendJSON<T>(
       r.status,
       parsed.code,
       parsed.diagnostic,
+      parsed.metadata,
     );
   }
   if (r.status === 204) return undefined as T;

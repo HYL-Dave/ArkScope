@@ -6,6 +6,7 @@ import {
   getProvidersConfig,
   putProviderConfig,
   setUiLocale,
+  translateSecurityLifecycleEvidence,
 } from "./api";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -136,6 +137,40 @@ describe("typed API errors", () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(ApiError);
       expect((error as Error).name).toBe("ApiError");
+    }
+  });
+
+  it("keeps only bounded translation failure metadata for GET and mutation errors", async () => {
+    const detail = {
+      code: "translation_auth_rejected",
+      provider: " anthropic ",
+      model: "claude-sonnet-5",
+      harness: "claude_subscription_structured_output",
+      retryable: false,
+      raw_exception: "secret-value",
+      nested: { authorization: "secret-value" },
+    };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(jsonResponse(502, { detail }))
+      .mockResolvedValueOnce(jsonResponse(502, { detail })));
+
+    const errors = [
+      await rejected(getProvidersConfig()),
+      await rejected(translateSecurityLifecycleEvidence("evidence-1", "zh-Hant")),
+    ];
+
+    for (const error of errors) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({
+        code: "translation_auth_rejected",
+        metadata: {
+          provider: "anthropic",
+          model: "claude-sonnet-5",
+          harness: "claude_subscription_structured_output",
+          retryable: false,
+        },
+      });
+      expect(JSON.stringify(error)).not.toContain("secret-value");
     }
   });
 });

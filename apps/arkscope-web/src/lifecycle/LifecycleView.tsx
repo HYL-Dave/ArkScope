@@ -8,6 +8,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Settings2,
   X,
 } from "lucide-react";
 
@@ -50,7 +51,10 @@ import {
   type TickerIdentityTransitionPreview,
   type TickerIdentityTransitionStatus,
   type TickerIdentityTransitionActivity,
+  type TranslationFailureCode,
+  type TranslationFailureMetadata,
 } from "../api";
+import type { NavigationTarget } from "../shell/navigation";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
@@ -663,36 +667,171 @@ function AutomationTruth({
   );
 }
 
-function translationErrorMessage(
-  code: string,
+const TRANSLATION_FAILURE_CODES: readonly TranslationFailureCode[] = [
+  "translation_route_unavailable",
+  "translation_credential_missing",
+  "translation_auth_rejected",
+  "translation_rate_limited",
+  "translation_quota_exhausted",
+  "translation_model_unavailable",
+  "translation_timeout",
+  "translation_output_invalid",
+  "translation_provider_error",
+  "evidence_changed",
+];
+
+type TranslationErrorState = TranslationFailureMetadata & {
+  code: TranslationFailureCode | "translation_unknown";
+};
+
+export interface TranslationFailurePresentation {
+  message: string;
+  action: "retry" | "settings" | null;
+}
+
+function isTranslationFailureCode(
+  value: string | null,
+): value is TranslationFailureCode {
+  return value !== null
+    && TRANSLATION_FAILURE_CODES.includes(value as TranslationFailureCode);
+}
+
+export function translationFailurePresentation(
+  code: TranslationFailureCode,
+  t: TFunction<"explore">,
+): TranslationFailurePresentation {
+  const presentations: Record<TranslationFailureCode, TranslationFailurePresentation> = {
+    translation_route_unavailable: {
+      message: t(($) => $.lifecycle.translation.routeUnavailable),
+      action: "settings",
+    },
+    translation_credential_missing: {
+      message: t(($) => $.lifecycle.translation.credentialMissing),
+      action: "settings",
+    },
+    translation_auth_rejected: {
+      message: t(($) => $.lifecycle.translation.authRejected),
+      action: "settings",
+    },
+    translation_rate_limited: {
+      message: t(($) => $.lifecycle.translation.rateLimited),
+      action: "retry",
+    },
+    translation_quota_exhausted: {
+      message: t(($) => $.lifecycle.translation.quotaExhausted),
+      action: "settings",
+    },
+    translation_model_unavailable: {
+      message: t(($) => $.lifecycle.translation.modelUnavailable),
+      action: "settings",
+    },
+    translation_timeout: {
+      message: t(($) => $.lifecycle.translation.timeout),
+      action: "retry",
+    },
+    translation_output_invalid: {
+      message: t(($) => $.lifecycle.translation.outputInvalid),
+      action: "retry",
+    },
+    translation_provider_error: {
+      message: t(($) => $.lifecycle.translation.providerError),
+      action: "retry",
+    },
+    evidence_changed: {
+      message: t(($) => $.lifecycle.translation.evidenceChanged),
+      action: null,
+    },
+  };
+  return presentations[code];
+}
+
+function captureTranslationError(error: unknown): TranslationErrorState {
+  const candidate = error && typeof error === "object" ? error : null;
+  const rawCode = candidate && "code" in candidate && typeof candidate.code === "string"
+    ? candidate.code
+    : null;
+  const code = isTranslationFailureCode(rawCode) ? rawCode : "translation_unknown";
+  const metadata = candidate && "metadata" in candidate
+    && candidate.metadata && typeof candidate.metadata === "object"
+    ? candidate.metadata as Partial<TranslationFailureMetadata>
+    : null;
+  return {
+    code,
+    provider: typeof metadata?.provider === "string" ? metadata.provider : null,
+    model: typeof metadata?.model === "string" ? metadata.model : null,
+    harness: typeof metadata?.harness === "string" ? metadata.harness : null,
+    retryable: metadata?.retryable === true,
+  };
+}
+
+function translationProviderLabel(
+  provider: string,
   t: TFunction<"explore">,
 ): string {
-  if (code === "translation_timeout") return t(($) => $.lifecycle.translation.timeout);
-  if (code === "translation_output_invalid") {
-    return t(($) => $.lifecycle.translation.outputInvalid);
+  if (provider === "anthropic") {
+    return t(($) => $.lifecycle.translation.providers.anthropic);
   }
-  if (code === "evidence_changed") return t(($) => $.lifecycle.translation.evidenceChanged);
-  return t(($) => $.lifecycle.translation.failed);
+  if (provider === "openai") {
+    return t(($) => $.lifecycle.translation.providers.openai);
+  }
+  return provider;
+}
+
+function translationRouteIdentity(
+  error: TranslationErrorState,
+  t: TFunction<"explore">,
+): string | null {
+  const values = [
+    error.provider ? translationProviderLabel(error.provider, t) : null,
+    error.model,
+    error.harness,
+  ].filter((value): value is string => Boolean(value));
+  return values.length > 0 ? values.join(" · ") : null;
+}
+
+function unknownTranslationFailure(
+  t: TFunction<"explore">,
+): TranslationFailurePresentation {
+  return {
+    message: t(($) => $.lifecycle.translation.unknown),
+    action: null,
+  };
+}
+
+function translationFailureForState(
+  error: TranslationErrorState,
+  t: TFunction<"explore">,
+): TranslationFailurePresentation {
+  if (error.code === "translation_unknown") {
+    return unknownTranslationFailure(t);
+  }
+  return translationFailurePresentation(error.code, t);
 }
 
 function EvidenceItem({
   evidence,
   locale,
   busy,
-  errorCode,
+  error,
   onTranslate,
+  onNavigate,
   t,
 }: {
   evidence: SecurityLifecycleEvidence;
   locale: LifecycleLocale;
   busy: boolean;
-  errorCode: string | null;
+  error: TranslationErrorState | null;
   onTranslate: () => void;
+  onNavigate?: (target: NavigationTarget) => void;
   t: TFunction<"explore">;
 }) {
   const translation = (evidence.translations ?? []).find(
     (item) => item.locale === locale,
   );
+  const failure = error ? translationFailureForState(error, t) : null;
+  const routeIdentity = error ? translationRouteIdentity(error, t) : null;
+  const canRetry = error && failure?.action === "retry"
+    && (error.retryable || error.code === "translation_output_invalid");
   return (
     <article className="lifecycle-history-row lifecycle-evidence-item">
       <div className="lifecycle-assessment-heading">
@@ -732,7 +871,37 @@ function EvidenceItem({
           {t(($) => $.lifecycle.actions.translateEvidence)}
         </Button>
       )}
-      {errorCode ? <p className="errorbox">{translationErrorMessage(errorCode, t)}</p> : null}
+      {error && failure ? (
+        <div className="errorbox">
+          <p>{failure.message}</p>
+          {routeIdentity ? <p className="tiny mono">{routeIdentity}</p> : null}
+          {canRetry ? (
+            <Button
+              size="compact"
+              tone="ghost"
+              icon={<RefreshCw size={14} />}
+              disabled={busy}
+              onClick={onTranslate}
+            >
+              {t(($) => $.lifecycle.translation.retry)}
+            </Button>
+          ) : null}
+          {failure.action === "settings" ? (
+            <Button
+              size="compact"
+              tone="ghost"
+              icon={<Settings2 size={14} />}
+              data-action="open-content-translation-settings"
+              onClick={() => onNavigate?.({
+                kind: "settings_section",
+                section: "models",
+              })}
+            >
+              {t(($) => $.lifecycle.translation.openSettings)}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -796,8 +965,10 @@ function CaseTable({
 
 export function LifecycleView({
   initialCaseId = null,
+  onNavigate,
 }: {
   initialCaseId?: string | null;
+  onNavigate?: (target: NavigationTarget) => void;
 }) {
   const { t, i18n } = useTranslation("explore");
   const locale = localeValue(i18n.resolvedLanguage);
@@ -839,7 +1010,9 @@ export function LifecycleView({
   const [citedEvidence, setCitedEvidence] = useState<string[]>([]);
   const [citationError, setCitationError] = useState(false);
   const [translationBusy, setTranslationBusy] = useState<string | null>(null);
-  const [translationErrors, setTranslationErrors] = useState<Record<string, string>>({});
+  const [translationErrors, setTranslationErrors] = useState<
+    Record<string, TranslationErrorState>
+  >({});
   const [transitionPreview, setTransitionPreview] = useState<TickerIdentityTransitionPreview | null>(
     null,
   );
@@ -1079,11 +1252,10 @@ export function LifecycleView({
       await translateSecurityLifecycleEvidence(evidenceId, locale);
       await loadDetail(selectedCaseId);
     } catch (error) {
-      const code = error && typeof error === "object" && "code" in error
-        && typeof error.code === "string"
-        ? error.code
-        : "translation_failed";
-      setTranslationErrors((current) => ({ ...current, [evidenceId]: code }));
+      setTranslationErrors((current) => ({
+        ...current,
+        [evidenceId]: captureTranslationError(error),
+      }));
     } finally {
       setTranslationBusy(null);
     }
@@ -1294,8 +1466,9 @@ export function LifecycleView({
                       evidence={item}
                       locale={locale}
                       busy={translationBusy === item.evidence_id}
-                      errorCode={translationErrors[item.evidence_id] ?? null}
+                      error={translationErrors[item.evidence_id] ?? null}
                       onTranslate={() => void runTranslation(item.evidence_id)}
+                      onNavigate={onNavigate}
                       t={t}
                       key={item.evidence_id}
                     />

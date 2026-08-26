@@ -75,7 +75,12 @@ export function UniverseView({
           {
             value: "lifecycle",
             label: t(($) => $.universe.tabs.lifecycle),
-            panel: <LifecycleView initialCaseId={caseId} />,
+            panel: (
+              <LifecycleView
+                initialCaseId={caseId}
+                onNavigate={inventoryProps.onNavigateTarget}
+              />
+            ),
           },
         ]}
       />

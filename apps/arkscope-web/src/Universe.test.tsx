@@ -14,6 +14,7 @@ const apiMocks = vi.hoisted(() => ({
   getSecurityLifecycleCase: vi.fn(),
   listSecurityLifecycleCases: vi.fn(),
   setTickerHidden: vi.fn(),
+  translateSecurityLifecycleEvidence: vi.fn(),
 }));
 
 vi.mock("./api", async (importOriginal) => {
@@ -185,6 +186,14 @@ async function waitForText(text: string) {
   throw new Error(`text not found: ${text}; rendered=${host?.textContent ?? ""}`);
 }
 
+async function waitForBodyText(text: string) {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    if (document.body.textContent?.includes(text)) return;
+    await flush();
+  }
+  throw new Error(`body text not found: ${text}; rendered=${document.body.textContent ?? ""}`);
+}
+
 async function click(element: Element) {
   await act(async () => {
     element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -336,6 +345,17 @@ beforeEach(async () => {
   });
   apiMocks.importUniverse.mockReset().mockResolvedValue(IMPORT_RESULT);
   apiMocks.setTickerHidden.mockReset().mockResolvedValue({ ticker: SOURCE_TICKER, hidden: true });
+  apiMocks.translateSecurityLifecycleEvidence.mockReset().mockRejectedValue(
+    Object.assign(new Error("private provider failure"), {
+      code: "translation_auth_rejected",
+      metadata: {
+        provider: "anthropic",
+        model: "claude-sonnet-5",
+        harness: "claude_subscription_structured_output",
+        retryable: false,
+      },
+    }),
+  );
   confirmMock = vi.fn(() => true);
   window.confirm = confirmMock;
 });
@@ -663,5 +683,40 @@ describe("Universe localization", () => {
     expect(document.body.querySelector('[role="dialog"]')).toBe(drawer);
     expect(host!.querySelector('[role="tab"][aria-selected="true"]')?.textContent)
       .toContain("Security event investigation");
+  });
+
+  it("forwards the exact Models Settings target from lifecycle translation recovery", async () => {
+    const onNavigateTarget = vi.fn();
+    apiMocks.getSecurityLifecycleCase.mockResolvedValueOnce({
+      ...(await apiMocks.getSecurityLifecycleCase()),
+      evidence: [{
+        evidence_id: "evidence-sec",
+        source_family: "regulator",
+        kind: "regulator_excerpt",
+        excerpt: "Official issuer source text.",
+        source_url: "https://www.sec.gov/Archives/example/qbts.htm",
+        content_sha256: "a".repeat(64),
+        title: "Issuer notice",
+        publisher: "SEC",
+        source_published_at: "2026-07-24T12:00:00Z",
+        translations: [],
+        created_at: "2026-07-24T12:00:00Z",
+      }],
+    });
+    await mountUniverse({ onNavigateTarget });
+    await click(buttonByText("標的事件調查", host!.querySelector('[role="tablist"]')!));
+    await waitForText("QBTS");
+    await click(buttonByText("QBTS"));
+    await waitForBodyText("Issuer notice");
+    await click(buttonByText("翻譯證據", document.body));
+    const recovery = document.body.querySelector<HTMLButtonElement>(
+      "[data-action='open-content-translation-settings']",
+    );
+    expect(recovery).not.toBeNull();
+    await click(recovery!);
+    expect(onNavigateTarget).toHaveBeenCalledWith({
+      kind: "settings_section",
+      section: "models",
+    });
   });
 });
