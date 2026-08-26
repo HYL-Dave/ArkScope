@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import sqlite3
+from types import SimpleNamespace
 
 
 _NOW = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
@@ -349,3 +350,65 @@ def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (market_path, profile_path)
     } == before
+
+
+def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatch):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_fact_kernel import _diagnostics
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {
+                "attempt_count": 2,
+                "document_count": 1,
+                "body_bytes": 4096,
+                "governor_wait_ms": 25,
+                "rate_limit_retries": 0,
+            }
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(),
+            facts=(),
+            blockers=("sec_evidence_insufficient",),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_local_news_evidence",
+        lambda _context, at: ((), {"news_evidence_count": 0}),
+    )
+    case = {
+        "case_id": "slc_diag",
+        "ticker": "DIAG",
+        "ticker_aliases": ("DIAG",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "DIAG",
+            "cik": "0000000001",
+            "issuer_name": "Diagnostic Issuer",
+            "filing_date": "2026-08-25",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "kinds": [
+                {"event_type": "listing_status_review", "effective_date": None}
+            ],
+        },
+    }
+
+    bundle = scheduler._load_evidence(case, mode="live", at="2026-08-26T00:00:00Z")
+
+    assert _diagnostics(bundle.diagnostics) == (
+        '{"ibkr_requests":0,"news_evidence_count":0,"sec_attempt_count":2,'
+        '"sec_document_count":1,"sec_governor_wait_ms":25,'
+        '"sec_payload_bytes":4096,"sec_rate_limit_retries":0}'
+    )

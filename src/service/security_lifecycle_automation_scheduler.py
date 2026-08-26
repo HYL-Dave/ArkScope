@@ -613,7 +613,7 @@ def _load_evidence(
             budget=budget,
         )
         diagnostics = {
-            f"sec_{key}": value
+            f"sec_{'payload_bytes' if key == 'body_bytes' else key}": value
             for key, value in transport.diagnostics(budget).items()
         }
     finally:
