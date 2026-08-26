@@ -2495,6 +2495,42 @@ export type SecurityLifecycleActionReadiness =
   | "waiting_transition_revalidation"
   | "transition_eligible"
   | "action_blocked";
+export type SecurityLifecycleDisposition =
+  | "confirmed_monitoring"
+  | "confirmed_effective"
+  | "not_confirmed_yet"
+  | "exception_required";
+export type SecurityLifecycleQueueBucket =
+  | "attention"
+  | "monitoring"
+  | "history";
+export type SecurityLifecycleSourceFamilyState =
+  | "confirmed"
+  | "present"
+  | "missing"
+  | "unavailable"
+  | "conflict";
+export type SecurityLifecycleDispositionReason =
+  | "awaiting_initial_automation"
+  | "automation_running"
+  | "waiting_effective_date"
+  | "waiting_market_confirmation"
+  | "waiting_transition_revalidation"
+  | "retryable_source_unavailable"
+  | "event_completion_not_confirmed"
+  | "not_confirmed_as_of"
+  | "source_missing"
+  | "source_conflict"
+  | "ambiguous_event"
+  | "nonretryable_provider_failure"
+  | "automation_failure"
+  | "resolved_no_change"
+  | "resolved_assessment"
+  | "transition_applied"
+  | "transition_reversed"
+  | "transition_cancelled"
+  | "transition_needs_review"
+  | "reviewed_inconclusive";
 export type SecurityLifecycleAssessmentAuthor =
   | "human"
   | "legacy_review"
@@ -2908,6 +2944,14 @@ export interface SecurityLifecycleCaseSummary {
   automation_fact_count: number;
   automation_tier: SecurityLifecycleDecisionTier | null;
   action_readiness: SecurityLifecycleActionReadiness | null;
+  disposition: SecurityLifecycleDisposition;
+  queue_bucket: SecurityLifecycleQueueBucket;
+  disposition_reason: SecurityLifecycleDispositionReason;
+  last_checked_at: string | null;
+  next_check_at: string | null;
+  source_family_status: Partial<
+    Record<SecurityLifecycleEvidenceSourceFamily, SecurityLifecycleSourceFamilyState>
+  >;
   evidence_count: number;
   assessment_count: number;
   acknowledgement_count: number;
@@ -2931,6 +2975,7 @@ export interface SecurityLifecycleCaseDetail extends SecurityLifecycleCaseSummar
 export interface SecurityLifecycleCaseListResponse {
   cases: SecurityLifecycleCaseSummary[];
   count: number;
+  queue_counts: Record<SecurityLifecycleQueueBucket, number>;
   data_integrity: { source_missing_count: number };
 }
 
@@ -2940,6 +2985,7 @@ export interface SecurityLifecycleCaseFilters {
   relevance?: SecurityLifecycleRelevance | "";
   event_type?: SecurityLifecycleEventType | "";
   proposal_type?: SecurityLifecycleProposalType | "";
+  queue_bucket?: SecurityLifecycleQueueBucket;
   source_presence?: SecurityLifecycleSourcePresence;
   limit?: number;
 }

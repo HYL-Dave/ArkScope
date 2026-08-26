@@ -9,6 +9,10 @@ import sqlite3
 from typing import Callable, Iterable, Mapping
 
 from src.market_data_admin import resolve_market_db_path
+from src.security_lifecycle_disposition import (
+    LIFECYCLE_QUEUE_BUCKETS,
+    project_lifecycle_disposition,
+)
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     compose_security_lifecycle,
@@ -276,6 +280,12 @@ def _case_summary(case: Mapping[str, object]) -> dict:
         ),
         "automation_tier": current_automation.get("decision_tier"),
         "action_readiness": current_automation.get("action_readiness"),
+        "disposition": case["disposition"],
+        "queue_bucket": case["queue_bucket"],
+        "disposition_reason": case["disposition_reason"],
+        "last_checked_at": case["last_checked_at"],
+        "next_check_at": case["next_check_at"],
+        "source_family_status": dict(case["source_family_status"]),
         "evidence_count": len(case.get("evidence", [])),
         "assessment_count": len(case.get("assessment_history", [])),
         "acknowledgement_count": len(case.get("acknowledgement_history", [])),
@@ -344,6 +354,17 @@ class SecurityLifecycleReadService:
                 if isinstance(observation, Mapping)
                 else None
             )
+            projection = project_lifecycle_disposition(item)
+            item.update(
+                {
+                    "disposition": projection.disposition,
+                    "queue_bucket": projection.queue_bucket,
+                    "disposition_reason": projection.reason_code,
+                    "last_checked_at": projection.last_checked_at,
+                    "next_check_at": projection.next_check_at,
+                    "source_family_status": dict(projection.source_family_status),
+                }
+            )
             rendered.append(item)
         return rendered
 
@@ -355,6 +376,7 @@ class SecurityLifecycleReadService:
         relevance: str | None = None,
         event_type: str | None = None,
         proposal_type: str | None = None,
+        queue_bucket: str | None = None,
         source_presence: str = "present",
         limit: int = 50,
     ) -> dict:
@@ -366,6 +388,11 @@ class SecurityLifecycleReadService:
             raise ValueError("event_type")
         if proposal_type is not None and proposal_type not in PROPOSAL_ACTIONS:
             raise ValueError("proposal_type")
+        if (
+            queue_bucket is not None
+            and queue_bucket not in LIFECYCLE_QUEUE_BUCKETS
+        ):
+            raise ValueError("queue_bucket")
         if source_presence not in SOURCE_PRESENCE_STATES:
             raise ValueError("source_presence")
         bounded_limit = min(max(int(limit), 1), 200)
@@ -398,11 +425,19 @@ class SecurityLifecycleReadService:
             }:
                 continue
             selected.append(case)
+        queue_counts = {bucket: 0 for bucket in sorted(LIFECYCLE_QUEUE_BUCKETS)}
+        for case in selected:
+            queue_counts[str(case["queue_bucket"])] += 1
+        if queue_bucket is not None:
+            selected = [
+                case for case in selected if case["queue_bucket"] == queue_bucket
+            ]
         count = len(selected)
         cases = [_case_summary(case) for case in selected[:bounded_limit]]
         return {
             "cases": cases,
             "count": count,
+            "queue_counts": queue_counts,
             "data_integrity": {"source_missing_count": source_missing_count},
         }
 
@@ -447,6 +482,7 @@ def list_security_lifecycle_cases(
         "status": "ok",
         "cases": payload["cases"],
         "count": payload["count"],
+        "queue_counts": payload["queue_counts"],
         "data_integrity": payload["data_integrity"],
     }
 

@@ -935,6 +935,50 @@ def test_route_failure_is_typed_and_never_falls_back_to_one_store(tmp_path, monk
         context["profile_conn"].close()
 
 
+def test_case_list_route_admits_only_closed_queue_buckets():
+    from src.api import dependencies
+    from src.api.routes import security_lifecycle as routes
+
+    calls = []
+
+    class Service:
+        def list_cases(self, **filters):
+            calls.append(filters)
+            return {
+                "cases": [
+                    {
+                        "ticker": "PENDING",
+                        "disposition": "not_confirmed_yet",
+                        "queue_bucket": "monitoring",
+                    }
+                ],
+                "count": 1,
+                "queue_counts": {
+                    "attention": 0,
+                    "monitoring": 1,
+                    "history": 0,
+                },
+                "data_integrity": {"source_missing_count": 0},
+            }
+
+    app = FastAPI()
+    app.include_router(routes.router)
+    app.dependency_overrides[dependencies.get_security_lifecycle_read_service] = (
+        Service
+    )
+    client = TestClient(app)
+
+    response = client.get("/security-lifecycle/cases?queue_bucket=monitoring")
+    assert response.status_code == 200
+    assert response.json()["cases"][0]["disposition"] == "not_confirmed_yet"
+    assert calls[0]["queue_bucket"] == "monitoring"
+
+    invalid = client.get("/security-lifecycle/cases?queue_bucket=unknown")
+    assert invalid.status_code == 422
+    assert invalid.json() == {"detail": {"code": "queue_bucket"}}
+    assert len(calls) == 1
+
+
 def test_route_writes_do_not_mutate_universe_portfolio_sa_or_market_history(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:

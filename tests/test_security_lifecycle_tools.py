@@ -290,6 +290,17 @@ def test_list_tool_is_local_read_only_stably_sorted_and_filters_ticker_prefixes(
         assert all("evidence" not in item for item in payload["cases"])
         assert all("investigation_runs" not in item for item in payload["cases"])
         assert all(item["evidence_count"] == 0 for item in payload["cases"])
+        assert payload["queue_counts"] == {
+            "attention": 0,
+            "monitoring": 3,
+            "history": 0,
+        }
+        assert all(
+            item["disposition"] == "not_confirmed_yet"
+            and item["queue_bucket"] == "monitoring"
+            and item["disposition_reason"] == "awaiting_initial_automation"
+            for item in payload["cases"]
+        )
         assert tools.list_security_lifecycle_cases(ticker="old", limit=20)["count"] == 1
         for prefix in ("z", "ze", "ZET"):
             filtered = tools.list_security_lifecycle_cases(ticker=prefix, limit=20)
@@ -300,6 +311,105 @@ def test_list_tool_is_local_read_only_stably_sorted_and_filters_ticker_prefixes(
         )["count"] == 3
     finally:
         profile.close()
+
+
+def test_queue_filter_counts_before_bucket_and_limit_and_composes_with_ticker(
+    tmp_path,
+    monkeypatch,
+):
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+    service = SecurityLifecycleReadService(
+        market_db_path=str(tmp_path / "unused-market.db"),
+        profile_db_path=str(tmp_path / "unused-profile.db"),
+        source_loader=lambda: {},
+    )
+
+    def row(ticker, bucket):
+        return {
+            "case_id": f"case-{ticker.lower()}",
+            "source": "sec_edgar",
+            "source_ref": f"ref-{ticker.lower()}",
+            "ticker": ticker,
+            "source_presence": "present",
+            "workflow_state": "unresolved",
+            "observation": {
+                "issuer_name": ticker,
+                "filing_date": _AT[:10],
+                "kinds": [],
+            },
+            "current_assessment": None,
+            "current_acknowledgement": None,
+            "active_sources": [],
+            "source_context": "available",
+            "components": {},
+            "investigation_runs": [],
+            "automation_runs": [],
+            "automation_facts": [],
+            "evidence": [],
+            "assessment_history": [],
+            "acknowledgement_history": [],
+            "proposals": [],
+            "disposition": (
+                "exception_required"
+                if bucket == "attention"
+                else "confirmed_effective"
+                if bucket == "history"
+                else "not_confirmed_yet"
+            ),
+            "queue_bucket": bucket,
+            "disposition_reason": (
+                "source_conflict"
+                if bucket == "attention"
+                else "resolved_assessment"
+                if bucket == "history"
+                else "awaiting_initial_automation"
+            ),
+            "last_checked_at": None,
+            "next_check_at": None,
+            "source_family_status": {},
+        }
+
+    monkeypatch.setattr(
+        service,
+        "_cases",
+        lambda: [
+            row("CONFLICT", "attention"),
+            row("PENDING", "monitoring"),
+            row("WAITING", "monitoring"),
+            row("WATCH", "monitoring"),
+            row("DONE", "history"),
+            row("ARCHIVED", "history"),
+        ],
+    )
+
+    result = service.list_cases(queue_bucket="monitoring", limit=2)
+    assert [item["ticker"] for item in result["cases"]] == ["PENDING", "WAITING"]
+    assert result["count"] == 3
+    assert result["queue_counts"] == {
+        "attention": 1,
+        "monitoring": 3,
+        "history": 2,
+    }
+
+    filtered = service.list_cases(
+        ticker="WA",
+        queue_bucket="monitoring",
+        limit=20,
+    )
+    assert [item["ticker"] for item in filtered["cases"]] == ["WAITING", "WATCH"]
+    assert filtered["queue_counts"] == {
+        "attention": 0,
+        "monitoring": 2,
+        "history": 0,
+    }
+
+    try:
+        service.list_cases(queue_bucket="unknown")
+    except ValueError as exc:
+        assert str(exc) == "queue_bucket"
+    else:
+        raise AssertionError("unknown queue bucket was accepted")
 
 
 def test_missing_case_is_typed_without_creating_either_database(tmp_path, monkeypatch):

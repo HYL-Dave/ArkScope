@@ -122,6 +122,7 @@ const coverage: TradingDayCoverage = {
 const lifecycle = {
   cases: [],
   count: 33,
+  queue_counts: { attention: 2, monitoring: 31, history: 0 },
   data_integrity: { source_missing_count: 2 },
 } satisfies SecurityLifecycleCaseListResponse;
 

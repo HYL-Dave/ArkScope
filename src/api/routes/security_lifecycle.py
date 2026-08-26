@@ -18,6 +18,7 @@ from src.agents.config import task_route
 from src.card_synthesis import translate_text, translation_harness
 from src.content_translation_failures import classify_content_translation_failure
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
+from src.security_lifecycle_disposition import LIFECYCLE_QUEUE_BUCKETS
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     LifecycleWritesUnavailable,
@@ -327,6 +328,7 @@ def list_cases(
     relevance: str | None = Query(default=None),
     event_type: str | None = Query(default=None),
     proposal_type: str | None = Query(default=None),
+    queue_bucket: str | None = Query(default=None),
     source_presence: Literal["present", "source_missing"] = Query(
         default="present"
     ),
@@ -336,12 +338,18 @@ def list_cases(
     ),
 ):
     try:
+        if (
+            queue_bucket is not None
+            and queue_bucket not in LIFECYCLE_QUEUE_BUCKETS
+        ):
+            raise ValueError("queue_bucket")
         return service.list_cases(
             ticker=ticker,
             workflow_state=workflow_state,
             relevance=relevance,
             event_type=event_type,
             proposal_type=proposal_type,
+            queue_bucket=queue_bucket,
             source_presence=source_presence,
             limit=limit,
         )
