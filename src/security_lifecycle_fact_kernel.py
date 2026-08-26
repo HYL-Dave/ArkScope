@@ -1016,10 +1016,6 @@ class SecurityLifecycleFactKernel:
                     )
                     due = _instant(str(row["retry_at"])) <= _instant(timestamp)
                     if retryable and due:
-                        predecessor = context.get("predecessor_failed_run_id")
-                        query_json = query_json_for(
-                            str(predecessor) if predecessor is not None else None
-                        )
                         self.conn.execute(
                             "DELETE FROM security_lifecycle_automation_facts "
                             "WHERE automation_run_id=?",
@@ -1038,11 +1034,10 @@ class SecurityLifecycleFactKernel:
                         self.conn.execute(
                             "UPDATE security_lifecycle_automation_runs SET "
                             "status='running',decision_tier=NULL,action_readiness=NULL,"
-                            "query_context_json=?,diagnostics_json=?,retry_at=NULL,"
+                            "diagnostics_json=?,retry_at=NULL,"
                             "failure_code=NULL,started_at=?,finished_at=NULL,updated_at=? "
                             "WHERE run_id=?",
                             (
-                                query_json,
                                 diagnostics_json,
                                 timestamp,
                                 timestamp,

@@ -481,6 +481,9 @@ def test_due_retryable_blocked_semantic_run_reuses_its_execution_row():
         diagnostics={"sec_attempts": 1},
         at=_LATER,
     )
+    before = store.get_automation_run(blocked.run_id)
+    original_run_key = before["run_key"]
+    original_query_context_json = before["query_context_json"]
 
     retry = _reserve(
         kernel,
@@ -489,8 +492,12 @@ def test_due_retryable_blocked_semantic_run_reuses_its_execution_row():
         execution_revision="trusted-lifecycle-execution-r1",
         at="2026-08-26T00:00:00Z",
     )
+    after = store.get_automation_run(retry.run_id)
     assert retry.should_execute is True
     assert retry.run_id == blocked.run_id
+    assert after["run_key"] == original_run_key
+    assert after["query_context_json"] == original_query_context_json
+    assert after["status"] == "running"
     assert len(store.list_automation_runs(case_id)) == 1
 
 
