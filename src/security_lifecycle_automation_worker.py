@@ -169,7 +169,7 @@ def _failure_code(exc: Exception, *, phase: str) -> str:
     if isinstance(exc, sqlite3.Error):
         return "persistence_failed"
     if isinstance(exc, ValueError):
-        if phase in {"persist", "approve"}:
+        if phase == "persist":
             return "persistence_failed"
         return "source_payload_invalid" if phase == "acquire" else "extractor_failed"
     return "internal_error"
@@ -278,6 +278,7 @@ class LifecycleAutomationWorker:
         transition_revalidation: bool = False,
     ) -> str:
         phase = "acquire"
+        failure_diagnostics: Mapping[str, int] = {}
         try:
             if transition_revalidation:
                 phase = "approve"
@@ -306,6 +307,7 @@ class LifecycleAutomationWorker:
             bundle = self._evidence_loader(case, mode=mode, at=at)
             if not isinstance(bundle, LifecycleAutomationEvidenceBundle):
                 raise TypeError("automation_evidence_bundle")
+            failure_diagnostics = bundle.diagnostics
             existing_evidence, existing_facts = _persisted_material(
                 store.conn,
                 run_id,
@@ -319,6 +321,7 @@ class LifecycleAutomationWorker:
             ):
                 blockers = ()
             if blockers:
+                phase = "persist"
                 kernel.complete_run(
                     run_id=run_id,
                     evidence=bundle.evidence,
@@ -419,15 +422,26 @@ class LifecycleAutomationWorker:
                     return "failed"
                 return "accepted"
             failure_code = _failure_code(exc, phase=phase)
+            diagnostics = dict(failure_diagnostics)
+            diagnostics["failures"] = diagnostics.get("failures", 0) + 1
             try:
                 kernel.fail_run(
                     run_id=run_id,
                     failure_code=failure_code,
-                    diagnostics={"failures": 1},
+                    diagnostics=diagnostics,
                     at=at,
                 )
             except (KeyError, ValueError, RuntimeError, sqlite3.Error):
-                pass
+                if diagnostics != {"failures": 1}:
+                    try:
+                        kernel.fail_run(
+                            run_id=run_id,
+                            failure_code=failure_code,
+                            diagnostics={"failures": 1},
+                            at=at,
+                        )
+                    except (KeyError, ValueError, RuntimeError, sqlite3.Error):
+                        pass
             return "failed"
 
     def run(self, limit: int = 2, mode: str = "live") -> dict[str, object]:

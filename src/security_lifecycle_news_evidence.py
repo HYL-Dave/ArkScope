@@ -44,6 +44,7 @@ _SA_SCHEMA = {
     "sa_market_news_tickers": {"news_row_id", "ticker"},
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_MAX_SOURCE_URL_BYTES = 1000
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,19 @@ def _domain(url: str | None) -> str | None:
     if not url:
         return None
     return urlsplit(url).hostname
+
+
+def _source_url(value: object) -> tuple[str | None, str]:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None, "missing"
+    if "\0" in normalized:
+        return None, "rejected_invalid"
+    if len(normalized.encode("utf-8")) > _MAX_SOURCE_URL_BYTES:
+        return None, "rejected_too_long"
+    if not normalized.startswith("https://"):
+        return None, "rejected_non_https"
+    return normalized, "accepted"
 
 
 def _normalized_rows(
@@ -212,6 +226,7 @@ def _evidence(
     row: Mapping[str, Any], *, retrieved_at: str, max_excerpt_bytes: int
 ) -> PublisherEvidence:
     excerpt = _bounded_utf8(row["body"], max_excerpt_bytes).strip()
+    source_url, source_url_status = _source_url(row.get("url"))
     content_digest = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
     body_digest = str(row.get("body_sha256") or "").lower()
     document_digest = body_digest if _SHA256.fullmatch(body_digest) else None
@@ -224,10 +239,10 @@ def _evidence(
         source_family="publisher",
         adapter="internal_news",
         kind="publisher_excerpt",
-        source_url=row.get("url"),
+        source_url=source_url,
         title=_bounded_utf8(row["title"], 500),
         publisher=_bounded_utf8(row["publisher"], 240),
-        domain=_domain(row.get("url")),
+        domain=_domain(source_url),
         source_published_at=str(row["published_at"]),
         retrieved_at=retrieved_at,
         excerpt=excerpt,
@@ -239,6 +254,7 @@ def _evidence(
             "provider_source": row["provider_source"],
             "matched_tickers": row["matched_tickers"],
             "body_status": row["body_status"],
+            "source_url_status": source_url_status,
         },
         evidence_dedupe_key=f"internal_news:{dedupe_digest}",
     )

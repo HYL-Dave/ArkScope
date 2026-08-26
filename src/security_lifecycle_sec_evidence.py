@@ -437,8 +437,8 @@ def _visible_text(document: str) -> str:
 def _bounded_utf8(value: str, limit: int) -> str:
     encoded = value.encode("utf-8")
     if len(encoded) <= limit:
-        return value
-    return encoded[:limit].decode("utf-8", errors="ignore")
+        return value.strip()
+    return encoded[:limit].decode("utf-8", errors="ignore").strip()
 
 
 def _sentence_spans(value: str) -> tuple[tuple[int, int, str], ...]:
