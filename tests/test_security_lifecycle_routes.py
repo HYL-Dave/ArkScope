@@ -459,6 +459,13 @@ def test_evidence_translation_route_caches_and_returns_typed_provenance(
             f"/security-lifecycle/evidence/{evidence_id}/translations",
             json={"locale": "zh-Hant"},
         )
+        monkeypatch.setattr(
+            routes,
+            "_translate_evidence_text",
+            lambda *_args: (_ for _ in ()).throw(
+                AssertionError("cached translation called provider")
+            ),
+        )
         second = client.post(
             f"/security-lifecycle/evidence/{evidence_id}/translations",
             json={"locale": "zh-Hant"},
@@ -524,13 +531,138 @@ def test_evidence_translation_route_validates_before_permission_and_masks_failur
         assert invalid_locale.status_code == 422
         assert missing.status_code == 404
         assert failed.status_code == 502
-        assert failed.json() == {"detail": {"code": "translation_failed"}}
+        assert failed.json() == {
+            "detail": {
+                "code": "translation_provider_error",
+                "provider": None,
+                "model": None,
+                "harness": None,
+                "retryable": True,
+            }
+        }
         assert "credential-secret" not in failed.text
         assert permission_calls == ["security_lifecycle_translate_evidence"]
         assert translator_calls == ["called"]
         assert context["profile_conn"].execute(
             "SELECT COUNT(*) FROM security_lifecycle_evidence_translations"
         ).fetchone()[0] == 0
+    finally:
+        context["profile_conn"].close()
+
+
+def test_evidence_translation_route_reports_selected_route_without_fallback(
+    tmp_path, monkeypatch
+):
+    from types import SimpleNamespace
+
+    from src import card_synthesis
+    from src.api.routes import security_lifecycle as routes
+    from src.auth_drivers.subscription_structured_output import (
+        SubscriptionStructuredOutputError,
+    )
+
+    context = _build_context(tmp_path)
+    selected = SimpleNamespace(
+        provider="anthropic",
+        model="claude-sonnet-5",
+        effort="default",
+    )
+    anthropic_calls: list[str] = []
+    openai_calls: list[str] = []
+
+    def fail_anthropic(*_args, **_kwargs):
+        anthropic_calls.append("called")
+        raise SubscriptionStructuredOutputError(
+            "reauth_required", "secret-value"
+        )
+
+    try:
+        client = _client(context, monkeypatch)
+        evidence_id = _add_manual(client, context["case_id"])
+        monkeypatch.setattr(routes, "task_route", lambda _task: selected)
+        monkeypatch.setattr(card_synthesis, "task_route", lambda _task: selected)
+        monkeypatch.setattr(
+            routes,
+            "resolve_fixed_task_runtime",
+            lambda _task: SimpleNamespace(model_timeout_s=600),
+        )
+        monkeypatch.setattr(
+            "src.auth_drivers.live_resolver.resolve_live_auth",
+            lambda _provider: SimpleNamespace(source="oauth_driver_unwired"),
+        )
+        monkeypatch.setattr(card_synthesis, "_translate_anthropic", fail_anthropic)
+        monkeypatch.setattr(
+            card_synthesis,
+            "_translate_openai",
+            lambda *_args, **_kwargs: openai_calls.append("called"),
+        )
+
+        response = client.post(
+            f"/security-lifecycle/evidence/{evidence_id}/translations",
+            json={"locale": "zh-Hant"},
+        )
+
+        assert response.status_code == 502
+        assert response.json() == {
+            "detail": {
+                "code": "translation_auth_rejected",
+                "provider": "anthropic",
+                "model": "claude-sonnet-5",
+                "harness": "claude_subscription_structured_output",
+                "retryable": False,
+            }
+        }
+        assert "secret-value" not in response.text
+        assert anthropic_calls == ["called"]
+        assert openai_calls == []
+    finally:
+        context["profile_conn"].close()
+
+
+def test_evidence_translation_route_reports_unresolvable_route_without_provider_call(
+    tmp_path, monkeypatch
+):
+    from types import SimpleNamespace
+
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path)
+    provider_calls: list[str] = []
+
+    try:
+        client = _client(context, monkeypatch)
+        evidence_id = _add_manual(client, context["case_id"])
+        monkeypatch.setattr(
+            routes,
+            "task_route",
+            lambda _task: SimpleNamespace(
+                provider="unsupported-provider",
+                model="secret-value",
+            ),
+        )
+        monkeypatch.setattr(
+            routes,
+            "translate_text",
+            lambda *_args, **_kwargs: provider_calls.append("called"),
+        )
+
+        response = client.post(
+            f"/security-lifecycle/evidence/{evidence_id}/translations",
+            json={"locale": "zh-Hant"},
+        )
+
+        assert response.status_code == 502
+        assert response.json() == {
+            "detail": {
+                "code": "translation_route_unavailable",
+                "provider": None,
+                "model": None,
+                "harness": None,
+                "retryable": False,
+            }
+        }
+        assert "secret-value" not in response.text
+        assert provider_calls == []
     finally:
         context["profile_conn"].close()
 

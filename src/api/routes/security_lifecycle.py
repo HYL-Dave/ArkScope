@@ -14,7 +14,9 @@ from src.api.dependencies import (
     get_security_lifecycle_store,
 )
 from src.api.permissions import require_db_write
-from src.card_synthesis import translate_text
+from src.agents.config import task_route
+from src.card_synthesis import translate_text, translation_harness
+from src.content_translation_failures import classify_content_translation_failure
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
@@ -241,13 +243,55 @@ class EvidenceTranslationRequest(BaseModel):
 
 
 def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResult:
-    runtime = resolve_fixed_task_runtime("card_translation")
-    result = translate_text(
-        text,
-        lang=locale,
-        model_timeout_s=runtime.model_timeout_s,
-    )
-    return EvidenceTranslationResult(**result)
+    try:
+        route = task_route("card_translation")
+        provider = route.provider
+        model = route.model
+        if provider not in {"anthropic", "openai"}:
+            raise ValueError("translation_route_provider")
+        if not model or len(model) > 160 or "\0" in model:
+            raise ValueError("translation_route_model")
+        harness = translation_harness(provider)
+        runtime = resolve_fixed_task_runtime("card_translation")
+    except Exception:
+        raise EvidenceTranslationFailure(
+            "translation_route_unavailable",
+            retryable=False,
+            provider=None,
+            model=None,
+            harness=None,
+        ) from None
+
+    try:
+        result = translate_text(
+            text,
+            lang=locale,
+            model_timeout_s=runtime.model_timeout_s,
+            provider=provider,
+            model=model,
+        )
+    except EvidenceTranslationFailure:
+        raise
+    except Exception as exc:
+        failure = classify_content_translation_failure(exc)
+        raise EvidenceTranslationFailure(
+            failure.code,
+            retryable=failure.retryable,
+            provider=provider,
+            model=model,
+            harness=harness,
+        ) from None
+
+    try:
+        return EvidenceTranslationResult(**result)
+    except (TypeError, ValueError):
+        raise EvidenceTranslationFailure(
+            "translation_output_invalid",
+            retryable=False,
+            provider=provider,
+            model=model,
+            harness=harness,
+        ) from None
 
 
 def _store_error(exc: LifecycleStoreUnavailable) -> HTTPException:
@@ -398,7 +442,7 @@ def translate_evidence_route(
     except EvidenceTranslationConflict as exc:
         raise HTTPException(status_code=409, detail={"code": exc.code}) from None
     except EvidenceTranslationFailure as exc:
-        raise HTTPException(status_code=502, detail={"code": exc.code}) from None
+        raise HTTPException(status_code=502, detail=exc.detail()) from None
     except (LifecycleWritesUnavailable, ValueError) as exc:
         raise _invalid(exc) from None
 

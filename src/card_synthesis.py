@@ -615,7 +615,7 @@ class TextTranslationOutputInvalid(ValueError):
     """The fixed one-field translation response did not match its contract."""
 
 
-def _translation_harness(provider: Provider) -> str:
+def translation_harness(provider: Provider) -> str:
     from src.auth_drivers.live_resolver import resolve_live_auth
 
     resolution = resolve_live_auth(provider)
@@ -675,7 +675,7 @@ def translate_text(
         separators=(",", ":"),
     )
     effort = route.effort if provider == route.provider else "default"
-    harness = _translation_harness(provider)
+    harness = translation_harness(provider)
 
     if provider == "anthropic":
         translated = _translate_anthropic(

@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from src.card_synthesis import ModelExecutionTimeout, TextTranslationOutputInvalid
+from src.content_translation_failures import (
+    TRANSLATION_FAILURE_CODES,
+    classify_content_translation_failure,
+)
 from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
 
 
@@ -21,9 +24,46 @@ class EvidenceTranslationResult:
 
 
 class EvidenceTranslationFailure(RuntimeError):
-    def __init__(self, code: str):
+    def __init__(
+        self,
+        code: str,
+        *,
+        retryable: bool,
+        provider: str | None,
+        model: str | None,
+        harness: str | None,
+    ) -> None:
+        if code not in TRANSLATION_FAILURE_CODES:
+            raise ValueError("translation_failure_code")
+        if not isinstance(retryable, bool):
+            raise ValueError("translation_failure_retryable")
+        for name, value, limit in (
+            ("provider", provider, 64),
+            ("model", model, 160),
+            ("harness", harness, 160),
+        ):
+            if value is not None and (
+                not isinstance(value, str)
+                or not value.strip()
+                or len(value) > limit
+                or "\0" in value
+            ):
+                raise ValueError(f"translation_failure_{name}")
         self.code = code
+        self.retryable = retryable
+        self.provider = provider
+        self.model = model
+        self.harness = harness
         super().__init__(code)
+
+    def detail(self) -> dict[str, object]:
+        return {
+            "code": self.code,
+            "provider": self.provider,
+            "model": self.model,
+            "harness": self.harness,
+            "retryable": self.retryable,
+        }
 
 
 class EvidenceTranslationConflict(RuntimeError):
@@ -51,7 +91,13 @@ def prepare_evidence_translation(
 
 def _validated_result(value: object) -> EvidenceTranslationResult:
     if not isinstance(value, EvidenceTranslationResult):
-        raise EvidenceTranslationFailure("translation_output_invalid")
+        raise EvidenceTranslationFailure(
+            "translation_output_invalid",
+            retryable=False,
+            provider=None,
+            model=None,
+            harness=None,
+        )
     limits = {
         "translated_text": 16000,
         "provider": 64,
@@ -66,7 +112,13 @@ def _validated_result(value: object) -> EvidenceTranslationResult:
             or len(text) > limit
             or "\0" in text
         ):
-            raise EvidenceTranslationFailure("translation_output_invalid")
+            raise EvidenceTranslationFailure(
+                "translation_output_invalid",
+                retryable=False,
+                provider=None,
+                model=None,
+                harness=None,
+            )
     return value
 
 
@@ -91,12 +143,17 @@ def translate_evidence(
         raise EvidenceTranslationConflict("translation_transaction_open")
     try:
         result = translator(str(evidence["excerpt"]), locale)
-    except (ModelExecutionTimeout, TimeoutError):
-        raise EvidenceTranslationFailure("translation_timeout") from None
-    except TextTranslationOutputInvalid:
-        raise EvidenceTranslationFailure("translation_output_invalid") from None
-    except Exception:
-        raise EvidenceTranslationFailure("translation_failed") from None
+    except EvidenceTranslationFailure:
+        raise
+    except Exception as exc:
+        failure = classify_content_translation_failure(exc)
+        raise EvidenceTranslationFailure(
+            failure.code,
+            retryable=failure.retryable,
+            provider=None,
+            model=None,
+            harness=None,
+        ) from None
     validated = _validated_result(result)
 
     try:

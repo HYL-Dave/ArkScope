@@ -178,7 +178,8 @@ def test_translation_failure_leaves_authoritative_evidence_and_case_unchanged():
                 translator=translator,
                 at=_AT,
             )
-        assert captured.value.code == "translation_failed"
+        assert captured.value.code == "translation_provider_error"
+        assert captured.value.retryable is True
         assert "credential-secret" not in str(captured.value)
         assert tuple(
             conn.execute(
@@ -194,6 +195,76 @@ def test_translation_failure_leaves_authoritative_evidence_and_case_unchanged():
         assert conn.execute(
             "SELECT COUNT(*) FROM security_lifecycle_evidence_translations"
         ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_translation_failure_detail_is_closed_bounded_and_message_free():
+    from src.security_lifecycle_translation import EvidenceTranslationFailure
+
+    failure = EvidenceTranslationFailure(
+        "translation_auth_rejected",
+        retryable=False,
+        provider="anthropic",
+        model="claude-sonnet-5",
+        harness="claude_subscription_structured_output",
+    )
+
+    assert failure.detail() == {
+        "code": "translation_auth_rejected",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "harness": "claude_subscription_structured_output",
+        "retryable": False,
+    }
+    assert "secret-value" not in repr(failure)
+
+    with pytest.raises(ValueError, match="translation_failure_code"):
+        EvidenceTranslationFailure(
+            "translation_failed",
+            retryable=True,
+            provider="anthropic",
+            model="claude-sonnet-5",
+            harness="claude_subscription_structured_output",
+        )
+    with pytest.raises(ValueError, match="translation_failure_provider"):
+        EvidenceTranslationFailure(
+            "translation_provider_error",
+            retryable=True,
+            provider="a" * 65,
+            model="claude-sonnet-5",
+            harness="claude_subscription_structured_output",
+        )
+
+
+def test_translation_preserves_safe_typed_provider_failure():
+    from src.security_lifecycle_translation import (
+        EvidenceTranslationFailure,
+        translate_evidence,
+    )
+
+    conn, store, _, evidence_id = _store_with_evidence()
+    failure = EvidenceTranslationFailure(
+        "translation_quota_exhausted",
+        retryable=False,
+        provider="openai",
+        model="gpt-5.4-mini",
+        harness="chatgpt_subscription_structured_output",
+    )
+
+    def translator(_text: str, _locale: str):
+        raise failure
+
+    try:
+        with pytest.raises(EvidenceTranslationFailure) as captured:
+            translate_evidence(
+                store,
+                evidence_id=evidence_id,
+                locale="zh-Hant",
+                translator=translator,
+                at=_AT,
+            )
+        assert captured.value is failure
     finally:
         conn.close()
 
