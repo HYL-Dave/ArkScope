@@ -51,7 +51,16 @@ const BASELINE_SECTIONS: ReadonlyArray<{
     id: "fixed_task_runtime",
     title: "固定 AI 任務執行限制",
     description: "設定 AI 卡片生成與翻譯的模型執行上界。",
-    keywords: ["timeout", "runtime", "卡片生成", "卡片翻譯", "fixed task"],
+    keywords: [
+      "timeout",
+      "runtime",
+      "卡片生成",
+      "內容翻譯",
+      "卡片翻譯",
+      "content translation",
+      "card translation",
+      "fixed task",
+    ],
   },
   {
     id: "research_runtime",

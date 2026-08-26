@@ -33,6 +33,7 @@ def test_registry_is_the_exact_fixed_task_membership():
         "card_translation",
     }
     assert set(FIXED_TASK_RUNTIME_TASKS) <= {task.id for task in TASKS}
+    assert FIXED_TASK_RUNTIME_TASKS["card_translation"].label == "內容翻譯"
 
 
 def test_defaults_are_900_seconds(store):

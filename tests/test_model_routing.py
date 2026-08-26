@@ -48,6 +48,14 @@ def test_model_catalog_exposes_seed_models(tmp_path):
         "none", "low", "medium", "high", "xhigh",
     ]
     assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research"}
+    translation = next(
+        task for task in res["tasks"] if task["id"] == "card_translation"
+    )
+    assert translation["label"] == "Content translation"
+    assert translation["description"] == (
+        "Translate cards and source excerpts while preserving structure, "
+        "citations, identifiers, and numbers."
+    )
 
 
 def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):

@@ -66,7 +66,16 @@ const BASELINE_SECTIONS: ReadonlyArray<{
     id: "fixed_task_runtime",
     title: "固定 AI 任務執行限制",
     description: "設定 AI 卡片生成與翻譯的模型執行上界。",
-    keywords: ["timeout", "runtime", "卡片生成", "卡片翻譯", "fixed task"],
+    keywords: [
+      "timeout",
+      "runtime",
+      "卡片生成",
+      "內容翻譯",
+      "卡片翻譯",
+      "content translation",
+      "card translation",
+      "fixed task",
+    ],
   },
   {
     id: "research_runtime",
@@ -204,8 +213,8 @@ describe("Settings static copy authority", () => {
   it("maps every model task without backend labels", () => {
     const tasks: ModelTask[] = ["card_synthesis", "card_translation", "ai_research"];
     const cases = [
-      { locale: "zh-Hant" as const, labels: ["AI 卡片生成", "卡片翻譯", "AI 研究"] },
-      { locale: "en" as const, labels: ["AI Card Synthesis", "Card Translation", "AI Research"] },
+      { locale: "zh-Hant" as const, labels: ["AI 卡片生成", "內容翻譯", "AI 研究"] },
+      { locale: "en" as const, labels: ["AI Card Synthesis", "Content Translation", "AI Research"] },
     ];
 
     for (const expected of cases) {

@@ -218,7 +218,7 @@ vi.mock("./settings/ModelRoutingSection", () => ({
   ),
   TASK_LABELS: {
     card_synthesis: "AI 卡片生成",
-    card_translation: "卡片翻譯",
+    card_translation: "內容翻譯",
     ai_research: "AI 研究",
   },
 }));

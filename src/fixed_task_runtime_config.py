@@ -37,7 +37,7 @@ FIXED_TASK_RUNTIME_TASKS: dict[TaskId, FixedTaskRuntimeDefinition] = {
     ),
     "card_translation": FixedTaskRuntimeDefinition(
         task="card_translation",
-        label="卡片翻譯",
+        label="內容翻譯",
         env_key="ARKSCOPE_CARD_TRANSLATION_TIMEOUT_S",
     ),
 }

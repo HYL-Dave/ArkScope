@@ -321,7 +321,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const translationSelect = expectLocalizedControlName(
       translation,
       "model",
-      "卡片翻譯 Model",
+      "內容翻譯 Model",
     ) as HTMLSelectElement;
     expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-sonnet-5")?.textContent)

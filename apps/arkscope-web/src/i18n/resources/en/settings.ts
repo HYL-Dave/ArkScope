@@ -90,7 +90,7 @@ const settings = {
       fixedTaskRuntime: {
         title: "Fixed AI Task Runtime Limits",
         description: "Set upper runtime limits for AI card synthesis and translation.",
-        searchAliases: "timeout|runtime|card synthesis|card translation|fixed task|runtime limit",
+        searchAliases: "timeout|runtime|card synthesis|content translation|card translation|fixed task|runtime limit",
       },
       researchRuntime: {
         title: "AI Research Runtime Limits",
@@ -152,8 +152,8 @@ const settings = {
         description: "Generate source-grounded AI cards.",
       },
       cardTranslation: {
-        label: "Card Translation",
-        description: "Translate generated AI card content.",
+        label: "Content Translation",
+        description: "Translate AI cards and source excerpts.",
       },
       aiResearch: {
         label: "AI Research",
@@ -256,7 +256,7 @@ const settings = {
       description: "Higher-effort models may need more time. These limits only control the maximum wait; they do not change the model or effort.",
       fields: {
         cardSynthesis: "AI Card Synthesis - model runtime limit (seconds)",
-        cardTranslation: "Card Translation - model runtime limit (seconds)",
+        cardTranslation: "Content Translation - model runtime limit (seconds)",
       },
       help: {
         seconds: "Measured in seconds.",

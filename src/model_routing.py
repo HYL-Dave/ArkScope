@@ -81,8 +81,11 @@ TASKS: list[TaskInfo] = [
     ),
     TaskInfo(
         id="card_translation",
-        label="Card translation",
-        description="Translate generated cards while preserving structure, citations, and numbers.",
+        label="Content translation",
+        description=(
+            "Translate cards and source excerpts while preserving structure, "
+            "citations, identifiers, and numbers."
+        ),
         default_provider="anthropic",
         recommended_model="claude-sonnet-4-6",
     ),

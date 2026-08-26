@@ -89,7 +89,7 @@ const settings = {
       fixedTaskRuntime: {
         title: "固定 AI 任務執行限制",
         description: "設定 AI 卡片生成與翻譯的模型執行上界。",
-        searchAliases: "timeout|runtime|卡片生成|卡片翻譯|fixed task|runtime limit",
+        searchAliases: "timeout|runtime|卡片生成|內容翻譯|卡片翻譯|content translation|card translation|fixed task|runtime limit",
       },
       researchRuntime: {
         title: "AI 研究執行限制",
@@ -151,8 +151,8 @@ const settings = {
         description: "生成具來源依據的 AI 卡片。",
       },
       cardTranslation: {
-        label: "卡片翻譯",
-        description: "翻譯已生成的 AI 卡片內容。",
+        label: "內容翻譯",
+        description: "翻譯 AI 卡片與來源摘錄。",
       },
       aiResearch: {
         label: "AI 研究",
@@ -255,7 +255,7 @@ const settings = {
       description: "較高 effort 的模型可能需要更久；這裡只控制最長等待時間，不會變更模型或 effort。",
       fields: {
         cardSynthesis: "AI 卡片生成 - 模型執行上限（秒）",
-        cardTranslation: "卡片翻譯 - 模型執行上限（秒）",
+        cardTranslation: "內容翻譯 - 模型執行上限（秒）",
       },
       help: {
         seconds: "以秒為單位。",

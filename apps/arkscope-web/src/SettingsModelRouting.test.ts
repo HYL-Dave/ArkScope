@@ -775,7 +775,7 @@ describe("Settings model route save gate", () => {
     const models = host.querySelector('[data-settings-anchor="models"]')!;
     expect(models.textContent).toContain("Task Model Routing");
     expect(models.textContent).toContain("AI Card Synthesis");
-    expect(models.textContent).toContain("Card Translation");
+    expect(models.textContent).toContain("Content Translation");
     expect(models.textContent).toContain("AI Research");
     expect(models.textContent).toContain("Generate source-grounded AI cards.");
     expect(models.textContent).toContain(

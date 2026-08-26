@@ -103,7 +103,8 @@ describe("FixedTaskRuntimeSection", () => {
     expect(input("card_synthesis_model_timeout_s").value).toBe("1200");
     expect(input("card_translation_model_timeout_s").value).toBe("600");
     expect(host!.textContent).toContain("AI 卡片生成 - 模型執行上限（秒）");
-    expect(host!.textContent).toContain("卡片翻譯 - 模型執行上限（秒）");
+    expect(host!.textContent).toContain("內容翻譯 - 模型執行上限（秒）");
+    expect(host!.textContent).not.toContain("卡片翻譯 - 模型執行上限（秒）");
     expect(host!.textContent).toContain("env 覆蓋");
     expect(host!.textContent).toContain("內建預設");
     expect(button("重設")).toBeTruthy();
@@ -199,7 +200,7 @@ describe("FixedTaskRuntimeSection", () => {
 
     expect(host!.textContent).toContain("Fixed AI Task Runtime Limits");
     expect(host!.textContent).toContain("AI Card Synthesis - model runtime limit (seconds)");
-    expect(host!.textContent).toContain("Card Translation - model runtime limit (seconds)");
+    expect(host!.textContent).toContain("Content Translation - model runtime limit (seconds)");
     expect(host!.textContent).toContain(
       "Higher-effort models may need more time. These limits only control the maximum wait; they do not change the model or effort.",
     );
