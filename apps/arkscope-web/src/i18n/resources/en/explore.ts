@@ -244,6 +244,7 @@ const explore = {
       retryableSourceUnavailable: "A source is temporarily unavailable; another check is scheduled",
       eventCompletionNotConfirmed: "Event completion has not been confirmed",
       notConfirmedAsOf: "Not confirmed as of the latest completed check",
+      notConfirmedAsOfDated: "Not confirmed as of {{date}}; active checking stopped.",
       sourceMissing: "Source observation is missing",
       sourceConflict: "Source facts conflict",
       ambiguousEvent: "The event outcome remains ambiguous",

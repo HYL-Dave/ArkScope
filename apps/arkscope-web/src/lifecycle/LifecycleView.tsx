@@ -32,6 +32,7 @@ import {
   type SecurityLifecycleCaseDetail,
   type SecurityLifecycleCaseFilters,
   type SecurityLifecycleCaseSummary,
+  type SecurityLifecycleDispositionReason,
   type SecurityLifecycleAssessment,
   type SecurityLifecycleAutomationFact,
   type SecurityLifecycleAssessmentOutcome,
@@ -924,6 +925,24 @@ function EvidenceItem({
   );
 }
 
+function LifecycleDispositionReasonText({
+  reason,
+  dispositionAsOf,
+  locale,
+}: {
+  reason: SecurityLifecycleDispositionReason;
+  dispositionAsOf: string | null;
+  locale: LifecycleLocale;
+}) {
+  const { t } = useTranslation("explore");
+  if (reason === "not_confirmed_as_of" && dispositionAsOf) {
+    return <>{t(($) => $.lifecycle.dispositionReasons.notConfirmedAsOfDated, {
+      date: dispositionAsOf,
+    })}</>;
+  }
+  return <>{lifecycleDispositionReasonLabel(reason, locale)}</>;
+}
+
 function CaseTable({
   cases,
   locale,
@@ -974,7 +993,11 @@ function CaseTable({
                     {lifecycleDispositionLabel(item.disposition, locale)}
                   </span>
                   <span className="tiny">
-                    {lifecycleDispositionReasonLabel(item.disposition_reason, locale)}
+                    <LifecycleDispositionReasonText
+                      reason={item.disposition_reason}
+                      dispositionAsOf={item.disposition_as_of}
+                      locale={locale}
+                    />
                   </span>
                   {item.last_checked_at ? (
                     <span className="muted tiny">
@@ -1540,10 +1563,11 @@ export function LifecycleView({
                 </div>
                 <div>
                   <dt>{t(($) => $.lifecycle.fields.actionReadiness)}</dt>
-                  <dd>{lifecycleDispositionReasonLabel(
-                    detail.disposition_reason,
-                    locale,
-                  )}</dd>
+                  <dd><LifecycleDispositionReasonText
+                    reason={detail.disposition_reason}
+                    dispositionAsOf={detail.disposition_as_of}
+                    locale={locale}
+                  /></dd>
                 </div>
                 {detail.last_checked_at ? (
                   <div>

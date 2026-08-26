@@ -20,6 +20,10 @@ describe("Lifecycle presentation", () => {
       .toBe("需要複查");
     expect(lifecycleDispositionReasonLabel("event_completion_not_confirmed", "en"))
       .toBe("Event completion has not been confirmed");
+    expect(lifecycleDispositionReasonLabel("not_confirmed_as_of", "en"))
+      .toBe("Not confirmed as of the latest completed check");
+    expect(lifecycleDispositionReasonLabel("not_confirmed_as_of", "zh-Hant"))
+      .toBe("截止最近一次完整查核仍未確認");
     expect(lifecycleDispositionReasonLabel("retryable_source_unavailable", "en"))
       .toBe("A source is temporarily unavailable; another check is scheduled");
     expect(lifecycleDispositionReasonLabel("event_completion_not_confirmed", "en"))

@@ -244,6 +244,7 @@ const explore = {
       retryableSourceUnavailable: "來源暫時無法取得；已排程再次查核",
       eventCompletionNotConfirmed: "尚未確認事件已完成",
       notConfirmedAsOf: "截止最近一次完整查核仍未確認",
+      notConfirmedAsOfDated: "截至 {{date}} 尚未確認；已停止主動追查。",
       sourceMissing: "原始觀察缺失",
       sourceConflict: "來源事實互相衝突",
       ambiguousEvent: "事件結果仍有歧義",

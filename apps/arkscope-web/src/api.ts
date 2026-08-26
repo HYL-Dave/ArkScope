@@ -2947,6 +2947,7 @@ export interface SecurityLifecycleCaseSummary {
   disposition: SecurityLifecycleDisposition;
   queue_bucket: SecurityLifecycleQueueBucket;
   disposition_reason: SecurityLifecycleDispositionReason;
+  disposition_as_of: string | null;
   last_checked_at: string | null;
   next_check_at: string | null;
   source_family_status: Partial<

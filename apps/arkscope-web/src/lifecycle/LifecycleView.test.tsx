@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SecurityLifecycleCaseFilters } from "../api";
+import type { SecurityLifecycleCaseFilters, SecurityLifecycleCaseSummary } from "../api";
 import { withTestUiLocale } from "../test/testUiLocale";
 
 const apiMocks = vi.hoisted(() => ({
@@ -169,14 +169,56 @@ const CASES = [
   proposal_count: workflowState === "resolved" ? 1 : 0,
 }));
 
-const SUMMARY = {
-  ...CASES[2],
+const SUMMARY: SecurityLifecycleCaseSummary = {
   case_id: CASE_ID,
+  source: "sec_edgar",
+  source_ref: "ref-CCC",
   ticker: "QBTS",
+  source_presence: "present",
+  workflow_state: "evidence_ready",
   issuer_name: "D-Wave Quantum Inc.",
+  filing_date: "2026-08-20",
+  kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
+  current_assessment: null,
+  current_acknowledgement: null,
+  active_sources: ["manual_lists"],
+  source_context: "available",
+  components: {},
+  automation_run_count: 0,
+  automation_fact_count: 0,
+  automation_tier: null,
+  action_readiness: null,
+  disposition: "exception_required",
+  queue_bucket: "attention",
+  disposition_reason: "ambiguous_event",
+  disposition_as_of: null,
+  last_checked_at: "2026-08-25T09:00:00Z",
+  next_check_at: null,
+  source_family_status: { regulator: "present" },
   evidence_count: 2,
   investigation_run_count: 1,
+  assessment_count: 0,
+  acknowledgement_count: 0,
+  proposal_count: 0,
 };
+
+const FINAL_UNCONFIRMED: SecurityLifecycleCaseSummary = Object.assign({}, SUMMARY, {
+  disposition: "not_confirmed_yet" as const,
+  queue_bucket: "history" as const,
+  disposition_reason: "not_confirmed_as_of" as const,
+  disposition_as_of: "2026-08-27",
+  last_checked_at: "2026-08-27T12:00:00Z",
+  next_check_at: null,
+});
+
+const MONITORING_UNCONFIRMED: SecurityLifecycleCaseSummary = Object.assign({}, SUMMARY, {
+  disposition: "not_confirmed_yet" as const,
+  queue_bucket: "monitoring" as const,
+  disposition_reason: "event_completion_not_confirmed" as const,
+  disposition_as_of: null,
+  last_checked_at: "2026-08-27T12:00:00Z",
+  next_check_at: "2026-08-28T12:00:00Z",
+});
 
 const TRANSITION_PREVIEW = {
   active_sources: ["manual_lists", "portfolio_open", "sa_alpha_picks_current"],
@@ -232,7 +274,7 @@ const TRANSITION_PREVIEW = {
   transition_kind: "symbol_continuation",
 };
 
-function detail(overrides: Record<string, unknown> = {}) {
+function detail(overrides: object = {}) {
   return {
     ...SUMMARY,
     workflow_state: "resolved",
@@ -478,6 +520,55 @@ afterEach(() => {
 });
 
 describe("Lifecycle workflow", () => {
+  it("renders truthful dated final-History reasons in both locales without acknowledgement", async () => {
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [FINAL_UNCONFIRMED],
+      count: 1,
+      queue_counts: { attention: 0, monitoring: 0, history: 1 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail(FINAL_UNCONFIRMED));
+
+    await mountLifecycle();
+
+    const englishCopy = "Not confirmed as of 2026-08-27; active checking stopped.";
+    expect(host!.querySelector("tbody")?.textContent).toContain(englishCopy);
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain(englishCopy);
+    expect(document.body.textContent).not.toContain("Confirmed complete");
+    expect(apiMocks.acknowledgeSecurityLifecycleCase).not.toHaveBeenCalled();
+    expect(apiMocks.acknowledgeTickerIdentityTransitionActivity).not.toHaveBeenCalled();
+
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await flush();
+
+    const chineseCopy = "截至 2026-08-27 尚未確認；已停止主動追查。";
+    expect(host!.querySelector("tbody")?.textContent).toContain(chineseCopy);
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain(chineseCopy);
+    expect(document.body.textContent).not.toContain("已確認完成");
+    expect(apiMocks.acknowledgeSecurityLifecycleCase).not.toHaveBeenCalled();
+    expect(apiMocks.acknowledgeTickerIdentityTransitionActivity).not.toHaveBeenCalled();
+  });
+
+  it("does not infer stopped checking from last check time or a monitoring reason", async () => {
+    const finalWithoutDispositionDate: SecurityLifecycleCaseSummary = {
+      ...FINAL_UNCONFIRMED,
+      disposition_as_of: null,
+      last_checked_at: "2026-08-28T12:00:00Z",
+    };
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [finalWithoutDispositionDate, MONITORING_UNCONFIRMED],
+      count: 2,
+      queue_counts: { attention: 0, monitoring: 1, history: 1 },
+      data_integrity: { source_missing_count: 0 },
+    });
+
+    await mountLifecycle(null);
+
+    expect(host!.textContent).not.toContain("active checking stopped");
+    expect(host!.textContent).toContain("Not confirmed as of the latest completed check");
+    expect(host!.textContent).toContain("Event completion has not been confirmed");
+  });
+
   it("acknowledges insufficient evidence and reopens it without creating an assessment", async () => {
     apiMocks.getSecurityLifecycleCase
       .mockResolvedValueOnce(detail())
