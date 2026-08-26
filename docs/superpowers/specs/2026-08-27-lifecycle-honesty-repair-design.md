@@ -1,8 +1,8 @@
 # Lifecycle Honesty Repair Design
 
-**Status:** Approved design amendment for implementation planning. Provider
-calls, production database access, App restart, merge, and push remain separate
-authorization gates.
+**Status:** Revised design amendment awaiting confirmation before implementation
+planning. Provider calls, production database access, App restart, merge, and
+push remain separate authorization gates.
 
 **Date:** 2026-08-27
 
@@ -52,9 +52,10 @@ row, byte start, byte end, and cited-text SHA-256, then verifies:
 - the selected bytes are valid UTF-8; and
 - SHA-256 of those exact bytes equals the supplied digest.
 
-Both automation facts and a `not_confirmed_as_of` deadline blocker use this
-validator. Producer self-consistency is not sufficient: tests must feed the
-producer's real output through `SecurityLifecycleFactKernel.complete_run`.
+Both automation facts and every blocker carrying source-deadline citation
+fields use this validator. Producer self-consistency is not sufficient: tests
+must feed the producer's real output through
+`SecurityLifecycleFactKernel.complete_run`.
 
 ### 3.2 New and retained evidence
 
@@ -67,7 +68,41 @@ A deadline may not cite evidence from another run or case. The blocker context
 uses the producer-local evidence ID before persistence and is rewritten to the
 persisted evidence ID in the same transaction.
 
-### 3.3 Atomicity and errors
+### 3.3 Trigger and closed scope
+
+The complete deadline-provenance set is:
+
+```text
+source_deadline
+source_deadline_evidence_id
+source_deadline_span_start_byte
+source_deadline_span_end_byte
+source_deadline_cited_text_sha256
+source_deadline_rule_id
+source_deadline_rule_version
+```
+
+At the `complete_run` boundary, the presence of **any** member of this set
+triggers deadline-citation validation and requires all members. This rule is
+independent of `monitoring_reason`:
+
+- pre-deadline `event_completion_not_confirmed` may omit the entire set, but a
+  supplied set must validate; and
+- final `not_confirmed_as_of` requires the complete validated set plus a valid
+  completed-check `as_of` date.
+
+This means a producer defect before the deadline fails loudly rather than
+persisting an unverified citation until the final tick.
+
+The kernel-generated `source_conflict` blocker and
+`defer_transition_revalidation` blockers remain closed, citation-free shapes.
+They are outside this deadline validator by design: the former is synthesized
+from already validated facts after `_normalize_blockers`, and the latter is
+inserted only for the two typed transition-revalidation reasons with `{}`
+context. Neither path may acquire source-deadline fields without first being
+routed through the shared citation validator.
+
+### 3.4 Atomicity and errors
 
 A missing evidence ID, invalid byte boundary, invalid UTF-8 boundary, forged
 digest, missing required deadline field, or mismatched rule identity raises a
@@ -75,6 +110,11 @@ typed `ValueError("blocker_citation")` before blocker/run terminal state is
 committed. The worker records the operational failure through its existing
 persist-phase failure path. No partially persisted evidence, fact, blocker, or
 terminal run state is allowed.
+
+This citation enforcement and the failed-run replay authority in Section 6 are
+one inseparable delivery unit. The citation validator may not ship on its own,
+because its intended atomic failures require the new execution-revision replay
+path after a producer repair.
 
 ## 4. Conservative Source-Deadline Extraction
 
@@ -88,9 +128,12 @@ an affirmative current clause such as:
 - `termination date is|shall be|remains <DATE>`; or
 - `outside date|termination date has been|was extended to <DATE>`.
 
-The accepted span is the exact source sentence. If a sentence contains more
-than one candidate deadline or the selected clause does not identify exactly
-one date, it emits no deadline.
+The accepted span is the exact source sentence. An explicit directional
+extension such as `extended from <OLD_DATE> to <NEW_DATE>` emits exactly the
+date governed by `to`; the old `from` date is not a target candidate. After the
+accepted grammar identifies its target position, more than one target date
+(for example, `extended to <DATE_A> or <DATE_B>`) or no target date emits no
+deadline.
 
 ### 4.2 Rejected clauses
 
@@ -107,8 +150,15 @@ This is intentionally precision-first. A real clause outside the grammar leaves
 the case in Monitoring; it never moves the case to History.
 
 The deadline rule remains
-`sec.explicit_transaction_termination_date`, with its own rule version advanced
-from `3` to `4`. Other SEC fact rules do not inherit this bump.
+`sec.explicit_transaction_termination_date`. Introduce a dedicated
+`_SOURCE_DEADLINE_RULE_VERSION = "4"` used only when constructing
+`SecSourceDeadline`. Keep the existing shared `_RULE_VERSION = "3"` unchanged
+for every SEC fact and SEC evidence `source_locator`. Do not add this extractor
+version to decision-policy `RULE_VERSIONS`.
+
+The deadline version therefore changes blocker citation metadata only. It does
+not change persisted evidence identity, fact identity,
+`decision_provenance_sha256`, assessment authority, or transition authority.
 
 ## 5. Truthful History Projection
 
@@ -134,6 +184,13 @@ The validated `source_deadline` triggers the final check. `disposition_as_of`
 records the date on which that check actually completed. They may differ after
 App downtime; the product must not backdate a later catch-up check to the source
 deadline.
+
+Concretely, `_pending_event_monitoring` must replace the existing
+`context["as_of"] = deadline_date.isoformat()` assignment with
+`context["as_of"] = today.isoformat()` when the final check completes. It keeps
+`context["source_deadline"]` as the separate source-defined boundary.
+`disposition_as_of` derives only from the validated `as_of` field and never
+falls back to `source_deadline`.
 
 The History presentation must combine disposition, reason, and date so it reads
 as:
@@ -207,26 +264,43 @@ No profile-schema change is required. Semantic matching reads existing indexed
 run columns and the bounded query context, and remains limited by the existing
 per-tick case budget.
 
+Sections 3 and 6 must be implemented, mutation-tested, and admitted together;
+neither one is a separately shippable partial repair.
+
 ## 7. Verification
 
 RED-first coverage must prove:
 
-1. a producer-created valid deadline citation passes through the real kernel;
-2. missing evidence, cross-run evidence, out-of-range spans, invalid UTF-8
-   boundaries, and forged hashes each fail atomically at the kernel boundary;
-3. valid forward-looking and explicit-extension clauses emit one deadline;
-4. historical, original, superseded, negated, `as of`, multi-date, and ambiguous
-   clauses emit none and retain Monitoring;
-5. `not_confirmed_as_of` projects as `not_confirmed_yet + history`, exposes the
+1. producer-created valid deadline citations for both pre-deadline monitoring
+   and final `not_confirmed_as_of` pass through the real kernel;
+2. any partial deadline-provenance set, missing evidence, cross-run evidence,
+   out-of-range span, invalid UTF-8 boundary, forged hash, or mismatched rule
+   identity fails atomically at the kernel boundary;
+3. the current simple accepted forms remain regression controls, while the true
+   RED directional-extension case `extended from March 1, 2026 to June 1, 2026`
+   emits exactly `2026-06-01` through the fixed extractor;
+4. historical, original, superseded, negated, `as of`, ambiguous-target, and
+   unsupported clauses emit none and retain Monitoring; a sentence with two
+   target dates after `to` emits none, while a directional `from ... to ...`
+   clause is not misclassified as ambiguous;
+5. pre-deadline contexts carrying source-deadline fields are validated even
+   though their `monitoring_reason` is not `not_confirmed_as_of`, while blockers
+   with no deadline fields remain unaffected;
+6. `not_confirmed_as_of` projects as `not_confirmed_yet + history`, exposes the
    exact completed-check date, renders truthful bilingual History copy, and
    does not backdate an overdue startup catch-up to the source deadline;
-6. a failed semantic run is replayed once after the execution revision changes,
+7. a failed semantic run is replayed once after the execution revision changes,
    is not replayed repeatedly at the same revision, and is not replayed after a
    successful replacement;
-7. changing execution revision leaves decision provenance and ticker-transition
+8. `_RULE_VERSION` remains `"3"`; introducing the deadline-only version leaves
+   all existing SEC evidence/fact identities and decision provenance
+   byte-equivalent;
+9. changing execution revision leaves decision provenance and ticker-transition
    authority byte-equivalent;
-8. no mutable disposition column or startup DDL is introduced; and
-9. all repaired seams have explicit mutation owners.
+10. kernel-generated `source_conflict` and transition-revalidation blockers
+    retain their closed citation-free shapes;
+11. no mutable disposition column or startup DDL is introduced; and
+12. all repaired seams have explicit mutation owners.
 
 After focused tests pass, rebuild the mutation ledger, bilingual desktop/mobile
 browser matrix, schema comparison, offline replay authority, and evidence
