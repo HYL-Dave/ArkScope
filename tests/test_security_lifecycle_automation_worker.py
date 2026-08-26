@@ -6,6 +6,7 @@ import json
 import socket
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import replace
 
 
 _AT = "2026-08-25T12:00:00Z"
@@ -372,6 +373,28 @@ def _store(harness):
     return SecurityLifecycleInvestigationStore(harness.conn)
 
 
+def _invalid_persistence_bundle(case, *, blockers=()):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+
+    bundle = _bundle(case)
+    evidence = bundle.evidence[0]
+    excerpt = evidence.excerpt + "\n"
+    invalid = replace(
+        evidence,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+    )
+    return LifecycleAutomationEvidenceBundle(
+        evidence=(invalid, *bundle.evidence[1:]),
+        facts=bundle.facts,
+        blockers=tuple(blockers),
+        diagnostics={"news_evidence_count": 20, "sec_attempts": 7},
+        retry_at=("2026-08-26T12:00:00Z" if blockers else None),
+    )
+
+
 def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_path):
     cases = [_case(3), _case(1), _case(2)]
     harness = _Harness(tmp_path, cases)
@@ -401,6 +424,50 @@ def test_persist_value_errors_are_classified_as_persistence_failures():
         _failure_code(ValueError("fact_value_shape"), phase="evaluate")
         == "extractor_failed"
     )
+
+
+def test_blocked_result_persistence_failure_is_not_source_payload_invalid(tmp_path):
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _invalid_persistence_bundle(
+        case,
+        blockers=(
+            AutomationBlocker(
+                code="sec_transport_unavailable",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+    )
+    try:
+        result = harness.worker().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert result["failed"] == 1
+        assert run["status"] == "failed"
+        assert run["failure_code"] == "persistence_failed"
+    finally:
+        harness.conn.close()
+
+
+def test_failed_run_retains_acquired_provider_diagnostics(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _invalid_persistence_bundle(case)
+    try:
+        result = harness.worker().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert result["failed"] == 1
+        assert json.loads(run["diagnostics_json"]) == {
+            "failures": 1,
+            "news_evidence_count": 20,
+            "sec_attempts": 7,
+        }
+    finally:
+        harness.conn.close()
 
 
 def test_verified_result_persists_automation_assessment_acceptance_and_proposals(

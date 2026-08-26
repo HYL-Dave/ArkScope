@@ -137,6 +137,8 @@ def test_ibkr_adapter_requires_injected_gateway_and_shared_lock():
 
 
 def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
+    from src.security_lifecycle_fact_kernel import _normalize_evidence
+
     state, lock = _lock_recorder()
     detail = _details()
     gateway = _Gateway(
@@ -179,6 +181,7 @@ def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
     ).hexdigest()
     assert evidence.evidence_dedupe_key == f"ibkr_contract:{evidence.content_sha256}"
     assert len(gateway.requests) == 3
+    assert _normalize_evidence(result.evidence)[0].excerpt == evidence.excerpt
 
 
 def test_regulator_declared_successor_is_queried_without_persisting_an_alias():

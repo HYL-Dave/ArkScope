@@ -306,6 +306,24 @@ def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts(
     assert all("Background material" not in item.excerpt for item in delayed_result.evidence)
 
 
+def test_sec_adapter_canonicalizes_boundary_excerpt_before_kernel_validation():
+    from src.security_lifecycle_fact_kernel import _normalize_evidence
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("HAPN")
+    case["document"] = "<html><body>" + ("x" * 4095) + " tail</body></html>"
+    result = collect_sec_evidence(
+        context=_context("HAPN"),
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+
+    normalized = _normalize_evidence(result.evidence)
+    assert len(result.evidence) == 1
+    assert len(result.evidence[0].excerpt.encode("utf-8")) == 4095
+    assert normalized[0].excerpt == result.evidence[0].excerpt
+
+
 def test_hapn_fixture_extracts_symbol_and_venue_change_without_a_to_a_transition():
     _case_data, _transport, result = _collect("HAPN")
     assert _values(result, "source_ticker") == {"LC"}

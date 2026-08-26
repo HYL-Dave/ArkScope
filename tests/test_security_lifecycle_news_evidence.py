@@ -121,6 +121,7 @@ def _insert_normalized(
     source="polygon",
     title="LC adopts HAPN symbol",
     body="LC will trade as HAPN on Nasdaq.",
+    url=None,
 ):
     conn.execute(
         "INSERT INTO news_articles VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -130,7 +131,7 @@ def _insert_normalized(
             f"provider-{row_id}",
             title,
             publisher,
-            f"https://news.example/{row_id}",
+            url or f"https://news.example/{row_id}",
             published_at,
             "full_text",
             "en",
@@ -286,6 +287,8 @@ def test_news_adapter_bounds_rows_excerpts_and_preserves_original_provenance():
 
 
 def test_news_adapter_hashes_the_canonical_excerpt_when_truncation_ends_on_whitespace():
+    from src.security_lifecycle_fact_kernel import _normalize_evidence
+
     normalized = _normalized_conn()
     sa = _sa_conn()
     _insert_normalized(
@@ -301,6 +304,34 @@ def test_news_adapter_hashes_the_canonical_excerpt_when_truncation_ends_on_white
     assert evidence.content_sha256 == hashlib.sha256(
         evidence.excerpt.encode()
     ).hexdigest()
+    assert _normalize_evidence(result.evidence)[0].excerpt == evidence.excerpt
+
+
+def test_news_adapter_rejects_invalid_urls_without_rejecting_the_evidence():
+    from src.security_lifecycle_fact_kernel import _normalize_evidence
+
+    normalized = _normalized_conn()
+    sa = _sa_conn()
+    _insert_normalized(
+        normalized,
+        row_id=1,
+        url="http://news.example/insecure",
+    )
+    _insert_normalized(
+        normalized,
+        row_id=2,
+        url="https://news.example/" + ("x" * 1000),
+    )
+
+    result = _read(normalized, sa)
+    persisted = _normalize_evidence(result.evidence)
+    by_row = {item.source_locator["row_id"]: item for item in result.evidence}
+
+    assert len(persisted) == 2
+    assert by_row[1].source_url is None
+    assert by_row[1].source_locator["source_url_status"] == "rejected_non_https"
+    assert by_row[2].source_url is None
+    assert by_row[2].source_locator["source_url_status"] == "rejected_too_long"
 
 
 def test_all_news_publishers_count_as_one_publisher_family():
