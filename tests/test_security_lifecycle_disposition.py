@@ -350,6 +350,22 @@ def test_stale_automation_transition_is_monitoring_until_current_revalidation():
     assert got.next_check_at == "2026-08-27T00:00:00Z"
 
 
+def test_stale_automation_transition_rechecks_before_later_execute_on():
+    assert next_lifecycle_recheck_at(
+        _run(
+            action_readiness="waiting_transition_revalidation",
+            updated_at="2026-08-26T00:00:00Z",
+        ),
+        None,
+        {
+            "status": "approved",
+            "execute_on": "2026-09-05",
+            "approval_authority": "automation_policy",
+            "automation_policy_version": "trusted-lifecycle-automation-old",
+        },
+    ) == "2026-08-27T00:00:00Z"
+
+
 def test_source_family_status_uses_current_run_citations_and_typed_families():
     assessment = _assessment()
     assessment["citations"] = [
@@ -401,6 +417,37 @@ def test_source_family_status_uses_current_run_citations_and_typed_families():
         "manual": "present",
     }
     assert set(got.source_family_status.values()) <= SOURCE_FAMILY_STATES
+
+
+def test_ibkr_missing_is_present_evidence_while_ambiguity_is_conflict():
+    missing = project_lifecycle_disposition(
+        _case(
+            automation_runs=(
+                _run(blockers=(_blocker("ibkr_contract_missing", retryable=True),)),
+            ),
+            evidence=(
+                {
+                    "evidence_id": "market-missing",
+                    "source_family": "market_infrastructure",
+                    "automation_run_id": "run-current",
+                },
+            ),
+        )
+    )
+    ambiguous = project_lifecycle_disposition(
+        _case(
+            automation_runs=(
+                _run(
+                    blockers=(
+                        _blocker("ibkr_contract_ambiguous", retryable=False),
+                    )
+                ),
+            ),
+        )
+    )
+
+    assert missing.source_family_status["market_infrastructure"] == "present"
+    assert ambiguous.source_family_status["market_infrastructure"] == "conflict"
 
 
 def test_conflicting_current_fact_values_mark_only_their_source_families():

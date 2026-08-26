@@ -782,6 +782,13 @@ def _pending_event_monitoring(
         next_check = instant + timedelta(days=1)
     else:
         next_check = instant + timedelta(days=7)
+    if deadline_date is not None and today < deadline_date:
+        deadline_check = datetime.combine(
+            deadline_date,
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        )
+        next_check = min(next_check, deadline_check)
     context["next_check_at"] = _timestamp(next_check)
     return AutomationBlocker(
         code="sec_evidence_insufficient",
@@ -883,12 +890,24 @@ def _load_evidence(
     )
     effective = _exact_fact_date(tuple(facts), "effective_date")
     today = datetime.fromisoformat(at.replace("Z", "+00:00")).date()
+    source_deadlines = tuple(getattr(sec, "source_deadlines", ()))
+    deadline_dates = {
+        str(getattr(row, "date", "")) for row in source_deadlines
+    }
+    if len(deadline_dates) > 1:
+        raise ValueError("source_deadlines")
+    deadline_due = bool(
+        deadline_dates
+        and today >= date.fromisoformat(next(iter(deadline_dates)))
+    )
     pending_market_check = bool(
         pending_kinds
         and "acquisition_completed" not in _event_kinds(case)
         and not _has_terminal_or_identity_resolution(tuple(facts))
-        and effective is not None
-        and today >= effective
+        and (
+            (effective is not None and today >= effective)
+            or deadline_due
+        )
     )
     ibkr_codes: tuple[str, ...] = ()
     market_queried = False
@@ -920,7 +939,7 @@ def _load_evidence(
         case,
         tuple(facts),
         source_family_results=source_family_results,
-        source_deadlines=tuple(getattr(sec, "source_deadlines", ())),
+        source_deadlines=source_deadlines,
         at=at,
     )
     if pending is not None:

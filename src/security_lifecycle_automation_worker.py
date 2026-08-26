@@ -31,6 +31,9 @@ from src.security_lifecycle_schema import (
 
 AUTOMATION_EXECUTION_REVISION = "trusted-lifecycle-execution-r1"
 _MAX_CASES_PER_TICK = 2
+_DECISION_FIELDS = tuple(AutomationDecision.__dataclass_fields__)
+
+
 @dataclass(frozen=True)
 class LifecycleAutomationEvidenceBundle:
     evidence: tuple[object, ...]
@@ -108,6 +111,54 @@ def _query_context(case: Mapping[str, object], *, mode: str) -> dict[str, object
             }
         ),
     }
+
+
+def _decision_context(decision: AutomationDecision) -> dict[str, object]:
+    return {
+        name: (
+            list(value)
+            if name in {"outcomes", "decision_issues"}
+            else value
+        )
+        for name in _DECISION_FIELDS
+        for value in (getattr(decision, name),)
+    }
+
+
+def _persisted_terminal_decision(
+    run: Mapping[str, object],
+) -> tuple[AutomationDecision, str]:
+    raw_context = run.get("query_context_json")
+    if not isinstance(raw_context, str):
+        raise ValueError("terminal_query_context")
+    try:
+        context = json.loads(raw_context)
+    except json.JSONDecodeError as exc:
+        raise ValueError("terminal_query_context") from exc
+    if not isinstance(context, Mapping):
+        raise ValueError("terminal_query_context")
+    raw_decision = context.get("terminal_decision")
+    provenance = context.get("terminal_decision_provenance_sha256")
+    if not isinstance(raw_decision, Mapping) or set(raw_decision) != set(
+        _DECISION_FIELDS
+    ):
+        raise ValueError("terminal_decision")
+    values = dict(raw_decision)
+    for name in ("outcomes", "decision_issues"):
+        sequence = values.get(name)
+        if not isinstance(sequence, list) or not all(
+            isinstance(value, str) for value in sequence
+        ):
+            raise ValueError("terminal_decision")
+        values[name] = tuple(sequence)
+    if type(values.get("transition_requested")) is not bool:
+        raise ValueError("terminal_decision")
+    decision = AutomationDecision(**values)
+    if _decision_context(decision) != dict(raw_decision):
+        raise ValueError("terminal_decision")
+    if not isinstance(provenance, str) or len(provenance) != 64:
+        raise ValueError("terminal_decision_provenance")
+    return decision, provenance
 
 
 def _transition_request(
@@ -255,9 +306,11 @@ class LifecycleAutomationWorker:
         now: datetime,
         sources: tuple[str, ...],
         transition_revalidation: bool = False,
+        finalization_only: bool = False,
     ) -> str:
         phase = "acquire"
         failure_diagnostics: Mapping[str, int] = {}
+        terminal_provenance: str | None = None
         try:
             if transition_revalidation:
                 phase = "approve"
@@ -283,66 +336,94 @@ class LifecycleAutomationWorker:
                     raise ValueError("automation_transition_approval_changed")
                 kernel.complete_transition_revalidation(run_id=run_id, at=at)
                 return "accepted"
-            bundle = self._evidence_loader(case, mode=mode, at=at)
-            if not isinstance(bundle, LifecycleAutomationEvidenceBundle):
-                raise TypeError("automation_evidence_bundle")
-            failure_diagnostics = bundle.diagnostics
-            existing_evidence, existing_facts = _persisted_material(
-                store.conn,
-                run_id,
-            )
-            all_evidence = (*existing_evidence, *bundle.evidence)
-            all_facts = (*existing_facts, *bundle.facts)
-            blockers = bundle.blockers
-            blocker_codes = {_blocker_code(value) for value in blockers}
-            if blocker_codes == {"ibkr_contract_missing"} and _terminal_delisting(
-                all_facts
-            ):
-                blockers = ()
-            if blockers:
+            if finalization_only:
+                phase = "finalize"
+                run = store.get_automation_run(run_id)
+                if run.get("status") != "succeeded":
+                    raise ValueError("automation_run_not_succeeded")
+                decision, terminal_provenance = _persisted_terminal_decision(run)
+            else:
+                bundle = self._evidence_loader(case, mode=mode, at=at)
+                if not isinstance(bundle, LifecycleAutomationEvidenceBundle):
+                    raise TypeError("automation_evidence_bundle")
+                failure_diagnostics = bundle.diagnostics
+                existing_evidence, existing_facts = _persisted_material(
+                    store.conn,
+                    run_id,
+                )
+                all_evidence = (*existing_evidence, *bundle.evidence)
+                all_facts = (*existing_facts, *bundle.facts)
+                blockers = bundle.blockers
+                blocker_codes = {_blocker_code(value) for value in blockers}
+                if blocker_codes == {"ibkr_contract_missing"} and _terminal_delisting(
+                    all_facts
+                ):
+                    blockers = ()
+                    blocker_codes = set()
+
+                decision: AutomationDecision | None = None
+                if not blockers or "source_conflict" in blocker_codes:
+                    phase = "evaluate"
+                    decision = self._evaluate(
+                        case=case,
+                        evidence=all_evidence,
+                        facts=all_facts,
+                        current_date=now.date(),
+                        sources=sources,
+                    )
+                    if (
+                        "source_conflict" in blocker_codes
+                        and decision.rule_id != "lifecycle.source_conflict"
+                    ):
+                        raise ValueError("source_conflict_decision")
+                    if decision.transition_requested:
+                        decision = self._evaluate(
+                            case=case,
+                            evidence=all_evidence,
+                            facts=all_facts,
+                            current_date=now.date(),
+                            sources=sources,
+                        )
+
+                if blockers and "source_conflict" not in blocker_codes:
+                    phase = "persist"
+                    kernel.complete_run(
+                        run_id=run_id,
+                        evidence=bundle.evidence,
+                        facts=bundle.facts,
+                        blockers=blockers,
+                        decision_tier=None,
+                        action_readiness=None,
+                        retry_at=bundle.retry_at,
+                        diagnostics=bundle.diagnostics,
+                        at=at,
+                    )
+                    return "blocked"
+
+                assert decision is not None
                 phase = "persist"
-                kernel.complete_run(
+                completed = kernel.complete_run(
                     run_id=run_id,
                     evidence=bundle.evidence,
                     facts=bundle.facts,
                     blockers=blockers,
-                    decision_tier=None,
-                    action_readiness=None,
-                    retry_at=bundle.retry_at,
+                    decision_tier=decision.decision_tier,
+                    action_readiness=decision.action_readiness,
+                    retry_at=(
+                        None
+                        if "source_conflict" in blocker_codes
+                        else bundle.retry_at
+                    ),
                     diagnostics=bundle.diagnostics,
                     at=at,
+                    terminal_decision=_decision_context(decision),
                 )
-                return "blocked"
+                if completed.status == "blocked":
+                    return "blocked"
+                terminal_provenance = completed.decision_provenance_sha256
 
-            phase = "evaluate"
-            decision = self._evaluate(
-                case=case,
-                evidence=all_evidence,
-                facts=all_facts,
-                current_date=now.date(),
-                sources=sources,
-            )
-            if decision.transition_requested:
-                decision = self._evaluate(
-                    case=case,
-                    evidence=all_evidence,
-                    facts=all_facts,
-                    current_date=now.date(),
-                    sources=sources,
-                )
-
-            phase = "persist"
-            kernel.complete_run(
-                run_id=run_id,
-                evidence=bundle.evidence,
-                facts=bundle.facts,
-                blockers=(),
-                decision_tier=decision.decision_tier,
-                action_readiness=decision.action_readiness,
-                retry_at=None,
-                diagnostics=bundle.diagnostics,
-                at=at,
-            )
+            phase = "finalize"
+            assert terminal_provenance is not None
             assessment_id = create_automation_assessment(
                 store=store,
                 run_id=run_id,
@@ -353,15 +434,22 @@ class LifecycleAutomationWorker:
                 at=at,
             )
             if decision.decision_tier == "verified_automatic":
-                store.accept_assessment(
-                    assessment_id,
-                    observation_fingerprint_sha256=str(
-                        case["observation_fingerprint_sha256"]
-                    ),
-                    acceptance_authority="automation_policy",
-                    at=at,
-                )
-                store.generate_action_proposals(
+                assessment = store.get_assessment(assessment_id)
+                if assessment["status"] == "draft":
+                    store.accept_assessment(
+                        assessment_id,
+                        observation_fingerprint_sha256=str(
+                            case["observation_fingerprint_sha256"]
+                        ),
+                        acceptance_authority="automation_policy",
+                        at=at,
+                    )
+                elif not (
+                    assessment["status"] == "accepted"
+                    and assessment["acceptance_authority"] == "automation_policy"
+                ):
+                    raise ValueError("automation_assessment_not_accepted")
+                proposals = store.generate_action_proposals(
                     case_id=str(case["case_id"]),
                     observation_fingerprint_sha256=str(
                         case["observation_fingerprint_sha256"]
@@ -369,6 +457,8 @@ class LifecycleAutomationWorker:
                     sources_by_ticker={str(case["ticker"]): sources},
                     at=at,
                 )
+                if proposals.get("block_reason") is not None:
+                    raise ValueError("automation_proposals_blocked")
                 if decision.transition_requested:
                     phase = "approve"
                     approved = self._transition_approver(
@@ -382,7 +472,17 @@ class LifecycleAutomationWorker:
                         or approved.get("approval_authority") != "automation_policy"
                     ):
                         raise ValueError("automation_transition_approval_changed")
+                phase = "finalize"
+                kernel.complete_terminal_finalization(
+                    run_id=run_id,
+                    decision_provenance_sha256=terminal_provenance,
+                )
                 return "accepted"
+
+            kernel.complete_terminal_finalization(
+                run_id=run_id,
+                decision_provenance_sha256=terminal_provenance,
+            )
             return "drafted"
         except Exception as exc:
             if phase == "approve":
@@ -399,7 +499,17 @@ class LifecycleAutomationWorker:
                     )
                 except (KeyError, ValueError, RuntimeError, sqlite3.Error):
                     return "failed"
+                if terminal_provenance is not None:
+                    try:
+                        kernel.complete_terminal_finalization(
+                            run_id=run_id,
+                            decision_provenance_sha256=terminal_provenance,
+                        )
+                    except (KeyError, ValueError, RuntimeError, sqlite3.Error):
+                        return "failed"
                 return "accepted"
+            if phase == "finalize":
+                return "failed"
             failure_code = _failure_code(exc, phase=phase)
             diagnostics = dict(failure_diagnostics)
             diagnostics["failures"] = diagnostics.get("failures", 0) + 1
@@ -473,37 +583,41 @@ class LifecycleAutomationWorker:
                     observation_fingerprint_sha256=fingerprint,
                 )
                 current = state["current_assessment"]
-                due = (
-                    None
-                    if current is None
-                    else self._due_recheck(store, current, now=now)
-                )
-                if current is not None and due is None:
+                if current is not None and current.get("author") != "automation":
                     summary["skipped_current"] = int(summary["skipped_current"]) + 1
                     continue
-                if due is not None:
-                    run, due_at = due
-                    transition_revalidation = (
-                        run.get("action_readiness")
-                        == "waiting_transition_revalidation"
+                claim = kernel.reserve_run(
+                    case_id=case_id,
+                    observation_fingerprint_sha256=fingerprint,
+                    policy_version=AUTOMATION_POLICY_VERSION,
+                    mode=mode,
+                    execution_revision=AUTOMATION_EXECUTION_REVISION,
+                    query_context=_query_context(case, mode=mode),
+                    diagnostics={},
+                    at=at,
+                )
+                transition_revalidation = False
+                finalization_only = (
+                    claim.should_execute and claim.status == "succeeded"
+                )
+                if not claim.should_execute:
+                    due = (
+                        None
+                        if current is None
+                        else self._due_recheck(store, current, now=now)
                     )
-                    claim = kernel.reserve_readiness_recheck(
-                        run_id=str(run["run_id"]),
-                        due_at=due_at,
-                        at=at,
-                    )
-                else:
-                    transition_revalidation = False
-                    claim = kernel.reserve_run(
-                        case_id=case_id,
-                        observation_fingerprint_sha256=fingerprint,
-                        policy_version=AUTOMATION_POLICY_VERSION,
-                        mode=mode,
-                        execution_revision=AUTOMATION_EXECUTION_REVISION,
-                        query_context=_query_context(case, mode=mode),
-                        diagnostics={},
-                        at=at,
-                    )
+                    if due is not None:
+                        run, due_at = due
+                        transition_revalidation = (
+                            run.get("action_readiness")
+                            == "waiting_transition_revalidation"
+                        )
+                        claim = kernel.reserve_readiness_recheck(
+                            run_id=str(run["run_id"]),
+                            due_at=due_at,
+                            at=at,
+                        )
+                        finalization_only = False
                 if not claim.should_execute:
                     summary["skipped_current"] = int(summary["skipped_current"]) + 1
                     continue
@@ -529,6 +643,7 @@ class LifecycleAutomationWorker:
                     now=now,
                     sources=sources,
                     transition_revalidation=transition_revalidation,
+                    finalization_only=finalization_only,
                 )
                 summary["processed"] = int(summary["processed"]) + 1
                 summary[outcome] = int(summary[outcome]) + 1

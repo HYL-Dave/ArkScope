@@ -8,6 +8,8 @@ import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
 
+import pytest
+
 
 _AT = "2026-08-25T12:00:00Z"
 _FINGERPRINTS = ("a" * 64, "b" * 64, "c" * 64, "d" * 64)
@@ -470,6 +472,115 @@ def _forged_deadline_bundle(case):
     )
 
 
+def _market_recheck_bundle(case, *, retrieved_at, market_status, fresh, include_regulator):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+
+    base = _bundle(case)
+    regulator, prior_market = base.evidence
+    market_payload = json.loads(prior_market.excerpt)
+    market_payload["market_data"].update(
+        {
+            "fresh": fresh,
+            "provider_time": retrieved_at,
+            "retrieved_at": retrieved_at,
+            "status": market_status,
+        }
+    )
+    excerpt = json.dumps(
+        market_payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    market = replace(
+        prior_market,
+        evidence_id=f"market-{market_status}-{retrieved_at}",
+        retrieved_at=retrieved_at,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        source_locator=market_payload,
+        evidence_dedupe_key=f"market:{case['case_id']}:{market_status}:{retrieved_at}",
+    )
+    market_facts = tuple(
+        _fact(market, market_payload["snapshot"], key, key)
+        for key in market_payload["snapshot"]
+    )
+    regulator_facts = tuple(
+        fact for fact in base.facts if fact.evidence_id == regulator.evidence_id
+    )
+    return LifecycleAutomationEvidenceBundle(
+        evidence=((regulator, market) if include_regulator else (market,)),
+        facts=((*regulator_facts, *market_facts) if include_regulator else market_facts),
+        blockers=(),
+        diagnostics={"ibkr_requests": 1, "sec_attempts": int(include_regulator)},
+        retry_at=None,
+    )
+
+
+def _conflict_bundle(case, *, pending):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    base = _bundle(case)
+    regulator, prior_market = base.evidence
+    market_payload = json.loads(prior_market.excerpt)
+    market_payload["snapshot"]["successor_ticker"] = "OTHER"
+    excerpt = json.dumps(
+        market_payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    market = replace(
+        prior_market,
+        evidence_id=f"market-conflict-{case['case_id']}",
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        source_locator=market_payload,
+        evidence_dedupe_key=f"market-conflict:{case['case_id']}",
+    )
+    facts = (
+        *(fact for fact in base.facts if fact.evidence_id == regulator.evidence_id),
+        *(
+            _fact(market, market_payload["snapshot"], key, key)
+            for key in market_payload["snapshot"]
+        ),
+    )
+    blockers = [
+        AutomationBlocker(
+            code="source_conflict",
+            retryable=False,
+            context={"fact_types": ["successor_ticker"]},
+        )
+    ]
+    if pending:
+        blockers.append(
+            AutomationBlocker(
+                code="sec_evidence_insufficient",
+                retryable=True,
+                context={
+                    "monitoring_reason": "event_completion_not_confirmed",
+                    "next_check_at": "2026-08-26T12:00:00Z",
+                },
+            )
+        )
+    return LifecycleAutomationEvidenceBundle(
+        evidence=(regulator, market),
+        facts=facts,
+        blockers=tuple(blockers),
+        diagnostics={"ibkr_requests": 1, "sec_attempts": 1},
+        retry_at=None,
+    )
+
+
+class _InjectedFinalizationCrash(BaseException):
+    pass
+
+
 def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_path):
     cases = [_case(3), _case(1), _case(2)]
     harness = _Harness(tmp_path, cases)
@@ -570,6 +681,94 @@ def test_verified_result_persists_automation_assessment_acceptance_and_proposals
         harness.conn.close()
 
 
+def test_market_recheck_uses_latest_snapshot_and_converges_from_frozen_to_fresh(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _market_recheck_bundle(
+        case,
+        retrieved_at=_AT,
+        market_status="frozen",
+        fresh=False,
+        include_regulator=True,
+    )
+    try:
+        first = harness.worker_with_transition_approver().run()
+        first_run = _store(harness).list_automation_runs(case["case_id"])[0]
+        assert first["accepted"] == 1
+        assert first_run["action_readiness"] == "waiting_market_confirmation"
+        assert harness.approval_calls == []
+
+        harness.now = "2026-08-26T12:00:00Z"
+        harness.bundles[case["case_id"]] = _market_recheck_bundle(
+            case,
+            retrieved_at=harness.now,
+            market_status="live",
+            fresh=True,
+            include_regulator=False,
+        )
+        second = harness.worker_with_transition_approver().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert second["accepted"] == 1
+        assert run["action_readiness"] == "transition_eligible"
+        assert len(harness.approval_calls) == 1
+        receipts = harness.conn.execute(
+            "SELECT source_locator_json FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? AND source_family='market_infrastructure' "
+            "ORDER BY retrieved_at",
+            (run["run_id"],),
+        ).fetchall()
+        assert [json.loads(row[0])["market_data"]["status"] for row in receipts] == [
+            "frozen",
+            "live",
+        ]
+    finally:
+        harness.conn.close()
+
+
+@pytest.mark.parametrize("pending", (False, True), ids=("conflict_only", "conflict_plus_pending"))
+def test_source_conflict_crosses_worker_kernel_and_attention_projection(
+    tmp_path,
+    pending,
+):
+    from src.security_lifecycle_disposition import project_lifecycle_disposition
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _conflict_bundle(case, pending=pending)
+    try:
+        result = harness.worker().run()
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        assessments = store.list_assessments(case["case_id"])
+        projection = project_lifecycle_disposition(
+            {
+                **case,
+                "automation_runs": [run],
+                "automation_facts": [],
+                "evidence": store.list_evidence(case["case_id"]),
+                "current_assessment": None,
+                "current_acknowledgement": None,
+                "assessment_history": assessments,
+                "ticker_transition": None,
+            }
+        )
+
+        assert result["failed"] == 0
+        assert run["status"] == ("blocked" if pending else "succeeded")
+        assert run["decision_tier"] == "review_suggested"
+        assert run["action_readiness"] == "action_blocked"
+        assert (projection.queue_bucket, projection.reason_code) == (
+            "attention",
+            "source_conflict",
+        )
+        assert len(assessments) == (0 if pending else 1)
+    finally:
+        harness.conn.close()
+
+
 def test_transition_eligible_verified_result_approves_automation_transition(
     tmp_path,
 ):
@@ -595,6 +794,201 @@ def test_transition_eligible_verified_result_approves_automation_transition(
                 "proposal_actions": ("notify", "remap_symbol"),
             }
         ]
+    finally:
+        harness.conn.close()
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    ("assessment", "acceptance", "proposal", "approval"),
+)
+def test_terminal_finalization_recovers_idempotently_after_each_boundary(
+    tmp_path,
+    monkeypatch,
+    boundary,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    faulted = False
+
+    def crash_after(callable_):
+        def wrapped(*args, **kwargs):
+            nonlocal faulted
+            result = callable_(*args, **kwargs)
+            if not faulted:
+                faulted = True
+                raise _InjectedFinalizationCrash(boundary)
+            return result
+
+        return wrapped
+
+    if boundary == "assessment":
+        monkeypatch.setattr(
+            worker_module,
+            "create_automation_assessment",
+            crash_after(worker_module.create_automation_assessment),
+        )
+    elif boundary == "acceptance":
+        monkeypatch.setattr(
+            SecurityLifecycleInvestigationStore,
+            "accept_assessment",
+            crash_after(SecurityLifecycleInvestigationStore.accept_assessment),
+        )
+    elif boundary == "proposal":
+        monkeypatch.setattr(
+            SecurityLifecycleInvestigationStore,
+            "generate_action_proposals",
+            crash_after(SecurityLifecycleInvestigationStore.generate_action_proposals),
+        )
+    else:
+        harness.transition_approver = crash_after(harness.transition_approver)
+
+    try:
+        with pytest.raises(_InjectedFinalizationCrash, match=boundary):
+            harness.worker_with_transition_approver().run()
+
+        recovered = harness.worker_with_transition_approver().run()
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        context = json.loads(run["query_context_json"])
+
+        assert recovered["accepted"] == 1
+        assert len(store.list_automation_runs(case["case_id"])) == 1
+        assert len(store.list_assessments(case["case_id"])) == 1
+        assert store.list_assessments(case["case_id"])[0]["status"] == "accepted"
+        assert len(store.list_proposals(case["case_id"])) == 2
+        assert context["terminal_finalized_decision_provenance_sha256"] == context[
+            "terminal_decision_provenance_sha256"
+        ]
+        expected_approval_calls = 2 if boundary == "approval" else 1
+        assert len(harness.approval_calls) == expected_approval_calls
+
+        settled = harness.worker_with_transition_approver().run()
+        assert settled["processed"] == 0
+        assert len(store.list_assessments(case["case_id"])) == 1
+        assert len(store.list_proposals(case["case_id"])) == 2
+    finally:
+        harness.conn.close()
+
+
+def test_approval_boundary_recovery_deduplicates_real_transition_and_mutates_no_profile(
+    tmp_path,
+):
+    from src.profile_state import ProfileStateStore
+    from src.security_lifecycle_investigation import assessment_fingerprint
+    from src.security_lifecycle_schema import create_profile_schema
+    from src.ticker_identity_schema import create_ticker_identity_schema
+    from src.ticker_identity_transition import (
+        TickerIdentityTransitionStore,
+        TransitionOptions,
+        build_transition_preview,
+    )
+
+    profile_path = tmp_path / "profile_state.db"
+    ProfileStateStore(profile_path)
+    with sqlite3.connect(profile_path) as setup:
+        create_profile_schema(setup)
+        create_ticker_identity_schema(setup)
+        setup.execute(
+            "INSERT INTO watchlists "
+            "(id,name,kind,position,archived_at,created_at,updated_at) "
+            "VALUES (1,'Core','custom',0,NULL,?,?)",
+            (_AT, _AT),
+        )
+        setup.execute(
+            "INSERT INTO watchlist_memberships "
+            "(list_id,ticker,position,archived_at,created_at,updated_at) "
+            "VALUES (1,'OLD',0,NULL,?,?)",
+            (_AT, _AT),
+        )
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    crashed = False
+
+    def profile_rows():
+        return {
+            table: harness.conn.execute(
+                f'SELECT * FROM "{table}" ORDER BY rowid'
+            ).fetchall()
+            for table in (
+                "ticker_meta",
+                "ticker_tags",
+                "universe_source_memberships",
+                "watchlist_memberships",
+            )
+        }
+
+    before_profile = profile_rows()
+
+    def approve_then_crash(*, case, request, sources):
+        nonlocal crashed
+        store = _store(harness)
+        assessment = store.project_case_state(
+            case["case_id"],
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+        )["current_assessment"]
+        assert assessment is not None
+        proposals = store.project_proposals(
+            case["case_id"],
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+        )
+        assert all(
+            proposal["assessment_fingerprint_sha256"]
+            == assessment_fingerprint(assessment)
+            for proposal in proposals
+        )
+        preview = build_transition_preview(
+            harness.conn,
+            case=case,
+            assessment=assessment,
+            proposals=proposals,
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+            sources=sources,
+            options=TransitionOptions(execute_on=str(request["effective_date"])),
+        )
+        result = TickerIdentityTransitionStore(
+            harness.conn,
+            clock=lambda: harness.now,
+            id_factory=lambda prefix: f"{prefix}_recovery",
+        ).approve_automation(
+            preview=preview,
+            approved_preview_sha256=str(preview["preview_sha256"]),
+        )
+        if not crashed:
+            crashed = True
+            raise _InjectedFinalizationCrash("approval")
+        return result
+
+    harness.transition_approver = approve_then_crash
+    try:
+        with pytest.raises(_InjectedFinalizationCrash, match="approval"):
+            harness.worker_with_transition_approver().run()
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 1
+        assert profile_rows() == before_profile
+
+        recovered = harness.worker_with_transition_approver().run()
+        store = _store(harness)
+        assert recovered["accepted"] == 1
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transitions"
+        ).fetchone()[0] == 1
+        assert len(store.list_assessments(case["case_id"])) == 1
+        assert len(store.list_proposals(case["case_id"])) == 2
+        assert profile_rows() == before_profile
     finally:
         harness.conn.close()
 
@@ -783,6 +1177,7 @@ def test_program_error_fails_run_without_network_classification(
     harness.bundles[acquire_case["case_id"]] = TypeError(
         "fixture programmer fault"
     )
+    create_assessment = worker_module.create_automation_assessment
     monkeypatch.setattr(
         worker_module,
         "create_automation_assessment",
@@ -799,8 +1194,13 @@ def test_program_error_fails_run_without_network_classification(
         ]
 
         assert result["failed"] == 2
-        assert {run["status"] for run in runs} == {"failed"}
-        assert {run["failure_code"] for run in runs} == {"internal_error"}
+        assert runs[0]["status"] == "failed"
+        assert runs[0]["failure_code"] == "internal_error"
+        assert runs[1]["status"] == "succeeded"
+        assert runs[1]["failure_code"] is None
+        terminal_context = json.loads(runs[1]["query_context_json"])
+        assert terminal_context["terminal_decision_provenance_sha256"]
+        assert "terminal_finalized_decision_provenance_sha256" not in terminal_context
         assert all(run["blockers"] == [] for run in runs)
         assert "network" not in json.dumps(result).lower()
         assert "fixture programmer fault" not in json.dumps(result)
@@ -809,6 +1209,20 @@ def test_program_error_fails_run_without_network_classification(
             store.list_assessments(case["case_id"]) == []
             for case in (acquire_case, assessment_case)
         )
+
+        monkeypatch.setattr(
+            worker_module,
+            "create_automation_assessment",
+            create_assessment,
+        )
+        recovered = harness.worker().run()
+        recovered_run = store.list_automation_runs(assessment_case["case_id"])[0]
+        recovered_context = json.loads(recovered_run["query_context_json"])
+        assert recovered["accepted"] == 1
+        assert recovered_context[
+            "terminal_finalized_decision_provenance_sha256"
+        ] == recovered_context["terminal_decision_provenance_sha256"]
+        assert len(store.list_assessments(assessment_case["case_id"])) == 1
     finally:
         harness.conn.close()
 

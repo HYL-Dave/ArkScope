@@ -76,8 +76,6 @@ _UNAVAILABLE_FAMILY_BY_BLOCKER = {
     "internal_news_unavailable": "publisher",
     "internal_news_schema_mismatch": "publisher",
     "ibkr_gateway_unavailable": "market_infrastructure",
-    "ibkr_contract_missing": "market_infrastructure",
-    "ibkr_contract_ambiguous": "market_infrastructure",
     "ibkr_entitlement_denied": "market_infrastructure",
 }
 
@@ -170,9 +168,73 @@ def _retryable(blocker: Mapping[str, object]) -> bool:
     raise ValueError("automation_blocker_retryable")
 
 
+def _artifact_is_current(
+    case: Mapping[str, object],
+    artifact: Mapping[str, object],
+    assessment: Mapping[str, object] | None = None,
+) -> bool:
+    current_observation = str(
+        case.get("observation_fingerprint_sha256") or ""
+    ).strip()
+    if not current_observation:
+        return True
+    preview_value = artifact.get("approved_preview")
+    preview = preview_value if isinstance(preview_value, Mapping) else {}
+    query_value = artifact.get("query_context")
+    query = query_value if isinstance(query_value, Mapping) else {}
+    observation_values = {
+        str(value)
+        for value in (
+            artifact.get("observation_fingerprint_sha256"),
+            artifact.get("approved_observation_fingerprint_sha256"),
+            preview.get("observation_fingerprint_sha256"),
+        )
+        if value
+    }
+    if not observation_values or observation_values != {current_observation}:
+        return False
+    if assessment is None:
+        return True
+
+    assessment_id = str(assessment.get("assessment_id") or "")
+    artifact_assessment_ids = {
+        str(value)
+        for value in (
+            artifact.get("assessment_id"),
+            preview.get("assessment_id"),
+        )
+        if value
+    }
+    if artifact_assessment_ids and artifact_assessment_ids != {assessment_id}:
+        return False
+    evidence_set = str(assessment.get("evidence_set_sha256") or "")
+    artifact_evidence_sets = {
+        str(value)
+        for value in (
+            artifact.get("evidence_set_sha256"),
+            preview.get("evidence_set_sha256"),
+        )
+        if value
+    }
+    if evidence_set and artifact_evidence_sets and artifact_evidence_sets != {
+        evidence_set
+    }:
+        return False
+    if artifact.get("approval_authority") == "automation_policy":
+        provenance = str(assessment.get("decision_provenance_sha256") or "")
+        artifact_provenance = str(
+            artifact.get("decision_provenance_sha256")
+            or query.get("terminal_decision_provenance_sha256")
+            or ""
+        )
+        if provenance and artifact_provenance and provenance != artifact_provenance:
+            return False
+    return True
+
+
 def _latest_run(case: Mapping[str, object]) -> Mapping[str, object] | None:
     runs = _rows(case.get("automation_runs", ()), "automation_runs")
-    return runs[0] if runs else None
+    return next((run for run in runs if _artifact_is_current(case, run)), None)
 
 
 def _blockers(run: Mapping[str, object] | None) -> tuple[Mapping[str, object], ...]:
@@ -228,7 +290,10 @@ def _conflicting_families(
 ) -> set[str]:
     families: set[str] = set()
     for blocker in blockers:
-        if _blocker_code(blocker) != "source_conflict":
+        code = _blocker_code(blocker)
+        if code == "ibkr_contract_ambiguous":
+            families.add("market_infrastructure")
+        if code != "source_conflict":
             continue
         context = _blocker_context(blocker)
         candidates: list[object] = []
@@ -330,15 +395,21 @@ def next_lifecycle_recheck_at(
     assessment: Mapping[str, object] | None,
     transition: Mapping[str, object] | None = None,
 ) -> str | None:
+    transition_execute_at: str | None = None
     if transition is not None:
         transition = _mapping(transition, "ticker_transition")
         if str(transition.get("status") or "") == "approved":
             execute_on = transition.get("execute_on")
             if execute_on:
-                return _date_start(execute_on, "transition_execute_on")
+                transition_execute_at = _date_start(
+                    execute_on,
+                    "transition_execute_on",
+                )
+                if not _automation_transition_is_stale(transition):
+                    return transition_execute_at
 
     if run is None:
-        return None
+        return transition_execute_at
     run = _mapping(run, "automation_run")
     retry_at = run.get("retry_at")
     if retry_at:
@@ -361,7 +432,8 @@ def next_lifecycle_recheck_at(
         return None
     updated = _instant(run.get("updated_at"), "automation_updated_at")
     if readiness == "waiting_transition_revalidation":
-        return _timestamp(updated + timedelta(days=1))
+        daily = _timestamp(updated + timedelta(days=1))
+        return min(daily, transition_execute_at) if transition_execute_at else daily
     effective: date | None = None
     if assessment is not None:
         assessment = _mapping(assessment, "current_assessment")
@@ -438,8 +510,15 @@ def project_lifecycle_disposition(
         if transition_value is None
         else _mapping(transition_value, "ticker_transition")
     )
+    if transition is not None and not _artifact_is_current(
+        case,
+        transition,
+        assessment,
+    ):
+        transition = None
     source_status = _source_family_status(case, run, assessment, blockers)
     last_checked_at = _last_checked_at(case, run)
+    blocker_codes = {_blocker_code(row) for row in blockers}
 
     disposition: str
     bucket: str
@@ -447,6 +526,18 @@ def project_lifecycle_disposition(
     disposition_as_of: str | None = None
     if case.get("source_presence") != "present":
         disposition, bucket, reason = "exception_required", "attention", "source_missing"
+    elif "source_conflict" in blocker_codes:
+        disposition, bucket, reason = (
+            "exception_required",
+            "attention",
+            "source_conflict",
+        )
+    elif blocker_codes & _NONRETRYABLE_PROVIDER_BLOCKERS:
+        disposition, bucket, reason = (
+            "exception_required",
+            "attention",
+            "nonretryable_provider_failure",
+        )
     elif transition is not None and transition.get("status") in {
         "applied",
         "reversed",
@@ -501,7 +592,6 @@ def project_lifecycle_disposition(
                 "automation_running",
             )
         elif run is not None and run.get("status") == "blocked":
-            codes = {_blocker_code(row) for row in blockers}
             monitoring_reasons = {
                 str(_blocker_context(row).get("monitoring_reason") or "")
                 for row in blockers
@@ -525,19 +615,19 @@ def project_lifecycle_disposition(
                     "monitoring",
                     "retryable_source_unavailable",
                 )
-            elif "source_conflict" in codes:
+            elif "source_conflict" in blocker_codes:
                 disposition, bucket, reason = (
                     "exception_required",
                     "attention",
                     "source_conflict",
                 )
-            elif codes & _NONRETRYABLE_PROVIDER_BLOCKERS:
+            elif blocker_codes & _NONRETRYABLE_PROVIDER_BLOCKERS:
                 disposition, bucket, reason = (
                     "exception_required",
                     "attention",
                     "nonretryable_provider_failure",
                 )
-            elif "sec_evidence_insufficient" in codes:
+            elif "sec_evidence_insufficient" in blocker_codes:
                 disposition, bucket, reason = (
                     "exception_required",
                     "attention",

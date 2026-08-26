@@ -109,66 +109,6 @@ const AUTOMATION_DRAFT = {
   exchange_ratio_decimal: "0.25",
 };
 
-const CASES = [
-  ["slc_unresolved", "AAA", "unresolved"],
-  ["slc_investigating", "BBB", "investigating"],
-  ["slc_evidence", "CCC", "evidence_ready"],
-  ["slc_inconclusive", "DDD", "reviewed_inconclusive"],
-  ["slc_resolved", "EEE", "resolved"],
-].map(([caseId, ticker, workflowState]) => ({
-  case_id: caseId,
-  source: "sec_edgar",
-  source_ref: `ref-${ticker}`,
-  ticker,
-  source_presence: "present",
-  workflow_state: workflowState,
-  issuer_name: `${ticker} Issuer`,
-  filing_date: "2026-08-20",
-  kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
-  current_assessment: workflowState === "resolved"
-    ? { relevance: "direct_tracked_security", confidence: "high" }
-    : null,
-  current_acknowledgement: workflowState === "reviewed_inconclusive"
-    ? { acknowledgement_id: "ack-current" }
-    : null,
-  active_sources: ["manual_lists"],
-  source_context: "available",
-  components: {},
-  disposition: workflowState === "resolved" || workflowState === "reviewed_inconclusive"
-    ? "confirmed_effective"
-    : workflowState === "evidence_ready"
-      ? "exception_required"
-      : "not_confirmed_yet",
-  queue_bucket: workflowState === "resolved" || workflowState === "reviewed_inconclusive"
-    ? "history"
-    : workflowState === "evidence_ready"
-      ? "attention"
-      : "monitoring",
-  disposition_reason: workflowState === "resolved"
-    ? "resolved_assessment"
-    : workflowState === "reviewed_inconclusive"
-      ? "reviewed_inconclusive"
-      : workflowState === "evidence_ready"
-        ? "ambiguous_event"
-        : workflowState === "investigating"
-          ? "automation_running"
-          : "awaiting_initial_automation",
-  last_checked_at: workflowState === "unresolved" ? null : "2026-08-25T09:00:00Z",
-  next_check_at: workflowState === "unresolved" || workflowState === "investigating"
-    ? "2026-08-26T09:00:00Z"
-    : null,
-  source_family_status: { regulator: "present" },
-  investigation_run_count: workflowState === "investigating" ? 1 : 0,
-  automation_run_count: workflowState === "investigating" ? 1 : 0,
-  automation_fact_count: 0,
-  automation_tier: null,
-  action_readiness: null,
-  evidence_count: workflowState === "evidence_ready" ? 1 : 0,
-  assessment_count: workflowState === "resolved" ? 1 : 0,
-  acknowledgement_count: workflowState === "reviewed_inconclusive" ? 1 : 0,
-  proposal_count: workflowState === "resolved" ? 1 : 0,
-}));
-
 const SUMMARY: SecurityLifecycleCaseSummary = {
   case_id: CASE_ID,
   source: "sec_edgar",
@@ -201,6 +141,53 @@ const SUMMARY: SecurityLifecycleCaseSummary = {
   acknowledgement_count: 0,
   proposal_count: 0,
 };
+
+const CASES: SecurityLifecycleCaseSummary[] = ([
+  ["slc_unresolved", "AAA", "unresolved"],
+  ["slc_investigating", "BBB", "investigating"],
+  ["slc_evidence", "CCC", "evidence_ready"],
+  ["slc_inconclusive", "DDD", "reviewed_inconclusive"],
+  ["slc_resolved", "EEE", "resolved"],
+] as const).map(([caseId, ticker, workflowState]) => ({
+  ...SUMMARY,
+  case_id: caseId,
+  source_ref: `ref-${ticker}`,
+  ticker,
+  workflow_state: workflowState,
+  issuer_name: `${ticker} Issuer`,
+  current_assessment: null,
+  current_acknowledgement: null,
+  disposition: workflowState === "resolved" || workflowState === "reviewed_inconclusive"
+    ? "confirmed_effective"
+    : workflowState === "evidence_ready"
+      ? "exception_required"
+      : "not_confirmed_yet",
+  queue_bucket: workflowState === "resolved" || workflowState === "reviewed_inconclusive"
+    ? "history"
+    : workflowState === "evidence_ready"
+      ? "attention"
+      : "monitoring",
+  disposition_reason: workflowState === "resolved"
+    ? "resolved_assessment"
+    : workflowState === "reviewed_inconclusive"
+      ? "reviewed_inconclusive"
+      : workflowState === "evidence_ready"
+        ? "ambiguous_event"
+        : workflowState === "investigating"
+          ? "automation_running"
+          : "awaiting_initial_automation",
+  disposition_as_of: null,
+  last_checked_at: workflowState === "unresolved" ? null : "2026-08-25T09:00:00Z",
+  next_check_at: workflowState === "unresolved" || workflowState === "investigating"
+    ? "2026-08-26T09:00:00Z"
+    : null,
+  investigation_run_count: workflowState === "investigating" ? 1 : 0,
+  automation_run_count: workflowState === "investigating" ? 1 : 0,
+  evidence_count: workflowState === "evidence_ready" ? 1 : 0,
+  assessment_count: workflowState === "resolved" ? 1 : 0,
+  acknowledgement_count: workflowState === "reviewed_inconclusive" ? 1 : 0,
+  proposal_count: workflowState === "resolved" ? 1 : 0,
+}));
 
 const FINAL_UNCONFIRMED: SecurityLifecycleCaseSummary = Object.assign({}, SUMMARY, {
   disposition: "not_confirmed_yet" as const,
@@ -732,6 +719,71 @@ describe("Lifecycle workflow", () => {
     expect(apiMocks.listSecurityLifecycleCases).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ queue_bucket: expect.anything() }),
     );
+  });
+
+  it("commits only the newest queue response when requests resolve out of order", async () => {
+    const attention = deferred<{
+      cases: SecurityLifecycleCaseSummary[];
+      count: number;
+      queue_counts: { attention: number; monitoring: number; history: number };
+      data_integrity: { source_missing_count: number };
+    }>();
+    const monitoring = deferred<{
+      cases: SecurityLifecycleCaseSummary[];
+      count: number;
+      queue_counts: { attention: number; monitoring: number; history: number };
+      data_integrity: { source_missing_count: number };
+    }>();
+    const staleAttention = {
+      ...SUMMARY,
+      case_id: "case-stale-attention",
+      ticker: "STALE",
+      queue_bucket: "attention" as const,
+    };
+    const newestMonitoring = {
+      ...MONITORING_UNCONFIRMED,
+      case_id: "case-newest-monitoring",
+      ticker: "NEWEST",
+    };
+    apiMocks.listSecurityLifecycleCases.mockImplementation(
+      (request: SecurityLifecycleCaseFilters) => (
+        request.queue_bucket === "monitoring" ? monitoring.promise : attention.promise
+      ),
+    );
+
+    await mountLifecycle(null);
+    await click("Monitoring", host!);
+    await act(async () => {
+      monitoring.resolve({
+        cases: [newestMonitoring],
+        count: 1,
+        queue_counts: { attention: 1, monitoring: 1, history: 0 },
+        data_integrity: { source_missing_count: 0 },
+      });
+      await Promise.resolve();
+    });
+    await flush();
+    expect(host!.textContent).toContain("NEWEST");
+    expect(host!.textContent).not.toContain("STALE");
+
+    await act(async () => {
+      attention.resolve({
+        cases: [staleAttention],
+        count: 1,
+        queue_counts: { attention: 1, monitoring: 1, history: 0 },
+        data_integrity: { source_missing_count: 0 },
+      });
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(host!.textContent).toContain("NEWEST");
+    expect(host!.textContent).not.toContain("STALE");
+    expect(
+      host!.querySelector('[data-queue-view="monitoring"]')?.getAttribute(
+        "aria-selected",
+      ),
+    ).toBe("true");
   });
 
   it("keeps prior evidence and shows a typed safe historical run error", async () => {

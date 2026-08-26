@@ -224,6 +224,7 @@ def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
     monkeypatch,
 ):
     from src.tools import security_lifecycle_tools
+    from src.security_lifecycle_investigation import observation_fingerprint
 
     case = {
         "case_id": "case-final-check",
@@ -270,6 +271,9 @@ def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
         "automation_facts": [],
         "current_assessment": None,
     }
+    case["automation_runs"][0]["observation_fingerprint_sha256"] = (
+        observation_fingerprint(case["observation"])
+    )
     monkeypatch.setattr(security_lifecycle_tools, "_store_exists", lambda *_: None)
     monkeypatch.setattr(
         security_lifecycle_tools, "_ticker_transitions_by_case", lambda _: {}
@@ -292,6 +296,113 @@ def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
     assert detailed["disposition_as_of"] == "2026-08-27"
     assert detailed["disposition"] == "not_confirmed_yet"
     assert detailed["queue_bucket"] == "history"
+
+
+def test_new_observation_keeps_old_terminal_run_and_transition_as_activity_only(
+    monkeypatch,
+):
+    from src.tools import security_lifecycle_tools
+
+    def case(case_id, ticker):
+        return {
+            "case_id": case_id,
+            "source": "sec_edgar",
+            "source_ref": f"{case_id}-current-observation",
+            "ticker": ticker,
+            "source_presence": "present",
+            "workflow_state": "unresolved",
+            "observation": {
+                "ticker": ticker,
+                "cik": "0000712515",
+                "issuer_name": f"{ticker} Current Issuer",
+                "filing_date": "2026-08-20",
+                "source": "sec_edgar",
+                "source_ref": f"{case_id}-current-observation",
+                "filing_form": "8-K",
+                "filing_items": ["2.01"],
+                "evidence_url": "https://www.sec.gov/Archives/current.htm",
+                "description": "A newer lifecycle observation.",
+                "last_observed_at": "2026-08-27T00:00:00Z",
+                "kinds": [
+                    {"event_type": "listing_status_review", "effective_date": None}
+                ],
+            },
+            "automation_runs": [
+                {
+                    "run_id": f"{case_id}-old-run",
+                    "observation_fingerprint_sha256": "a" * 64,
+                    "status": "blocked",
+                    "action_readiness": None,
+                    "retry_at": None,
+                    "updated_at": "2026-08-26T12:00:00Z",
+                    "created_at": "2026-08-26T12:00:00Z",
+                    "blockers": [
+                        {
+                            "blocker_code": "sec_evidence_insufficient",
+                            "retryable": False,
+                            "context": {
+                                "monitoring_reason": "not_confirmed_as_of",
+                                "as_of": "2026-08-26",
+                            },
+                        }
+                    ],
+                }
+            ],
+            "automation_facts": [],
+            "evidence": [],
+            "current_assessment": None,
+            "current_acknowledgement": None,
+            "assessment_history": [],
+            "acknowledgement_history": [],
+            "proposals": [],
+        }
+
+    run_only = case("case-old-run", "RUN")
+    transitioned = case("case-old-transition", "MOVE")
+    old_transition = {
+        "transition_id": "transition-old",
+        "status": "applied",
+        "approved_observation_fingerprint_sha256": "a" * 64,
+        "approved_preview": {
+            "observation_fingerprint_sha256": "a" * 64,
+            "evidence_set_sha256": "b" * 64,
+        },
+        "decision_provenance_sha256": "c" * 64,
+        "updated_at": "2026-08-26T12:00:00Z",
+    }
+    monkeypatch.setattr(security_lifecycle_tools, "_store_exists", lambda *_: None)
+    monkeypatch.setattr(
+        security_lifecycle_tools,
+        "_ticker_transitions_by_case",
+        lambda _: {transitioned["case_id"]: old_transition},
+    )
+    monkeypatch.setattr(
+        security_lifecycle_tools,
+        "compose_security_lifecycle",
+        lambda *_: {"cases": [run_only, transitioned]},
+    )
+    service = security_lifecycle_tools.SecurityLifecycleReadService(
+        market_db_path="unused-market.db",
+        profile_db_path="unused-profile.db",
+        source_loader=lambda: {"RUN": (), "MOVE": ()},
+    )
+
+    result = service.list_cases()
+    assert result["queue_counts"] == {
+        "attention": 0,
+        "history": 0,
+        "monitoring": 2,
+    }
+    assert {
+        (row["case_id"], row["queue_bucket"], row["disposition_reason"])
+        for row in result["cases"]
+    } == {
+        ("case-old-run", "monitoring", "awaiting_initial_automation"),
+        ("case-old-transition", "monitoring", "awaiting_initial_automation"),
+    }
+    detail = service.get_case("case-old-transition")
+    assert detail["ticker_transition"]["status"] == "applied"
+    assert detail["automation_run_count"] == 1
 
 
 def test_list_tool_is_local_read_only_stably_sorted_and_filters_ticker_prefixes(

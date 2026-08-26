@@ -69,6 +69,7 @@ class _Evidence:
     evidence_id: str
     source_family: str
     source_locator: Mapping[str, Any]
+    retrieved_at: str | None
 
 
 @dataclass(frozen=True)
@@ -170,7 +171,13 @@ def _evidence_rows(values: Iterable[object]) -> tuple[_Evidence, ...]:
         family = _text(_field(value, "source_family"))
         if evidence_id is None or family is None:
             raise ValueError("evidence_identity")
-        row = _Evidence(evidence_id, family, _locator(value))
+        locator = _locator(value)
+        retrieved_at = _text(_field(value, "retrieved_at"))
+        if retrieved_at is None:
+            market_data = locator.get("market_data")
+            if isinstance(market_data, Mapping):
+                retrieved_at = _text(market_data.get("retrieved_at"))
+        row = _Evidence(evidence_id, family, locator, retrieved_at)
         if evidence_id in rows and rows[evidence_id] != row:
             raise ValueError("duplicate_evidence_identity")
         rows[evidence_id] = row
@@ -398,6 +405,38 @@ def _market_timestamp(value: object) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _current_decision_material(
+    evidence: tuple[_Evidence, ...],
+    facts: tuple[_Fact, ...],
+) -> tuple[tuple[_Evidence, ...], tuple[_Fact, ...]]:
+    market = tuple(
+        row for row in evidence if row.source_family == "market_infrastructure"
+    )
+    if len(market) <= 1:
+        return evidence, facts
+    timestamps = tuple(
+        (row, _market_timestamp(row.retrieved_at)) for row in market
+    )
+    if any(value is None for _row, value in timestamps):
+        selected: tuple[_Evidence, ...] = ()
+    else:
+        latest = max(value for _row, value in timestamps if value is not None)
+        selected = tuple(row for row, value in timestamps if value == latest)
+        if len(selected) != 1:
+            selected = ()
+    selected_ids = {row.evidence_id for row in selected}
+    current_evidence = tuple(
+        row
+        for row in evidence
+        if row.source_family != "market_infrastructure"
+        or row.evidence_id in selected_ids
+    )
+    current_ids = {row.evidence_id for row in current_evidence}
+    return current_evidence, tuple(
+        row for row in facts if row.evidence_id in current_ids
+    )
+
+
 def _market_snapshot_fresh(evidence: tuple[_Evidence, ...]) -> bool:
     rows = tuple(
         row
@@ -442,8 +481,12 @@ def evaluate_automation_decision(
 ) -> AutomationDecision:
     """Evaluate cited facts without opening a database, provider, or model."""
 
-    evidence_rows = _evidence_rows(evidence)
-    fact_rows = _fact_rows(facts, evidence_rows)
+    all_evidence_rows = _evidence_rows(evidence)
+    all_fact_rows = _fact_rows(facts, all_evidence_rows)
+    evidence_rows, fact_rows = _current_decision_material(
+        all_evidence_rows,
+        all_fact_rows,
+    )
     case_ticker = _ticker(case.get("ticker"))
     case_cik = _cik(case.get("cik"))
     if case_ticker is None:

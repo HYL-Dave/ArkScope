@@ -1593,6 +1593,88 @@ def create_automation_assessment(
             for evidence_id in evidence_ids
         ),
     ]
+    existing = [
+        assessment
+        for assessment in store.list_assessments(str(run["case_id"]))
+        if assessment.get("automation_run_id") == run_id
+        and assessment.get("decision_provenance_sha256") == provenance
+    ]
+    if len(existing) > 1:
+        raise ValueError("duplicate_automation_assessment")
+    if existing:
+        assessment = existing[0]
+        expected = {
+            "author": "automation",
+            "automation_method": "deterministic_rule",
+            "automation_run_id": run_id,
+            "cash_per_security_decimal": _decision_value(
+                decision, "cash_per_security_decimal"
+            ),
+            "case_id": str(run["case_id"]),
+            "confidence": str(_decision_value(decision, "confidence") or ""),
+            "consideration_currency": _decision_value(
+                decision, "consideration_currency"
+            ),
+            "conclusion": str(_decision_value(decision, "conclusion") or ""),
+            "counterparty_cik": _decision_value(decision, "counterparty_cik"),
+            "counterparty_name": _decision_value(decision, "counterparty_name"),
+            "counterparty_ticker": _decision_value(
+                decision, "counterparty_ticker"
+            ),
+            "decision_provenance_sha256": provenance,
+            "destination_venue": _decision_value(decision, "destination_venue"),
+            "effective_date": _decision_value(decision, "effective_date"),
+            "evidence_set_sha256": store._evidence_set_sha256(str(run["case_id"])),
+            "exchange_ratio_decimal": _decision_value(
+                decision, "exchange_ratio_decimal"
+            ),
+            "impact_summary": str(
+                _decision_value(decision, "impact_summary") or ""
+            ),
+            "observation_fingerprint_sha256": fingerprint,
+            "relevance": str(_decision_value(decision, "relevance") or ""),
+            "rule_id": rule_id,
+            "rule_version": rule_version,
+            "successor_ticker": _decision_value(decision, "successor_ticker"),
+        }
+        for key, value in expected.items():
+            if assessment.get(key) != value:
+                raise ValueError("automation_assessment_changed")
+        if assessment.get("status") not in {"draft", "accepted"}:
+            raise ValueError("automation_assessment_not_current")
+        if tuple(assessment.get("outcomes") or ()) != tuple(
+            sorted(_decision_value(decision, "outcomes") or ())
+        ):
+            raise ValueError("automation_assessment_changed")
+        expected_citations = tuple(
+            (
+                citation["reference_kind"],
+                citation.get("evidence_id"),
+                (
+                    fingerprint
+                    if citation["reference_kind"] == "observation"
+                    else str(
+                        store.conn.execute(
+                            "SELECT content_sha256 FROM security_lifecycle_evidence "
+                            "WHERE evidence_id=?",
+                            (citation["evidence_id"],),
+                        ).fetchone()[0]
+                    )
+                ),
+            )
+            for citation in citations
+        )
+        observed_citations = tuple(
+            (
+                citation["reference_kind"],
+                citation.get("evidence_id"),
+                citation["cited_content_sha256"],
+            )
+            for citation in assessment.get("citations") or ()
+        )
+        if observed_citations != expected_citations:
+            raise ValueError("automation_assessment_changed")
+        return str(assessment["assessment_id"])
     return store.create_assessment(
         case_id=str(run["case_id"]),
         relevance=str(_decision_value(decision, "relevance") or ""),

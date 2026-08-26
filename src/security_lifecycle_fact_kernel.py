@@ -71,6 +71,11 @@ _SOURCE_DEADLINE_CONTEXT_FIELDS = frozenset(
         "source_deadline_rule_version",
     }
 )
+_QUERY_CONTEXT_LIMIT = 16_384
+_TERMINAL_DECISION_KEY = "terminal_decision"
+_TERMINAL_PROVENANCE_KEY = "terminal_decision_provenance_sha256"
+_TERMINAL_FINALIZED_KEY = "terminal_finalized_decision_provenance_sha256"
+_LATEST_ATTEMPT_REVISION_KEY = "latest_attempt_execution_revision"
 
 
 @dataclass(frozen=True)
@@ -276,6 +281,38 @@ def _canonical_json(
     if len(encoded.encode("utf-8")) > max_bytes:
         raise ValueError(name)
     return encoded
+
+
+def _query_context_value(value: object) -> dict[str, object]:
+    if not isinstance(value, str) or len(value.encode("utf-8")) > _QUERY_CONTEXT_LIMIT:
+        raise ValueError("query_context")
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("query_context") from exc
+    safe = _safe_json_value(decoded, diagnostics=False)
+    if not isinstance(safe, dict):
+        raise ValueError("query_context")
+    return safe
+
+
+def _query_context_json(value: Mapping[str, object]) -> str:
+    return _canonical_json(
+        value,
+        name="query_context",
+        max_bytes=_QUERY_CONTEXT_LIMIT,
+    )
+
+
+def _terminal_finalization_pending(context: Mapping[str, object]) -> bool:
+    decision = context.get(_TERMINAL_DECISION_KEY)
+    provenance = context.get(_TERMINAL_PROVENANCE_KEY)
+    return (
+        isinstance(decision, Mapping)
+        and isinstance(provenance, str)
+        and _SHA256.fullmatch(provenance) is not None
+        and context.get(_TERMINAL_FINALIZED_KEY) != provenance
+    )
 
 
 _TRANSACTION_TERM_FIELDS = frozenset(
@@ -1059,7 +1096,11 @@ class SecurityLifecycleFactKernel:
             for key in (
                 "semantic_run_key",
                 "execution_revision",
+                _LATEST_ATTEMPT_REVISION_KEY,
                 "predecessor_failed_run_id",
+                _TERMINAL_DECISION_KEY,
+                _TERMINAL_PROVENANCE_KEY,
+                _TERMINAL_FINALIZED_KEY,
             )
         ):
             raise ValueError("reserved_query_context")
@@ -1074,26 +1115,19 @@ class SecurityLifecycleFactKernel:
                 **dict(query_context),
                 "semantic_run_key": semantic_run_key,
                 "execution_revision": execution,
+                _LATEST_ATTEMPT_REVISION_KEY: execution,
                 "input_evidence_set_sha256": input_evidence_digest,
             }
             if predecessor_failed_run_id is not None:
                 context["predecessor_failed_run_id"] = predecessor_failed_run_id
-            return _canonical_json(
-                context,
-                name="query_context",
-                max_bytes=16_384,
-            )
+            return _query_context_json(context)
 
         def stored_context(row: sqlite3.Row) -> Mapping[str, object] | None:
-            raw = row["query_context_json"]
-            if not isinstance(raw, str) or len(raw.encode("utf-8")) > 16_384:
-                return None
             try:
-                context = json.loads(raw)
-                _safe_json_value(context, diagnostics=False)
-            except (TypeError, ValueError, json.JSONDecodeError):
+                context = _query_context_value(row["query_context_json"])
+            except (TypeError, ValueError):
                 return None
-            return context if isinstance(context, Mapping) else None
+            return context
 
         with _immediate_transaction(self.conn):
             rows = self.conn.execute(
@@ -1119,7 +1153,12 @@ class SecurityLifecycleFactKernel:
             if row is not None:
                 existing_id = str(row["run_id"])
                 existing_run_key = str(row["run_key"])
-                existing_revision = str(context.get("execution_revision", "unknown"))
+                existing_revision = str(
+                    context.get(
+                        _LATEST_ATTEMPT_REVISION_KEY,
+                        context.get("execution_revision", "unknown"),
+                    )
+                )
                 if row["status"] == "blocked" and row["retry_at"] is not None:
                     blocker_rows = self.conn.execute(
                         "SELECT retryable FROM security_lifecycle_automation_run_blockers "
@@ -1131,6 +1170,8 @@ class SecurityLifecycleFactKernel:
                     )
                     due = _instant(str(row["retry_at"])) <= _instant(timestamp)
                     if retryable and due:
+                        retry_context = dict(context)
+                        retry_context[_LATEST_ATTEMPT_REVISION_KEY] = execution
                         self.conn.execute(
                             "DELETE FROM security_lifecycle_automation_facts "
                             "WHERE automation_run_id=?",
@@ -1149,10 +1190,11 @@ class SecurityLifecycleFactKernel:
                         self.conn.execute(
                             "UPDATE security_lifecycle_automation_runs SET "
                             "status='running',decision_tier=NULL,action_readiness=NULL,"
-                            "diagnostics_json=?,retry_at=NULL,"
+                            "query_context_json=?,diagnostics_json=?,retry_at=NULL,"
                             "failure_code=NULL,started_at=?,finished_at=NULL,updated_at=? "
                             "WHERE run_id=?",
                             (
+                                _query_context_json(retry_context),
                                 diagnostics_json,
                                 timestamp,
                                 timestamp,
@@ -1162,6 +1204,12 @@ class SecurityLifecycleFactKernel:
                         return AutomationRunClaim(
                             existing_id, existing_run_key, "running", True
                         )
+                if row["status"] == "succeeded" and _terminal_finalization_pending(
+                    context
+                ):
+                    return AutomationRunClaim(
+                        existing_id, existing_run_key, "succeeded", True
+                    )
                 if row["status"] != "failed" or existing_revision == execution:
                     return AutomationRunClaim(
                         existing_id,
@@ -1359,6 +1407,7 @@ class SecurityLifecycleFactKernel:
         retry_at: str | None,
         diagnostics: Mapping[str, object],
         at: str,
+        terminal_decision: Mapping[str, object] | None = None,
     ) -> AutomationRunResult:
         self.store.assert_automation_write_available()
         run = self.store.get_automation_run(run_id)
@@ -1377,10 +1426,20 @@ class SecurityLifecycleFactKernel:
         retry_timestamp = (
             None if retry_at is None else _timestamp("retry_at", retry_at)
         )
+        normalized_terminal_decision = (
+            None
+            if terminal_decision is None
+            else _safe_json_value(terminal_decision, diagnostics=False)
+        )
+        if normalized_terminal_decision is not None and not isinstance(
+            normalized_terminal_decision, Mapping
+        ):
+            raise ValueError("terminal_decision")
 
         with _immediate_transaction(self.conn):
             current = self.conn.execute(
-                "SELECT status,case_id FROM security_lifecycle_automation_runs "
+                "SELECT status,case_id,observation_fingerprint_sha256,policy_version,"
+                "mode,query_context_json FROM security_lifecycle_automation_runs "
                 "WHERE run_id=?",
                 (run_id,),
             ).fetchone()
@@ -1397,6 +1456,9 @@ class SecurityLifecycleFactKernel:
                 )
             )
             conflicts = _conflicts((*existing_facts, *normalized_facts))
+            explicit_conflicts = [
+                row for row in normalized_blockers if row[0] == "source_conflict"
+            ]
             normalized_blockers = [
                 row for row in normalized_blockers if row[0] != "source_conflict"
             ]
@@ -1414,15 +1476,26 @@ class SecurityLifecycleFactKernel:
                     )
                 )
                 normalized_blockers.sort(key=lambda row: row[0])
+            elif explicit_conflicts:
+                normalized_blockers.append(explicit_conflicts[0])
+                normalized_blockers.sort(key=lambda row: row[0])
 
             terminal_blockers = [
                 row for row in normalized_blockers if row[0] != "source_conflict"
             ]
+            has_conflict = any(
+                row[0] == "source_conflict" for row in normalized_blockers
+            )
             if terminal_blockers:
                 status = "blocked"
-                terminal_tier = None
-                terminal_readiness = None
-                all_retryable = all(row[1] for row in terminal_blockers)
+                terminal_tier = "review_suggested" if has_conflict else None
+                terminal_readiness = "action_blocked" if has_conflict else None
+                if has_conflict and (
+                    decision_tier != terminal_tier
+                    or action_readiness != terminal_readiness
+                ):
+                    raise ValueError("blocked_conflict_terminal_shape")
+                all_retryable = all(row[1] for row in normalized_blockers)
                 if all_retryable != (retry_timestamp is not None):
                     raise ValueError("retry_at")
                 if retry_timestamp is not None and _instant(
@@ -1441,12 +1514,19 @@ class SecurityLifecycleFactKernel:
                 ):
                     raise ValueError("successful_run_terminal_shape")
                 status = "succeeded"
-                if conflicts:
+                if has_conflict:
                     terminal_tier = "review_suggested"
                     terminal_readiness = "action_blocked"
                 else:
                     terminal_tier = decision_tier
                     terminal_readiness = action_readiness
+                if normalized_terminal_decision is not None and (
+                    normalized_terminal_decision.get("decision_tier")
+                    != terminal_tier
+                    or normalized_terminal_decision.get("action_readiness")
+                    != terminal_readiness
+                ):
+                    raise ValueError("terminal_decision_shape")
 
             persisted_ids: dict[str, str] = {}
             for row in normalized_evidence:
@@ -1577,14 +1657,38 @@ class SecurityLifecycleFactKernel:
                     "VALUES (?,?,?,?,?)",
                     (run_id, code, int(retryable), context_json, timestamp),
                 )
+            persisted_evidence = _persisted_evidence_rows(self.conn, run_id)
+            persisted_facts = _persisted_fact_rows(self.conn, run_id)
+            provenance = _provenance(
+                case_id=str(current["case_id"]),
+                observation_fingerprint_sha256=str(
+                    current["observation_fingerprint_sha256"]
+                ),
+                policy_version=str(current["policy_version"]),
+                mode=str(current["mode"]),
+                evidence=persisted_evidence,
+                facts=persisted_facts,
+            )
+            query_context = _query_context_value(current["query_context_json"])
+            if status == "succeeded" and normalized_terminal_decision is not None:
+                query_context[_TERMINAL_DECISION_KEY] = dict(
+                    normalized_terminal_decision
+                )
+                query_context[_TERMINAL_PROVENANCE_KEY] = provenance
+                query_context.pop(_TERMINAL_FINALIZED_KEY, None)
+            elif status != "succeeded":
+                query_context.pop(_TERMINAL_DECISION_KEY, None)
+                query_context.pop(_TERMINAL_PROVENANCE_KEY, None)
+                query_context.pop(_TERMINAL_FINALIZED_KEY, None)
             self.conn.execute(
                 "UPDATE security_lifecycle_automation_runs SET status=?,decision_tier=?,"
-                "action_readiness=?,diagnostics_json=?,retry_at=?,failure_code=NULL,"
+                "action_readiness=?,query_context_json=?,diagnostics_json=?,retry_at=?,failure_code=NULL,"
                 "finished_at=?,updated_at=? WHERE run_id=?",
                 (
                     status,
                     terminal_tier,
                     terminal_readiness,
+                    _query_context_json(query_context),
                     diagnostics_json,
                     retry_timestamp,
                     timestamp,
@@ -1601,9 +1705,6 @@ class SecurityLifecycleFactKernel:
                 (run_id,),
             )
         )
-        persisted_evidence = _persisted_evidence_rows(self.conn, run_id)
-        persisted_facts = _persisted_fact_rows(self.conn, run_id)
-        provenance = persisted_decision_provenance_sha256(self.conn, run_id)
         return AutomationRunResult(
             run_id=run_id,
             status=status,
@@ -1616,6 +1717,45 @@ class SecurityLifecycleFactKernel:
             conflicts=_conflicts(persisted_facts),
             decision_provenance_sha256=provenance,
         )
+
+    def complete_terminal_finalization(
+        self,
+        *,
+        run_id: str,
+        decision_provenance_sha256: str,
+    ) -> None:
+        """Durably acknowledge idempotent post-run decision finalization."""
+
+        self.store.assert_automation_write_available()
+        provenance = _sha256(
+            "decision_provenance_sha256",
+            decision_provenance_sha256,
+        )
+        with _immediate_transaction(self.conn):
+            row = self.conn.execute(
+                "SELECT status,query_context_json FROM "
+                "security_lifecycle_automation_runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError("automation_run_not_found")
+            if str(row["status"]) != "succeeded":
+                raise ValueError("automation_run_not_succeeded")
+            context = _query_context_value(row["query_context_json"])
+            if context.get(_TERMINAL_PROVENANCE_KEY) != provenance:
+                raise ValueError("terminal_decision_provenance_changed")
+            if persisted_decision_provenance_sha256(self.conn, run_id) != provenance:
+                raise ValueError("terminal_decision_provenance_changed")
+            if not isinstance(context.get(_TERMINAL_DECISION_KEY), Mapping):
+                raise ValueError("terminal_decision_missing")
+            if context.get(_TERMINAL_FINALIZED_KEY) == provenance:
+                return
+            context[_TERMINAL_FINALIZED_KEY] = provenance
+            self.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "query_context_json=? WHERE run_id=?",
+                (_query_context_json(context), run_id),
+            )
 
     def fail_run(
         self,

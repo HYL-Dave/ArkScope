@@ -1091,10 +1091,12 @@ export function LifecycleView({
   const [transitionUnhideSuccessor, setTransitionUnhideSuccessor] = useState(false);
   const [transitionDialog, setTransitionDialog] = useState<"approve" | "reverse" | null>(null);
   const transitionPreviewRequestRef = useRef(0);
+  const caseRequestRef = useRef(0);
   const pendingQueueViewRef = useRef<QueueView | null>(null);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const loadCases = useCallback(async () => {
+    const requestId = ++caseRequestRef.current;
     try {
       const requestFilters: SecurityLifecycleCaseFilters = {
         ...filters,
@@ -1104,6 +1106,7 @@ export function LifecycleView({
         requestFilters.queue_bucket = queueView;
       }
       const response = await listSecurityLifecycleCases(requestFilters);
+      if (requestId !== caseRequestRef.current) return;
       setCases(response.cases);
       setQueueCounts(response.queue_counts);
       setSourceMissingCount(response.data_integrity.source_missing_count);
@@ -1117,6 +1120,7 @@ export function LifecycleView({
       }
       setListError(null);
     } catch (error) {
+      if (requestId !== caseRequestRef.current) return;
       setListError(lifecycleErrorPresentation(error, locale));
     }
   }, [filters, locale, queueView, sourcePresence]);

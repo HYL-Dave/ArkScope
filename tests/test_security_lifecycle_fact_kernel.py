@@ -906,8 +906,89 @@ def test_due_retryable_blocked_semantic_run_reuses_its_execution_row():
     assert retry.should_execute is True
     assert retry.run_id == blocked.run_id
     assert after["run_key"] == original_run_key
-    assert after["query_context_json"] == original_query_context_json
+    before_context = json.loads(original_query_context_json)
+    after_context = json.loads(after["query_context_json"])
+    assert before_context["execution_revision"] == "trusted-lifecycle-execution-r0"
+    assert after_context["execution_revision"] == "trusted-lifecycle-execution-r0"
+    assert before_context["latest_attempt_execution_revision"] == (
+        "trusted-lifecycle-execution-r0"
+    )
+    assert after_context["latest_attempt_execution_revision"] == (
+        "trusted-lifecycle-execution-r1"
+    )
+    assert {
+        key: value
+        for key, value in after_context.items()
+        if key != "latest_attempt_execution_revision"
+    } == {
+        key: value
+        for key, value in before_context.items()
+        if key != "latest_attempt_execution_revision"
+    }
     assert after["status"] == "running"
+    assert len(store.list_automation_runs(case_id)) == 1
+
+
+def test_cross_revision_due_blocked_failure_does_not_replay_same_attempt_revision():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    blocked = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    kernel.complete_run(
+        run_id=blocked.run_id,
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="sec_transport_unavailable",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-26T00:00:00Z",
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+
+    retry = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-26T00:00:00Z",
+    )
+    retry_context = json.loads(
+        store.get_automation_run(retry.run_id)["query_context_json"]
+    )
+    assert retry.should_execute is True
+    assert retry.run_id == blocked.run_id
+    assert retry_context["execution_revision"] == "trusted-lifecycle-execution-r0"
+    assert retry_context["latest_attempt_execution_revision"] == (
+        "trusted-lifecycle-execution-r1"
+    )
+
+    kernel.fail_run(
+        run_id=retry.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at="2026-08-26T00:01:00Z",
+    )
+    same_deploy = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-27T00:00:00Z",
+    )
+    assert same_deploy.should_execute is False
+    assert same_deploy.run_id == blocked.run_id
     assert len(store.list_automation_runs(case_id)) == 1
 
 
@@ -1350,6 +1431,7 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
     assert json.loads(row["query_context_json"]) == {
         "a": {"ticker": "HAPN"},
         "execution_revision": "trusted-lifecycle-execution-r1",
+        "latest_attempt_execution_revision": "trusted-lifecycle-execution-r1",
         "input_evidence_set_sha256": (
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         ),
@@ -1373,6 +1455,7 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
         ({"input_evidence_set_sha256": "1" * 64}, {}),
         ({"semantic_run_key": "spoofed"}, {}),
         ({"execution_revision": "spoofed"}, {}),
+        ({"latest_attempt_execution_revision": "spoofed"}, {}),
         ({"predecessor_failed_run_id": "slar_spoofed"}, {}),
         ({}, {"source_url": 1}),
         ({}, {"sec_attempts": "1"}),

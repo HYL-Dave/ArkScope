@@ -521,6 +521,100 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
     )
 
 
+def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market_check(
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_sec_evidence import SecSourceDeadline
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = {
+        "case_id": "slc_deadline_only",
+        "ticker": "DEAD",
+        "ticker_aliases": ("DEAD",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "DEAD",
+            "cik": "0000000001",
+            "issuer_name": "Deadline Only Issuer",
+            "filing_date": "2026-08-20",
+            "source": "sec_edgar",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["1.01"],
+            "evidence_url": "https://www.sec.gov/Archives/deadline.htm",
+            "description": "Agreement with an outside date.",
+            "kinds": [{"event_type": "merger_agreement", "effective_date": None}],
+        },
+    }
+    deadline = SecSourceDeadline(
+        date="2026-08-30",
+        evidence_id="deadline-evidence",
+        span_start_byte=0,
+        span_end_byte=64,
+        cited_text="The outside date remains August 30, 2026.",
+        cited_text_sha256="a" * 64,
+        rule_id="sec.explicit_transaction_termination_date",
+        rule_version="4",
+    )
+    before = scheduler._pending_event_monitoring(
+        case,
+        (),
+        source_family_results={
+            "regulator": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(deadline,),
+        at="2026-08-27T12:00:00Z",
+    )
+    assert before is not None
+    assert before.context["next_check_at"] == "2026-08-30T00:00:00Z"
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    market_calls = []
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(),
+            facts=(),
+            blockers=("sec_evidence_insufficient",),
+            source_deadlines=(deadline,),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_local_news_evidence",
+        lambda _context, at: ((), (), {"news_evidence_count": 0}),
+    )
+
+    def ibkr(context, *, at, regulator_successors):
+        market_calls.append((context.case_id, at, regulator_successors))
+        return SimpleNamespace(evidence=(), blockers=(), requests_made=1), ()
+
+    monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr)
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-30T12:00:00Z",
+    )
+
+    assert market_calls == [("slc_deadline_only", "2026-08-30T12:00:00Z", ())]
+    assert bundle.diagnostics["ibkr_requests"] == 1
+    assert len(bundle.blockers) == 1
+    assert bundle.blockers[0].retryable is False
+    assert bundle.blockers[0].context["monitoring_reason"] == "not_confirmed_as_of"
+    assert bundle.retry_at is None
+
+
 def test_pending_without_source_deadline_never_becomes_timeless_negative():
     from src.service import security_lifecycle_automation_scheduler as scheduler
 
