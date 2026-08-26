@@ -328,6 +328,43 @@ If implementation proves a new closed assessment outcome or CHECK value is
 required, it becomes a separately reviewed profile-schema migration. It may not
 be slipped into application startup or inferred from existing rows.
 
+### 9.1 Automation policy-version cutover
+
+`trusted-lifecycle-automation-v3` is a semantic policy change, not an
+operational retry token. At the cutover:
+
+- every assessment whose `author` is `automation` and whose owning run uses an
+  older policy version becomes stale, including an automation-authored
+  assessment accepted with `acceptance_authority = human`;
+- no old assessment, evidence, proposal, or run row is physically deleted. A
+  v2 draft remains a stale draft; a stale v2 accepted assessment remains
+  accepted until a replacement is accepted, then receives only the existing
+  `superseded` status and timestamp while its payload and provenance remain
+  intact;
+- human-authored and legacy-migrated assessments are unaffected by the policy
+  bump;
+- the worker reserves a new v3 run key and creates a new revision or a typed
+  monitoring result; an old v2 result never becomes current merely because it
+  was accepted before cutover; and
+- a pending ticker transition authorized by an older automation policy must
+  fail closed before profile mutation. It may be reapproved only from a current
+  v3 assessment, preview, evidence digest, and decision provenance.
+
+Before any live v3 restart, a separately authorized read-only inventory records
+the exact counts and IDs by assessment status, acceptance authority, policy
+version, and pending transition authority. The design does not hard-code the
+currently observed count because the user may review a draft before cutover.
+Until a v3 result exists, the current view treats the old automation result as
+stale and places the case in Monitoring for reprocessing; the old result remains
+visible in assessment history with stale/superseded provenance. A policy bump
+alone does not create a human-attention task.
+
+This slice does not add a `reprocess_generation` column. Future replay of an
+unchanged policy after an operational defect must use a separately designed
+retry/reset authority; it must not manufacture a policy-version bump. This v3
+bump is justified by changed decision and monitoring semantics, so invalidating
+old automation authority is intentional.
+
 ## 10. Verification
 
 RED-first coverage must prove:
@@ -346,10 +383,16 @@ RED-first coverage must prove:
    Monitoring, not Needs attention;
 9. source conflict enters Needs attention;
 10. resolved/applied cases enter History and automatically reopen when stale;
-11. provider retry and app downtime catch-up do not duplicate transitions; and
+11. provider retry and app downtime catch-up do not duplicate transitions;
 12. English and Traditional Chinese desktop/mobile browser matrices preserve
     evidence/source links, avoid overlap, and never substitute translation for
-    original text.
+    original text;
+13. v2 automation drafts and human-accepted automation assessments remain in
+    history, become stale, and are reprocessed under a distinct v3 run key;
+14. a v2 automation-approved transition cannot mutate profile state after the
+    v3 cutover and can be reapproved only from current v3 authority; and
+15. schema-object and column inventories remain unchanged, with no persisted
+    disposition, queue-bucket, or reason-code column.
 
 Offline tests use provider-shaped fixtures. Any live SEC, IBKR, translation, or
 hosted-search call remains separately authorized and bounded. Production reads,

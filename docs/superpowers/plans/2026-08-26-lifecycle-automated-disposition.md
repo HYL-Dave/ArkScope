@@ -24,6 +24,15 @@
 - Automatic ticker mutation retains the existing reversible transition preview, authority, scheduler, activity, acknowledgement, and reverse guards.
 - Do not add a second mutable case workflow column or startup DDL.
 - Policy behavior changes require a new exact automation policy version.
+- The v3 bump intentionally stales every v2 automation-authored assessment,
+  including one accepted by a human, while preserving every old row as audit
+  history and reprocessing it under a distinct v3 run key. Normal replacement
+  acceptance may mark an old accepted row `superseded`; it never rewrites that
+  row's decision payload or provenance.
+- A transition approved by an older automation policy must fail closed before
+  any profile mutation and may be reapproved only from current v3 authority.
+- Policy version is semantic authority, not a generic operational retry lever;
+  do not add or imply a `reprocess_generation` field in this slice.
 - The version bump must not reach the running App before separately authorized live provider execution.
 - Production DB access, provider calls, live cutover, merge, and push remain separate gates.
 - Execute the sibling Content translation plan first. Both plans are independently
@@ -38,6 +47,7 @@
 - `src/security_lifecycle_automation_worker.py`: shares the next-check calculation and policy version.
 - `src/service/security_lifecycle_automation_scheduler.py`: typed pending-event blockers, bounded retry/backoff, and source diagnostics.
 - `src/security_lifecycle_ibkr_evidence.py`: contract identity plus bounded quote-quality snapshot.
+- `src/ticker_identity_transition.py`: independently fails closed when an approved automation transition carries stale policy authority.
 - `src/tools/security_lifecycle_tools.py`: composes and filters derived disposition fields.
 - `src/api/routes/security_lifecycle.py`: admits the new read-only filter.
 - `apps/arkscope-web/src/api.ts`: closed disposition/queue/source-status types.
@@ -55,7 +65,7 @@
 - Test: `tests/test_security_lifecycle_automation_worker.py`
 
 **Interfaces:**
-- Consumes: one composed case mapping with `source_presence`, `observation`, `current_assessment`, `current_acknowledgement`, `assessment_history`, `automation_runs`, and `ticker_transition`.
+- Consumes: one composed case mapping with `source_presence`, `observation`, `current_assessment`, `current_acknowledgement`, `assessment_history`, `automation_runs`, and `ticker_transition`, plus the exact current `AUTOMATION_POLICY_VERSION` as read-only code authority.
 - Produces:
 
 ```python
@@ -149,6 +159,13 @@ def test_disposition_projection_is_exhaustive(fixture, disposition, bucket, reas
 
 Assert `source_missing` always becomes attention even if an old accepted assessment exists, because the current source/body relationship cannot be validated.
 
+Add a separate owner for an `approved` automation transition whose persisted
+`automation_policy_version` is v2 while code authority is v3. Before a v3
+replacement assessment exists, project it as `not_confirmed_yet` / `monitoring`
+with `waiting_transition_revalidation`, not as a scheduled current transition.
+This is a pure comparison of the composed transition row with code authority;
+it is not a second stored workflow state.
+
 - [ ] **Step 2: Write next-check RED tests**
 
 ```python
@@ -191,6 +208,7 @@ Use this precedence, returning once:
 if source_presence != "present": source_missing_attention()
 elif current_transition_status in {"applied", "reversed", "cancelled"}: history()
 elif current_transition_status == "needs_review": transition_review_attention()
+elif automation_transition_policy_is_stale: transition_revalidation_monitoring()
 elif current_transition_status == "approved": scheduled_transition_monitoring()
 elif current_nonstale_assessment and readiness in WAITING_READINESS: confirmed_monitoring()
 elif current_nonstale_assessment: confirmed_effective_history()
@@ -260,10 +278,13 @@ git commit -m "feat(lifecycle): derive automated case disposition"
 - Modify: `src/security_lifecycle_sec_evidence.py`
 - Modify: `src/service/security_lifecycle_automation_scheduler.py:45-75,430-505,600-670`
 - Modify: `src/security_lifecycle_automation_worker.py`
+- Modify: `src/ticker_identity_transition.py:1027-1165,1796-1920`
 - Test: `tests/test_security_lifecycle_decision_policy.py`
 - Test: `tests/test_security_lifecycle_sec_evidence.py`
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_security_lifecycle_automation_worker.py`
+- Test: `tests/test_security_lifecycle_investigation.py`
+- Test: `tests/test_ticker_identity_transition.py`
 
 **Interfaces:**
 - Consumes: observation event kinds plus cited SEC facts.
@@ -351,17 +372,67 @@ assert no_date_pending.retry_at == "2026-09-02T00:00:00Z"  # weekly
 Add a negative owner: an effective date with no explicit source deadline never
 becomes a terminal negative merely because seven days elapsed.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [ ] **Step 3: Write v2-to-v3 authority RED tests**
+
+Use persisted rows, not projection-only mappings, to pin all three cutover
+shapes:
+
+```python
+def test_v3_reprocesses_v2_draft_without_deleting_audit_history():
+    old = seed_v2_automation_assessment(status="draft")
+    result = run_worker_with_policy("trusted-lifecycle-automation-v3")
+    assert result["processed"] == 1
+    assert assessment_row(old.assessment_id)["status"] == "draft"
+    assert projected_assessment(old.assessment_id)["stale"] is True
+    assert latest_run()["policy_version"] == "trusted-lifecycle-automation-v3"
+    assert latest_run()["run_id"] != old.run_id
+
+def test_v3_reprocesses_human_accepted_v2_automation_without_deleting_it():
+    old = seed_v2_automation_assessment(
+        status="accepted", acceptance_authority="human"
+    )
+    result = run_worker_with_policy("trusted-lifecycle-automation-v3")
+    assert result["processed"] == 1
+    persisted = assessment_row(old.assessment_id)
+    assert persisted is not None
+    assert persisted["status"] in {"accepted", "superseded"}
+    assert decision_payload_sha256(persisted) == old.decision_payload_sha256
+    assert persisted["decision_provenance_sha256"] == old.provenance_sha256
+    assert projected_assessment(old.assessment_id)["stale"] is True
+    assert latest_run()["policy_version"] == "trusted-lifecycle-automation-v3"
+
+def test_v2_automation_transition_fails_closed_at_v3_apply():
+    transition, preview = seed_v2_approved_automation_transition(due=True)
+    before = profile_dependency_sha256()
+    result = apply_under_policy_v3(transition, current_preview=preview)
+    assert result["status"] == "blocked"
+    assert result["block_reasons"] == ["preview_changed"]
+    assert result["transition"]["status"] == "needs_review"
+    assert profile_dependency_sha256() == before
+```
+
+The transition owner must call the store apply boundary with an otherwise
+coherent preview, so it proves a direct policy-authority guard rather than
+passing only because the read service happened to omit the stale assessment.
+Add the positive counterpart: a new v3 assessment and preview reapprove the
+same dedupe identity and can proceed through the existing apply/reverse scratch
+contract.
+
+- [ ] **Step 4: Run focused tests and verify RED**
 
 Run:
 
 ```bash
-pytest tests/test_security_lifecycle_decision_policy.py tests/test_security_lifecycle_sec_evidence.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py -q
+pytest tests/test_security_lifecycle_decision_policy.py tests/test_security_lifecycle_sec_evidence.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py tests/test_security_lifecycle_investigation.py tests/test_ticker_identity_transition.py -q
 ```
 
-Expected: current `transaction_kind` creates `lifecycle.ma_review` immediately and `_blockers` always retries after one day with empty context.
+Expected: current `transaction_kind` creates `lifecycle.ma_review` immediately,
+`_blockers` always retries after one day with empty context, v2 rows are not
+reprocessed under the unchanged v2 key, and an otherwise coherent v2-approved
+transition can still reach the apply boundary. The last two failures prove the
+version-cutover owners are live.
 
-- [ ] **Step 4: Add one hash-cited source-deadline result without changing schema authority**
+- [ ] **Step 5: Add one hash-cited source-deadline result without changing schema authority**
 
 Add this provider-result type; it is scheduling evidence, not an assessment
 fact:
@@ -401,7 +472,7 @@ rule ID, and rule version in the blocker context. This changes no closed
 `fact_type` or SQLite CHECK authority. An exact schema diff in tests must
 remain empty.
 
-- [ ] **Step 5: Detect pending completion before policy evaluation**
+- [ ] **Step 6: Detect pending completion before policy evaluation**
 
 Add a pure helper in the scheduler:
 
@@ -440,7 +511,7 @@ the shared lock remains mandatory. Record source-family results as exactly
 `available`, `unavailable`, or `conflict`; do not infer availability from row
 count.
 
-- [ ] **Step 6: Implement exact retry timing and final dated context**
+- [ ] **Step 7: Implement exact retry timing and final dated context**
 
 - Before an explicit effective date: retry on that date.
 - From the effective date through day 7 inclusive: retry daily.
@@ -453,7 +524,7 @@ count.
 
 Change `_blockers` to accept prebuilt `AutomationBlocker` values plus code-only provider blockers; do not discard context.
 
-- [ ] **Step 7: Bump policy authority exactly once**
+- [ ] **Step 8: Bump policy authority exactly once and close stale transition authority**
 
 Change:
 
@@ -463,20 +534,39 @@ AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v3"
 
 Add `lifecycle.event_monitoring` to `RULE_VERSIONS` only if a completed decision row uses it. A blocked monitoring run does not invent a rule ID or assessment.
 
-- [ ] **Step 8: Re-run focused tests**
+Keep the existing run-key semantics: a v2 automation draft or accepted
+assessment remains queryable and stale, while `reserve_run(..., policy_version=v3)`
+creates a distinct run. Do not update old run rows or rewrite old assessment
+payload/provenance. If a replacement v3 assessment is accepted, permit only the
+existing `accepted` to `superseded` status/timestamp update on the former
+accepted row; a v2 draft remains a stale draft.
+
+At `TickerIdentityTransitionStore.apply`, compare an automation-approved
+transition's stored `automation_policy_version` with the exact current policy
+before accepting an otherwise coherent preview. A mismatch records the existing
+typed `preview_changed` blocked attempt, marks the transition `needs_review`,
+and performs zero profile mutation. This guard is independent of the read
+service's current-assessment projection. A subsequent coherent v3 approval may
+reuse the existing transition dedupe identity through the reviewed reapproval
+path.
+
+- [ ] **Step 9: Re-run focused tests**
 
 Run:
 
 ```bash
-pytest tests/test_security_lifecycle_decision_policy.py tests/test_security_lifecycle_fact_kernel.py tests/test_security_lifecycle_sec_evidence.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py -q
+pytest tests/test_security_lifecycle_decision_policy.py tests/test_security_lifecycle_fact_kernel.py tests/test_security_lifecycle_sec_evidence.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py tests/test_security_lifecycle_investigation.py tests/test_ticker_identity_transition.py -q
 ```
 
-Expected: all pass; pending agreements create no human draft, completed/ambiguous acquisitions still do, and v2 run identity tests are updated only where the policy version is deliberately asserted.
+Expected: all pass; pending agreements create no human draft,
+completed/ambiguous acquisitions still do, v2 automation rows remain audit
+history while v3 gets a distinct run/revision, and v2 transition authority
+cannot mutate profile state after the bump.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add src/security_lifecycle_decision_policy.py src/security_lifecycle_sec_evidence.py src/security_lifecycle_automation_worker.py src/service/security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_decision_policy.py tests/test_security_lifecycle_sec_evidence.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py
+git add src/security_lifecycle_decision_policy.py src/security_lifecycle_sec_evidence.py src/security_lifecycle_automation_worker.py src/service/security_lifecycle_automation_scheduler.py src/ticker_identity_transition.py tests/test_security_lifecycle_decision_policy.py tests/test_security_lifecycle_sec_evidence.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py tests/test_security_lifecycle_investigation.py tests/test_ticker_identity_transition.py
 git commit -m "feat(lifecycle): monitor unconfirmed events automatically"
 ```
 
@@ -1087,8 +1177,10 @@ Apply and restore each mutation separately:
 6. make History rendering acknowledge activity;
 7. treat an effective date as a source termination deadline;
 8. remove `market_data` from the hash-bound canonical excerpt;
-9. map an approved, not-yet-applied transition to History; and
-10. map `event_completion_not_confirmed` to provider-unavailable copy.
+9. map an approved, not-yet-applied transition to History;
+10. map `event_completion_not_confirmed` to provider-unavailable copy;
+11. keep a v2 automation assessment current under v3; and
+12. let a v2 automation-approved transition pass the v3 apply guard.
 
 Each mutation must kill at least one named owner test, produce no unexpected owner drift, and restore touched files byte-for-byte.
 
@@ -1113,6 +1205,18 @@ cd apps/arkscope-web && npm run build
 
 Record current exact counts; do not pin an older collection count in advance.
 
+Also compare the base and head profile schema authorities mechanically:
+
+```text
+sqlite_master owned object diff = empty
+PRAGMA table_info diff = empty
+columns named disposition / queue_bucket / reason_code = 0
+startup DDL changes = 0
+```
+
+Any difference is a hard stop requiring a separately reviewed migration; a
+passing runtime test cannot waive it.
+
 - [ ] **Step 4: Run a bilingual browser matrix**
 
 Fixtures cover all four dispositions and all five source-family status values
@@ -1136,6 +1240,8 @@ Record:
 - exact base/head commits and linear topology;
 - policy version `trusted-lifecycle-automation-v3`;
 - unchanged profile schema inventory;
+- v2 fixture inventory before replay and preserved-row/new-v3-run inventory after replay;
+- stale v2 transition apply attempt proving zero profile-state drift;
 - zero provider/network calls;
 - zero production DB reads/writes/migrations/backups/restores;
 - full and focused command outputs;
@@ -1155,6 +1261,13 @@ git commit -m "test(lifecycle): seal automated disposition admission"
 - [ ] **Step 7: Stop at the live boundary**
 
 Do not restart the current App from the v3 tree. A restart would make the policy-version bump select cases and issue SEC/IBKR calls. Report these separate decisions to the user:
+
+Before requesting that restart, obtain separate authority for a read-only live
+inventory. Record exact IDs and counts grouped by automation assessment status,
+`acceptance_authority`, and owning `policy_version`, plus every nonterminal
+transition's `approval_authority` and `automation_policy_version`. Do not assume
+the review-time count of five drafts remains current. The inventory performs no
+rewrite, invalidation, or provider call.
 
 1. review/merge of the implementation branch;
 2. bounded read-only SEC/IBKR v3 canary authority;
