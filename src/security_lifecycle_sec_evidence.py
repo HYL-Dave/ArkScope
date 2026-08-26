@@ -24,6 +24,8 @@ _IDENTITY_FORMS = frozenset({"25", "25-NSE", "8-A12B", "8-K12B"})
 _M_AND_A_FORMS = frozenset({"DEFM14A", "DEFA14A"})
 _MAX_EXCERPT_BYTES = 4096
 _RULE_VERSION = "3"
+_SOURCE_DEADLINE_RULE_ID = "sec.explicit_transaction_termination_date"
+_SOURCE_DEADLINE_RULE_VERSION = "4"
 _MONTH_NAME = (
     r"(?:January|February|March|April|May|June|July|August|September|October|"
     r"November|December)"
@@ -48,6 +50,32 @@ _SOURCE_DEADLINE_PHRASE = re.compile(
 )
 _ANY_MONTH_DATE = re.compile(rf"\b(?P<date>{_MONTH_DATE_TEXT})\b", re.IGNORECASE)
 _ANY_ISO_DATE = re.compile(r"\b(?P<date>\d{4}-\d{2}-\d{2})\b")
+_SOURCE_DATE_TEXT = rf"(?:{_MONTH_DATE_TEXT}|\d{{4}}-\d{{2}}-\d{{2}})"
+_TERMINATE_IF_BY = re.compile(
+    rf"\bmay be terminated if\b[^.]{{0,480}}?\bby\s+"
+    rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
+_CURRENT_DEADLINE = re.compile(
+    rf"\b(?:outside|termination) date\s+(?:is|shall be|remains)\s+"
+    rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
+_EXTENDED_DEADLINE = re.compile(
+    rf"\b(?:outside|termination) date\s+(?:has been|was)\s+extended"
+    rf"(?:\s+from\s+{_SOURCE_DATE_TEXT})?\s+to\s+"
+    rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
+_COORDINATE_TARGET = re.compile(
+    rf"\A\s*(?:,\s*)?(?:or|and)\s+{_SOURCE_DATE_TEXT}\b",
+    re.IGNORECASE,
+)
+_EXTENSION_ACTION = re.compile(
+    rf"\bextended\b(?:\s+from\s+{_SOURCE_DATE_TEXT})?\s+to\s+"
+    rf"{_SOURCE_DATE_TEXT}\b",
+    re.IGNORECASE,
+)
 _NEW_REPLACING = re.compile(
     r"\bnew ticker symbol\s+(?P<new>[A-Z][A-Z0-9.\-]{0,19})\s*,?\s*"
     r"replacing\s+(?P<old>[A-Z][A-Z0-9.\-]{0,19})\b",
@@ -629,33 +657,36 @@ def _normalized_month_date_text(value: str) -> str:
 def _source_deadlines(evidence: SecEvidence) -> tuple[SecSourceDeadline, ...]:
     rows: list[SecSourceDeadline] = []
     for start, end, sentence in _sentence_spans(evidence.excerpt):
-        if _SOURCE_DEADLINE_PHRASE.search(sentence) is None:
+        target_matches = [
+            match
+            for pattern in (_TERMINATE_IF_BY, _CURRENT_DEADLINE, _EXTENDED_DEADLINE)
+            for match in pattern.finditer(sentence)
+        ]
+        if len(target_matches) != 1 or len(_EXTENSION_ACTION.findall(sentence)) > 1:
             continue
-        dates = {
-            _normalized_month_date_text(match.group("date"))
-            for match in _ANY_MONTH_DATE.finditer(sentence)
-        }
-        dates.update(
-            _normalized_date("source_deadline", match.group("date"))
-            for match in _ANY_ISO_DATE.finditer(sentence)
+        target_match = target_matches[0]
+        target_date = target_match.group("date")
+        if _COORDINATE_TARGET.match(sentence[target_match.end("date") :]) is not None:
+            continue
+        value = (
+            _normalized_month_date_text(target_date)
+            if _ANY_MONTH_DATE.fullmatch(target_date) is not None
+            else _normalized_date("source_deadline", target_date)
         )
         byte_start = len(evidence.excerpt[:start].encode("utf-8"))
         byte_end = byte_start + len(sentence.encode("utf-8"))
-        for value in sorted(dates):
-            rows.append(
-                SecSourceDeadline(
-                    date=value,
-                    evidence_id=evidence.evidence_id,
-                    span_start_byte=byte_start,
-                    span_end_byte=byte_end,
-                    cited_text=sentence,
-                    cited_text_sha256=hashlib.sha256(
-                        sentence.encode("utf-8")
-                    ).hexdigest(),
-                    rule_id="sec.explicit_transaction_termination_date",
-                    rule_version=_RULE_VERSION,
-                )
+        rows.append(
+            SecSourceDeadline(
+                date=value,
+                evidence_id=evidence.evidence_id,
+                span_start_byte=byte_start,
+                span_end_byte=byte_end,
+                cited_text=sentence,
+                cited_text_sha256=hashlib.sha256(sentence.encode("utf-8")).hexdigest(),
+                rule_id=_SOURCE_DEADLINE_RULE_ID,
+                rule_version=_SOURCE_DEADLINE_RULE_VERSION,
             )
+        )
     return tuple(rows)
 
 

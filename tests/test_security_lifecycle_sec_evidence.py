@@ -114,6 +114,18 @@ def _collect(name: str):
     return case, transport, result
 
 
+def _collect_deadline_sentence(sentence: str):
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("BLBD")
+    case["document"] = f"<html><body><p>{sentence}</p></body></html>"
+    return collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+
+
 def _real_case(name: str) -> dict:
     legacy = json.loads(
         (
@@ -676,6 +688,79 @@ def test_chain_stops_at_shared_request_document_and_byte_budgets():
     assert {id(shared) for _kind, shared in transport.calls} == {id(budget)}
 
 
+def test_deadline_evidence_admission_identity_is_unchanged_for_rejected_and_oversized_sentences():
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    short_sentences = (
+        "As of June 30, 2026, the outside date had not been extended.",
+        "The original outside date of March 15, 2025 was extended twice.",
+        "We do not expect the termination date of December 31, 2027 to apply.",
+        "The outside date was extended to June 1, 2026 or July 1, 2026.",
+    )
+    tail_deadline_phrase = "outside date was extended to June 1, 2026"
+    oversized_sentence = ("Background " * 420) + f"The {tail_deadline_phrase}."
+    assert len(oversized_sentence.encode()) > 4096
+    assert len(oversized_sentence.split(tail_deadline_phrase, 1)[0].encode()) > 4096
+
+    case = _case("BLBD")
+    case["document"] = "<html><body>" + "".join(
+        f"<p>{sentence}</p>" for sentence in (*short_sentences, oversized_sentence)
+    ) + "</body></html>"
+    result = collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+
+    assert {(row.evidence_id, row.content_sha256) for row in result.evidence} == {
+        (
+            "sle_97ce816fee19d813378cd33f91045f49",
+            "2ca802c92f60f87bb0bc388b4ed8d1f773ba234124cc29bc01971d79dfa72edb",
+        ),
+    }
+    excerpts = "\n".join(row.excerpt for row in result.evidence)
+    assert all(sentence in excerpts for sentence in short_sentences)
+    assert tail_deadline_phrase in excerpts
+
+
+def test_deadline_closed_grammar_emits_only_one_current_target_and_exact_citation():
+    cases = {
+        "The outside date was extended from March 1, 2026 to June 1, 2026.": (
+            "2026-06-01",
+        ),
+        "The outside date was extended to June 1, 2026.": ("2026-06-01",),
+        "The termination date remains 2026-11-01.": ("2026-11-01",),
+        "The agreement may be terminated if closing has not occurred by October 1, 2026.": (
+            "2026-10-01",
+        ),
+        "As of June 30, 2026, the outside date had not been extended.": (),
+        "The original outside date of March 15, 2025 was extended twice.": (),
+        "We do not expect the termination date of December 31, 2027 to apply.": (),
+        "The outside date was extended to June 1, 2026 or July 1, 2026.": (),
+        "The outside date was extended from March 1, 2026 to June 1, 2026, and further extended to September 1, 2026.": (),
+        "extended from March 1, 2026 to June 1, 2026": (),
+        "The outside date was extended to June 1, 2026, and the Company will file a Current Report on Form 8-K.": (
+            "2026-06-01",
+        ),
+        "The termination date remains 2026-11-01, and the parties continue to work toward closing.": (
+            "2026-11-01",
+        ),
+    }
+
+    for sentence, expected_dates in cases.items():
+        result = _collect_deadline_sentence(sentence)
+        assert tuple(row.date for row in result.source_deadlines) == expected_dates
+        for deadline in result.source_deadlines:
+            evidence = next(
+                row for row in result.evidence if row.evidence_id == deadline.evidence_id
+            )
+            cited = evidence.excerpt.encode()[
+                deadline.span_start_byte : deadline.span_end_byte
+            ]
+            assert cited.decode() == sentence
+            assert deadline.cited_text_sha256 == hashlib.sha256(cited).hexdigest()
+
+
 def test_explicit_outside_date_is_hash_cited_and_conflicts_fail_closed():
     from src.security_lifecycle_sec_evidence import collect_sec_evidence
 
@@ -697,7 +782,7 @@ def test_explicit_outside_date_is_hash_cited_and_conflicts_fail_closed():
     deadline = result.source_deadlines[0]
     assert deadline.date == "2026-10-15"
     assert deadline.rule_id == "sec.explicit_transaction_termination_date"
-    assert deadline.rule_version == "3"
+    assert deadline.rule_version == "4"
     assert deadline.cited_text == sentence
     assert hashlib.sha256(deadline.cited_text.encode()).hexdigest() == (
         deadline.cited_text_sha256
@@ -705,6 +790,8 @@ def test_explicit_outside_date_is_hash_cited_and_conflicts_fail_closed():
     evidence = next(row for row in result.evidence if row.evidence_id == deadline.evidence_id)
     cited = evidence.excerpt.encode()[deadline.span_start_byte : deadline.span_end_byte]
     assert cited.decode() == sentence
+    assert {fact.rule_version for fact in result.facts} == {"3"}
+    assert {row.source_locator["rule_version"] for row in result.evidence} == {"3"}
 
     conflicting = _case("BLBD")
     conflicting["document"] = conflicting["document"].replace(
