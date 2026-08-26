@@ -544,6 +544,37 @@ def test_pending_without_source_deadline_never_becomes_timeless_negative():
     }
 
 
+def test_effective_date_never_substitutes_for_source_termination_deadline():
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = {
+        "observation": {
+            "kinds": [{"event_type": "merger_proxy", "effective_date": None}]
+        }
+    }
+    facts = (SimpleNamespace(fact_type="effective_date", value="2026-09-05"),)
+
+    blocker = scheduler._pending_event_monitoring(
+        case,
+        facts,
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(),
+        at="2027-08-26T00:00:00Z",
+    )
+
+    assert blocker is not None
+    assert blocker.retryable is True
+    assert blocker.context == {
+        "monitoring_reason": "event_completion_not_confirmed",
+        "effective_date": "2026-09-05",
+        "next_check_at": "2027-09-02T00:00:00Z",
+    }
+
+
 def test_completed_or_resolved_event_does_not_create_monitoring_blocker():
     from src.service import security_lifecycle_automation_scheduler as scheduler
 

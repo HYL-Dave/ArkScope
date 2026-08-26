@@ -442,21 +442,13 @@ def test_real_hapn_first_discovery_extracts_declared_identity_facts():
         transition_preview=preview,
     )
     assert decision.decision_tier == "verified_automatic"
-    assert decision.action_readiness == "transition_eligible"
+    assert decision.action_readiness == "waiting_market_confirmation"
     assert decision.rule_id == "lifecycle.simple_symbol_continuation"
     assert decision.successor_ticker == "HAPN"
     assert decision.destination_venue == "NASDAQ"
     assert decision.effective_date == "2026-06-22"
-    assert decision.transition_requested is True
-    assert preview_calls == [
-        {
-            "transition_kind": "symbol_continuation",
-            "source_ticker": "LC",
-            "successor_ticker": "HAPN",
-            "effective_date": "2026-06-22",
-            "outcomes": ("symbol_changed", "venue_transfer"),
-        }
-    ]
+    assert decision.transition_requested is False
+    assert preview_calls == []
 
 
 def test_real_qbts_extracts_symbol_continuity_and_venue_transfer():

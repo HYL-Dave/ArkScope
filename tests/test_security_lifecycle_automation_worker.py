@@ -226,17 +226,29 @@ def _bundle(
         kind="regulator_excerpt",
         locator={"filing_chain_complete": True},
     )
-    market_payload = {
+    market_snapshot = {
         "destination_venue": "NASDAQ",
         "security_class": "common_stock",
         "successor_ticker": successor,
+    }
+    market_payload = {
+        "adapter_version": "2",
+        "contract_status": "found",
+        "market_data": {
+            "fresh": True,
+            "last": "10.00",
+            "provider_time": _AT,
+            "retrieved_at": _AT,
+            "status": "live",
+        },
+        "snapshot": market_snapshot,
     }
     market = _evidence(
         case,
         family="market_infrastructure",
         payload=market_payload,
         kind="market_infrastructure_snapshot",
-        locator={"snapshot": market_payload},
+        locator=market_payload,
     )
     return LifecycleAutomationEvidenceBundle(
         evidence=(regulator, market),
@@ -246,8 +258,8 @@ def _bundle(
                 for key in regulator_payload
             ),
             *(
-                _fact(market, market_payload, key, key)
-                for key in market_payload
+                _fact(market, market_snapshot, key, key)
+                for key in market_snapshot
             ),
         ),
         blockers=(),
