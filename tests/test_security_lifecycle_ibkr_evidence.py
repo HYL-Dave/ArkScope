@@ -4,6 +4,7 @@ import hashlib
 import inspect
 import json
 from contextlib import contextmanager
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -53,11 +54,36 @@ def _details(
     )
 
 
+def _market_ticker(
+    *,
+    market_data_type=1,
+    last=12.57,
+    provider_time=datetime.fromisoformat("2026-08-25T01:01:00+00:00"),
+):
+    return SimpleNamespace(
+        marketDataType=market_data_type,
+        last=last,
+        time=provider_time,
+    )
+
+
 class _Gateway:
-    def __init__(self, responses=(), *, connected=True, lock_state=None):
+    def __init__(
+        self,
+        responses=(),
+        *,
+        market_ticker="default",
+        connected=True,
+        lock_state=None,
+    ):
         self.connected = connected
         self.responses = list(responses)
         self.requests = []
+        self.market_ticker = (
+            _market_ticker() if market_ticker == "default" else market_ticker
+        )
+        self.market_requests = []
+        self.sleep_calls = []
         self.lock_state = lock_state
 
     def isConnected(self):
@@ -71,6 +97,21 @@ class _Gateway:
         if isinstance(response, BaseException):
             raise response
         return response
+
+    def reqMktData(self, contract, genericTickList, snapshot, regulatorySnapshot):
+        if self.lock_state is not None:
+            assert self.lock_state["held"] is True
+        self.market_requests.append(
+            (contract, genericTickList, snapshot, regulatorySnapshot)
+        )
+        if isinstance(self.market_ticker, BaseException):
+            raise self.market_ticker
+        return self.market_ticker
+
+    def sleep(self, seconds):
+        if self.lock_state is not None:
+            assert self.lock_state["held"] is True
+        self.sleep_calls.append(seconds)
 
 
 def _lock_recorder():
@@ -151,7 +192,7 @@ def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
     assert result.blockers == ()
     assert result.source_families == ("market_infrastructure",)
     assert result.corroboration_family_count == 1
-    assert result.requests_made == 3
+    assert result.requests_made == 4
     assert len(result.evidence) == 1
     evidence = result.evidence[0]
     assert evidence.source_family == "market_infrastructure"
@@ -160,7 +201,14 @@ def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
     assert evidence.source_url is None
     assert evidence.source_published_at is None
     assert evidence.retrieved_at == "2026-08-25T01:02:03.123456Z"
-    assert set(evidence.source_locator) == {"snapshot"}
+    assert set(evidence.source_locator) == {
+        "adapter_version",
+        "contract_status",
+        "market_data",
+        "snapshot",
+    }
+    assert evidence.source_locator["adapter_version"] == "2"
+    assert evidence.source_locator["contract_status"] == "found"
     snapshot = evidence.source_locator["snapshot"]
     assert snapshot == {
         "symbol": "HAPN",
@@ -172,8 +220,18 @@ def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
         "currency": "USD",
         "retrieved_at": "2026-08-25T01:02:03.123456Z",
     }
+    assert evidence.source_locator["market_data"] == {
+        "status": "live",
+        "last": "12.57",
+        "provider_time": "2026-08-25T01:01:00Z",
+        "retrieved_at": "2026-08-25T01:02:03Z",
+        "fresh": True,
+    }
     assert evidence.excerpt == json.dumps(
-        snapshot, ensure_ascii=True, separators=(",", ":"), sort_keys=True
+        evidence.source_locator,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
     )
     assert len(evidence.excerpt.encode("utf-8")) <= 4096
     assert evidence.content_sha256 == hashlib.sha256(
@@ -181,7 +239,78 @@ def test_ibkr_adapter_persists_one_bounded_contract_snapshot():
     ).hexdigest()
     assert evidence.evidence_dedupe_key == f"ibkr_contract:{evidence.content_sha256}"
     assert len(gateway.requests) == 3
+    assert len(gateway.market_requests) == 1
+    assert gateway.market_requests[0][0].conId == 112233
+    assert gateway.market_requests[0][1:] == ("", True, False)
+    assert gateway.sleep_calls == [2.0]
     assert _normalize_evidence(result.evidence)[0].excerpt == evidence.excerpt
+
+
+@pytest.mark.parametrize(
+    ("market_data_type", "expected"),
+    [(1, "live"), (2, "frozen"), (3, "delayed"), (4, "delayed_frozen")],
+)
+def test_market_data_type_and_freshness_are_preserved(market_data_type, expected):
+    state, lock = _lock_recorder()
+    gateway = _Gateway(
+        responses=([_details()], [_details()], [_details()]),
+        market_ticker=_market_ticker(market_data_type=market_data_type),
+        lock_state=state,
+    )
+
+    result = _read(gateway, lock)
+
+    market = result.evidence[0].source_locator["market_data"]
+    assert market["status"] == expected
+    assert market["fresh"] is (expected == "live")
+
+
+def test_live_quote_outside_freshness_window_is_not_fresh():
+    state, lock = _lock_recorder()
+    old = _Gateway(
+        responses=([_details()], [_details()], [_details()]),
+        market_ticker=_market_ticker(
+            provider_time=datetime.fromisoformat("2026-08-25T00:30:00+00:00")
+        ),
+        lock_state=state,
+    )
+    old_result = _read(old, lock)
+    assert old_result.evidence[0].source_locator["market_data"]["fresh"] is False
+
+    state, lock = _lock_recorder()
+    future = _Gateway(
+        responses=([_details()], [_details()], [_details()]),
+        market_ticker=_market_ticker(
+            provider_time=datetime.fromisoformat("2026-08-25T01:08:00+00:00")
+        ),
+        lock_state=state,
+    )
+    future_result = _read(future, lock)
+    assert future_result.evidence[0].source_locator["market_data"]["fresh"] is False
+
+
+def test_invalid_or_missing_quote_is_hash_bound_as_unavailable():
+    state, lock = _lock_recorder()
+    gateway = _Gateway(
+        responses=([_details()], [_details()], [_details()]),
+        market_ticker=_market_ticker(last=float("nan"), provider_time=None),
+        lock_state=state,
+    )
+
+    result = _read(gateway, lock)
+
+    evidence = result.evidence[0]
+    assert evidence.source_locator["market_data"] == {
+        "status": "live",
+        "last": None,
+        "provider_time": None,
+        "retrieved_at": "2026-08-25T01:02:03Z",
+        "fresh": False,
+    }
+    assert json.loads(evidence.excerpt) == evidence.source_locator
+    assert hashlib.sha256(evidence.excerpt.encode()).hexdigest() == (
+        evidence.content_sha256
+    )
 
 
 def test_regulator_declared_successor_is_queried_without_persisting_an_alias():
@@ -307,7 +436,7 @@ def test_contract_snapshot_emits_exact_cited_market_facts():
         assert hashlib.sha256(cited).hexdigest() == fact.cited_text_sha256
         assert json.loads(cited.decode()) in {"HAPN", "NASDAQ", "STK"}
         assert fact.evidence_id == evidence.evidence_id
-        assert fact.extractor_rule_version == "1"
+        assert fact.extractor_rule_version == "2"
     assert contract_snapshot_facts(
         evidence,
         regulator_successors=("OTHER",),

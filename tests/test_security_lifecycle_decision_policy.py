@@ -18,7 +18,19 @@ def _case(*, ticker="LC", kinds=("listing_status_review",)):
 
 
 def _evidence(evidence_id, family):
-    return {"evidence_id": evidence_id, "source_family": family}
+    row = {"evidence_id": evidence_id, "source_family": family}
+    if family == "market_infrastructure":
+        row["source_locator"] = {
+            "contract_status": "found",
+            "market_data": {
+                "status": "live",
+                "last": "12.57",
+                "provider_time": "2026-08-25T01:01:00Z",
+                "retrieved_at": "2026-08-25T01:02:03Z",
+                "fresh": True,
+            },
+        }
+    return row
 
 
 def _fact(evidence_id, fact_type, value):
@@ -119,6 +131,31 @@ def test_simple_symbol_continuation_requires_regulator_market_and_eligible_previ
     assert no_market.action_readiness == "action_blocked"
     assert "market_corroboration_missing" in no_market.decision_issues
     assert no_market.transition_requested is False
+
+    stale_market = _evaluate(
+        evidence=(
+            _evidence("sec", "regulator"),
+            {
+                **_evidence("ibkr", "market_infrastructure"),
+                "source_locator": {
+                    "contract_status": "found",
+                    "market_data": {
+                        "status": "live",
+                        "last": "12.57",
+                        "provider_time": "2026-08-25T00:30:00Z",
+                        "retrieved_at": "2026-08-25T01:02:03Z",
+                        "fresh": False,
+                    },
+                },
+            },
+        ),
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("stale market data must not preview a mutation")
+        ),
+    )
+    assert stale_market.decision_tier == "verified_automatic"
+    assert stale_market.action_readiness == "waiting_market_confirmation"
+    assert stale_market.transition_requested is False
 
     ineligible = _evaluate(
         transition_preview=lambda _request: {
@@ -238,6 +275,10 @@ def test_terminal_delisting_separates_conclusion_from_action_readiness():
         evidence=(
             regulator_evidence,
             {
+                **_evidence("news", "publisher"),
+                "source_locator": {"last": "12.57"},
+            },
+            {
                 **_evidence("ibkr", "market_infrastructure"),
                 "source_locator": {"contract_status": "missing"},
             },
@@ -255,6 +296,31 @@ def test_terminal_delisting_separates_conclusion_from_action_readiness():
     assert confirmed.action_readiness == "transition_eligible"
     assert confirmed.rule_id == "lifecycle.terminal_delisting"
     assert confirmed.transition_requested is True
+
+    frozen_contract = _evaluate(
+        case=_case(ticker="OLD", kinds=("listing_removal_notice",)),
+        evidence=(
+            regulator_evidence,
+            {
+                **_evidence("ibkr", "market_infrastructure"),
+                "source_locator": {
+                    "contract_status": "found",
+                    "market_data": {
+                        "status": "frozen",
+                        "last": "12.57",
+                        "provider_time": "2026-09-01T00:00:00Z",
+                        "retrieved_at": "2026-09-01T00:01:00Z",
+                        "fresh": False,
+                    },
+                },
+            },
+        ),
+        facts=regulator_facts,
+        current_date=date(2026, 9, 1),
+    )
+    assert frozen_contract.decision_tier == "verified_automatic"
+    assert frozen_contract.action_readiness == "waiting_market_confirmation"
+    assert frozen_contract.transition_requested is False
 
     portfolio_open = _evaluate(
         case=_case(ticker="OLD", kinds=("listing_removal_notice",)),

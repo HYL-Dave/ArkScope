@@ -7,7 +7,8 @@ import json
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any, ContextManager, Protocol
 
 from ib_insync import Contract, RequestError, Stock
@@ -26,6 +27,16 @@ class IBKRContractGateway(Protocol):
     def isConnected(self) -> bool: ...
 
     def reqContractDetails(self, contract: Contract) -> Iterable[Any]: ...
+
+    def reqMktData(
+        self,
+        contract: Contract,
+        genericTickList: str,
+        snapshot: bool,
+        regulatorySnapshot: bool,
+    ) -> object: ...
+
+    def sleep(self, seconds: float) -> None: ...
 
 
 GatewayLock = Callable[[float], ContextManager[None]]
@@ -70,6 +81,84 @@ def _timestamp(value: str) -> str:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("retrieved_at")
     return normalized
+
+
+def _instant(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return None
+        parseable = normalized[:-1] + "+00:00" if normalized.endswith("Z") else normalized
+        try:
+            parsed = datetime.fromisoformat(parseable)
+        except ValueError:
+            return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _second_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )
+
+
+def _last_decimal(value: object) -> str | None:
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    if not parsed.is_finite() or parsed <= 0:
+        return None
+    rendered = format(parsed, "f")
+    if "." in rendered:
+        rendered = rendered.rstrip("0").rstrip(".")
+    return rendered
+
+
+def _market_data_snapshot(
+    ticker: object,
+    *,
+    retrieved_at: datetime,
+) -> dict[str, object]:
+    statuses = {
+        1: "live",
+        2: "frozen",
+        3: "delayed",
+        4: "delayed_frozen",
+    }
+    status = statuses.get(getattr(ticker, "marketDataType", None), "unavailable")
+    last = _last_decimal(getattr(ticker, "last", None))
+    provider_time = _instant(getattr(ticker, "time", None))
+    age = None if provider_time is None else retrieved_at - provider_time
+    fresh = bool(
+        status == "live"
+        and last is not None
+        and age is not None
+        and -timedelta(minutes=5) <= age <= timedelta(minutes=15)
+    )
+    return {
+        "status": status,
+        "last": last,
+        "provider_time": (
+            None if provider_time is None else _second_timestamp(provider_time)
+        ),
+        "retrieved_at": _second_timestamp(retrieved_at),
+        "fresh": fresh,
+    }
+
+
+def _unavailable_market_data(*, retrieved_at: datetime) -> dict[str, object]:
+    return {
+        "status": "unavailable",
+        "last": None,
+        "provider_time": None,
+        "retrieved_at": _second_timestamp(retrieved_at),
+        "fresh": False,
+    }
 
 
 def _text(value: object, *, field: str, limit: int, required: bool = False) -> str:
@@ -281,7 +370,7 @@ def contract_snapshot_facts(
         decoded = json.loads(excerpt)
     except json.JSONDecodeError as exc:
         raise ValueError("ibkr_contract_snapshot_shape") from exc
-    if decoded != dict(snapshot):
+    if decoded != dict(locator) or decoded.get("snapshot") != dict(snapshot):
         raise ValueError("ibkr_contract_snapshot_shape")
     content_digest = str(getattr(evidence, "content_sha256", ""))
     if hashlib.sha256(excerpt.encode("utf-8")).hexdigest() != content_digest:
@@ -332,7 +421,7 @@ def contract_snapshot_facts(
             source_span_end=span[1],
             cited_text_sha256=hashlib.sha256(encoded[span[0] : span[1]]).hexdigest(),
             extractor_rule_id=f"ibkr.contract_snapshot.{fact_type}",
-            extractor_rule_version="1",
+            extractor_rule_version="2",
         )
         for fact_type, key, value in rows
     )
@@ -352,12 +441,17 @@ def read_ibkr_contract_evidence(
     retrieved_at: str,
     lock_timeout_s: float = 30.0,
     max_queries: int = 8,
+    quote_wait_s: float = 2.0,
 ) -> IbkrContractEvidenceResult:
     """Query an already-connected client while holding the caller's shared lock."""
     if not callable(getattr(gateway, "isConnected", None)):
         raise TypeError("gateway.isConnected")
     if not callable(getattr(gateway, "reqContractDetails", None)):
         raise TypeError("gateway.reqContractDetails")
+    if not callable(getattr(gateway, "reqMktData", None)):
+        raise TypeError("gateway.reqMktData")
+    if not callable(getattr(gateway, "sleep", None)):
+        raise TypeError("gateway.sleep")
     if not callable(gateway_lock):
         raise TypeError("gateway_lock")
     if isinstance(lock_timeout_s, bool) or not isinstance(lock_timeout_s, (int, float)):
@@ -366,8 +460,15 @@ def read_ibkr_contract_evidence(
         raise ValueError("lock_timeout_s")
     if type(max_queries) is not int or not 1 <= max_queries <= 16:
         raise ValueError("max_queries")
+    if isinstance(quote_wait_s, bool) or not isinstance(quote_wait_s, (int, float)):
+        raise ValueError("quote_wait_s")
+    if not 0 < float(quote_wait_s) <= 5:
+        raise ValueError("quote_wait_s")
 
     at = _timestamp(retrieved_at)
+    retrieved_instant = _instant(at)
+    if retrieved_instant is None:
+        raise ValueError("retrieved_at")
     queries = _queries(
         context,
         candidate_tickers=candidate_tickers,
@@ -375,6 +476,8 @@ def read_ibkr_contract_evidence(
     )
     requests_made = 0
     detail_rows: list[object] = []
+    snapshot: dict[str, Any] | None = None
+    market_data: dict[str, object] | None = None
 
     try:
         with gateway_lock(float(lock_timeout_s)):
@@ -394,33 +497,67 @@ def read_ibkr_contract_evidence(
                 if details is None:
                     continue
                 detail_rows.extend(tuple(details))
+
+            snapshots = {
+                json.dumps(
+                    _snapshot(detail, retrieved_at=at),
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+                for detail in detail_rows
+            }
+            if not snapshots:
+                return _contract_missing(
+                    context,
+                    retrieved_at=at,
+                    requests_made=requests_made,
+                )
+            if len(snapshots) != 1:
+                return _blocked(
+                    "ibkr_contract_ambiguous",
+                    requests_made=requests_made,
+                )
+
+            snapshot = json.loads(snapshots.pop())
+            requests_made += 1
+            try:
+                ticker = gateway.reqMktData(
+                    Contract(conId=int(snapshot["conId"]), exchange="SMART"),
+                    "",
+                    True,
+                    False,
+                )
+                gateway.sleep(float(quote_wait_s))
+                market_data = _market_data_snapshot(
+                    ticker,
+                    retrieved_at=retrieved_instant,
+                )
+            except (RequestError, ConnectionError, TimeoutError, OSError):
+                market_data = _unavailable_market_data(
+                    retrieved_at=retrieved_instant
+                )
     except RequestError:
         return _blocked("ibkr_gateway_unavailable", requests_made=requests_made)
     except (ConnectionError, TimeoutError, OSError):
         return _blocked("ibkr_gateway_unavailable", requests_made=requests_made)
 
-    snapshots = {
-        json.dumps(
-            _snapshot(detail, retrieved_at=at),
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        for detail in detail_rows
+    if snapshot is None or market_data is None:
+        raise RuntimeError("ibkr_contract_snapshot_missing")
+    payload = {
+        "adapter_version": "2",
+        "contract_status": "found",
+        "market_data": market_data,
+        "snapshot": snapshot,
     }
-    if not snapshots:
-        return _contract_missing(
-            context,
-            retrieved_at=at,
-            requests_made=requests_made,
-        )
-    if len(snapshots) != 1:
-        return _blocked("ibkr_contract_ambiguous", requests_made=requests_made)
-
-    excerpt = snapshots.pop()
+    excerpt = json.dumps(
+        payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
     if len(excerpt.encode("utf-8")) > _MAX_EXCERPT_BYTES:
         raise ValueError("ibkr_contract_snapshot_too_large")
-    snapshot = json.loads(excerpt)
     content_digest = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
     evidence = IbkrContractEvidence(
         evidence_id="sle_" + content_digest[:32],
@@ -436,7 +573,7 @@ def read_ibkr_contract_evidence(
         excerpt=excerpt,
         content_sha256=content_digest,
         source_document_sha256=None,
-        source_locator={"snapshot": snapshot},
+        source_locator=payload,
         evidence_dedupe_key=f"ibkr_contract:{content_digest}",
     )
     return IbkrContractEvidenceResult(

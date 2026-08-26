@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -85,6 +86,23 @@ class _IbkrGateway:
     def reqContractDetails(self, _contract):
         self.requests += 1
         return self.responses.pop(0)
+
+    def reqMktData(
+        self,
+        _contract,
+        _generic_tick_list,
+        _snapshot,
+        _regulatory_snapshot,
+    ):
+        self.requests += 1
+        return SimpleNamespace(
+            marketDataType=1,
+            last=12.57,
+            time=datetime.fromisoformat("2026-08-25T01:01:00+00:00"),
+        )
+
+    def sleep(self, _seconds):
+        return None
 
 
 @contextmanager

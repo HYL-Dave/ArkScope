@@ -581,6 +581,29 @@ class _LifecycleIbkrGateway:
             raise ConnectionError("ibkr_gateway_unavailable")
         return gateway.reqContractDetails(contract)
 
+    def reqMktData(
+        self,
+        contract,
+        genericTickList,
+        snapshot,
+        regulatorySnapshot,
+    ):
+        gateway = getattr(self._source, "_ib", None)
+        if gateway is None:
+            raise ConnectionError("ibkr_gateway_unavailable")
+        return gateway.reqMktData(
+            contract,
+            genericTickList,
+            snapshot,
+            regulatorySnapshot,
+        )
+
+    def sleep(self, seconds: float) -> None:
+        gateway = getattr(self._source, "_ib", None)
+        if gateway is None:
+            raise ConnectionError("ibkr_gateway_unavailable")
+        gateway.sleep(seconds)
+
     def disconnect(self) -> None:
         self._source.disconnect()
 

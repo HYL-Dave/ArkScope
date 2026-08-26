@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
@@ -383,6 +384,51 @@ def _market_contract_missing(evidence: tuple[_Evidence, ...]) -> bool:
     )
 
 
+def _market_timestamp(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parseable = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(parseable)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _market_snapshot_fresh(evidence: tuple[_Evidence, ...]) -> bool:
+    rows = tuple(
+        row
+        for row in evidence
+        if row.source_family == "market_infrastructure"
+        and row.source_locator.get("contract_status") == "found"
+    )
+    if len(rows) != 1:
+        return False
+    market_data = rows[0].source_locator.get("market_data")
+    if not isinstance(market_data, Mapping):
+        return False
+    try:
+        last = Decimal(str(market_data.get("last")))
+    except (InvalidOperation, ValueError):
+        return False
+    provider_time = _market_timestamp(market_data.get("provider_time"))
+    retrieved_at = _market_timestamp(market_data.get("retrieved_at"))
+    if (
+        market_data.get("status") != "live"
+        or market_data.get("fresh") is not True
+        or not last.is_finite()
+        or last <= 0
+        or provider_time is None
+        or retrieved_at is None
+    ):
+        return False
+    age = retrieved_at - provider_time
+    return -timedelta(minutes=5) <= age <= timedelta(minutes=15)
+
+
 def evaluate_automation_decision(
     *,
     case: Mapping[str, object],
@@ -644,6 +690,7 @@ def evaluate_automation_decision(
             or market_destination == regulator_destination
         )
     )
+    market_snapshot_fresh = _market_snapshot_fresh(evidence_rows)
     destination = regulator_destination or market_destination
     venue_changed = (
         regulator_source_venue is not None
@@ -666,6 +713,23 @@ def evaluate_automation_decision(
                 effective_date=regulator_date,
                 rule_id="lifecycle.venue_transfer",
                 decision_issues=("market_corroboration_missing",),
+            )
+        if not market_snapshot_fresh:
+            return _decision(
+                decision_tier="verified_automatic",
+                action_readiness="waiting_market_confirmation",
+                relevance="direct_tracked_security",
+                confidence="high",
+                outcomes=("venue_transfer",),
+                conclusion="Regulator and contract evidence indicate a venue transfer.",
+                impact_summary=(
+                    "A fresh live market snapshot is still required before the "
+                    "event is treated as effective."
+                ),
+                successor_ticker=regulator_successor,
+                destination_venue=destination,
+                effective_date=regulator_date,
+                rule_id="lifecycle.venue_transfer",
             )
         return _decision(
             decision_tier="verified_automatic",
@@ -705,6 +769,26 @@ def evaluate_automation_decision(
                 effective_date=regulator_date,
                 rule_id="lifecycle.simple_symbol_continuation",
                 decision_issues=("market_corroboration_missing",),
+            )
+        if not market_snapshot_fresh:
+            return _decision(
+                decision_tier="verified_automatic",
+                action_readiness="waiting_market_confirmation",
+                relevance="direct_tracked_security",
+                confidence="high",
+                outcomes=outcomes,
+                conclusion=(
+                    f"Regulator and contract evidence indicate {regulator_source} "
+                    f"will become {regulator_successor}."
+                ),
+                impact_summary=(
+                    "A fresh live market snapshot is still required before any "
+                    "ticker transition can be scheduled."
+                ),
+                successor_ticker=regulator_successor,
+                destination_venue=destination,
+                effective_date=regulator_date,
+                rule_id="lifecycle.simple_symbol_continuation",
             )
         if case_ticker == regulator_successor:
             return _decision(
