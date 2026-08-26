@@ -322,16 +322,23 @@ def test_news_adapter_rejects_invalid_urls_without_rejecting_the_evidence():
         row_id=2,
         url="https://news.example/" + ("x" * 1000),
     )
+    _insert_normalized(
+        normalized,
+        row_id=3,
+        url="https://news.example/invalid\0path",
+    )
 
     result = _read(normalized, sa)
     persisted = _normalize_evidence(result.evidence)
     by_row = {item.source_locator["row_id"]: item for item in result.evidence}
 
-    assert len(persisted) == 2
+    assert len(persisted) == 3
     assert by_row[1].source_url is None
     assert by_row[1].source_locator["source_url_status"] == "rejected_non_https"
     assert by_row[2].source_url is None
     assert by_row[2].source_locator["source_url_status"] == "rejected_too_long"
+    assert by_row[3].source_url is None
+    assert by_row[3].source_locator["source_url_status"] == "rejected_invalid"
 
 
 def test_all_news_publishers_count_as_one_publisher_family():
