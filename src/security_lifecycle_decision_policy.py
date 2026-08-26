@@ -11,7 +11,7 @@ from typing import Any, Literal
 from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
 
 
-AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v2"
+AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v3"
 RULE_VERSIONS = {
     "lifecycle.insufficient_identity_facts": "1",
     "lifecycle.ma_review": "1",

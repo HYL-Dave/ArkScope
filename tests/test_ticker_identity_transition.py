@@ -772,6 +772,46 @@ def test_automation_transition_approval_rejects_incoherent_or_stale_authority(
         conn.close()
 
 
+def test_v2_automation_transition_fails_closed_at_v3_apply(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _seed_transferable_state(conn)
+        _seed_automation_authority(conn)
+        preview = _build(conn, sources=("manual_lists",))
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve_automation(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        conn.execute(
+            "UPDATE ticker_identity_transitions SET automation_policy_version=? "
+            "WHERE transition_id=?",
+            ("trusted-lifecycle-automation-v2", transition["transition_id"]),
+        )
+        conn.commit()
+        before = _profile_owned_rows(conn)
+
+        result = store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
+            trigger="scheduler",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["block_reasons"] == ["preview_changed"]
+        assert result["transition"]["status"] == "needs_review"
+        assert _profile_owned_rows(conn) == before
+    finally:
+        conn.close()
+
+
 def test_transition_approval_rejects_tampered_or_ineligible_preview_without_rows(
     tmp_path,
 ):

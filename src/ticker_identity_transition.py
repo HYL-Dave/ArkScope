@@ -1851,6 +1851,30 @@ class TickerIdentityTransitionStore:
                 result["transition"] = self.get(transition_id)
                 return result
 
+            if transition["approval_authority"] == "automation_policy":
+                from src.security_lifecycle_decision_policy import (
+                    AUTOMATION_POLICY_VERSION,
+                )
+
+                if (
+                    transition["automation_policy_version"]
+                    != AUTOMATION_POLICY_VERSION
+                ):
+                    result = self._blocked_apply(
+                        transition_id=transition_id,
+                        trigger=trigger,
+                        reasons=["preview_changed"],
+                        observed_preview_sha256=str(
+                            (current_preview or {}).get("preview_sha256") or ""
+                        )
+                        or None,
+                        at=now,
+                        mark_needs_review=True,
+                    )
+                    self.conn.commit()
+                    result["transition"] = self.get(transition_id)
+                    return result
+
             if current_preview is None:
                 result = self._blocked_apply(
                     transition_id=transition_id,

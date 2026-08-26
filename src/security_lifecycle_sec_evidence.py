@@ -23,7 +23,7 @@ _ACCESSION = re.compile(r"^[A-Za-z0-9.\-]{1,160}$")
 _IDENTITY_FORMS = frozenset({"25", "25-NSE", "8-A12B", "8-K12B"})
 _M_AND_A_FORMS = frozenset({"DEFM14A", "DEFA14A"})
 _MAX_EXCERPT_BYTES = 4096
-_RULE_VERSION = "2"
+_RULE_VERSION = "3"
 _MONTH_NAME = (
     r"(?:January|February|March|April|May|June|July|August|September|October|"
     r"November|December)"
@@ -42,6 +42,12 @@ _TRADING_BEGIN_DATE = re.compile(
     rf"(?P<date>{_MONTH_DATE_TEXT})\b",
     re.IGNORECASE,
 )
+_SOURCE_DEADLINE_PHRASE = re.compile(
+    r"\b(?:outside date|termination date|may be terminated if)\b",
+    re.IGNORECASE,
+)
+_ANY_MONTH_DATE = re.compile(rf"\b(?P<date>{_MONTH_DATE_TEXT})\b", re.IGNORECASE)
+_ANY_ISO_DATE = re.compile(r"\b(?P<date>\d{4}-\d{2}-\d{2})\b")
 _NEW_REPLACING = re.compile(
     r"\bnew ticker symbol\s+(?P<new>[A-Z][A-Z0-9.\-]{0,19})\s*,?\s*"
     r"replacing\s+(?P<old>[A-Z][A-Z0-9.\-]{0,19})\b",
@@ -191,6 +197,18 @@ class SecFact:
 
 
 @dataclass(frozen=True)
+class SecSourceDeadline:
+    date: str
+    evidence_id: str
+    span_start_byte: int
+    span_end_byte: int
+    cited_text: str
+    cited_text_sha256: str
+    rule_id: str
+    rule_version: str
+
+
+@dataclass(frozen=True)
 class SecEvidenceResult:
     context: IdentityContext
     selection: FilingChainSelection
@@ -199,6 +217,7 @@ class SecEvidenceResult:
     conflicts: Mapping[str, tuple[str, ...]]
     blockers: tuple[str, ...]
     symbol_transitions: tuple[tuple[str, str], ...]
+    source_deadlines: tuple[SecSourceDeadline, ...]
     diagnostics: Mapping[str, int]
 
 
@@ -478,6 +497,11 @@ def _candidate_sentence(sentence: str, context: IdentityContext) -> bool:
         return True
     if _TRADING_BEGIN_DATE.search(sentence) is not None:
         return True
+    if _SOURCE_DEADLINE_PHRASE.search(sentence) is not None and (
+        _ANY_MONTH_DATE.search(sentence) is not None
+        or _ANY_ISO_DATE.search(sentence) is not None
+    ):
+        return True
     if _ASSET_PURCHASE.search(sentence) is not None:
         return True
     if _CORPORATE_UNIFICATION.search(sentence) is not None:
@@ -512,6 +536,9 @@ def _focused_candidate(
         _EFFECTIVE_MONTH_DATE,
         _EFFECTIVE_ISO_DATE,
         _TRADING_BEGIN_DATE,
+        _SOURCE_DEADLINE_PHRASE,
+        _ANY_MONTH_DATE,
+        _ANY_ISO_DATE,
         _ASSET_PURCHASE,
         _CORPORATE_UNIFICATION,
         _SAME_NUMBER_COMMON_SHARES,
@@ -597,6 +624,39 @@ def _fact(
 
 def _normalized_month_date_text(value: str) -> str:
     return datetime.strptime(value, "%B %d, %Y").date().isoformat()
+
+
+def _source_deadlines(evidence: SecEvidence) -> tuple[SecSourceDeadline, ...]:
+    rows: list[SecSourceDeadline] = []
+    for start, end, sentence in _sentence_spans(evidence.excerpt):
+        if _SOURCE_DEADLINE_PHRASE.search(sentence) is None:
+            continue
+        dates = {
+            _normalized_month_date_text(match.group("date"))
+            for match in _ANY_MONTH_DATE.finditer(sentence)
+        }
+        dates.update(
+            _normalized_date("source_deadline", match.group("date"))
+            for match in _ANY_ISO_DATE.finditer(sentence)
+        )
+        byte_start = len(evidence.excerpt[:start].encode("utf-8"))
+        byte_end = byte_start + len(sentence.encode("utf-8"))
+        for value in sorted(dates):
+            rows.append(
+                SecSourceDeadline(
+                    date=value,
+                    evidence_id=evidence.evidence_id,
+                    span_start_byte=byte_start,
+                    span_end_byte=byte_end,
+                    cited_text=sentence,
+                    cited_text_sha256=hashlib.sha256(
+                        sentence.encode("utf-8")
+                    ).hexdigest(),
+                    rule_id="sec.explicit_transaction_termination_date",
+                    rule_version=_RULE_VERSION,
+                )
+            )
+    return tuple(rows)
 
 
 def _venue_mentions(sentence: str) -> tuple[tuple[int, str], ...]:
@@ -990,6 +1050,7 @@ def _empty_result(
         conflicts={},
         blockers=tuple(dict.fromkeys(blockers)),
         symbol_transitions=(),
+        source_deadlines=(),
         diagnostics=budget.diagnostics(),
     )
 
@@ -1095,6 +1156,12 @@ def collect_sec_evidence(
         for evidence in evidence_rows
         for fact in _extract_facts(evidence, context)
     ]
+    deadline_rows = tuple(
+        row for evidence in evidence_rows for row in _source_deadlines(evidence)
+    )
+    if len({row.date for row in deadline_rows}) > 1:
+        blockers.append("sec_evidence_insufficient")
+        deadline_rows = ()
 
     conflicts = detect_fact_conflicts(facts)
     if conflicts:
@@ -1118,5 +1185,6 @@ def collect_sec_evidence(
         conflicts=conflicts,
         blockers=tuple(dict.fromkeys(blockers)),
         symbol_transitions=transitions,
+        source_deadlines=deadline_rows,
         diagnostics=shared_budget.diagnostics(),
     )

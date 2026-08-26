@@ -279,7 +279,7 @@ def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts(
     assert evidence.content_sha256 == hashlib.sha256(evidence.excerpt.encode()).hexdigest()
     assert evidence.document_sha256 == hashlib.sha256(case["document"].encode()).hexdigest()
     assert evidence.source_locator["accession"] == case["filing"]["accessionNumber"]
-    assert evidence.source_locator["rule_version"] == "2"
+    assert evidence.source_locator["rule_version"] == "3"
     assert transport.calls[0][1] is transport.calls[1][1]
 
     for fact in result.facts:
@@ -682,3 +682,49 @@ def test_chain_stops_at_shared_request_document_and_byte_budgets():
     assert len(result.evidence) == 1
     assert [kind for kind, _budget in transport.calls] == ["json", "document"]
     assert {id(shared) for _kind, shared in transport.calls} == {id(budget)}
+
+
+def test_explicit_outside_date_is_hash_cited_and_conflicts_fail_closed():
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("BLBD")
+    sentence = (
+        "The merger agreement may be terminated if the merger is not "
+        "consummated by October 15, 2026 (the Outside Date)."
+    )
+    case["document"] = case["document"].replace(
+        "</body>", f"<p>{sentence}</p></body>"
+    )
+    result = collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert deadline.date == "2026-10-15"
+    assert deadline.rule_id == "sec.explicit_transaction_termination_date"
+    assert deadline.rule_version == "3"
+    assert deadline.cited_text == sentence
+    assert hashlib.sha256(deadline.cited_text.encode()).hexdigest() == (
+        deadline.cited_text_sha256
+    )
+    evidence = next(row for row in result.evidence if row.evidence_id == deadline.evidence_id)
+    cited = evidence.excerpt.encode()[deadline.span_start_byte : deadline.span_end_byte]
+    assert cited.decode() == sentence
+
+    conflicting = _case("BLBD")
+    conflicting["document"] = conflicting["document"].replace(
+        "</body>",
+        "<p>The transaction may be terminated if it has not closed by "
+        "October 15, 2026 (the Outside Date).</p>"
+        "<p>The termination date is 2026-11-01.</p></body>",
+    )
+    rejected = collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(conflicting),
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+    assert rejected.source_deadlines == ()
+    assert "sec_evidence_insufficient" in rejected.blockers

@@ -408,7 +408,7 @@ def test_policy_output_is_deterministic_and_uses_closed_rule_identity():
     )
 
     assert first == second
-    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v2"
+    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v3"
     assert RULE_VERSIONS == {
         "lifecycle.insufficient_identity_facts": "1",
         "lifecycle.ma_review": "1",

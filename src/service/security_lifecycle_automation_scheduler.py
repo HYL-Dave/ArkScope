@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 import logging
 from pathlib import Path
@@ -64,6 +64,7 @@ _RETRYABLE_BLOCKERS = frozenset(
         "sec_transport_unavailable",
         "sec_document_unavailable",
         "sec_evidence_insufficient",
+        "internal_news_unavailable",
         "ibkr_gateway_unavailable",
         "ibkr_contract_missing",
     }
@@ -465,27 +466,58 @@ def _normalize_sec_blocker(code: str) -> str:
     return code
 
 
-def _blockers(codes: list[str], *, at: str) -> tuple[tuple[AutomationBlocker, ...], str | None]:
-    normalized = tuple(dict.fromkeys(code for code in codes if code != "source_conflict"))
-    rows = tuple(
-        AutomationBlocker(code=code, retryable=code in _RETRYABLE_BLOCKERS, context={})
-        for code in normalized
-    )
-    retry_at = None
-    if rows and all(row.retryable for row in rows):
-        parsed = datetime.fromisoformat(at.replace("Z", "+00:00"))
-        retry_at = _timestamp(parsed + timedelta(days=1))
-    return rows, retry_at
+def _blockers(
+    values: list[str | AutomationBlocker],
+    *,
+    at: str,
+) -> tuple[tuple[AutomationBlocker, ...], str | None]:
+    rows_by_code: dict[str, AutomationBlocker] = {}
+    for value in values:
+        row = (
+            value
+            if isinstance(value, AutomationBlocker)
+            else AutomationBlocker(
+                code=value,
+                retryable=value in _RETRYABLE_BLOCKERS,
+                context={},
+            )
+        )
+        current = rows_by_code.get(row.code)
+        if current is None or (not current.context and row.context):
+            rows_by_code[row.code] = row
+    rows = tuple(rows_by_code[code] for code in sorted(rows_by_code))
+    if not rows or not all(row.retryable for row in rows):
+        return rows, None
+
+    parsed = datetime.fromisoformat(at.replace("Z", "+00:00"))
+    retry_candidates = [_timestamp(parsed + timedelta(days=1))]
+    for row in rows:
+        candidate = row.context.get("next_check_at")
+        if candidate is not None:
+            retry_candidates.append(
+                _timestamp(
+                    datetime.fromisoformat(str(candidate).replace("Z", "+00:00"))
+                )
+            )
+    return rows, max(retry_candidates)
 
 
-def _local_news_evidence(context, *, at: str) -> tuple[tuple[object, ...], dict[str, int]]:
+def _local_news_evidence(
+    context,
+    *,
+    at: str,
+) -> tuple[tuple[object, ...], tuple[str, ...], dict[str, int]]:
     from src.sa_capture_store import resolve_sa_db_path
     from src.security_lifecycle_news_evidence import read_local_publisher_evidence
 
     market_path = _market_path()
     sa_path = Path(resolve_sa_db_path())
     if not market_path.is_file() or not sa_path.is_file():
-        return (), {"news_evidence_count": 0, "news_unavailable": 1}
+        return (
+            (),
+            ("internal_news_unavailable",),
+            {"news_evidence_count": 0, "news_unavailable": 1},
+        )
     normalized_conn: sqlite3.Connection | None = None
     sa_conn: sqlite3.Connection | None = None
     try:
@@ -507,13 +539,21 @@ def _local_news_evidence(context, *, at: str) -> tuple[tuple[object, ...], dict[
             end_date=context.primary_end,
             retrieved_at=at,
         )
-        return result.evidence, {
-            "news_evidence_count": len(result.evidence),
-            "news_truncated": int(result.truncated),
-            "news_unavailable": int(bool(result.blockers)),
-        }
+        return (
+            result.evidence,
+            result.blockers,
+            {
+                "news_evidence_count": len(result.evidence),
+                "news_truncated": int(result.truncated),
+                "news_unavailable": int(bool(result.blockers)),
+            },
+        )
     except (OSError, sqlite3.Error):
-        return (), {"news_evidence_count": 0, "news_unavailable": 1}
+        return (
+            (),
+            ("internal_news_unavailable",),
+            {"news_evidence_count": 0, "news_unavailable": 1},
+        )
     finally:
         if normalized_conn is not None:
             normalized_conn.close()
@@ -592,6 +632,173 @@ def _fact_type(fact: object) -> str:
     return str(getattr(fact, "fact_type", "") or "")
 
 
+def _event_kinds(case: Mapping[str, object]) -> frozenset[str]:
+    observation = case.get("observation")
+    if not isinstance(observation, Mapping):
+        raise ValueError("source_observation_missing")
+    raw_kinds = observation.get("kinds", ())
+    if not isinstance(raw_kinds, (list, tuple)):
+        raise ValueError("observation_kinds")
+    return frozenset(
+        str(row.get("event_type") or "").strip()
+        for row in raw_kinds
+        if isinstance(row, Mapping) and str(row.get("event_type") or "").strip()
+    )
+
+
+def _exact_fact_date(facts: tuple[object, ...], fact_type: str) -> date | None:
+    values = {
+        str(_fact_value(fact)).strip()
+        for fact in facts
+        if _fact_type(fact) == fact_type and _fact_value(fact)
+    }
+    if len(values) != 1:
+        return None
+    try:
+        return date.fromisoformat(next(iter(values)))
+    except ValueError as exc:
+        raise ValueError(fact_type) from exc
+
+
+def _has_terminal_or_identity_resolution(facts: tuple[object, ...]) -> bool:
+    resolved_effects = {
+        "asset_acquisition_no_registrant_change",
+        "no_identity_change",
+        "symbol_and_venue_change",
+        "symbol_change",
+        "terminal_delisting",
+        "venue_change_only",
+    }
+    return any(
+        _fact_type(fact) == "tracked_security_effect"
+        and _fact_value(fact) in resolved_effects
+        for fact in facts
+    )
+
+
+def _pending_event_monitoring(
+    case: Mapping[str, object],
+    facts: tuple[object, ...],
+    *,
+    source_family_results: Mapping[str, str],
+    source_deadlines: tuple[object, ...],
+    at: str,
+) -> AutomationBlocker | None:
+    kinds = _event_kinds(case)
+    if "acquisition_completed" in kinds:
+        return None
+    if not kinds.intersection(
+        {"merger_agreement", "merger_proxy", "listing_status_review"}
+    ):
+        return None
+    if _has_terminal_or_identity_resolution(facts):
+        return None
+
+    instant = datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(
+        timezone.utc
+    )
+    today = instant.date()
+    effective = _exact_fact_date(facts, "effective_date")
+    deadlines = tuple(source_deadlines)
+    if len({str(getattr(row, "date", "")) for row in deadlines}) > 1:
+        raise ValueError("source_deadlines")
+    deadline = deadlines[0] if deadlines else None
+    deadline_date = (
+        date.fromisoformat(str(getattr(deadline, "date")))
+        if deadline is not None
+        else None
+    )
+
+    context: dict[str, object] = {
+        "monitoring_reason": "event_completion_not_confirmed",
+    }
+    if effective is not None:
+        context["effective_date"] = effective.isoformat()
+    if deadline is not None:
+        context.update(
+            {
+                "source_deadline": deadline_date.isoformat(),
+                "source_deadline_evidence_id": getattr(deadline, "evidence_id"),
+                "source_deadline_span_start_byte": getattr(
+                    deadline, "span_start_byte"
+                ),
+                "source_deadline_span_end_byte": getattr(deadline, "span_end_byte"),
+                "source_deadline_cited_text_sha256": getattr(
+                    deadline, "cited_text_sha256"
+                ),
+                "source_deadline_rule_id": getattr(deadline, "rule_id"),
+                "source_deadline_rule_version": getattr(deadline, "rule_version"),
+            }
+        )
+
+    required_families = {
+        "regulator",
+        "market_infrastructure",
+        "publisher",
+    }
+    sources_complete = all(
+        source_family_results.get(family) == "available"
+        for family in required_families
+    )
+    if deadline_date is not None and today >= deadline_date and sources_complete:
+        context["monitoring_reason"] = "not_confirmed_as_of"
+        context["as_of"] = deadline_date.isoformat()
+        return AutomationBlocker(
+            code="sec_evidence_insufficient",
+            retryable=False,
+            context=context,
+        )
+
+    if effective is not None and today < effective:
+        next_check = datetime.combine(
+            effective,
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        )
+    elif effective is not None and today <= effective + timedelta(days=7):
+        next_check = instant + timedelta(days=1)
+    else:
+        next_check = instant + timedelta(days=7)
+    context["next_check_at"] = _timestamp(next_check)
+    return AutomationBlocker(
+        code="sec_evidence_insufficient",
+        retryable=True,
+        context=context,
+    )
+
+
+def _provider_state(codes: tuple[str, ...], *, family: str) -> str:
+    conflict_codes = {
+        "regulator": {"source_conflict"},
+        "market_infrastructure": {"ibkr_contract_ambiguous"},
+        "publisher": set(),
+    }[family]
+    unavailable_codes = {
+        "regulator": {
+            "sec_access_denied",
+            "sec_document_unavailable",
+            "sec_governor_unavailable",
+            "sec_identity_unconfigured",
+            "sec_rate_limited",
+            "sec_request_budget_exhausted",
+            "sec_transport_unavailable",
+        },
+        "market_infrastructure": {
+            "ibkr_entitlement_denied",
+            "ibkr_gateway_unavailable",
+        },
+        "publisher": {
+            "internal_news_schema_mismatch",
+            "internal_news_unavailable",
+        },
+    }[family]
+    if conflict_codes.intersection(codes):
+        return "conflict"
+    if unavailable_codes.intersection(codes):
+        return "unavailable"
+    return "available"
+
+
 def _load_evidence(
     case: Mapping[str, object],
     *,
@@ -619,14 +826,19 @@ def _load_evidence(
     finally:
         transport.close()
 
-    codes = [_normalize_sec_blocker(str(code)) for code in sec.blockers]
-    if not sec.facts and "sec_evidence_insufficient" not in codes:
+    sec_codes = tuple(_normalize_sec_blocker(str(code)) for code in sec.blockers)
+    codes: list[str | AutomationBlocker] = list(sec_codes)
+    if not sec.facts and "sec_evidence_insufficient" not in sec_codes:
         codes.append("sec_evidence_insufficient")
     evidence: list[object] = list(sec.evidence)
     facts: list[object] = list(sec.facts)
 
-    news_evidence, news_diagnostics = _local_news_evidence(context, at=at)
+    news_evidence, news_codes, news_diagnostics = _local_news_evidence(
+        context,
+        at=at,
+    )
     evidence.extend(news_evidence)
+    codes.extend(news_codes)
     diagnostics.update(news_diagnostics)
 
     successor_values = tuple(
@@ -643,18 +855,53 @@ def _load_evidence(
         and _fact_value(fact) == "terminal_delisting"
         for fact in facts
     )
-    if successor_values or terminal:
+    pending_kinds = _event_kinds(case).intersection(
+        {"merger_agreement", "merger_proxy", "listing_status_review"}
+    )
+    effective = _exact_fact_date(tuple(facts), "effective_date")
+    today = datetime.fromisoformat(at.replace("Z", "+00:00")).date()
+    pending_market_check = bool(
+        pending_kinds
+        and "acquisition_completed" not in _event_kinds(case)
+        and not _has_terminal_or_identity_resolution(tuple(facts))
+        and effective is not None
+        and today >= effective
+    )
+    ibkr_codes: tuple[str, ...] = ()
+    market_queried = False
+    if successor_values or terminal or pending_market_check:
         ibkr, ibkr_facts = _ibkr_evidence(
             context,
             at=at,
             regulator_successors=successor_values,
         )
+        market_queried = True
         evidence.extend(ibkr.evidence)
         facts.extend(ibkr_facts)
-        codes.extend(str(code) for code in ibkr.blockers)
+        ibkr_codes = tuple(str(code) for code in ibkr.blockers)
+        codes.extend(ibkr_codes)
         diagnostics["ibkr_requests"] = int(ibkr.requests_made)
     else:
         diagnostics["ibkr_requests"] = 0
+
+    source_family_results = {
+        "regulator": _provider_state(sec_codes, family="regulator"),
+        "publisher": _provider_state(news_codes, family="publisher"),
+    }
+    if market_queried:
+        source_family_results["market_infrastructure"] = _provider_state(
+            ibkr_codes,
+            family="market_infrastructure",
+        )
+    pending = _pending_event_monitoring(
+        case,
+        tuple(facts),
+        source_family_results=source_family_results,
+        source_deadlines=tuple(getattr(sec, "source_deadlines", ())),
+        at=at,
+    )
+    if pending is not None:
+        codes.append(pending)
 
     blockers, retry_at = _blockers(codes, at=at)
     return LifecycleAutomationEvidenceBundle(

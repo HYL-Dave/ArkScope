@@ -797,12 +797,12 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
         monkeypatch.setattr(
             policy_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v3",
+            "trusted-lifecycle-automation-v4",
         )
         monkeypatch.setattr(
             worker_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v3",
+            "trusted-lifecycle-automation-v4",
         )
         harness.worker().run()
 
@@ -812,6 +812,143 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
         assert len(history) == 4
         assert history[0]["status"] == "accepted"
         assert all(row["status"] == "superseded" for row in history[1:])
+    finally:
+        harness.conn.close()
+
+
+def test_v3_reprocesses_v2_draft_without_deleting_audit_history(
+    tmp_path,
+    monkeypatch,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+    import src.security_lifecycle_decision_policy as policy_module
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _bundle(case, review_structure="stock")
+    try:
+        monkeypatch.setattr(
+            policy_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v2",
+        )
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v2",
+        )
+        first = harness.worker().run()
+        store = _store(harness)
+        old = store.list_assessments(case["case_id"])[0]
+        assert first["drafted"] == 1
+        assert old["status"] == "draft"
+
+        monkeypatch.setattr(
+            policy_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v3",
+        )
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v3",
+        )
+        second = harness.worker().run()
+
+        runs = store.list_automation_runs(case["case_id"])
+        assert second["processed"] == 1
+        assert len(runs) == 2
+        assert runs[0]["policy_version"] == "trusted-lifecycle-automation-v3"
+        assert runs[0]["run_id"] != old["automation_run_id"]
+        assert store.get_assessment(old["assessment_id"])["status"] == "draft"
+        projected = store.project_case_state(
+            case["case_id"],
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+        )
+        old_projection = next(
+            row
+            for row in projected["assessment_history"]
+            if row["assessment_id"] == old["assessment_id"]
+        )
+        assert old_projection["stale"] is True
+    finally:
+        harness.conn.close()
+
+
+def test_v3_reprocesses_human_accepted_v2_automation_without_rewriting_it(
+    tmp_path,
+    monkeypatch,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+    import src.security_lifecycle_decision_policy as policy_module
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _bundle(case, review_structure="stock")
+    try:
+        monkeypatch.setattr(
+            policy_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v2",
+        )
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v2",
+        )
+        harness.worker().run()
+        store = _store(harness)
+        old = store.list_assessments(case["case_id"])[0]
+        store.accept_assessment(
+            old["assessment_id"],
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+            acceptance_authority="human",
+            at=_AT,
+        )
+        before = store.get_assessment(old["assessment_id"])
+
+        monkeypatch.setattr(
+            policy_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v3",
+        )
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_POLICY_VERSION",
+            "trusted-lifecycle-automation-v3",
+        )
+        result = harness.worker().run()
+        persisted = store.get_assessment(old["assessment_id"])
+
+        assert result["processed"] == 1
+        assert persisted["status"] == "accepted"
+        for field in (
+            "conclusion",
+            "impact_summary",
+            "decision_provenance_sha256",
+            "evidence_set_sha256",
+            "observation_fingerprint_sha256",
+        ):
+            assert persisted[field] == before[field]
+        projected = store.project_case_state(
+            case["case_id"],
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+        )
+        old_projection = next(
+            row
+            for row in projected["assessment_history"]
+            if row["assessment_id"] == old["assessment_id"]
+        )
+        assert old_projection["stale"] is True
+        assert store.list_automation_runs(case["case_id"])[0][
+            "policy_version"
+        ] == "trusted-lifecycle-automation-v3"
     finally:
         harness.conn.close()
 

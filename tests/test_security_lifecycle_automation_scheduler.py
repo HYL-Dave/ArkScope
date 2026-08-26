@@ -384,7 +384,7 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
     monkeypatch.setattr(
         scheduler,
         "_local_news_evidence",
-        lambda _context, at: ((), {"news_evidence_count": 0}),
+        lambda _context, at: ((), (), {"news_evidence_count": 0}),
     )
     case = {
         "case_id": "slc_diag",
@@ -412,3 +412,186 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
         '"sec_document_count":1,"sec_governor_wait_ms":25,'
         '"sec_payload_bytes":4096,"sec_rate_limit_retries":0}'
     )
+
+
+def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
+    from src.security_lifecycle_sec_evidence import SecSourceDeadline
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = {
+        "observation": {
+            "kinds": [{"event_type": "merger_agreement", "effective_date": None}]
+        }
+    }
+    facts = (
+        SimpleNamespace(fact_type="effective_date", value="2026-09-05"),
+        SimpleNamespace(
+            fact_type="transaction_structure",
+            value={"kind": "stock", "terms_status": "complete"},
+        ),
+    )
+    deadline = SecSourceDeadline(
+        date="2026-10-15",
+        evidence_id="sle_deadline",
+        span_start_byte=10,
+        span_end_byte=80,
+        cited_text="The merger may be terminated by October 15, 2026.",
+        cited_text_sha256="a" * 64,
+        rule_id="sec.explicit_transaction_termination_date",
+        rule_version="3",
+    )
+
+    before_effective = scheduler._pending_event_monitoring(
+        case,
+        facts,
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(deadline,),
+        at="2026-08-26T00:00:00Z",
+    )
+    assert before_effective is not None
+    assert before_effective.retryable is True
+    assert before_effective.context["monitoring_reason"] == (
+        "event_completion_not_confirmed"
+    )
+    assert before_effective.context["next_check_at"] == "2026-09-05T00:00:00Z"
+
+    daily = scheduler._pending_event_monitoring(
+        case,
+        facts,
+        source_family_results={},
+        source_deadlines=(deadline,),
+        at="2026-09-10T00:00:00Z",
+    )
+    assert daily is not None
+    assert daily.context["next_check_at"] == "2026-09-11T00:00:00Z"
+
+    weekly = scheduler._pending_event_monitoring(
+        case,
+        facts,
+        source_family_results={},
+        source_deadlines=(deadline,),
+        at="2026-09-13T00:00:00Z",
+    )
+    assert weekly is not None
+    assert weekly.context["next_check_at"] == "2026-09-20T00:00:00Z"
+
+    final = scheduler._pending_event_monitoring(
+        case,
+        facts,
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(deadline,),
+        at="2026-10-15T12:00:00Z",
+    )
+    assert final is not None
+    assert final.retryable is False
+    assert final.context["monitoring_reason"] == "not_confirmed_as_of"
+    assert final.context["as_of"] == "2026-10-15"
+    assert final.context["source_deadline_evidence_id"] == "sle_deadline"
+
+    unavailable_final_check = scheduler._pending_event_monitoring(
+        case,
+        facts,
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "unavailable",
+        },
+        source_deadlines=(deadline,),
+        at="2026-10-15T12:00:00Z",
+    )
+    assert unavailable_final_check is not None
+    assert unavailable_final_check.retryable is True
+    assert unavailable_final_check.context["monitoring_reason"] == (
+        "event_completion_not_confirmed"
+    )
+    assert unavailable_final_check.context["next_check_at"] == (
+        "2026-10-22T12:00:00Z"
+    )
+
+
+def test_pending_without_source_deadline_never_becomes_timeless_negative():
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = {
+        "observation": {
+            "kinds": [{"event_type": "merger_proxy", "effective_date": None}]
+        }
+    }
+    blocker = scheduler._pending_event_monitoring(
+        case,
+        (),
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(),
+        at="2027-08-26T00:00:00Z",
+    )
+    assert blocker is not None
+    assert blocker.retryable is True
+    assert blocker.context == {
+        "monitoring_reason": "event_completion_not_confirmed",
+        "next_check_at": "2027-09-02T00:00:00Z",
+    }
+
+
+def test_completed_or_resolved_event_does_not_create_monitoring_blocker():
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    completed = {
+        "observation": {
+            "kinds": [{"event_type": "acquisition_completed", "effective_date": None}]
+        }
+    }
+    assert scheduler._pending_event_monitoring(
+        completed,
+        (),
+        source_family_results={},
+        source_deadlines=(),
+        at="2026-08-26T00:00:00Z",
+    ) is None
+
+    resolved = {
+        "observation": {
+            "kinds": [{"event_type": "merger_agreement", "effective_date": None}]
+        }
+    }
+    facts = (
+        SimpleNamespace(
+            fact_type="tracked_security_effect",
+            value="no_identity_change",
+        ),
+    )
+    assert scheduler._pending_event_monitoring(
+        resolved,
+        facts,
+        source_family_results={},
+        source_deadlines=(),
+        at="2026-08-26T00:00:00Z",
+    ) is None
+
+
+def test_blocker_normalization_preserves_typed_context_and_retry_schedule():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    pending = AutomationBlocker(
+        code="sec_evidence_insufficient",
+        retryable=True,
+        context={
+            "monitoring_reason": "event_completion_not_confirmed",
+            "next_check_at": "2026-09-05T00:00:00Z",
+        },
+    )
+    blockers, retry_at = scheduler._blockers([pending], at="2026-08-26T00:00:00Z")
+    assert blockers == (pending,)
+    assert retry_at == "2026-09-05T00:00:00Z"
