@@ -129,11 +129,12 @@ an affirmative current clause such as:
 - `outside date|termination date has been|was extended to <DATE>`.
 
 The accepted span is the exact source sentence. An explicit directional
-extension such as `extended from <OLD_DATE> to <NEW_DATE>` emits exactly the
-date governed by `to`; the old `from` date is not a target candidate. After the
-accepted grammar identifies its target position, more than one target date
-(for example, `extended to <DATE_A> or <DATE_B>`) or no target date emits no
-deadline.
+extension such as `the outside date was extended from <OLD_DATE> to <NEW_DATE>`
+emits exactly the date governed by `to` in that matched extension clause; the
+old `from` date is not a target candidate. A sentence containing two or more
+extension clauses or `extended ... to` targets emits no deadline. Within one
+matched clause, more than one target date (for example,
+`extended to <DATE_A> or <DATE_B>`) or no target date also emits no deadline.
 
 ### 4.2 Rejected clauses
 
@@ -151,7 +152,8 @@ the case in Monitoring; it never moves the case to History.
 
 The deadline rule remains
 `sec.explicit_transaction_termination_date`. Introduce a dedicated
-`_SOURCE_DEADLINE_RULE_VERSION = "4"` used only when constructing
+`_SOURCE_DEADLINE_RULE_VERSION = "4"` in
+`src/security_lifecycle_sec_evidence.py`, used only when constructing
 `SecSourceDeadline`. Keep the existing shared `_RULE_VERSION = "3"` unchanged
 for every SEC fact and SEC evidence `source_locator`. Do not add this extractor
 version to decision-policy `RULE_VERSIONS`.
@@ -277,12 +279,12 @@ RED-first coverage must prove:
    out-of-range span, invalid UTF-8 boundary, forged hash, or mismatched rule
    identity fails atomically at the kernel boundary;
 3. the current simple accepted forms remain regression controls, while the true
-   RED directional-extension case `extended from March 1, 2026 to June 1, 2026`
-   emits exactly `2026-06-01` through the fixed extractor;
+   RED directional-extension case `The outside date was extended from March 1,
+   2026 to June 1, 2026.` emits exactly `2026-06-01` through the fixed extractor;
 4. historical, original, superseded, negated, `as of`, ambiguous-target, and
    unsupported clauses emit none and retain Monitoring; a sentence with two
-   target dates after `to` emits none, while a directional `from ... to ...`
-   clause is not misclassified as ambiguous;
+   target dates after `to` or two extension clauses emits none, while a single
+   directional `from ... to ...` clause is not misclassified as ambiguous;
 5. pre-deadline contexts carrying source-deadline fields are validated even
    though their `monitoring_reason` is not `not_confirmed_as_of`, while blockers
    with no deadline fields remain unaffected;
