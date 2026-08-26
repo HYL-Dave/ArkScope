@@ -101,6 +101,78 @@ def _fact(evidence, value="HAPN", *, rule_version="1"):
     )
 
 
+def _deadline_owner(*, at="2026-08-27T00:00:00Z", excerpt_prefix=""):
+    from src.security_lifecycle_sec_evidence import SecSourceDeadline
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    cited_text = (
+        "HAPN merger agreement may be terminated if the merger is not "
+        "consummated by May 7, 2026."
+    )
+    excerpt = excerpt_prefix + cited_text
+    evidence = _evidence("deadline", excerpt=excerpt)
+    encoded = excerpt.encode("utf-8")
+    cited = cited_text.encode("utf-8")
+    start = encoded.index(cited)
+    deadline = SecSourceDeadline(
+        date="2026-05-07",
+        evidence_id=evidence.evidence_id,
+        span_start_byte=start,
+        span_end_byte=start + len(cited),
+        cited_text=cited_text,
+        cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+        rule_id="sec.explicit_transaction_termination_date",
+        rule_version="4",
+    )
+    blocker = scheduler._pending_event_monitoring(
+        {
+            "observation": {
+                "kinds": [
+                    {"event_type": "merger_agreement", "effective_date": None}
+                ]
+            }
+        },
+        (),
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(deadline,),
+        at=at,
+    )
+    assert blocker is not None
+    return evidence, blocker
+
+
+def _cut_inside_multibyte_source_character(context):
+    invalid_byte = "é".encode("utf-8")[1:2]
+    context["source_deadline_span_start_byte"] = 1
+    context["source_deadline_span_end_byte"] = 2
+    context["source_deadline_cited_text_sha256"] = hashlib.sha256(
+        invalid_byte
+    ).hexdigest()
+
+
+_BLOCKER_CITATION_MUTATIONS = {
+    "partial_set": lambda c: c.pop("source_deadline_span_end_byte"),
+    "missing_evidence": lambda c: c.__setitem__(
+        "source_deadline_evidence_id", "missing"
+    ),
+    "out_of_range": lambda c: c.__setitem__(
+        "source_deadline_span_end_byte", 999999
+    ),
+    "utf8_boundary": _cut_inside_multibyte_source_character,
+    "forged_hash": lambda c: c.__setitem__(
+        "source_deadline_cited_text_sha256", "f" * 64
+    ),
+    "wrong_rule_id": lambda c: c.__setitem__("source_deadline_rule_id", "sec.other"),
+    "wrong_rule_version": lambda c: c.__setitem__(
+        "source_deadline_rule_version", "3"
+    ),
+}
+
+
 def _succeed(kernel, claim, *, evidence=(), facts=(), diagnostics=None, at=_LATER):
     return kernel.complete_run(
         run_id=claim.run_id,
@@ -113,6 +185,344 @@ def _succeed(kernel, claim, *, evidence=(), facts=(), diagnostics=None, at=_LATE
         diagnostics=diagnostics or {"sec_attempts": 1},
         at=at,
     )
+
+
+@pytest.mark.parametrize(
+    ("at", "expected_reason", "retry_at"),
+    [
+        (
+            "2026-05-01T00:00:00Z",
+            "event_completion_not_confirmed",
+            "2026-05-08T00:00:00Z",
+        ),
+        ("2026-08-27T00:00:00Z", "not_confirmed_as_of", None),
+    ],
+)
+def test_producer_deadline_citation_crosses_real_kernel(
+    at, expected_reason, retry_at
+):
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at=at)
+    sec_evidence, scheduler_blocker = _deadline_owner(at=at)
+
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(sec_evidence,),
+        facts=(),
+        blockers=(scheduler_blocker,),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at=retry_at,
+        diagnostics={"sec_attempts": 1},
+        at=at,
+    )
+
+    stored = store.get_automation_run(result.run_id)["blockers"][0]
+    stored_context = json.loads(stored["context_json"])
+    assert stored_context["monitoring_reason"] == expected_reason
+    expected_evidence_id = "sle_" + hashlib.sha256(
+        f"{claim.run_id}\0{sec_evidence.evidence_id}\0{sec_evidence.content_sha256}".encode()
+    ).hexdigest()[:32]
+    assert stored_context["source_deadline_evidence_id"] == expected_evidence_id
+    assert scheduler_blocker.context["source_deadline_evidence_id"] == (
+        sec_evidence.evidence_id
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation_name", "mutate"),
+    tuple(_BLOCKER_CITATION_MUTATIONS.items()),
+    ids=tuple(_BLOCKER_CITATION_MUTATIONS),
+)
+def test_blocker_citation_mutations_fail_atomically(mutation_name, mutate):
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at="2026-08-27T00:00:00Z")
+    prefix = "é" if mutation_name == "utf8_boundary" else ""
+    evidence, blocker = _deadline_owner(excerpt_prefix=prefix)
+    context = dict(blocker.context)
+    mutate(context)
+    forged = replace(blocker, context=context)
+
+    before = {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in (
+            "security_lifecycle_evidence",
+            "security_lifecycle_automation_facts",
+            "security_lifecycle_automation_run_blockers",
+        )
+    }
+    with pytest.raises(ValueError) as exc_info:
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(evidence,),
+            facts=(_fact(evidence),),
+            blockers=(forged,),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at="2026-08-27T00:00:00Z",
+        )
+
+    assert str(exc_info.value) == "blocker_citation"
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
+    assert {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in before
+    } == before
+
+
+def test_blocker_citation_rejects_evidence_owned_by_another_run_atomically():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    conn, store, kernel, case_id = _context()
+    evidence, producer_blocker = _deadline_owner()
+    owner = _reserve(kernel, case_id, at="2026-08-27T00:00:00Z")
+    kernel.complete_run(
+        run_id=owner.run_id,
+        evidence=(evidence,),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="sec_transport_unavailable",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-28T00:00:00Z",
+        diagnostics={"sec_attempts": 1},
+        at="2026-08-27T00:00:00Z",
+    )
+    persisted_id = conn.execute(
+        "SELECT evidence_id FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=?",
+        (owner.run_id,),
+    ).fetchone()[0]
+
+    claimant = _reserve(
+        kernel,
+        case_id,
+        observation_fingerprint_sha256="b" * 64,
+        at="2026-08-27T00:00:00Z",
+    )
+    context = dict(producer_blocker.context)
+    context["source_deadline_evidence_id"] = persisted_id
+    cross_run = replace(producer_blocker, context=context)
+    before = {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in (
+            "security_lifecycle_evidence",
+            "security_lifecycle_automation_facts",
+            "security_lifecycle_automation_run_blockers",
+        )
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        kernel.complete_run(
+            run_id=claimant.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(cross_run,),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at="2026-08-27T00:00:00Z",
+        )
+
+    assert str(exc_info.value) == "blocker_citation"
+    assert store.get_automation_run(claimant.run_id)["status"] == "running"
+    assert {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in before
+    } == before
+
+
+def test_blocker_citation_resolves_existing_evidence_owned_by_same_run():
+    conn, store, kernel, case_id = _context()
+    evidence, producer_blocker = _deadline_owner()
+    claim = _reserve(kernel, case_id, at="2026-08-27T00:00:00Z")
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="waiting_effective_date",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at="2026-08-27T00:00:00Z",
+    )
+    persisted_id = conn.execute(
+        "SELECT evidence_id FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=?",
+        (claim.run_id,),
+    ).fetchone()[0]
+    retry = kernel.reserve_readiness_recheck(
+        run_id=claim.run_id,
+        due_at="2026-08-28T00:00:00Z",
+        at="2026-08-28T00:00:00Z",
+    )
+    assert retry.run_id == claim.run_id
+    context = dict(producer_blocker.context)
+    context["source_deadline_evidence_id"] = persisted_id
+
+    result = kernel.complete_run(
+        run_id=retry.run_id,
+        evidence=(),
+        facts=(),
+        blockers=(replace(producer_blocker, context=context),),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at=None,
+        diagnostics={"sec_attempts": 2},
+        at="2026-08-28T00:00:00Z",
+    )
+
+    assert result.status == "blocked"
+    stored_context = json.loads(
+        store.get_automation_run(retry.run_id)["blockers"][0]["context_json"]
+    )
+    assert stored_context["source_deadline_evidence_id"] == persisted_id
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda context: context.__setitem__("source_deadline", "2026-5-7"),
+        lambda context: context.pop("as_of"),
+        lambda context: context.__setitem__("as_of", "2026-5-7"),
+    ),
+    ids=("source_deadline_not_iso", "missing_final_as_of", "final_as_of_not_iso"),
+)
+def test_blocker_citation_requires_canonical_deadline_dates(mutate):
+    _conn, store, kernel, case_id = _context()
+    evidence, blocker = _deadline_owner()
+    claim = _reserve(kernel, case_id, at="2026-08-27T00:00:00Z")
+    context = dict(blocker.context)
+    mutate(context)
+
+    with pytest.raises(ValueError) as exc_info:
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(evidence,),
+            facts=(),
+            blockers=(replace(blocker, context=context),),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at="2026-08-27T00:00:00Z",
+        )
+
+    assert str(exc_info.value) == "blocker_citation"
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
+
+
+def test_blocker_citation_free_event_monitoring_remains_valid():
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at="2026-08-27T00:00:00Z")
+    blocker = scheduler._pending_event_monitoring(
+        {
+            "observation": {
+                "kinds": [
+                    {"event_type": "merger_agreement", "effective_date": None}
+                ]
+            }
+        },
+        (),
+        source_family_results={},
+        source_deadlines=(),
+        at="2026-08-27T00:00:00Z",
+    )
+    assert blocker is not None
+
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(),
+        facts=(),
+        blockers=(blocker,),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-09-03T00:00:00Z",
+        diagnostics={"sec_attempts": 1},
+        at="2026-08-27T00:00:00Z",
+    )
+
+    assert result.status == "blocked"
+    assert json.loads(store.get_automation_run(claim.run_id)["blockers"][0]["context_json"]) == {
+        "monitoring_reason": "event_completion_not_confirmed",
+        "next_check_at": "2026-09-03T00:00:00Z",
+    }
+
+
+def test_blocker_citation_any_deadline_field_triggers_complete_set_before_deadline():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at="2026-05-01T00:00:00Z")
+
+    with pytest.raises(ValueError) as exc_info:
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(
+                AutomationBlocker(
+                    code="sec_evidence_insufficient",
+                    retryable=True,
+                    context={
+                        "monitoring_reason": "event_completion_not_confirmed",
+                        "next_check_at": "2026-05-08T00:00:00Z",
+                        "source_deadline": "2026-05-07",
+                    },
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at="2026-05-08T00:00:00Z",
+            diagnostics={"sec_attempts": 1},
+            at="2026-05-01T00:00:00Z",
+        )
+
+    assert str(exc_info.value) == "blocker_citation"
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
+
+
+def test_blocker_citation_final_reason_requires_complete_deadline_set():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at="2026-08-27T00:00:00Z")
+
+    with pytest.raises(ValueError) as exc_info:
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(
+                AutomationBlocker(
+                    code="sec_evidence_insufficient",
+                    retryable=False,
+                    context={
+                        "monitoring_reason": "not_confirmed_as_of",
+                        "as_of": "2026-05-07",
+                    },
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at="2026-08-27T00:00:00Z",
+        )
+
+    assert str(exc_info.value) == "blocker_citation"
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
 
 
 def test_automation_run_key_binds_case_observation_policy_and_mode():
@@ -652,6 +1062,30 @@ def test_conflicting_current_facts_are_typed_and_never_majority_resolved():
     assert row["decision_tier"] == "review_suggested"
     assert row["action_readiness"] == "action_blocked"
     assert [item["blocker_code"] for item in row["blockers"]] == ["source_conflict"]
+    assert json.loads(row["blockers"][0]["context_json"]) == {
+        "fact_types": ["successor_ticker"]
+    }
+
+
+@pytest.mark.parametrize(
+    "blocker_code",
+    ("transition_approval_changed", "transition_approval_unavailable"),
+)
+def test_transition_revalidation_blockers_remain_citation_free(blocker_code):
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+    _succeed(kernel, claim, evidence=(evidence,), facts=(_fact(evidence),))
+
+    kernel.defer_transition_revalidation(
+        run_id=claim.run_id,
+        blocker_code=blocker_code,
+        at="2026-08-25T03:00:00Z",
+    )
+
+    blockers = store.get_automation_run(claim.run_id)["blockers"]
+    assert [row["blocker_code"] for row in blockers] == [blocker_code]
+    assert json.loads(blockers[0]["context_json"]) == {}
 
 
 def test_persisted_decision_provenance_recomputes_from_database_rows():

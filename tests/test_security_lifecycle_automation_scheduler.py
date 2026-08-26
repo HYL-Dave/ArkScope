@@ -438,7 +438,7 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
         cited_text="The merger may be terminated by October 15, 2026.",
         cited_text_sha256="a" * 64,
         rule_id="sec.explicit_transaction_termination_date",
-        rule_version="3",
+        rule_version="4",
     )
 
     before_effective = scheduler._pending_event_monitoring(
@@ -495,6 +495,7 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
     assert final.context["monitoring_reason"] == "not_confirmed_as_of"
     assert final.context["as_of"] == "2026-10-15"
     assert final.context["source_deadline_evidence_id"] == "sle_deadline"
+    assert final.context["source_deadline_rule_version"] == "4"
 
     unavailable_final_check = scheduler._pending_event_monitoring(
         case,

@@ -407,6 +407,69 @@ def _invalid_persistence_bundle(case, *, blockers=()):
     )
 
 
+def _forged_deadline_bundle(case):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationEvidence
+    from src.security_lifecycle_sec_evidence import SecSourceDeadline
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    cited_text = (
+        "HAPN transaction may be terminated if it is not consummated by "
+        "August 24, 2026."
+    )
+    encoded = cited_text.encode("utf-8")
+    evidence = AutomationEvidence(
+        evidence_id="source-deadline",
+        source_family="regulator",
+        adapter="sec_edgar",
+        kind="regulator_excerpt",
+        source_url=case["observation"]["evidence_url"],
+        title="Deadline evidence",
+        publisher="SEC EDGAR",
+        domain="sec.gov",
+        source_published_at="2026-08-20",
+        retrieved_at=_AT,
+        excerpt=cited_text,
+        content_sha256=hashlib.sha256(encoded).hexdigest(),
+        source_document_sha256="d" * 64,
+        source_locator={"accession": case["source_ref"]},
+        evidence_dedupe_key=f"deadline:{case['case_id']}",
+    )
+    deadline = SecSourceDeadline(
+        date="2026-08-24",
+        evidence_id=evidence.evidence_id,
+        span_start_byte=0,
+        span_end_byte=len(encoded),
+        cited_text=cited_text,
+        cited_text_sha256=hashlib.sha256(encoded).hexdigest(),
+        rule_id="sec.explicit_transaction_termination_date",
+        rule_version="4",
+    )
+    blocker = scheduler._pending_event_monitoring(
+        case,
+        (),
+        source_family_results={
+            "regulator": "available",
+            "market_infrastructure": "available",
+            "publisher": "available",
+        },
+        source_deadlines=(deadline,),
+        at=_AT,
+    )
+    assert blocker is not None
+    forged_context = dict(blocker.context)
+    forged_context["source_deadline_cited_text_sha256"] = "f" * 64
+    return LifecycleAutomationEvidenceBundle(
+        evidence=(evidence,),
+        facts=(),
+        blockers=(replace(blocker, context=forged_context),),
+        diagnostics={"news_evidence_count": 20, "sec_attempts": 7},
+        retry_at=None,
+    )
+
+
 def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_path):
     cases = [_case(3), _case(1), _case(2)]
     harness = _Harness(tmp_path, cases)
@@ -793,6 +856,55 @@ def test_worker_records_execution_revision_without_replaying_current_failed_run(
         assert second["processed"] == 0
         assert second["skipped_current"] == 1
         assert len(_store(harness).list_automation_runs(case["case_id"])) == 1
+    finally:
+        harness.conn.close()
+
+
+def test_forged_deadline_failure_replays_once_after_execution_revision_change(
+    tmp_path,
+    monkeypatch,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _forged_deadline_bundle(case)
+    try:
+        first_result = harness.worker().run()
+        store = _store(harness)
+        failed_run = store.list_automation_runs(case["case_id"])[0]
+        failed_snapshot = store.get_automation_run(failed_run["run_id"])
+
+        assert first_result["failed"] == 1
+        assert failed_run["failure_code"] == "persistence_failed"
+        assert json.loads(failed_run["diagnostics_json"]) == {
+            "failures": 1,
+            "news_evidence_count": 20,
+            "sec_attempts": 7,
+        }
+        assert failed_run["blockers"] == []
+        assert harness.conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=?",
+            (failed_run["run_id"],),
+        ).fetchone()[0] == 0
+
+        monkeypatch.setattr(
+            worker_module,
+            "AUTOMATION_EXECUTION_REVISION",
+            "trusted-lifecycle-execution-r2",
+        )
+        replay_result = harness.worker().run()
+        runs = store.list_automation_runs(case["case_id"])
+
+        assert replay_result["selected"] == 1
+        assert replay_result["failed"] == 1
+        assert len(runs) == 2
+        assert runs[0]["run_id"] != failed_run["run_id"]
+        assert json.loads(runs[0]["query_context_json"])[
+            "predecessor_failed_run_id"
+        ] == failed_run["run_id"]
+        assert store.get_automation_run(failed_run["run_id"]) == failed_snapshot
     finally:
         harness.conn.close()
 

@@ -60,6 +60,17 @@ _DIAGNOSTIC_CONTENT_MARKERS = (
     "prompt",
     "contact",
 )
+_SOURCE_DEADLINE_CONTEXT_FIELDS = frozenset(
+    {
+        "source_deadline",
+        "source_deadline_evidence_id",
+        "source_deadline_span_start_byte",
+        "source_deadline_span_end_byte",
+        "source_deadline_cited_text_sha256",
+        "source_deadline_rule_id",
+        "source_deadline_rule_version",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -551,6 +562,29 @@ def _normalize_evidence(values: Iterable[object]) -> tuple[_EvidenceRow, ...]:
     return tuple(sorted(rows, key=lambda row: (row.local_id, row.content_sha256)))
 
 
+def _validate_citation(
+    *,
+    error_name: str,
+    evidence: _EvidenceRow,
+    start: object,
+    end: object,
+    cited_text_sha256: object,
+) -> None:
+    if type(start) is not int or type(end) is not int or start < 0 or end <= start:
+        raise ValueError(error_name)
+    encoded = evidence.excerpt.encode("utf-8")
+    if end > len(encoded):
+        raise ValueError(error_name)
+    cited = encoded[start:end]
+    try:
+        cited.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(error_name) from exc
+    digest = _sha256(error_name, cited_text_sha256)
+    if hashlib.sha256(cited).hexdigest() != digest:
+        raise ValueError(error_name)
+
+
 def _normalize_facts(
     values: Iterable[object], evidence: tuple[_EvidenceRow, ...]
 ) -> tuple[_FactRow, ...]:
@@ -583,21 +617,15 @@ def _normalize_facts(
             raise ValueError("normalized_value")
         start = _field(value, "source_span_start", _field(value, "span_start_byte"))
         end = _field(value, "source_span_end", _field(value, "span_end_byte"))
-        if type(start) is not int or type(end) is not int or start < 0 or end <= start:
-            raise ValueError("fact_citation")
-        encoded = evidence_row.excerpt.encode("utf-8")
-        if end > len(encoded):
-            raise ValueError("fact_citation")
-        cited = encoded[start:end]
-        try:
-            cited.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise ValueError("fact_citation") from exc
-        cited_digest = _sha256(
-            "fact_citation", _field(value, "cited_text_sha256")
+        cited_text_sha256 = _field(value, "cited_text_sha256")
+        _validate_citation(
+            error_name="fact_citation",
+            evidence=evidence_row,
+            start=start,
+            end=end,
+            cited_text_sha256=cited_text_sha256,
         )
-        if hashlib.sha256(cited).hexdigest() != cited_digest:
-            raise ValueError("fact_citation")
+        cited_digest = str(cited_text_sha256)
         rule_id = _text(
             "extractor_rule_id",
             _field(value, "extractor_rule_id", _field(value, "rule_id")),
@@ -661,6 +689,93 @@ def _normalize_blockers(values: Iterable[object]) -> tuple[tuple[str, bool, str]
             raise ValueError("duplicate_blocker_code")
         rows[code] = (code, retryable, context_json)
     return tuple(rows[code] for code in sorted(rows))
+
+
+def _persisted_evidence_id(run_id: str, evidence: _EvidenceRow) -> str:
+    identity_digest = hashlib.sha256(
+        f"{run_id}\0{evidence.local_id}\0{evidence.content_sha256}".encode()
+    ).hexdigest()
+    return "sle_" + identity_digest[:32]
+
+
+def _citation_date(value: object) -> bool:
+    if type(value) is not str:
+        return False
+    try:
+        return date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        return False
+
+
+def _normalize_deadline_blockers(
+    *,
+    run_id: str,
+    blockers: Iterable[tuple[str, bool, str]],
+    current_evidence: tuple[_EvidenceRow, ...],
+    existing_evidence: tuple[_EvidenceRow, ...],
+) -> tuple[tuple[str, bool, str], ...]:
+    current_by_id = {
+        row.local_id: (row, _persisted_evidence_id(run_id, row))
+        for row in current_evidence
+    }
+    existing_by_id = {row.local_id: (row, row.local_id) for row in existing_evidence}
+    normalized: list[tuple[str, bool, str]] = []
+    for code, retryable, context_json in blockers:
+        context = json.loads(context_json)
+        has_deadline_fields = bool(
+            _SOURCE_DEADLINE_CONTEXT_FIELDS.intersection(context)
+        )
+        if (
+            context.get("monitoring_reason") == "not_confirmed_as_of"
+            and not has_deadline_fields
+        ):
+            raise ValueError("blocker_citation")
+        if not has_deadline_fields:
+            normalized.append((code, retryable, context_json))
+            continue
+        if not _SOURCE_DEADLINE_CONTEXT_FIELDS.issubset(context):
+            raise ValueError("blocker_citation")
+        if not _citation_date(context["source_deadline"]):
+            raise ValueError("blocker_citation")
+        if (
+            context["source_deadline_rule_id"]
+            != "sec.explicit_transaction_termination_date"
+            or context["source_deadline_rule_version"] != "4"
+        ):
+            raise ValueError("blocker_citation")
+        evidence_id = context["source_deadline_evidence_id"]
+        if type(evidence_id) is not str:
+            raise ValueError("blocker_citation")
+        resolved = current_by_id.get(evidence_id) or existing_by_id.get(evidence_id)
+        if resolved is None:
+            raise ValueError("blocker_citation")
+        evidence, persisted_id = resolved
+        _validate_citation(
+            error_name="blocker_citation",
+            evidence=evidence,
+            start=context["source_deadline_span_start_byte"],
+            end=context["source_deadline_span_end_byte"],
+            cited_text_sha256=context["source_deadline_cited_text_sha256"],
+        )
+        if context.get("monitoring_reason") == "not_confirmed_as_of" and not (
+            _citation_date(context.get("as_of"))
+        ):
+            raise ValueError("blocker_citation")
+        rewritten = dict(context)
+        rewritten["source_deadline_evidence_id"] = persisted_id
+        normalized.append(
+            (
+                code,
+                retryable,
+                _canonical_json(
+                    rewritten,
+                    name="blocker_context",
+                    max_bytes=4096,
+                    diagnostics=True,
+                ),
+            )
+        )
+    return tuple(normalized)
 
 
 def _conflicts(facts: Iterable[_FactRow]) -> dict[str, tuple[str, ...]]:
@@ -1251,27 +1366,7 @@ class SecurityLifecycleFactKernel:
             raise ValueError("automation_run_not_running")
         normalized_evidence = _normalize_evidence(evidence)
         normalized_facts = _normalize_facts(facts, normalized_evidence)
-        normalized_blockers = list(_normalize_blockers(blockers))
-        existing_evidence = _persisted_evidence_rows(self.conn, run_id)
-        existing_facts = _persisted_fact_rows(self.conn, run_id)
-        conflicts = _conflicts((*existing_facts, *normalized_facts))
-        normalized_blockers = [
-            row for row in normalized_blockers if row[0] != "source_conflict"
-        ]
-        if conflicts:
-            normalized_blockers.append(
-                (
-                    "source_conflict",
-                    False,
-                    _canonical_json(
-                        {"fact_types": sorted(conflicts)},
-                        name="blocker_context",
-                        max_bytes=4096,
-                        diagnostics=True,
-                    ),
-                )
-            )
-            normalized_blockers.sort(key=lambda row: row[0])
+        structurally_normalized_blockers = _normalize_blockers(blockers)
 
         if decision_tier is not None and decision_tier not in DECISION_TIERS:
             raise ValueError("decision_tier")
@@ -1283,47 +1378,79 @@ class SecurityLifecycleFactKernel:
             None if retry_at is None else _timestamp("retry_at", retry_at)
         )
 
-        terminal_blockers = [
-            row for row in normalized_blockers if row[0] != "source_conflict"
-        ]
-        if terminal_blockers:
-            status = "blocked"
-            terminal_tier = None
-            terminal_readiness = None
-            all_retryable = all(row[1] for row in terminal_blockers)
-            if all_retryable != (retry_timestamp is not None):
-                raise ValueError("retry_at")
-            if retry_timestamp is not None and _instant(retry_timestamp) <= _instant(timestamp):
-                raise ValueError("retry_at")
-        else:
-            if not (normalized_evidence or existing_evidence) or not (
-                normalized_facts or existing_facts
-            ):
-                raise ValueError("successful_run_requires_evidence_and_facts")
-            if decision_tier is None or action_readiness is None or retry_timestamp is not None:
-                raise ValueError("successful_run_terminal_shape")
-            status = "succeeded"
-            if conflicts:
-                terminal_tier = "review_suggested"
-                terminal_readiness = "action_blocked"
-            else:
-                terminal_tier = decision_tier
-                terminal_readiness = action_readiness
-
-        persisted_ids: dict[str, str] = {}
-
         with _immediate_transaction(self.conn):
             current = self.conn.execute(
-                "SELECT status FROM security_lifecycle_automation_runs WHERE run_id=?",
+                "SELECT status,case_id FROM security_lifecycle_automation_runs "
+                "WHERE run_id=?",
                 (run_id,),
             ).fetchone()
             if current is None or str(current["status"]) != "running":
                 raise ValueError("automation_run_not_running")
+            existing_evidence = _persisted_evidence_rows(self.conn, run_id)
+            existing_facts = _persisted_fact_rows(self.conn, run_id)
+            normalized_blockers = list(
+                _normalize_deadline_blockers(
+                    run_id=run_id,
+                    blockers=structurally_normalized_blockers,
+                    current_evidence=normalized_evidence,
+                    existing_evidence=existing_evidence,
+                )
+            )
+            conflicts = _conflicts((*existing_facts, *normalized_facts))
+            normalized_blockers = [
+                row for row in normalized_blockers if row[0] != "source_conflict"
+            ]
+            if conflicts:
+                normalized_blockers.append(
+                    (
+                        "source_conflict",
+                        False,
+                        _canonical_json(
+                            {"fact_types": sorted(conflicts)},
+                            name="blocker_context",
+                            max_bytes=4096,
+                            diagnostics=True,
+                        ),
+                    )
+                )
+                normalized_blockers.sort(key=lambda row: row[0])
+
+            terminal_blockers = [
+                row for row in normalized_blockers if row[0] != "source_conflict"
+            ]
+            if terminal_blockers:
+                status = "blocked"
+                terminal_tier = None
+                terminal_readiness = None
+                all_retryable = all(row[1] for row in terminal_blockers)
+                if all_retryable != (retry_timestamp is not None):
+                    raise ValueError("retry_at")
+                if retry_timestamp is not None and _instant(
+                    retry_timestamp
+                ) <= _instant(timestamp):
+                    raise ValueError("retry_at")
+            else:
+                if not (normalized_evidence or existing_evidence) or not (
+                    normalized_facts or existing_facts
+                ):
+                    raise ValueError("successful_run_requires_evidence_and_facts")
+                if (
+                    decision_tier is None
+                    or action_readiness is None
+                    or retry_timestamp is not None
+                ):
+                    raise ValueError("successful_run_terminal_shape")
+                status = "succeeded"
+                if conflicts:
+                    terminal_tier = "review_suggested"
+                    terminal_readiness = "action_blocked"
+                else:
+                    terminal_tier = decision_tier
+                    terminal_readiness = action_readiness
+
+            persisted_ids: dict[str, str] = {}
             for row in normalized_evidence:
-                identity_digest = hashlib.sha256(
-                    f"{run_id}\0{row.local_id}\0{row.content_sha256}".encode()
-                ).hexdigest()
-                persisted_id = "sle_" + identity_digest[:32]
+                persisted_id = _persisted_evidence_id(run_id, row)
                 persisted_ids[row.local_id] = persisted_id
                 dedupe_digest = hashlib.sha256(
                     row.evidence_dedupe_key.encode("utf-8")
@@ -1338,7 +1465,7 @@ class SecurityLifecycleFactKernel:
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         persisted_id,
-                        run["case_id"],
+                        current["case_id"],
                         None,
                         run_id,
                         row.source_family,
@@ -1368,7 +1495,7 @@ class SecurityLifecycleFactKernel:
                     (persisted_id,),
                 ).fetchone()
                 expected = (
-                    str(run["case_id"]),
+                    str(current["case_id"]),
                     run_id,
                     row.source_family,
                     row.adapter,
@@ -1407,7 +1534,7 @@ class SecurityLifecycleFactKernel:
                     (
                         fact_id,
                         run_id,
-                        run["case_id"],
+                        current["case_id"],
                         persisted_ids[row.local_evidence_id],
                         row.fact_type,
                         row.normalized_value_json,
@@ -1430,7 +1557,7 @@ class SecurityLifecycleFactKernel:
                 ).fetchone()
                 expected = (
                     run_id,
-                    str(run["case_id"]),
+                    str(current["case_id"]),
                     persisted_ids[row.local_evidence_id],
                     row.fact_type,
                     row.normalized_value_json,
