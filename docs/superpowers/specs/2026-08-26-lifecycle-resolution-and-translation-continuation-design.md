@@ -1,7 +1,8 @@
 # Security Lifecycle Resolution and Translation Continuation Design
 
-**Status:** Draft for user review. No implementation, provider call, live
-migration, merge, or push is authorized by this document.
+**Status:** Approved design for implementation planning. Provider calls,
+production access or migration, merge, live cutover, and push remain separate
+authorization gates.
 
 **Date:** 2026-08-26
 
