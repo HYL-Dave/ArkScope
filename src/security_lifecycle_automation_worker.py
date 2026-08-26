@@ -6,7 +6,7 @@ import json
 import sqlite3
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, ContextManager
 
 from src.security_lifecycle_decision_policy import (
@@ -22,6 +22,7 @@ from src.security_lifecycle_investigation import (
     SecurityLifecycleInvestigationStore,
     create_automation_assessment,
 )
+from src.security_lifecycle_disposition import next_lifecycle_recheck_at
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
     LifecycleWritesUnavailable,
@@ -29,9 +30,6 @@ from src.security_lifecycle_schema import (
 
 
 _MAX_CASES_PER_TICK = 2
-_MARKET_RECHECK_INTERVAL = timedelta(days=1)
-
-
 @dataclass(frozen=True)
 class LifecycleAutomationEvidenceBundle:
     evidence: tuple[object, ...]
@@ -48,13 +46,6 @@ def _instant(value: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("automation_clock")
     return parsed.astimezone(timezone.utc)
-
-
-def _utc_timestamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00",
-        "Z",
-    )
 
 
 def _field(value: object, name: str, default: Any = None) -> Any:
@@ -219,21 +210,8 @@ class LifecycleAutomationWorker:
         if not run_id:
             return None
         run = store.get_automation_run(run_id)
-        readiness = str(run.get("action_readiness") or "")
-        if readiness == "waiting_effective_date":
-            effective_date = assessment.get("effective_date")
-            if not effective_date:
-                return None
-            due_at = f"{effective_date}T00:00:00Z"
-        elif readiness == "waiting_market_confirmation":
-            due_at = _utc_timestamp(
-                _instant(str(run["updated_at"])) + _MARKET_RECHECK_INTERVAL
-            )
-        elif readiness == "waiting_transition_revalidation":
-            due_at = _utc_timestamp(
-                _instant(str(run["updated_at"])) + _MARKET_RECHECK_INTERVAL
-            )
-        else:
+        due_at = next_lifecycle_recheck_at(run, assessment)
+        if due_at is None:
             return None
         if now < _instant(due_at):
             return None
