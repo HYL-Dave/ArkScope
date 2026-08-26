@@ -155,6 +155,15 @@ def test_failed_semantic_run_replays_once_per_execution_revision():
     assert duplicate.run_id == replay.run_id
     assert store.get_automation_run(first.run_id)["status"] == "failed"
 
+    first_row = store.get_automation_run(first.run_id)
+    replay_row = store.get_automation_run(replay.run_id)
+    assert first_row["run_key"].startswith("lifecycle-automation-execution-v1:")
+    assert replay_row["run_key"].startswith("lifecycle-automation-execution-v1:")
+    assert replay_row["run_key"] != first_row["run_key"]
+    assert json.loads(replay_row["query_context_json"])["semantic_run_key"] == (
+        json.loads(first_row["query_context_json"])["semantic_run_key"]
+    )
+
 
 def test_successful_replay_prevents_later_revision_fanout():
     _conn, store, kernel, case_id = _context()
@@ -249,7 +258,14 @@ Reject caller-supplied `semantic_run_key`, `execution_revision`, or
 `predecessor_failed_run_id` keys as reserved query context. Add the internal
 values only after copying caller context so audit identity cannot be spoofed.
 
-Do not update or delete the predecessor failed row. Generate `run_id` from the execution key, not the semantic key. Preserve the existing unique `run_key` column and all schema SQL unchanged.
+Do not update or delete the predecessor failed row. Generate `run_id` from the
+execution key. Store the execution key in the `run_key` column for every newly
+created row, including first attempts; persist the semantic key only as
+`query_context["semantic_run_key"]`. Semantic lookup no longer reads the
+`run_key` column: it uses the exact semantic tuple columns plus the persisted
+`input_evidence_set_sha256`. Existing rows remain byte-unchanged, including
+legacy rows whose `run_key` contains the semantic key. Preserve the unique
+`run_key` column and all schema SQL unchanged.
 
 - [ ] **Step 4: Wire the worker constant explicitly**
 
@@ -331,10 +347,29 @@ cases = {
     "The outside date was extended to June 1, 2026 or July 1, 2026.": (),
     "The outside date was extended from March 1, 2026 to June 1, 2026, and further extended to September 1, 2026.": (),
     "extended from March 1, 2026 to June 1, 2026": (),
+    "The outside date was extended to June 1, 2026, and the Company will file a Current Report on Form 8-K.": (
+        "2026-06-01",
+    ),
+    "The termination date remains 2026-11-01, and the parties continue to work toward closing.": (
+        "2026-11-01",
+    ),
 }
 ```
 
 For every emitted row, assert the cited bytes decode to the exact source sentence and the digest matches those bytes.
+
+Before changing production code, add a characterization owner over one fixture
+document containing the four rejected deadline sentences plus an oversized
+sentence whose deadline phrase/date appear after byte 4096. Run it against the
+current implementation and freeze the exact literal set of
+`(evidence_id, content_sha256)` pairs. Assert all four short sentences remain in
+the resulting excerpts and that the oversized excerpt still contains its
+tail-positioned deadline phrase. This owner is GREEN before the deadline repair
+and must remain GREEN after it; do not duplicate the legacy matcher in the test.
+The short rows exercise `_candidate_sentence`; the oversized row exercises
+`_focused_candidate`. Together they prove evidence admission and excerpt
+identity remain byte-equivalent while only `SecSourceDeadline` extraction
+narrows.
 
 - [ ] **Step 2: Run the grammar owner and verify RED**
 
@@ -348,7 +383,11 @@ Expected before implementation: the complete directional outside-date sentence e
 
 - [ ] **Step 3: Implement one-target closed grammar**
 
-Replace `_SOURCE_DEADLINE_PHRASE` plus `_ANY_*_DATE` harvesting with three accepted target patterns:
+Replace date harvesting inside `_source_deadlines` only with three accepted
+target patterns. Keep `_SOURCE_DEADLINE_PHRASE`, `_ANY_MONTH_DATE`, and
+`_ANY_ISO_DATE` byte-unchanged for `_candidate_sentence` and
+`_focused_candidate`; those paths own existing evidence admission and excerpt
+identity under shared `_RULE_VERSION = "3"` and must not narrow.
 
 ```python
 _SOURCE_DATE_TEXT = rf"(?:{_MONTH_DATE_TEXT}|\d{{4}}-\d{{2}}-\d{{2}})"
@@ -368,15 +407,26 @@ _EXTENDED_DEADLINE = re.compile(
     rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
     re.IGNORECASE,
 )
+_COORDINATE_TARGET = re.compile(
+    rf"\A\s*(?:,\s*)?(?:or|and)\s+{_SOURCE_DATE_TEXT}\b",
+    re.IGNORECASE,
+)
+_EXTENSION_ACTION = re.compile(
+    rf"\bextended\b(?:\s+from\s+{_SOURCE_DATE_TEXT})?\s+to\s+"
+    rf"{_SOURCE_DATE_TEXT}\b",
+    re.IGNORECASE,
+)
 ```
 
 For each sentence:
 
-- gather target matches from all three accepted patterns;
-- count every extension-to-date action, including elliptical `further extended to` actions;
-- emit only when there is exactly one accepted target and no second extension action;
-- reject a second date joined to the selected target by `or` or `and`, even when
-  the sentence contains only one `extended` verb;
+- gather target matches from all three accepted patterns and require exactly one;
+- count `_EXTENSION_ACTION` matches across the sentence and emit nothing when
+  more than one extension-to-date action exists, including an elliptical
+  `further extended to` action;
+- apply `_COORDINATE_TARGET.match(sentence[target_match.end("date"):])` and emit
+  nothing only when a bare `or|and <DATE>` coordinate immediately follows the
+  selected target; an `and`/`or` introducing ordinary prose is not ambiguous;
 - normalize the named target only; never collect every date in the sentence; and
 - keep the exact sentence as the citation span.
 
@@ -398,6 +448,11 @@ assert deadline.rule_version == "4"
 assert {fact.rule_version for fact in result.facts} == {"3"}
 assert {row.source_locator["rule_version"] for row in result.evidence} == {"3"}
 ```
+
+The characterization owner from Step 1 must still return its frozen exact
+`(evidence_id, content_sha256)` set and preserve all four rejected deadline
+sentences in excerpts. Checking only the string value of `rule_version` is not
+evidence-identity coverage.
 
 Retain the cross-document behavior: if distinct accepted source deadlines remain after per-sentence parsing, return no deadline and add `sec_evidence_insufficient`.
 
@@ -911,8 +966,10 @@ Apply and restore each mutation independently:
 10. render generic confirmed-complete copy for final unconfirmed History;
 11. include execution revision in decision provenance or transition authority;
 12. replay a failed row repeatedly at the same execution revision;
-13. replay a succeeded semantic run after only execution revision changes; and
-14. let `source_conflict` or transition-revalidation contexts acquire deadline citation fields outside the shared validator.
+13. replay a succeeded semantic run after only execution revision changes;
+14. let `source_conflict` or transition-revalidation contexts acquire deadline citation fields outside the shared validator;
+15. narrow `_candidate_sentence` or `_focused_candidate` to the new deadline grammar instead of retaining the three legacy patterns; and
+16. reject an accepted target merely because any `and` or `or` appears after its date instead of requiring a bare coordinated date target.
 
 Each mutation records exact owner node IDs, failing counts, unexpected owner drift, and SHA-256 of every restored product file. All mutations must be killed and every file restored byte-identically before continuing.
 
