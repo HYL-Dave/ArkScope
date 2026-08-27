@@ -725,7 +725,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 795,
+      settings: 800,
       research: 207,
       explore: 772,
       portfolio: 374,
@@ -796,7 +796,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2270);
+      expect(total, `${locale}.total`).toBe(2275);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1137,6 +1137,11 @@ describe("bundled i18n resources", () => {
 
   it("preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move", () => {
     const postSliceSettingsPaths = [
+      "workspace.routes.effortRequired",
+      "workspace.routes.modelRetired",
+      "models.route.effortRequired",
+      "models.route.modelRetired",
+      "models.catalog.selectEffort",
       "models.metrics.officialPricing",
       "actions.refreshStatus",
       "dataStorage.coverage.generatedAt",
@@ -1213,6 +1218,13 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.summary.activeCases",
       "dataStorage.lifecycle.summary.sourceMissing",
     ] as const;
+    const currentOwnerSettingsPaths = new Set([
+      "workspace.routes.effortRequired",
+      "workspace.routes.modelRetired",
+      "models.route.effortRequired",
+      "models.route.modelRetired",
+      "models.catalog.selectEffort",
+    ]);
     const retiredSettingsPaths = [
       "dataStorage.update.title",
       "dataStorage.update.never",
@@ -1226,10 +1238,10 @@ describe("bundled i18n resources", () => {
     ] as const;
     const expectedSubtreeCounts = {
       actions: 18,
-      workspace: 29,
+      workspace: 31,
       registry: 30,
       errors: 13,
-      models: 67,
+      models: 70,
       runtime: 21,
       providers: 130,
       dataSources: 155,
@@ -1267,7 +1279,9 @@ describe("bundled i18n resources", () => {
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {
         const currentAddedCount = postSliceSettingsPaths
-          .filter((path) => path.startsWith(`${subtree}.`)).length;
+          .filter((path) => (
+            !currentOwnerSettingsPaths.has(path) && path.startsWith(`${subtree}.`)
+          )).length;
         const currentRetiredCount = retiredSettingsPaths
           .filter((path) => path.startsWith(`${subtree}.`)).length;
         expect(

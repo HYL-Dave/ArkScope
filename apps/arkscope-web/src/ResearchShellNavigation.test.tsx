@@ -663,6 +663,9 @@ describe("Research shell navigation", () => {
       expect(openAiRoute).toBeDefined();
     });
     await click(openAiRoute!);
+    await vi.waitFor(() => {
+      expect(host!.textContent).toContain("研究模型：openai · gpt-5.6-luna · high");
+    });
     const textarea = host!.querySelector("textarea[placeholder^='輸入問題']") as HTMLTextAreaElement;
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
     await act(async () => {

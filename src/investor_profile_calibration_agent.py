@@ -189,7 +189,7 @@ async def unavailable_responder(
 def _default_model(provider: str, model: str | None) -> str:
     if model:
         return model
-    return "gpt-5.4-mini" if provider == "openai" else "claude-sonnet-4-6"
+    return "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5"
 
 
 def _message_text_openai(resp) -> str:

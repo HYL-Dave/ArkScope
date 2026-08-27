@@ -1272,3 +1272,38 @@ def test_responder_request_contains_no_tool_or_market_language(monkeypatch):
         {"role": "user", "content": "I want growth."}
     ]
     assert "tool" not in captured
+
+
+@pytest.mark.parametrize(
+    ("provider", "expected_model"),
+    [
+        ("openai", "gpt-5.6-luna"),
+        ("anthropic", "claude-sonnet-5"),
+    ],
+)
+def test_responder_uses_current_model_when_model_is_omitted(
+    monkeypatch, provider, expected_model
+):
+    captured = {}
+
+    async def fake_call(*, provider, model, instructions, input_messages):
+        captured.update({"provider": provider, "model": model})
+        return (
+            '{"assistant_message":"Continue.","addressed_topic_id":"loss_response",'
+            '"topic_covered":false,"next_topic_id":"loss_response",'
+            '"profile_patch":null,"rationales":{}}'
+        )
+
+    monkeypatch.setattr(calibration_agent, "_call_calibration_llm", fake_call)
+    asyncio.run(
+        calibration_agent.live_calibration_responder(
+            messages=[{"role": "user", "content": "Continue."}],
+            current_topic_id="loss_response",
+            covered_topics=(),
+            request_proposal=False,
+            provider=provider,
+            model=None,
+        )
+    )
+
+    assert captured == {"provider": provider, "model": expected_model}

@@ -834,6 +834,7 @@ export function ResearchView({
 
   const chooseProvider = useCallback((nextProvider: ProviderId) => {
     if (!catalog) return;
+    if (nextProvider === provider && selectionReady && !incompleteSelection) return;
     const context = catalog.effective?.providers?.[nextProvider] ?? null;
     const block = catalog.effective?.tasks.ai_research?.providers?.[nextProvider];
     const providerReason = modelProviderReason(context, block);
@@ -843,7 +844,7 @@ export function ResearchView({
     ));
     if (!selected) return;
     setIncompleteSelection({ provider: nextProvider, model: selected.id });
-  }, [catalog]);
+  }, [catalog, incompleteSelection, provider, selectionReady]);
 
   const retryLastFailed = useCallback(() => {
     if (
