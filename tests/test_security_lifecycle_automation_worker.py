@@ -734,6 +734,7 @@ def test_source_conflict_crosses_worker_kernel_and_attention_projection(
     pending,
 ):
     from src.security_lifecycle_disposition import project_lifecycle_disposition
+    from src.security_lifecycle_investigation import _automation_history
 
     case = _case(1)
     harness = _Harness(tmp_path, [case])
@@ -741,13 +742,16 @@ def test_source_conflict_crosses_worker_kernel_and_attention_projection(
     try:
         result = harness.worker().run()
         store = _store(harness)
-        run = store.list_automation_runs(case["case_id"])[0]
+        automation_runs, automation_facts, _run_total, _fact_total = (
+            _automation_history(store, case["case_id"])
+        )
+        run = automation_runs[0]
         assessments = store.list_assessments(case["case_id"])
         projection = project_lifecycle_disposition(
             {
                 **case,
-                "automation_runs": [run],
-                "automation_facts": [],
+                "automation_runs": automation_runs,
+                "automation_facts": automation_facts,
                 "evidence": store.list_evidence(case["case_id"]),
                 "current_assessment": None,
                 "current_acknowledgement": None,
