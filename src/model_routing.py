@@ -16,6 +16,8 @@ TaskId = Literal["card_synthesis", "card_translation", "ai_research"]
 RouteSource = Literal["env", "db", "profile", "default"]
 EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
+TASK_ROUTE_EFFORT_ORDER = ("low", "medium", "high", "xhigh", "max")
+
 OPENAI_MODELS_SOURCE = "https://developers.openai.com/api/docs/models"
 OPENAI_LATEST_SOURCE = "https://developers.openai.com/api/docs/guides/latest-model"
 ANTHROPIC_MODELS_SOURCE = "https://docs.anthropic.com/en/docs/about-claude/models/all-models"
@@ -254,6 +256,31 @@ def is_valid_effort(provider: Provider, effort: str, *, model: str | None = None
         option.id for option in EFFORT_OPTIONS[provider]
     )
     return effort in options
+
+
+def selectable_effort_ids_for_model(provider: Provider, model: str) -> tuple[str, ...]:
+    """Return explicit effort values permitted for a new task route.
+
+    Provider-native defaults and diagnostic-only values remain available through
+    ``effort_ids_for_model``. Known retired models are ineligible for task routes;
+    unknown ids retain forward-compatible access to the provider's explicit union.
+    """
+    from src.model_capabilities import capability_for
+
+    capability = capability_for(model)
+    if capability is not None:
+        if capability.provider != provider or capability.task_route_status != "current":
+            return ()
+        supported = capability.effort_options
+    else:
+        supported = tuple(option.id for option in EFFORT_OPTIONS[provider])
+
+    return tuple(effort for effort in TASK_ROUTE_EFFORT_ORDER if effort in supported)
+
+
+def is_valid_task_route_effort(provider: Provider, effort: str, model: str) -> bool:
+    """Return whether ``effort`` is an explicit value for a new task route."""
+    return effort in selectable_effort_ids_for_model(provider, model)
 
 
 def route_capability_warnings(

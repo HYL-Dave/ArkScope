@@ -29,6 +29,12 @@ from src.api.routes.config_routes import (
     update_model_routes,
 )
 from src.model_credentials import CredentialStore, provider_credentials
+from src.model_routing import (
+    TASK_ROUTE_EFFORT_ORDER,
+    effort_ids_for_model,
+    is_valid_task_route_effort,
+    selectable_effort_ids_for_model,
+)
 
 
 def test_model_catalog_exposes_seed_models(tmp_path):
@@ -67,6 +73,42 @@ def test_catalog_exposes_canonical_current_and_retired_model_policy():
     }
     assert len(policy.retired_model_ids) == 12
     assert set(policy.current_model_ids).isdisjoint(policy.retired_model_ids)
+
+
+def test_task_route_effort_order_is_canonical_and_provider_native_facts_remain():
+    assert TASK_ROUTE_EFFORT_ORDER == (
+        "low", "medium", "high", "xhigh", "max",
+    )
+    assert "none" in effort_ids_for_model("openai", "gpt-5.6-luna")
+    assert "default" in effort_ids_for_model("openai", "gpt-5.6-luna")
+
+
+@pytest.mark.parametrize("model", [
+    "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+])
+def test_current_models_expose_identical_explicit_task_efforts(model):
+    provider = "anthropic" if model.startswith("claude-") else "openai"
+    assert selectable_effort_ids_for_model(provider, model) == (
+        "low", "medium", "high", "xhigh", "max",
+    )
+
+
+def test_unknown_openai_model_exposes_filtered_explicit_provider_union():
+    assert selectable_effort_ids_for_model("openai", "gpt-7-custom") == (
+        "low", "medium", "high", "xhigh", "max",
+    )
+
+
+def test_task_route_validity_excludes_provider_native_default_and_none():
+    assert is_valid_task_route_effort("openai", "none", "gpt-5.6-luna") is False
+    assert is_valid_task_route_effort("openai", "default", "gpt-5.6-luna") is False
+    assert is_valid_task_route_effort("openai", "max", "gpt-5.6-luna") is True
+
+
+def test_retired_model_is_rejected_before_effort_validity():
+    assert selectable_effort_ids_for_model("openai", "gpt-5.5") == ()
+    assert is_valid_task_route_effort("openai", "max", "gpt-5.5") is False
 
 
 def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
