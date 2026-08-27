@@ -893,6 +893,167 @@ describe("Lifecycle workflow", () => {
     expect(drawer?.textContent).not.toContain("FIRST");
   });
 
+  it("keeps the newly selected case detail after a pending case command completes", async () => {
+    const command = deferred<{ acknowledgement_id: string }>();
+    const staleCaseRefresh = deferred<ReturnType<typeof detail>>();
+    const initialNextCaseDetail = deferred<ReturnType<typeof detail>>();
+    const refreshedNextCaseDetail = deferred<ReturnType<typeof detail>>();
+    const currentCase = {
+      ...SUMMARY,
+      case_id: "case-current-command",
+      ticker: "CURRENT",
+    };
+    const nextCase = {
+      ...SUMMARY,
+      case_id: "case-next-command",
+      ticker: "NEXT",
+    };
+    let currentCaseReads = 0;
+    let nextCaseReads = 0;
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [currentCase, nextCase],
+      count: 2,
+      queue_counts: { attention: 2, monitoring: 0, history: 0 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.getSecurityLifecycleCase.mockImplementation((caseId: string) => {
+      if (caseId === currentCase.case_id) {
+        currentCaseReads += 1;
+        return currentCaseReads === 1
+          ? Promise.resolve(detail({ ...currentCase, issuer_name: "Current issuer" }))
+          : staleCaseRefresh.promise;
+      }
+      if (caseId === nextCase.case_id) {
+        nextCaseReads += 1;
+        return nextCaseReads === 1
+          ? initialNextCaseDetail.promise
+          : refreshedNextCaseDetail.promise;
+      }
+      throw new Error(`unexpected case read: ${caseId}`);
+    });
+    apiMocks.acknowledgeSecurityLifecycleCase.mockReturnValue(command.promise);
+
+    await mountLifecycle(currentCase.case_id);
+    await click("Record insufficient evidence");
+    const nextCaseTrigger = Array.from(
+      host!.querySelectorAll<HTMLButtonElement>(".lifecycle-case-trigger"),
+    ).find((button) => button.textContent?.includes("NEXT"));
+    if (!nextCaseTrigger) throw new Error("missing next-case trigger");
+    await act(async () => nextCaseTrigger.click());
+    await flush();
+
+    await act(async () => {
+      command.resolve({ acknowledgement_id: "ack-current" });
+      await Promise.resolve();
+    });
+    await flush();
+    await act(async () => {
+      initialNextCaseDetail.resolve(detail({ ...nextCase, issuer_name: "Next issuer" }));
+      staleCaseRefresh.resolve(detail({ ...currentCase, issuer_name: "Current issuer" }));
+      refreshedNextCaseDetail.resolve(detail({ ...nextCase, issuer_name: "Next issuer" }));
+      await Promise.resolve();
+    });
+    await flush();
+
+    const drawer = document.body.querySelector('[role="dialog"]');
+    expect(drawer?.textContent).toContain("NEXT");
+    expect(drawer?.textContent).toContain("Next issuer");
+    expect(drawer?.textContent).not.toContain("Current issuer");
+  });
+
+  it("keeps the newly selected case detail after a pending activity command completes", async () => {
+    const command = deferred<{ activity_id: string; acknowledged_at: string }>();
+    const staleCaseRefresh = deferred<ReturnType<typeof detail>>();
+    const initialNextCaseDetail = deferred<ReturnType<typeof detail>>();
+    const refreshedNextCaseDetail = deferred<ReturnType<typeof detail>>();
+    const currentCase = {
+      ...SUMMARY,
+      case_id: "case-current-activity",
+      ticker: "CURRENT",
+    };
+    const nextCase = {
+      ...SUMMARY,
+      case_id: "case-next-activity",
+      ticker: "NEXT",
+    };
+    let currentCaseReads = 0;
+    let nextCaseReads = 0;
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [currentCase, nextCase],
+      count: 2,
+      queue_counts: { attention: 2, monitoring: 0, history: 0 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.listTickerIdentityTransitionActivity.mockResolvedValue({
+      items: [{
+        activity_id: "activity-pending",
+        transition_id: "transition-pending",
+        case_id: currentCase.case_id,
+        activity_type: "reversed",
+        source_ticker: "CURRENT",
+        successor_ticker: "NEXT",
+        effective_date: "2026-08-27",
+        user_owned_changes: [],
+        provider_owned_retained: [],
+        state_sha256: "1".repeat(64),
+        rule_id: "lifecycle.simple_symbol_continuation",
+        rule_version: "1",
+        decision_provenance_sha256: "2".repeat(64),
+        occurred_at: "2026-08-27T12:00:00Z",
+        acknowledged_at: null,
+        created_at: "2026-08-27T12:00:00Z",
+      }],
+      count: 1,
+      unacknowledged_count: 1,
+    });
+    apiMocks.getSecurityLifecycleCase.mockImplementation((caseId: string) => {
+      if (caseId === currentCase.case_id) {
+        currentCaseReads += 1;
+        return currentCaseReads === 1
+          ? Promise.resolve(detail({ ...currentCase, issuer_name: "Current issuer" }))
+          : staleCaseRefresh.promise;
+      }
+      if (caseId === nextCase.case_id) {
+        nextCaseReads += 1;
+        return nextCaseReads === 1
+          ? initialNextCaseDetail.promise
+          : refreshedNextCaseDetail.promise;
+      }
+      throw new Error(`unexpected case read: ${caseId}`);
+    });
+    apiMocks.acknowledgeTickerIdentityTransitionActivity.mockReturnValue(command.promise);
+
+    await mountLifecycle(currentCase.case_id);
+    await click("Acknowledge");
+    const nextCaseTrigger = Array.from(
+      host!.querySelectorAll<HTMLButtonElement>(".lifecycle-case-trigger"),
+    ).find((button) => button.textContent?.includes("NEXT"));
+    if (!nextCaseTrigger) throw new Error("missing next-case trigger");
+    await act(async () => nextCaseTrigger.click());
+    await flush();
+
+    await act(async () => {
+      command.resolve({
+        activity_id: "activity-pending",
+        acknowledged_at: "2026-08-27T12:01:00Z",
+      });
+      await Promise.resolve();
+    });
+    await flush();
+    await act(async () => {
+      initialNextCaseDetail.resolve(detail({ ...nextCase, issuer_name: "Next issuer" }));
+      staleCaseRefresh.resolve(detail({ ...currentCase, issuer_name: "Current issuer" }));
+      refreshedNextCaseDetail.resolve(detail({ ...nextCase, issuer_name: "Next issuer" }));
+      await Promise.resolve();
+    });
+    await flush();
+
+    const drawer = document.body.querySelector('[role="dialog"]');
+    expect(drawer?.textContent).toContain("NEXT");
+    expect(drawer?.textContent).toContain("Next issuer");
+    expect(drawer?.textContent).not.toContain("Current issuer");
+  });
+
   it("keeps prior evidence and shows a typed safe historical run error", async () => {
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
       investigation_runs: [{
