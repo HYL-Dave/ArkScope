@@ -97,6 +97,8 @@ def _model_eligibility(
         return False, provider_reason
     if capability is None:
         return True, "model_not_in_registry"
+    if capability.task_route_status == "retired":
+        return False, "model_retired"
     if capability.provider != provider or not task_capability_ok(task, capability):
         return False, "task_capability_missing"
     return True, None

@@ -30,7 +30,7 @@ def test_opus_4_7_capability_still_present():  # regression: don't drop the lega
 
 def test_default_model_tiers_option1():
     c = AgentConfig()
-    assert c.anthropic_model == "claude-sonnet-4-6"       # cheaper default
-    assert c.anthropic_model_advanced == "claude-opus-4-8"  # frontier advanced
-    assert c.openai_model == "gpt-5.4"
-    assert c.openai_model_advanced == "gpt-5.5"
+    assert c.anthropic_model == "claude-sonnet-5"
+    assert c.anthropic_model_advanced == "claude-opus-5"
+    assert c.openai_model == "gpt-5.6-luna"
+    assert c.openai_model_advanced == "gpt-5.6-sol"

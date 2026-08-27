@@ -69,6 +69,8 @@ class ModelCatalog(BaseModel):
     tasks: list[TaskInfo]
     models: list[ModelOption]
     effort_options: dict[Provider, list[EffortOption]]
+    current_model_ids: list[str]
+    retired_model_ids: list[str]
 
 
 TASKS: list[TaskInfo] = [
@@ -77,7 +79,7 @@ TASKS: list[TaskInfo] = [
         label="Card synthesis",
         description="Generate the structured §2 investment-research card from objective evidence.",
         default_provider="anthropic",
-        recommended_model="claude-opus-4-8",
+        recommended_model="claude-opus-5",
     ),
     TaskInfo(
         id="card_translation",
@@ -87,14 +89,14 @@ TASKS: list[TaskInfo] = [
             "citations, identifiers, and numbers."
         ),
         default_provider="anthropic",
-        recommended_model="claude-sonnet-4-6",
+        recommended_model="claude-sonnet-5",
     ),
     TaskInfo(
         id="ai_research",
         label="AI 研究 (Research)",
-        description="The interactive AI 研究 surface. Unset → the request provider's default-tier model; set a cheaper model/effort here (e.g. gpt-5.4-mini / low) for routine research.",
+        description="The interactive AI 研究 surface.",
         default_provider="openai",
-        recommended_model="gpt-5.4-mini",
+        recommended_model="gpt-5.6-luna",
     ),
 ]
 
@@ -217,11 +219,15 @@ EFFORT_OPTIONS: dict[Provider, list[EffortOption]] = {
 
 
 def catalog() -> ModelCatalog:
+    from src.model_capabilities import all_models
+
     return ModelCatalog(
         providers=["anthropic", "openai"],
         tasks=TASKS,
         models=MODEL_CATALOG,
         effort_options=EFFORT_OPTIONS,
+        current_model_ids=[cap.id for cap in all_models() if cap.task_route_status == "current"],
+        retired_model_ids=[cap.id for cap in all_models() if cap.task_route_status == "retired"],
     )
 
 
@@ -287,7 +293,7 @@ def default_model_for(provider: Provider, task: TaskId) -> str:
     for model in MODEL_CATALOG:
         if model.provider == provider and task in model.recommended_for:
             return model.id
-    return "claude-opus-4-8" if provider == "anthropic" else "gpt-5.5"
+    return "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna"
 
 
 def is_seed_model(provider: Provider, model: str) -> bool:

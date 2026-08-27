@@ -36,13 +36,26 @@ def test_ai_research_is_a_task():
 
 def test_agentconfig_has_ai_research_fields():
     c = AgentConfig()
-    assert c.ai_research_provider == "" and c.ai_research_model == "" and c.ai_research_effort == ""
+    assert (c.ai_research_provider, c.ai_research_model, c.ai_research_effort) == (
+        "openai", "gpt-5.6-luna", "xhigh",
+    )
 
 
-def test_unconfigured_uses_provider_default_tier(clean_env):
+def test_fresh_research_uses_complete_provider_specific_routes(clean_env):
     clean_env.setattr(cfg, "get_agent_config", lambda: AgentConfig())  # fresh, unconfigured
-    assert resolve_research_route("openai") == ("gpt-5.4", None)         # openai default tier
-    assert resolve_research_route("anthropic") == ("claude-sonnet-4-6", None)  # anthropic default tier
+    assert resolve_research_route("openai") == ("gpt-5.6-luna", "xhigh")
+    assert resolve_research_route("anthropic") == ("claude-sonnet-5", "xhigh")
+
+
+def test_matching_legacy_research_route_with_default_effort_stays_ambiguous(clean_env):
+    class RouteStore:
+        def get(self, task):
+            return type("Route", (), {
+                "provider": "openai", "model": "gpt-5.4-mini", "effort": "default",
+            })()
+
+    clean_env.setattr(cfg, "get_agent_config", lambda: AgentConfig())
+    assert resolve_research_route("openai", route_store=RouteStore()) == ("gpt-5.4-mini", None)
 
 
 def test_catalog_tasks_include_ai_research():
@@ -69,4 +82,4 @@ def test_configured_route_for_matching_provider(clean_env):
     c.ai_research_effort = "low"
     clean_env.setattr(cfg, "get_agent_config", lambda: c)
     assert resolve_research_route("openai") == ("gpt-5.4-mini", "low")  # honored (provider matches)
-    assert resolve_research_route("anthropic") == ("claude-sonnet-4-6", None)  # mismatch → default tier
+    assert resolve_research_route("anthropic") == ("claude-sonnet-5", "xhigh")

@@ -36,8 +36,25 @@ class TestAgentConfig:
     def test_default_config(self):
         """Default config has expected values."""
         config = AgentConfig()
-        assert config.openai_model == "gpt-5.4"          # default tier (advanced = gpt-5.5)
-        assert config.anthropic_model == "claude-sonnet-4-6"  # default tier (advanced = claude-opus-4-8)
+        assert config.openai_model == "gpt-5.6-luna"
+        assert config.openai_model_advanced == "gpt-5.6-sol"
+        assert config.anthropic_model == "claude-sonnet-5"
+        assert config.anthropic_model_advanced == "claude-opus-5"
+        assert (
+            config.card_synthesis_provider,
+            config.card_synthesis_model,
+            config.card_synthesis_effort,
+        ) == ("anthropic", "claude-opus-5", "high")
+        assert (
+            config.card_translation_provider,
+            config.card_translation_model,
+            config.card_translation_effort,
+        ) == ("anthropic", "claude-sonnet-5", "medium")
+        assert (
+            config.ai_research_provider,
+            config.ai_research_model,
+            config.ai_research_effort,
+        ) == ("openai", "gpt-5.6-luna", "xhigh")
         assert config.reasoning_effort in ("none", "minimal", "low", "medium", "high", "xhigh")
         assert config.max_tool_calls > 0
         assert config.claude_subscription_timeout_s >= 900

@@ -84,7 +84,7 @@ def test_synthesize_merges_metadata_and_citations(monkeypatch):
     assert card.traceability.completeness.technicals is True
     assert card.traceability.completeness.fundamentals is False
     assert "iv" in (card.traceability.completeness.note or "")
-    assert meta == {"provider": "anthropic", "model": meta["model"], "effort": "default"}
+    assert meta == {"provider": "anthropic", "model": meta["model"], "effort": "high"}
 
 
 def test_synthesize_rejects_unknown_provider():
@@ -171,7 +171,7 @@ def test_task_model_routing(tmp_path, monkeypatch):
     monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", raising=False)
     get_agent_config.cache_clear()
     # translation defaults to the fast model (not the Opus synthesis model)
-    assert task_model("card_translation") == "claude-sonnet-4-6"
+    assert task_model("card_translation") == "claude-sonnet-5"
     # env override wins for either task
     monkeypatch.setenv("ARKSCOPE_CARD_TRANSLATION_MODEL", "claude-haiku-4-5")
     monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", "test-model-x")

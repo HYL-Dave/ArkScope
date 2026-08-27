@@ -35,17 +35,16 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     store = CredentialStore(tmp_path / "profile_state.db")
     res = model_catalog(store=store)
     ids = {m["id"] for m in res["models"]}
-    assert "claude-opus-4-8" in ids
-    assert "gpt-5.5" in ids
+    assert "claude-opus-5" in ids
+    assert "gpt-5.6-luna" in ids
+    assert "claude-opus-4-8" not in ids
+    assert "gpt-5.5" not in ids
     assert "default" in {x["id"] for x in res["effort_options"]["anthropic"]}
     assert "minimal" not in {x["id"] for x in res["effort_options"]["openai"]}
     assert "max" in {x["id"] for x in res["effort_options"]["openai"]}
     by_id = {model["id"]: model for model in res["models"]}
     assert by_id["gpt-5.6-luna"]["effort_options"] == [
         "none", "low", "medium", "high", "xhigh", "max",
-    ]
-    assert by_id["gpt-5.4-mini"]["effort_options"] == [
-        "none", "low", "medium", "high", "xhigh",
     ]
     assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research"}
     translation = next(
@@ -56,6 +55,18 @@ def test_model_catalog_exposes_seed_models(tmp_path):
         "Translate cards and source excerpts while preserving structure, "
         "citations, identifiers, and numbers."
     )
+
+
+def test_catalog_exposes_canonical_current_and_retired_model_policy():
+    from src.model_routing import catalog
+
+    policy = catalog()
+    assert set(policy.current_model_ids) == {
+        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+    }
+    assert len(policy.retired_model_ids) == 12
+    assert set(policy.current_model_ids).isdisjoint(policy.retired_model_ids)
 
 
 def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
@@ -634,11 +645,10 @@ def test_export_routes_writes_db_to_yaml_preserving_other_keys(make_route_store,
 def test_task_route_whitespace_only_yaml_effort_resolves_to_default(make_route_store):
     from src.agents.config import task_route
 
-    # yaml sets ONLY a whitespace effort (no provider/model) → resolves to pure built-in
-    # defaults, so the source must be "default", not "profile" (the label must use the
-    # STRIPPED effort, consistent with how effort itself is resolved).
+    # An explicit legacy blank effort remains a profile-owned ambiguous route.
     rs = make_route_store({"llm_preferences": {"ai_research_effort": "   "}})
-    assert task_route("ai_research", route_store=rs).source == "default"
+    route = task_route("ai_research", route_store=rs)
+    assert route.source == "profile" and route.effort == "default"
 
 
 def test_import_skips_provider_model_mismatch(make_route_store, tmp_path):

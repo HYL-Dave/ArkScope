@@ -56,7 +56,7 @@ class SummaryCaller(Protocol):
 
 
 # Default summary model — cheap tier (Sonnet, not Opus). spec §8 lock.
-DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5"
 
 # Output cap for the summary call. The prompt asks for ≤2000 words; we
 # leave headroom for thinking tokens + output. 8K tokens ≈ 6K words is

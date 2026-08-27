@@ -93,30 +93,29 @@ def test_openai_models_record_model_specific_effort_sets():
 def test_routing_seed_flags_pin_exact_current_membership():
     routing = {c.id for c in all_models() if c.in_routing_seed}
     assert routing == {
-        "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
-        "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
-        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
 
 
 def test_picker_visibility_matches_the_ruling():
     vis = {c.id: c.picker_visibility for c in all_models()}
-    assert vis["claude-opus-4-8"] == "default"
-    assert vis["claude-haiku-4-5"] == "default"
-    assert vis["gpt-5.4-mini"] == "default"
-    assert vis["claude-opus-4-7"] == "advanced"
-    assert vis["claude-sonnet-4-6"] == "advanced"
-    for pinned in ("gpt-5.5", "gpt-5.4", "gpt-5.4-nano", "gpt-5.2",
-                   "gpt-5.2-codex", "claude-sonnet-4-5", "claude-opus-4-5"):
+    for current in ("claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+                    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+        assert vis[current] == "default", current
+    for pinned in (set(vis) - {
+        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+    }):
         assert vis[pinned] == "pinned_only", pinned
 
 
 def test_default_picker_models_helper():
     assert {c.id for c in default_picker_models("openai")} == {
-        "gpt-5.4-mini", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
     assert {c.id for c in default_picker_models("anthropic")} == {
-        "claude-opus-4-8", "claude-haiku-4-5", "claude-fable-5", "claude-sonnet-5",
+        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
     }
 
 
@@ -215,11 +214,10 @@ def test_routing_view_keeps_exact_membership_and_capability_facts():
     from src.model_routing import MODEL_CATALOG as ROUTING_VIEW, is_seed_model
 
     assert {m.id for m in ROUTING_VIEW} == {
-        "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
-        "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
-        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
-    assert is_seed_model("openai", "gpt-5.5")
+    assert is_seed_model("openai", "gpt-5.6-luna")
 
     for option in ROUTING_VIEW:
         cap = capability_for(option.id)
@@ -272,6 +270,34 @@ def test_new_generation_entries_present_with_task0_facts():
         assert cap.effort_options == ("none", "low", "medium", "high", "xhigh", "max"), mid
         assert cap.cost_tier == cost, mid
         assert cap.in_routing_seed, mid
+
+
+def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
+    opus5 = capability_for("claude-opus-5")
+    assert len(all_models()) == 18
+    assert opus5.provider == "anthropic"
+    assert opus5.context_limit == 1_000_000 and opus5.max_output == 128_000
+    assert opus5.thinking_mode == "adaptive_default_on"
+    assert opus5.effort_options == ("max", "xhigh", "high", "medium", "low")
+    assert opus5.task_route_status == "current"
+    assert opus5.source_url == (
+        "https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5"
+    )
+    assert opus5.verified_at == "2026-08-28"
+
+
+def test_known_retired_models_keep_capabilities_but_leave_new_task_routes():
+    current = {"claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+               "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
+    retired = {cap.id for cap in all_models()} - current
+    assert len(retired) == 12
+    for model_id in retired:
+        capability = capability_for(model_id)
+        assert capability is not None, model_id
+        assert capability.task_route_status == "retired", model_id
+        assert capability.picker_visibility == "pinned_only", model_id
+        assert capability.in_routing_seed is False, model_id
+        assert capability.recommended_for == (), model_id
 
 
 def test_official_alias_gpt56_routes_to_sol():

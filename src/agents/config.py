@@ -39,27 +39,27 @@ class AgentConfig(BaseModel):
     """Agent model and behavior configuration."""
 
     # OpenAI models — default tier = everyday/cheaper, advanced = frontier
-    openai_model: str = "gpt-5.4"
-    openai_model_advanced: str = "gpt-5.5"
+    openai_model: str = "gpt-5.6-luna"
+    openai_model_advanced: str = "gpt-5.6-sol"
 
     # Anthropic models — default tier = everyday/cheaper, advanced = frontier
-    anthropic_model: str = "claude-sonnet-4-6"
-    anthropic_model_advanced: str = "claude-opus-4-8"
+    anthropic_model: str = "claude-sonnet-5"
+    anthropic_model_advanced: str = "claude-opus-5"
 
     # Per-task model routing (minimal; full Settings UI later). Empty string =
     # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
-    card_synthesis_provider: str = ""  # "" → anthropic unless model infers otherwise
-    card_synthesis_model: str = ""    # "" → anthropic_model_advanced (Opus-class)
-    card_synthesis_effort: str = ""   # "" → provider default
-    card_translation_provider: str = ""  # "" → anthropic unless model infers otherwise
-    card_translation_model: str = ""  # "" → a fast model (Sonnet)
-    card_translation_effort: str = ""  # "" → provider default
+    card_synthesis_provider: str = "anthropic"
+    card_synthesis_model: str = "claude-opus-5"
+    card_synthesis_effort: str = "high"
+    card_translation_provider: str = "anthropic"
+    card_translation_model: str = "claude-sonnet-5"
+    card_translation_effort: str = "medium"
     # AI 研究 (Research) surface route. Empty = use the request provider's
     # default-tier agent model (today's behavior). Honored only when its provider
     # matches the request provider (see resolve_research_route).
-    ai_research_provider: str = ""
-    ai_research_model: str = ""
-    ai_research_effort: str = ""
+    ai_research_provider: str = "openai"
+    ai_research_model: str = "gpt-5.6-luna"
+    ai_research_effort: str = "xhigh"
 
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
@@ -154,7 +154,7 @@ class AgentConfig(BaseModel):
     # remains threshold-driven and protected by the circuit breaker.
     compaction_layer_5_enabled: bool = False
     compaction_layer_5_threshold_chars: int = 250_000
-    compaction_layer_5_model_anthropic: str = "claude-sonnet-4-6"
+    compaction_layer_5_model_anthropic: str = "claude-sonnet-5"
 
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
@@ -400,7 +400,12 @@ def get_agent_config() -> AgentConfig:
 # Per-task model routing. Resolution: env override → user_profile → built-in
 # default. Lets card synthesis stay Opus-class while translation (and future
 # chat/deep-research) route to cheaper/faster models, without a full Settings UI.
-_DEFAULT_TRANSLATION_MODEL = "claude-sonnet-4-6"
+_DEFAULT_TRANSLATION_MODEL = "claude-sonnet-5"
+_BUILTIN_TASK_DEFAULTS = {
+    "card_synthesis": ("anthropic", "claude-opus-5", "high"),
+    "card_translation": ("anthropic", "claude-sonnet-5", "medium"),
+    "ai_research": ("openai", "gpt-5.6-luna", "xhigh"),
+}
 _TASK_ENV = {
     "card_synthesis": (
         "ARKSCOPE_CARD_SYNTHESIS_PROVIDER",
@@ -503,9 +508,11 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
     elif from_db:
         source = "db"
     else:
-        source = "profile" if (provider or model or base_effort) else "default"
+        source = "default" if (provider, model, effort) == _BUILTIN_TASK_DEFAULTS[task] else "profile"
 
-    if not provider and model:
+    if env_model and not env_provider:
+        provider = model_provider(env_model) or provider
+    elif not provider and model:
         provider = model_provider(model)
     if not provider:
         provider = "anthropic"
@@ -566,4 +573,4 @@ def resolve_research_route(provider: Provider, *, route_store=None) -> tuple[str
         return route.model, effort
     config = get_agent_config()
     model = config.anthropic_model if provider == "anthropic" else config.openai_model
-    return model, None
+    return model, "xhigh"

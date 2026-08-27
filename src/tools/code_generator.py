@@ -373,7 +373,7 @@ def _resolve_code_model() -> str:
     if config.code_model:
         return config.code_model
     # Default: use the advanced model for the provider
-    return config.anthropic_model_advanced or "claude-opus-4-7"
+    return config.anthropic_model_advanced or "claude-opus-5"
 
 
 def generate_and_execute(

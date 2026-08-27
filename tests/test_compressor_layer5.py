@@ -64,6 +64,12 @@ from src.agents.shared.context_manager import (
 )
 
 
+def test_anthropic_summary_default_has_a_direct_current_model_owner():
+    from src.agents.shared.compressor.summary_callers import DEFAULT_ANTHROPIC_MODEL
+
+    assert DEFAULT_ANTHROPIC_MODEL == "claude-sonnet-5"
+
+
 # ============================================================
 # Helpers
 # ============================================================

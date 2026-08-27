@@ -186,7 +186,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "correlations, regressions) and autonomous analysis design "
             "(anomaly detection, pattern recognition, custom models)."
         ),
-        model="gpt-5.4",
+        model="gpt-5.6-sol",
         system_prompt=_CODE_ANALYST_PROMPT,
         tool_names=[
             "execute_python_analysis",
@@ -204,7 +204,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "raw news, price action, fundamentals, "
             "and event sequences to produce comprehensive analysis."
         ),
-        model="gpt-5.4",
+        model="gpt-5.6-sol",
         system_prompt=_DEEP_RESEARCHER_PROMPT,
         tool_names=[
             "get_ticker_news",
@@ -228,7 +228,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "sector comparisons, multi-ticker screening, and news digests. "
             "Optimized for speed and conciseness."
         ),
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-5",
         system_prompt=_DATA_SUMMARIZER_PROMPT,
         tool_names=[
             "get_news_brief",
@@ -250,7 +250,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "flaws, overlooked risks, data gaps, and common analytical biases. "
             "Returns structured confidence adjustment."
         ),
-        model="claude-opus-4-7",
+        model="claude-opus-5",
         system_prompt=_REVIEWER_PROMPT,
         tool_names=[
             "get_ticker_news",

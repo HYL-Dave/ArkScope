@@ -26,6 +26,15 @@ from src.tools.code_generator import (
 from src.tools.code_executor import CodeExecutionResult
 
 
+def test_code_generator_fallback_uses_current_anthropic_advanced_model(monkeypatch):
+    import src.tools.code_generator as cg
+
+    monkeypatch.setattr("src.agents.config.get_agent_config", lambda: type("Config", (), {
+        "code_model": "", "anthropic_model_advanced": "",
+    })())
+    assert cg._resolve_code_model() == "claude-opus-5"
+
+
 # ============================================================
 # temperature param construction — modern reasoning models DEPRECATE
 # `temperature` (Anthropic 4.x / OpenAI gpt-5.x 400 on it). Code gen must omit

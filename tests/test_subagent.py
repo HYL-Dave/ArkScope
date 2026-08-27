@@ -40,6 +40,13 @@ from src.agents.shared.subagent import (
 # SubagentConfig Tests
 # ============================================================
 
+
+def test_builtin_subagents_use_current_generation_runtime_defaults():
+    assert SUBAGENT_REGISTRY["code_analyst"].model == "gpt-5.6-sol"
+    assert SUBAGENT_REGISTRY["deep_researcher"].model == "gpt-5.6-sol"
+    assert SUBAGENT_REGISTRY["data_summarizer"].model == "claude-sonnet-5"
+    assert SUBAGENT_REGISTRY["reviewer"].model == "claude-opus-5"
+
 class TestSubagentConfig:
     def test_config_creation(self):
         cfg = SubagentConfig(

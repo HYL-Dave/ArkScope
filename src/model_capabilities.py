@@ -48,6 +48,7 @@ class ModelCapability:
     supports_structured_output: bool = True
     supports_tool_calling: bool = True
     runtime_ready: bool = True
+    task_route_status: str = "retired"  # current | retired; independent of adapter readiness
     in_routing_seed: bool = False
     aliases: tuple[str, ...] = ()      # OFFICIAL aliases only (e.g. "gpt-5.6"→Sol)
     quality: str = "high"             # frontier | high | balanced | fast
@@ -67,6 +68,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
+        task_route_status="current",
         in_routing_seed=True,
         aliases=(),
         quality="frontier", speed="slow", cost_tier="high",
@@ -83,6 +85,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
+        task_route_status="current",
         in_routing_seed=True,
         aliases=(),
         quality="balanced", speed="fast", cost_tier="medium",
@@ -94,53 +97,58 @@ _REGISTRY: tuple[ModelCapability, ...] = (
               "2026-08-31).",
     ),
     ModelCapability(
+        id="claude-opus-5", provider="anthropic", label="Claude Opus 5",
+        picker_visibility="default", thinking_mode="adaptive_default_on",
+        effort_options=_OPUS_EFFORTS,
+        supports_compaction=True, context_mode="ga_1m",
+        context_limit=1_000_000, max_output=128_000,
+        task_route_status="current", in_routing_seed=True,
+        quality="frontier", speed="slow", cost_tier="high",
+        source_url="https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5",
+        verified_at="2026-08-28",
+        notes="Thinking default-on; effort ladder verified against "
+              "https://platform.claude.com/docs/en/build-with-claude/effort.",
+    ),
+    ModelCapability(
         id="claude-opus-4-8", provider="anthropic", label="Claude Opus 4.8",
-        picker_visibility="default", thinking_mode="adaptive_opt_in",
+        picker_visibility="pinned_only", thinking_mode="adaptive_opt_in",
         effort_options=_OPUS_EFFORTS,          # Fix A (CLI helper previously None)
         supports_compaction=True,              # Fix C (compaction beta list)
         context_mode="ga_1m",                  # Fix B (1M GA per context-windows doc)
         context_limit=1_000_000,               # Fix B (was 200_000 fallback)
         max_output=128_000,
-        in_routing_seed=True,
         quality="frontier", speed="slow", cost_tier="high",
-        recommended_for=("card_synthesis",),
         source_url=_ANTHROPIC_CTX_DOC, verified_at="2026-07-10",
         notes="Fixes A/B/C applied per official docs (user-ruled 2026-07-10).",
     ),
     ModelCapability(
         id="claude-opus-4-7", provider="anthropic", label="Claude Opus 4.7",
-        picker_visibility="advanced", thinking_mode="adaptive_opt_in",
+        picker_visibility="pinned_only", thinking_mode="adaptive_opt_in",
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
-        in_routing_seed=True,
         quality="high", speed="slow", cost_tier="high",
-        recommended_for=("card_synthesis",),
         source_url=_ANTHROPIC_DOCS, verified_at="2026-06-06",
         notes="Previous generation kept as an Advanced path; future removal expected.",
     ),
     ModelCapability(
         id="claude-sonnet-4-6", provider="anthropic", label="Claude Sonnet 4.6",
-        picker_visibility="advanced", thinking_mode="adaptive_opt_in",
+        picker_visibility="pinned_only", thinking_mode="adaptive_opt_in",
         effort_options=("max", "high", "medium", "low"),   # Fix E (docs incl. max)
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000,
         max_output=128_000,                    # Fix D (was 64_000; models table)
-        in_routing_seed=True,
         quality="balanced", speed="medium", cost_tier="medium",
-        recommended_for=("card_translation",),
         source_url=_ANTHROPIC_OVERVIEW, verified_at="2026-07-10",
         notes="Fixes D/E applied per official docs (user-ruled 2026-07-10). "
               "Previous generation kept as an Advanced path; future removal expected.",
     ),
     ModelCapability(
         id="claude-haiku-4-5", provider="anthropic", label="Claude Haiku 4.5",
-        picker_visibility="default", thinking_mode="manual_budget",
+        picker_visibility="pinned_only", thinking_mode="manual_budget",
         effort_options=(), supports_compaction=False, context_mode="standard",
         context_limit=200_000, max_output=64_000,
-        in_routing_seed=True,
         quality="fast", speed="fast", cost_tier="low",
-        recommended_for=("card_translation",),
         source_url=_ANTHROPIC_DOCS, verified_at="2026-06-06",
         notes="Canonical dated id is claude-haiku-4-5-20251001; prefix match covers it.",
     ),
@@ -168,6 +176,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        task_route_status="current",
         in_routing_seed=True,
         aliases=("gpt-5.6",),   # official: the gpt-5.6 alias routes to Sol
         quality="frontier", speed="medium", cost_tier="high",
@@ -181,6 +190,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        task_route_status="current",
         in_routing_seed=True,
         aliases=(),
         quality="high", speed="medium", cost_tier="medium",
@@ -195,6 +205,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        task_route_status="current",
         in_routing_seed=True,
         aliases=(),
         quality="balanced", speed="fast", cost_tier="low",
@@ -209,20 +220,16 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True,
         quality="frontier", speed="medium", cost_tier="high",
-        recommended_for=("card_synthesis",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
         notes="Superseded by gpt-5.6-terra at half the price (user ruling 2026-07-10).",
     ),
     ModelCapability(
         id="gpt-5.4-mini", provider="openai", label="GPT-5.4 mini",
-        picker_visibility="default", thinking_mode="none",
+        picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
-        in_routing_seed=True,
         quality="balanced", speed="fast", cost_tier="low",
-        recommended_for=("card_translation",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
         notes="Stays default: cheapest relevant option under codex OAuth costing.",
     ),
@@ -239,9 +246,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True,
         quality="high", speed="medium", cost_tier="medium",
-        recommended_for=("card_synthesis",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
     ModelCapability(

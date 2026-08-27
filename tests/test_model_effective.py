@@ -44,9 +44,9 @@ def _routes_mixed() -> dict:
     # Round-3 MF1: the DEFAULT config shape — anthropic cards + openai research.
     return {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="anthropic",
-                                    model="claude-opus-4-8", effort="default"),
+                                    model="claude-opus-5", effort="high"),
         "card_translation": TaskRoute(task="card_translation", provider="anthropic",
-                                      model="claude-sonnet-4-6", effort="default"),
+                                      model="claude-sonnet-5", effort="medium"),
         "ai_research": TaskRoute(task="ai_research", provider="openai",
                                  model="mystery-model", effort="default"),
     }
@@ -67,34 +67,28 @@ def _seed_cache(tmp_path):
     cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
     cache.record_run(provider="anthropic", auth_mode="api_key", credential_id="a1",
                      secret_fingerprint=_fp("sk-ant"), status="ok",
-                     models=[{"id": "claude-opus-4-8", "label": "Opus 4.8", "source": "provider_api"},
-                             {"id": "claude-opus-4-7", "label": "Opus 4.7", "source": "provider_api"}])
+                     models=[{"id": "claude-opus-5", "label": "Opus 5", "source": "provider_api"}])
     cache.record_run(provider="openai", auth_mode="chatgpt_oauth", credential_id="o1",
                      secret_fingerprint="oauth", status="ok",
-                     models=[{"id": "gpt-5.4-mini", "label": "mini", "source": "provider_api"},
-                             {"id": "gpt-5.5", "label": "GPT-5.5", "source": "provider_api"}])
+                     models=[{"id": "gpt-5.6-luna", "label": "Luna", "source": "provider_api"}])
     return cache
 
 
 def test_effective_view_handles_mixed_providers_per_task(tmp_path):
     view = effective_model_view(cache=_seed_cache(tmp_path), routes=_routes_mixed(),
                                 credentials=_credentials())
-    # anthropic api_key cards: opus-4.8 verified (visible+default+executable);
-    # opus-4.7 visible but advanced-visibility → advanced
+    # Anthropic API-key cards expose the discovered current Opus 5 route.
     synth = view["tasks"]["card_synthesis"]
-    assert [m["id"] for m in synth["verified"]] == ["claude-opus-4-8"]
-    assert any(m["id"] == "claude-opus-4-7" and m["badge"] == "advanced"
-               for m in synth["advanced"])
+    assert [m["id"] for m in synth["verified"]] == ["claude-opus-5"]
     assert synth["cache_state"] == "ok" and synth["discovered_at"]
-    # card_translation pins sonnet-4.6 (advanced visibility) → appears in advanced
+    # A selected but undiscovered current route remains visible as its route pin.
     trans = view["tasks"]["card_translation"]
-    assert any(m["id"] == "claude-sonnet-4-6" for m in trans["advanced"])
-    # openai research under chatgpt_oauth: mini verified; gpt-5.5 pinned_only →
-    # NOT shown despite visibility (round-4 MF1); mystery-model = route badge
+    assert any(m["id"] == "claude-sonnet-5" and m["badge"] == "route"
+               for m in trans["advanced"])
+    # OpenAI research keeps its unknown route pin while verified uses Luna.
     research = view["tasks"]["ai_research"]
-    assert [m["id"] for m in research["verified"]] == ["gpt-5.4-mini"]
+    assert [m["id"] for m in research["verified"]] == ["gpt-5.6-luna"]
     advanced_ids = {m["id"] for m in research["advanced"]}
-    assert "gpt-5.5" not in advanced_ids
     assert "mystery-model" in advanced_ids
 
 
@@ -110,6 +104,31 @@ def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
     # and still absent from every task that does NOT pin it
     assert all(m["id"] != "gpt-5.5"
                for m in view["tasks"]["card_synthesis"]["advanced"])
+
+
+def test_retired_discovery_stays_out_of_verified_and_route_pin_is_ineligible(tmp_path):
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(provider="openai", auth_mode="api_key", credential_id="o1",
+                     secret_fingerprint=_fp("sk-openai"), status="ok",
+                     models=[{"id": "gpt-5.4-mini-snapshot", "label": "legacy", "source": "provider_api"}])
+    credentials = {
+        "openai": ActiveCredential("openai", "o1", "api_key", _fp("sk-openai")),
+        "anthropic": None,
+    }
+    route = TaskRoute(task="ai_research", provider="openai", model="gpt-5.4-mini-snapshot")
+    view = effective_model_view_v2(
+        cache=cache,
+        routes={"card_synthesis": route, "card_translation": route, "ai_research": route},
+        credentials=credentials,
+    )
+    models = view["tasks"]["ai_research"]["providers"]["openai"]["models"]
+    retired = next(entry for entry in models if entry["id"] == "gpt-5.4-mini-snapshot")
+    assert retired["status"] == "route"
+    assert retired["eligible"] is False
+    assert retired["reason_code"] == "model_retired"
+    assert "gpt-5.4-mini-snapshot" not in {
+        entry["id"] for entry in models if entry["status"] == "visible"
+    }
 
 
 def test_effective_view_anthropic_oauth_research_is_executable_but_seed_only(tmp_path):
@@ -235,7 +254,7 @@ def test_dated_discovery_ids_resolve_to_registry_capability(tmp_path):
     cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
     cache.record_run(provider="anthropic", auth_mode="api_key", credential_id="a1",
                      secret_fingerprint=_fp("sk-ant"), status="ok",
-                     models=[{"id": "claude-haiku-4-5-20251001", "label": "Haiku 4.5",
+                     models=[{"id": "claude-fable-5-20261001", "label": "Fable 5",
                               "source": "provider_api"}])
     creds = {
         "anthropic": ActiveCredential(provider="anthropic", credential_id="a1",
@@ -246,9 +265,9 @@ def test_dated_discovery_ids_resolve_to_registry_capability(tmp_path):
     view = effective_model_view(cache=cache, routes=_routes_mixed(), credentials=creds)
     synth = view["tasks"]["card_synthesis"]
     verified_ids = [m["id"] for m in synth["verified"]]
-    assert "claude-haiku-4-5-20251001" in verified_ids   # real executable id kept
+    assert "claude-fable-5-20261001" in verified_ids   # real executable id kept
     all_ids = verified_ids + [m["id"] for m in synth["advanced"]]
-    assert "claude-haiku-4-5-20251001" in all_ids        # never vanishes
+    assert "claude-fable-5-20261001" in all_ids        # never vanishes
 
 
 def test_unknown_discovery_ids_do_not_flood_advanced(tmp_path):
@@ -280,7 +299,7 @@ def test_unknown_discovery_ids_do_not_flood_advanced(tmp_path):
 
 def test_v2_both_providers_present_regardless_of_route(tmp_path):
     routes = {
-        task: TaskRoute(task=task, provider="openai", model="gpt-5.4-mini", effort="default")
+        task: TaskRoute(task=task, provider="openai", model="gpt-5.6-luna", effort="xhigh")
         for task in ("card_synthesis", "card_translation", "ai_research")
     }
     view = effective_model_view_v2(
@@ -303,11 +322,9 @@ def test_v2_entry_schema_and_grouping(tmp_path):
     synth = view["tasks"]["card_synthesis"]["providers"]["anthropic"]
     entries = {entry["id"]: entry for entry in synth["models"]}
 
-    assert entries["claude-opus-4-8"]["status"] == "visible"
-    assert entries["claude-opus-4-8"]["visible_to_credential"] is True
-    assert entries["claude-opus-4-7"]["status"] == "advanced"
-    assert entries["claude-opus-4-7"]["visible_to_credential"] is True
-    assert not ({"claude-opus-4-5", "claude-sonnet-4-5"} & entries.keys())
+    assert entries["claude-opus-5"]["status"] == "visible"
+    assert entries["claude-opus-5"]["visible_to_credential"] is True
+    assert not ({"claude-opus-4-8", "claude-opus-4-7"} & entries.keys())
     for entry in entries.values():
         assert set(entry) == {
             "id", "label", "status", "visible_to_credential",
@@ -328,6 +345,8 @@ def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
         id="gpt-no-structured",
         label="GPT no structured",
         supports_structured_output=False,
+        picker_visibility="default",
+        task_route_status="current",
     )
     original_all = model_effective_module.all_models
     original_capability = model_effective_module.capability_for
@@ -357,7 +376,7 @@ def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
     routes = {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model=no_structured.id),
         "card_translation": TaskRoute(task="card_translation", provider="anthropic", model="claude-sonnet-5"),
-        "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.4-mini"),
+        "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.6-luna"),
     }
     view = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)
 
@@ -428,9 +447,8 @@ def test_v2_thinking_mode_carried_from_registry(tmp_path):
         entries.update({entry["id"]: entry for entry in block["models"]})
     assert entries["claude-fable-5"]["thinking_mode"] == "adaptive_always_on"
     assert entries["claude-sonnet-5"]["thinking_mode"] == "adaptive_default_on"
-    assert entries["claude-opus-4-8"]["thinking_mode"] == "adaptive_opt_in"
-    assert entries["claude-haiku-4-5"]["thinking_mode"] == "manual_budget"
-    assert entries["gpt-5.4-mini"]["thinking_mode"] == "none"
+    assert entries["claude-opus-5"]["thinking_mode"] == "adaptive_default_on"
+    assert entries["gpt-5.6-luna"]["thinking_mode"] == "none"
     assert entries["mystery-model"]["thinking_mode"] == "none"
 
 
@@ -446,8 +464,8 @@ def test_v2_effort_options_are_model_specific(tmp_path):
     assert entries["gpt-5.6-luna"]["effort_options"] == [
         "none", "low", "medium", "high", "xhigh", "max",
     ]
-    assert entries["gpt-5.4-mini"]["effort_options"] == [
-        "none", "low", "medium", "high", "xhigh",
+    assert entries["claude-opus-5"]["effort_options"] == [
+        "max", "xhigh", "high", "medium", "low",
     ]
     assert entries["mystery-model"]["effort_options"] == []
 
@@ -460,10 +478,9 @@ def test_v2_visibility_is_orthogonal_to_tier(tmp_path):
         entry["id"]: entry
         for entry in view["tasks"]["card_synthesis"]["providers"]["anthropic"]["models"]
     }
-    assert entries["claude-opus-4-7"]["status"] == "advanced"
-    assert entries["claude-opus-4-7"]["visible_to_credential"] is True
-    assert entries["claude-sonnet-4-6"]["status"] == "advanced"
-    assert entries["claude-sonnet-4-6"]["visible_to_credential"] is False
+    assert entries["claude-opus-5"]["status"] == "visible"
+    assert entries["claude-opus-5"]["visible_to_credential"] is True
+    assert not ({"claude-opus-4-7", "claude-sonnet-4-6"} & entries.keys())
 
     seed_cache = ModelDiscoveryCache(tmp_path / "seed.db")
     seed_cache.record_run(
@@ -489,6 +506,8 @@ def test_v2_discovered_ineligible_default_stays_out_of_alias(tmp_path, monkeypat
         id="gpt-no-structured",
         label="GPT no structured",
         supports_structured_output=False,
+        picker_visibility="default",
+        task_route_status="current",
     )
     original_all = model_effective_module.all_models
     original_capability = model_effective_module.capability_for
@@ -513,9 +532,9 @@ def test_v2_discovered_ineligible_default_stays_out_of_alias(tmp_path, monkeypat
         "anthropic": None,
     }
     routes = {
-        "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model="gpt-5.4-mini"),
-        "card_translation": TaskRoute(task="card_translation", provider="openai", model="gpt-5.4-mini"),
-        "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.4-mini"),
+        "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model="gpt-5.6-luna"),
+        "card_translation": TaskRoute(task="card_translation", provider="openai", model="gpt-5.6-luna"),
+        "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.6-luna"),
     }
     v2 = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)
     v2_entry = next(
