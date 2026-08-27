@@ -36,6 +36,7 @@ import {
   providerContexts,
   type TaskTestSnapshot,
 } from "./modelRoutingUx";
+import { taskRouteBlocker } from "./researchModels";
 import { InvestorProfilePanel } from "./InvestorProfilePanel";
 import type {
   NavigationRequest,
@@ -587,7 +588,7 @@ export function SettingsView({
     [catalog],
   );
   const routeSaveBlocks = useMemo(
-    () => catalog ? blockedRouteSaves(draft, catalog.routes, modelProviderContexts) : [],
+    () => catalog ? blockedRouteSaves(draft, catalog.routes, modelProviderContexts, catalog) : [],
     [catalog, draft, modelProviderContexts],
   );
 
@@ -629,7 +630,8 @@ export function SettingsView({
           setRouteOutcome({ kind: "missing_model", task: task.id });
           return;
         }
-        routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort || "default" };
+        if (taskRouteBlocker(catalog, row)) return;
+        routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort.trim() };
       }
       await saveModelRoutes(routes);
       const refreshed = await fetchCatalogAfterMutation();
@@ -876,13 +878,22 @@ export function SettingsView({
               </Button>
             </div>
             {routeSaveBlocks.length > 0 ? (
-              <p id="route-save-blocked" className="warn-text">
-                {t(($) => $.workspace.routes.saveBlocked, {
-                  value: routeSaveBlocks
-                    .map(({ task }) => settingsTaskLabel(task, t))
-                    .join(", "),
-                })}
-              </p>
+              <div id="route-save-blocked">
+                {(["missing_active_credential", "effort_required", "model_retired"] as const)
+                  .map((reason) => {
+                    const tasks = routeSaveBlocks
+                      .filter((block) => block.reason === reason)
+                      .map(({ task }) => settingsTaskLabel(task, t))
+                      .join(", ");
+                    if (!tasks) return null;
+                    const message = reason === "missing_active_credential"
+                      ? t(($) => $.workspace.routes.saveBlocked, { value: tasks })
+                      : reason === "effort_required"
+                        ? t(($) => $.workspace.routes.effortRequired, { value: tasks })
+                        : t(($) => $.workspace.routes.modelRetired, { value: tasks });
+                    return <p className="warn-text" key={reason}>{message}</p>;
+                  })}
+              </div>
             ) : null}
             <details className="settings-model-transfer">
               <summary>
@@ -921,14 +932,14 @@ export function SettingsView({
             onDraft={setDraft}
             onTest={async (task) => {
             const row = draft[task];
-            if (!row || !row.model.trim()) return;
+            if (!row || !row.model.trim() || taskRouteBlocker(catalog, row)) return;
             const context = modelProviderContexts[row.provider];
             if (!context) return;
             const snapshot: TaskTestSnapshot = {
               task,
               provider: row.provider,
               model: row.model.trim(),
-              effort: row.effort || "default",
+              effort: row.effort.trim(),
               credential_id: context.credential_id,
             };
             setTestState((prev) => ({
@@ -937,7 +948,7 @@ export function SettingsView({
             }));
             try {
               const result = await testTaskModelAccess(
-                task, row.provider, row.model.trim(), row.effort || "default",
+                task, row.provider, row.model.trim(), row.effort.trim(),
               );
               setTestState((prev) => ({
                 ...prev,
@@ -961,7 +972,7 @@ export function SettingsView({
                     auth_mode: context.auth_mode,
                     credential_id: null,
                     model: row.model,
-                    effort: row.effort || "default",
+                    effort: row.effort.trim(),
                     status: "error",
                     error_code: "provider_call_failed",
                     latency_ms: null,
@@ -1197,7 +1208,7 @@ function fromRoutes(routes: Record<ModelTask, TaskRoute>): Partial<Record<ModelT
     out[task] = {
       provider: routes[task].provider,
       model: routes[task].model,
-      effort: routes[task].effort || "default",
+      effort: routes[task].effort,
       custom: routes[task].custom,
     };
   }
@@ -1215,7 +1226,7 @@ function onDraftForTask(
     [task]: {
       provider,
       model,
-      effort: prev[task]?.effort ?? "default",
+      effort: prev[task]?.effort ?? "",
       custom: true,
     },
   }));

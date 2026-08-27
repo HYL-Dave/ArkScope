@@ -59,6 +59,8 @@ const settings = {
     },
     routes: {
       saveBlocked: "本次變更尚未儲存：請先到 Provider 登入與憑證完成 {{value}}所選 provider 的登入。",
+      effortRequired: "本次變更尚未儲存：請為 {{value}}選擇明確的 effort。",
+      modelRetired: "本次變更尚未儲存：請為 {{value}}改用目前可用的模型，不能使用已淘汰模型。",
       missingModel: "儲存前，請為 {{taskLabel}}選擇或輸入模型。",
       saved: "模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。",
       saveFailed: "無法儲存任務路由。",
@@ -162,6 +164,8 @@ const settings = {
     route: {
       authority: "路由權威",
       envOverrideDetail: "目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準。",
+      effortRequired: "儲存或執行實際任務測試前，請選擇明確的 effort。",
+      modelRetired: "這個路由使用已淘汰模型。儲存或執行實際任務測試前，請選擇目前可用的模型。",
       resetToFallback: "重設為 fallback",
       sources: {
         env: "env 覆蓋",
@@ -183,6 +187,7 @@ const settings = {
     catalog: {
       loading: "正在載入模型目錄…",
       select: "選擇模型…",
+      selectEffort: "選擇 effort…",
       visibleListLoaded: "已取得可見模型清單",
       seedOnly: "此通道無法線上列出模型。",
       neverDiscovered: "尚未探索此登入的模型",

@@ -7,6 +7,20 @@ import type {
   ProviderCredential,
 } from "./api";
 
+const TASK_ROUTE_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+export type TaskRouteBlockerReason = "model_retired" | "effort_required";
+
+export function taskRouteModelStatus(
+  catalog: ModelCatalog,
+  model: string,
+): "current" | "retired" | "unknown" {
+  const id = model.trim();
+  if ((catalog.retired_model_ids ?? []).includes(id)) return "retired";
+  if ((catalog.current_model_ids ?? []).includes(id)) return "current";
+  return "unknown";
+}
+
 export function activeCredential(creds: ProviderCredential[] | undefined): ProviderCredential | null {
   return creds?.find((c) => c.active) ?? null;
 }
@@ -36,12 +50,23 @@ export function effortOptionsForModel(
     ))
     .sort((left, right) => right.id.length - left.id.length)[0];
   const supported = effectiveEffortIds ?? modelOption?.effort_options;
-  if (supported === undefined) {
-    const hasModelContracts = catalog.models.some((item) => item.effort_options !== undefined);
-    return hasModelContracts
-      ? providerOptions.filter((item) => item.id === "default")
-      : providerOptions;
-  }
-  const allowed = new Set(["default", ...supported]);
-  return providerOptions.filter((item) => allowed.has(item.id));
+  const providerIds = new Set(providerOptions.map((item) => item.id));
+  const allowed = supported === undefined
+    ? providerIds
+    : new Set(supported);
+  return TASK_ROUTE_EFFORT_IDS
+    .filter((id) => providerIds.has(id) && allowed.has(id))
+    .map((id) => providerOptions.find((item) => item.id === id)!)
+    .filter(Boolean);
+}
+
+export function taskRouteBlocker(
+  catalog: ModelCatalog,
+  route: Pick<{ provider: ModelProvider; model: string; effort: string }, "provider" | "model" | "effort">,
+): TaskRouteBlockerReason | null {
+  if (taskRouteModelStatus(catalog, route.model) === "retired") return "model_retired";
+  const effort = route.effort.trim();
+  const supported = effortOptionsForModel(catalog, route.provider, route.model)
+    .some((option) => option.id === effort);
+  return supported ? null : "effort_required";
 }

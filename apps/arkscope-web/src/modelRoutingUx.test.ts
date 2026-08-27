@@ -164,11 +164,35 @@ const route = (provider: "openai" | "anthropic", model: string): TaskRoute => ({
   task: "ai_research",
   provider,
   model,
-  effort: "default",
+  effort: "low",
   source: "db",
   custom: false,
   warning: null,
 });
+
+const taskCatalog = {
+  current_model_ids: [
+    "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+    "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+  ],
+  retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+  effort_options: {
+    openai: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
+      id, provider: "openai" as const, label: id, description: id, applies_to_card_tasks: true,
+    })),
+    anthropic: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
+      id, provider: "anthropic" as const, label: id, description: id, applies_to_card_tasks: true,
+    })),
+  },
+  models: [
+    ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
+      id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
+    })),
+    ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+      id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
+    })),
+  ],
+} as unknown as ModelCatalog;
 
 const credential = (provider: "openai" | "anthropic", id: string, active = true) => ({
   id,
@@ -225,25 +249,44 @@ describe("blockedRouteSaves", () => {
 
   it("does not block a pre-existing missing-credential route", () => {
     const draft = {
-      ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "default", custom: false },
+      ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "low", custom: false },
     } satisfies Partial<Record<string, DraftRouteValue>>;
-    expect(blockedRouteSaves(draft, baseline, contexts)).toEqual([]);
+    expect(blockedRouteSaves(draft, baseline, contexts, taskCatalog)).toEqual([]);
   });
 
   it("blocks only a task freshly drafted onto that provider", () => {
     const draft = {
-      ai_research: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
+      ai_research: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
     } satisfies Partial<Record<string, DraftRouteValue>>;
-    expect(blockedRouteSaves(draft, baseline, contexts)).toEqual([
+    expect(blockedRouteSaves(draft, baseline, contexts, taskCatalog)).toEqual([
       { task: "ai_research", reason: "missing_active_credential" },
     ]);
   });
 
   it("compares semantic fields, not object identity", () => {
     expect(routesSemanticallyEqual(
-      { provider: "openai", model: "gpt-5.4-mini", effort: "low" },
-      { ...route("openai", "gpt-5.4-mini"), effort: "low" },
+      { provider: "openai", model: "gpt-5.6-luna", effort: "low" },
+      { ...route("openai", "gpt-5.6-luna"), effort: "low" },
     )).toBe(true);
+  });
+
+  it("blocks unchanged incomplete and retired rows before semantic equality", () => {
+    const currentContexts = {
+      openai: { credential_id: "local:7", auth_mode: "chatgpt_oauth", label: "ChatGPT" },
+      anthropic: { credential_id: "local:4", auth_mode: "api_key", label: "Claude" },
+    } satisfies ProviderContextMap;
+    for (const effort of ["default", "none", ""] as const) {
+      const legacy = { provider: "openai" as const, model: "gpt-5.6-luna", effort, custom: false };
+      expect(blockedRouteSaves({ ai_research: legacy }, { ai_research: { ...route("openai", "gpt-5.6-luna"), effort } }, currentContexts, taskCatalog))
+        .toEqual([{ task: "ai_research", reason: "effort_required" }]);
+    }
+    const retired = { provider: "openai" as const, model: "gpt-5.4-mini", effort: "low", custom: false };
+    expect(blockedRouteSaves({ ai_research: retired }, { ai_research: { ...route("openai", "gpt-5.4-mini"), effort: "low" } }, currentContexts, taskCatalog))
+      .toEqual([{ task: "ai_research", reason: "model_retired" }]);
+    expect(routesSemanticallyEqual(
+      { provider: "openai", model: "gpt-5.6-luna", effort: "" },
+      { ...route("openai", "gpt-5.6-luna"), effort: "default" },
+    )).toBe(false);
   });
 });
 
@@ -251,7 +294,7 @@ describe("task test snapshots", () => {
   const snapshot: TaskTestSnapshot = {
     task: "ai_research",
     provider: "openai",
-    model: "gpt-5.4-mini",
+    model: "gpt-5.6-luna",
     effort: "low",
     credential_id: "local:7",
   };
@@ -259,19 +302,19 @@ describe("task test snapshots", () => {
   it("requires all five fields and never accepts an explicitly stale result", () => {
     expect(isTaskTestSnapshotCurrent(snapshot, {
       task: "ai_research",
-      route: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+      route: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       credentialId: "local:7",
       stale: false,
     })).toBe(true);
     expect(isTaskTestSnapshotCurrent(snapshot, {
       task: "ai_research",
-      route: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      route: { provider: "openai", model: "gpt-5.6-terra", effort: "low", custom: false },
       credentialId: "local:7",
       stale: false,
     })).toBe(false);
     expect(isTaskTestSnapshotCurrent(snapshot, {
       task: "ai_research",
-      route: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+      route: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       credentialId: "local:7",
       stale: true,
     })).toBe(false);

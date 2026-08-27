@@ -25,18 +25,25 @@ const controls = vi.hoisted(() => ({
   getModelCatalog: vi.fn(),
   saveFixedTaskRuntime: vi.fn(async () => ({ fixed_task_runtime: {} })),
   saveModelRoutes: vi.fn(),
+  testTaskModelAccess: vi.fn(),
   discoverModels: vi.fn(),
   catalogPending: null as Promise<ModelCatalog> | null,
   catalogError: null as Error | null,
   catalogOverride: null as ModelCatalog | null,
 }));
 
+const CURRENT_MODEL_IDS = [
+  "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+  "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+] as const;
+const TASK_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"];
+
 const taskRoute = (
   task: ModelTask,
   provider: "openai" | "anthropic",
   model: string,
 ): TaskRoute => ({
-  task, provider, model, effort: "default", source: "db", custom: false, warning: null,
+  task, provider, model, effort: "low", source: "db", custom: false, warning: null,
 });
 
 const providerBlock = (provider: "openai" | "anthropic", model: string) => ({
@@ -56,23 +63,39 @@ const providerBlock = (provider: "openai" | "anthropic", model: string) => ({
 });
 
 const routes = {
-  card_synthesis: taskRoute("card_synthesis", "openai", "gpt-5.4-mini"),
+  card_synthesis: taskRoute("card_synthesis", "openai", "gpt-5.6-luna"),
   card_translation: taskRoute("card_translation", "anthropic", "claude-sonnet-5"),
-  ai_research: taskRoute("ai_research", "openai", "gpt-5.4-mini"),
+  ai_research: taskRoute("ai_research", "openai", "gpt-5.6-luna"),
 };
 
 const catalog: ModelCatalog = {
   providers: ["anthropic", "openai"],
   tasks: [
-    { id: "card_synthesis", label: "生成", description: "", default_provider: "openai", recommended_model: "gpt-5.4-mini" },
+    { id: "card_synthesis", label: "生成", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
     { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5" },
-    { id: "ai_research", label: "研究", description: "", default_provider: "openai", recommended_model: "gpt-5.4-mini" },
+    { id: "ai_research", label: "研究", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
   ],
-  models: [],
+  models: CURRENT_MODEL_IDS.map((id) => ({
+    id,
+    provider: id.startsWith("gpt-") ? "openai" as const : "anthropic" as const,
+    label: id,
+    quality: "frontier" as const,
+    speed: "medium" as const,
+    cost_tier: "medium" as const,
+    supports_structured_output: true,
+    supports_tool_calling: true,
+    effort_options: TASK_EFFORT_IDS,
+    recommended_for: [],
+    source_url: "",
+    verified_at: "",
+    notes: "",
+  })),
   effort_options: {
-    openai: [{ id: "default", provider: "openai", label: "Default", description: "", applies_to_card_tasks: true }],
-    anthropic: [{ id: "default", provider: "anthropic", label: "Default", description: "", applies_to_card_tasks: true }],
+    openai: TASK_EFFORT_IDS.map((id) => ({ id, provider: "openai" as const, label: id, description: "", applies_to_card_tasks: true })),
+    anthropic: TASK_EFFORT_IDS.map((id) => ({ id, provider: "anthropic" as const, label: id, description: "", applies_to_card_tasks: true })),
   },
+  current_model_ids: [...CURRENT_MODEL_IDS],
+  retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
   routes,
   credentials: { openai: [], anthropic: [] },
   custom_allowed: true,
@@ -85,7 +108,7 @@ const catalog: ModelCatalog = {
       verified: [], advanced: [], cache_state: "ok", discovered_at: null,
       current_provider: routes[task].provider,
       providers: {
-        openai: providerBlock("openai", "gpt-5.4-mini"),
+        openai: providerBlock("openai", "gpt-5.6-luna"),
         anthropic: providerBlock("anthropic", "claude-sonnet-5"),
       },
     }])) as ModelCatalog["effective"] extends { tasks: infer T } ? T : never,
@@ -100,6 +123,7 @@ vi.mock("./api", async (importOriginal) => {
     discoverModels: controls.discoverModels,
     saveFixedTaskRuntime: controls.saveFixedTaskRuntime,
     saveModelRoutes: controls.saveModelRoutes,
+    testTaskModelAccess: controls.testTaskModelAccess,
   };
 });
 
@@ -147,6 +171,12 @@ beforeEach(async () => {
       return controls.catalogOverride ?? catalog;
   });
   controls.discoverModels.mockReset();
+  controls.testTaskModelAccess.mockReset();
+  controls.testTaskModelAccess.mockResolvedValue({
+    task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "high",
+    auth_mode: "api_key", credential_id: "local:7", status: "ok", error_code: null,
+    latency_ms: 1, tested_at: "2026-08-27T00:00:00Z", fallback_effort: null, warning: null,
+  });
   controls.saveFixedTaskRuntime.mockReset();
   controls.saveFixedTaskRuntime.mockResolvedValue({ fixed_task_runtime: {} });
   controls.saveModelRoutes.mockReset();
@@ -337,19 +367,95 @@ describe("Settings model route save gate", () => {
     expect(save.disabled).toBe(true);
   });
 
+  it("keeps legacy effort for diagnosis but requires an explicit task effort before save or test", async () => {
+    controls.catalogOverride = {
+      ...catalog,
+      routes: {
+        ...catalog.routes,
+        ai_research: { ...catalog.routes.ai_research, effort: "default" },
+      },
+    };
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const research = host.querySelector('[data-testid="route-ai_research"]')!;
+    const effort = research.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-ai_research-task-label model-route-ai_research-effort-label"]',
+    )!;
+    const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!;
+    const test = Array.from(research.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "實際測試")!;
+
+    expect(effort.value).toBe("");
+    expect(Array.from(effort.options).map((option) => option.value))
+      .toEqual(["", "low", "medium", "high", "xhigh", "max"]);
+    expect(research.textContent).not.toContain("default");
+    expect(save.disabled).toBe(true);
+    expect(test.disabled).toBe(true);
+    expect(host.querySelector("#route-save-blocked")?.textContent)
+      .toContain("AI 研究");
+  });
+
+  it("sends a selected real effort unchanged to task test and route save", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const research = host.querySelector('[data-testid="route-ai_research"]')!;
+    const effort = research.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-ai_research-task-label model-route-ai_research-effort-label"]',
+    )!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(effort, "high");
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    const test = Array.from(research.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "實際測試")!;
+    await click(test);
+    expect(controls.testTaskModelAccess).toHaveBeenCalledWith(
+      "ai_research", "openai", "gpt-5.6-luna", "high",
+    );
+    const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!;
+    await click(save);
+    expect(controls.saveModelRoutes).toHaveBeenCalledWith(expect.objectContaining({
+      ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "high" },
+    }));
+  });
+
   it("wires the fixed-task panel to one atomic settings request", async () => {
     controls.saveFixedTaskRuntime.mockClear();
     const runtime = {
       anthropic: {
         model: "claude-sonnet-5",
-        model_advanced: "claude-opus-4-8",
+        model_advanced: "claude-opus-5",
         effort: null,
         thinking: false,
         key_set: true,
         credentials: [],
       },
       openai: {
-        model: "gpt-5.4-mini",
+        model: "gpt-5.6-luna",
         model_advanced: "gpt-5.6-luna",
         reasoning_effort: "default",
         key_set: true,
@@ -778,9 +884,7 @@ describe("Settings model route save gate", () => {
     expect(models.textContent).toContain("Content Translation");
     expect(models.textContent).toContain("AI Research");
     expect(models.textContent).toContain("Generate source-grounded AI cards.");
-    expect(models.textContent).toContain(
-      "Do not send effort; the current model and backend determine the effective level.",
-    );
+    expect(models.textContent).not.toContain("Do not send effort;");
     expect(models.textContent).not.toContain("BACKEND TASK");
     expect(models.textContent).not.toContain("BACKEND EFFORT");
   });
@@ -804,14 +908,14 @@ describe("Settings model route save gate", () => {
     };
     const openAiModels = [
       {
-        id: "gpt-5.4-mini",
-        label: "gpt-5.4-mini",
+        id: "gpt-5.6-luna",
+        label: "gpt-5.6-luna",
         status: "visible" as const,
         visible_to_credential: true,
         eligible: true,
         reason_code: null,
         thinking_mode: "none",
-        effort_options: ["low", "high"],
+        effort_options: TASK_EFFORT_IDS,
       },
       {
         id: "gpt-custom-preserved",
@@ -821,7 +925,7 @@ describe("Settings model route save gate", () => {
         eligible: true,
         reason_code: null,
         thinking_mode: "none",
-        effort_options: ["low", "high"],
+        effort_options: TASK_EFFORT_IDS,
       },
     ];
     const openAiBlock = {
@@ -836,8 +940,8 @@ describe("Settings model route save gate", () => {
       credentials: { ...catalog.credentials, openai: [credential] },
       effort_options: {
         ...catalog.effort_options,
-        openai: ["default", "low", "high"].map((id) => ({
-          id: id as "default" | "low" | "high",
+        openai: TASK_EFFORT_IDS.map((id) => ({
+          id,
           provider: "openai" as const,
           label: `BACKEND ${id}`,
           description: `BACKEND ${id}`,
@@ -952,14 +1056,14 @@ describe("Settings model route save gate", () => {
     const runtime = {
       anthropic: {
         model: "claude-sonnet-5",
-        model_advanced: "claude-opus-4-8",
+        model_advanced: "claude-opus-5",
         effort: null,
         thinking: false,
         key_set: true,
         credentials: [],
       },
       openai: {
-        model: "gpt-5.4-mini",
+        model: "gpt-5.6-luna",
         model_advanced: "gpt-5.6-luna",
         reasoning_effort: "default",
         key_set: true,

@@ -27,17 +27,29 @@ afterEach(() => {
   host = null;
 });
 
-const MODELS: ModelOption[] = [
-  { id: "gpt-5.4-mini", provider: "openai", label: "GPT-5.4 mini", quality: "balanced", speed: "fast",
-    cost_tier: "low", supports_structured_output: true, supports_tool_calling: true, recommended_for: [],
-    source_url: "", verified_at: "", notes: "" },
-  { id: "claude-opus-4-8", provider: "anthropic", label: "Claude Opus 4.8", quality: "frontier", speed: "slow",
-    cost_tier: "high", supports_structured_output: true, supports_tool_calling: true, recommended_for: [],
-    source_url: "", verified_at: "", notes: "" },
-];
+const CURRENT_MODEL_IDS = [
+  "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+  "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+] as const;
+const TASK_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"];
+const MODELS: ModelOption[] = CURRENT_MODEL_IDS.map((id) => ({
+  id,
+  provider: id.startsWith("gpt-") ? "openai" : "anthropic",
+  label: id,
+  quality: "frontier",
+  speed: "medium",
+  cost_tier: "medium",
+  supports_structured_output: true,
+  supports_tool_calling: true,
+  effort_options: TASK_EFFORT_IDS,
+  recommended_for: [],
+  source_url: "",
+  verified_at: "",
+  notes: "",
+}));
 
 const route = (over: Partial<TaskRoute>): TaskRoute => ({
-  task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+  task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low",
   source: "db", custom: false, warning: null, ...over,
 });
 
@@ -46,17 +58,19 @@ function catalog(): ModelCatalog {
   return {
     providers: ["anthropic", "openai"],
     tasks: [
-      { id: "ai_research", label: "AI 研究", description: "", default_provider: "openai", recommended_model: "gpt-5.4-mini" },
-      { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-opus-4-8" },
+      { id: "ai_research", label: "AI 研究", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
+      { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
     ],
     models: MODELS,
     effort_options: {
-      openai: [{ id: "low", provider: "openai", label: "Low", description: "", applies_to_card_tasks: true }],
-      anthropic: [{ id: "default", provider: "anthropic", label: "Provider default", description: "", applies_to_card_tasks: true }],
+      openai: TASK_EFFORT_IDS.map((id) => ({ id, provider: "openai" as const, label: id, description: "", applies_to_card_tasks: true })),
+      anthropic: TASK_EFFORT_IDS.map((id) => ({ id, provider: "anthropic" as const, label: id, description: "", applies_to_card_tasks: true })),
     },
+    current_model_ids: [...CURRENT_MODEL_IDS],
+    retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
     routes: {
       ai_research: route({ task: "ai_research", source: "db" }),
-      card_translation: route({ task: "card_translation", provider: "anthropic", model: "claude-opus-4-8", effort: "default", source: "profile" }),
+      card_translation: route({ task: "card_translation", provider: "anthropic", model: "claude-opus-5", effort: "low", source: "profile" }),
       card_synthesis: route({ task: "card_synthesis", source: "default" }),
     },
     credentials: { anthropic: [], openai: [] },
@@ -76,14 +90,17 @@ function render(
   document.body.append(host);
   root = createRoot(host);
   const cat = catOverride ?? catalog();
-  const modelsByProvider = { anthropic: [MODELS[1]], openai: [MODELS[0]] };
+  const modelsByProvider = {
+    anthropic: MODELS.filter((model) => model.provider === "anthropic"),
+    openai: MODELS.filter((model) => model.provider === "openai"),
+  };
   act(() => {
     root!.render(React.createElement(ModelRoutingSection, {
       catalog: cat,
       draft: {
-        ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
       modelsByProvider,
       testState: {},
@@ -215,15 +232,15 @@ describe("ModelRoutingSection provider-first UX", () => {
     const cat = catalog();
     cat.tasks = [
       ...cat.tasks,
-      { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-4-8" },
+      { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
     ];
     cat.credentials = {
       openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT Plus")],
       anthropic: [cred("anthropic", "local:4", "api_key", "Claude API")],
     };
-    cat.effort_options.openai = ["default", "none", "low", "medium", "high", "xhigh", "max"]
+    cat.effort_options.openai = TASK_EFFORT_IDS
       .map((id) => ({
-        id: id as "default" | "none" | "low" | "medium" | "high" | "xhigh" | "max",
+        id,
         provider: "openai",
         label: id,
         description: id,
@@ -233,9 +250,9 @@ describe("ModelRoutingSection provider-first UX", () => {
       executable: true, reason_code: null, cache_state: "ok",
       discovered_at: "2026-07-10T06:00:00Z",
       models: [
-        entry("gpt-5.4-mini", "visible", true, null),
-        entry("gpt-5.6-luna", "visible", false, "task_capability_missing"),
-        entry("gpt-5.6-terra", "advanced", true, null),
+        entry("gpt-5.6-luna", "visible", true, null),
+        entry("gpt-5.6-terra", "visible", false, "task_capability_missing"),
+        entry("gpt-5.6-sol", "advanced", true, null),
         entry("mystery-model", "route", true, "model_not_in_registry", "none", false),
       ],
     };
@@ -244,7 +261,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       discovered_at: null,
       models: [
         entry("claude-sonnet-5", "seed", true, null, "adaptive_default_on", null),
-        entry("claude-opus-4-8", "advanced", true, null, "adaptive_opt_in", null),
+        entry("claude-opus-5", "advanced", true, null, "adaptive_opt_in", null),
       ],
     };
     const taskBlock = (current: "openai" | "anthropic") => ({
@@ -280,7 +297,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const onDraft = vi.fn((updater: unknown) => {
       if (typeof updater === "function") {
         drafts.push((updater as (p: Record<string, unknown>) => unknown)({
-          ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+          ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
         }));
       }
     }) as unknown as DraftDispatch;
@@ -290,8 +307,35 @@ describe("ModelRoutingSection provider-first UX", () => {
 
     act(() => buttonByText(researchCard(), "Anthropic").click());
     const updated = drafts.at(-1) as Record<string, { provider: string; model: string; effort: string }>;
-    expect(updated.ai_research).toMatchObject({ provider: "anthropic", model: "", effort: "default" });
+    expect(updated.ai_research).toMatchObject({ provider: "anthropic", model: "", effort: "low" });
     expect(invalidate).toHaveBeenCalledWith("ai_research");
+  });
+
+  it("retains a supported real effort across current-model changes", () => {
+    const drafts: unknown[] = [];
+    const onDraft = vi.fn((updater: unknown) => {
+      if (typeof updater === "function") {
+        drafts.push((updater as (p: Record<string, unknown>) => unknown)({
+          ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
+        }));
+      }
+    }) as unknown as DraftDispatch;
+    render(vi.fn(), catalogV2(), onDraft, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      },
+    });
+    const model = labelledControl(researchCard(), "model") as HTMLSelectElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    act(() => {
+      setter?.call(model, "gpt-5.6-sol");
+      model.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(drafts.at(-1)).toMatchObject({
+      ai_research: { model: "gpt-5.6-sol", effort: "high" },
+    });
   });
 
   it("renders one selector with four groups and disables ineligible entries with text reasons", () => {
@@ -306,16 +350,16 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(Array.from(select.querySelectorAll("optgroup")).map((g) => g.label)).toEqual([
       "可供此任務使用", "此登入可見", "進階／未驗證", "目前路由",
     ]);
-    const luna = Array.from(select.options).find((option) => option.value === "gpt-5.6-luna")!;
-    expect(luna.disabled).toBe(true);
-    expect(luna.textContent).toContain("缺少任務能力");
-    expect(luna.getAttribute("title")).toBeNull();
+    const terra = Array.from(select.options).find((option) => option.value === "gpt-5.6-terra")!;
+    expect(terra.disabled).toBe(true);
+    expect(terra.textContent).toContain("缺少任務能力");
+    expect(terra.getAttribute("title")).toBeNull();
     expect(card.textContent).toContain("不可選：缺少任務能力");
     const modelLimitHelp = card.querySelector("p.field-help")!;
     expect(modelLimitHelp.getAttribute("aria-label")).toBeNull();
     expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
     expectNoKnownTaskId(modelLimitHelp.textContent);
-    expect(Array.from(select.options).find((option) => option.value === "gpt-5.6-terra")?.textContent)
+    expect(Array.from(select.options).find((option) => option.value === "gpt-5.6-sol")?.textContent)
       .toContain("進階");
     const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
     const translationSelect = expectLocalizedControlName(
@@ -327,7 +371,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       .find((option) => option.value === "claude-sonnet-5")?.textContent)
       .toContain("未驗證");
     expect(Array.from(translationSelect.options)
-      .find((option) => option.value === "claude-opus-4-8")?.textContent)
+      .find((option) => option.value === "claude-opus-5")?.textContent)
       .toContain("進階");
   });
 
@@ -344,7 +388,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const onDraft = vi.fn((updater: unknown) => {
       if (typeof updater === "function") {
         drafts.push((updater as (p: Record<string, unknown>) => unknown)({
-          ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+          ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
         }));
       }
     }) as unknown as DraftDispatch;
@@ -360,9 +404,9 @@ describe("ModelRoutingSection provider-first UX", () => {
     host = null;
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
-        ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: true },
-        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: true },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const openAiCustom = researchCard();
@@ -387,9 +431,9 @@ describe("ModelRoutingSection provider-first UX", () => {
     disposeRender();
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
-        ai_research: { provider: "anthropic", model: "claude-custom", effort: "default", custom: true },
-        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+        ai_research: { provider: "anthropic", model: "claude-custom", effort: "low", custom: true },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     expect((researchCard().querySelector("input") as HTMLInputElement).placeholder).toBe("claude-…");
@@ -426,9 +470,9 @@ describe("ModelRoutingSection provider-first UX", () => {
   it("shows the selected Anthropic credential and its seed-only state", () => {
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
-        ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "default", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+        ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const card = researchCard();
@@ -452,49 +496,47 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(translation.querySelector('[aria-label="Thinking card_translation"]')).toBeNull();
   });
 
-  it("shows only the selected model's supported effort values", () => {
+  it("projects a legacy effort as empty, without default or none task options", () => {
     const cat = catalogV2();
-    const research = cat.effective!.tasks.ai_research!.providers!.openai!;
-    const mini = research.models.find((model) => model.id === "gpt-5.4-mini")!;
-    const luna = research.models.find((model) => model.id === "gpt-5.6-luna")!;
-    (mini as typeof mini & { effort_options: string[] }).effort_options = [
-      "none", "low", "medium", "high", "xhigh",
-    ];
-    (luna as typeof luna & { effort_options: string[] }).effort_options = [
-      "none", "low", "medium", "high", "xhigh", "max",
-    ];
-
     render(vi.fn(), cat, undefined, {
       draft: {
-        ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "max", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "default", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
-    const miniEffort = labelledControl(researchCard(), "effort") as HTMLSelectElement;
-    expect(Array.from(miniEffort.options).map((option) => option.value)).toEqual([
-      "default", "none", "low", "medium", "high", "xhigh",
+    const effort = labelledControl(researchCard(), "effort") as HTMLSelectElement;
+    expect(Array.from(effort.options).map((option) => option.value)).toEqual([
+      "", "low", "medium", "high", "xhigh", "max",
     ]);
-    expect(miniEffort.value).toBe("default");
-    expect(researchCard().textContent).toContain(
-      "不送 effort；實際檔位由目前模型與後端決定。",
+    expect(effort.value).toBe("");
+    expect(researchCard().textContent).not.toContain("不送 effort；實際檔位由目前模型與後端決定。");
+    expect(buttonByText(researchCard(), "實際測試").disabled).toBe(true);
+  });
+
+  it("retains a retired model as read-only provenance while excluding it from discovered choices", () => {
+    const cat = catalogV2();
+    cat.effective!.tasks.ai_research!.providers!.openai!.models.push(
+      entry("gpt-5.4-mini", "visible", true, null),
     );
-
-    act(() => root!.unmount());
-    root = null;
-    host!.remove();
-    host = null;
     render(vi.fn(), cat, undefined, {
       draft: {
-        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "max", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+        ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
-    const lunaEffort = labelledControl(researchCard(), "effort") as HTMLSelectElement;
-    expect(Array.from(lunaEffort.options).map((option) => option.value)).toEqual([
-      "default", "none", "low", "medium", "high", "xhigh", "max",
-    ]);
+    const model = labelledControl(researchCard(), "model") as HTMLSelectElement;
+    expect(model.value).toBe("gpt-5.4-mini");
+    expect(model.disabled).toBe(true);
+    expect(researchCard().textContent).toContain("已淘汰");
+    expect(buttonByText(researchCard(), "實際測試").disabled).toBe(true);
+
+    disposeRender();
+    render(vi.fn(), cat);
+    const currentModelSelect = labelledControl(researchCard(), "model") as HTMLSelectElement;
+    expect(Array.from(currentModelSelect.options).map((option) => option.value))
+      .not.toContain("gpt-5.4-mini");
   });
 
   it("uses the task-scoped test and explains subscription billing", () => {
@@ -507,18 +549,15 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(onTest).toHaveBeenCalledWith("ai_research");
   });
 
-  it("keeps route-pinned unknown models in the current route group", () => {
+  it("does not promote a discovered unknown model into a task choice", () => {
     render(vi.fn(), catalogV2());
     const select = labelledControl(researchCard(), "model") as HTMLSelectElement;
-    const routeGroup = Array.from(select.querySelectorAll("optgroup"))
-      .find((group) => group.label === "目前路由")!;
-    expect(routeGroup.textContent).toContain("mystery-model");
-    expect((routeGroup.querySelector("option") as HTMLOptionElement).disabled).toBe(false);
+    expect(Array.from(select.options).map((option) => option.value)).not.toContain("mystery-model");
   });
 
   it("marks a changed test snapshot stale and does not show the old result", () => {
     const result: TaskModelTestResult = {
-      task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+      task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low",
       auth_mode: "chatgpt_oauth", credential_id: "local:7", status: "ok",
       error_code: null, latency_ms: 12, tested_at: "2026-07-11T00:00:00Z",
       fallback_effort: null, warning: null,
@@ -527,7 +566,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       testState: {
         ai_research: {
           loading: false, result, stale: true,
-          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low", credential_id: "local:7" },
+          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low", credential_id: "local:7" },
         },
       },
     });
@@ -538,7 +577,7 @@ describe("ModelRoutingSection provider-first UX", () => {
 
   it("renders an actual-call success only for the current five-field snapshot", () => {
     const result: TaskModelTestResult = {
-      task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+      task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low",
       auth_mode: "chatgpt_oauth", credential_id: "local:7", status: "ok",
       error_code: null, latency_ms: 12, tested_at: "2026-07-11T00:00:00Z",
       fallback_effort: "high", warning: null,
@@ -547,7 +586,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       testState: {
         ai_research: {
           loading: false, result, stale: false,
-          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low", credential_id: "local:7" },
+          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low", credential_id: "local:7" },
         },
       },
     });
@@ -558,7 +597,7 @@ describe("ModelRoutingSection provider-first UX", () => {
 
   it("maps a reauth result to the credential action without exposing mutation controls", () => {
     const result: TaskModelTestResult = {
-      task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+      task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low",
       auth_mode: "chatgpt_oauth", credential_id: "local:7", status: "error",
       error_code: "reauth_required", latency_ms: 8, tested_at: "2026-07-11T00:00:00Z",
       fallback_effort: null, warning: "token expired",
@@ -567,7 +606,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       testState: {
         ai_research: {
           loading: false, result, stale: false,
-          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low", credential_id: "local:7" },
+          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.6-luna", effort: "low", credential_id: "local:7" },
         },
       },
     });
@@ -630,7 +669,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
     expectNoKnownTaskId(modelLimitHelp.textContent);
     expect(Array.from(effort.options).map((option) => option.textContent)).toContain("low");
-    expect(research.textContent).toContain("Low reasoning effort.");
+    expect(research.textContent).not.toContain("Low reasoning effort.");
     expect(research.textContent).toContain(
       "The environment currently controls this route. You can save a DB value, but runtime continues to follow the environment override.",
     );
@@ -676,7 +715,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       "AI 研究 Effort",
     ) as HTMLSelectElement;
     const openai = buttonByText(research, "OpenAI");
-    expect(model.value).toBe("gpt-5.4-mini");
+    expect(model.value).toBe("gpt-5.6-luna");
     expect(effort.value).toBe("low");
     expect(research.textContent).toContain("Desk credential alias");
     expect(research.textContent).not.toContain("速度：fast");
@@ -704,12 +743,12 @@ describe("ModelRoutingSection provider-first UX", () => {
       "effort",
       "AI Research Effort",
     )).toBe(effort);
-    expect(model.value).toBe("gpt-5.4-mini");
+    expect(model.value).toBe("gpt-5.6-luna");
     expect(effort.value).toBe("low");
     expect(buttonByText(translatedResearch, "OpenAI")).toBe(openai);
     expect(openai.getAttribute("aria-pressed")).toBe("true");
     expect(translatedResearch.textContent).toContain("Desk credential alias");
-    expect(translatedResearch.textContent).toContain("gpt-5.4-mini");
+    expect(translatedResearch.textContent).toContain("gpt-5.6-luna");
     expect(translatedResearch.querySelector(".model-note")).toBe(modelNote);
     expect(modelNote.textContent).not.toBe(sourceContent);
     expect(modelNote.textContent).not.toContain("Speed: fast");
@@ -745,7 +784,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const result: TaskModelTestResult = {
       task: "ai_research",
       provider: "openai",
-      model: "gpt-5.4-mini",
+      model: "gpt-5.6-luna",
       effort: "low",
       auth_mode: "chatgpt_oauth",
       credential_id: "local:7",
@@ -764,7 +803,7 @@ describe("ModelRoutingSection provider-first UX", () => {
         snapshot: {
           task: "ai_research",
           provider: "openai",
-          model: "gpt-5.4-mini",
+          model: "gpt-5.6-luna",
           effort: "low",
           credential_id: "local:7",
         },

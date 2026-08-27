@@ -162,6 +162,8 @@ export interface ModelCatalog {
   tasks: TaskInfo[];
   models: ModelOption[];
   effort_options: Record<ModelProvider, EffortOption[]>;
+  current_model_ids?: string[];
+  retired_model_ids?: string[];
   routes: Record<ModelTask, TaskRoute>;
   credentials: Record<ModelProvider, ProviderCredential[]>;
   custom_allowed: boolean;

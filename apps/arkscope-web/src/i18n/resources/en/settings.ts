@@ -60,6 +60,8 @@ const settings = {
     },
     routes: {
       saveBlocked: "These changes were not saved. Complete the selected provider sign-in for {{value}} under Provider Sign-in and Credentials first.",
+      effortRequired: "These changes were not saved. Select an explicit effort for {{value}}.",
+      modelRetired: "These changes were not saved. Replace the retired model for {{value}} with a current model.",
       missingModel: "Select or enter a model for {{taskLabel}} before saving.",
       saved: "Task routes saved to the profile DB (the profile file remains the fallback and import/export mirror).",
       saveFailed: "Could not save task routes.",
@@ -163,6 +165,8 @@ const settings = {
     route: {
       authority: "Route authority",
       envOverrideDetail: "The environment currently controls this route. You can save a DB value, but runtime continues to follow the environment override.",
+      effortRequired: "Select an explicit effort before saving or running a live task test.",
+      modelRetired: "This route uses a retired model. Select a current model before saving or running a live task test.",
       resetToFallback: "Reset to fallback",
       sources: {
         env: "Environment override",
@@ -184,6 +188,7 @@ const settings = {
     catalog: {
       loading: "Loading the model catalog...",
       select: "Select a model...",
+      selectEffort: "Select an effort...",
       visibleListLoaded: "Visible model list loaded",
       seedOnly: "This channel cannot list models online.",
       neverDiscovered: "Models have not been discovered for this sign-in",

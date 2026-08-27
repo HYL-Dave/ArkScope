@@ -26,11 +26,14 @@ import {
   type ModelCommonT,
   type TaskTestSnapshot,
 } from "../modelRoutingUx";
-import { effortOptionsForModel } from "../researchModels";
+import {
+  effortOptionsForModel,
+  taskRouteBlocker,
+  taskRouteModelStatus,
+} from "../researchModels";
 import { formatSystemTimestamp } from "../timeDisplay";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import {
-  settingsEffortDescription,
   settingsEffortLabel,
   settingsTaskLabel,
   settingsThinkingLabel,
@@ -152,25 +155,32 @@ export function ModelRoutingSection({
           const providerBlock = taskEffective?.providers?.[row.provider];
           const rawEntries = providerBlock?.models
             ?? compatEntries(row.provider, row, modelsByProvider, commonT);
-          const entries = rawEntries.some((entry) => entry.id === row.model) || !row.model
-            ? rawEntries
+          const currentModels = new Set(catalog.current_model_ids ?? catalog.models.map((model) => model.id));
+          const currentEntries = rawEntries.filter((entry) => currentModels.has(entry.id));
+          const entries = currentEntries.some((entry) => entry.id === row.model) || !row.model
+            ? currentEntries
             : [
-                ...rawEntries,
+                ...currentEntries,
                 {
                   id: row.model,
                   label: row.model,
                   status: "route" as const,
                   visible_to_credential: null,
-                  eligible: true,
-                  reason_code: "model_not_in_registry",
+                  eligible: taskRouteModelStatus(catalog, row.model) !== "retired",
+                  reason_code: taskRouteModelStatus(catalog, row.model) === "retired"
+                    ? "model_retired"
+                    : "model_not_in_registry",
                   thinking_mode: "none",
-                  effort_options: [],
+                  effort_options: undefined,
                 },
               ];
           const providerReason = modelProviderReason(context, providerBlock);
           const groups = groupedModelEntries(entries, providerReason, commonT);
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
-          const selectedReason = selectedEntry ? optionReason(selectedEntry, providerReason) : null;
+          const selectedModelStatus = taskRouteModelStatus(catalog, row.model);
+          const selectedReason = selectedModelStatus === "retired"
+            ? "model_retired"
+            : selectedEntry ? optionReason(selectedEntry, providerReason) : null;
           const disabledReasons = Array.from(new Set(
             groups.flatMap((group) => group.entries)
               .map((entry) => entry.disabledReason)
@@ -183,8 +193,9 @@ export function ModelRoutingSection({
             selectedEntry?.effort_options,
           );
           const selectedEffort = effortOptions.some(
-            (item) => item.id === (row.effort || "default"),
-          ) ? (row.effort || "default") : "default";
+            (item) => item.id === row.effort.trim(),
+          ) ? row.effort.trim() : "";
+          const routeBlocker = taskRouteBlocker(catalog, row);
           const currentTest = testState[task.id];
           const testIsCurrent = !!(
             currentTest?.snapshot
@@ -195,12 +206,15 @@ export function ModelRoutingSection({
               stale: currentTest.stale,
             })
           );
-          const modelSelectDisabled = !context || (!!providerBlock && !providerBlock.executable);
+          const modelSelectDisabled = !context
+            || (!!providerBlock && !providerBlock.executable)
+            || selectedModelStatus === "retired";
           const testDisabled = (
             compatMode
             || modelSelectDisabled
             || !row.model.trim()
             || !!selectedReason
+            || !!routeBlocker
             || !!currentTest?.loading
           );
           const routeBadge = routeSourceBadge(effectiveRoute?.source ?? "default", t);
@@ -256,10 +270,15 @@ export function ModelRoutingSection({
                         const nextModels = nextBlock?.models
                           ?? compatEntries(provider, row, modelsByProvider, commonT);
                         const keepModel = nextModels.some((entry) => entry.id === row.model);
+                        const nextModel = keepModel ? row.model : "";
+                        const nextEffort = effortOptionsForModel(catalog, provider, nextModel)
+                          .some((item) => item.id === row.effort.trim())
+                          ? row.effort.trim()
+                          : "";
                         updateTask(task.id, {
                           provider,
-                          model: keepModel ? row.model : "",
-                          effort: "default",
+                          model: nextModel,
+                          effort: nextEffort,
                           custom: false,
                         });
                       }}
@@ -322,9 +341,9 @@ export function ModelRoutingSection({
                       const nextEfforts = effortOptionsForModel(
                         catalog, row.provider, model, nextEntry?.effort_options,
                       );
-                      const effort = nextEfforts.some((item) => item.id === row.effort)
-                        ? row.effort
-                        : "default";
+                      const effort = nextEfforts.some((item) => item.id === row.effort.trim())
+                        ? row.effort.trim()
+                        : "";
                       updateTask(task.id, { ...row, model, effort, custom: false });
                     }}
                   >
@@ -359,7 +378,12 @@ export function ModelRoutingSection({
                     type="button"
                     className="btn-ghost small model-custom-toggle"
                     disabled={!context}
-                    onClick={() => updateTask(task.id, { ...row, effort: "default", custom: true })}
+                    onClick={() => updateTask(task.id, {
+                      ...row,
+                      effort: effortOptionsForModel(catalog, row.provider, row.model)
+                        .some((item) => item.id === row.effort.trim()) ? row.effort.trim() : "",
+                      custom: true,
+                    })}
                   >
                     {t(($) => $.models.custom.use)}
                   </button>
@@ -374,6 +398,11 @@ export function ModelRoutingSection({
                     onChange={(event) => updateTask(task.id, {
                       ...row,
                       model: event.currentTarget.value.trim(),
+                      effort: effortOptionsForModel(
+                        catalog,
+                        row.provider,
+                        event.currentTarget.value.trim(),
+                      ).some((item) => item.id === row.effort.trim()) ? row.effort.trim() : "",
                       custom: true,
                     })}
                   />
@@ -400,16 +429,21 @@ export function ModelRoutingSection({
                     effort: event.currentTarget.value,
                   })}
                 >
+                  <option value="">{t(($) => $.models.catalog.selectEffort)}</option>
                   {effortOptions.map((effort) => (
                     <option key={effort.id} value={effort.id}>
                       {settingsEffortLabel(effort.id, t)}
                     </option>
                   ))}
                 </select>
-                <span className="field-help">
-                  {settingsEffortDescription(row.provider, selectedEffort, t)}
-                </span>
               </label>
+
+              {routeBlocker === "effort_required" ? (
+                <p className="warn-text">{t(($) => $.models.route.effortRequired)}</p>
+              ) : null}
+              {routeBlocker === "model_retired" ? (
+                <p className="warn-text">{t(($) => $.models.route.modelRetired)}</p>
+              ) : null}
 
               <div className="model-thinking-line">
                 <span>{t(($) => $.models.fields.thinking)}</span>

@@ -9,6 +9,7 @@ import type {
   ProviderCredential,
   TaskRoute,
 } from "./api";
+import { taskRouteBlocker, type TaskRouteBlockerReason } from "./researchModels";
 
 export type ModelCommonT = TFunction<"common">;
 
@@ -148,19 +149,26 @@ export function routesSemanticallyEqual(
   return (
     draft.provider === baseline.provider
     && draft.model.trim() === baseline.model.trim()
-    && (draft.effort || "default") === (baseline.effort || "default")
+    && draft.effort.trim() === baseline.effort.trim()
   );
 }
 
 export function blockedRouteSaves(
   draft: Partial<Record<ModelTask, DraftRouteValue>>,
-  baseline: ModelCatalog["routes"],
+  baseline: Partial<Record<ModelTask, TaskRoute>>,
   contexts: ProviderContextMap,
-): Array<{ task: ModelTask; reason: "missing_active_credential" }> {
-  const blocked: Array<{ task: ModelTask; reason: "missing_active_credential" }> = [];
+  catalog: ModelCatalog,
+): Array<{ task: ModelTask; reason: "missing_active_credential" | TaskRouteBlockerReason }> {
+  const blocked: Array<{ task: ModelTask; reason: "missing_active_credential" | TaskRouteBlockerReason }> = [];
   for (const task of Object.keys(draft) as ModelTask[]) {
     const row = draft[task];
-    if (!row || routesSemanticallyEqual(row, baseline[task])) continue;
+    if (!row) continue;
+    const routeBlocker = taskRouteBlocker(catalog, row);
+    if (routeBlocker) {
+      blocked.push({ task, reason: routeBlocker });
+      continue;
+    }
+    if (routesSemanticallyEqual(row, baseline[task])) continue;
     if (!contexts[row.provider]) blocked.push({ task, reason: "missing_active_credential" });
   }
   return blocked;
@@ -179,6 +187,6 @@ export function isTaskTestSnapshotCurrent(
     && snapshot.task === current.task
     && snapshot.provider === current.route.provider
     && snapshot.model === current.route.model
-    && snapshot.effort === (current.route.effort || "default")
+    && snapshot.effort === current.route.effort.trim()
     && snapshot.credential_id === current.credentialId;
 }
