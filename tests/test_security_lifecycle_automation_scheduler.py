@@ -521,6 +521,116 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
     )
 
 
+def test_pending_event_monitoring_rejects_multiple_deadline_dates():
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = {
+        "observation": {
+            "kinds": [{"event_type": "merger_agreement", "effective_date": None}]
+        }
+    }
+
+    try:
+        scheduler._pending_event_monitoring(
+            case,
+            (),
+            source_family_results={},
+            source_deadlines=(
+                SimpleNamespace(
+                    date="2026-09-01",
+                    evidence_id="deadline-a",
+                    span_start_byte=0,
+                    span_end_byte=1,
+                    cited_text_sha256="a" * 64,
+                    rule_id="sec.explicit_transaction_termination_date",
+                    rule_version="4",
+                ),
+                SimpleNamespace(
+                    date="2026-10-01",
+                    evidence_id="deadline-b",
+                    span_start_byte=0,
+                    span_end_byte=1,
+                    cited_text_sha256="b" * 64,
+                    rule_id="sec.explicit_transaction_termination_date",
+                    rule_version="4",
+                ),
+            ),
+            at="2026-08-26T00:00:00Z",
+        )
+    except ValueError as exc:
+        assert str(exc) == "source_deadlines"
+    else:
+        raise AssertionError("multiple deadline dates must fail closed")
+
+
+def test_acquisition_scheduling_rejects_multiple_deadline_dates_before_market_work(
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 0}
+
+        def close(self):
+            pass
+
+    case = {
+        "case_id": "slc_deadline_conflict",
+        "ticker": "DEAD",
+        "ticker_aliases": ("DEAD",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "DEAD",
+            "cik": "0000000001",
+            "issuer_name": "Deadline Conflict Issuer",
+            "filing_date": "2026-08-20",
+            "source": "sec_edgar",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["1.01"],
+            "evidence_url": "https://www.sec.gov/Archives/deadline.htm",
+            "description": "Agreement with conflicting outside dates.",
+            "kinds": [{"event_type": "merger_agreement", "effective_date": None}],
+        },
+    }
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(),
+            facts=(),
+            blockers=(),
+            source_deadlines=(
+                SimpleNamespace(date="2026-08-25"),
+                SimpleNamespace(date="2026-08-26"),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_local_news_evidence",
+        lambda _context, at: ((), (), {"news_evidence_count": 0}),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("market work must not start")
+        ),
+    )
+
+    try:
+        scheduler._load_evidence(case, mode="live", at="2026-08-27T00:00:00Z")
+    except ValueError as exc:
+        assert str(exc) == "source_deadlines"
+    else:
+        raise AssertionError("conflicting deadline dates must fail before market work")
+
+
 def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market_check(
     monkeypatch,
 ):

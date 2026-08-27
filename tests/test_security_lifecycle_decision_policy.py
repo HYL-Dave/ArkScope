@@ -204,6 +204,43 @@ def test_multiple_market_snapshots_fail_closed_when_any_retrieval_time_is_missin
     assert decision.transition_requested is False
 
 
+def test_latest_market_timestamp_tie_contributes_no_decision_material():
+    from src.security_lifecycle_decision_policy import (
+        _current_decision_material,
+        _evidence_rows,
+        _fact_rows,
+    )
+
+    evidence = _evidence_rows(
+        (
+            _evidence("sec", "regulator"),
+            {
+                **_evidence("ibkr-a", "market_infrastructure"),
+                "retrieved_at": "2026-08-25T01:02:03Z",
+            },
+            {
+                **_evidence("ibkr-b", "market_infrastructure"),
+                "retrieved_at": "2026-08-25T01:02:03Z",
+            },
+        )
+    )
+    facts = _fact_rows(
+        (
+            _fact("sec", "issuer_cik", _CIK),
+            _fact("ibkr-a", "successor_ticker", "HAPN"),
+            _fact("ibkr-b", "successor_ticker", "HAPN"),
+        ),
+        evidence,
+    )
+
+    current_evidence, current_facts = _current_decision_material(evidence, facts)
+
+    assert [row.evidence_id for row in current_evidence] == ["sec"]
+    assert [(row.evidence_id, row.fact_type) for row in current_facts] == [
+        ("sec", "issuer_cik")
+    ]
+
+
 def test_case_already_keyed_by_successor_accepts_without_a_to_a_transition():
     decision = _evaluate(
         case=_case(ticker="HAPN"),

@@ -1272,6 +1272,84 @@ def test_persisted_decision_provenance_recomputes_from_database_rows():
     ) != result.decision_provenance_sha256
 
 
+def test_terminal_finalization_rejects_changed_query_context_provenance():
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="not_applicable",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+        terminal_decision={
+            "decision_tier": "verified_automatic",
+            "action_readiness": "not_applicable",
+        },
+    )
+    context = json.loads(store.get_automation_run(claim.run_id)["query_context_json"])
+    context["terminal_decision_provenance_sha256"] = "f" * 64
+    conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), claim.run_id),
+    )
+    conn.commit()
+
+    with pytest.raises(ValueError, match="terminal_decision_provenance_changed"):
+        kernel.complete_terminal_finalization(
+            run_id=claim.run_id,
+            decision_provenance_sha256=result.decision_provenance_sha256,
+        )
+
+    final_context = json.loads(
+        store.get_automation_run(claim.run_id)["query_context_json"]
+    )
+    assert "terminal_finalized_decision_provenance_sha256" not in final_context
+
+
+def test_terminal_finalization_rejects_changed_persisted_provenance():
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="not_applicable",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+        terminal_decision={
+            "decision_tier": "verified_automatic",
+            "action_readiness": "not_applicable",
+        },
+    )
+    conn.execute(
+        "UPDATE security_lifecycle_automation_facts "
+        "SET extractor_rule_version='2' WHERE automation_run_id=?",
+        (claim.run_id,),
+    )
+    conn.commit()
+
+    with pytest.raises(ValueError, match="terminal_decision_provenance_changed"):
+        kernel.complete_terminal_finalization(
+            run_id=claim.run_id,
+            decision_provenance_sha256=result.decision_provenance_sha256,
+        )
+
+    final_context = json.loads(
+        store.get_automation_run(claim.run_id)["query_context_json"]
+    )
+    assert "terminal_finalized_decision_provenance_sha256" not in final_context
+
+
 def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
     from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
 
