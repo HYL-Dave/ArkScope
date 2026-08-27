@@ -1145,6 +1145,77 @@ describe("Research workspace contracts", () => {
     });
   });
 
+  it.each([
+    { label: "null", effort: null },
+    { label: "blank", effort: "  " },
+  ])("makes completed $label effort authoritative over the submitted low selection", async ({ effort }) => {
+    const completion = deferred<Response>();
+    let threadId = "";
+    vi.stubGlobal("fetch", stubFetch({
+      events: { "completed-provenance-run": completion.promise },
+      createResponder: (body) => {
+        threadId = String(body.thread_id);
+        return json({ run: run("completed-provenance-run", threadId, "running") });
+      },
+    }));
+    await mountResearch();
+    const model = select("模型");
+    if (!model) throw new Error("Research model picker must be available");
+    await setSelect(model, "gpt-5.6-sol");
+    const effortPicker = select("effort");
+    if (!effortPicker) throw new Error("Research effort picker must be available");
+    await setSelect(effortPicker, "low");
+    await setTextarea("Completed provenance wins");
+    await click(button("送出")!);
+
+    await act(async () => {
+      completion.resolve(json({
+        run: run("completed-provenance-run", threadId, "succeeded", {
+          model: "gpt-5.6-sol", effort,
+        }),
+        events: [], has_more: false,
+      }));
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(select("effort")?.value).toBe("");
+      expect(button("送出")?.disabled).toBe(true);
+    });
+    expect(JSON.parse(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY) ?? "null"))
+      .toMatchObject({ tuple: { provider: "openai", model: "gpt-5.6-sol", effort: "low" } });
+
+    await click(button("新研究")!);
+    expect(select("模型")?.value).toBe("gpt-5.6-sol");
+    expect(select("effort")?.value).toBe("low");
+  });
+
+  it.each([
+    { label: "default effort", tuple: { provider: "openai", model: "gpt-5.6-luna", effort: "default" } },
+    { label: "none effort", tuple: { provider: "openai", model: "gpt-5.6-luna", effort: "none" } },
+    { label: "retired model", tuple: { provider: "openai", model: "gpt-5.4-mini", effort: "low" } },
+  ])("keeps historical $label in provenance instead of picker options", async ({ tuple }) => {
+    const threadId = `legacy-${tuple.effort}-${tuple.model}`;
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread(threadId, "Legacy provenance")],
+      selections: { [threadId]: tuple },
+    }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
+    await mountResearch();
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(true));
+
+    expect(host!.querySelector(".ui-page-header-context")?.textContent)
+      .toContain(`${tuple.provider} · ${tuple.model} · ${tuple.effort}`);
+    if (tuple.model === "gpt-5.4-mini") {
+      expect(Array.from(select("模型")?.options ?? []).map((option) => option.value))
+        .not.toContain(tuple.model);
+    } else {
+      expect(Array.from(select("effort")?.options ?? []).map((option) => option.value))
+        .not.toContain(tuple.effort);
+    }
+    expect(select("effort")?.value).toBe("");
+    if (tuple.model === "gpt-5.4-mini") expect(select("模型")?.value).toBe("");
+  });
+
   it("8. keeps an active draft editable with disabled Send and separate Stop and queues nothing", async () => {
     const active = run("active-run", "thread-a", "running");
     const never = new Promise<Response>(() => undefined);

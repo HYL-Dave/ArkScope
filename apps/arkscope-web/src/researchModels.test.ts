@@ -5,6 +5,7 @@ import {
   activeCredential,
   effortNote,
   effortOptionsForModel,
+  isTaskRouteEffort,
 } from "./researchModels";
 
 const cred = (over: Partial<ProviderCredential>): ProviderCredential => ({
@@ -75,5 +76,15 @@ describe("effortOptionsForModel", () => {
   it("gives a genuinely unknown custom model the explicit provider union", () => {
     expect(effortOptionsForModel(catalog, "openai", "gpt-future-custom").map((item) => item.id))
       .toEqual(["low", "medium", "high", "xhigh", "max"]);
+  });
+});
+
+describe("isTaskRouteEffort", () => {
+  it.each(["low", "medium", "high", "xhigh", "max"])("accepts %s", (effort) => {
+    expect(isTaskRouteEffort(effort)).toBe(true);
+  });
+
+  it.each(["default", "none", "experimental", ""])("rejects legacy or unknown %s", (effort) => {
+    expect(isTaskRouteEffort(effort)).toBe(false);
   });
 });

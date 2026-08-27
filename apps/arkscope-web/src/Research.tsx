@@ -284,8 +284,9 @@ export function ResearchView({
     : null;
   const provider = incompleteSelection?.provider ?? selection?.tuple?.provider ?? null;
   const selModel = incompleteSelection?.model ?? selection?.tuple?.model ?? "";
-  const selEffort = incompleteSelection ? "" : selection?.tuple?.effort ?? "";
-  const effortSelectionRequired = !!incompleteSelection || selection?.reasonCode === "effort_required";
+  const selectionBlocked = selection?.state === "blocked";
+  const selEffort = incompleteSelection || selectionBlocked ? "" : selection?.tuple?.effort ?? "";
+  const effortSelectionRequired = !!incompleteSelection || selectionBlocked;
   const selectionReady = !incompleteSelection && selection?.state === "ready";
   const currentThread = state.activeThreadId
     ? state.threads.find((thread) => thread.id === state.activeThreadId) ?? null
@@ -484,6 +485,7 @@ export function ResearchView({
               },
               loaded: true,
             });
+            setUserSelection(null);
           }
         }
         setActiveRunsByThread((prev) => {
@@ -785,9 +787,10 @@ export function ResearchView({
   })).filter((group) => group.entries.length > 0);
   const selectedEffectiveModel = selectedProviderChoice?.block?.models
     .find((item) => item.id === selModel);
-  const selectedModelMissing = !!provider && !!selModel && (
+  const selectedModelRetired = !!catalog && !!selModel
+    && taskRouteModelStatus(catalog, selModel) === "retired";
+  const selectedModelMissing = !selectedModelRetired && !!provider && !!selModel && (
     !selectedEffectiveModel
-    || (!!catalog && taskRouteModelStatus(catalog, selModel) === "retired")
   );
   const effortOpts = useMemo(
     () => provider && catalog
@@ -795,7 +798,7 @@ export function ResearchView({
       : [],
     [catalog, provider, selModel, selectedEffectiveModel?.effort_options],
   );
-  const effortChoices = !selEffort || effortOpts.some((option) => option.id === selEffort)
+  const effortChoices = effortSelectionRequired || !selEffort || effortOpts.some((option) => option.id === selEffort)
     ? effortOpts
     : [...effortOpts, {
         id: selEffort,
@@ -1098,11 +1101,16 @@ export function ResearchView({
                         {researchT(($) => $.workspace.modelLabel)}
                       </span>
                       <select
-                        value={selModel}
+                        value={selectedModelRetired ? "" : selModel}
                         aria-label={researchT(($) => $.workspace.modelAria)}
                         onChange={(event) => chooseModel(event.target.value)}
                         disabled={!!state.pending}
                       >
+                        {selectedModelRetired && (
+                          <option value="" disabled>
+                            {researchT(($) => $.workspace.noAvailableModels)}
+                          </option>
+                        )}
                         {selectedModelMissing && (
                           <option value={selModel} disabled>
                             {selModel}{" "}

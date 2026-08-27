@@ -2,6 +2,7 @@
 import type {
   CredentialAuthType,
   EffortOption,
+  ExplicitResearchEffort,
   ModelCatalog,
   ModelProvider,
   ProviderCredential,
@@ -10,6 +11,10 @@ import type {
 const TASK_ROUTE_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"] as const;
 
 export type TaskRouteBlockerReason = "model_retired" | "effort_required";
+
+export function isTaskRouteEffort(value: string): value is ExplicitResearchEffort {
+  return (TASK_ROUTE_EFFORT_IDS as readonly string[]).includes(value);
+}
 
 export function taskRouteModelStatus(
   catalog: ModelCatalog,

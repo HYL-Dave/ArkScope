@@ -5,7 +5,7 @@ import type {
   ModelProvider,
 } from "./api";
 import { modelProviderReason, optionReason } from "./modelPicker";
-import { effortOptionsForModel, taskRouteBlocker } from "./researchModels";
+import { effortOptionsForModel, isTaskRouteEffort, taskRouteBlocker } from "./researchModels";
 
 export interface ResearchTuple {
   provider: ModelProvider;
@@ -86,8 +86,8 @@ function normalizeTuple(value: unknown): ResearchTuple | null {
 
 function normalizeExplicitTuple(value: unknown): ExplicitResearchTuple | null {
   const tuple = normalizeTuple(value);
-  if (!tuple || !tuple.effort || tuple.effort === "default" || tuple.effort === "none") return null;
-  return tuple as ExplicitResearchTuple;
+  if (!tuple || !tuple.effort || !isTaskRouteEffort(tuple.effort)) return null;
+  return { ...tuple, effort: tuple.effort };
 }
 
 function defaultStorage(): StorageWriter | null {

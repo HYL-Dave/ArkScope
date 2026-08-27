@@ -228,6 +228,23 @@ describe("research selection precedence and validation", () => {
     expect(readExplicitResearchSelection(storage)).toEqual(tuple);
   });
 
+  it("does not read an arbitrary non-empty effort as a writable preference", () => {
+    const storage = new MemoryStorage();
+    storage.values.set(RESEARCH_SELECTION_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      tuple: { provider: "openai", model: "gpt-5.6-luna", effort: "experimental" },
+    }));
+    expect(readExplicitResearchSelection(storage)).toBeNull();
+  });
+
+  it("does not write an arbitrary non-empty effort as a writable preference", () => {
+    const storage = new MemoryStorage();
+    writeExplicitResearchSelection({
+      provider: "openai", model: "gpt-5.6-luna", effort: "experimental",
+    } as unknown as ExplicitResearchTuple, storage);
+    expect(storage.values.get(RESEARCH_SELECTION_STORAGE_KEY)).toBeUndefined();
+  });
+
   it("never writes a preference during automatic resolution", () => {
     const storage = new MemoryStorage();
     resolveResearchSelection({
