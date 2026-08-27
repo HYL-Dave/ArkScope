@@ -25,9 +25,9 @@ from src.model_routing import (
     TaskRoute,
     default_model_for,
     is_valid_effort,
-    is_seed_model,
     model_provider,
 )
+from src.model_capabilities import capability_for
 
 logger = logging.getLogger(__name__)
 
@@ -545,7 +545,7 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
         model=model,
         effort=effort,
         source=source,
-        custom=not is_seed_model(provider, model),
+        custom=capability_for(model) is None,
         warning=warning,
     )
 

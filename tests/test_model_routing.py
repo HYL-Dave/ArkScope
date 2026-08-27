@@ -499,6 +499,41 @@ def test_update_model_routes_rejects_each_retired_model_before_effort(tmp_path):
         assert route_store.get("ai_research") is None
 
 
+def test_update_model_routes_preflights_entire_payload_before_any_write(tmp_path, monkeypatch):
+    import src.api.routes.config_routes as cr
+    from src.model_route_store import ModelRouteStore
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    route_store = ModelRouteStore(store.db_path)
+    route_store.set("card_synthesis", "anthropic", "claude-opus-5", "high")
+    profile_writes = []
+    monkeypatch.setattr(
+        cr,
+        "require_profile_state_write",
+        lambda *args: profile_writes.append(args),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "card_synthesis": RouteUpdate(
+                    provider="openai", model="gpt-5.6-luna", effort="high",
+                ),
+                "ai_research": RouteUpdate(
+                    provider="openai", model="gpt-5.6-luna", effort="default",
+                ),
+            }),
+            store=store,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "effort_required", "field": "effort"}
+    row = route_store.get("card_synthesis")
+    assert (row.provider, row.model, row.effort) == ("anthropic", "claude-opus-5", "high")
+    assert route_store.get("ai_research") is None
+    assert profile_writes == []
+
+
 def test_model_specific_effort_validation_preserves_max_only_for_gpt56(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
 
@@ -633,6 +668,56 @@ def test_task_route_db_wins_over_yaml(make_route_store):
     route = task_route("ai_research", route_store=rs)
     assert (route.provider, route.model, route.effort, route.source) == (
         "anthropic", "claude-opus-4-8", "high", "db")
+
+
+def test_task_route_retired_db_model_is_not_custom(make_route_store):
+    from src.agents.config import task_route
+
+    route_store = make_route_store()
+    route_store.set("ai_research", "openai", "gpt-5.5", "high")
+
+    route = task_route("ai_research", route_store=route_store)
+
+    assert route.source == "db"
+    assert route.model == "gpt-5.5"
+    assert route.custom is False
+
+
+@pytest.mark.parametrize("source", ["profile", "env"])
+def test_task_route_retired_profile_or_env_model_is_not_custom(
+    make_route_store, monkeypatch, source
+):
+    from src.agents.config import task_route
+
+    if source == "profile":
+        route_store = make_route_store({"llm_preferences": {
+            "ai_research_provider": "openai",
+            "ai_research_model": "gpt-5.5",
+            "ai_research_effort": "high",
+        }})
+    else:
+        route_store = make_route_store()
+        monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_PROVIDER", "openai")
+        monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.5")
+        monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_EFFORT", "high")
+
+    route = task_route("ai_research", route_store=route_store)
+
+    assert route.source == source
+    assert route.model == "gpt-5.5"
+    assert route.custom is False
+
+
+def test_task_route_unknown_model_is_custom(make_route_store):
+    from src.agents.config import task_route
+
+    route_store = make_route_store()
+    route_store.set("ai_research", "openai", "gpt-7-custom", "high")
+
+    route = task_route("ai_research", route_store=route_store)
+
+    assert route.model == "gpt-7-custom"
+    assert route.custom is True
 
 
 def test_task_route_db_is_atomic_not_field_merged_with_yaml(make_route_store):

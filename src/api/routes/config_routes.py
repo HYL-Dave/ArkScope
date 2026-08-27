@@ -46,7 +46,6 @@ from src.model_routing import (
     TaskId,
     TaskRoute,
     catalog,
-    is_seed_model,
     is_valid_effort,
     is_valid_task_route_effort,
     model_provider,
@@ -1049,7 +1048,7 @@ def update_model_routes(
     store = _credential_store(store)
     route_store = ModelRouteStore(store.db_path)
 
-    saved: dict[str, TaskRoute] = {}
+    prepared: list[tuple[TaskId, Provider, str, str, list[str]]] = []
     for task, update in body.routes.items():
         model = update.model.strip()
         if not model:
@@ -1072,19 +1071,23 @@ def update_model_routes(
                 update.provider, model, effort, auth_mode=_active_auth_mode(update.provider, store),
             )
         )
+        prepared.append((task, update.provider, model, effort, warnings))
+
+    saved: dict[str, TaskRoute] = {}
+    for task, provider, model, effort, warnings in prepared:
         require_profile_state_write(
             "model_route_update",
-            {"task": task, "provider": update.provider, "model": model, "effort": effort},
+            {"task": task, "provider": provider, "model": model, "effort": effort},
         )
         # Atomic upsert — provider/model/effort land together, never half-applied.
-        route_store.set(task, update.provider, model, effort)
+        route_store.set(task, provider, model, effort)
         saved[task] = TaskRoute(
             task=task,
-            provider=update.provider,
+            provider=provider,
             model=model,
             effort=effort,
             source="db",
-            custom=not is_seed_model(update.provider, model),
+            custom=capability_for(model) is None,
             warning=" ".join(warnings) or None,
         )
     return {"routes": {k: v.model_dump() for k, v in saved.items()}}
