@@ -534,6 +534,36 @@ def test_update_model_routes_preflights_entire_payload_before_any_write(tmp_path
     assert profile_writes == []
 
 
+def test_update_model_routes_rejection_does_not_construct_route_store(tmp_path, monkeypatch):
+    import src.api.routes.config_routes as cr
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    constructed = []
+
+    def schema_writing_constructor(db_path):
+        constructed.append(db_path)
+        raise AssertionError("rejected payload must not initialize route storage")
+
+    monkeypatch.setattr(cr, "ModelRouteStore", schema_writing_constructor)
+
+    with pytest.raises(HTTPException) as exc:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "card_synthesis": RouteUpdate(
+                    provider="openai", model="gpt-5.6-luna", effort="high",
+                ),
+                "ai_research": RouteUpdate(
+                    provider="openai", model="gpt-5.6-luna", effort="default",
+                ),
+            }),
+            store=store,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "effort_required", "field": "effort"}
+    assert constructed == []
+
+
 def test_model_specific_effort_validation_preserves_max_only_for_gpt56(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
 

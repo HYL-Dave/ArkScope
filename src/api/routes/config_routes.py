@@ -1046,7 +1046,6 @@ def update_model_routes(
     if not body.routes:
         raise HTTPException(status_code=400, detail="no routes supplied")
     store = _credential_store(store)
-    route_store = ModelRouteStore(store.db_path)
 
     prepared: list[tuple[TaskId, Provider, str, str, list[str]]] = []
     for task, update in body.routes.items():
@@ -1073,6 +1072,7 @@ def update_model_routes(
         )
         prepared.append((task, update.provider, model, effort, warnings))
 
+    route_store = ModelRouteStore(store.db_path)
     saved: dict[str, TaskRoute] = {}
     for task, provider, model, effort, warnings in prepared:
         require_profile_state_write(
