@@ -126,20 +126,20 @@ def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
     res = update_model_routes(
         ModelRoutesUpdate(
             routes={
-                "card_synthesis": RouteUpdate(provider="openai", model="gpt-5.5", effort="high"),
-                "card_translation": RouteUpdate(provider="anthropic", model="claude-sonnet-4-6"),
+                "card_synthesis": RouteUpdate(provider="openai", model="gpt-5.6-sol", effort="high"),
+                "card_translation": RouteUpdate(provider="anthropic", model="claude-sonnet-5", effort="medium"),
             }
         ),
         store=CredentialStore(db),  # route store shares this profile DB
     )
     assert res["routes"]["card_synthesis"]["provider"] == "openai"
-    assert res["routes"]["card_synthesis"]["model"] == "gpt-5.5"
+    assert res["routes"]["card_synthesis"]["model"] == "gpt-5.6-sol"
     assert res["routes"]["card_synthesis"]["effort"] == "high"
     assert res["routes"]["card_synthesis"]["source"] == "db"
 
     # persisted to the profile DB as an atomic row, NOT user_profile.local.yaml
     row = ModelRouteStore(db).get("card_synthesis")
-    assert (row.provider, row.model, row.effort) == ("openai", "gpt-5.5", "high")
+    assert (row.provider, row.model, row.effort) == ("openai", "gpt-5.6-sol", "high")
     assert not (tmp_path / "user_profile.local.yaml").exists()  # yaml untouched by a save
 
     # resolution reads it back as DB authority
@@ -421,7 +421,7 @@ def test_save_route_claude_oauth_active_preserves_effort_without_drop_warning(tm
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
 
     res = update_model_routes(
-        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="anthropic", model="claude-opus-4-8", effort="high")}),
+        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="anthropic", model="claude-opus-5", effort="high")}),
         store=store,
     )
     w = res["routes"]["ai_research"]["warning"]
@@ -440,36 +440,63 @@ def test_save_route_chatgpt_oauth_active_points_at_discovery(tmp_path, monkeypat
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
 
     res = update_model_routes(
-        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="openai", model="gpt-5.4-mini")}),
+        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="openai", model="gpt-5.6-luna", effort="high")}),
         store=store,
     )
     assert "discovery" in (res["routes"]["ai_research"]["warning"] or "").lower()
     cfg_mod.get_agent_config.cache_clear()
 
 
-def test_invalid_effort_falls_back_to_default(tmp_path, monkeypatch):
-    from src.agents import config as cfg_mod
+@pytest.mark.parametrize(
+    ("model", "effort", "code"),
+    [
+        ("gpt-5.6-luna", "default", "effort_required"),
+        ("gpt-5.6-luna", "none", "effort_required"),
+        ("gpt-5.6-luna", "future-effort", "effort_not_supported"),
+    ],
+)
+def test_update_model_routes_rejects_ambiguous_or_unsupported_effort(
+    tmp_path, model, effort, code
+):
+    store = CredentialStore(tmp_path / "profile_state.db")
 
-    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
-    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
-    cfg_mod.get_agent_config.cache_clear()
-
-    res = update_model_routes(
-        ModelRoutesUpdate(
-            routes={
-                "card_translation": RouteUpdate(
-                    provider="anthropic",
-                    model="claude-sonnet-4-6",
-                    effort="future-effort",
+    with pytest.raises(HTTPException) as exc:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "ai_research": RouteUpdate(
+                    provider="openai", model=model, effort=effort,
                 ),
-            }
-        ),
-        store=CredentialStore(tmp_path / "profile_state.db"),  # isolate
-    )
-    assert res["routes"]["card_translation"]["effort"] == "default"
-    assert "future-effort" in res["routes"]["card_translation"]["warning"]
+            }),
+            store=store,
+        )
 
-    cfg_mod.get_agent_config.cache_clear()
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": code, "field": "effort"}
+
+
+def test_update_model_routes_rejects_each_retired_model_before_effort(tmp_path):
+    from src.model_capabilities import capability_for
+    from src.model_route_store import ModelRouteStore
+    from src.model_routing import catalog
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    route_store = ModelRouteStore(store.db_path)
+
+    for model in catalog().retired_model_ids:
+        capability = capability_for(model)
+        assert capability is not None
+        with pytest.raises(HTTPException) as exc:
+            update_model_routes(
+                ModelRoutesUpdate(routes={
+                    "ai_research": RouteUpdate(
+                        provider=capability.provider, model=model, effort="high",
+                    ),
+                }),
+                store=store,
+            )
+        assert exc.value.status_code == 400
+        assert exc.value.detail == {"code": "model_retired", "field": "model"}
+        assert route_store.get("ai_research") is None
 
 
 def test_model_specific_effort_validation_preserves_max_only_for_gpt56(tmp_path, monkeypatch):
@@ -490,16 +517,16 @@ def test_model_specific_effort_validation_preserves_max_only_for_gpt56(tmp_path,
     )
     assert accepted["routes"]["ai_research"]["effort"] == "max"
 
-    normalized = update_model_routes(
-        ModelRoutesUpdate(routes={
-            "ai_research": RouteUpdate(
-                provider="openai", model="gpt-5.4-mini", effort="max",
-            ),
-        }),
-        store=store,
-    )
-    assert normalized["routes"]["ai_research"]["effort"] == "default"
-    assert "max" in normalized["routes"]["ai_research"]["warning"]
+    with pytest.raises(HTTPException) as exc:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "ai_research": RouteUpdate(
+                    provider="openai", model="gpt-5.4-mini", effort="max",
+                ),
+            }),
+            store=store,
+        )
+    assert exc.value.detail == {"code": "model_retired", "field": "model"}
     cfg_mod.get_agent_config.cache_clear()
 
 
@@ -653,7 +680,7 @@ def test_import_routes_copies_yaml_into_db(make_route_store, tmp_path):
     from src.api.routes.config_routes import import_model_routes
 
     rs = make_route_store({"llm_preferences": {
-        "ai_research_provider": "openai", "ai_research_model": "gpt-5.4-mini", "ai_research_effort": "low",
+        "ai_research_provider": "openai", "ai_research_model": "gpt-5.6-luna", "ai_research_effort": "low",
         "card_synthesis_provider": "anthropic",  # no model → incomplete → skipped
     }})
     assert rs.get("ai_research") is None  # explicit: nothing in DB until import is called
@@ -663,7 +690,7 @@ def test_import_routes_copies_yaml_into_db(make_route_store, tmp_path):
     assert "ai_research" in res["imported"]
     assert "card_synthesis" in res["skipped"]  # provider without model is not imported
     row = rs.get("ai_research")
-    assert (row.provider, row.model, row.effort) == ("openai", "gpt-5.4-mini", "low")
+    assert (row.provider, row.model, row.effort) == ("openai", "gpt-5.6-luna", "low")
     assert rs.get("card_synthesis") is None
 
 
@@ -704,15 +731,24 @@ def test_import_skips_provider_model_mismatch(make_route_store, tmp_path):
     assert rs.get("ai_research") is None         # inconsistent route NOT persisted
 
 
-def test_import_normalizes_unknown_effort_to_default(make_route_store, tmp_path):
+@pytest.mark.parametrize(
+    ("model", "effort"),
+    [
+        ("gpt-5.6-luna", "default"),
+        ("gpt-5.6-luna", "none"),
+        ("gpt-5.6-luna", "bogus"),
+        ("gpt-5.5", "high"),
+    ],
+)
+def test_import_skips_ambiguous_or_retired_route(make_route_store, tmp_path, model, effort):
     from src.api.routes.config_routes import import_model_routes
 
     rs = make_route_store({"llm_preferences": {
-        "ai_research_provider": "openai", "ai_research_model": "gpt-5.4-mini", "ai_research_effort": "bogus",
+        "ai_research_provider": "openai", "ai_research_model": model, "ai_research_effort": effort,
     }})
     res = import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
-    assert "ai_research" in res["imported"]
-    assert rs.get("ai_research").effort == "default"  # unknown effort normalized, mirroring save
+    assert "ai_research" in res["skipped"]
+    assert rs.get("ai_research") is None
 
 
 def test_task_route_db_error_degrades_to_yaml(make_route_store):

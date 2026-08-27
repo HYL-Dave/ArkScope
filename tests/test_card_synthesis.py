@@ -520,6 +520,118 @@ def test_subscription_effort_errors_never_retry_with_default(
     assert calls[0]["effort"] == "high"
 
 
+@pytest.mark.parametrize(
+    "invoke",
+    [
+        lambda cs: cs._synthesize_openai(
+            _packet(), "gpt-5.6-luna", effort="high", model_timeout_s=900,
+        ),
+        lambda cs: cs._synthesize_anthropic(
+            _packet(), "claude-sonnet-5", effort="high", model_timeout_s=900,
+        ),
+        lambda cs: cs._translate_openai(
+            "gpt-5.6-luna", "system", '{"conclusion":"view"}',
+            {"type": "object"}, "Traditional Chinese", effort="medium", model_timeout_s=900,
+        ),
+        lambda cs: cs._translate_anthropic(
+            "claude-sonnet-5", "system", '{"conclusion":"view"}',
+            {"type": "object"}, "Traditional Chinese", effort="medium", model_timeout_s=900,
+        ),
+    ],
+)
+def test_task_provider_effort_rejection_is_not_retried_with_default(monkeypatch, invoke):
+    from src import card_synthesis as cs
+
+    efforts = []
+
+    def reject_effort(**kwargs):
+        efforts.append(kwargs["effort"])
+        raise RuntimeError("provider rejected reasoning effort")
+
+    monkeypatch.setattr(cs, "_subscription_structured_output_if_active", reject_effort)
+
+    with pytest.raises(RuntimeError, match="provider rejected reasoning effort"):
+        invoke(cs)
+
+    assert efforts in (["high"], ["medium"])
+    assert "default" not in efforts
+
+
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")],
+)
+def test_synthesis_provider_override_uses_explicit_task_effort(monkeypatch, provider, model):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda task: TaskRoute(
+            task="card_synthesis", provider="anthropic" if provider == "openai" else "openai",
+            model="claude-opus-5" if provider == "openai" else "gpt-5.6-sol",
+            effort="xhigh", source="db",
+        ),
+    )
+    calls = []
+
+    def synthesize(packet, selected_model, effort, *, model_timeout_s, **kwargs):
+        calls.append((selected_model, effort))
+        return _synth(), {"effort": effort}
+
+    monkeypatch.setattr(
+        cs,
+        "_synthesize_openai" if provider == "openai" else "_synthesize_anthropic",
+        synthesize,
+    )
+
+    cs.synthesize_card(
+        _packet(), now_iso="2026-08-27T00:00:00Z", provider=provider,
+        model=model, model_timeout_s=900,
+    )
+
+    assert calls == [(model, "high")]
+
+
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")],
+)
+def test_translation_provider_override_uses_explicit_task_effort(monkeypatch, provider, model):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda task: TaskRoute(
+            task="card_translation", provider="anthropic" if provider == "openai" else "openai",
+            model="claude-sonnet-5" if provider == "openai" else "gpt-5.6-sol",
+            effort="xhigh", source="db",
+        ),
+    )
+    monkeypatch.setattr(cs, "translation_harness", lambda selected_provider: "fake")
+    calls = []
+
+    def translate(selected_model, system, user, schema, target, effort, **kwargs):
+        calls.append((selected_model, effort))
+        return {"translated_text": "translated"}
+
+    monkeypatch.setattr(
+        cs,
+        "_translate_openai" if provider == "openai" else "_translate_anthropic",
+        translate,
+    )
+
+    result = cs.translate_text(
+        "source", lang="zh-Hant", provider=provider, model=model, model_timeout_s=900,
+    )
+
+    assert result["translated_text"] == "translated"
+    assert calls == [(model, "medium")]
+
+
 def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypatch):
     from types import SimpleNamespace
 

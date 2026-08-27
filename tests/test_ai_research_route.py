@@ -47,6 +47,22 @@ def test_fresh_research_uses_complete_provider_specific_routes(clean_env):
     assert resolve_research_route("anthropic") == ("claude-sonnet-5", "xhigh")
 
 
+def test_fresh_install_task_routes_have_complete_explicit_efforts(clean_env, tmp_path):
+    from src.agents import config as config_module
+    from src.agents.config import task_route
+    from src.model_route_store import ModelRouteStore
+
+    clean_env.setattr(config_module, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    clean_env.setattr(config_module, "_LOCAL_CONFIG_PATH", tmp_path / "missing.local.yaml")
+    config_module.get_agent_config.cache_clear()
+    store = ModelRouteStore(tmp_path / "profile_state.db")
+
+    assert (task_route("card_synthesis", route_store=store).model, task_route("card_synthesis", route_store=store).effort) == ("claude-opus-5", "high")
+    assert (task_route("card_translation", route_store=store).model, task_route("card_translation", route_store=store).effort) == ("claude-sonnet-5", "medium")
+    assert (task_route("ai_research", route_store=store).model, task_route("ai_research", route_store=store).effort) == ("gpt-5.6-luna", "xhigh")
+    config_module.get_agent_config.cache_clear()
+
+
 def test_matching_legacy_research_route_with_default_effort_stays_ambiguous(clean_env):
     class RouteStore:
         def get(self, task):

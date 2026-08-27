@@ -6,6 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import pytest
+from fastapi import HTTPException
 
 from src.api.routes import query as q
 from src.api.routes import research as r
@@ -259,7 +260,7 @@ def test_create_run_route_persists_user_and_schedules_with_prior_history(stores,
         scheduled.update(kwargs)
 
     monkeypatch.setattr(r, "schedule_research_run", fake_schedule_research_run)
-    monkeypatch.setattr(r, "resolve_research_route", lambda provider: ("gpt-5.4-mini", "low"))
+    monkeypatch.setattr(r, "resolve_research_route", lambda provider: ("gpt-5.6-luna", "low"))
     monkeypatch.setattr(
         r,
         "resolve_live_auth",
@@ -277,7 +278,7 @@ def test_create_run_route_persists_user_and_schedules_with_prior_history(stores,
     run = res["run"]
     assert run["thread_id"] == "t1"
     assert run["status"] == "queued"
-    assert run["model"] == "gpt-5.4-mini"
+    assert run["model"] == "gpt-5.6-luna"
     assert run["effort"] == "low"
     assert run["auth_mode"] == "api_key"
     assert run["credential_id"] == "local:3"
@@ -396,7 +397,7 @@ def test_cancel_run_route_terminalizes_when_no_in_memory_task(stores, monkeypatc
 # ─── P2.8 Slice 3: semantic selection + typed terminal outcomes ─────────────
 
 
-def test_latest_successful_selection_ignores_non_success_and_maps_default(stores):
+def test_latest_successful_selection_preserves_null_legacy_effort(stores):
     run_store, thread_store = stores
     _seed_run(
         run_store,
@@ -438,7 +439,7 @@ def test_latest_successful_selection_ignores_non_success_and_maps_default(stores
     assert (selection.provider, selection.model, selection.effort) == (
         "anthropic",
         "claude-sonnet-5",
-        "default",
+        None,
     )
 
 
@@ -470,7 +471,93 @@ def test_latest_successful_selection_orders_by_completion_then_id(stores):
     assert selection.model == "gpt-5.6-sol"
 
 
-def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeypatch):
+@pytest.mark.parametrize("effort", ["default", "none"])
+def test_create_research_run_rejects_ambiguous_effort_before_persistence(
+    stores, monkeypatch, effort
+):
+    run_store, thread_store = stores
+    persisted = []
+    scheduled = []
+
+    def should_not_persist(**kwargs):
+        persisted.append(kwargs)
+        raise AssertionError("ambiguous effort must not be persisted")
+
+    monkeypatch.setattr(run_store, "create_run_with_user_message", should_not_persist)
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs))
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            r.create_research_run(
+                r.ResearchRunCreate(
+                    question="ambiguous effort", provider="openai",
+                    model="gpt-5.6-luna", effort=effort,
+                ),
+                dal=object(), thread_store=thread_store, run_store=run_store,
+            )
+        )
+
+    assert exc.value.status_code == 422
+    assert persisted == []
+    assert scheduled == []
+
+
+@pytest.mark.parametrize(
+    ("provider", "model", "effort"),
+    [
+        ("openai", "gpt-5.6-luna", "xhigh"),
+        ("anthropic", "claude-sonnet-5", "xhigh"),
+    ],
+)
+def test_implicit_current_research_route_persists_explicit_effort(
+    stores, monkeypatch, provider, model, effort
+):
+    run_store, thread_store = stores
+    scheduled = []
+    monkeypatch.setattr(r, "resolve_research_route", lambda selected: (model, effort))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs))
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda selected: ("api_key", "local:test"))
+
+    response = asyncio.run(
+        r.create_research_run(
+            r.ResearchRunCreate(question="implicit current", provider=provider),
+            dal=object(), thread_store=thread_store, run_store=run_store,
+        )
+    )
+
+    assert (response["run"]["model"], response["run"]["effort"]) == (model, effort)
+    assert run_store.get_run(response["run"]["id"]).effort == effort
+    assert len(scheduled) == 1
+
+
+@pytest.mark.parametrize("legacy_effort", ["default", "none"])
+def test_legacy_research_route_remains_readable_but_cannot_start_new_run(
+    stores, monkeypatch, legacy_effort
+):
+    run_store, thread_store = stores
+    thread_store.ensure_thread(id="legacy-thread", title="legacy")
+    run_store.create_run(
+        id="legacy", thread_id="legacy-thread", question="legacy", ticker=None,
+        provider="openai", model="gpt-5.6-luna", effort=legacy_effort,
+        auth_mode="api_key", credential_id=None,
+    )
+    assert run_store.get_run("legacy").effort == legacy_effort
+    monkeypatch.setattr(r, "resolve_research_route", lambda provider: ("gpt-5.6-luna", legacy_effort))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not schedule")))
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            r.create_research_run(
+                r.ResearchRunCreate(question="new", provider="openai"),
+                dal=object(), thread_store=thread_store, run_store=run_store,
+            )
+        )
+
+    assert exc.value.status_code == 422
+    assert run_store.get_run("legacy").effort == legacy_effort
+
+
+def test_openai_explicit_effort_persists_and_reaches_wire(stores, monkeypatch):
     run_store, thread_store = stores
     scheduled = {}
     monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.update(kwargs))
@@ -479,10 +566,10 @@ def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeyp
     response = asyncio.run(
         r.create_research_run(
             r.ResearchRunCreate(
-                question="default effort",
+                question="explicit effort",
                 provider="openai",
-                model="gpt-5.4-mini",
-                effort=None,
+                model="gpt-5.6-luna",
+                effort="high",
             ),
             dal=object(),
             thread_store=thread_store,
@@ -490,7 +577,7 @@ def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeyp
         )
     )
     run = run_store.get_run(response["run"]["id"])
-    assert run is not None and run.effort == "default"
+    assert run is not None and run.effort == "high"
 
     captured = {}
     sentinel = object()
@@ -514,7 +601,7 @@ def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeyp
     )
 
     assert result is sentinel
-    assert captured["reasoning_effort"] is None
+    assert captured["reasoning_effort"] == "high"
 
     subscription_captured = {}
     subscription_sentinel = object()
@@ -540,10 +627,10 @@ def test_openai_semantic_default_persists_but_wire_receives_none(stores, monkeyp
     )
 
     assert subscription_result is subscription_sentinel
-    assert subscription_captured["effort"] is None
+    assert subscription_captured["effort"] == "high"
 
 
-def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monkeypatch):
+def test_anthropic_explicit_effort_persists_and_reaches_wire(stores, monkeypatch):
     run_store, thread_store = stores
     monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: None)
     monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", "local:test"))
@@ -551,10 +638,10 @@ def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monk
     response = asyncio.run(
         r.create_research_run(
             r.ResearchRunCreate(
-                question="default effort",
+                question="explicit effort",
                 provider="anthropic",
                 model="claude-sonnet-5",
-                effort=None,
+                effort="high",
             ),
             dal=object(),
             thread_store=thread_store,
@@ -562,7 +649,7 @@ def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monk
         )
     )
     run = run_store.get_run(response["run"]["id"])
-    assert run is not None and run.effort == "default"
+    assert run is not None and run.effort == "high"
 
     captured = {}
     sentinel = object()
@@ -588,7 +675,7 @@ def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monk
     )
 
     assert result is sentinel
-    assert captured["effort"] is None
+    assert captured["effort"] == "high"
 
     subscription_captured = {}
     subscription_sentinel = object()
@@ -618,7 +705,7 @@ def test_anthropic_semantic_default_persists_but_wire_receives_none(stores, monk
     )
 
     assert subscription_result is subscription_sentinel
-    assert subscription_captured["effort"] is None
+    assert subscription_captured["effort"] == "high"
 
 
 def test_explicit_error_code_survives_event_run_and_linked_message(stores):
@@ -948,7 +1035,7 @@ def test_cancel_fallback_atomically_persists_typed_terminal_before_next_run(
         thread_id="cancel-race",
         question="new question",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
     )
 
@@ -1012,7 +1099,7 @@ def test_restart_reconciliation_atomically_persists_typed_terminal_before_next_r
         thread_id="restart-race",
         question="new question",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
     )
 
@@ -1563,7 +1650,7 @@ def test_create_run_stores_stance_and_rejects_invalid(stores, tmp_path, monkeypa
     run_store, thread_store = stores
     _tracka_profile(tmp_path, monkeypatch, enabled=True)
     monkeypatch.setattr(r, "schedule_research_run", lambda **k: None)
-    monkeypatch.setattr(r, "resolve_research_route", lambda provider: ("gpt-5.4-mini", "low"))
+    monkeypatch.setattr(r, "resolve_research_route", lambda provider: ("gpt-5.6-luna", "low"))
     monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", None))
 
     body = r.ResearchRunCreate(

@@ -29,6 +29,8 @@ from src.research_threads import (
     ResearchThreadActiveError,
     valid_thread_id,
 )
+from src.model_capabilities import capability_for
+from src.model_routing import is_valid_task_route_effort
 
 from ..dependencies import (
     get_dal,
@@ -341,6 +343,17 @@ def _resolve_auth_metadata(provider: str) -> tuple[str | None, str | None]:
     return None, res.credential_id
 
 
+def _research_task_admission_detail(provider: str, model: str, effort: str) -> dict[str, str] | None:
+    capability = capability_for(model)
+    if capability is not None and capability.task_route_status == "retired":
+        return {"code": "model_retired", "field": "model"}
+    if effort in ("", "default", "none"):
+        return {"code": "effort_required", "field": "effort"}
+    if not is_valid_task_route_effort(provider, effort, model):
+        return {"code": "effort_not_supported", "field": "effort"}
+    return None
+
+
 @router.post("/research/runs")
 async def create_research_run(
     request: ResearchRunCreate,
@@ -368,8 +381,13 @@ async def create_research_run(
     model, effort = request.model, request.effort
     if model is None:
         model, effort = resolve_research_route(provider)
-    if effort in (None, ""):
-        effort = "default"
+    model = model.strip() if isinstance(model, str) else ""
+    effort = effort.strip() if isinstance(effort, str) else ""
+    if not model:
+        raise HTTPException(status_code=422, detail={"code": "model_required", "field": "model"})
+    detail = _research_task_admission_detail(provider, model, effort)
+    if detail is not None:
+        raise HTTPException(status_code=422, detail=detail)
     auth_mode, credential_id = _resolve_auth_metadata(provider)
     agent_question = _compose_agent_question(question, request.ticker)
 

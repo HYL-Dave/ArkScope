@@ -51,7 +51,7 @@ def _add_run(run_store, thread_id, run_id, *, status="queued", created_at=None):
         question=f"question for {thread_id}",
         ticker=None,
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
         auth_mode="api_key",
         credential_id=None,
@@ -80,7 +80,7 @@ def _insert_active_run(conn, thread_id, run_id):
         INSERT INTO research_runs
             (id, thread_id, status, question, provider, model, created_at, updated_at)
         VALUES
-            (?, ?, 'queued', 'question', 'openai', 'gpt-5.4-mini',
+            (?, ?, 'queued', 'question', 'openai', 'gpt-5.6-luna',
              '2026-07-18T02:00:00+00:00', '2026-07-18T02:00:00+00:00')
         """,
         (run_id, thread_id),
@@ -304,7 +304,7 @@ def test_history_route_filters_before_pagination_and_batches_active_runs(
             title=title,
             ticker=ticker,
             provider="openai",
-            model="gpt-5.4-mini",
+            model="gpt-5.6-luna",
             now=updated_at,
         )
     for thread_id in [
@@ -571,7 +571,7 @@ def test_patch_archive_active_thread_returns_409_without_mutation(
             thread_id="archive-first",
             question="must not append",
             provider="openai",
-            model="gpt-5.4-mini",
+            model="gpt-5.6-luna",
             effort="low",
         )
         error, _ = _finish_after_writer_commit(
@@ -625,7 +625,7 @@ def test_patch_archive_active_thread_returns_409_without_mutation(
         thread_id="atomic-create",
         question="atomic question",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
     )
     with pytest.raises(sqlite3.IntegrityError, match="message insert failed"):
@@ -664,7 +664,7 @@ def test_patch_archive_active_thread_returns_409_without_mutation(
         thread_id="wrong-database",
         question="must stay absent",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
     )
     with pytest.raises(ValueError, match="same SQLite database"):
@@ -722,7 +722,7 @@ def test_patch_archive_active_thread_returns_409_without_mutation(
             thread_id="history-race",
             question="follow up",
             provider="openai",
-            model="gpt-5.4-mini",
+            model="gpt-5.6-luna",
             effort="low",
         )
         error, response = _finish_after_writer_commit(
@@ -841,7 +841,7 @@ def test_delete_active_thread_returns_409_without_cascade(
             thread_id="delete-first",
             question="must not append",
             provider="openai",
-            model="gpt-5.4-mini",
+            model="gpt-5.6-luna",
             effort="low",
         )
         error, _ = _finish_after_writer_commit(
@@ -874,7 +874,7 @@ def test_delete_active_thread_returns_409_without_cascade(
         thread_id="schedule-failure",
         question="schedule me",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
     )
     with pytest.raises(HTTPException) as exc_info:
@@ -917,7 +917,7 @@ def test_delete_active_thread_returns_409_without_cascade(
         thread_id="schedule-failure",
         question="retry now",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
         retry_last_failed=True,
     )
@@ -950,7 +950,7 @@ def test_list_messages_route_roundtrip(store):
     assert res["messages"][0]["is_error"] is False  # serialized for the client mapper
 
 
-def test_latest_selection_route_returns_semantic_tuple_without_credentials(
+def test_latest_selection_route_returns_nullable_legacy_effort_without_credentials(
     research_stores,
 ):
     thread_store, run_store, _ = research_stores
@@ -989,9 +989,34 @@ def test_latest_selection_route_returns_semantic_tuple_without_credentials(
     assert response == {
         "provider": "anthropic",
         "model": "claude-sonnet-5",
-        "effort": "default",
+        "effort": None,
     }
     assert all("credential" not in key for key in response)
+
+
+def test_latest_selection_route_preserves_blank_and_explicit_efforts(research_stores):
+    thread_store, run_store, _ = research_stores
+    for thread_id, run_id, effort in (
+        ("blank-selection", "blank", ""),
+        ("explicit-selection", "explicit", "high"),
+    ):
+        thread_store.ensure_thread(id=thread_id, title=thread_id)
+        run_store.create_run(
+            id=run_id, thread_id=thread_id, question="selection", ticker=None,
+            provider="openai", model="gpt-5.6-luna", effort=effort,
+            auth_mode="api_key", credential_id=None,
+        )
+        run_store.mark_terminal(run_id, "succeeded")
+
+    blank = r.get_research_thread_selection(
+        "blank-selection", store=thread_store, run_store=run_store,
+    )
+    explicit = r.get_research_thread_selection(
+        "explicit-selection", store=thread_store, run_store=run_store,
+    )
+
+    assert blank == {"provider": "openai", "model": "gpt-5.6-luna", "effort": ""}
+    assert explicit == {"provider": "openai", "model": "gpt-5.6-luna", "effort": "high"}
 
 
 def test_run_and_message_routes_expose_typed_redacted_failure_details(
@@ -1007,7 +1032,7 @@ def test_run_and_message_routes_expose_typed_redacted_failure_details(
         question="q",
         ticker=None,
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="default",
         auth_mode="api_key",
         credential_id="local:compat-only",
@@ -1024,7 +1049,7 @@ def test_run_and_message_routes_expose_typed_redacted_failure_details(
         role="assistant",
         content=raw_error,
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="default",
         is_error=True,
         error_code="model_timeout",
@@ -1156,7 +1181,7 @@ def test_query_stream_explicit_model_and_effort_passthrough(store, monkeypatch):
         raise AssertionError("resolve_research_route must NOT be called when model is explicit")
 
     monkeypatch.setattr("src.agents.config.resolve_research_route", _boom)
-    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.4-mini", effort="low", thread_id=None, ticker=None)
+    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.6-luna", effort="low", thread_id=None, ticker=None)
 
     async def drive():
         resp = await q.query_agent_stream(req, dal=object(), store=store)
@@ -1164,7 +1189,7 @@ def test_query_stream_explicit_model_and_effort_passthrough(store, monkeypatch):
             pass
 
     asyncio.run(drive())
-    assert captured["model"] == "gpt-5.4-mini" and captured["effort"] == "low"
+    assert captured["model"] == "gpt-5.6-luna" and captured["effort"] == "low"
 
 
 def test_query_stream_retry_last_failed_excludes_failed_pair_from_history(store, monkeypatch):
@@ -1188,7 +1213,7 @@ def test_query_stream_retry_last_failed_excludes_failed_pair_from_history(store,
     req = q.QueryRequest(
         question="failed q",
         provider="openai",
-        model="gpt-5.4-mini",
+        model="gpt-5.6-luna",
         effort="low",
         thread_id="t1",
         ticker=None,
@@ -1486,7 +1511,7 @@ def test_oauth_active_openai_routes_to_chatgpt_oauth_driver(store, monkeypatch):
 
     monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", boom_run_query_stream)
 
-    req = q.QueryRequest(question="follow up", provider="openai", model="gpt-5.4-mini",
+    req = q.QueryRequest(question="follow up", provider="openai", model="gpt-5.6-luna",
                          effort="low", thread_id="t1", ticker="AAPL")
 
     frames = []
@@ -1500,7 +1525,7 @@ def test_oauth_active_openai_routes_to_chatgpt_oauth_driver(store, monkeypatch):
 
     assert captured["credential_id"] == "local:9"
     assert captured["question"] == "針對 AAPL：follow up"
-    assert captured["model"] == "gpt-5.4-mini"
+    assert captured["model"] == "gpt-5.6-luna"
     assert captured["effort"] == "low"
     assert captured["history"] == [
         {"role": "user", "content": "prev q"},
@@ -1744,7 +1769,7 @@ def test_openai_subscription_stream_builds_driver_with_research_runtime(monkeypa
     monkeypatch.setattr("src.auth_drivers.factory.build_driver", fake_build_driver)
 
     out = q._openai_subscription_stream(
-        credential_id="local:9", question="hi", model="gpt-5.4-mini",
+        credential_id="local:9", question="hi", model="gpt-5.6-luna",
         effort="low", dal=sentinel_dal, history=[],
     )
 
@@ -1773,7 +1798,7 @@ def test_api_key_stream_receives_research_max_turns(store, monkeypatch, tmp_path
 
     monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_stream)
 
-    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.4-mini", thread_id=None)
+    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.6-luna", thread_id=None)
 
     async def drive():
         resp = await q.query_agent_stream(req, dal=object(), store=store)

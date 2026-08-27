@@ -458,9 +458,82 @@ def test_task_test_route_shape(monkeypatch, tmp_path):
     )
     out = cr.run_task_model_test(
         cr.TaskModelTestRequest(
-            task="ai_research", provider="openai", model="gpt-5.4-mini", effort="low"
+            task="ai_research", provider="openai", model="gpt-5.6-luna", effort="low"
         ),
         store=_Store(tmp_path / "profile_state.db"),
         token_store=object(),
     )
     assert set(out) == expected
+
+
+@pytest.mark.parametrize(
+    ("model", "effort", "code"),
+    [
+        ("gpt-5.5", "high", "model_retired"),
+        ("gpt-5.6-luna", "default", "effort_required"),
+        ("gpt-5.6-luna", "none", "effort_required"),
+        ("gpt-5.6-luna", "bogus", "effort_not_supported"),
+    ],
+)
+def test_task_test_route_rejects_retired_or_ambiguous_effort_before_dispatch(
+    monkeypatch, tmp_path, model, effort, code
+):
+    from fastapi import HTTPException
+    from src.api.routes import config_routes as cr
+
+    dispatched = []
+
+    async def fake_dispatch(**kwargs):
+        dispatched.append(kwargs)
+        return SimpleNamespace(model_dump=lambda: {})
+
+    monkeypatch.setattr(cr, "dispatch_task_model_test", fake_dispatch)
+
+    with pytest.raises(HTTPException) as exc:
+        cr.run_task_model_test(
+            cr.TaskModelTestRequest(
+                task="ai_research", provider="openai", model=model, effort=effort,
+            ),
+            store=_Store(tmp_path / "profile_state.db"),
+            token_store=object(),
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": code, "field": "model" if code == "model_retired" else "effort"}
+    assert dispatched == []
+
+
+@pytest.mark.parametrize(
+    ("model", "effort"),
+    [("gpt-7-custom", "high"), ("gpt-5.6-luna", "xhigh")],
+)
+def test_task_test_route_dispatches_custom_and_current_explicit_routes(
+    monkeypatch, tmp_path, model, effort
+):
+    from src.api.routes import config_routes as cr
+
+    dispatched = []
+
+    async def fake_dispatch(**kwargs):
+        dispatched.append(kwargs)
+        return SimpleNamespace(model_dump=lambda: {"model": kwargs["model"], "effort": kwargs["effort"]})
+
+    monkeypatch.setattr(cr, "dispatch_task_model_test", fake_dispatch)
+
+    response = cr.run_task_model_test(
+        cr.TaskModelTestRequest(
+            task="ai_research", provider="openai", model=model, effort=effort,
+        ),
+        store=_Store(tmp_path / "profile_state.db"),
+        token_store=object(),
+    )
+
+    assert response == {"model": model, "effort": effort}
+    assert len(dispatched) == 1
+    assert {
+        key: dispatched[0][key]
+        for key in ("task", "provider", "model", "effort")
+    } == {
+        "task": "ai_research", "provider": "openai", "model": model,
+        "effort": effort,
+    }

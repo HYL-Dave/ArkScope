@@ -123,7 +123,7 @@ class ResearchRunEvent:
 class ResearchSelection:
     provider: str
     model: str
-    effort: str
+    effort: str | None
 
 
 class ResearchRunStore:
@@ -559,7 +559,7 @@ class ResearchRunStore:
         return ResearchSelection(
             provider=row["provider"],
             model=row["model"],
-            effort=row["effort"] if row["effort"] not in (None, "") else "default",
+            effort=row["effort"],
         )
 
     def latest_active_for_thread(self, thread_id: str) -> Optional[ResearchRun]:

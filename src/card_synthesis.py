@@ -28,7 +28,6 @@ from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.evidence_packet import EvidencePacket
-from src.model_credentials import looks_like_effort_error
 from src.result_card import (
     ClaimCitation,
     Completeness,
@@ -331,19 +330,7 @@ def _synthesize_anthropic(
         raise
     except AnthropicRefusalError:
         raise  # zero-fallback contract: a refusal is never retried (MF6)
-    except Exception as exc:
-        if _is_subscription_structured_output_error(exc):
-            raise
-        if effort != "default" and looks_like_effort_error(exc):
-            synth = run_once("default")
-            return synth, {
-                "effort": effort,
-                "fallback_effort": "default",
-                "warning": (
-                    f"Provider rejected effort '{effort}', so synthesis fell back "
-                    "to provider default."
-                ),
-            }
+    except Exception:
         raise
 
 
@@ -418,19 +405,7 @@ def _synthesize_openai(
         return run_once(effort), {"effort": effort}
     except ModelExecutionTimeout:
         raise
-    except Exception as exc:
-        if _is_subscription_structured_output_error(exc):
-            raise
-        if effort != "default" and looks_like_effort_error(exc):
-            synth = run_once("default")
-            return synth, {
-                "effort": effort,
-                "fallback_effort": "default",
-                "warning": (
-                    f"Provider rejected effort '{effort}', so synthesis fell back "
-                    "to provider default."
-                ),
-            }
+    except Exception:
         raise
 
 
@@ -517,7 +492,7 @@ def synthesize_card(
     route = task_route("card_synthesis")
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
-        effort = route.effort if route.provider == "anthropic" else "default"
+        effort = route.effort if route.provider == "anthropic" else "high"
         synth, effort_meta = _synthesize_anthropic(
             packet,
             model,
@@ -527,7 +502,7 @@ def synthesize_card(
         )
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
-        effort = route.effort if route.provider == "openai" else "default"
+        effort = route.effort if route.provider == "openai" else "high"
         synth, effort_meta = _synthesize_openai(
             packet,
             model,
@@ -674,7 +649,7 @@ def translate_text(
         ensure_ascii=False,
         separators=(",", ":"),
     )
-    effort = route.effort if provider == route.provider else "default"
+    effort = route.effort if provider == route.provider else "medium"
     harness = translation_harness(provider)
 
     if provider == "anthropic":
@@ -765,7 +740,7 @@ def translate_card(
     )
     user = json.dumps(payload, ensure_ascii=False, indent=2)
 
-    effort = route.effort if provider == route.provider else "default"
+    effort = route.effort if provider == route.provider else "medium"
     if provider == "anthropic":
         translated = _translate_anthropic(
             model,
@@ -868,15 +843,7 @@ def _translate_anthropic(
         raise
     except AnthropicRefusalError:
         raise  # zero-fallback contract: a refusal is never retried (MF6)
-    except Exception as exc:
-        if _is_subscription_structured_output_error(exc):
-            raise
-        if effort != "default" and looks_like_effort_error(exc):
-            logger.warning(
-                "Anthropic translation effort %s was rejected; retrying with provider default",
-                effort,
-            )
-            return run_once("default")
+    except Exception:
         raise
 
 
@@ -952,15 +919,7 @@ def _translate_openai(
         return run_once(effort)
     except ModelExecutionTimeout:
         raise
-    except Exception as exc:
-        if _is_subscription_structured_output_error(exc):
-            raise
-        if effort != "default" and looks_like_effort_error(exc):
-            logger.warning(
-                "OpenAI translation effort %s was rejected; retrying with provider default",
-                effort,
-            )
-            return run_once("default")
+    except Exception:
         raise
 
 
