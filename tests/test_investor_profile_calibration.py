@@ -1263,6 +1263,7 @@ def test_responder_request_contains_no_tool_or_market_language(monkeypatch):
         )
     )
     assert result.assistant_message.startswith("What")
+    assert captured["model"] == "gpt-5.4-mini"
     blob = captured["instructions"].lower()
     assert "no market data" in blob
     assert 'current_topic_id: "loss_response"' in captured["instructions"]

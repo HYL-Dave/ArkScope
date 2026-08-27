@@ -989,6 +989,66 @@ describe("Research workspace contracts", () => {
     expect.soft(context).toContain(" · xhigh");
   });
 
+  it("recovers a blocked legacy effort when the selected provider is clicked", async () => {
+    const threadId = "legacy-default-recovery";
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread(threadId, "Legacy effort")],
+      selections: {
+        [threadId]: { provider: "openai", model: "gpt-5.6-sol", effort: "default" },
+      },
+    }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
+    await mountResearch();
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(true));
+
+    await click(buttonContaining("OpenAI")!);
+    await vi.waitFor(() => {
+      expect(select("模型")?.value).toBe("gpt-5.6-luna");
+      expect(select("effort")?.value).toBe("");
+    });
+    await setSelect(select("effort")!, "xhigh");
+    await setTextarea("Recover the legacy route");
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
+  });
+
+  it("recovers a retired historical model when the selected provider is clicked", async () => {
+    const threadId = "retired-model-recovery";
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread(threadId, "Retired model")],
+      selections: {
+        [threadId]: { provider: "openai", model: "gpt-5.4-mini", effort: "low" },
+      },
+    }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
+    await mountResearch();
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(true));
+
+    await click(buttonContaining("OpenAI")!);
+    await vi.waitFor(() => {
+      expect(select("模型")?.value).toBe("gpt-5.6-luna");
+      expect(select("effort")?.value).toBe("");
+    });
+    await setSelect(select("effort")!, "xhigh");
+    await setTextarea("Recover the retired route");
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
+  });
+
+  it("recovers an active incomplete edit when the selected provider is clicked", async () => {
+    vi.stubGlobal("fetch", stubFetch());
+    await mountResearch();
+    await setSelect(select("模型")!, "gpt-5.6-sol");
+    expect(select("effort")?.value).toBe("");
+
+    await click(buttonContaining("OpenAI")!);
+    await vi.waitFor(() => {
+      expect(select("模型")?.value).toBe("gpt-5.6-luna");
+      expect(select("effort")?.value).toBe("");
+    });
+    await setSelect(select("effort")!, "xhigh");
+    await setTextarea("Recover the incomplete edit");
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
+  });
+
   it("4. distinguishes subscription quota from API-key usage in provider context", async () => {
     vi.stubGlobal("fetch", stubFetch({ catalog: catalog("chatgpt_oauth") }));
     await mountResearch();
