@@ -652,7 +652,7 @@ cd apps/arkscope-web && npm test -- --run src/researchModels.test.ts src/modelRo
 
 Expected: pass.
 
-- [ ] **Step 2: Run complete frontend gates**
+- [x] **Step 2: Run complete frontend gates**
 
 ```bash
 cd apps/arkscope-web
@@ -672,7 +672,7 @@ pytest -q
 
 Expected: pass with only the repository's known skips/warnings.
 
-- [ ] **Step 4: Run static scope checks**
+- [x] **Step 4: Run static scope checks**
 
 ```bash
 git diff --check
@@ -702,3 +702,13 @@ git commit -m "docs: close explicit effort routing slice"
 
 Do not merge or push. Report the exact branch tip, test counts, and remaining
 legacy compatibility behavior for independent review.
+
+Closeout note (2026-08-28, after product fix `5c45a845`): all focused and
+complete gates passed. Focused backend: 505 passed. Focused frontend: 6 files,
+118 tests passed. Full frontend: 106 files, 1,280 tests passed; typecheck and
+build passed, with the existing Vite large-chunk warning. Full backend: 4,593
+passed, 12 skipped, 3 known `edgartools` deprecation warnings. Static inventories
+passed; the remaining legacy matches are capability/history, diagnostics,
+documentation, or explicit compatibility fixtures, and card task execution has
+no default-effort fallback. The same-provider ready AI Research provider click
+is now a no-op; blocked/incomplete recovery remains covered.
