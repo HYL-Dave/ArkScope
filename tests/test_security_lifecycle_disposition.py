@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -76,11 +77,12 @@ def _case(
     ticker_transition: dict | None = None,
     evidence: tuple[dict, ...] = (),
     automation_facts: tuple[dict, ...] = (),
+    observation_fingerprint_sha256: str | None = None,
 ) -> dict:
     history = list(assessment_history)
     if current_assessment is not None and not history:
         history = [current_assessment]
-    return {
+    case = {
         "case_id": "case-1",
         "source_presence": source_presence,
         "observation": {"last_observed_at": "2026-08-25T12:00:00Z"},
@@ -92,6 +94,17 @@ def _case(
         "evidence": list(evidence),
         "automation_facts": list(automation_facts),
     }
+    if observation_fingerprint_sha256 is not None:
+        case["observation_fingerprint_sha256"] = observation_fingerprint_sha256
+    return case
+
+
+def _manual_evidence_digest(*rows: tuple[str, str]) -> str:
+    payload = "".join(
+        f"{evidence_id}\t{content_sha256}\n"
+        for evidence_id, content_sha256 in sorted(rows)
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 @pytest.mark.parametrize(
@@ -364,6 +377,193 @@ def test_stale_automation_transition_rechecks_before_later_execute_on():
             "automation_policy_version": "trusted-lifecycle-automation-old",
         },
     ) == "2026-08-27T00:00:00Z"
+
+
+def test_latest_run_uses_the_current_manual_evidence_digest():
+    observation = "a" * 64
+    current_content = "b" * 64
+    current_digest = _manual_evidence_digest(("manual-current", current_content))
+    stale_run = _run(
+        blockers=(
+            _blocker(
+                "sec_evidence_insufficient",
+                retryable=False,
+                context=_not_confirmed_as_of_context(),
+            ),
+        ),
+    )
+    stale_run.update(
+        {
+            "run_id": "run-stale",
+            "observation_fingerprint_sha256": observation,
+            "query_context": {"input_evidence_set_sha256": "c" * 64},
+        }
+    )
+    current_run = _run(status="running")
+    current_run.update(
+        {
+            "run_id": "run-current",
+            "observation_fingerprint_sha256": observation,
+            "query_context": {"input_evidence_set_sha256": current_digest},
+        }
+    )
+
+    got = project_lifecycle_disposition(
+        _case(
+            observation_fingerprint_sha256=observation,
+            automation_runs=(stale_run, current_run),
+            evidence=(
+                {
+                    "evidence_id": "manual-current",
+                    "content_sha256": current_content,
+                    "automation_run_id": None,
+                    "source_family": "manual",
+                },
+                {
+                    "evidence_id": "automation-output",
+                    "content_sha256": "d" * 64,
+                    "automation_run_id": "run-stale",
+                    "source_family": "publisher",
+                },
+            ),
+        )
+    )
+
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "not_confirmed_yet",
+        "monitoring",
+        "automation_running",
+    )
+
+
+def test_stale_automation_assessment_prevents_applied_transition_from_masking_fresh_run():
+    observation = "a" * 64
+    current_run = _run(status="running")
+    current_run.update(
+        {
+            "observation_fingerprint_sha256": observation,
+            "query_context": {
+                "input_evidence_set_sha256": _manual_evidence_digest()
+            },
+        }
+    )
+    stale_assessment = _assessment(stale=True)
+    stale_assessment.update(
+        {
+            "observation_fingerprint_sha256": observation,
+            "evidence_set_sha256": "b" * 64,
+            "decision_provenance_sha256": "c" * 64,
+        }
+    )
+
+    got = project_lifecycle_disposition(
+        _case(
+            observation_fingerprint_sha256=observation,
+            current_assessment=stale_assessment,
+            automation_runs=(current_run,),
+            ticker_transition={
+                "status": "applied",
+                "approval_authority": "automation_policy",
+                "observation_fingerprint_sha256": observation,
+                "decision_provenance_sha256": "c" * 64,
+                "approved_preview": {
+                    "assessment_id": "assessment-current",
+                    "evidence_set_sha256": "b" * 64,
+                    "observation_fingerprint_sha256": observation,
+                },
+            },
+        )
+    )
+
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "not_confirmed_yet",
+        "monitoring",
+        "automation_running",
+    )
+
+
+def _automation_transition_fixture(
+    *,
+    assessment_id: str = "assessment-current",
+    evidence_set_sha256: str = "b" * 64,
+    decision_provenance_sha256: str = "c" * 64,
+) -> dict:
+    observation = "a" * 64
+    return {
+        "status": "applied",
+        "approval_authority": "automation_policy",
+        "observation_fingerprint_sha256": observation,
+        "decision_provenance_sha256": decision_provenance_sha256,
+        "approved_preview": {
+            "assessment_id": assessment_id,
+            "evidence_set_sha256": evidence_set_sha256,
+            "observation_fingerprint_sha256": observation,
+        },
+    }
+
+
+def _current_automation_assessment() -> dict:
+    assessment = _assessment()
+    assessment.update(
+        {
+            "observation_fingerprint_sha256": "a" * 64,
+            "evidence_set_sha256": "b" * 64,
+            "decision_provenance_sha256": "c" * 64,
+        }
+    )
+    return assessment
+
+
+def test_exact_current_automation_transition_remains_visible():
+    got = project_lifecycle_disposition(
+        _case(
+            observation_fingerprint_sha256="a" * 64,
+            current_assessment=_current_automation_assessment(),
+            ticker_transition=_automation_transition_fixture(),
+        )
+    )
+
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "confirmed_effective",
+        "history",
+        "transition_applied",
+    )
+
+
+@pytest.mark.parametrize(
+    "transition",
+    [
+        _automation_transition_fixture(assessment_id="assessment-stale"),
+        _automation_transition_fixture(evidence_set_sha256="d" * 64),
+        _automation_transition_fixture(decision_provenance_sha256="e" * 64),
+    ],
+    ids=("assessment-id", "evidence-set", "decision-provenance"),
+)
+def test_stale_automation_transition_artifact_does_not_mask_current_run(transition):
+    current_run = _run(status="running")
+    current_run.update(
+        {
+            "observation_fingerprint_sha256": "a" * 64,
+            "query_context": {
+                "input_evidence_set_sha256": _manual_evidence_digest()
+            },
+        }
+    )
+
+    got = project_lifecycle_disposition(
+        _case(
+            observation_fingerprint_sha256="a" * 64,
+            current_assessment=_current_automation_assessment(),
+            automation_runs=(current_run,),
+            ticker_transition=transition,
+        )
+    )
+
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "confirmed_effective",
+        "history",
+        "resolved_assessment",
+    )
 
 
 def test_source_family_status_uses_current_run_citations_and_typed_families():

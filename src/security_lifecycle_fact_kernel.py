@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
 
-from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
+from src.security_lifecycle_investigation import (
+    SecurityLifecycleInvestigationStore,
+    evidence_rows_sha256,
+)
 from src.security_lifecycle_schema import (
     ACTION_READINESS,
     AUTOMATION_BLOCKER_CODES,
@@ -477,7 +480,7 @@ def _input_evidence_set_sha256(
     conn: sqlite3.Connection,
     case_id: str,
 ) -> str:
-    rows = sorted(
+    rows = (
         (str(row[0]), str(row[1]))
         for row in conn.execute(
             "SELECT evidence_id,content_sha256 FROM security_lifecycle_evidence "
@@ -485,8 +488,7 @@ def _input_evidence_set_sha256(
             (case_id,),
         )
     )
-    payload = "".join(f"{evidence_id}\t{digest}\n" for evidence_id, digest in rows)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return evidence_rows_sha256(rows)
 
 
 def _normalize_evidence(values: Iterable[object]) -> tuple[_EvidenceRow, ...]:

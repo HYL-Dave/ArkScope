@@ -1090,27 +1090,41 @@ export function LifecycleView({
   >(null);
   const [transitionUnhideSuccessor, setTransitionUnhideSuccessor] = useState(false);
   const [transitionDialog, setTransitionDialog] = useState<"approve" | "reverse" | null>(null);
+  const caseQuery = useMemo(() => ({ filters, queueView, sourcePresence }), [
+    filters,
+    queueView,
+    sourcePresence,
+  ]);
   const transitionPreviewRequestRef = useRef(0);
   const caseRequestRef = useRef(0);
+  const detailRequestRef = useRef(0);
+  const caseQueryRef = useRef(caseQuery);
+  const selectedCaseIdRef = useRef(selectedCaseId);
   const pendingQueueViewRef = useRef<QueueView | null>(null);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
+  caseQueryRef.current = caseQuery;
+  selectedCaseIdRef.current = selectedCaseId;
 
   const loadCases = useCallback(async () => {
     const requestId = ++caseRequestRef.current;
+    const requestQuery = caseQueryRef.current;
     try {
       const requestFilters: SecurityLifecycleCaseFilters = {
-        ...filters,
-        source_presence: sourcePresence,
+        ...requestQuery.filters,
+        source_presence: requestQuery.sourcePresence,
       };
-      if (sourcePresence === "present" && queueView !== "all") {
-        requestFilters.queue_bucket = queueView;
+      if (requestQuery.sourcePresence === "present" && requestQuery.queueView !== "all") {
+        requestFilters.queue_bucket = requestQuery.queueView;
       }
       const response = await listSecurityLifecycleCases(requestFilters);
-      if (requestId !== caseRequestRef.current) return;
+      if (
+        requestId !== caseRequestRef.current
+        || requestQuery !== caseQueryRef.current
+      ) return;
       setCases(response.cases);
       setQueueCounts(response.queue_counts);
       setSourceMissingCount(response.data_integrity.source_missing_count);
-      if (pendingQueueViewRef.current === queueView) {
+      if (pendingQueueViewRef.current === requestQuery.queueView) {
         setSelectedCaseId((caseId) => (
           caseId && !response.cases.some((item) => item.case_id === caseId)
             ? null
@@ -1120,10 +1134,13 @@ export function LifecycleView({
       }
       setListError(null);
     } catch (error) {
-      if (requestId !== caseRequestRef.current) return;
+      if (
+        requestId !== caseRequestRef.current
+        || requestQuery !== caseQueryRef.current
+      ) return;
       setListError(lifecycleErrorPresentation(error, locale));
     }
-  }, [filters, locale, queueView, sourcePresence]);
+  }, [locale]);
 
   const loadActivity = useCallback(async () => {
     try {
@@ -1154,10 +1171,20 @@ export function LifecycleView({
   }, [locale]);
 
   const loadDetail = useCallback(async (caseId: string) => {
+    const requestId = ++detailRequestRef.current;
     try {
-      setDetail(await getSecurityLifecycleCase(caseId));
+      const response = await getSecurityLifecycleCase(caseId);
+      if (
+        requestId !== detailRequestRef.current
+        || selectedCaseIdRef.current !== caseId
+      ) return;
+      setDetail(response);
       setCommandError(null);
     } catch (error) {
+      if (
+        requestId !== detailRequestRef.current
+        || selectedCaseIdRef.current !== caseId
+      ) return;
       setCommandError(lifecycleErrorPresentation(error, locale));
     }
   }, [locale]);
@@ -1193,11 +1220,14 @@ export function LifecycleView({
     }
   }, [locale, t]);
 
-  useEffect(() => { void loadCases(); }, [loadCases]);
+  useEffect(() => { void loadCases(); }, [caseQuery, loadCases]);
   useEffect(() => { void loadActivity(); }, [loadActivity]);
   useEffect(() => {
     if (selectedCaseId) void loadDetail(selectedCaseId);
-    else setDetail(null);
+    else {
+      detailRequestRef.current += 1;
+      setDetail(null);
+    }
   }, [loadDetail, selectedCaseId]);
   useEffect(() => {
     const transition = detail?.ticker_transition;
@@ -1294,7 +1324,11 @@ export function LifecycleView({
     setCommandError(null);
     try {
       await command();
-      await Promise.all([loadCases(), loadDetail(selectedCaseId)]);
+      const currentCaseId = selectedCaseIdRef.current;
+      await Promise.all([
+        loadCases(),
+        currentCaseId ? loadDetail(currentCaseId) : Promise.resolve(),
+      ]);
       return true;
     } catch (error) {
       setCommandError(commandErrorPresentation(error, locale, t));
@@ -1316,7 +1350,9 @@ export function LifecycleView({
       await Promise.all([
         loadActivity(),
         loadCases(),
-        selectedCaseId ? loadDetail(selectedCaseId) : Promise.resolve(),
+        selectedCaseIdRef.current
+          ? loadDetail(selectedCaseIdRef.current)
+          : Promise.resolve(),
       ]);
     } catch (error) {
       setActivityError(commandErrorPresentation(error, locale, t));
@@ -1335,7 +1371,8 @@ export function LifecycleView({
     });
     try {
       await translateSecurityLifecycleEvidence(evidenceId, locale);
-      await loadDetail(selectedCaseId);
+      const currentCaseId = selectedCaseIdRef.current;
+      if (currentCaseId) await loadDetail(currentCaseId);
     } catch (error) {
       setTranslationErrors((current) => ({
         ...current,

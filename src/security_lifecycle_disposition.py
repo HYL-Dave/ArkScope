@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+from src.security_lifecycle_investigation import evidence_rows_sha256
 from src.security_lifecycle_schema import EVIDENCE_SOURCE_FAMILIES
 
 
@@ -173,6 +174,12 @@ def _artifact_is_current(
     artifact: Mapping[str, object],
     assessment: Mapping[str, object] | None = None,
 ) -> bool:
+    if (
+        artifact.get("approval_authority") == "automation_policy"
+        and artifact.get("status") in {"applied", "reversed", "cancelled"}
+        and assessment is None
+    ):
+        return False
     current_observation = str(
         case.get("observation_fingerprint_sha256") or ""
     ).strip()
@@ -232,9 +239,36 @@ def _artifact_is_current(
     return True
 
 
+def _current_input_evidence_set_sha256(case: Mapping[str, object]) -> str:
+    evidence = _rows(case.get("evidence", ()), "evidence")
+    return evidence_rows_sha256(
+        (
+            str(row.get("evidence_id") or ""),
+            str(row.get("content_sha256") or ""),
+        )
+        for row in evidence
+        if row.get("automation_run_id") is None
+    )
+
+
+def _run_is_current(
+    case: Mapping[str, object], run: Mapping[str, object]
+) -> bool:
+    if not _artifact_is_current(case, run):
+        return False
+    if not str(case.get("observation_fingerprint_sha256") or "").strip():
+        return True
+    query_value = run.get("query_context")
+    if not isinstance(query_value, Mapping):
+        return False
+    return query_value.get(
+        "input_evidence_set_sha256"
+    ) == _current_input_evidence_set_sha256(case)
+
+
 def _latest_run(case: Mapping[str, object]) -> Mapping[str, object] | None:
     runs = _rows(case.get("automation_runs", ()), "automation_runs")
-    return next((run for run in runs if _artifact_is_current(case, run)), None)
+    return next((run for run in runs if _run_is_current(case, run)), None)
 
 
 def _blockers(run: Mapping[str, object] | None) -> tuple[Mapping[str, object], ...]:

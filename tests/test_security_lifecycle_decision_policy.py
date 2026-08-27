@@ -169,6 +169,41 @@ def test_simple_symbol_continuation_requires_regulator_market_and_eligible_previ
     assert ineligible.decision_issues == ("preview:successor_hidden",)
 
 
+def test_multiple_market_snapshots_fail_closed_when_any_retrieval_time_is_missing():
+    valid_market = {
+        **_evidence("ibkr-valid", "market_infrastructure"),
+        "retrieved_at": "2026-08-25T01:02:03Z",
+    }
+    unknown_time_market = _evidence("ibkr-unknown", "market_infrastructure")
+    unknown_time_market["source_locator"]["market_data"].pop("retrieved_at")
+    facts = tuple(
+        {
+            **fact,
+            "evidence_id": (
+                "ibkr-valid" if fact["evidence_id"] == "ibkr" else fact["evidence_id"]
+            ),
+        }
+        for fact in _identity_facts()
+    )
+
+    decision = _evaluate(
+        evidence=(
+            _evidence("sec", "regulator"),
+            valid_market,
+            unknown_time_market,
+        ),
+        facts=facts,
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("ambiguous market recency must not preview a mutation")
+        ),
+    )
+
+    assert decision.decision_tier == "review_suggested"
+    assert decision.action_readiness == "action_blocked"
+    assert "market_corroboration_missing" in decision.decision_issues
+    assert decision.transition_requested is False
+
+
 def test_case_already_keyed_by_successor_accepts_without_a_to_a_transition():
     decision = _evaluate(
         case=_case(ticker="HAPN"),

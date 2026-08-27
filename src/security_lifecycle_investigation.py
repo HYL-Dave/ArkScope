@@ -209,7 +209,7 @@ def _canonical_sha256(name: str, value: object) -> str:
     return text
 
 
-def _digest_rows(rows: Iterable[tuple[str, str]]) -> str:
+def evidence_rows_sha256(rows: Iterable[tuple[str, str]]) -> str:
     ordered = sorted((str(row_id), str(digest)) for row_id, digest in rows)
     payload = "" if not ordered else "".join(
         f"{row_id}\t{digest}\n" for row_id, digest in ordered
@@ -407,7 +407,7 @@ class SecurityLifecycleInvestigationStore:
         return dict(self._case_row(case_id))
 
     def _evidence_set_sha256(self, case_id: str) -> str:
-        return _digest_rows(
+        return evidence_rows_sha256(
             (
                 str(row["evidence_id"]),
                 str(row["content_sha256"]),

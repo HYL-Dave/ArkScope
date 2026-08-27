@@ -244,10 +244,13 @@ def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
                 "run_id": "run-final-check",
                 "status": "blocked",
                 "action_readiness": None,
-                "retry_at": None,
-                "updated_at": "2026-08-27T12:00:00Z",
-                "created_at": "2026-08-27T12:00:00Z",
-                "blockers": [
+                    "retry_at": None,
+                    "updated_at": "2026-08-27T12:00:00Z",
+                    "created_at": "2026-08-27T12:00:00Z",
+                    "query_context": {
+                        "input_evidence_set_sha256": hashlib.sha256(b"").hexdigest(),
+                    },
+                    "blockers": [
                     {
                         "blocker_code": "sec_evidence_insufficient",
                         "retryable": False,

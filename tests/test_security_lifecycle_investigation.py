@@ -595,6 +595,51 @@ def test_automation_policy_acceptance_requires_verified_current_run_and_matching
         conn.close()
 
 
+@pytest.mark.parametrize("tamper", ("assessment-field", "citation"))
+def test_automation_assessment_reuse_rejects_changed_persisted_material(
+    tmp_path,
+    tamper,
+):
+    from src.security_lifecycle_investigation import create_automation_assessment
+
+    conn, store, case_id = _context(tmp_path)
+    try:
+        claim, _result = _automation_run(store, case_id)
+        assessment_id = create_automation_assessment(
+            store=store,
+            run_id=claim.run_id,
+            decision=_automation_decision(),
+            observation_fingerprint_sha256=_FINGERPRINT,
+            at=_LATER,
+        )
+        if tamper == "assessment-field":
+            conn.execute(
+                "UPDATE security_lifecycle_assessments SET conclusion=? "
+                "WHERE assessment_id=?",
+                ("Persisted conclusion changed.", assessment_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE security_lifecycle_assessment_evidence "
+                "SET cited_content_sha256=? "
+                "WHERE assessment_id=? AND reference_kind='observation'",
+                ("0" * 64, assessment_id),
+            )
+        conn.commit()
+
+        with pytest.raises(ValueError, match="automation_assessment_changed"):
+            create_automation_assessment(
+                store=store,
+                run_id=claim.run_id,
+                decision=_automation_decision(),
+                observation_fingerprint_sha256=_FINGERPRINT,
+                at="2026-08-25T03:00:00Z",
+            )
+        assert len(store.list_assessments(case_id)) == 1
+    finally:
+        conn.close()
+
+
 def test_human_accepts_unchanged_automation_draft_without_rewriting_author(tmp_path):
     from src.security_lifecycle_investigation import create_automation_assessment
 

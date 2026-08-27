@@ -735,6 +735,46 @@ def test_successful_replay_prevents_later_revision_fanout():
     assert len(store.list_automation_runs(case_id)) == 2
 
 
+def test_pre_execution_key_succeeded_row_remains_idempotent():
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r0",
+    )
+    evidence = _evidence()
+    _succeed(kernel, first, evidence=(evidence,), facts=(_fact(evidence),))
+
+    row = store.get_automation_run(first.run_id)
+    context = json.loads(row["query_context_json"])
+    semantic_run_key = context.pop("semantic_run_key")
+    context.pop("execution_revision")
+    context.pop("latest_attempt_execution_revision")
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs "
+        "SET run_key=?,query_context_json=? WHERE run_id=?",
+        (
+            semantic_run_key,
+            json.dumps(context, separators=(",", ":"), sort_keys=True),
+            first.run_id,
+        ),
+    )
+    store.conn.commit()
+
+    duplicate = _reserve(
+        kernel,
+        case_id,
+        policy_version="trusted-lifecycle-automation-v3",
+        execution_revision="trusted-lifecycle-execution-r1",
+        at="2026-08-27T00:00:00Z",
+    )
+
+    assert duplicate.should_execute is False
+    assert duplicate.run_id == first.run_id
+    assert len(store.list_automation_runs(case_id)) == 1
+
+
 def test_legacy_failed_semantic_run_replays_once_at_current_execution_revision():
     _conn, store, kernel, case_id = _context()
     failed = _reserve(
@@ -1145,6 +1185,43 @@ def test_conflicting_current_facts_are_typed_and_never_majority_resolved():
     assert [item["blocker_code"] for item in row["blockers"]] == ["source_conflict"]
     assert json.loads(row["blockers"][0]["context_json"]) == {
         "fact_types": ["successor_ticker"]
+    }
+
+
+def test_explicit_source_conflict_survives_persistence_without_derived_fact_conflict():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        blockers=(
+            AutomationBlocker(
+                code="source_conflict",
+                retryable=False,
+                context={"source_families": ["regulator", "publisher"]},
+            ),
+        ),
+        decision_tier="review_suggested",
+        action_readiness="action_blocked",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+
+    row = store.get_automation_run(claim.run_id)
+    assert result.status == "succeeded"
+    assert result.decision_tier == "review_suggested"
+    assert result.action_readiness == "action_blocked"
+    assert [item["blocker_code"] for item in row["blockers"]] == [
+        "source_conflict"
+    ]
+    assert json.loads(row["blockers"][0]["context_json"]) == {
+        "source_families": ["regulator", "publisher"]
     }
 
 

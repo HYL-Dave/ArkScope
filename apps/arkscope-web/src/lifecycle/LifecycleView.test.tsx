@@ -786,6 +786,113 @@ describe("Lifecycle workflow", () => {
     ).toBe("true");
   });
 
+  it("refreshes a completed command against the currently selected queue", async () => {
+    const command = deferred<{ acknowledgement_id: string }>();
+    const attention = {
+      ...SUMMARY,
+      case_id: "case-attention",
+      ticker: "ATTENTION",
+      queue_bucket: "attention" as const,
+    };
+    const monitoring = {
+      ...MONITORING_UNCONFIRMED,
+      case_id: "case-monitoring",
+      ticker: "MONITORING",
+    };
+    apiMocks.acknowledgeSecurityLifecycleCase.mockReturnValue(command.promise);
+    apiMocks.listSecurityLifecycleCases.mockImplementation(
+      async (request: SecurityLifecycleCaseFilters) => ({
+        cases: request.queue_bucket === "monitoring" ? [monitoring] : [attention],
+        count: 1,
+        queue_counts: { attention: 1, monitoring: 1, history: 0 },
+        data_integrity: { source_missing_count: 0 },
+      }),
+    );
+
+    await mountLifecycle();
+    await click("Record insufficient evidence");
+    await click("Monitoring", host!);
+    expect(host!.textContent).toContain("MONITORING");
+    expect(host!.textContent).not.toContain("ATTENTION");
+
+    await act(async () => {
+      command.resolve({ acknowledgement_id: "ack-current" });
+      await command.promise;
+    });
+    await flush();
+
+    expect(
+      host!.querySelector('[data-queue-view="monitoring"]')?.getAttribute(
+        "aria-selected",
+      ),
+    ).toBe("true");
+    expect(host!.textContent).toContain("MONITORING");
+    expect(host!.textContent).not.toContain("ATTENTION");
+    expect(apiMocks.listSecurityLifecycleCases).toHaveBeenLastCalledWith(
+      expect.objectContaining({ queue_bucket: "monitoring" }),
+    );
+  });
+
+  it("keeps detail bound to the currently selected case when responses resolve out of order", async () => {
+    const first = deferred<ReturnType<typeof detail>>();
+    const second = deferred<ReturnType<typeof detail>>();
+    const firstSummary = {
+      ...SUMMARY,
+      case_id: "case-first",
+      ticker: "FIRST",
+    };
+    const secondSummary = {
+      ...SUMMARY,
+      case_id: "case-second",
+      ticker: "SECOND",
+    };
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [firstSummary, secondSummary],
+      count: 2,
+      queue_counts: { attention: 2, monitoring: 0, history: 0 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.getSecurityLifecycleCase.mockImplementation((caseId: string) => (
+      caseId === "case-first" ? first.promise : second.promise
+    ));
+
+    await mountLifecycle(null);
+    const triggers = Array.from(
+      host!.querySelectorAll<HTMLButtonElement>(".lifecycle-case-trigger"),
+    );
+    await act(async () => triggers[0].click());
+    await flush();
+    await act(async () => triggers[1].click());
+    await flush();
+
+    await act(async () => {
+      second.resolve(detail({
+        case_id: "case-second",
+        ticker: "SECOND",
+        issuer_name: "Second Issuer",
+      }));
+      await second.promise;
+    });
+    await flush();
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain(
+      "SECOND",
+    );
+
+    await act(async () => {
+      first.resolve(detail({
+        case_id: "case-first",
+        ticker: "FIRST",
+        issuer_name: "First Issuer",
+      }));
+      await first.promise;
+    });
+    await flush();
+
+    const drawer = document.body.querySelector('[role="dialog"]');
+    expect(drawer?.textContent).toContain("SECOND");
+    expect(drawer?.textContent).not.toContain("FIRST");
+  });
+
   it("keeps prior evidence and shows a typed safe historical run error", async () => {
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
       investigation_runs: [{
