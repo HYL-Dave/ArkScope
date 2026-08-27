@@ -47,6 +47,7 @@ import {
 import {
   effortNote,
   effortOptionsForModel,
+  taskRouteModelStatus,
 } from "./researchModels";
 import {
   groupedModelEntries,
@@ -59,6 +60,7 @@ import {
   quotaKindForAuthMode,
   resolveResearchSelection,
   writeExplicitResearchSelection,
+  type ExplicitResearchTuple,
   type ResearchTuple,
 } from "./researchSelection";
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
@@ -220,7 +222,7 @@ export function ResearchView({
   const [evidenceMessageIndex, setEvidenceMessageIndex] = useState<number | null>(null);
   const [transcriptPendingThreadId, setTranscriptPendingThreadId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
-  const [userSelection, setUserSelection] = useState<ResearchTuple | null>(null);
+  const [userSelection, setUserSelection] = useState<ExplicitResearchTuple | null>(null);
   const [incompleteSelection, setIncompleteSelection] = useState<{
     provider: ProviderId;
     model: string;
@@ -282,13 +284,14 @@ export function ResearchView({
     : null;
   const provider = incompleteSelection?.provider ?? selection?.tuple?.provider ?? null;
   const selModel = incompleteSelection?.model ?? selection?.tuple?.model ?? "";
-  const selEffort = incompleteSelection ? "" : selection?.tuple?.effort ?? "default";
+  const selEffort = incompleteSelection ? "" : selection?.tuple?.effort ?? "";
+  const effortSelectionRequired = !!incompleteSelection || selection?.reasonCode === "effort_required";
   const selectionReady = !incompleteSelection && selection?.state === "ready";
   const currentThread = state.activeThreadId
     ? state.threads.find((thread) => thread.id === state.activeThreadId) ?? null
     : null;
 
-  const rememberUserSelection = useCallback((tuple: ResearchTuple) => {
+  const rememberUserSelection = useCallback((tuple: ExplicitResearchTuple) => {
     setIncompleteSelection(null);
     setUserSelection(tuple);
     writeExplicitResearchSelection(tuple);
@@ -477,7 +480,7 @@ export function ResearchView({
               tuple: {
                 provider: successfulProvider,
                 model: res.run.model.trim(),
-                effort: res.run.effort?.trim() || "default",
+                effort: res.run.effort?.trim() || null,
               },
               loaded: true,
             });
@@ -517,7 +520,13 @@ export function ResearchView({
   }, []);
 
   const runManaged = useCallback(async (
-    body: { question: string; provider: ProviderId; model: string; effort: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean; assistant_stance?: AssistantStance },
+    body: ExplicitResearchTuple & {
+      question: string;
+      thread_id: string;
+      ticker: string | null;
+      retry_last_failed?: boolean;
+      assistant_stance?: AssistantStance;
+    },
     submissionSequence: number,
   ) => {
     try {
@@ -740,10 +749,10 @@ export function ResearchView({
     const context = catalog?.effective?.providers?.[id] ?? null;
     const block = taskProviders?.[id];
     const providerReason = modelProviderReason(context, block);
-    const preferred = block?.models.find((entry) => (
-      entry.id === catalog?.routes.ai_research.model && !optionReason(entry, providerReason)
+    const firstReady = block?.models.find((entry) => (
+      !optionReason(entry, providerReason)
+      && (!catalog || taskRouteModelStatus(catalog, entry.id) !== "retired")
     ));
-    const firstReady = block?.models.find((entry) => !optionReason(entry, providerReason));
     const authMode = context?.auth_mode ?? null;
     return {
       id,
@@ -758,7 +767,7 @@ export function ResearchView({
         quotaKind: quotaKindForAuthMode(authMode),
         reasonCode: providerReason,
       }, researchT, commonT),
-      suggestedModel: preferred?.id ?? firstReady?.id ?? "",
+      suggestedModel: firstReady?.id ?? "",
       disabled: !context || !block || !firstReady,
     };
   });
@@ -768,28 +777,27 @@ export function ResearchView({
     selectedProviderChoice?.block?.models ?? [],
     selectedProviderReason,
     commonT,
-  );
+  ).map((group) => ({
+    ...group,
+    entries: group.entries.filter((entry) => (
+      !catalog || taskRouteModelStatus(catalog, entry.id) !== "retired"
+    )),
+  })).filter((group) => group.entries.length > 0);
   const selectedEffectiveModel = selectedProviderChoice?.block?.models
     .find((item) => item.id === selModel);
-  const selectedModelMissing = !!provider && !!selModel && !selectedEffectiveModel;
+  const selectedModelMissing = !!provider && !!selModel && (
+    !selectedEffectiveModel
+    || (!!catalog && taskRouteModelStatus(catalog, selModel) === "retired")
+  );
   const effortOpts = useMemo(
     () => provider && catalog
       ? effortOptionsForModel(catalog, provider, selModel ?? "", selectedEffectiveModel?.effort_options)
       : [],
     [catalog, provider, selModel, selectedEffectiveModel?.effort_options],
   );
-  const supportedEffortChoices = effortOpts.some((option) => option.id === "default")
+  const effortChoices = !selEffort || effortOpts.some((option) => option.id === selEffort)
     ? effortOpts
-    : [{
-        id: "default",
-        provider: provider ?? "openai",
-        label: researchT(($) => $.workspace.defaultEffort),
-        description: researchT(($) => $.workspace.defaultEffortDescription),
-        applies_to_card_tasks: false,
-      }, ...effortOpts];
-  const effortChoices = !selEffort || supportedEffortChoices.some((option) => option.id === selEffort)
-    ? supportedEffortChoices
-    : [...supportedEffortChoices, {
+    : [...effortOpts, {
         id: selEffort,
         provider: provider ?? "openai",
         label: researchT(($) => $.workspace.unsupportedEffortOption, { effort: selEffort }),
@@ -805,37 +813,34 @@ export function ResearchView({
     if (!provider || !catalog) return;
     const entry = catalog.effective?.tasks.ai_research?.providers?.[provider]
       ?.models.find((candidate) => candidate.id === nextModel);
-    if (!entry) return;
-    const supported = selEffort === "default" || effortOptionsForModel(
-      catalog,
-      provider,
-      nextModel,
-      entry.effort_options,
-    ).some((option) => option.id === selEffort);
-    if (!supported) {
-      setIncompleteSelection({ provider, model: nextModel });
-      return;
-    }
-    rememberUserSelection({ provider, model: nextModel, effort: selEffort });
-  }, [catalog, provider, rememberUserSelection, selEffort]);
+    if (!entry || taskRouteModelStatus(catalog, nextModel) === "retired") return;
+    setIncompleteSelection({ provider, model: nextModel });
+  }, [catalog, provider]);
 
   const chooseEffort = useCallback((nextEffort: string) => {
-    if (!provider || !selModel || !nextEffort) return;
-    rememberUserSelection({ provider, model: selModel, effort: nextEffort });
-  }, [provider, rememberUserSelection, selModel]);
+    if (!provider || !selModel || !nextEffort || !catalog) return;
+    const supported = effortOptionsForModel(catalog, provider, selModel)
+      .some((option) => option.id === nextEffort);
+    if (!supported) return;
+    rememberUserSelection({
+      provider,
+      model: selModel,
+      effort: nextEffort as ExplicitResearchTuple["effort"],
+    });
+  }, [catalog, provider, rememberUserSelection, selModel]);
 
   const chooseProvider = useCallback((nextProvider: ProviderId) => {
     if (!catalog) return;
     const context = catalog.effective?.providers?.[nextProvider] ?? null;
     const block = catalog.effective?.tasks.ai_research?.providers?.[nextProvider];
     const providerReason = modelProviderReason(context, block);
-    const route = catalog.routes.ai_research;
     const selected = block?.models.find((entry) => (
-      entry.id === route.model && !optionReason(entry, providerReason)
-    )) ?? block?.models.find((entry) => !optionReason(entry, providerReason));
+      !optionReason(entry, providerReason)
+      && taskRouteModelStatus(catalog, entry.id) !== "retired"
+    ));
     if (!selected) return;
-    rememberUserSelection({ provider: nextProvider, model: selected.id, effort: "default" });
-  }, [catalog, rememberUserSelection]);
+    setIncompleteSelection({ provider: nextProvider, model: selected.id });
+  }, [catalog]);
 
   const retryLastFailed = useCallback(() => {
     if (
@@ -899,7 +904,7 @@ export function ResearchView({
                 {researchT(($) => $.workspace.researchModelPrefix)}
                 {selection.tuple.provider} · {selection.tuple.model}{" "}
                 {researchT(($) => $.workspace.effortSummary, {
-                  effort: selection.tuple.effort,
+                  effort: selection.tuple.effort ?? "",
                 })}
                 {selectionPresentation?.provenanceLabel
                   ? researchT(($) => $.workspace.selectionProvenanceSuffix, {
@@ -1134,11 +1139,11 @@ export function ResearchView({
                       <select
                         value={selEffort}
                         aria-label={researchT(($) => $.workspace.effortAria)}
-                        aria-invalid={incompleteSelection ? "true" : undefined}
+                        aria-invalid={effortSelectionRequired ? "true" : undefined}
                         onChange={(event) => chooseEffort(event.target.value)}
                         disabled={!!state.pending}
                       >
-                        {incompleteSelection ? (
+                        {effortSelectionRequired ? (
                           <option value="" disabled>
                             {researchT(($) => $.workspace.chooseSupportedEffort)}
                           </option>
@@ -1162,7 +1167,7 @@ export function ResearchView({
                         {selectionPresentation?.reasonLabel ?? selection.reasonCode}
                       </span>
                     )}
-                    {incompleteSelection ? (
+                    {effortSelectionRequired ? (
                       <span className="warn-text tiny">
                         {researchT(($) => $.workspace.unsupportedSelectedEffort)}
                       </span>

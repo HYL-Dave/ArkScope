@@ -28,19 +28,19 @@ const route = (
   task: ModelTask,
   provider: "openai" | "anthropic" = "openai",
   model = "gpt-5.6-luna",
-  effort = "high",
+  effort = "xhigh",
 ): TaskRoute => ({
   task, provider, model, effort, source: "db", custom: false, warning: null,
 });
 
 const RUNTIME: RuntimeConfig = {
   anthropic: {
-    model: "claude-sonnet-5", model_advanced: "claude-opus-4-8",
+    model: "claude-sonnet-5", model_advanced: "claude-opus-5",
     effort: null, thinking: false, key_set: true, credentials: [],
   },
   openai: {
     model: "gpt-5.6-luna", model_advanced: "gpt-5.6-sol",
-    reasoning_effort: "high", key_set: true, credentials: [],
+    reasoning_effort: "xhigh", key_set: true, credentials: [],
   },
   card_synthesis: route("card_synthesis"),
   card_translation: route("card_translation"),
@@ -70,13 +70,25 @@ function catalog(
       id: "ai_research", label: "AI 研究", description: "",
       default_provider: "openai", recommended_model: "gpt-5.6-luna",
     }],
-    models: [],
+    current_model_ids: [
+      "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+      "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    ],
+    retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    models: [
+      ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
+        id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
+      })),
+      ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+        id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
+      })),
+    ] as unknown as ModelCatalog["models"],
     effort_options: {
-      openai: ["default", "low", "high"].map((id) => ({
+      openai: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
         id, provider: "openai", label: id, description: "",
         applies_to_card_tasks: false,
       })),
-      anthropic: ["default", "high"].map((id) => ({
+      anthropic: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
         id, provider: "anthropic", label: id, description: "",
         applies_to_card_tasks: false,
       })),
@@ -107,9 +119,9 @@ function catalog(
               executable: true, reason_code: null, cache_state: "ok",
               discovered_at: "2026-07-18T00:00:00Z",
               models: [
-                model("gpt-5.6-luna", ["high"]),
-                model("gpt-5.6-mini", ["low"]),
-                model("gpt-hidden", ["high"], {
+                model("gpt-5.6-luna", ["low", "medium", "high", "xhigh", "max"]),
+                model("gpt-5.6-sol", ["low", "medium", "high", "xhigh", "max"]),
+                model("gpt-5.6-terra", ["low", "medium", "high", "xhigh", "max"], {
                   visible_to_credential: false,
                   reason_code: "model_not_visible",
                 }),
@@ -118,7 +130,11 @@ function catalog(
             anthropic: {
               executable: true, reason_code: null, cache_state: "seed_only",
               discovered_at: null,
-              models: [model("claude-sonnet-5", ["high"], { status: "seed" })],
+              models: [
+                model("claude-fable-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
+                model("claude-opus-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
+                model("claude-sonnet-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
+              ],
             },
           },
         },
@@ -779,7 +795,7 @@ describe("Research workspace contracts", () => {
       "Luna display · SOURCE / decorated",
     );
 
-    expect(host!.textContent).toContain("Settings route");
+    expect(host!.textContent).toContain("Last explicit selection");
     expect(host!.textContent).toContain("ChatGPT subscription sign-in");
     expect(host!.textContent).toContain("Uses subscription quota, not API billing");
     await setTextarea("SOURCE_MODEL_SELECTION_PROMPT");
@@ -792,7 +808,7 @@ describe("Research workspace contracts", () => {
     expect(body).toMatchObject({
       provider: "openai",
       model: "gpt-5.6-luna",
-      effort: "high",
+      effort: "xhigh",
     });
     expect(String(body.model)).not.toContain("Luna display");
   });
@@ -939,21 +955,19 @@ describe("Research workspace contracts", () => {
     expect.soft(host!.querySelector(".research-trace")).toBeNull();
   });
 
-  it("2. resolves the configured complete tuple once and renders reviewed provenance", async () => {
+  it("2. initializes new AI Research with the current Luna xhigh preference", async () => {
     vi.stubGlobal("fetch", stubFetch());
     await mountResearch();
 
     expect(select("模型")?.value).toBe("gpt-5.6-luna");
-    expect(select("effort")?.value).toBe("high");
+    expect(select("effort")?.value).toBe("xhigh");
     const context = host!.querySelector(".ui-page-header-context")?.textContent ?? "";
-    expect.soft(context).toContain("openai · gpt-5.6-luna · high");
-    expect.soft(context).toContain("設定路線");
-    expect.soft(context).not.toContain("（settings）");
+    expect.soft(context).toContain("openai · gpt-5.6-luna · xhigh");
+    expect.soft(context).toContain("上次明確選擇");
   });
 
   it("3. uses effective provider/model/effort blocks and exposes disabled reasons", async () => {
     const cat = catalog();
-    cat.routes.ai_research.effort = "default";
     const anthropic = cat.effective!.tasks.ai_research!.providers!.anthropic!;
     anthropic.executable = false;
     anthropic.reason_code = "task_auth_mode_unsupported";
@@ -964,14 +978,15 @@ describe("Research workspace contracts", () => {
     expect.soft(provider?.disabled).toBe(true);
     expect.soft(provider?.textContent).toContain("此登入方式不支援這個任務");
     const hidden = Array.from(select("模型")?.options ?? [])
-      .find((option) => option.value === "gpt-hidden");
+      .find((option) => option.value === "gpt-5.6-terra");
     expect.soft(hidden?.disabled).toBe(true);
     expect.soft(hidden?.textContent).toContain("探索清單未顯示");
-    const defaultEffort = Array.from(select("effort")?.options ?? [])
-      .find((option) => option.value === "default");
-    expect.soft(defaultEffort?.textContent).toBe("default");
+    expect.soft(Array.from(select("effort")?.options ?? []).map((option) => option.value))
+      .not.toEqual(expect.arrayContaining(["default", "none"]));
+    expect.soft(Array.from(select("模型")?.options ?? []).map((option) => option.value))
+      .not.toEqual(expect.arrayContaining(["gpt-5.4-mini", "claude-opus-4-8"]));
     const context = host!.querySelector(".ui-page-header-context")?.textContent ?? "";
-    expect.soft(context).toContain(" · default");
+    expect.soft(context).toContain(" · xhigh");
   });
 
   it("4. distinguishes subscription quota from API-key usage in provider context", async () => {
@@ -984,6 +999,9 @@ describe("Research workspace contracts", () => {
     expect.soft(anthropic?.textContent).toContain("API key");
     expect.soft(host!.textContent).toContain("使用訂閱額度，非 API 帳單");
     if (anthropic) await click(anthropic);
+    expect.soft(select("effort")?.value).toBe("");
+    const effort = select("effort");
+    if (effort) await setSelect(effort, "low");
     expect.soft(host!.textContent).toContain("使用 API 額度，會計入 API 帳單");
   });
 
@@ -1008,34 +1026,20 @@ describe("Research workspace contracts", () => {
     });
   });
 
-  it("6. requires an explicit effort after changing to a model that rejects the current effort", async () => {
-    vi.stubGlobal("fetch", stubFetch({
-      threads: [thread("thread-a", "Failed research")],
-      messages: {
-        "thread-a": [
-          message("Original question", {
-            role: "user", provider: null, model: null, effort: null,
-          }),
-          message("Provider failed", {
-            is_error: true, error_code: "provider_call_failed",
-          }),
-        ],
-      },
-    }));
-    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "thread-a");
+  it("6. requires a real effort after a model change and sends the persisted low tuple in a new conversation", async () => {
+    const fetchMock = stubFetch();
+    vi.stubGlobal("fetch", fetchMock);
     await mountResearch();
-    expect.soft(button("重試")).toBeDefined();
     const model = select("模型");
     expect(model).not.toBeNull();
     if (!model) return;
-    await setSelect(model, "gpt-5.6-mini");
+    await setSelect(model, "gpt-5.6-sol");
     await setTextarea("Do not silently fallback");
 
     const effort = select("effort");
     expect.soft(effort?.value).toBe("");
     expect.soft(effort?.getAttribute("aria-invalid")).toBe("true");
     expect.soft(button("送出")?.disabled).toBe(true);
-    expect.soft(button("重試")).toBeUndefined();
     expect.soft(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY)).toBeNull();
     if (!effort) return;
     await setSelect(effort, "low");
@@ -1043,22 +1047,33 @@ describe("Research workspace contracts", () => {
       window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY) ?? "null",
     );
     expect(saved?.tuple).toEqual({
-      provider: "openai", model: "gpt-5.6-mini", effort: "low",
+      provider: "openai", model: "gpt-5.6-sol", effort: "low",
+    });
+    await click(button("新研究")!);
+    await setTextarea("Persist low exactly");
+    await click(button("送出")!);
+    await vi.waitFor(() => expect(fetchMock.mock.calls.some(([input, init]) => (
+      new URL(typeof input === "string" ? input : (input as Request).url).pathname === "/research/runs"
+      && init?.method === "POST"
+    ))).toBe(true));
+    const create = fetchMock.mock.calls.find(([input, init]) => (
+      new URL(typeof input === "string" ? input : (input as Request).url).pathname === "/research/runs"
+      && init?.method === "POST"
+    ));
+    expect(JSON.parse(String(create?.[1]?.body ?? "{}"))).toMatchObject({
+      provider: "openai", model: "gpt-5.6-sol", effort: "low",
     });
   });
 
   it("7. includes semantic provider, model, and effort in every create request", async () => {
-    const cat = catalog();
-    cat.routes.ai_research.effort = "default";
     let resolveFirst!: (response: Response) => void;
     const firstCreate = new Promise<Response>((resolve) => { resolveFirst = resolve; });
     const secondEvents = new Promise<Response>(() => undefined);
     const oldRun = run("old-run", "thread-a", "succeeded");
     const fetchMock = stubFetch({
-      catalog: cat,
       threads: [thread("thread-a", "Existing research", oldRun)],
       selections: {
-        "thread-a": { provider: "openai", model: "gpt-5.6-luna", effort: "default" },
+        "thread-a": { provider: "openai", model: "gpt-5.6-luna", effort: "xhigh" },
       },
       events: { "run-b": secondEvents },
       createResponder: (body, index) => index === 0
@@ -1082,7 +1097,7 @@ describe("Research workspace contracts", () => {
     expect(create).toBeDefined();
     const body = JSON.parse(String(create?.[1]?.body ?? "{}"));
     expect(body).toMatchObject({
-      provider: "openai", model: "gpt-5.6-luna", effort: "default",
+      provider: "openai", model: "gpt-5.6-luna", effort: "xhigh",
     });
     expect.soft(host!.textContent).toContain("建立執行");
     expect.soft(host!.textContent).not.toContain("研究完成");
@@ -1100,6 +1115,34 @@ describe("Research workspace contracts", () => {
       new URL(typeof input === "string" ? input : (input as Request).url).pathname
         === "/research/runs/run-a/events"
     ))).toBe(false);
+  });
+
+  it("does not install default when a completed run returns null effort", async () => {
+    const completion = deferred<Response>();
+    let threadId = "";
+    vi.stubGlobal("fetch", stubFetch({
+      events: { "null-effort-run": completion.promise },
+      createResponder: (body) => {
+        threadId = String(body.thread_id);
+        return json({ run: run("null-effort-run", threadId, "running") });
+      },
+    }));
+    await mountResearch();
+    await setTextarea("Retain nullable run provenance");
+    await click(button("送出")!);
+    await vi.waitFor(() => expect(select("effort")?.value).toBe("high"));
+
+    await act(async () => {
+      completion.resolve(json({
+        run: run("null-effort-run", threadId, "succeeded", { effort: null }),
+        events: [], has_more: false,
+      }));
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(select("effort")?.value).toBe("");
+      expect(button("送出")?.disabled).toBe(true);
+    });
   });
 
   it("8. keeps an active draft editable with disabled Send and separate Stop and queues nothing", async () => {

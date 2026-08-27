@@ -39,7 +39,7 @@ const research = {
     modelLabel: "模型",
     verifyingThreadModel: "正在確認此對話上次成功使用的模型…",
     archivedThread: "此對話已封存；取消封存後才能繼續提問。",
-    unsupportedSelectedEffort: "此模型不支援已選 effort，請明確選擇新的 effort。",
+    unsupportedSelectedEffort: "請先為這個 provider 與模型選擇 effort，才能送出。",
     history: "歷史",
     threadModelUnknown: "無法確認此對話上次使用的模型；目前不會自動 fallback。",
     researchModelPrefix: "研究模型：",

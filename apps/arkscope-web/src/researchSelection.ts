@@ -1,15 +1,20 @@
 import type {
   CredentialAuthType,
+  ExplicitResearchEffort,
   ModelCatalog,
   ModelProvider,
 } from "./api";
 import { modelProviderReason, optionReason } from "./modelPicker";
-import { effortOptionsForModel } from "./researchModels";
+import { effortOptionsForModel, taskRouteBlocker } from "./researchModels";
 
 export interface ResearchTuple {
   provider: ModelProvider;
   model: string;
-  effort: string;
+  effort: string | null;
+}
+
+export interface ExplicitResearchTuple extends ResearchTuple {
+  effort: ExplicitResearchEffort;
 }
 
 export type ResearchSelectionProvenance = "thread" | "explicit" | "settings" | "user";
@@ -31,7 +36,7 @@ interface SelectionSemantics {
 export type ResearchSelectionResult = SelectionSemantics & (
   | {
       state: "ready";
-      tuple: ResearchTuple;
+      tuple: ExplicitResearchTuple;
       provenance: ResearchSelectionProvenance;
       reasonCode: null;
     }
@@ -74,9 +79,15 @@ function normalizeTuple(value: unknown): ResearchTuple | null {
   const row = value as Partial<ResearchTuple>;
   if (!isProvider(row.provider)) return null;
   const model = typeof row.model === "string" ? row.model.trim() : "";
-  const effort = typeof row.effort === "string" ? row.effort.trim() : "";
-  if (!model || !effort) return null;
+  const effort = typeof row.effort === "string" ? row.effort.trim() || null : null;
+  if (!model) return null;
   return { provider: row.provider, model, effort };
+}
+
+function normalizeExplicitTuple(value: unknown): ExplicitResearchTuple | null {
+  const tuple = normalizeTuple(value);
+  if (!tuple || !tuple.effort || tuple.effort === "default" || tuple.effort === "none") return null;
+  return tuple as ExplicitResearchTuple;
 }
 
 function defaultStorage(): StorageWriter | null {
@@ -89,24 +100,24 @@ function defaultStorage(): StorageWriter | null {
 
 export function readExplicitResearchSelection(
   storage: StorageReader | null = defaultStorage(),
-): ResearchTuple | null {
+): ExplicitResearchTuple | null {
   if (!storage) return null;
   try {
     const raw = storage.getItem(RESEARCH_SELECTION_STORAGE_KEY);
     if (!raw) return null;
     const envelope = JSON.parse(raw) as { version?: unknown; tuple?: unknown };
     if (envelope.version !== 1) return null;
-    return normalizeTuple(envelope.tuple);
+    return normalizeExplicitTuple(envelope.tuple);
   } catch {
     return null;
   }
 }
 
 export function writeExplicitResearchSelection(
-  tuple: ResearchTuple,
+  tuple: ExplicitResearchTuple,
   storage: StorageWriter | null = defaultStorage(),
 ): void {
-  const normalized = normalizeTuple(tuple);
+  const normalized = normalizeExplicitTuple(tuple);
   if (!storage || !normalized) return;
   try {
     storage.setItem(RESEARCH_SELECTION_STORAGE_KEY, JSON.stringify({ version: 1, tuple: normalized }));
@@ -137,6 +148,10 @@ function blocked(
   };
 }
 
+function defaultResearchSelection(): ExplicitResearchTuple {
+  return { provider: "openai", model: "gpt-5.6-luna", effort: "xhigh" };
+}
+
 export function resolveResearchSelection({
   catalog,
   hasActiveThread,
@@ -148,11 +163,11 @@ export function resolveResearchSelection({
   catalog: ModelCatalog;
   hasActiveThread: boolean;
   threadSelection: ResearchTuple | null | undefined;
-  userSelection?: ResearchTuple | null;
+  userSelection?: ExplicitResearchTuple | null;
   preferenceStorage?: StorageReader | null;
   sdkAvailability?: Partial<Record<ModelProvider, boolean>>;
 }): ResearchSelectionResult {
-  let tuple: ResearchTuple | null = normalizeTuple(userSelection);
+  let tuple: ResearchTuple | null = normalizeExplicitTuple(userSelection);
   let provenance: ResearchSelectionProvenance | null = tuple ? "user" : null;
 
   if (!tuple && hasActiveThread && threadSelection === undefined) {
@@ -174,13 +189,8 @@ export function resolveResearchSelection({
     if (tuple) provenance = "explicit";
   }
   if (!tuple) {
-    const route = catalog.routes.ai_research;
-    tuple = normalizeTuple({
-      provider: route?.provider,
-      model: route?.model,
-      effort: route?.effort || "default",
-    });
-    provenance = "settings";
+    tuple = defaultResearchSelection();
+    provenance = "explicit";
   }
   if (!tuple || !provenance) {
     return {
@@ -200,19 +210,31 @@ export function resolveResearchSelection({
   if (providerReason) return blocked(tuple, provenance, providerReason, authMode);
   if (!providerBlock) return blocked(tuple, provenance, "discovery_unavailable", authMode);
 
+  const routeBlocker = taskRouteBlocker(catalog, {
+    provider: tuple.provider,
+    model: tuple.model,
+    effort: tuple.effort ?? "",
+  });
+  if (routeBlocker === "model_retired") {
+    return blocked(tuple, provenance, routeBlocker, authMode);
+  }
+
   const selected = providerBlock.models.find((entry) => entry.id === tuple!.model);
   if (!selected) return blocked(tuple, provenance, "model_not_visible", authMode);
   const selectedReason = optionReason(selected, null);
   if (selectedReason) return blocked(tuple, provenance, selectedReason, authMode);
 
-  if (tuple.effort !== "default") {
-    const supported = effortOptionsForModel(
-      catalog,
-      tuple.provider,
-      tuple.model,
-      selected.effort_options,
-    ).some((option) => option.id === tuple!.effort);
-    if (!supported) return blocked(tuple, provenance, "effort_not_supported", authMode);
+  if (!tuple.effort || tuple.effort === "default" || tuple.effort === "none") {
+    return blocked(tuple, provenance, "effort_required", authMode);
+  }
+  const supported = effortOptionsForModel(
+    catalog,
+    tuple.provider,
+    tuple.model,
+    selected.effort_options,
+  ).some((option) => option.id === tuple!.effort);
+  if (!supported || routeBlocker === "effort_required") {
+    return blocked(tuple, provenance, "effort_not_supported", authMode);
   }
 
   if (sdkAvailability && sdkAvailability[tuple.provider] !== true) {
@@ -221,7 +243,7 @@ export function resolveResearchSelection({
 
   return {
     state: "ready",
-    tuple,
+    tuple: tuple as ExplicitResearchTuple,
     provenance,
     reasonCode: null,
     ...selectionSemantics(authMode),

@@ -3,17 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 import type { ModelCatalog, ModelProvider, TaskRoute } from "./api";
 import {
   quotaKindForAuthMode,
+  loadResearchThreadSelection,
   RESEARCH_SELECTION_STORAGE_KEY,
   readExplicitResearchSelection,
   resolveResearchSelection,
   writeExplicitResearchSelection,
+  type ExplicitResearchTuple,
   type ResearchTuple,
 } from "./researchSelection";
 
 const route = (
   provider: ModelProvider = "openai",
-  model = "gpt-5.4-mini",
-  effort = "low",
+  model = "gpt-5.6-luna",
+  effort = "xhigh",
 ): TaskRoute => ({
   task: "ai_research",
   provider,
@@ -44,7 +46,7 @@ function catalog(): ModelCatalog {
   const routes = {
     ai_research: route(),
     card_synthesis: { ...route(), task: "card_synthesis" as const },
-    card_translation: { ...route("anthropic", "claude-sonnet-5", "default"), task: "card_translation" as const },
+    card_translation: { ...route("anthropic", "claude-sonnet-5", "medium"), task: "card_translation" as const },
   };
   const openai = {
     executable: true,
@@ -52,13 +54,7 @@ function catalog(): ModelCatalog {
     cache_state: "ok" as const,
     discovered_at: "2026-07-18T00:00:00Z",
     models: [
-      model("gpt-5.4-mini", ["low", "high"]),
-      model("gpt-5.6-luna", ["low", "high", "max"]),
-      model("gpt-route-custom", ["low"], {
-        status: "route",
-        visible_to_credential: false,
-        reason_code: "model_not_in_registry",
-      }),
+      ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => model(id, ["low", "medium", "high", "xhigh", "max"])),
     ],
   };
   const anthropic = {
@@ -66,7 +62,7 @@ function catalog(): ModelCatalog {
     reason_code: null,
     cache_state: "seed_only" as const,
     discovered_at: null,
-    models: [model("claude-sonnet-5", ["low", "high"])],
+    models: ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => model(id, ["low", "medium", "high", "xhigh", "max"])),
   };
   return {
     providers: ["openai", "anthropic"],
@@ -75,14 +71,26 @@ function catalog(): ModelCatalog {
       label: "AI 研究",
       description: "",
       default_provider: "openai",
-      recommended_model: "gpt-5.4-mini",
+      recommended_model: "gpt-5.6-luna",
     }],
-    models: [],
+    current_model_ids: [
+      "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+      "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    ],
+    retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    models: [
+      ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
+        id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
+      })),
+      ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+        id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
+      })),
+    ] as unknown as ModelCatalog["models"],
     effort_options: {
-      openai: ["default", "low", "high", "max"].map((id) => ({
+      openai: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
         id, provider: "openai" as const, label: id, description: "", applies_to_card_tasks: false,
       })),
-      anthropic: ["default", "low", "high"].map((id) => ({
+      anthropic: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
         id, provider: "anthropic" as const, label: id, description: "", applies_to_card_tasks: false,
       })),
     },
@@ -128,26 +136,26 @@ describe("research selection precedence and validation", () => {
 
   it("uses the last explicit tuple for a new thread", () => {
     const storage = new MemoryStorage();
-    const explicit = { provider: "openai" as const, model: "gpt-5.6-luna", effort: "max" };
+    const explicit: ExplicitResearchTuple = { provider: "openai", model: "gpt-5.6-luna", effort: "max" };
     writeExplicitResearchSelection(explicit, storage);
     expect(resolveResearchSelection({
       catalog: catalog(), hasActiveThread: false, threadSelection: null, preferenceStorage: storage,
     })).toMatchObject({ state: "ready", provenance: "explicit", tuple: explicit });
   });
 
-  it("uses the Settings route when there is no prior choice", () => {
+  it("initializes a new preference with the current Luna xhigh tuple", () => {
     expect(resolveResearchSelection({
       catalog: catalog(), hasActiveThread: false, threadSelection: null, preferenceStorage: new MemoryStorage(),
     })).toMatchObject({
       state: "ready",
-      provenance: "settings",
-      tuple: { provider: "openai", model: "gpt-5.4-mini", effort: "low" },
+      provenance: "explicit",
+      tuple: { provider: "openai", model: "gpt-5.6-luna", effort: "xhigh" },
     });
   });
 
   it("blocks an invalid thread tuple without falling through", () => {
     const storage = new MemoryStorage();
-    writeExplicitResearchSelection({ provider: "openai", model: "gpt-5.4-mini", effort: "low" }, storage);
+    writeExplicitResearchSelection({ provider: "openai", model: "gpt-5.6-luna", effort: "low" }, storage);
     expect(resolveResearchSelection({
       catalog: catalog(),
       hasActiveThread: true,
@@ -164,35 +172,57 @@ describe("research selection precedence and validation", () => {
     })).toMatchObject({ state: "blocked", provenance: "explicit", reasonCode: "model_not_visible" });
   });
 
-  it("blocks an invalid Settings route", () => {
-    const cat = catalog();
-    cat.routes.ai_research = route("openai", "gpt-removed", "low");
-    expect(resolveResearchSelection({
-      catalog: cat, hasActiveThread: false, threadSelection: null, preferenceStorage: new MemoryStorage(),
-    })).toMatchObject({ state: "blocked", provenance: "settings", reasonCode: "model_not_visible" });
-  });
-
   it("blocks an unsupported saved effort instead of resetting it", () => {
     expect(resolveResearchSelection({
       catalog: catalog(),
       hasActiveThread: true,
-      threadSelection: { provider: "openai", model: "gpt-5.4-mini", effort: "max" },
+      threadSelection: { provider: "openai", model: "gpt-5.6-luna", effort: "experimental" },
       preferenceStorage: new MemoryStorage(),
     })).toMatchObject({ state: "blocked", provenance: "thread", reasonCode: "effort_not_supported" });
   });
 
-  it("accepts semantic default as a complete effort", () => {
+  it.each(["default", "none"])("blocks %s as an incomplete current-model effort", (effort) => {
     expect(resolveResearchSelection({
       catalog: catalog(),
       hasActiveThread: true,
-      threadSelection: { provider: "anthropic", model: "claude-sonnet-5", effort: "default" },
+      threadSelection: { provider: "openai", model: "gpt-5.6-luna", effort },
       preferenceStorage: new MemoryStorage(),
-    })).toMatchObject({ state: "ready", tuple: { effort: "default" } });
+    })).toMatchObject({ state: "blocked", provenance: "thread", reasonCode: "effort_required" });
+  });
+
+  it("blocks a retired historical tuple even with a syntactically valid effort", () => {
+    expect(resolveResearchSelection({
+      catalog: catalog(),
+      hasActiveThread: true,
+      threadSelection: { provider: "openai", model: "gpt-5.4-mini", effort: "low" },
+      preferenceStorage: new MemoryStorage(),
+    })).toMatchObject({ state: "blocked", provenance: "thread", reasonCode: "model_retired" });
+  });
+
+  it("retains blank historical effort as thread provenance instead of falling through", () => {
+    const storage = new MemoryStorage();
+    writeExplicitResearchSelection({ provider: "openai", model: "gpt-5.6-luna", effort: "low" }, storage);
+    expect(resolveResearchSelection({
+      catalog: catalog(), hasActiveThread: true,
+      threadSelection: { provider: "anthropic", model: "claude-sonnet-5", effort: "  " },
+      preferenceStorage: storage,
+    })).toMatchObject({
+      state: "blocked", provenance: "thread", reasonCode: "effort_required",
+      tuple: { provider: "anthropic", model: "claude-sonnet-5", effort: null },
+    });
+  });
+
+  it("reads a nullable server effort as historical provenance", async () => {
+    await expect(loadResearchThreadSelection("thread-legacy", async () => ({
+      provider: "openai", model: "gpt-5.6-luna", effort: null,
+    }))).resolves.toEqual({
+      provider: "openai", model: "gpt-5.6-luna", effort: null,
+    });
   });
 
   it("writes a versioned preference for an explicit user action", () => {
     const storage = new MemoryStorage();
-    const tuple = { provider: "openai" as const, model: "gpt-5.6-luna", effort: "high" };
+    const tuple: ExplicitResearchTuple = { provider: "openai", model: "gpt-5.6-luna", effort: "high" };
     writeExplicitResearchSelection(tuple, storage);
     expect(JSON.parse(storage.values.get(RESEARCH_SELECTION_STORAGE_KEY)!)).toEqual({ version: 1, tuple });
     expect(readExplicitResearchSelection(storage)).toEqual(tuple);
@@ -253,11 +283,10 @@ describe("research selection precedence and validation", () => {
       sdkAvailability: { anthropic: true },
     })).toMatchObject({ state: "blocked", reasonCode: "runtime_unavailable" });
 
-    const invalid = catalog();
-    invalid.routes.ai_research = route("openai", "gpt-removed", "low");
     expect(resolveResearchSelection({
-      catalog: invalid, hasActiveThread: false, threadSelection: null, preferenceStorage: new MemoryStorage(),
-      sdkAvailability: { openai: false },
-    })).toMatchObject({ state: "blocked", reasonCode: "model_not_visible" });
+      catalog: catalog(), hasActiveThread: true,
+      threadSelection: { provider: "openai", model: "gpt-5.6-luna", effort: "default" },
+      preferenceStorage: new MemoryStorage(), sdkAvailability: { openai: false },
+    })).toMatchObject({ state: "blocked", reasonCode: "effort_required" });
   });
 });

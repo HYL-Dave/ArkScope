@@ -1098,6 +1098,7 @@ export interface ResearchRunDTO {
   created_at: string;
   updated_at: string;
 }
+export type ExplicitResearchEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export interface ResearchRunEventDTO {
   run_id: string;
   seq: number;
@@ -1176,12 +1177,12 @@ export function getResearchMessages(threadId: string): Promise<{ thread_id: stri
 export function getResearchSelection(threadId: string): Promise<{
   provider: ModelProvider;
   model: string;
-  effort: string;
+  effort: string | null;
 } | null> {
   return getJSON<{
     provider: ModelProvider;
     model: string;
-    effort: string;
+    effort: string | null;
   } | null>(`/research/threads/${encodeURIComponent(threadId)}/selection`, 8_000);
 }
 export function deleteResearchThread(threadId: string): Promise<{ thread_id: string; deleted: boolean }> {
@@ -1193,7 +1194,7 @@ export function createResearchRun(body: {
   ticker?: string | null;
   provider: ModelProvider;
   model: string;
-  effort: string;
+  effort: ExplicitResearchEffort;
   retry_last_failed?: boolean;
   assistant_stance?: AssistantStance;
 }): Promise<{ run: ResearchRunDTO }> {

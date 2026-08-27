@@ -39,7 +39,7 @@ const research = {
     modelLabel: "Model",
     verifyingThreadModel: "Confirming the model last used successfully in this conversation...",
     archivedThread: "This conversation is archived. Unarchive it before asking another question.",
-    unsupportedSelectedEffort: "This model does not support the selected effort. Explicitly choose a new effort.",
+    unsupportedSelectedEffort: "Choose an effort for this provider and model before submitting.",
     history: "History",
     threadModelUnknown: "The model last used by this conversation could not be confirmed. It will not fall back automatically.",
     researchModelPrefix: "Research model:",
