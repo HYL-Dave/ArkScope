@@ -243,9 +243,8 @@ const settings = {
     metrics: {
       latency: "延遲 {{value}} ms",
       testedAt: "測試時間 {{timestamp}}",
-      speed: "速度：{{value}}",
-      costTier: "成本級別：{{value}}",
       verifiedAt: "驗證時間：{{timestamp}}",
+      officialPricing: "查看官方價格",
     },
     resetSuccess: "已移除 profile DB 中儲存的路由，將改用設定檔／內建 fallback。",
   },

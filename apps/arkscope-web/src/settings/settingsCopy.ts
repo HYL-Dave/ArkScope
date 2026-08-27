@@ -159,25 +159,8 @@ export function settingsTaskLabel(task: ModelTask, t: SettingsT): string {
   }
 }
 
-export function settingsEffortLabel(id: string, t: SettingsT): string {
-  switch (id) {
-    case "default":
-      return t(($) => $.models.effort.default);
-    case "none":
-      return t(($) => $.models.effort.none);
-    case "low":
-      return t(($) => $.models.effort.low);
-    case "medium":
-      return t(($) => $.models.effort.medium);
-    case "high":
-      return t(($) => $.models.effort.high);
-    case "xhigh":
-      return t(($) => $.models.effort.xhigh);
-    case "max":
-      return t(($) => $.models.effort.max);
-    default:
-      return id;
-  }
+export function settingsEffortLabel(id: string, _t: SettingsT): string {
+  return id;
 }
 
 export function settingsEffortDescription(

@@ -144,6 +144,7 @@ export function App() {
     <UniverseView
       {...exploreCapabilities}
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+      runtime={runtime}
       navigationRequest={universeNavigation}
       onNavigationConsumed={(sequence) => {
         setUniverseNavigation((current) => (

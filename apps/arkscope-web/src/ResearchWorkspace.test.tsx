@@ -969,10 +969,9 @@ describe("Research workspace contracts", () => {
     expect.soft(hidden?.textContent).toContain("探索清單未顯示");
     const defaultEffort = Array.from(select("effort")?.options ?? [])
       .find((option) => option.value === "default");
-    expect.soft(defaultEffort?.textContent).toContain("Provider 預設");
+    expect.soft(defaultEffort?.textContent).toBe("default");
     const context = host!.querySelector(".ui-page-header-context")?.textContent ?? "";
-    expect.soft(context).toContain("Provider 預設");
-    expect.soft(context).not.toContain(" · default");
+    expect.soft(context).toContain(" · default");
   });
 
   it("4. distinguishes subscription quota from API-key usage in provider context", async () => {

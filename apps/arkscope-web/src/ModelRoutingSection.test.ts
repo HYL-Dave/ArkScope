@@ -553,7 +553,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     });
     expect(researchCard().textContent).toContain("實際測試通過");
     expect(researchCard().textContent).toContain("12 ms");
-    expect(researchCard().textContent).toContain("使用的 fallback effort：高。");
+    expect(researchCard().textContent).toContain("使用的 fallback effort：high。");
   });
 
   it("maps a reauth result to the credential action without exposing mutation controls", () => {
@@ -629,7 +629,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(modelLimitHelp.getAttribute("aria-label")).toBeNull();
     expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
     expectNoKnownTaskId(modelLimitHelp.textContent);
-    expect(Array.from(effort.options).map((option) => option.textContent)).toContain("Low");
+    expect(Array.from(effort.options).map((option) => option.textContent)).toContain("low");
     expect(research.textContent).toContain("Low reasoning effort.");
     expect(research.textContent).toContain(
       "The environment currently controls this route. You can save a DB value, but runtime continues to follow the environment override.",
@@ -679,10 +679,15 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(model.value).toBe("gpt-5.4-mini");
     expect(effort.value).toBe("low");
     expect(research.textContent).toContain("Desk credential alias");
-    expect(research.textContent).toContain("速度：fast");
-    expect(research.textContent).toContain("成本級別：low");
+    expect(research.textContent).not.toContain("速度：fast");
+    expect(research.textContent).not.toContain("成本級別：low");
     expect(research.textContent).toContain("驗證時間：SOURCE_VERIFIED_2026-07-10T06:00:00Z");
-    expect(research.textContent).toContain("SOURCE MODEL NOTE: keep byte-identical");
+    expect(research.textContent).not.toContain("SOURCE MODEL NOTE: keep byte-identical");
+    const pricingLink = research.querySelector<HTMLAnchorElement>(".model-pricing-link");
+    expect(pricingLink?.textContent).toBe("查看官方價格");
+    expect(pricingLink?.href).toBe("https://chatgpt.com/pricing/");
+    expect(pricingLink?.target).toBe("_blank");
+    expect(pricingLink?.rel).toContain("noreferrer");
     const modelNote = research.querySelector(".model-note")!;
     const sourceContent = modelNote.textContent;
 
@@ -707,13 +712,27 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(translatedResearch.textContent).toContain("gpt-5.4-mini");
     expect(translatedResearch.querySelector(".model-note")).toBe(modelNote);
     expect(modelNote.textContent).not.toBe(sourceContent);
-    expect(modelNote.textContent).toContain("Speed: fast");
-    expect(modelNote.textContent).toContain("Cost tier: low");
+    expect(modelNote.textContent).not.toContain("Speed: fast");
+    expect(modelNote.textContent).not.toContain("Cost tier: low");
     expect(modelNote.textContent).toContain("Verified: SOURCE_VERIFIED_2026-07-10T06:00:00Z");
-    expect(modelNote.textContent).toContain("SOURCE MODEL NOTE: keep byte-identical");
+    expect(modelNote.textContent).not.toContain("SOURCE MODEL NOTE: keep byte-identical");
+    expect(modelNote.textContent).toContain("Official pricing");
   });
 
-  it("shows raw model warnings only in Developer Mode", () => {
+  it("links API-key routes to the provider API pricing page", () => {
+    const cat = catalogV2();
+    cat.effective!.providers!.openai = {
+      credential_id: "local:api",
+      auth_mode: "api_key",
+      label: "OpenAI API",
+    };
+    render(vi.fn(), cat);
+
+    const pricingLink = researchCard().querySelector<HTMLAnchorElement>(".model-pricing-link");
+    expect(pricingLink?.href).toBe("https://developers.openai.com/api/docs/pricing");
+  });
+
+  it("shows route and test diagnostics only in Developer Mode and never renders model notes", () => {
     const cat = catalogV2();
     cat.routes.ai_research = {
       ...cat.routes.ai_research,
@@ -755,9 +774,8 @@ describe("ModelRoutingSection provider-first UX", () => {
 
     render(vi.fn(), cat, undefined, { testState, modelsByProvider });
     expect(host!.textContent).not.toContain("PLANTED ROUTE WARNING");
-    expect(host!.textContent).toContain("PLANTED MODEL NOTE");
+    expect(host!.textContent).not.toContain("PLANTED MODEL NOTE");
     expect(host!.textContent).not.toContain("PLANTED TEST WARNING");
-    expect(host!.querySelector(".model-note")?.textContent).toContain("PLANTED MODEL NOTE");
 
     act(() => root!.unmount());
     root = null;
@@ -770,7 +788,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     });
     expect(host!.textContent).toContain("開發者診斷");
     expect(host!.textContent).toContain("PLANTED ROUTE WARNING");
-    expect(host!.textContent).toContain("PLANTED MODEL NOTE");
+    expect(host!.textContent).not.toContain("PLANTED MODEL NOTE");
     expect(host!.textContent).toContain("PLANTED TEST WARNING");
     const diagnostics = Array.from(host!.querySelectorAll('[data-testid="developer-diagnostics"]'))
       .map((node) => node.textContent)

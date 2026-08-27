@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 
 import type {
+  CredentialAuthType,
   EffectiveProviderSummary,
   ModelCatalog,
   ModelProvider,
@@ -12,6 +13,24 @@ import type {
 export type ModelCommonT = TFunction<"common">;
 
 const DECORATED_COMPATIBILITY_ID = "decorated_suffix";
+
+export function officialModelPricingUrl(
+  provider: ModelProvider,
+  authMode: CredentialAuthType | null,
+): string | null {
+  if (authMode === "api_key" || authMode === "api_key_pool") {
+    return provider === "openai"
+      ? "https://developers.openai.com/api/docs/pricing"
+      : "https://platform.claude.com/docs/en/about-claude/pricing";
+  }
+  if (provider === "openai" && authMode === "chatgpt_oauth") {
+    return "https://chatgpt.com/pricing/";
+  }
+  if (provider === "anthropic" && authMode === "claude_code_oauth") {
+    return "https://claude.com/pricing";
+  }
+  return null;
+}
 
 export function modelGroupLabel(id: string, t: ModelCommonT): string {
   switch (id) {

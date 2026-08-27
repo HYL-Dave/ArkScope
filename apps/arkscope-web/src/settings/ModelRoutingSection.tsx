@@ -20,6 +20,7 @@ import {
   modelAuthModeLabel,
   modelCompatibilityLabel,
   modelReasonLabel,
+  officialModelPricingUrl,
   providerContexts,
   type DraftRouteValue,
   type ModelCommonT,
@@ -421,6 +422,8 @@ export function ModelRoutingSection({
                 models={modelsByProvider[row.provider] ?? []}
                 selected={row.model}
                 custom={row.custom}
+                provider={row.provider}
+                authMode={context?.auth_mode ?? null}
                 t={t}
               />
 
@@ -504,11 +507,15 @@ function ModelNotes({
   models,
   selected,
   custom,
+  provider,
+  authMode,
   t,
 }: {
   models: ModelOption[];
   selected: string;
   custom: boolean;
+  provider: ModelProvider;
+  authMode: Parameters<typeof officialModelPricingUrl>[1];
   t: SettingsT;
 }) {
   if (custom) {
@@ -516,12 +523,22 @@ function ModelNotes({
   }
   const model = models.find((m) => m.id === selected);
   if (!model) return null;
+  const pricingUrl = officialModelPricingUrl(provider, authMode);
   return (
     <div className="model-note">
-      <span>{t(($) => $.models.metrics.speed, { value: model.speed })}</span>
-      <span>{t(($) => $.models.metrics.costTier, { value: model.cost_tier })}</span>
-      <span>{t(($) => $.models.metrics.verifiedAt, { timestamp: model.verified_at })}</span>
-      {model.notes ? <p>{model.notes}</p> : null}
+      {model.verified_at ? (
+        <span>{t(($) => $.models.metrics.verifiedAt, { timestamp: model.verified_at })}</span>
+      ) : null}
+      {pricingUrl ? (
+        <a
+          className="model-pricing-link"
+          href={pricingUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t(($) => $.models.metrics.officialPricing)}
+        </a>
+      ) : null}
     </div>
   );
 }

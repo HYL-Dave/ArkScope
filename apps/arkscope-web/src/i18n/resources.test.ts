@@ -94,7 +94,7 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 381,
+      lifecycle: 385,
       news: 44,
       tickerDetail: 89,
       aiCard: 67,
@@ -264,7 +264,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(768);
+      expect(flattened.size, `${locale}.explore`).toBe(772);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -286,6 +286,10 @@ describe("bundled i18n resources", () => {
         "universe.summaryCounts.one",
         "universe.summaryCounts.other",
         "universe.importSummarySeparator",
+        "lifecycle.sections.auditDetails",
+        "lifecycle.sections.manualSupplement",
+        "lifecycle.states.llmDerived",
+        "lifecycle.translation.viewMode",
         "news.marketSearchSummary",
         "news.seekingAlphaSearchSummary",
         "news.loadMoreProgress",
@@ -721,9 +725,9 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 796,
+      settings: 795,
       research: 207,
-          explore: 768,
+      explore: 772,
       portfolio: 374,
       system: 24,
     } as const;
@@ -792,7 +796,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2267);
+      expect(total, `${locale}.total`).toBe(2270);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1133,6 +1137,7 @@ describe("bundled i18n resources", () => {
 
   it("preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move", () => {
     const postSliceSettingsPaths = [
+      "models.metrics.officialPricing",
       "actions.refreshStatus",
       "dataStorage.coverage.generatedAt",
       "dataStorage.coverage.drilldown.securityDefinition",
@@ -1224,7 +1229,7 @@ describe("bundled i18n resources", () => {
       workspace: 29,
       registry: 30,
       errors: 13,
-      models: 69,
+      models: 67,
       runtime: 21,
       providers: 130,
       dataSources: 155,
@@ -1255,9 +1260,9 @@ describe("bundled i18n resources", () => {
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
       const movedModelCount = flattenResource(commonModels).size - 1;
-      expect(physicalPreSliceCount).toBe(641);
+      expect(physicalPreSliceCount).toBe(639);
       expect(movedModelCount).toBe(23);
-      expect(physicalPreSliceCount + movedModelCount).toBe(664);
+      expect(physicalPreSliceCount + movedModelCount).toBe(662);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

@@ -4,7 +4,11 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SecurityLifecycleCaseFilters, SecurityLifecycleCaseSummary } from "../api";
+import type {
+  RuntimeConfig,
+  SecurityLifecycleCaseFilters,
+  SecurityLifecycleCaseSummary,
+} from "../api";
 import { withTestUiLocale } from "../test/testUiLocale";
 
 const apiMocks = vi.hoisted(() => ({
@@ -38,6 +42,17 @@ vi.mock("../api", async (importOriginal) => ({
 const PROVIDER_EVIDENCE = "SEC source: Units of Beneficial Interest — 原文保留";
 const CASE_ID = "slc_case_present";
 const LIFECYCLE_VIEW_MODULE = "./LifecycleView";
+const LIFECYCLE_RUNTIME = {
+  fixed_task_runtime: {
+    card_translation: {
+      task: "card_translation",
+      model_timeout_s: 600,
+      source: "db",
+      db_saved: true,
+      warning: null,
+    },
+  },
+} as RuntimeConfig;
 
 const LEGACY_ASSESSMENT = {
   assessment_id: "assessment-legacy",
@@ -385,7 +400,11 @@ async function mountLifecycle(
   root = createRoot(host);
   await act(async () => {
     root!.render(withTestUiLocale(
-      <LifecycleView initialCaseId={caseId} onNavigate={onNavigate} />,
+      <LifecycleView
+        initialCaseId={caseId}
+        onNavigate={onNavigate}
+        runtime={LIFECYCLE_RUNTIME}
+      />,
     ));
     await Promise.resolve();
   });
@@ -1415,7 +1434,7 @@ describe("Lifecycle workflow", () => {
     expect(AUTOMATION_DRAFT.author).toBe("automation");
   });
 
-  it("keeps original evidence visible beside machine translation and translation failure", async () => {
+  it("keeps original evidence authoritative when machine translation fails", async () => {
     const { ApiError } = await import("../api");
     const secondExcerpt = "交易所公告原文必須保留";
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
@@ -1453,15 +1472,16 @@ describe("Lifecycle workflow", () => {
 
     await mountLifecycle(CASE_ID, onNavigate);
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
-    expect(document.body.textContent).toContain("SEC source: Units of Beneficial Interest");
     expect(document.body.textContent).toContain("Machine translation");
-    expect(document.body.textContent).toContain("openai · gpt-5 · responses-api");
     expect(document.body.textContent).toContain(secondExcerpt);
+    const translatedEvidence = document.body.querySelector("details.lifecycle-evidence-item");
+    expect(translatedEvidence?.querySelector(".lifecycle-derived-translation")).toBeNull();
 
     await click("Translate evidence");
     expect(apiMocks.translateSecurityLifecycleEvidence).toHaveBeenCalledWith(
       "evidence-market",
       "en",
+      LIFECYCLE_RUNTIME,
     );
     expect(document.body.textContent).toContain(secondExcerpt);
     expect(document.body.textContent).toContain("Anthropic · claude-sonnet-5");
@@ -1478,6 +1498,49 @@ describe("Lifecycle workflow", () => {
       section: "models",
     });
     expect(document.body.textContent).not.toContain("private provider failure");
+  });
+
+  it("collapses evidence and switches between source text and LLM translation", async () => {
+    await mountLifecycle();
+
+    const evidence = document.body.querySelector<HTMLDetailsElement>(
+      "details.lifecycle-evidence-item",
+    );
+    expect(evidence).not.toBeNull();
+    expect(evidence!.open).toBe(false);
+    expect(evidence!.querySelector("summary")?.textContent).toContain("Regulatory filing");
+    const body = evidence!.querySelector<HTMLElement>("[data-evidence-mode]");
+    expect(body?.dataset.evidenceMode).toBe("original");
+    expect(body?.textContent).toContain(PROVIDER_EVIDENCE);
+    expect(body?.querySelector(".lifecycle-derived-translation")).toBeNull();
+
+    await click("Machine translation", evidence!);
+    const translated = evidence!.querySelector<HTMLElement>("[data-evidence-mode]");
+    expect(translated?.dataset.evidenceMode).toBe("translation");
+    expect(translated?.querySelector(".lifecycle-provider-evidence")).toBeNull();
+    expect(translated?.textContent).toContain("SEC source: Units of Beneficial Interest");
+    expect(translated?.textContent).toContain("openai · gpt-5 · responses-api");
+  });
+
+  it("summarizes the current decision and marks deterministic automation as non-LLM", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      current_assessment: { ...AUTOMATION_DRAFT, rule_id: "lifecycle.ma_review" },
+      assessment_history: [{ ...AUTOMATION_DRAFT, rule_id: "lifecycle.ma_review" }],
+    }));
+
+    await mountLifecycle();
+
+    const summary = document.body.querySelector<HTMLElement>(
+      "[data-testid='lifecycle-decision-summary']",
+    );
+    expect(summary?.textContent).toContain("The transaction involving QBTS still requires review.");
+    expect(summary?.textContent).toContain("Deterministic rule (not LLM)");
+    const audit = document.body.querySelector<HTMLDetailsElement>(
+      "details.lifecycle-audit-details",
+    );
+    expect(audit).not.toBeNull();
+    expect(audit!.open).toBe(false);
+    expect(audit!.querySelector("summary")?.textContent).toBe("Audit details");
   });
 
   it("keeps retry available for a retryable translation failure", async () => {

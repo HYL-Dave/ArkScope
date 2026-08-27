@@ -356,6 +356,8 @@ const explore = {
       transition: "標的追蹤轉移",
       automation: "自動化判定",
       facts: "已擷取事實",
+      auditDetails: "稽核細節",
+      manualSupplement: "補充證據",
     },
     fields: {
       manualText: "手動文字證據",
@@ -402,6 +404,7 @@ const explore = {
       automationAssessment: "自動化產生的判定",
       originalEvidence: "來源原文證據",
       machineTranslation: "機器翻譯",
+      llmDerived: "LLM 衍生內容",
       acknowledged: "已確認知悉",
       unacknowledged: "待確認知悉",
     },
@@ -501,7 +504,7 @@ const explore = {
       automation: "自動化產生的判定",
     },
     automationMethods: {
-      deterministicRule: "確定性規則",
+      deterministicRule: "確定性規則（非 LLM）",
       modelAssisted: "模型輔助建議",
     },
     acceptanceAuthorities: {
@@ -574,6 +577,7 @@ const explore = {
       evidence: "證據引用",
     },
     translation: {
+      viewMode: "證據文字檢視",
       provenance: "{{provider}} · {{model}} · {{harness}}",
       routeUnavailable: "目前無法解析內容翻譯路由。",
       credentialMissing: "尚未設定內容翻譯所需憑證。",

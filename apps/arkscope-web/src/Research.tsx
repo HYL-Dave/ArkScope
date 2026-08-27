@@ -899,9 +899,7 @@ export function ResearchView({
                 {researchT(($) => $.workspace.researchModelPrefix)}
                 {selection.tuple.provider} · {selection.tuple.model}{" "}
                 {researchT(($) => $.workspace.effortSummary, {
-                  effort: selection.tuple.effort === "default"
-                    ? researchT(($) => $.workspace.providerDefault)
-                    : selection.tuple.effort,
+                  effort: selection.tuple.effort,
                 })}
                 {selectionPresentation?.provenanceLabel
                   ? researchT(($) => $.workspace.selectionProvenanceSuffix, {
@@ -1147,9 +1145,7 @@ export function ResearchView({
                         ) : null}
                         {effortChoices.map((o) => (
                           <option key={o.id} value={o.id} disabled={"disabled" in o && o.disabled}>
-                            {o.id === "default"
-                              ? researchT(($) => $.workspace.providerDefault)
-                              : o.label}
+                            {o.id}
                           </option>
                         ))}
                       </select>

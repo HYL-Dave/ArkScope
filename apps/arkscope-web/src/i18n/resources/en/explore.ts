@@ -356,6 +356,8 @@ const explore = {
       transition: "Ticker tracking transition",
       automation: "Automation decision",
       facts: "Extracted facts",
+      auditDetails: "Audit details",
+      manualSupplement: "Supplemental evidence",
     },
     fields: {
       manualText: "Manual evidence text",
@@ -402,6 +404,7 @@ const explore = {
       automationAssessment: "Automation-generated assessment",
       originalEvidence: "Original source evidence",
       machineTranslation: "Machine translation",
+      llmDerived: "LLM-derived",
       acknowledged: "Acknowledged",
       unacknowledged: "Needs acknowledgement",
     },
@@ -501,7 +504,7 @@ const explore = {
       automation: "Automation-generated assessment",
     },
     automationMethods: {
-      deterministicRule: "Deterministic rule",
+      deterministicRule: "Deterministic rule (not LLM)",
       modelAssisted: "Model-assisted suggestion",
     },
     acceptanceAuthorities: {
@@ -574,6 +577,7 @@ const explore = {
       evidence: "Evidence citation",
     },
     translation: {
+      viewMode: "Evidence text view",
       provenance: "{{provider}} · {{model}} · {{harness}}",
       routeUnavailable: "The content translation route is unavailable.",
       credentialMissing: "No credential is configured for content translation.",

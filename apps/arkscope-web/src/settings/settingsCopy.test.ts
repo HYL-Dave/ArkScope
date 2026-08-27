@@ -235,7 +235,7 @@ describe("Settings static copy authority", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        efforts: ["預設", "無", "低", "中", "高", "極高", "最大"],
+        efforts,
         descriptions: {
           openai: [
             "不送 effort；實際檔位由目前模型與後端決定。",
@@ -265,7 +265,7 @@ describe("Settings static copy authority", () => {
       },
       {
         locale: "en" as const,
-        efforts: ["Default", "None", "Low", "Medium", "High", "Extra high", "Maximum"],
+        efforts,
         descriptions: {
           openai: [
             "Do not send effort; the current model and backend determine the effective level.",

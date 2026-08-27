@@ -1192,6 +1192,9 @@ table.wl tbody tr.archived td {
   flex-basis: 100%;
   margin: 4px 0 0;
 }
+.model-pricing-link {
+  color: var(--accent);
+}
 .research-runtime-panel {
   margin-top: 14px;
 }
@@ -2107,7 +2110,88 @@ table.lifecycle-table tbody tr:last-child td {
   border-top: 1px solid var(--border);
 }
 .lifecycle-evidence-item {
-  padding-left: 10px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+}
+.lifecycle-evidence-item > summary,
+.lifecycle-audit-details > summary,
+.lifecycle-secondary-details > summary {
+  cursor: pointer;
+  color: var(--fg);
+  font-weight: 600;
+}
+.lifecycle-evidence-item > summary {
+  padding: 9px 10px;
+}
+.lifecycle-evidence-summary {
+  display: inline-flex;
+  width: calc(100% - 18px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  vertical-align: top;
+}
+.lifecycle-evidence-summary > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.lifecycle-evidence-body {
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--border);
+}
+.lifecycle-evidence-mode-switch {
+  display: inline-flex;
+  margin: 9px 0 4px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.lifecycle-evidence-mode-switch button {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lifecycle-evidence-mode-switch button[aria-pressed="true"] {
+  background: var(--panel2);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.lifecycle-decision-summary {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.lifecycle-provenance-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.lifecycle-audit-details,
+.lifecycle-secondary-details {
+  margin: 10px 0;
+}
+.lifecycle-audit-details {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.lifecycle-audit-details > .lifecycle-detail-section {
+  padding-bottom: 0;
+  border-top: 0;
+}
+.lifecycle-secondary-details > summary,
+.lifecycle-audit-details > summary {
+  font-size: 12px;
 }
 .lifecycle-derived-translation {
   margin-top: 10px;

@@ -48,12 +48,17 @@ describe("card API timeouts", () => {
       ),
     );
 
-    const { generateCard, translateCard } = await import("./api");
+    const {
+      generateCard,
+      translateCard,
+      translateSecurityLifecycleEvidence,
+    } = await import("./api");
     const runtime = runtimeWith(1200, 600);
     await generateCard("MU", { provider: "anthropic" }, runtime);
     await translateCard(1, "zh-Hant", runtime);
+    await translateSecurityLifecycleEvidence("evidence-1", "zh-Hant", runtime);
 
     const budgets = setTimeoutSpy.mock.calls.map((call) => call[1]);
-    expect(budgets).toEqual([1_260_000, 660_000]);
+    expect(budgets).toEqual([1_260_000, 660_000, 660_000]);
   });
 });

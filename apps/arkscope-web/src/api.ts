@@ -3038,11 +3038,13 @@ export function addSecurityLifecycleEvidence(
 export function translateSecurityLifecycleEvidence(
   evidenceId: string,
   locale: "en" | "zh-Hant",
+  runtime?: RuntimeConfig | null,
 ): Promise<SecurityLifecycleEvidenceTranslation> {
   return sendJSON<SecurityLifecycleEvidenceTranslation>(
     `/security-lifecycle/evidence/${encodeURIComponent(evidenceId)}/translations`,
     "POST",
     { locale },
+    fixedTaskRequestTimeoutMs(runtime, "card_translation"),
   );
 }
 

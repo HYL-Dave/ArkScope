@@ -7,12 +7,29 @@ import * as modelRoutingUx from "./modelRoutingUx";
 import {
   blockedRouteSaves,
   isTaskTestSnapshotCurrent,
+  officialModelPricingUrl,
   providerContexts,
   routesSemanticallyEqual,
   type DraftRouteValue,
   type ProviderContextMap,
   type TaskTestSnapshot,
 } from "./modelRoutingUx";
+
+describe("official model pricing links", () => {
+  it("separates metered API pricing from subscription plan pricing", () => {
+    expect(officialModelPricingUrl("openai", "api_key"))
+      .toBe("https://developers.openai.com/api/docs/pricing");
+    expect(officialModelPricingUrl("openai", "api_key_pool"))
+      .toBe("https://developers.openai.com/api/docs/pricing");
+    expect(officialModelPricingUrl("openai", "chatgpt_oauth"))
+      .toBe("https://chatgpt.com/pricing/");
+    expect(officialModelPricingUrl("anthropic", "api_key"))
+      .toBe("https://platform.claude.com/docs/en/about-claude/pricing");
+    expect(officialModelPricingUrl("anthropic", "claude_code_oauth"))
+      .toBe("https://claude.com/pricing");
+    expect(officialModelPricingUrl("anthropic", null)).toBeNull();
+  });
+});
 
 describe("Models terminology", () => {
   it("keeps status, auth, thinking, and group copy in one canonical table", () => {

@@ -244,9 +244,8 @@ const settings = {
     metrics: {
       latency: "Latency: {{value}} ms",
       testedAt: "Tested {{timestamp}}",
-      speed: "Speed: {{value}}",
-      costTier: "Cost tier: {{value}}",
       verifiedAt: "Verified: {{timestamp}}",
+      officialPricing: "Official pricing",
     },
     resetSuccess: "The route saved in the profile DB was removed; the profile file or built-in fallback will be used.",
   },

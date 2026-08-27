@@ -12,6 +12,7 @@ import {
   getUniverse,
   importUniverse,
   setTickerHidden,
+  type RuntimeConfig,
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
@@ -40,11 +41,13 @@ interface UniverseViewProps {
   onOpenTicker: (ticker: string) => void;
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
+  runtime?: RuntimeConfig | null;
   navigationRequest?: UniverseNavigationRequest | null;
   onNavigationConsumed?: (sequence: number) => void;
 }
 
 export function UniverseView({
+  runtime = null,
   navigationRequest = null,
   onNavigationConsumed,
   ...inventoryProps
@@ -79,6 +82,7 @@ export function UniverseView({
               <LifecycleView
                 initialCaseId={caseId}
                 onNavigate={inventoryProps.onNavigateTarget}
+                runtime={runtime}
               />
             ),
           },
@@ -92,7 +96,7 @@ function UniverseInventoryView({
   onOpenTicker,
   developerMode,
   onNavigateTarget,
-}: Omit<UniverseViewProps, "navigationRequest" | "onNavigationConsumed">) {
+}: Omit<UniverseViewProps, "navigationRequest" | "onNavigationConsumed" | "runtime">) {
   const { t } = useTranslation("explore");
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
   const [lists, setLists] = useState<WatchlistSummary[]>([]);

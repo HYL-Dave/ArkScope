@@ -29,6 +29,7 @@ import {
   retryTickerIdentityTransition,
   reverseTickerIdentityTransition,
   translateSecurityLifecycleEvidence,
+  type RuntimeConfig,
   type SecurityLifecycleCaseDetail,
   type SecurityLifecycleCaseFilters,
   type SecurityLifecycleCaseSummary,
@@ -844,6 +845,7 @@ function EvidenceItem({
   onNavigate?: (target: NavigationTarget) => void;
   t: TFunction<"explore">;
 }) {
+  const [mode, setMode] = useState<"original" | "translation">("original");
   const translation = (evidence.translations ?? []).find(
     (item) => item.locale === locale,
   );
@@ -851,77 +853,115 @@ function EvidenceItem({
   const routeIdentity = error ? translationRouteIdentity(error, t) : null;
   const canRetry = error && failure?.action === "retry"
     && (error.retryable || error.code === "translation_output_invalid");
+  const visibleMode = translation ? mode : "original";
   return (
-    <article className="lifecycle-history-row lifecycle-evidence-item">
-      <div className="lifecycle-assessment-heading">
-        <strong>{evidence.title || t(($) => $.lifecycle.states.originalEvidence)}</strong>
-        <span className="lifecycle-state">{
-          lifecycleEvidenceSourceFamilyLabel(evidence.source_family, locale)
-        }</span>
+    <details className="lifecycle-evidence-item">
+      <summary>
+        <span className="lifecycle-evidence-summary">
+          <span>
+            <strong>{evidence.title || t(($) => $.lifecycle.states.originalEvidence)}</strong>
+            {evidence.publisher || evidence.source_published_at ? (
+              <span className="tiny">{[evidence.publisher, evidence.source_published_at]
+                .filter(Boolean).join(" · ")}</span>
+            ) : null}
+          </span>
+          <span className="lifecycle-state">{
+            lifecycleEvidenceSourceFamilyLabel(evidence.source_family, locale)
+          }</span>
+        </span>
+      </summary>
+      <div className="lifecycle-evidence-body">
+        {translation ? (
+          <div
+            className="lifecycle-evidence-mode-switch"
+            role="group"
+            aria-label={t(($) => $.lifecycle.translation.viewMode)}
+          >
+            <button
+              type="button"
+              aria-pressed={visibleMode === "original"}
+              onClick={() => setMode("original")}
+            >
+              {t(($) => $.lifecycle.states.originalEvidence)}
+            </button>
+            <button
+              type="button"
+              aria-pressed={visibleMode === "translation"}
+              onClick={() => setMode("translation")}
+            >
+              {t(($) => $.lifecycle.states.machineTranslation)}
+            </button>
+          </div>
+        ) : null}
+        <div data-evidence-mode={visibleMode}>
+          {visibleMode === "translation" && translation ? (
+            <div className="lifecycle-derived-translation">
+              <div className="lifecycle-assessment-heading">
+                <strong>{t(($) => $.lifecycle.states.machineTranslation)}</strong>
+                <span className="lifecycle-state">{t(($) => $.lifecycle.states.llmDerived)}</span>
+              </div>
+              <p>{translation.translated_text}</p>
+              <p className="tiny mono">{t(($) => $.lifecycle.translation.provenance, {
+                provider: translation.provider,
+                model: translation.model,
+                harness: translation.harness,
+              })}</p>
+            </div>
+          ) : (
+            <>
+              <strong className="tiny">{t(($) => $.lifecycle.states.originalEvidence)}</strong>
+              <p className="lifecycle-provider-evidence">{evidence.excerpt}</p>
+              {safeEvidenceUrl(evidence.source_url) ? (
+                <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">
+                  <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
+                </a>
+              ) : null}
+            </>
+          )}
+        </div>
+        {!translation ? (
+          <Button
+            size="compact"
+            tone="ghost"
+            disabled={busy}
+            onClick={onTranslate}
+          >
+            {t(($) => $.lifecycle.actions.translateEvidence)}
+          </Button>
+        ) : null}
+        {error && failure ? (
+          <div className="errorbox">
+            <p>{failure.message}</p>
+            {routeIdentity ? <p className="tiny mono">{routeIdentity}</p> : null}
+            {canRetry ? (
+              <Button
+                size="compact"
+                tone="ghost"
+                icon={<RefreshCw size={14} />}
+                disabled={busy}
+                onClick={onTranslate}
+              >
+                {t(($) => $.lifecycle.translation.retry)}
+              </Button>
+            ) : null}
+            {failure.action === "settings" ? (
+              <Button
+                size="compact"
+                tone="ghost"
+                icon={<Settings2 size={14} />}
+                data-action="open-content-translation-settings"
+                onClick={() => onNavigate?.({
+                  kind: "settings_section",
+                  section: "models",
+                })}
+              >
+                {t(($) => $.lifecycle.translation.openSettings)}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      {evidence.publisher || evidence.source_published_at ? (
-        <p className="tiny">{[evidence.publisher, evidence.source_published_at]
-          .filter(Boolean).join(" · ")}</p>
-      ) : null}
-      <strong className="tiny">{t(($) => $.lifecycle.states.originalEvidence)}</strong>
-      <p className="lifecycle-provider-evidence">{evidence.excerpt}</p>
-      {safeEvidenceUrl(evidence.source_url) ? (
-        <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">
-          <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
-        </a>
-      ) : null}
-      {translation ? (
-        <div className="lifecycle-derived-translation">
-          <strong>{t(($) => $.lifecycle.states.machineTranslation)}</strong>
-          <p>{translation.translated_text}</p>
-          <p className="tiny mono">{t(($) => $.lifecycle.translation.provenance, {
-            provider: translation.provider,
-            model: translation.model,
-            harness: translation.harness,
-          })}</p>
-        </div>
-      ) : (
-        <Button
-          size="compact"
-          tone="ghost"
-          disabled={busy}
-          onClick={onTranslate}
-        >
-          {t(($) => $.lifecycle.actions.translateEvidence)}
-        </Button>
-      )}
-      {error && failure ? (
-        <div className="errorbox">
-          <p>{failure.message}</p>
-          {routeIdentity ? <p className="tiny mono">{routeIdentity}</p> : null}
-          {canRetry ? (
-            <Button
-              size="compact"
-              tone="ghost"
-              icon={<RefreshCw size={14} />}
-              disabled={busy}
-              onClick={onTranslate}
-            >
-              {t(($) => $.lifecycle.translation.retry)}
-            </Button>
-          ) : null}
-          {failure.action === "settings" ? (
-            <Button
-              size="compact"
-              tone="ghost"
-              icon={<Settings2 size={14} />}
-              data-action="open-content-translation-settings"
-              onClick={() => onNavigate?.({
-                kind: "settings_section",
-                section: "models",
-              })}
-            >
-              {t(($) => $.lifecycle.translation.openSettings)}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
+    </details>
   );
 }
 
@@ -1027,9 +1067,11 @@ function CaseTable({
 export function LifecycleView({
   initialCaseId = null,
   onNavigate,
+  runtime = null,
 }: {
   initialCaseId?: string | null;
   onNavigate?: (target: NavigationTarget) => void;
+  runtime?: RuntimeConfig | null;
 }) {
   const { t, i18n } = useTranslation("explore");
   const locale = localeValue(i18n.resolvedLanguage);
@@ -1370,7 +1412,7 @@ export function LifecycleView({
       return next;
     });
     try {
-      await translateSecurityLifecycleEvidence(evidenceId, locale);
+      await translateSecurityLifecycleEvidence(evidenceId, locale, runtime);
       const currentCaseId = selectedCaseIdRef.current;
       if (currentCaseId) await loadDetail(currentCaseId);
     } catch (error) {
@@ -1396,6 +1438,9 @@ export function LifecycleView({
   const evidenceCitations = useMemo(() => currentEvidence.filter(
     (item) => Boolean(item.evidence_id),
   ), [currentEvidence]);
+  const currentDecisionNarrative = detail?.current_assessment
+    ? lifecycleAutomationNarrative(detail.current_assessment, detail.ticker, locale)
+    : null;
 
   const updateOutcome = (
     value: SecurityLifecycleAssessmentOutcome,
@@ -1597,6 +1642,27 @@ export function LifecycleView({
               <p className="errorbox" data-error-code={commandError.code}>{commandError.message}</p>
             ) : null}
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.status)}>
+              {detail.current_assessment && currentDecisionNarrative ? (
+                <div
+                  className="lifecycle-decision-summary"
+                  data-testid="lifecycle-decision-summary"
+                >
+                  <strong>{currentDecisionNarrative.conclusion}</strong>
+                  <p>{currentDecisionNarrative.impact}</p>
+                  <div className="lifecycle-provenance-row">
+                    <span className="lifecycle-state">{lifecycleAssessmentAuthorLabel(
+                      detail.current_assessment.author,
+                      locale,
+                    )}</span>
+                    {detail.current_assessment.automation_method ? (
+                      <span className="lifecycle-state">{lifecycleAutomationMethodLabel(
+                        detail.current_assessment.automation_method,
+                        locale,
+                      )}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               <dl className="lifecycle-assessment-facts lifecycle-disposition-summary">
                 <div>
                   <dt>{t(($) => $.lifecycle.table.disposition)}</dt>
@@ -1675,8 +1741,8 @@ export function LifecycleView({
                 </section>
               ))}
               {detail.investigation_runs.length > 0 ? (
-                <div>
-                  <h4>{t(($) => $.lifecycle.sections.runs)}</h4>
+                <details className="lifecycle-secondary-details">
+                  <summary>{t(($) => $.lifecycle.sections.runs)}</summary>
                   {detail.investigation_runs.map((run) => (
                     <p key={run.run_id}>
                       {run.status === "succeeded" && run.result_count === 0
@@ -1692,57 +1758,63 @@ export function LifecycleView({
                         </>}
                     </p>
                   ))}
-                </div>
+                </details>
               ) : null}
               {detail.source_presence === "present" ? (
-                <div className="lifecycle-commands lifecycle-manual-supplement">
-                  <label>{t(($) => $.lifecycle.fields.manualText)}
-                    <textarea
-                      aria-label={t(($) => $.lifecycle.fields.manualText)}
-                      value={manualText}
-                      onChange={(event) => setManualText(event.target.value)}
-                    />
-                  </label>
-                  <Button
-                    size="compact"
-                    icon={<Plus size={15} />}
-                    disabled={!manualText.trim()}
-                    onClick={() => void runCommand("manual-text", async () => {
-                      await addSecurityLifecycleEvidence(detail.case_id, {
-                        text: manualText.trim(),
-                        url: null,
-                      });
-                      setManualText("");
-                    })}
-                  >
-                    {t(($) => $.lifecycle.actions.addText)}
-                  </Button>
-                  <label>{t(($) => $.lifecycle.fields.manualUrl)}
-                    <input
-                      aria-label={t(($) => $.lifecycle.fields.manualUrl)}
-                      value={manualUrl}
-                      onChange={(event) => setManualUrl(event.target.value)}
-                    />
-                  </label>
-                  <Button
-                    size="compact"
-                    icon={<Plus size={15} />}
-                    disabled={!manualUrl.trim()}
-                    onClick={() => void runCommand("manual-url", async () => {
-                      await addSecurityLifecycleEvidence(detail.case_id, {
-                        text: null,
-                        url: manualUrl.trim(),
-                      });
-                      setManualUrl("");
-                    })}
-                  >
-                    {t(($) => $.lifecycle.actions.addUrl)}
-                  </Button>
-                </div>
+                <details className="lifecycle-secondary-details lifecycle-manual-supplement">
+                  <summary>{t(($) => $.lifecycle.sections.manualSupplement)}</summary>
+                  <div className="lifecycle-commands">
+                    <label>{t(($) => $.lifecycle.fields.manualText)}
+                      <textarea
+                        aria-label={t(($) => $.lifecycle.fields.manualText)}
+                        value={manualText}
+                        onChange={(event) => setManualText(event.target.value)}
+                      />
+                    </label>
+                    <Button
+                      size="compact"
+                      icon={<Plus size={15} />}
+                      disabled={!manualText.trim()}
+                      onClick={() => void runCommand("manual-text", async () => {
+                        await addSecurityLifecycleEvidence(detail.case_id, {
+                          text: manualText.trim(),
+                          url: null,
+                        });
+                        setManualText("");
+                      })}
+                    >
+                      {t(($) => $.lifecycle.actions.addText)}
+                    </Button>
+                    <label>{t(($) => $.lifecycle.fields.manualUrl)}
+                      <input
+                        aria-label={t(($) => $.lifecycle.fields.manualUrl)}
+                        value={manualUrl}
+                        onChange={(event) => setManualUrl(event.target.value)}
+                      />
+                    </label>
+                    <Button
+                      size="compact"
+                      icon={<Plus size={15} />}
+                      disabled={!manualUrl.trim()}
+                      onClick={() => void runCommand("manual-url", async () => {
+                        await addSecurityLifecycleEvidence(detail.case_id, {
+                          text: null,
+                          url: manualUrl.trim(),
+                        });
+                        setManualUrl("");
+                      })}
+                    >
+                      {t(($) => $.lifecycle.actions.addUrl)}
+                    </Button>
+                  </div>
+                </details>
               ) : null}
             </LifecycleCaseSection>
 
-            <AutomationTruth detail={detail} locale={locale} t={t} />
+            <details className="lifecycle-audit-details">
+              <summary>{t(($) => $.lifecycle.sections.auditDetails)}</summary>
+              <AutomationTruth detail={detail} locale={locale} t={t} />
+            </details>
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.acknowledgement)}>
               {detail.acknowledgement_history.map((item) => (
