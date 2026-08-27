@@ -128,7 +128,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { createSettingsReadCache } from "./settings/settingsReadCache";
-import { SettingsView, type SettingsViewProps } from "./Settings";
+import { SettingsView, onDraftForTask, type SettingsViewProps } from "./Settings";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -235,6 +235,137 @@ async function click(element: HTMLElement) {
 }
 
 describe("Settings model route save gate", () => {
+  it.each(["default", "none"])(
+    "clears a hydrated %s effort when Provider discovery selects a model",
+    (legacyEffort) => {
+      const updates: Array<Partial<Record<ModelTask, { effort: string; model: string }>>> = [];
+      onDraftForTask(
+        (updater) => {
+          if (typeof updater !== "function") throw new Error("expected a draft updater");
+          updates.push(updater({
+            card_synthesis: {
+              provider: "openai",
+              model: "gpt-5.6-luna",
+              effort: legacyEffort,
+              custom: false,
+            },
+          }));
+        },
+        catalog,
+        "card_synthesis",
+        "openai",
+        "gpt-discovered",
+      );
+
+      expect(updates.at(-1)?.card_synthesis).toMatchObject({
+        model: "gpt-discovered",
+        effort: "",
+        custom: true,
+      });
+    },
+  );
+
+  it("retains a supported real effort when Provider discovery selects a model", () => {
+    const updates: Array<Partial<Record<ModelTask, { effort: string; model: string }>>> = [];
+    onDraftForTask(
+      (updater) => {
+        if (typeof updater !== "function") throw new Error("expected a draft updater");
+        updates.push(updater({
+          card_synthesis: {
+            provider: "openai",
+            model: "gpt-5.6-luna",
+            effort: "high",
+            custom: false,
+          },
+        }));
+      },
+      catalog,
+      "card_synthesis",
+      "openai",
+      "gpt-discovered",
+    );
+
+    expect(updates.at(-1)?.card_synthesis).toMatchObject({
+      model: "gpt-discovered",
+      effort: "high",
+      custom: true,
+    });
+  });
+
+  it.each(["default", "none"])(
+    "keeps the discovered Provider route incomplete after a hydrated %s effort",
+    async (legacyEffort) => {
+      const credential: ProviderCredential = {
+        id: "local:7",
+        provider: "openai",
+        auth_type: "api_key",
+        label: "OpenAI API",
+        account_label: null,
+        expires_at: null,
+        source: "profile_state.db",
+        available: true,
+        masked: "sk-a…AAAA",
+        active: true,
+        editable: true,
+        can_discover_models: true,
+        can_test_models: true,
+        notes: "",
+      };
+      controls.catalogOverride = {
+        ...catalog,
+        routes: {
+          ...catalog.routes,
+          card_synthesis: { ...catalog.routes.card_synthesis, effort: legacyEffort },
+        },
+        credentials: { ...catalog.credentials, openai: [credential] },
+      };
+      controls.discoverModels.mockResolvedValue({
+        provider: "openai",
+        credential_id: credential.id,
+        status: "ok",
+        models: [{ id: "gpt-discovered", provider: "openai", label: "gpt-discovered", source: "provider_api" }],
+        error: null,
+        source_url: null,
+      } satisfies ModelDiscoveryResult);
+
+      host = document.createElement("div");
+      document.body.append(host);
+      root = createRoot(host);
+      await act(async () => {
+        root!.render(React.createElement(TestSettingsView, {
+          runtime: null,
+          developerMode: false,
+          onRuntimeChanged: vi.fn(),
+        }));
+      });
+      await flush();
+
+      const credentialRow = Array.from(host.querySelectorAll<HTMLElement>(".credential-row"))
+        .find((row) => row.textContent?.includes(credential.label))!;
+      await click(Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "列模型")!);
+      await click(Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "用於生成")!);
+
+      const route = host.querySelector('[data-testid="route-card_synthesis"]')!;
+      const customModel = route.querySelector<HTMLInputElement>("input")!;
+      const effort = route.querySelector<HTMLSelectElement>(
+        '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-effort-label"]',
+      )!;
+      const taskTest = Array.from(route.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "實際測試")!;
+      const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "儲存")!;
+
+      expect(customModel.value).toBe("gpt-discovered");
+      expect(effort.value).toBe("");
+      expect(taskTest.disabled).toBe(true);
+      expect(save.disabled).toBe(true);
+      expect(controls.saveModelRoutes).not.toHaveBeenCalled();
+      expect(controls.testTaskModelAccess).not.toHaveBeenCalled();
+    },
+  );
+
   it("renders_retained_catalog_synchronously_and_joins_idle_revalidation", async () => {
     let now = 0;
     const settingsReadCache = createSettingsReadCache({ clock: () => now });

@@ -36,7 +36,7 @@ import {
   providerContexts,
   type TaskTestSnapshot,
 } from "./modelRoutingUx";
-import { taskRouteBlocker } from "./researchModels";
+import { effortOptionsForModel, taskRouteBlocker } from "./researchModels";
 import { InvestorProfilePanel } from "./InvestorProfilePanel";
 import type {
   NavigationRequest,
@@ -851,7 +851,7 @@ export function SettingsView({
           }}
           onUseModel={(provider, model, task) => {
             invalidateTaskTest(task);
-            onDraftForTask(setDraft, task, provider, model);
+            onDraftForTask(setDraft, catalog, task, provider, model);
             revealSection("models");
           }}
           onNavigationGuardChange={setProviderGuard}
@@ -1215,19 +1215,22 @@ function fromRoutes(routes: Record<ModelTask, TaskRoute>): Partial<Record<ModelT
   return out;
 }
 
-function onDraftForTask(
+export function onDraftForTask(
   setDraft: Dispatch<SetStateAction<Partial<Record<ModelTask, DraftRoute>>>>,
+  catalog: ModelCatalog,
   task: ModelTask,
   provider: ModelProvider,
   model: string,
 ) {
-  setDraft((prev) => ({
-    ...prev,
-    [task]: {
-      provider,
-      model,
-      effort: prev[task]?.effort ?? "",
-      custom: true,
-    },
-  }));
+  setDraft((prev) => {
+    const previousEffort = prev[task]?.effort.trim() ?? "";
+    const effort = effortOptionsForModel(catalog, provider, model)
+      .some((option) => option.id === previousEffort)
+      ? previousEffort
+      : "";
+    return {
+      ...prev,
+      [task]: { provider, model, effort, custom: true },
+    };
+  });
 }
