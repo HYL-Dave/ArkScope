@@ -121,7 +121,7 @@ def _v2_entry(
         provider_reason=provider_reason,
         capability=capability,
     )
-    return {
+    entry = {
         "id": model_id,
         "label": label,
         "status": status,
@@ -129,8 +129,10 @@ def _v2_entry(
         "eligible": eligible,
         "reason_code": reason,
         "thinking_mode": capability.thinking_mode if capability is not None else "none",
-        "effort_options": list(capability.effort_options) if capability is not None else [],
     }
+    if capability is not None:
+        entry["effort_options"] = list(capability.effort_options)
+    return entry
 
 
 def effective_model_view_v2(

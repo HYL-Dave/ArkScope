@@ -699,6 +699,8 @@ export function ResearchView({
       detachLocalPolling();
       setTranscriptPendingThreadId(null);
       setUserSelection(null);
+      setIncompleteSelection(null);
+      setThreadSelection(null);
       writeActiveThreadId(null);
     }
     dispatch({ kind: "deleteThread", threadId });
@@ -753,7 +755,7 @@ export function ResearchView({
     const providerReason = modelProviderReason(context, block);
     const firstReady = block?.models.find((entry) => (
       !optionReason(entry, providerReason)
-      && (!catalog || taskRouteModelStatus(catalog, entry.id) !== "retired")
+      && (!catalog || taskRouteModelStatus(catalog, id, entry.id) !== "retired")
     ));
     const authMode = context?.auth_mode ?? null;
     return {
@@ -782,13 +784,14 @@ export function ResearchView({
   ).map((group) => ({
     ...group,
     entries: group.entries.filter((entry) => (
-      !catalog || taskRouteModelStatus(catalog, entry.id) !== "retired"
+      !catalog || !provider
+      || taskRouteModelStatus(catalog, provider, entry.id) !== "retired"
     )),
   })).filter((group) => group.entries.length > 0);
   const selectedEffectiveModel = selectedProviderChoice?.block?.models
     .find((item) => item.id === selModel);
-  const selectedModelRetired = !!catalog && !!selModel
-    && taskRouteModelStatus(catalog, selModel) === "retired";
+  const selectedModelRetired = !!catalog && !!provider && !!selModel
+    && taskRouteModelStatus(catalog, provider, selModel) === "retired";
   const selectedModelMissing = !selectedModelRetired && !!provider && !!selModel && (
     !selectedEffectiveModel
   );
@@ -816,7 +819,7 @@ export function ResearchView({
     if (!provider || !catalog) return;
     const entry = catalog.effective?.tasks.ai_research?.providers?.[provider]
       ?.models.find((candidate) => candidate.id === nextModel);
-    if (!entry || taskRouteModelStatus(catalog, nextModel) === "retired") return;
+    if (!entry || taskRouteModelStatus(catalog, provider, nextModel) === "retired") return;
     setIncompleteSelection({ provider, model: nextModel });
   }, [catalog, provider]);
 
@@ -840,7 +843,7 @@ export function ResearchView({
     const providerReason = modelProviderReason(context, block);
     const selected = block?.models.find((entry) => (
       !optionReason(entry, providerReason)
-      && taskRouteModelStatus(catalog, entry.id) !== "retired"
+      && taskRouteModelStatus(catalog, nextProvider, entry.id) !== "retired"
     ));
     if (!selected) return;
     setIncompleteSelection({ provider: nextProvider, model: selected.id });
@@ -1304,7 +1307,7 @@ function Bubble({
           {m.model && (
             <span className="research-model">
               {m.provider}/{m.model}
-              {m.effort && m.effort !== "default" ? (
+              {m.effort ? (
                 <>
                   {" "}
                   {researchT(($) => $.workspace.effortSummary, { effort: m.effort })}

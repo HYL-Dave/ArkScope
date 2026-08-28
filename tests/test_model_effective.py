@@ -326,10 +326,13 @@ def test_v2_entry_schema_and_grouping(tmp_path):
     assert entries["claude-opus-5"]["visible_to_credential"] is True
     assert not ({"claude-opus-4-8", "claude-opus-4-7"} & entries.keys())
     for entry in entries.values():
-        assert set(entry) == {
+        assert set(entry) in ({
             "id", "label", "status", "visible_to_credential",
             "eligible", "reason_code", "thinking_mode", "effort_options",
-        }
+        }, {
+            "id", "label", "status", "visible_to_credential",
+            "eligible", "reason_code", "thinking_mode",
+        })
 
     research = view["tasks"]["ai_research"]["providers"]["openai"]
     research_entries = {entry["id"]: entry for entry in research["models"]}
@@ -467,7 +470,7 @@ def test_v2_effort_options_are_model_specific(tmp_path):
     assert entries["claude-opus-5"]["effort_options"] == [
         "max", "xhigh", "high", "medium", "low",
     ]
-    assert entries["mystery-model"]["effort_options"] == []
+    assert "effort_options" not in entries["mystery-model"]
 
 
 def test_v2_visibility_is_orthogonal_to_tier(tmp_path):

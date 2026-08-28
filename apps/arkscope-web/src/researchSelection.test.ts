@@ -78,6 +78,16 @@ function catalog(): ModelCatalog {
       "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
     ],
     retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    model_lifecycle: [
+      { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
+      { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
+      { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
+      { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
+      { id: "claude-fable-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
+    ],
     models: [
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
         id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
@@ -179,6 +189,43 @@ describe("research selection precedence and validation", () => {
       threadSelection: { provider: "openai", model: "gpt-5.6-luna", effort: "experimental" },
       preferenceStorage: new MemoryStorage(),
     })).toMatchObject({ state: "blocked", provenance: "thread", reasonCode: "effort_not_supported" });
+  });
+
+  it("admits a discovered unknown custom model when its explicit effort is real", () => {
+    const custom = catalog();
+    custom.effective!.tasks.ai_research!.providers!.openai!.models.push(model(
+      "gpt-7-custom",
+      [],
+      { effort_options: undefined, reason_code: "model_not_in_registry" },
+    ));
+
+    expect(resolveResearchSelection({
+      catalog: custom,
+      hasActiveThread: true,
+      threadSelection: { provider: "openai", model: "gpt-7-custom", effort: "high" },
+      preferenceStorage: new MemoryStorage(),
+    })).toMatchObject({
+      state: "ready", provenance: "thread",
+      tuple: { provider: "openai", model: "gpt-7-custom", effort: "high" },
+    });
+  });
+
+  it("keeps an invalid discovered custom-model effort blocked", () => {
+    const custom = catalog();
+    custom.effective!.tasks.ai_research!.providers!.openai!.models.push(model(
+      "gpt-7-custom",
+      [],
+      { effort_options: undefined, reason_code: "model_not_in_registry" },
+    ));
+
+    expect(resolveResearchSelection({
+      catalog: custom,
+      hasActiveThread: true,
+      threadSelection: { provider: "openai", model: "gpt-7-custom", effort: "experimental" },
+      preferenceStorage: new MemoryStorage(),
+    })).toMatchObject({
+      state: "blocked", provenance: "thread", reasonCode: "effort_not_supported",
+    });
   });
 
   it.each(["default", "none"])("blocks %s as an incomplete current-model effort", (effort) => {

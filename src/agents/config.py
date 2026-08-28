@@ -423,6 +423,13 @@ _TASK_ENV = {
         "ARKSCOPE_AI_RESEARCH_EFFORT",
     ),
 }
+_TASK_PROFILE_FIELDS = {
+    task: frozenset(
+        field.removeprefix("ARKSCOPE_").lower()
+        for field in env_fields
+    )
+    for task, env_fields in _TASK_ENV.items()
+}
 
 
 def _clean_provider(value: str | None) -> Provider | None:
@@ -508,7 +515,12 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
     elif from_db:
         source = "db"
     else:
-        source = "default" if (provider, model, effort) == _BUILTIN_TASK_DEFAULTS[task] else "profile"
+        profile_fields = _TASK_PROFILE_FIELDS[task]
+        source = (
+            "profile"
+            if profile_fields.intersection(config.model_fields_set)
+            else "default"
+        )
 
     if env_model and not env_provider:
         provider = model_provider(env_model) or provider
@@ -533,11 +545,7 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
 
     warning = None
     if not is_valid_effort(provider, effort, model=model):
-        warning = (
-            f"Configured effort '{effort}' is not known for provider '{provider}'; "
-            "using provider default."
-        )
-        effort = "default"
+        warning = f"unsupported_effort:{effort}"
 
     return TaskRoute(
         task=task,

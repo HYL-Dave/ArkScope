@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.personalization import resolve_personalization as _resolve_personalization
+from src.model_routing import task_route_admission_detail
 from pydantic import BaseModel
 
 from ..dependencies import get_dal, get_thread_store
@@ -197,7 +198,13 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
     and event framing.
     """
     provider = provider.lower()
-    wire_effort = None if effort in (None, "", "default") else effort
+    if provider not in ("openai", "anthropic"):
+        raise ValueError(f"Unknown provider: {provider}")
+    normalized_effort = effort.strip() if isinstance(effort, str) else ""
+    detail = task_route_admission_detail(provider, model, normalized_effort)
+    if detail is not None:
+        raise ValueError(detail)
+    wire_effort = normalized_effort
     from src.research_runtime_config import resolve_research_runtime
     runtime = resolve_research_runtime()
     from src.auth_drivers.live_resolver import resolve_live_auth
@@ -315,6 +322,34 @@ class QueryResponse(BaseModel):
     model: str
 
 
+def _resolve_query_task_route(
+    request: QueryRequest,
+    provider: str,
+) -> tuple[str, str]:
+    if provider not in ("openai", "anthropic"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown provider: {provider}. Use 'openai' or 'anthropic'.",
+        )
+
+    model, effort = request.model, request.effort
+    if model is None:
+        from src.agents.config import resolve_research_route
+
+        model, effort = resolve_research_route(provider)
+    model = model.strip() if isinstance(model, str) else ""
+    effort = effort.strip() if isinstance(effort, str) else ""
+    if not model:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "model_required", "field": "model"},
+        )
+    detail = task_route_admission_detail(provider, model, effort)
+    if detail is not None:
+        raise HTTPException(status_code=422, detail=detail)
+    return model, effort
+
+
 @router.post("/query", response_model=QueryResponse)
 async def query_agent(
     request: QueryRequest,
@@ -339,13 +374,9 @@ async def query_agent(
         - "Generate a morning brief"
     """
     provider = request.provider.lower()
+    model, effort = _resolve_query_task_route(request, provider)
     personalization_context, _ptrace = _resolve_personalization(request.assistant_stance)
     _pctx = {"personalization_context": personalization_context} if personalization_context else {}
-    # No explicit model → the AI 研究 route (or the provider's default tier).
-    model, effort = request.model, None
-    if model is None and provider in ("openai", "anthropic"):
-        from src.agents.config import resolve_research_route
-        model, effort = resolve_research_route(provider)
 
     if provider == "openai":
         try:
@@ -385,12 +416,6 @@ async def query_agent(
             logger.error(f"Anthropic agent error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown provider: {provider}. Use 'openai' or 'anthropic'."
-        )
-
     return QueryResponse(**result)
 
 
@@ -415,6 +440,7 @@ async def query_agent_stream(
         - done: Final answer with full result
     """
     provider = request.provider.lower()
+    res_model, res_effort = _resolve_query_task_route(request, provider)
     # Track A: validate the stance override + resolve profile context BEFORE the
     # stream starts, so an invalid value is a clean 400 (not a mid-stream error).
     personalization_context, personalization = _resolve_personalization(request.assistant_stance)
@@ -440,16 +466,6 @@ async def query_agent_stream(
             if persist
             else []
         )
-        # No explicit model → the AI 研究 route (or the provider's default tier).
-        # Resolve BEFORE persisting so the thread records the model actually used.
-        # Explicit model (the AI 研究 picker) → use request.model + request.effort
-        # directly. No explicit model → the AI 研究 route (or the provider's default
-        # tier). Retry excludes the immediately preceding failed user+assistant
-        # pair from history so the same question is not duplicated in context.
-        res_model, res_effort = request.model, request.effort
-        if res_model is None and provider in ("openai", "anthropic"):
-            from src.agents.config import resolve_research_route
-            res_model, res_effort = resolve_research_route(provider)
         if persist:
             _persist_user_turn(
                 store, thread_id=request.thread_id, question=request.question,

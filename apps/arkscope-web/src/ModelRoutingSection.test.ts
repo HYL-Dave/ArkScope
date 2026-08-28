@@ -528,7 +528,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     });
     const model = labelledControl(researchCard(), "model") as HTMLSelectElement;
     expect(model.value).toBe("gpt-5.4-mini");
-    expect(model.disabled).toBe(true);
+    expect(model.disabled).toBe(false);
+    expect(model.selectedOptions[0].disabled).toBe(true);
     expect(researchCard().textContent).toContain("已淘汰");
     expect(buttonByText(researchCard(), "實際測試").disabled).toBe(true);
 

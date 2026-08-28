@@ -85,6 +85,8 @@ const catalog: ModelCatalog = {
     supports_structured_output: true,
     supports_tool_calling: true,
     effort_options: TASK_EFFORT_IDS,
+    task_route_status: "current" as const,
+    aliases: id === "gpt-5.6-sol" ? ["gpt-5.6"] : [],
     recommended_for: [],
     source_url: "",
     verified_at: "",
@@ -96,6 +98,16 @@ const catalog: ModelCatalog = {
   },
   current_model_ids: [...CURRENT_MODEL_IDS],
   retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+  model_lifecycle: [
+    { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
+    { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
+    { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
+    { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
+    { id: "claude-fable-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+    { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+    { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+    { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
+  ],
   routes,
   credentials: { openai: [], anthropic: [] },
   custom_allowed: true,
@@ -290,6 +302,69 @@ describe("Settings model route save gate", () => {
       effort: "high",
       custom: true,
     });
+  });
+
+  it("keeps retired provenance selected while enabling same-provider recovery", async () => {
+    const retired = "gpt-5.4-mini-2026-08-01";
+    controls.catalogOverride = {
+      ...catalog,
+      routes: {
+        ...catalog.routes,
+        card_synthesis: {
+          ...catalog.routes.card_synthesis,
+          provider: "openai",
+          model: retired,
+          effort: "default",
+          custom: false,
+        },
+      },
+    };
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const route = host.querySelector('[data-testid="route-card_synthesis"]')!;
+    const modelSelect = route.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-model-label"]',
+    )!;
+    const effortSelect = route.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-effort-label"]',
+    )!;
+    expect(modelSelect.value).toBe(retired);
+    expect(modelSelect.selectedOptions[0].disabled).toBe(true);
+    expect(modelSelect.disabled).toBe(false);
+
+    const selectSetter = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      selectSetter?.call(modelSelect, "gpt-5.6-luna");
+      modelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(modelSelect.value).toBe("gpt-5.6-luna");
+    expect(effortSelect.value).toBe("");
+
+    await act(async () => {
+      selectSetter?.call(effortSelect, "high");
+      effortSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(effortSelect.value).toBe("high");
+    const taskTest = Array.from(route.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "實際測試")!;
+    expect(taskTest.disabled).toBe(false);
+    expect(Array.from(modelSelect.options).filter((option) => option.value.includes("gpt-5.4")))
+      .toHaveLength(0);
   });
 
   it.each(["default", "none"])(

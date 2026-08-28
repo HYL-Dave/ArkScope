@@ -73,6 +73,13 @@ def test_catalog_exposes_canonical_current_and_retired_model_policy():
     }
     assert len(policy.retired_model_ids) == 12
     assert set(policy.current_model_ids).isdisjoint(policy.retired_model_ids)
+    lifecycle = {fact.id: fact for fact in policy.model_lifecycle}
+    assert lifecycle["gpt-5.6-sol"].task_route_status == "current"
+    assert lifecycle["gpt-5.6-sol"].aliases == ["gpt-5.6"]
+    assert lifecycle["gpt-5.4-mini"].task_route_status == "retired"
+    seed = {model.id: model for model in policy.models}
+    assert seed["gpt-5.6-sol"].task_route_status == "current"
+    assert seed["gpt-5.6-sol"].aliases == ["gpt-5.6"]
 
 
 def test_task_route_effort_order_is_canonical_and_provider_native_facts_remain():
@@ -109,6 +116,26 @@ def test_task_route_validity_excludes_provider_native_default_and_none():
 def test_retired_model_is_rejected_before_effort_validity():
     assert selectable_effort_ids_for_model("openai", "gpt-5.5") == ()
     assert is_valid_task_route_effort("openai", "max", "gpt-5.5") is False
+
+
+@pytest.mark.parametrize(
+    ("provider", "model", "effort", "detail"),
+    [
+        ("openai", "gpt-5.6-luna", "default", {"code": "effort_required", "field": "effort"}),
+        ("openai", "gpt-5.6-luna", "none", {"code": "effort_required", "field": "effort"}),
+        ("openai", "gpt-5.6-luna", "future", {"code": "effort_not_supported", "field": "effort"}),
+        ("openai", "claude-sonnet-5", "high", {"code": "effort_not_supported", "field": "effort"}),
+        ("openai", "gpt-5.4-mini-2026-08-01", "high", {"code": "model_retired", "field": "model"}),
+        ("openai", "gpt-7-custom", "high", None),
+        ("openai", "gpt-5.6-luna-2026-08-01", "max", None),
+    ],
+)
+def test_shared_task_route_admission_is_the_bounded_authority(
+    provider, model, effort, detail
+):
+    from src.model_routing import task_route_admission_detail
+
+    assert task_route_admission_detail(provider, model, effort) == detail
 
 
 def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
@@ -776,6 +803,41 @@ def test_task_route_default_when_no_db_no_yaml(make_route_store):
 
     rs = make_route_store(None)
     assert task_route("ai_research", route_store=rs).source == "default"
+
+
+def test_task_route_explicit_profile_values_equal_to_builtins_remain_profile_owned(
+    make_route_store,
+):
+    from src.agents.config import task_route
+
+    route_store = make_route_store({"llm_preferences": {
+        "ai_research_provider": "openai",
+        "ai_research_model": "gpt-5.6-luna",
+        "ai_research_effort": "xhigh",
+    }})
+
+    route = task_route("ai_research", route_store=route_store)
+
+    assert (route.provider, route.model, route.effort, route.source) == (
+        "openai", "gpt-5.6-luna", "xhigh", "profile",
+    )
+
+
+def test_task_route_preserves_unsupported_profile_effort_for_admission(
+    make_route_store,
+):
+    from src.agents.config import task_route
+
+    route_store = make_route_store({"llm_preferences": {
+        "ai_research_provider": "openai",
+        "ai_research_model": "gpt-5.6-luna",
+        "ai_research_effort": "future",
+    }})
+
+    route = task_route("ai_research", route_store=route_store)
+
+    assert route.effort == "future"
+    assert route.warning == "unsupported_effort:future"
 
 
 def test_task_route_real_env_overrides_db(make_route_store, monkeypatch):

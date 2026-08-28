@@ -47,9 +47,9 @@ from src.model_routing import (
     TaskRoute,
     catalog,
     is_valid_effort,
-    is_valid_task_route_effort,
     model_provider,
     route_capability_warnings,
+    task_route_admission_detail,
 )
 from src.model_capabilities import capability_for
 from src.tools.data_access import DataAccessLayer
@@ -964,18 +964,6 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _task_route_admission_detail(provider: Provider, model: str, effort: str) -> dict[str, str] | None:
-    """Return the bounded reason a new task route cannot be admitted."""
-    capability = capability_for(model)
-    if capability is not None and capability.task_route_status == "retired":
-        return {"code": "model_retired", "field": "model"}
-    if effort in ("", "default", "none"):
-        return {"code": "effort_required", "field": "effort"}
-    if not is_valid_task_route_effort(provider, effort, model):
-        return {"code": "effort_not_supported", "field": "effort"}
-    return None
-
-
 @router.post("/config/model-test")
 def run_provider_model_test(
     body: ModelTestRequest,
@@ -1015,7 +1003,7 @@ def run_task_model_test(
     if not model:
         raise HTTPException(status_code=400, detail="model is required")
     effort = body.effort.strip()
-    detail = _task_route_admission_detail(body.provider, model, effort)
+    detail = task_route_admission_detail(body.provider, model, effort)
     if detail is not None:
         raise HTTPException(status_code=400, detail=detail)
     result = _run_coro(dispatch_task_model_test(
@@ -1054,7 +1042,7 @@ def update_model_routes(
             raise HTTPException(status_code=400, detail=f"{task}: model is required")
         effort = update.effort.strip()
         warnings: list[str] = []
-        detail = _task_route_admission_detail(update.provider, model, effort)
+        detail = task_route_admission_detail(update.provider, model, effort)
         if detail is not None:
             raise HTTPException(status_code=400, detail=detail)
         inferred = model_provider(model)
@@ -1211,7 +1199,7 @@ def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
         if inferred and inferred != provider:  # same prefix-mismatch guard as update_model_routes
             skipped.append(task)
             continue
-        if _task_route_admission_detail(provider, model, effort) is not None:
+        if task_route_admission_detail(provider, model, effort) is not None:
             skipped.append(task)
             continue
         require_profile_state_write("model_route_import", {"task": task})

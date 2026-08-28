@@ -598,7 +598,10 @@ def test_synthesis_provider_override_uses_explicit_task_effort(monkeypatch, prov
     ("provider", "model"),
     [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")],
 )
-def test_translation_provider_override_uses_explicit_task_effort(monkeypatch, provider, model):
+@pytest.mark.parametrize("seam", ["translate_text", "translate_card"])
+def test_translation_provider_override_uses_explicit_task_effort(
+    monkeypatch, provider, model, seam
+):
     from src import card_synthesis as cs
     from src.model_routing import TaskRoute
 
@@ -616,7 +619,11 @@ def test_translation_provider_override_uses_explicit_task_effort(monkeypatch, pr
 
     def translate(selected_model, system, user, schema, target, effort, **kwargs):
         calls.append((selected_model, effort))
-        return {"translated_text": "translated"}
+        return (
+            {"translated_text": "translated"}
+            if seam == "translate_text"
+            else {"conclusion": "translated"}
+        )
 
     monkeypatch.setattr(
         cs,
@@ -624,12 +631,122 @@ def test_translation_provider_override_uses_explicit_task_effort(monkeypatch, pr
         translate,
     )
 
-    result = cs.translate_text(
-        "source", lang="zh-Hant", provider=provider, model=model, model_timeout_s=900,
+    if seam == "translate_text":
+        result = cs.translate_text(
+            "source", lang="zh-Hant", provider=provider, model=model,
+            model_timeout_s=900,
+        )
+        assert result["translated_text"] == "translated"
+    else:
+        result = cs.translate_card(
+            ResultCard(
+                ticker="AAPL", analysis_time="2026-08-28T00:00:00Z",
+                conclusion="source", confidence_level="low",
+                traceability=Traceability(),
+            ).model_dump(),
+            lang="zh-Hant", provider=provider, model=model, model_timeout_s=900,
+        )
+        assert result["conclusion"] == "translated"
+
+    assert calls == [(model, "medium")]
+
+
+def _invoke_fixed_task_seam(cs, seam, *, provider=None):
+    if seam == "synthesize_card":
+        return cs.synthesize_card(
+            _packet(), now_iso="2026-08-28T00:00:00Z", model_timeout_s=900,
+            **({"provider": provider} if provider is not None else {}),
+        )
+    if seam == "translate_text":
+        return cs.translate_text(
+            "source", lang="zh-Hant", model_timeout_s=900,
+        )
+    return cs.translate_card(
+        ResultCard(
+            ticker="AAPL", analysis_time="2026-08-28T00:00:00Z",
+            conclusion="source", confidence_level="low",
+            traceability=Traceability(),
+        ).model_dump(),
+        lang="zh-Hant",
+        model_timeout_s=900,
     )
 
-    assert result["translated_text"] == "translated"
-    assert calls == [(model, "medium")]
+
+@pytest.mark.parametrize("seam", ["synthesize_card", "translate_text", "translate_card"])
+@pytest.mark.parametrize(
+    ("provider", "model", "effort", "detail"),
+    [
+        ("openai", "gpt-5.6-luna", "", {"code": "effort_required", "field": "effort"}),
+        ("openai", "gpt-5.6-luna", "default", {"code": "effort_required", "field": "effort"}),
+        ("openai", "gpt-5.6-luna", "none", {"code": "effort_required", "field": "effort"}),
+        ("openai", "gpt-5.6-luna", "future", {"code": "effort_not_supported", "field": "effort"}),
+        ("openai", "claude-sonnet-5", "high", {"code": "effort_not_supported", "field": "effort"}),
+        ("openai", "gpt-5.4-mini-2026-08-01", "high", {"code": "model_retired", "field": "model"}),
+    ],
+)
+def test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch(
+    monkeypatch, seam, provider, model, effort, detail
+):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    task = "card_synthesis" if seam == "synthesize_card" else "card_translation"
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: TaskRoute(
+            task=task, provider=provider, model=model, effort=effort, source="db",
+        ),
+    )
+    provider_calls = []
+    monkeypatch.setattr(cs, "_synthesize_openai", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(cs, "_synthesize_anthropic", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(cs, "_translate_openai", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(cs, "_translate_anthropic", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(cs, "translation_harness", lambda _provider: "fake")
+
+    with pytest.raises(ValueError) as exc:
+        _invoke_fixed_task_seam(cs, seam, provider=provider)
+
+    assert exc.value.args == (detail,)
+    assert provider_calls == []
+
+
+@pytest.mark.parametrize("seam", ["synthesize_card", "translate_text", "translate_card"])
+@pytest.mark.parametrize("model", ["gpt-5.6-luna", "gpt-7-custom"])
+def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
+    monkeypatch, seam, model
+):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    task = "card_synthesis" if seam == "synthesize_card" else "card_translation"
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: TaskRoute(
+            task=task, provider="openai", model=model, effort="high", source="db",
+        ),
+    )
+    calls = []
+
+    def synthesize(_packet_value, selected_model, effort, **_kwargs):
+        calls.append((selected_model, effort))
+        return _synth(), {"effort": effort}
+
+    def translate(selected_model, _system, _user, _schema, _target, effort, **_kwargs):
+        calls.append((selected_model, effort))
+        return {"translated_text": "translated"} if seam == "translate_text" else {
+            "conclusion": "translated",
+        }
+
+    monkeypatch.setattr(cs, "_synthesize_openai", synthesize)
+    monkeypatch.setattr(cs, "_translate_openai", translate)
+    monkeypatch.setattr(cs, "translation_harness", lambda _provider: "fake")
+
+    _invoke_fixed_task_seam(cs, seam, provider="openai")
+
+    assert calls == [(model, "high")]
 
 
 def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypatch):

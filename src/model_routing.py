@@ -38,6 +38,15 @@ class ModelOption(BaseModel):
     source_url: str
     verified_at: str = CATALOG_VERIFIED_AT
     notes: str = ""
+    task_route_status: Literal["current", "retired"]
+    aliases: list[str] = Field(default_factory=list)
+
+
+class ModelLifecycleFact(BaseModel):
+    id: str
+    provider: Provider
+    task_route_status: Literal["current", "retired"]
+    aliases: list[str] = Field(default_factory=list)
 
 
 class TaskInfo(BaseModel):
@@ -73,6 +82,7 @@ class ModelCatalog(BaseModel):
     effort_options: dict[Provider, list[EffortOption]]
     current_model_ids: list[str]
     retired_model_ids: list[str]
+    model_lifecycle: list[ModelLifecycleFact]
 
 
 TASKS: list[TaskInfo] = [
@@ -125,6 +135,8 @@ def _routing_view() -> list[ModelOption]:
             source_url=cap.source_url,
             verified_at=cap.verified_at,
             notes=cap.notes,
+            task_route_status=cap.task_route_status,  # type: ignore[arg-type]
+            aliases=list(cap.aliases),
         )
         for cap in all_models()
         if cap.in_routing_seed
@@ -230,6 +242,15 @@ def catalog() -> ModelCatalog:
         effort_options=EFFORT_OPTIONS,
         current_model_ids=[cap.id for cap in all_models() if cap.task_route_status == "current"],
         retired_model_ids=[cap.id for cap in all_models() if cap.task_route_status == "retired"],
+        model_lifecycle=[
+            ModelLifecycleFact(
+                id=cap.id,
+                provider=cap.provider,  # type: ignore[arg-type]
+                task_route_status=cap.task_route_status,  # type: ignore[arg-type]
+                aliases=list(cap.aliases),
+            )
+            for cap in all_models()
+        ],
     )
 
 
@@ -281,6 +302,28 @@ def selectable_effort_ids_for_model(provider: Provider, model: str) -> tuple[str
 def is_valid_task_route_effort(provider: Provider, effort: str, model: str) -> bool:
     """Return whether ``effort`` is an explicit value for a new task route."""
     return effort in selectable_effort_ids_for_model(provider, model)
+
+
+def task_route_admission_detail(
+    provider: str,
+    model: str,
+    effort: str,
+) -> dict[str, str] | None:
+    """Return the bounded reason an effective task route cannot execute."""
+    from src.model_capabilities import capability_for
+
+    capability = capability_for(model)
+    if capability is not None and capability.task_route_status == "retired":
+        return {"code": "model_retired", "field": "model"}
+    if not effort.strip() or effort in ("default", "none"):
+        return {"code": "effort_required", "field": "effort"}
+    if provider not in EFFORT_OPTIONS:
+        return {"code": "effort_not_supported", "field": "effort"}
+    if capability is not None and capability.provider != provider:
+        return {"code": "effort_not_supported", "field": "effort"}
+    if effort not in selectable_effort_ids_for_model(provider, model):  # type: ignore[arg-type]
+        return {"code": "effort_not_supported", "field": "effort"}
+    return None
 
 
 def route_capability_warnings(

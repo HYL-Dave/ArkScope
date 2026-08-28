@@ -99,6 +99,15 @@ export interface ModelOption {
   source_url: string;
   verified_at: string;
   notes: string;
+  task_route_status?: "current" | "retired";
+  aliases?: string[];
+}
+
+export interface ModelLifecycleFact {
+  id: string;
+  provider: ModelProvider;
+  task_route_status: "current" | "retired";
+  aliases?: string[];
 }
 
 export interface TaskInfo {
@@ -164,6 +173,7 @@ export interface ModelCatalog {
   effort_options: Record<ModelProvider, EffortOption[]>;
   current_model_ids?: string[];
   retired_model_ids?: string[];
+  model_lifecycle?: ModelLifecycleFact[];
   routes: Record<ModelTask, TaskRoute>;
   credentials: Record<ModelProvider, ProviderCredential[]>;
   custom_allowed: boolean;

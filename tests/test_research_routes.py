@@ -15,6 +15,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import pytest
+from fastapi import HTTPException
 
 from src.api.routes import query as q
 from src.api.routes import research as r
@@ -1192,6 +1193,145 @@ def test_query_stream_explicit_model_and_effort_passthrough(store, monkeypatch):
     assert captured["model"] == "gpt-5.6-luna" and captured["effort"] == "low"
 
 
+@pytest.mark.parametrize(
+    ("request_model", "request_effort", "resolved", "detail"),
+    [
+        ("gpt-5.6-luna", "default", None, {"code": "effort_required", "field": "effort"}),
+        ("gpt-5.6-luna", "future", None, {"code": "effort_not_supported", "field": "effort"}),
+        ("gpt-5.4-mini-2026-08-01", "high", None, {"code": "model_retired", "field": "model"}),
+        ("claude-sonnet-5", "high", None, {"code": "effort_not_supported", "field": "effort"}),
+        (None, None, ("gpt-5.6-luna", "default"), {"code": "effort_required", "field": "effort"}),
+    ],
+)
+def test_query_sync_rejects_invalid_explicit_or_configured_route_before_provider(
+    monkeypatch, request_model, request_effort, resolved, detail
+):
+    provider_calls = []
+
+    async def fake_query(**kwargs):
+        provider_calls.append(kwargs)
+        return {
+            "answer": "unexpected", "tools_used": [],
+            "provider": "openai", "model": kwargs["model"],
+        }
+
+    monkeypatch.setattr("src.agents.openai_agent.run_query", fake_query)
+    if resolved is not None:
+        monkeypatch.setattr("src.agents.config.resolve_research_route", lambda _provider: resolved)
+    request = q.QueryRequest(
+        question="q", provider="openai", model=request_model, effort=request_effort,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(q.query_agent(request, dal=object()))
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == detail
+    assert provider_calls == []
+
+
+@pytest.mark.parametrize("model", ["gpt-5.6-luna", "gpt-7-custom"])
+def test_query_sync_dispatches_current_and_custom_explicit_routes(monkeypatch, model):
+    captured = {}
+
+    async def fake_query(**kwargs):
+        captured.update(kwargs)
+        return {
+            "answer": "ok", "tools_used": [],
+            "provider": "openai", "model": kwargs["model"],
+        }
+
+    monkeypatch.setattr("src.agents.openai_agent.run_query", fake_query)
+    request = q.QueryRequest(
+        question="q", provider="openai", model=model, effort="high",
+    )
+
+    response = asyncio.run(q.query_agent(request, dal=object()))
+
+    assert response.answer == "ok"
+    assert captured["model"] == model
+    assert captured["reasoning_effort"] == "high"
+
+
+def test_query_sync_unknown_provider_remains_bounded_400():
+    request = q.QueryRequest(
+        question="q", provider="future-provider", model="future-model", effort="high",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(q.query_agent(request, dal=object()))
+
+    assert exc.value.status_code == 400
+    assert "Unknown provider" in str(exc.value.detail)
+
+
+@pytest.mark.parametrize(
+    ("request_model", "request_effort", "resolved", "detail"),
+    [
+        ("gpt-5.6-luna", "none", None, {"code": "effort_required", "field": "effort"}),
+        ("gpt-5.6-luna", "future", None, {"code": "effort_not_supported", "field": "effort"}),
+        ("gpt-5.4-mini-snapshot", "high", None, {"code": "model_retired", "field": "model"}),
+        (None, None, ("gpt-5.6-luna", "default"), {"code": "effort_required", "field": "effort"}),
+    ],
+)
+def test_query_stream_rejects_before_response_persistence_or_provider_dispatch(
+    store, monkeypatch, request_model, request_effort, resolved, detail
+):
+    provider_calls = []
+    monkeypatch.setattr(
+        q,
+        "_research_provider_stream",
+        lambda **kwargs: provider_calls.append(kwargs),
+    )
+    if resolved is not None:
+        monkeypatch.setattr("src.agents.config.resolve_research_route", lambda _provider: resolved)
+    request = q.QueryRequest(
+        question="must not persist", provider="openai",
+        model=request_model, effort=request_effort, thread_id="invalid-route-thread",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(q.query_agent_stream(request, dal=object(), store=store))
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == detail
+    assert store.get_thread("invalid-route-thread") is None
+    assert store.list_messages("invalid-route-thread") == []
+    assert provider_calls == []
+
+
+@pytest.mark.parametrize("model", ["gpt-5.6-luna", "gpt-7-custom"])
+def test_query_stream_dispatches_current_and_discovered_custom_route(
+    store, monkeypatch, model
+):
+    captured = {}
+
+    async def events(**kwargs):
+        captured.update(kwargs)
+        from src.agents.shared.events import AgentEvent, EventType
+
+        yield AgentEvent(EventType.done, {
+            "answer": "ok", "tools_used": [], "provider": "openai",
+            "model": kwargs["model"], "token_usage": {},
+        })
+
+    monkeypatch.setattr(q, "_research_provider_stream", events)
+    request = q.QueryRequest(
+        question="q", provider="openai", model=model,
+        effort="high", thread_id=None,
+    )
+
+    async def drive():
+        response = await q.query_agent_stream(request, dal=object(), store=store)
+        async for _chunk in response.body_iterator:
+            pass
+
+    asyncio.run(drive())
+
+    assert captured["model"] == model
+    assert captured["effort"] == "high"
+
+
 def test_query_stream_retry_last_failed_excludes_failed_pair_from_history(store, monkeypatch):
     import asyncio
 
@@ -1301,23 +1441,92 @@ def test_anthropic_run_query_stream_raise_becomes_error_event_and_persists(store
     assert "API key" in msgs[1].content and "Settings" in msgs[1].content  # actionable message persisted
 
 
-def test_unknown_provider_persists_error_turn_not_a_dangling_user(store):
-    """An unknown provider returns early without ever calling the agent — but the
-    user turn was persisted eagerly, so the error terminal must persist an
-    is_error assistant turn too (same invariant as MUST-FIX 2; no dangling turn)."""
-    import asyncio
-
+def test_query_stream_unknown_provider_is_400_before_response_or_persistence(store):
     req = q.QueryRequest(question="q", provider="bad", model=None, thread_id="t1", ticker=None)
 
-    async def drive():
-        resp = await q.query_agent_stream(req, dal=object(), store=store)  # dal unused on this path
-        async for _ in resp.body_iterator:
-            pass
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(q.query_agent_stream(req, dal=object(), store=store))
 
-    asyncio.run(drive())
-    msgs = store.list_messages("t1")
-    assert [m.role for m in msgs] == ["user", "assistant"]
-    assert msgs[1].is_error is True and "Unknown provider" in msgs[1].content
+    assert exc.value.status_code == 400
+    assert store.get_thread("t1") is None
+    assert store.list_messages("t1") == []
+
+
+def test_internal_research_stream_cannot_normalize_invalid_task_effort(monkeypatch):
+    auth_calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: auth_calls.append(provider),
+    )
+
+    with pytest.raises(ValueError) as exc:
+        q._research_provider_stream(
+            provider="openai", question="q", model="gpt-5.6-luna",
+            effort="default", dal=object(), history=[],
+        )
+
+    assert exc.value.args == ({"code": "effort_required", "field": "effort"},)
+    assert auth_calls == []
+
+
+@pytest.mark.parametrize(
+    ("model", "effort", "detail"),
+    [
+        ("gpt-5.6-luna", "default", {"code": "effort_required", "field": "effort"}),
+        ("gpt-5.6-luna", "future", {"code": "effort_not_supported", "field": "effort"}),
+        ("gpt-5.4-mini-snapshot", "high", {"code": "model_retired", "field": "model"}),
+        ("claude-sonnet-5", "high", {"code": "effort_not_supported", "field": "effort"}),
+    ],
+)
+def test_research_runs_reject_invalid_route_before_persistence_or_schedule(
+    research_stores, monkeypatch, model, effort, detail
+):
+    thread_store, run_store, _history_store = research_stores
+    scheduled = []
+    auth_calls = []
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs))
+    monkeypatch.setattr(
+        r,
+        "_resolve_auth_metadata",
+        lambda provider: auth_calls.append(provider) or (None, None),
+    )
+    request = r.ResearchRunCreate(
+        thread_id="invalid-run-route", question="must not persist",
+        provider="openai", model=model, effort=effort,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(r.create_research_run(
+            request, dal=object(), thread_store=thread_store, run_store=run_store,
+        ))
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == detail
+    assert thread_store.get_thread("invalid-run-route") is None
+    assert thread_store.list_messages("invalid-run-route") == []
+    assert scheduled == []
+    assert auth_calls == []
+
+
+def test_research_runs_admit_custom_model_with_explicit_provider_effort(
+    research_stores, monkeypatch
+):
+    thread_store, run_store, _history_store = research_stores
+    scheduled = []
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs))
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda _provider: ("api_key", "local:1"))
+    request = r.ResearchRunCreate(
+        thread_id="custom-run-route", question="custom route",
+        provider="openai", model="gpt-7-custom", effort="high",
+    )
+
+    response = asyncio.run(r.create_research_run(
+        request, dal=object(), thread_store=thread_store, run_store=run_store,
+    ))
+
+    assert response["run"]["model"] == "gpt-7-custom"
+    assert response["run"]["effort"] == "high"
+    assert len(scheduled) == 1
 
 
 # =====================================================================
@@ -1798,7 +2007,10 @@ def test_api_key_stream_receives_research_max_turns(store, monkeypatch, tmp_path
 
     monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_stream)
 
-    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.6-luna", thread_id=None)
+    req = q.QueryRequest(
+        question="q", provider="openai", model="gpt-5.6-luna",
+        effort="low", thread_id=None,
+    )
 
     async def drive():
         resp = await q.query_agent_stream(req, dal=object(), store=store)

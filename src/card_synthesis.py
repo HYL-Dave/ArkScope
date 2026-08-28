@@ -28,6 +28,7 @@ from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.evidence_packet import EvidencePacket
+from src.model_routing import task_route_admission_detail
 from src.result_card import (
     ClaimCitation,
     Completeness,
@@ -41,6 +42,12 @@ logger = logging.getLogger(__name__)
 Provider = Literal["anthropic", "openai"]
 _TOOL_NAME = "emit_result_card"
 _MAX_TOKENS = 8192  # card JSON is small; well under the 21333 streaming threshold
+
+
+def _require_task_route(provider: Provider, model: str, effort: str) -> None:
+    detail = task_route_admission_detail(provider, model, effort)
+    if detail is not None:
+        raise ValueError(detail)
 
 
 class ModelExecutionTimeout(RuntimeError):
@@ -493,6 +500,7 @@ def synthesize_card(
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
         effort = route.effort if route.provider == "anthropic" else "high"
+        _require_task_route(provider, model, effort)
         synth, effort_meta = _synthesize_anthropic(
             packet,
             model,
@@ -503,6 +511,7 @@ def synthesize_card(
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
         effort = route.effort if route.provider == "openai" else "high"
+        _require_task_route(provider, model, effort)
         synth, effort_meta = _synthesize_openai(
             packet,
             model,
@@ -650,6 +659,9 @@ def translate_text(
         separators=(",", ":"),
     )
     effort = route.effort if provider == route.provider else "medium"
+    if provider not in ("anthropic", "openai"):
+        raise ValueError(f"unknown provider: {provider}")
+    _require_task_route(provider, model, effort)
     harness = translation_harness(provider)
 
     if provider == "anthropic":
@@ -741,6 +753,9 @@ def translate_card(
     user = json.dumps(payload, ensure_ascii=False, indent=2)
 
     effort = route.effort if provider == route.provider else "medium"
+    if provider not in ("anthropic", "openai"):
+        raise ValueError(f"unknown provider: {provider}")
+    _require_task_route(provider, model, effort)
     if provider == "anthropic":
         translated = _translate_anthropic(
             model,

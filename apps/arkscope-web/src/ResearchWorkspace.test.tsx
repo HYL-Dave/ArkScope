@@ -75,6 +75,16 @@ function catalog(
       "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
     ],
     retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    model_lifecycle: [
+      { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
+      { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
+      { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
+      { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
+      { id: "claude-fable-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
+    ],
     models: [
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
         id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
@@ -232,7 +242,7 @@ type FetchOptions = {
 
 function stubFetch(options: FetchOptions = {}) {
   const cat = options.catalog ?? catalog();
-  const threads = options.threads ?? [];
+  const threads = [...(options.threads ?? [])];
   const created = new Map<string, ResearchRunDTO>();
   let createIndex = 0;
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -253,6 +263,12 @@ function stubFetch(options: FetchOptions = {}) {
       return json({ threads, total: threads.length, limit: 50, offset: 0 });
     }
     const exact = url.pathname.match(/^\/research\/threads\/([^/]+)$/);
+    if (exact && method === "DELETE") {
+      const id = decodeURIComponent(exact[1]);
+      const index = threads.findIndex((item) => item.id === id);
+      if (index >= 0) threads.splice(index, 1);
+      return json({ thread_id: id, deleted: index >= 0 });
+    }
     if (exact && method === "GET") {
       const found = threads.find((item) => item.id === decodeURIComponent(exact[1]));
       return found ? json({ thread: found }) : json({ detail: "not found" }, 404);
@@ -1049,6 +1065,58 @@ describe("Research workspace contracts", () => {
     await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
   });
 
+  it("makes a discovered unknown custom model selectable with a real effort", async () => {
+    const cat = catalog();
+    cat.effective!.tasks.ai_research!.providers!.openai!.models.push({
+      id: "gpt-7-custom",
+      label: "GPT 7 custom",
+      status: "visible",
+      visible_to_credential: true,
+      eligible: true,
+      reason_code: "model_not_in_registry",
+      thinking_mode: "none",
+    });
+    vi.stubGlobal("fetch", stubFetch({ catalog: cat }));
+    await mountResearch();
+
+    await setSelect(select("模型")!, "gpt-7-custom");
+    expect(select("effort")?.value).toBe("");
+    expect(Array.from(select("effort")?.options ?? []).map((option) => option.value))
+      .toContain("high");
+    await setSelect(select("effort")!, "high");
+    await setTextarea("Use the discovered custom model");
+
+    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
+  });
+
+  it("clears stale route edits immediately when the active thread is deleted", async () => {
+    const threadId = "delete-stale-selection";
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread(threadId, "Delete stale selection")],
+      selections: {
+        [threadId]: { provider: "openai", model: "gpt-5.6-luna", effort: "high" },
+      },
+    }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
+    await mountResearch();
+    await vi.waitFor(() => expect(select("模型")?.value).toBe("gpt-5.6-luna"));
+
+    await setSelect(select("模型")!, "gpt-5.6-sol");
+    expect(select("effort")?.value).toBe("");
+    await click(button("歷史")!);
+    const deleteButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((candidate) => candidate.getAttribute("aria-label")
+        === "永久刪除 Delete stale selection")!;
+    await click(deleteButton);
+    await click(button("永久刪除")!);
+
+    await vi.waitFor(() => {
+      expect(select("模型")?.value).toBe("gpt-5.6-luna");
+      expect(select("effort")?.value).toBe("xhigh");
+    });
+    expect(host!.textContent).not.toContain("gpt-5.6-sol 尚未選擇 effort");
+  });
+
   it("4. distinguishes subscription quota from API-key usage in provider context", async () => {
     vi.stubGlobal("fetch", stubFetch({ catalog: catalog("chatgpt_oauth") }));
     await mountResearch();
@@ -1276,6 +1344,24 @@ describe("Research workspace contracts", () => {
     if (tuple.model === "gpt-5.4-mini") expect(select("模型")?.value).toBe("");
   });
 
+  it("shows the stored historical default effort identifier literally", async () => {
+    const threadId = "literal-default-history";
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread(threadId, "Literal default")],
+      messages: {
+        [threadId]: [message("Historical answer", { effort: "default" })],
+      },
+      selections: {
+        [threadId]: { provider: "openai", model: "gpt-5.6-luna", effort: "default" },
+      },
+    }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
+    await mountResearch();
+
+    await vi.waitFor(() => expect(host!.textContent).toContain("Historical answer"));
+    expect(host!.querySelector(".research-bubble-meta")?.textContent).toContain("default");
+  });
+
   it("8. keeps an active draft editable with disabled Send and separate Stop and queues nothing", async () => {
     const active = run("active-run", "thread-a", "running");
     const never = new Promise<Response>(() => undefined);
@@ -1376,8 +1462,7 @@ describe("Research workspace contracts", () => {
     expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain("研究歷史");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("中性");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain("成長機會派");
-    expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("openai · gpt-5.6-luna · Provider 預設");
-    expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain(" · default");
+    expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("openai · gpt-5.6-luna · default");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).toContain("總輸入 tokens");
     expect.soft(document.querySelector("[role='dialog']")?.textContent).not.toContain("total_input_tokens");
 

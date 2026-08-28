@@ -271,9 +271,7 @@ export function presentResearchRoute(input: {
     model,
     modelLabel: model ?? unknown,
     effort,
-    effortLabel: effort === "default"
-      ? t(($) => $.workspace.providerDefault)
-      : effort ?? unknown,
+    effortLabel: effort ?? unknown,
     runId: input.runId ?? null,
     errorCode: input.errorCode ?? null,
   };

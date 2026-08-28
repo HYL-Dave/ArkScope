@@ -155,8 +155,9 @@ export function ModelRoutingSection({
           const providerBlock = taskEffective?.providers?.[row.provider];
           const rawEntries = providerBlock?.models
             ?? compatEntries(row.provider, row, modelsByProvider, commonT);
-          const currentModels = new Set(catalog.current_model_ids ?? catalog.models.map((model) => model.id));
-          const currentEntries = rawEntries.filter((entry) => currentModels.has(entry.id));
+          const currentEntries = rawEntries.filter((entry) => (
+            taskRouteModelStatus(catalog, row.provider, entry.id) === "current"
+          ));
           const entries = currentEntries.some((entry) => entry.id === row.model) || !row.model
             ? currentEntries
             : [
@@ -166,8 +167,8 @@ export function ModelRoutingSection({
                   label: row.model,
                   status: "route" as const,
                   visible_to_credential: null,
-                  eligible: taskRouteModelStatus(catalog, row.model) !== "retired",
-                  reason_code: taskRouteModelStatus(catalog, row.model) === "retired"
+                  eligible: taskRouteModelStatus(catalog, row.provider, row.model) !== "retired",
+                  reason_code: taskRouteModelStatus(catalog, row.provider, row.model) === "retired"
                     ? "model_retired"
                     : "model_not_in_registry",
                   thinking_mode: "none",
@@ -177,7 +178,7 @@ export function ModelRoutingSection({
           const providerReason = modelProviderReason(context, providerBlock);
           const groups = groupedModelEntries(entries, providerReason, commonT);
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
-          const selectedModelStatus = taskRouteModelStatus(catalog, row.model);
+          const selectedModelStatus = taskRouteModelStatus(catalog, row.provider, row.model);
           const selectedReason = selectedModelStatus === "retired"
             ? "model_retired"
             : selectedEntry ? optionReason(selectedEntry, providerReason) : null;
@@ -207,8 +208,7 @@ export function ModelRoutingSection({
             })
           );
           const modelSelectDisabled = !context
-            || (!!providerBlock && !providerBlock.executable)
-            || selectedModelStatus === "retired";
+            || (!!providerBlock && !providerBlock.executable);
           const testDisabled = (
             compatMode
             || modelSelectDisabled

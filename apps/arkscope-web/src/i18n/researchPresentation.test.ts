@@ -241,6 +241,16 @@ describe("research presentation", () => {
     });
   });
 
+  it("shows the historical default effort identifier literally", async () => {
+    const presentation = await loadPresentation();
+
+    expect(presentation.presentResearchRoute({
+      provider: "openai",
+      model: "gpt-5.6-luna",
+      effort: "default",
+    }, translators("en").researchT).effortLabel).toBe("default");
+  });
+
   it("preserves unknown stable values instead of collapsing them", async () => {
     const presentation = await loadPresentation();
     const { researchT, commonT } = translators("en");
