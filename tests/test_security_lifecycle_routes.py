@@ -566,7 +566,7 @@ def test_evidence_translation_route_reports_selected_route_without_fallback(
     selected = SimpleNamespace(
         provider="anthropic",
         model="claude-sonnet-5",
-        effort="default",
+        effort="medium",
     )
     anthropic_calls: list[str] = []
     openai_calls: list[str] = []

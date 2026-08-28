@@ -439,13 +439,12 @@ class TestSSEEndpoint:
             yield c
 
     def test_stream_bad_provider(self, client):
-        """POST /query/stream with unknown provider returns error event."""
+        """POST /query/stream rejects an unknown provider before opening SSE."""
         r = client.post(
             "/query/stream",
             json={"question": "Test", "provider": "unknown"},
         )
-        assert r.status_code == 200
-        assert r.headers["content-type"].startswith("text/event-stream")
-        # Should contain an error event
-        body = r.text
-        assert '"type": "error"' in body
+        assert r.status_code == 400
+        assert r.json() == {
+            "detail": "Unknown provider: unknown. Use 'openai' or 'anthropic'."
+        }
