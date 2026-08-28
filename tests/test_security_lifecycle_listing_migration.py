@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sqlite3
 import stat
+import threading
 
 import pytest
 
@@ -530,6 +531,113 @@ def test_preflight_is_read_only_and_exact_v3_migration_is_an_idempotent_noop(tmp
     assert result.source_schema_version == "v3"
     assert result.target_schema_version == "v3"
     assert source.read_bytes() == migrated_bytes
+
+
+def test_preflight_uses_one_read_snapshot_during_concurrent_writer_commit(
+    tmp_path, monkeypatch
+):
+    import src.security_lifecycle_listing_migration as migration
+
+    source = _seeded_v2_profile(tmp_path)
+    with sqlite3.connect(source) as conn:
+        assert conn.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+        conn.execute("PRAGMA wal_autocheckpoint=0")
+
+    before = migration.preflight_listing_authority_migration(source)
+    digest_started = threading.Event()
+    writer_committed = threading.Event()
+    writer_errors: list[BaseException] = []
+
+    def writer() -> None:
+        try:
+            if not digest_started.wait(timeout=5):
+                raise AssertionError("preflight did not reach table digests")
+            with sqlite3.connect(source, timeout=5) as conn:
+                conn.execute(
+                    "UPDATE security_lifecycle_cases SET updated_at=? "
+                    "WHERE case_id='slc_1'",
+                    ("2026-08-28T00:01:00Z",),
+                )
+            writer_committed.set()
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            writer_errors.append(exc)
+            writer_committed.set()
+
+    real_table_digests = migration._table_digests
+
+    def pause_before_table_digests(conn, tables):
+        digest_started.set()
+        assert writer_committed.wait(timeout=5)
+        return real_table_digests(conn, tables)
+
+    monkeypatch.setattr(migration, "_table_digests", pause_before_table_digests)
+    thread = threading.Thread(target=writer)
+    thread.start()
+    during = migration.preflight_listing_authority_migration(source)
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert writer_errors == []
+
+    monkeypatch.setattr(migration, "_table_digests", real_table_digests)
+    after = migration.preflight_listing_authority_migration(source)
+    assert during == before
+    assert after != before
+
+
+def test_preflight_rolls_back_read_transaction_on_success_and_error(
+    tmp_path, monkeypatch
+):
+    import src.security_lifecycle_listing_migration as migration
+
+    source = _seeded_v2_profile(tmp_path)
+    real_open = migration._open_read_only
+    opened: list[TrackingConnection] = []
+
+    class TrackingConnection:
+        def __init__(self, connection: sqlite3.Connection) -> None:
+            self.connection = connection
+            self.statements: list[str] = []
+            self.rollback_calls = 0
+            self.close_calls = 0
+
+        @property
+        def in_transaction(self) -> bool:
+            return self.connection.in_transaction
+
+        def execute(self, statement, parameters=()):
+            self.statements.append(str(statement))
+            return self.connection.execute(statement, parameters)
+
+        def rollback(self) -> None:
+            self.rollback_calls += 1
+            self.connection.rollback()
+
+        def close(self) -> None:
+            self.close_calls += 1
+            self.connection.close()
+
+    def tracking_open(path: Path, *, restore: bool = False):
+        tracked = TrackingConnection(real_open(path, restore=restore))
+        opened.append(tracked)
+        return tracked
+
+    monkeypatch.setattr(migration, "_open_read_only", tracking_open)
+    migration.preflight_listing_authority_migration(source)
+    assert any(statement.strip().casefold() == "begin" for statement in opened[0].statements)
+    assert opened[0].rollback_calls == 1
+    assert opened[0].close_calls == 1
+
+    def fail_inspection(conn) -> None:
+        assert conn.in_transaction
+        raise migration.ListingMigrationRejected("forced_inspection_failure")
+
+    monkeypatch.setattr(migration, "_inspect_connection", fail_inspection)
+    with pytest.raises(
+        migration.ListingMigrationRejected, match="forced_inspection_failure"
+    ):
+        migration.preflight_listing_authority_migration(source)
+    assert opened[1].rollback_calls == 1
+    assert opened[1].close_calls == 1
 
 
 def test_migration_rejects_stale_approval_and_wrong_backup_digest(tmp_path):

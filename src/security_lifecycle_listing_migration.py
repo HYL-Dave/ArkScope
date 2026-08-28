@@ -406,7 +406,11 @@ def preflight_listing_authority_migration(
 
     conn = _open_read_only(Path(path))
     try:
-        return _inspect_connection(conn)
+        conn.execute("BEGIN")
+        try:
+            return _inspect_connection(conn)
+        finally:
+            conn.rollback()
     except sqlite3.Error as exc:
         raise ListingMigrationRejected("profile_preflight_failed") from exc
     finally:

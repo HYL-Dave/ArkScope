@@ -533,6 +533,7 @@ def test_listing_evidence_requires_https_automation_document_digest_and_locator(
             "source_locator_json": '{"candidate_ticker":"OLD"}',
         }
         for column, value in (
+            ("source_url", None),
             ("source_url", "http://api.massive.com/v3/reference/tickers"),
             ("automation_run_id", None),
             ("source_document_sha256", None),

@@ -689,6 +689,7 @@ PROFILE_TABLE_SQL = {
                     AND kind = 'listing_directory_snapshot'
                     AND run_id IS NULL
                     AND automation_run_id IS NOT NULL
+                    AND source_url IS NOT NULL
                     AND source_url LIKE 'https://%'
                     AND source_document_sha256 IS NOT NULL
                     AND source_locator_json IS NOT NULL
