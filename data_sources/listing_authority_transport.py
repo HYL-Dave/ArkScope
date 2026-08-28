@@ -144,6 +144,7 @@ class ListingAuthorityTransport:
 
         chunks: list[bytes] = []
         total = 0
+        transport_failed = False
         try:
             iterator = response.iter_content(chunk_size=min(65_536, maximum + 1))
             for chunk in iterator:
@@ -161,10 +162,10 @@ class ListingAuthorityTransport:
                 chunks.append(chunk)
         except ListingTransportFailure:
             raise
-        except requests.RequestException:
+        except (requests.RequestException, OSError, TypeError, ValueError):
+            transport_failed = True
+        if transport_failed:
             raise ListingTransportFailure(f"{code_prefix}_transport_unavailable") from None
-        except (OSError, TypeError, ValueError) as exc:
-            raise ListingTransportFailure(f"{code_prefix}_transport_unavailable") from exc
         return b"".join(chunks)
 
     @staticmethod
@@ -208,6 +209,8 @@ class ListingAuthorityTransport:
         aggregate_maximum_bytes: int | None = None,
         aggregate_overflow_code: str | None = None,
     ) -> ListingHttpPayload:
+        response: Any | None = None
+        request_failed = False
         try:
             response = self._session.get(
                 request_url,
@@ -217,9 +220,13 @@ class ListingAuthorityTransport:
                 stream=True,
                 allow_redirects=False,
             )
-        except (requests.RequestException, OSError, TimeoutError):
+        except (requests.RequestException, OSError, TimeoutError, TypeError, ValueError):
+            request_failed = True
+        if request_failed:
             raise ListingTransportFailure(f"{code_prefix}_transport_unavailable") from None
 
+        payload: ListingHttpPayload | None = None
+        response_failed = False
         try:
             status_code = int(getattr(response, "status_code"))
             if 300 <= status_code < 400:
@@ -239,7 +246,7 @@ class ListingAuthorityTransport:
                 aggregate_maximum=aggregate_maximum_bytes,
                 aggregate_overflow_code=aggregate_overflow_code,
             )
-            return ListingHttpPayload(
+            payload = ListingHttpPayload(
                 source_url=source_url,
                 retrieved_at=self._retrieved_at(self._now()),
                 status_code=status_code,
@@ -248,13 +255,16 @@ class ListingAuthorityTransport:
             )
         except ListingTransportFailure:
             raise
-        except (AttributeError, TypeError, ValueError) as exc:
-            raise ListingTransportFailure(f"{code_prefix}_transport_unavailable") from exc
+        except (AttributeError, OSError, TypeError, ValueError):
+            response_failed = True
         finally:
             try:
                 response.close()
             except (AttributeError, OSError, TypeError):
                 pass
+        if response_failed or payload is None:
+            raise ListingTransportFailure(f"{code_prefix}_transport_unavailable") from None
+        return payload
 
     def fetch_nasdaq(
         self, source_url: str, *, budget: ListingRequestBudget
@@ -337,10 +347,14 @@ class ListingAuthorityTransport:
 
     @staticmethod
     def _validate_massive_payload(body: bytes, ticker: str) -> None:
+        payload: Any = None
+        invalid_json = False
         try:
             payload = json.loads(body)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ListingTransportFailure("massive_invalid_json") from exc
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            invalid_json = True
+        if invalid_json:
+            raise ListingTransportFailure("massive_invalid_json") from None
         if not isinstance(payload, dict):
             raise ListingTransportFailure("massive_invalid_json")
         if str(payload.get("status", "")).upper() == "ERROR":

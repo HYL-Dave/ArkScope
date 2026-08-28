@@ -84,6 +84,19 @@ def _massive_call(
     )
 
 
+def _assert_closed_failure(
+    error: Exception, expected_code: str, *untrusted_values: str
+) -> None:
+    assert type(error) is ListingTransportFailure
+    assert error.code == expected_code
+    assert str(error) == expected_code
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    rendered = repr(error)
+    for value in untrusted_values:
+        assert value not in rendered
+
+
 def test_transport_allows_only_two_exact_nasdaq_files() -> None:
     """Rejecting a third directory request prevents per-case fetches."""
     session = FakeSession([_nasdaq_response(), _nasdaq_response()])
@@ -310,6 +323,24 @@ def test_massive_rejects_malformed_json_and_multiple_exact_rows() -> None:
     assert exc.value.code == "massive_response_ambiguous"
 
 
+def test_massive_invalid_json_does_not_retain_decoder_document() -> None:
+    """A JSONDecodeError document must not survive in the closed failure chain."""
+    raw_marker = "raw-provider-body"
+    api_key_marker = "apiKey=credential-value"
+    body = f'{{"results":["{raw_marker}","{api_key_marker}"'.encode("ascii")
+    transport = ListingAuthorityTransport(session=FakeSession([_massive_response(body)]))
+
+    with pytest.raises(Exception) as exc:
+        _massive_call(transport, ListingRequestBudget.lifecycle())
+
+    _assert_closed_failure(
+        exc.value,
+        "massive_invalid_json",
+        raw_marker,
+        api_key_marker,
+    )
+
+
 def test_massive_rejects_provider_error_envelopes() -> None:
     """A 200 provider error envelope cannot become an empty ticker result."""
     response = _massive_response(b'{"status":"ERROR","error":"secret-value"}')
@@ -337,6 +368,7 @@ def test_transport_redacts_timeout_exception_and_closes_injected_session() -> No
     assert exc.value.code == "massive_transport_unavailable"
     assert "secret-value" not in str(exc.value)
     assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
     transport.close()
     assert session.closed is True
 
@@ -357,6 +389,78 @@ def test_transport_redacts_streaming_request_exceptions() -> None:
     assert exc.value.code == "massive_transport_unavailable"
     assert "secret-value" not in str(exc.value)
     assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+    assert response.closed is True
+
+
+def test_transport_redacts_generic_session_oserror() -> None:
+    """A generic session failure must not retain a credential-bearing URL."""
+    api_key_marker = "apiKey=generic-session-secret"
+
+    class FailingSession(FakeSession):
+        def get(self, url: str, **kwargs: object) -> FakeResponse:
+            del url, kwargs
+            raise OSError(f"https://api.massive.com/tickers?{api_key_marker}")
+
+    transport = ListingAuthorityTransport(session=FailingSession())
+
+    with pytest.raises(Exception) as exc:
+        _massive_call(transport, ListingRequestBudget.lifecycle())
+
+    _assert_closed_failure(
+        exc.value,
+        "massive_transport_unavailable",
+        api_key_marker,
+    )
+
+
+@pytest.mark.parametrize("error_type", (OSError, TypeError, ValueError))
+def test_transport_redacts_generic_streaming_exceptions(error_type: type[Exception]) -> None:
+    """Generic body-stream failures must not retain raw provider content."""
+    raw_marker = f"raw-stream-body-{error_type.__name__}"
+
+    class FailingResponse(FakeResponse):
+        def iter_content(self, chunk_size: int):
+            del chunk_size
+            raise error_type(raw_marker)
+
+    response = FailingResponse(headers={"Content-Type": "application/json"})
+    transport = ListingAuthorityTransport(session=FakeSession([response]))
+
+    with pytest.raises(Exception) as exc:
+        _massive_call(transport, ListingRequestBudget.lifecycle())
+
+    _assert_closed_failure(
+        exc.value,
+        "massive_transport_unavailable",
+        raw_marker,
+    )
+    assert response.closed is True
+
+
+@pytest.mark.parametrize("error_type", (OSError, TypeError, ValueError))
+def test_transport_redacts_generic_response_content_exceptions(
+    error_type: type[Exception],
+) -> None:
+    """Generic response metadata failures must not retain provider details."""
+    api_key_marker = f"apiKey=response-{error_type.__name__}"
+
+    class FailingHeaders:
+        def items(self):
+            raise error_type(api_key_marker)
+
+    response = FakeResponse()
+    response.headers = FailingHeaders()
+    transport = ListingAuthorityTransport(session=FakeSession([response]))
+
+    with pytest.raises(Exception) as exc:
+        _massive_call(transport, ListingRequestBudget.lifecycle())
+
+    _assert_closed_failure(
+        exc.value,
+        "massive_transport_unavailable",
+        api_key_marker,
+    )
     assert response.closed is True
 
 
