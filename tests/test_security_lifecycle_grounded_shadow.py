@@ -20,6 +20,38 @@ def _payload(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _listing_material(name: str, snapshot: dict) -> tuple[dict, tuple[dict, ...]]:
+    evidence_id = f"listing-{name.lower()}"
+    evidence = {
+        "evidence_id": evidence_id,
+        "source_family": "listing_authority",
+        "source_locator": {
+            "locator_kind": "listing_directory_snapshot",
+            "adapter": snapshot["adapter"],
+            "candidate_ticker": snapshot["candidate_ticker"],
+            "expected_active_state": snapshot["expected_active_state"],
+            "market": snapshot["market"],
+            "status": snapshot["status"],
+            "active": snapshot["active"],
+        },
+        "retrieved_at": _AT,
+    }
+    facts = tuple(
+        {
+            "evidence_id": evidence_id,
+            "fact_type": fact_type,
+            "normalized_value": value,
+        }
+        for fact_type, value in (
+            ("successor_ticker", snapshot["candidate_ticker"]),
+            ("destination_venue", snapshot["venue"]),
+            ("security_class", snapshot["security_class"]),
+            ("issuer_cik", snapshot["issuer_cik"]),
+        )
+    )
+    return evidence, facts
+
+
 def _submissions(case: dict) -> dict:
     filing = case["filing"]
     fields = (
@@ -136,6 +168,11 @@ def _shadow(name: str):
     )
     evidence = list(sec.evidence)
     facts = list(sec.facts)
+    listing_evidence, listing_facts = _listing_material(
+        name, manifest_case["listing_snapshot"]
+    )
+    evidence.append(listing_evidence)
+    facts.extend(listing_facts)
     snapshot = manifest_case["market_snapshot"]
     if snapshot is not None:
         request_count = len(context.ibkr_conids) + len(context.ticker_aliases)
@@ -227,6 +264,10 @@ def test_shadow_manifest_binds_reviewed_case_identity_and_discloses_a_to_b_n1():
     assert manifest["market_snapshot_provenance"] == (
         "synthetic_ibkr_contract_shape"
     )
+    assert manifest["listing_snapshot_provenance"] == (
+        "synthetic_nasdaq_directory_shape"
+    )
+    assert all(case["listing_snapshot"] for case in manifest["cases"].values())
     assert manifest["network_calls"] == 0
     assert manifest["historical_a_to_b_coverage"] == 1
     assert [

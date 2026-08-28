@@ -5,14 +5,13 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from datetime import date, datetime, time, timezone
 from typing import Any, Literal
 
 from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
 
 
-AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v3"
+AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v4"
 RULE_VERSIONS = {
     "lifecycle.insufficient_identity_facts": "1",
     "lifecycle.ma_review": "1",
@@ -383,14 +382,6 @@ def _regulator_chain_complete(evidence: tuple[_Evidence, ...]) -> bool:
     )
 
 
-def _market_contract_missing(evidence: tuple[_Evidence, ...]) -> bool:
-    return any(
-        row.source_family == "market_infrastructure"
-        and row.source_locator.get("contract_status") == "missing"
-        for row in evidence
-    )
-
-
 def _market_timestamp(value: object) -> datetime | None:
     text = str(value or "").strip()
     if not text:
@@ -405,67 +396,259 @@ def _market_timestamp(value: object) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _listing_snapshot(row: _Evidence) -> Mapping[str, Any] | None:
+    if row.source_family != "listing_authority":
+        return None
+    nested = row.source_locator.get("listing_directory_snapshot")
+    snapshot = nested if isinstance(nested, Mapping) else row.source_locator
+    kind = _text(snapshot.get("locator_kind"))
+    if kind not in {None, "listing_directory_snapshot"}:
+        return None
+    if _text(snapshot.get("adapter")) is None:
+        return None
+    return snapshot
+
+
+def _listing_expected_state(value: object) -> str | None:
+    if value is True:
+        return "active"
+    if value is False:
+        return "inactive"
+    text = _text(value)
+    return None if text is None else text.lower()
+
+
+def _listing_component(row: _Evidence) -> tuple[str, str, str, str] | None:
+    snapshot = _listing_snapshot(row)
+    if snapshot is None:
+        return None
+    adapter = _text(snapshot.get("adapter"))
+    ticker = _ticker(snapshot.get("candidate_ticker"))
+    expected = _listing_expected_state(snapshot.get("expected_active_state"))
+    market = _text(snapshot.get("market"))
+    if None in {adapter, ticker, expected, market}:
+        return None
+    assert adapter is not None
+    assert ticker is not None
+    assert expected is not None
+    assert market is not None
+    return adapter.lower(), ticker, expected, market.lower()
+
+
+def _listing_records(
+    evidence: tuple[_Evidence, ...], ticker: str
+) -> tuple[_Evidence, ...]:
+    """Select current listing material independently within each component."""
+
+    candidate = _ticker(ticker)
+    grouped: dict[tuple[str, str, str, str], list[_Evidence]] = {}
+    for row in evidence:
+        component = _listing_component(row)
+        if component is None or component[1] != candidate:
+            continue
+        grouped.setdefault(component, []).append(row)
+
+    selected: list[_Evidence] = []
+    for component in sorted(grouped):
+        rows = grouped[component]
+        timestamps = tuple((row, _market_timestamp(row.retrieved_at)) for row in rows)
+        if len(rows) == 1:
+            selected.extend(rows)
+        elif all(value is not None for _row, value in timestamps):
+            latest = max(value for _row, value in timestamps if value is not None)
+            selected.extend(row for row, value in timestamps if value == latest)
+        else:
+            # Unknown recency cannot safely supersede another record.
+            selected.extend(rows)
+    return tuple(sorted(selected, key=lambda row: row.evidence_id))
+
+
+def _listing_status(row: _Evidence) -> str | None:
+    snapshot = _listing_snapshot(row)
+    if snapshot is None:
+        return None
+    value = snapshot.get("status", snapshot.get("result"))
+    text = _text(value)
+    return None if text is None else text.lower()
+
+
+def _listing_row_active(row: _Evidence) -> bool:
+    snapshot = _listing_snapshot(row)
+    if snapshot is None:
+        return False
+    return _listing_status(row) == "found" and snapshot.get("active") is True
+
+
+def _listing_active(evidence: tuple[_Evidence, ...], ticker: str) -> bool:
+    return any(_listing_row_active(row) for row in _listing_records(evidence, ticker))
+
+
+def _listing_active_successor_present(
+    evidence: tuple[_Evidence, ...], source_ticker: str
+) -> bool:
+    source = _ticker(source_ticker)
+    return any(
+        component is not None
+        and component[1] != source
+        and _listing_row_active(row)
+        for row in _selected_listing_rows(evidence)
+        for component in (_listing_component(row),)
+    )
+
+
+def _listing_active_rows(
+    evidence: tuple[_Evidence, ...],
+    ticker: str,
+    *,
+    adapter: str | None = None,
+    market: str | None = None,
+) -> tuple[_Evidence, ...]:
+    return tuple(
+        row
+        for row in _listing_records(evidence, ticker)
+        for component in (_listing_component(row),)
+        if component is not None
+        and _listing_row_active(row)
+        and (adapter is None or component[0] == adapter.lower())
+        and (market is None or component[3] == market.lower())
+    )
+
+
+def _facts_for_evidence(
+    facts: tuple[_Fact, ...], evidence: tuple[_Evidence, ...]
+) -> tuple[_Fact, ...]:
+    evidence_ids = {row.evidence_id for row in evidence}
+    return tuple(row for row in facts if row.evidence_id in evidence_ids)
+
+
+def _listing_explicit_inactive(
+    evidence: tuple[_Evidence, ...], ticker: str, today: date
+) -> bool:
+    cutoff = datetime.combine(today, time.max, tzinfo=timezone.utc)
+    for row in _listing_records(evidence, ticker):
+        component = _listing_component(row)
+        snapshot = _listing_snapshot(row)
+        if component is None or snapshot is None:
+            continue
+        delisted = _market_timestamp(snapshot.get("delisted_utc"))
+        if (
+            component[0] == "massive_reference"
+            and _listing_status(row) == "found"
+            and snapshot.get("active") is False
+            and delisted is not None
+            and delisted <= cutoff
+        ):
+            return True
+    return False
+
+
+def _listing_not_found(
+    evidence: tuple[_Evidence, ...], ticker: str, authority: str
+) -> bool:
+    expected = authority.lower()
+    return any(
+        component is not None
+        and component[0] == expected
+        and _listing_status(row) == "not_found"
+        for row in _listing_records(evidence, ticker)
+        for component in (_listing_component(row),)
+    )
+
+
+def _nasdaq_not_found_complete(
+    evidence: tuple[_Evidence, ...], ticker: str
+) -> bool:
+    markets = {
+        component[3]
+        for row in _listing_records(evidence, ticker)
+        for component in (_listing_component(row),)
+        if component is not None
+        and component[0] == "nasdaq_symbol_directory"
+        and _listing_status(row) == "not_found"
+    }
+    return len(markets) >= 2
+
+
+def _listing_conflicts(
+    evidence: tuple[_Evidence, ...], ticker: str
+) -> tuple[str, ...]:
+    rows = _listing_records(evidence, ticker)
+    grouped: dict[tuple[str, str, str, str], list[_Evidence]] = {}
+    for row in rows:
+        component = _listing_component(row)
+        if component is not None:
+            grouped.setdefault(component, []).append(row)
+    for component_rows in grouped.values():
+        states = {
+            (
+                _listing_status(row),
+                (_listing_snapshot(row) or {}).get("active"),
+                _text((_listing_snapshot(row) or {}).get("delisted_utc")),
+            )
+            for row in component_rows
+        }
+        if len(states) > 1:
+            return ("listing_authority_conflict",)
+    if any(_listing_row_active(row) for row in rows) and any(
+        (_listing_snapshot(row) or {}).get("active") is False
+        and _listing_status(row) == "found"
+        for row in rows
+    ):
+        return ("listing_authority_conflict",)
+    return ()
+
+
+def _selected_listing_rows(evidence: tuple[_Evidence, ...]) -> tuple[_Evidence, ...]:
+    tickers = {
+        component[1]
+        for row in evidence
+        for component in (_listing_component(row),)
+        if component is not None
+    }
+    selected = {
+        row.evidence_id: row
+        for ticker in tickers
+        for row in _listing_records(evidence, ticker)
+    }
+    return tuple(selected[key] for key in sorted(selected))
+
+
 def _current_decision_material(
     evidence: tuple[_Evidence, ...],
     facts: tuple[_Fact, ...],
 ) -> tuple[tuple[_Evidence, ...], tuple[_Fact, ...]]:
+    listing = _selected_listing_rows(evidence)
     market = tuple(
-        row for row in evidence if row.source_family == "market_infrastructure"
-    )
-    if len(market) <= 1:
-        return evidence, facts
-    timestamps = tuple(
-        (row, _market_timestamp(row.retrieved_at)) for row in market
-    )
-    if any(value is None for _row, value in timestamps):
-        selected: tuple[_Evidence, ...] = ()
-    else:
-        latest = max(value for _row, value in timestamps if value is not None)
-        selected = tuple(row for row, value in timestamps if value == latest)
-        if len(selected) != 1:
-            selected = ()
-    selected_ids = {row.evidence_id for row in selected}
-    current_evidence = tuple(
-        row
-        for row in evidence
-        if row.source_family != "market_infrastructure"
-        or row.evidence_id in selected_ids
-    )
-    current_ids = {row.evidence_id for row in current_evidence}
-    return current_evidence, tuple(
-        row for row in facts if row.evidence_id in current_ids
-    )
-
-
-def _market_snapshot_fresh(evidence: tuple[_Evidence, ...]) -> bool:
-    rows = tuple(
         row
         for row in evidence
         if row.source_family == "market_infrastructure"
         and row.source_locator.get("contract_status") == "found"
     )
-    if len(rows) != 1:
-        return False
-    market_data = rows[0].source_locator.get("market_data")
-    if not isinstance(market_data, Mapping):
-        return False
-    try:
-        last = Decimal(str(market_data.get("last")))
-    except (InvalidOperation, ValueError):
-        return False
-    provider_time = _market_timestamp(market_data.get("provider_time"))
-    retrieved_at = _market_timestamp(market_data.get("retrieved_at"))
-    if (
-        market_data.get("status") != "live"
-        or market_data.get("fresh") is not True
-        or not last.is_finite()
-        or last <= 0
-        or provider_time is None
-        or retrieved_at is None
-    ):
-        return False
-    age = retrieved_at - provider_time
-    return -timedelta(minutes=5) <= age <= timedelta(minutes=15)
+    timestamps = tuple(
+        (row, _market_timestamp(row.retrieved_at)) for row in market
+    )
+    if len(market) <= 1:
+        selected_market = market
+    elif any(value is None for _row, value in timestamps):
+        selected_market = ()
+    else:
+        latest = max(value for _row, value in timestamps if value is not None)
+        selected_market = tuple(row for row, value in timestamps if value == latest)
+        if len(selected_market) != 1:
+            selected_market = ()
+    selected_ids = {
+        row.evidence_id
+        for row in evidence
+        if row.source_family == "regulator"
+    }
+    selected_ids.update(row.evidence_id for row in listing)
+    selected_ids.update(row.evidence_id for row in selected_market)
+    current_evidence = tuple(
+        row for row in evidence if row.evidence_id in selected_ids
+    )
+    return current_evidence, tuple(
+        row for row in facts if row.evidence_id in selected_ids
+    )
 
 
 def evaluate_automation_decision(
@@ -501,6 +684,30 @@ def evaluate_automation_decision(
     else:
         raise ValueError("current_date")
     sources = frozenset(str(value) for value in active_sources)
+
+    listing_tickers = {
+        component[1]
+        for row in evidence_rows
+        for component in (_listing_component(row),)
+        if component is not None
+    }
+    listing_issues = tuple(
+        issue
+        for ticker in sorted(listing_tickers)
+        for issue in _listing_conflicts(evidence_rows, ticker)
+    )
+    if listing_issues:
+        return _decision(
+            decision_tier="review_suggested",
+            action_readiness="action_blocked",
+            relevance="direct_tracked_security",
+            confidence="low",
+            outcomes=("undetermined",),
+            conclusion="Current listing authority contains incompatible records.",
+            impact_summary="No listing state was selected by source count.",
+            rule_id="lifecycle.source_conflict",
+            decision_issues=listing_issues,
+        )
 
     conflicts = _conflicts(fact_rows)
     if conflicts:
@@ -590,18 +797,41 @@ def evaluate_automation_decision(
             return _insufficient(issues=missing)
 
         assert regulator_date is not None
+        if _listing_active_successor_present(evidence_rows, regulator_source):
+            return _decision(
+                decision_tier="review_suggested",
+                action_readiness="action_blocked",
+                relevance="direct_tracked_security",
+                confidence="low",
+                outcomes=("undetermined",),
+                conclusion="Current listing authority presents an active successor.",
+                impact_summary="Terminal action is blocked by the positive successor.",
+                effective_date=regulator_date,
+                rule_id="lifecycle.source_conflict",
+                decision_issues=("successor_present",),
+            )
         if today < date.fromisoformat(regulator_date):
             readiness = "waiting_effective_date"
             issues: tuple[str, ...] = ()
             requested = False
-        elif not _market_contract_missing(evidence_rows):
+            outcomes = ("listing_ended",)
+        elif not _nasdaq_not_found_complete(evidence_rows, regulator_source):
             readiness = "waiting_market_confirmation"
-            issues = ()
+            issues = ("nasdaq_not_found_incomplete",)
             requested = False
+            outcomes = ("undetermined",)
+        elif not _listing_explicit_inactive(
+            evidence_rows, regulator_source, today
+        ):
+            readiness = "waiting_market_confirmation"
+            issues = ("massive_explicit_inactive_missing",)
+            requested = False
+            outcomes = ("undetermined",)
         elif "portfolio_open" in sources:
             readiness = "action_blocked"
             issues = ("portfolio_position_open",)
             requested = False
+            outcomes = ("listing_ended",)
         else:
             request = {
                 "transition_kind": "terminal_delisting",
@@ -613,19 +843,29 @@ def evaluate_automation_decision(
             eligible, issues = _preview(transition_preview, request)
             readiness = "transition_eligible" if eligible else "action_blocked"
             requested = eligible
+            outcomes = ("listing_ended",)
         return _decision(
             decision_tier="verified_automatic",
             action_readiness=readiness,
             relevance="direct_tracked_security",
             confidence="high",
-            outcomes=("listing_ended",),
+            outcomes=outcomes,
             conclusion=(
-                f"The cited regulator record ends listing of {regulator_source} "
-                f"effective {regulator_date}."
+                (
+                    f"The cited regulator record and current listing authorities "
+                    f"establish that listing of {regulator_source} ended."
+                )
+                if outcomes == ("listing_ended",)
+                else (
+                    "Current directory absence does not establish an explicit "
+                    "terminal listing state."
+                )
             ),
             impact_summary=(
-                "Notify now; profile action waits for its effective date and "
-                "market confirmation."
+                "Keep the case in Monitoring until explicit listing authority "
+                "supports terminal action."
+                if outcomes == ("undetermined",)
+                else "Notify now; profile action follows the eligible preview."
             ),
             effective_date=regulator_date,
             rule_id="lifecycle.terminal_delisting",
@@ -646,8 +886,32 @@ def evaluate_automation_decision(
             missing.append("regulator_issuer_cik_missing")
         elif regulator_cik != case_cik:
             missing.append("issuer_cik_mismatch")
+        if regulator_class is None:
+            missing.append("regulator_security_class_missing")
         if missing:
             return _insufficient(issues=missing)
+        listing_rows = _listing_active_rows(evidence_rows, case_ticker)
+        listing_facts = _facts_for_evidence(fact_rows, listing_rows)
+        listing_ticker = _one(listing_facts, "successor_ticker")
+        listing_class = _one(listing_facts, "security_class")
+        if (
+            not listing_rows
+            or listing_ticker != case_ticker
+            or listing_class != regulator_class
+        ):
+            return _insufficient(issues=("listing_active_missing",))
+        if regulator_date is not None and today < date.fromisoformat(regulator_date):
+            return _decision(
+                decision_tier="verified_automatic",
+                action_readiness="waiting_effective_date",
+                relevance="issuer_related",
+                confidence="high",
+                outcomes=("undetermined",),
+                conclusion="The deterministic issuer effect is not yet effective.",
+                impact_summary="Keep the case in Monitoring until the effective date.",
+                effective_date=regulator_date,
+                rule_id="lifecycle.no_identity_change",
+            )
         return _decision(
             decision_tier="verified_automatic",
             action_readiness="not_applicable",
@@ -663,6 +927,11 @@ def evaluate_automation_decision(
             terms=transaction,
             decision_issues=transaction_issues,
         )
+
+    if "acquisition_completed" in {
+        str(value) for value in case.get("event_kinds", ())
+    } and _listing_active(evidence_rows, case_ticker):
+        return _insufficient(issues=("regulator_role_effect_missing",))
 
     if transaction_kind is not None:
         return _decision(
@@ -715,26 +984,40 @@ def evaluate_automation_decision(
     if case_ticker not in {regulator_source, regulator_successor}:
         return _insufficient(issues=("case_ticker_mismatch",))
 
-    market_successor = _one(
-        fact_rows, "successor_ticker", family="market_infrastructure"
+    otc_destination = (
+        regulator_destination is not None
+        and regulator_destination.startswith("OTC")
     )
-    market_destination = _one(
-        fact_rows, "destination_venue", family="market_infrastructure"
-    )
-    market_class = _one(
-        fact_rows, "security_class", family="market_infrastructure"
-    )
-    market_matches = (
-        market_successor == regulator_successor
-        and market_destination is not None
-        and market_class == regulator_class
+    if otc_destination:
+        listing_rows = _listing_active_rows(
+            evidence_rows,
+            regulator_successor,
+            adapter="massive_reference",
+            market="otc",
+        )
+        listing_issue = "massive_otc_active_missing"
+    else:
+        listing_rows = _listing_active_rows(
+            evidence_rows,
+            regulator_successor,
+            adapter="nasdaq_symbol_directory",
+        )
+        listing_issue = "listing_active_missing"
+    listing_facts = _facts_for_evidence(fact_rows, listing_rows)
+    listing_successor = _one(listing_facts, "successor_ticker")
+    listing_destination = _one(listing_facts, "destination_venue")
+    listing_class = _one(listing_facts, "security_class")
+    listing_matches = (
+        bool(listing_rows)
+        and listing_successor == regulator_successor
+        and listing_destination is not None
+        and listing_class == regulator_class
         and (
             regulator_destination is None
-            or market_destination == regulator_destination
+            or listing_destination == regulator_destination
         )
     )
-    market_snapshot_fresh = _market_snapshot_fresh(evidence_rows)
-    destination = regulator_destination or market_destination
+    destination = regulator_destination or listing_destination
     venue_changed = (
         regulator_source_venue is not None
         and destination is not None
@@ -742,7 +1025,7 @@ def evaluate_automation_decision(
     )
 
     if regulator_source == regulator_successor and venue_changed:
-        if not market_matches:
+        if not listing_matches:
             return _decision(
                 decision_tier="review_suggested",
                 action_readiness="action_blocked",
@@ -750,25 +1033,22 @@ def evaluate_automation_decision(
                 confidence="medium",
                 outcomes=("venue_transfer",),
                 conclusion="Regulator evidence indicates a venue transfer.",
-                impact_summary="Market-infrastructure corroboration is still required.",
+                impact_summary="Current destination listing authority is still required.",
                 successor_ticker=regulator_successor,
                 destination_venue=destination,
                 effective_date=regulator_date,
                 rule_id="lifecycle.venue_transfer",
-                decision_issues=("market_corroboration_missing",),
+                decision_issues=(listing_issue,),
             )
-        if not market_snapshot_fresh:
+        if today < date.fromisoformat(regulator_date):
             return _decision(
                 decision_tier="verified_automatic",
-                action_readiness="waiting_market_confirmation",
+                action_readiness="waiting_effective_date",
                 relevance="direct_tracked_security",
                 confidence="high",
                 outcomes=("venue_transfer",),
-                conclusion="Regulator and contract evidence indicate a venue transfer.",
-                impact_summary=(
-                    "A fresh live market snapshot is still required before the "
-                    "event is treated as effective."
-                ),
+                conclusion="Regulator and listing evidence indicate a venue transfer.",
+                impact_summary="Notify when the deterministic effective date arrives.",
                 successor_ticker=regulator_successor,
                 destination_venue=destination,
                 effective_date=regulator_date,
@@ -795,7 +1075,7 @@ def evaluate_automation_decision(
         outcomes = ("symbol_changed",) + (
             ("venue_transfer",) if venue_changed else ()
         )
-        if not market_matches:
+        if not listing_matches:
             return _decision(
                 decision_tier="review_suggested",
                 action_readiness="action_blocked",
@@ -806,32 +1086,47 @@ def evaluate_automation_decision(
                     f"Regulator evidence indicates {regulator_source} will become "
                     f"{regulator_successor}."
                 ),
-                impact_summary="Market-infrastructure corroboration is still required.",
+                impact_summary="Current destination listing authority is still required.",
                 successor_ticker=regulator_successor,
                 destination_venue=destination,
                 effective_date=regulator_date,
                 rule_id="lifecycle.simple_symbol_continuation",
-                decision_issues=("market_corroboration_missing",),
+                decision_issues=(listing_issue,),
             )
-        if not market_snapshot_fresh:
+        if today < date.fromisoformat(regulator_date):
             return _decision(
                 decision_tier="verified_automatic",
-                action_readiness="waiting_market_confirmation",
+                action_readiness="waiting_effective_date",
                 relevance="direct_tracked_security",
                 confidence="high",
                 outcomes=outcomes,
                 conclusion=(
-                    f"Regulator and contract evidence indicate {regulator_source} "
+                    f"Regulator and listing evidence indicate {regulator_source} "
                     f"will become {regulator_successor}."
                 ),
-                impact_summary=(
-                    "A fresh live market snapshot is still required before any "
-                    "ticker transition can be scheduled."
-                ),
+                impact_summary="Wait for the deterministic effective date.",
                 successor_ticker=regulator_successor,
                 destination_venue=destination,
                 effective_date=regulator_date,
                 rule_id="lifecycle.simple_symbol_continuation",
+            )
+        if "portfolio_open" in sources:
+            return _decision(
+                decision_tier="review_suggested",
+                action_readiness="action_blocked",
+                relevance="direct_tracked_security",
+                confidence="high",
+                outcomes=outcomes,
+                conclusion=(
+                    f"The tracked security will continue from {regulator_source} "
+                    f"to {regulator_successor}."
+                ),
+                impact_summary="An open portfolio position blocks automatic mutation.",
+                successor_ticker=regulator_successor,
+                destination_venue=destination,
+                effective_date=regulator_date,
+                rule_id="lifecycle.simple_symbol_continuation",
+                decision_issues=("portfolio_position_open",),
             )
         if case_ticker == regulator_successor:
             return _decision(
