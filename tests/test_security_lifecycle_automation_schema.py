@@ -36,6 +36,14 @@ def _columns(conn: sqlite3.Connection, table: str) -> list[str]:
     return [str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
+def _schema_sql(conn: sqlite3.Connection, table: str) -> str:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()
+    assert row is not None
+    return str(row[0])
+
+
 def _insert_case(conn: sqlite3.Connection, case_id: str = "slc_case") -> None:
     conn.execute(
         "INSERT INTO security_lifecycle_cases "
@@ -234,10 +242,25 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
     import src.security_lifecycle_schema as schema
 
     assert getattr(schema, "EVIDENCE_SOURCE_FAMILIES", None) == frozenset(
-        {"regulator", "market_infrastructure", "publisher", "general_web", "manual"}
+        {
+            "regulator",
+            "market_infrastructure",
+            "publisher",
+            "general_web",
+            "manual",
+            "listing_authority",
+        }
     )
     assert getattr(schema, "EVIDENCE_ADAPTERS", None) == frozenset(
-        {"sec_edgar", "internal_news", "ibkr_contract", "manual", "hosted_search"}
+        {
+            "sec_edgar",
+            "internal_news",
+            "ibkr_contract",
+            "manual",
+            "hosted_search",
+            "nasdaq_symbol_directory",
+            "massive_reference",
+        }
     )
     assert getattr(schema, "AUTOMATION_MODES", None) == frozenset(
         {"live", "historical"}
@@ -382,6 +405,172 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "idx_security_lifecycle_assessments_case_revision",
             "idx_security_lifecycle_one_current_ack",
         }
+    finally:
+        conn.close()
+
+
+def test_v3_schema_adds_listing_authority_without_removing_v2_values():
+    from src.security_lifecycle_schema import create_profile_schema
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        create_profile_schema(conn)
+        sql = _schema_sql(conn, "security_lifecycle_evidence")
+        for value in (
+            "listing_authority",
+            "nasdaq_symbol_directory",
+            "massive_reference",
+            "listing_directory_snapshot",
+            "publisher",
+            "internal_news",
+            "publisher_excerpt",
+        ):
+            assert f"'{value}'" in sql
+
+        _insert_case(conn)
+        _insert_automation_run(conn)
+        for adapter in ("nasdaq_symbol_directory", "massive_reference"):
+            _insert_evidence(
+                conn,
+                evidence_id=f"sle_{adapter}",
+                source_family="listing_authority",
+                adapter=adapter,
+                kind="listing_directory_snapshot",
+                automation_run_id="sla_run",
+                source_document_sha256=_HEX_C,
+                source_locator_json='{"candidate_ticker":"OLD"}',
+            )
+    finally:
+        conn.close()
+
+
+def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
+    from src.security_lifecycle_schema import (
+        PROFILE_INDEX_SQL,
+        PROFILE_TABLE_SQL,
+        V2_EVIDENCE_ADAPTERS,
+        V2_EVIDENCE_KINDS,
+        V2_EVIDENCE_SOURCE_FAMILIES,
+        V2_PROFILE_INDEX_SQL,
+        V2_PROFILE_TABLE_SQL,
+        create_v2_profile_schema,
+        verify_v2_profile_connection,
+    )
+
+    assert V2_PROFILE_INDEX_SQL == PROFILE_INDEX_SQL
+    assert V2_EVIDENCE_SOURCE_FAMILIES == frozenset(
+        {"regulator", "market_infrastructure", "publisher", "general_web", "manual"}
+    )
+    assert V2_EVIDENCE_ADAPTERS == frozenset(
+        {"sec_edgar", "internal_news", "ibkr_contract", "manual", "hosted_search"}
+    )
+    assert V2_EVIDENCE_KINDS == frozenset(
+        {
+            "regulator_excerpt",
+            "market_infrastructure_snapshot",
+            "publisher_excerpt",
+            "hosted_search_citation",
+            "manual_url",
+            "manual_text",
+            "document_reference",
+        }
+    )
+    assert {
+        name: sql
+        for name, sql in V2_PROFILE_TABLE_SQL.items()
+        if name != "security_lifecycle_evidence"
+    } == {
+        name: sql
+        for name, sql in PROFILE_TABLE_SQL.items()
+        if name != "security_lifecycle_evidence"
+    }
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        create_v2_profile_schema(conn)
+        verify_v2_profile_connection(conn)
+        sql = _schema_sql(conn, "security_lifecycle_evidence")
+        for value in (
+            "listing_authority",
+            "nasdaq_symbol_directory",
+            "massive_reference",
+            "listing_directory_snapshot",
+        ):
+            assert f"'{value}'" not in sql
+
+        _insert_case(conn)
+        _insert_automation_run(conn)
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_evidence(
+                conn,
+                evidence_id="sle_listing",
+                source_family="listing_authority",
+                adapter="nasdaq_symbol_directory",
+                kind="listing_directory_snapshot",
+                automation_run_id="sla_run",
+                source_document_sha256=_HEX_C,
+                source_locator_json='{"candidate_ticker":"OLD"}',
+            )
+    finally:
+        conn.close()
+
+
+def test_listing_evidence_requires_https_automation_document_digest_and_locator():
+    from src.security_lifecycle_schema import create_profile_schema
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        create_profile_schema(conn)
+        _insert_case(conn)
+        _insert_automation_run(conn)
+        valid = {
+            "evidence_id": "sle_listing",
+            "source_family": "listing_authority",
+            "adapter": "massive_reference",
+            "kind": "listing_directory_snapshot",
+            "automation_run_id": "sla_run",
+            "source_document_sha256": _HEX_C,
+            "source_locator_json": '{"candidate_ticker":"OLD"}',
+        }
+        for column, value in (
+            ("source_url", "http://api.massive.com/v3/reference/tickers"),
+            ("automation_run_id", None),
+            ("source_document_sha256", None),
+            ("source_locator_json", None),
+        ):
+            conn.execute("SAVEPOINT invalid_listing")
+            try:
+                if column == "source_url":
+                    with pytest.raises(sqlite3.IntegrityError):
+                        conn.execute(
+                            "INSERT INTO security_lifecycle_evidence "
+                            "(evidence_id,case_id,run_id,automation_run_id,source_family,kind,"
+                            "source_url,adapter,excerpt,content_sha256,source_document_sha256,"
+                            "source_locator_json,evidence_dedupe_key,created_at) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (
+                                valid["evidence_id"],
+                                "slc_case",
+                                None,
+                                valid["automation_run_id"],
+                                valid["source_family"],
+                                valid["kind"],
+                                value,
+                                valid["adapter"],
+                                "Listing record",
+                                _HEX_B,
+                                valid["source_document_sha256"],
+                                valid["source_locator_json"],
+                                "dedupe:invalid-source-url",
+                                _AT,
+                            ),
+                        )
+                else:
+                    with pytest.raises(sqlite3.IntegrityError):
+                        _insert_evidence(conn, **{**valid, column: value})
+            finally:
+                conn.execute("ROLLBACK TO invalid_listing")
+                conn.execute("RELEASE invalid_listing")
     finally:
         conn.close()
 

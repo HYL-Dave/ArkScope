@@ -634,6 +634,71 @@ PROFILE_INDEX_SQL = {
 }
 
 
+# V2 is the exact automation authority. Keep it immutable for explicit
+# migrations, scratch verification, and rollback checks.
+V2_PROFILE_TABLE_SQL = dict(PROFILE_TABLE_SQL)
+V2_PROFILE_INDEX_SQL = dict(PROFILE_INDEX_SQL)
+V2_EVIDENCE_SOURCE_FAMILIES = EVIDENCE_SOURCE_FAMILIES
+V2_EVIDENCE_ADAPTERS = EVIDENCE_ADAPTERS
+V2_EVIDENCE_KINDS = EVIDENCE_KINDS
+
+EVIDENCE_SOURCE_FAMILIES = V2_EVIDENCE_SOURCE_FAMILIES | {"listing_authority"}
+EVIDENCE_ADAPTERS = V2_EVIDENCE_ADAPTERS | {
+    "nasdaq_symbol_directory",
+    "massive_reference",
+}
+EVIDENCE_KINDS = V2_EVIDENCE_KINDS | {"listing_directory_snapshot"}
+
+PROFILE_TABLE_SQL = {
+    **V2_PROFILE_TABLE_SQL,
+    "security_lifecycle_evidence": f"""
+        CREATE TABLE security_lifecycle_evidence (
+            evidence_id TEXT PRIMARY KEY,
+            case_id TEXT NOT NULL REFERENCES security_lifecycle_cases(case_id) ON DELETE CASCADE,
+            run_id TEXT REFERENCES security_lifecycle_investigation_runs(run_id),
+            automation_run_id TEXT REFERENCES security_lifecycle_automation_runs(run_id),
+            source_family TEXT NOT NULL CHECK (source_family IN ({_quoted(EVIDENCE_SOURCE_FAMILIES)})),
+            kind TEXT NOT NULL CHECK (kind IN ({_quoted(EVIDENCE_KINDS)})),
+            source_url TEXT CHECK (source_url IS NULL OR length(source_url) <= 1000),
+            title TEXT CHECK (title IS NULL OR length(title) <= 500),
+            publisher TEXT CHECK (publisher IS NULL OR length(publisher) <= 240),
+            domain TEXT CHECK (domain IS NULL OR length(domain) <= 253),
+            source_published_at TEXT,
+            retrieved_at TEXT,
+            adapter TEXT NOT NULL CHECK (adapter IN ({_quoted(EVIDENCE_ADAPTERS)})),
+            excerpt TEXT NOT NULL CHECK (length(excerpt) <= 16000),
+            content_sha256 TEXT NOT NULL CHECK (length(content_sha256) = 64 AND content_sha256 NOT GLOB '*[^0-9a-f]*'),
+            source_document_sha256 TEXT CHECK (source_document_sha256 IS NULL OR (length(source_document_sha256) = 64 AND source_document_sha256 NOT GLOB '*[^0-9a-f]*')),
+            source_locator_json TEXT CHECK (source_locator_json IS NULL OR length(source_locator_json) BETWEEN 2 AND 4096),
+            evidence_dedupe_key TEXT NOT NULL UNIQUE CHECK (length(evidence_dedupe_key) BETWEEN 1 AND 500 AND instr(evidence_dedupe_key, char(0)) = 0),
+            mime_type TEXT CHECK (mime_type IS NULL OR length(mime_type) <= 127),
+            document_status TEXT CHECK (document_status IS NULL OR document_status IN ({_quoted(DOCUMENT_STATUSES)})),
+            created_at TEXT NOT NULL,
+            UNIQUE(evidence_id, content_sha256),
+            CHECK (run_id IS NULL OR automation_run_id IS NULL),
+            CHECK ((kind = 'document_reference' AND document_status IS NOT NULL) OR (kind <> 'document_reference' AND document_status IS NULL)),
+            CHECK (
+                (adapter = 'manual' AND source_family = 'manual' AND kind IN ('manual_url', 'manual_text', 'document_reference') AND automation_run_id IS NULL)
+                OR (adapter = 'sec_edgar' AND source_family = 'regulator' AND kind = 'regulator_excerpt' AND run_id IS NULL AND automation_run_id IS NOT NULL AND source_document_sha256 IS NOT NULL AND source_locator_json IS NOT NULL)
+                OR (adapter = 'internal_news' AND source_family = 'publisher' AND kind = 'publisher_excerpt' AND run_id IS NULL AND automation_run_id IS NOT NULL)
+                OR (adapter = 'ibkr_contract' AND source_family = 'market_infrastructure' AND kind = 'market_infrastructure_snapshot' AND run_id IS NULL AND automation_run_id IS NOT NULL)
+                OR (adapter = 'hosted_search' AND source_family = 'general_web' AND kind = 'hosted_search_citation' AND run_id IS NULL AND automation_run_id IS NOT NULL)
+                OR (
+                    adapter IN ('massive_reference','nasdaq_symbol_directory')
+                    AND source_family = 'listing_authority'
+                    AND kind = 'listing_directory_snapshot'
+                    AND run_id IS NULL
+                    AND automation_run_id IS NOT NULL
+                    AND source_url LIKE 'https://%'
+                    AND source_document_sha256 IS NOT NULL
+                    AND source_locator_json IS NOT NULL
+                )
+            )
+        )
+    """,
+}
+
+
 def _execute_schema(conn: sqlite3.Connection, tables: dict[str, str], indexes: dict[str, str]) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     with conn:
@@ -653,6 +718,10 @@ def create_profile_schema(conn: sqlite3.Connection) -> None:
 
 def create_v1_profile_schema(conn: sqlite3.Connection) -> None:
     _execute_schema(conn, V1_PROFILE_TABLE_SQL, V1_PROFILE_INDEX_SQL)
+
+
+def create_v2_profile_schema(conn: sqlite3.Connection) -> None:
+    _execute_schema(conn, V2_PROFILE_TABLE_SQL, V2_PROFILE_INDEX_SQL)
 
 
 def _normalize_sql(value: str) -> str:
@@ -711,6 +780,10 @@ def verify_profile_connection(conn: sqlite3.Connection) -> None:
 
 def verify_v1_profile_connection(conn: sqlite3.Connection) -> None:
     _verify_connection(conn, V1_PROFILE_TABLE_SQL, V1_PROFILE_INDEX_SQL)
+
+
+def verify_v2_profile_connection(conn: sqlite3.Connection) -> None:
+    _verify_connection(conn, V2_PROFILE_TABLE_SQL, V2_PROFILE_INDEX_SQL)
 
 
 def _verify_path(path: str | Path, verifier) -> None:

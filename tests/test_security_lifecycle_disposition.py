@@ -615,6 +615,7 @@ def test_source_family_status_uses_current_run_citations_and_typed_families():
         "publisher": "missing",
         "general_web": "missing",
         "manual": "present",
+        "listing_authority": "missing",
     }
     assert set(got.source_family_status.values()) <= SOURCE_FAMILY_STATES
 

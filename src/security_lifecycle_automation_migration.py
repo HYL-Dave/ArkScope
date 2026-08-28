@@ -15,12 +15,12 @@ from typing import Callable
 
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
-    PROFILE_INDEX_SQL,
-    PROFILE_TABLE_SQL,
     V1_PROFILE_INDEX_SQL,
     V1_PROFILE_TABLE_SQL,
-    verify_profile_connection,
+    V2_PROFILE_INDEX_SQL,
+    V2_PROFILE_TABLE_SQL,
     verify_v1_profile_connection,
+    verify_v2_profile_connection,
 )
 from src.ticker_identity_schema import (
     IDENTITY_INDEX_SQL,
@@ -77,7 +77,7 @@ class AutomationProfileBackup:
 
 _V1_PROFILE_TABLES = frozenset(V1_PROFILE_TABLE_SQL)
 _V1_IDENTITY_TABLES = frozenset(V1_IDENTITY_TABLE_SQL)
-_V2_PROFILE_TABLES = frozenset(PROFILE_TABLE_SQL)
+_V2_PROFILE_TABLES = frozenset(V2_PROFILE_TABLE_SQL)
 _V2_IDENTITY_TABLES = frozenset(IDENTITY_TABLE_SQL)
 
 
@@ -155,7 +155,7 @@ def _table_row_digest(conn: sqlite3.Connection, table: str) -> str:
 
 def _detect_schema_version(conn: sqlite3.Connection) -> str:
     try:
-        verify_profile_connection(conn)
+        verify_v2_profile_connection(conn)
         verify_ticker_identity_connection(conn)
         return "v2"
     except (LifecycleSchemaMismatch, TickerIdentitySchemaMismatch):
@@ -176,7 +176,7 @@ def _authority_for(
         indexes = frozenset(V1_PROFILE_INDEX_SQL) | frozenset(V1_IDENTITY_INDEX_SQL)
     elif version == "v2":
         tables = _V2_PROFILE_TABLES | _V2_IDENTITY_TABLES
-        indexes = frozenset(PROFILE_INDEX_SQL) | frozenset(IDENTITY_INDEX_SQL)
+        indexes = frozenset(V2_PROFILE_INDEX_SQL) | frozenset(IDENTITY_INDEX_SQL)
     else:
         raise AutomationMigrationRejected("unknown_schema_version")
     return tables, indexes, tables | indexes
@@ -423,9 +423,9 @@ def _drop_v1_owned_tables(conn: sqlite3.Connection) -> None:
 
 
 def _create_v2_owned_tables(conn: sqlite3.Connection) -> None:
-    for statement in PROFILE_TABLE_SQL.values():
+    for statement in V2_PROFILE_TABLE_SQL.values():
         conn.execute(statement)
-    for statement in PROFILE_INDEX_SQL.values():
+    for statement in V2_PROFILE_INDEX_SQL.values():
         conn.execute(statement)
     for statement in IDENTITY_TABLE_SQL.values():
         conn.execute(statement)
@@ -583,7 +583,7 @@ def migrate_automation_profile_schema(
         hook("after_identity_copy", conn)
         hook("before_verify", conn)
 
-        verify_profile_connection(conn)
+        verify_v2_profile_connection(conn)
         verify_ticker_identity_connection(conn)
         if conn.execute("PRAGMA foreign_key_check").fetchall():
             raise AutomationMigrationRejected("postflight_foreign_key_failed")

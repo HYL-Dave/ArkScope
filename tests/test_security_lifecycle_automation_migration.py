@@ -402,7 +402,7 @@ def test_preflight_rejects_stored_tavily_or_retired_web_evidence_before_writes(
 def test_mapping_preserves_every_legacy_lifecycle_row_and_four_accepted_assessments(
     tmp_path,
 ):
-    from src.security_lifecycle_schema import verify_profile_connection
+    from src.security_lifecycle_schema import verify_v2_profile_connection
 
     path = tmp_path / "profile.db"
     _seed_v1(path)
@@ -423,7 +423,7 @@ def test_mapping_preserves_every_legacy_lifecycle_row_and_four_accepted_assessme
     assert result.target_schema_version == "v2"
     conn = sqlite3.connect(path)
     try:
-        verify_profile_connection(conn)
+        verify_v2_profile_connection(conn)
         assert conn.execute(
             "SELECT COUNT(*) FROM security_lifecycle_assessments"
         ).fetchone()[0] == 4
@@ -503,7 +503,7 @@ def test_mapping_preserves_manual_evidence_and_attended_transition_authority(tmp
 def test_migration_rebuilds_exact_owned_components_and_preserves_unrelated_rows(
     tmp_path,
 ):
-    from src.security_lifecycle_schema import verify_profile_connection
+    from src.security_lifecycle_schema import verify_v2_profile_connection
     from src.ticker_identity_schema import verify_ticker_identity_connection
 
     path = tmp_path / "profile.db"
@@ -512,7 +512,7 @@ def test_migration_rebuilds_exact_owned_components_and_preserves_unrelated_rows(
     assert first.changed is True
     conn = sqlite3.connect(path)
     try:
-        verify_profile_connection(conn)
+        verify_v2_profile_connection(conn)
         verify_ticker_identity_connection(conn)
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -624,6 +624,7 @@ def test_backup_and_restore_are_bound_and_fail_before_target_mutation(
         LifecycleSchemaMismatch,
         verify_profile_connection,
         verify_v1_profile_connection,
+        verify_v2_profile_connection,
     )
     from src.ticker_identity_schema import verify_v1_ticker_identity_connection
 
@@ -658,7 +659,7 @@ def test_backup_and_restore_are_bound_and_fail_before_target_mutation(
         approval_sha256=approved.approval_sha256,
     )
     with sqlite3.connect(source) as conn:
-        verify_profile_connection(conn)
+        verify_v2_profile_connection(conn)
 
     restored = tmp_path / "restored" / "profile.db"
     restored.parent.mkdir()
