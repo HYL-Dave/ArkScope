@@ -514,10 +514,32 @@ const explore = {
     },
     evidenceFamilies: {
       regulator: "監管申報",
+      listingAuthority: "上市主管機關",
       marketInfrastructure: "市場基礎設施",
       publisher: "新聞出版來源",
       generalWeb: "一般網頁",
       manual: "人工補充",
+    },
+    listingEvidence: {
+      authorities: {
+        nasdaqTrader: "Nasdaq Trader",
+        massive: "Massive",
+      },
+      statuses: {
+        active: "有效",
+        inactive: "非有效",
+        notFound: "在這份完整快照中找不到",
+        unverified: "未驗證",
+      },
+      fields: {
+        authority: "主管機關",
+        directory: "名錄",
+        ticker: "標的代號",
+        status: "上市狀態",
+        market: "市場",
+        venue: "交易場所",
+        asOf: "資料日期",
+      },
     },
     factTypes: {
       sourceTicker: "原代號",

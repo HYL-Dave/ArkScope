@@ -526,6 +526,163 @@ afterEach(() => {
 });
 
 describe("Lifecycle workflow", () => {
+  it("renders only the ordered active evidence families with compact listing snapshots", async () => {
+    const regulator = {
+      ...detail().evidence[0],
+      translations: [],
+    };
+    const evidence = [
+      {
+        evidence_id: "evidence-publisher",
+        source_family: "publisher",
+        kind: "publisher_excerpt",
+        excerpt: "Legacy publisher prose.",
+        source_url: "https://example.com/publisher",
+        title: "Legacy publisher item",
+        translations: [],
+        created_at: "2026-08-28T10:00:00Z",
+      },
+      {
+        evidence_id: "evidence-not-found",
+        source_family: "listing_authority",
+        kind: "listing_directory_snapshot",
+        excerpt: '{"secret":"not-found-canonical-json"}',
+        source_url: "https://nasdaqtrader.com/symbol-directory",
+        title: "Nasdaq exact symbol lookup",
+        translations: [],
+        listing: {
+          authority: "nasdaq_trader",
+          directory: "other_listed",
+          candidate_ticker: "MISS",
+          listing_status: "not_found",
+          market: "stocks",
+          primary_exchange: null,
+          source_as_of: "2026-08-28",
+        },
+        created_at: "2026-08-28T10:01:00Z",
+      },
+      {
+        evidence_id: "evidence-general-web",
+        source_family: "general_web",
+        kind: "hosted_search_citation",
+        excerpt: "Inactive general web prose.",
+        source_url: "https://example.com/search",
+        title: "General web item",
+        translations: [],
+        created_at: "2026-08-28T10:02:00Z",
+      },
+      {
+        evidence_id: "evidence-listing",
+        source_family: "listing_authority",
+        kind: "listing_directory_snapshot",
+        excerpt: '{"secret":"active-canonical-json"}',
+        source_url: "https://api.massive.com/v3/reference/tickers/B",
+        title: "Massive exact ticker lookup",
+        translations: [],
+        listing: {
+          authority: "massive",
+          directory: null,
+          candidate_ticker: "B",
+          listing_status: "active",
+          market: "stocks",
+          primary_exchange: "XNAS",
+          source_as_of: "2026-08-28",
+        },
+        created_at: "2026-08-28T10:03:00Z",
+      },
+      {
+        evidence_id: "evidence-malformed-listing",
+        source_family: "listing_authority",
+        kind: "listing_directory_snapshot",
+        excerpt: '{"secret":"malformed-canonical-json"}',
+        source_url: "https://example.com/malformed-listing",
+        title: "Malformed listing fixture",
+        translations: [],
+        created_at: "2026-08-28T10:03:30Z",
+      },
+      {
+        evidence_id: "evidence-ibkr",
+        source_family: "market_infrastructure",
+        kind: "market_infrastructure_snapshot",
+        excerpt: "IBKR exact contract snapshot.",
+        source_url: null,
+        title: "IBKR exact contract",
+        translations: [],
+        created_at: "2026-08-28T10:04:00Z",
+      },
+      {
+        evidence_id: "evidence-manual",
+        source_family: "manual",
+        kind: "manual_text",
+        excerpt: "Attended issuer note.",
+        source_url: null,
+        title: "Issuer note",
+        translations: [],
+        created_at: "2026-08-28T10:05:00Z",
+      },
+      regulator,
+    ];
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      evidence,
+      evidence_count: evidence.length,
+      source_family_status: {
+        publisher: "present",
+        manual: "present",
+        listing_authority: "confirmed",
+        regulator: "present",
+        general_web: "present",
+        market_infrastructure: "present",
+      },
+    }));
+
+    await mountLifecycle();
+
+    const familyLabels = Array.from(
+      document.body.querySelectorAll(".lifecycle-evidence-group > h4"),
+      (node) => node.textContent,
+    );
+    expect(familyLabels).toEqual([
+      "Regulatory filing",
+      "Listing authority",
+      "Market infrastructure",
+      "Manual supplement",
+    ]);
+    expect(document.body.textContent).not.toContain("Publisher reporting");
+    expect(document.body.textContent).not.toContain("General web");
+    expect(document.body.textContent).toContain("Active");
+    expect(document.body.textContent).toContain("XNAS");
+    expect(document.body.textContent).toContain("Not found in this completed snapshot");
+    expect(document.body.textContent).not.toContain("Delisted");
+    expect(document.body.textContent).not.toContain("active-canonical-json");
+    expect(document.body.textContent).not.toContain("not-found-canonical-json");
+    expect(document.body.textContent).not.toContain("malformed-canonical-json");
+
+    const listingItem = Array.from(
+      document.body.querySelectorAll<HTMLDetailsElement>("details.lifecycle-evidence-item"),
+    ).find((item) => item.textContent?.includes("Massive"));
+    const regulatorItem = Array.from(
+      document.body.querySelectorAll<HTMLDetailsElement>("details.lifecycle-evidence-item"),
+    ).find((item) => item.textContent?.includes("SEC source"));
+    expect(listingItem).toBeDefined();
+    expect(regulatorItem).toBeDefined();
+    expect(listingItem!.open).toBe(false);
+    expect(regulatorItem!.open).toBe(false);
+    expect(Array.from(listingItem!.querySelectorAll("button"))
+      .some((button) => /translate/i.test(button.textContent ?? ""))).toBe(false);
+    expect(Array.from(regulatorItem!.querySelectorAll("button"))
+      .some((button) => /translate/i.test(button.textContent ?? ""))).toBe(true);
+    expect(listingItem!.querySelector("dl")).not.toBeNull();
+    expect(listingItem!.querySelector("a")?.getAttribute("href"))
+      .toBe("https://api.massive.com/v3/reference/tickers/B");
+    expect(listingItem!.textContent).toContain("2026-08-28");
+
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await flush();
+    expect(document.body.textContent).toContain("在這份完整快照中找不到");
+    expect(document.body.textContent).not.toContain("已下市");
+    expect(document.body.textContent).not.toContain("active-canonical-json");
+  });
+
   it("renders truthful dated final-History reasons in both locales without acknowledgement", async () => {
     apiMocks.listSecurityLifecycleCases.mockResolvedValue({
       cases: [FINAL_UNCONFIRMED],

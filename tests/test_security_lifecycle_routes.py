@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import json
 import sqlite3
 
 from fastapi import FastAPI
@@ -10,6 +11,77 @@ from fastapi.testclient import TestClient
 
 _AT = "2026-08-20T00:00:00Z"
 _SOURCE_REF = "0000712515-26-000042"
+
+
+def _listing_locator(**overrides):
+    locator = {
+        "locator_kind": "listing_directory_snapshot",
+        "adapter": "massive_reference",
+        "authority": "massive",
+        "directory": None,
+        "candidate_ticker": "B",
+        "expected_active_state": True,
+        "listing_status": "active",
+        "market": "stocks",
+        "primary_exchange": "XNAS",
+        "security_type": "CS",
+        "issuer_cik": "0000000001",
+        "composite_figi": None,
+        "delisted_utc": None,
+        "source_as_of": "2026-08-28",
+        "provider_last_updated_utc": None,
+        "snapshot_complete": True,
+        "source_document_sha256": "b" * 64,
+        "adapter_version": "listing-authority-v1",
+    }
+    locator.update(overrides)
+    return locator
+
+
+def _insert_automation_evidence(
+    context,
+    *,
+    evidence_id,
+    source_family,
+    kind,
+    adapter,
+    excerpt,
+    source_url=None,
+    source_document_sha256=None,
+    source_locator=None,
+):
+    run_id = str(context["profile_conn"].execute(
+        "SELECT run_id FROM security_lifecycle_automation_runs LIMIT 1"
+    ).fetchone()[0])
+    context["profile_conn"].execute(
+        "INSERT INTO security_lifecycle_evidence "
+        "(evidence_id,case_id,run_id,automation_run_id,source_family,kind,"
+        "source_url,title,publisher,domain,source_published_at,retrieved_at,"
+        "adapter,excerpt,content_sha256,source_document_sha256,"
+        "source_locator_json,evidence_dedupe_key,mime_type,document_status,"
+        "created_at) VALUES (?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)",
+        (
+            evidence_id,
+            context["case_id"],
+            run_id,
+            source_family,
+            kind,
+            source_url,
+            f"{source_family} fixture",
+            f"{source_family} fixture",
+            "example.com",
+            "2026-08-28",
+            _AT,
+            adapter,
+            excerpt,
+            hashlib.sha256(excerpt.encode()).hexdigest(),
+            source_document_sha256,
+            json.dumps(source_locator or {}, separators=(",", ":"), sort_keys=True),
+            f"route-projection:{evidence_id}",
+            "application/json",
+            _AT,
+        ),
+    )
 
 
 def _build_context(
@@ -425,6 +497,103 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         assert automation_assessment_id in {
             row["assessment_id"] for row in payload["assessment_history"]
         }
+    finally:
+        context["profile_conn"].close()
+
+
+def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
+    tmp_path,
+    monkeypatch,
+):
+    context = _build_context(tmp_path)
+    try:
+        _create_automation_draft(context)
+        for values in (
+            {
+                "evidence_id": "evidence-listing",
+                "source_family": "listing_authority",
+                "kind": "listing_directory_snapshot",
+                "adapter": "massive_reference",
+                "excerpt": '{"listing_status":"active","secret":"canonical-only"}',
+                "source_url": "https://api.massive.com/v3/reference/tickers",
+                "source_document_sha256": "b" * 64,
+                "source_locator": _listing_locator(),
+            },
+            {
+                "evidence_id": "evidence-ibkr",
+                "source_family": "market_infrastructure",
+                "kind": "market_infrastructure_snapshot",
+                "adapter": "ibkr_contract",
+                "excerpt": "IBKR exact contract snapshot.",
+            },
+            {
+                "evidence_id": "evidence-publisher",
+                "source_family": "publisher",
+                "kind": "publisher_excerpt",
+                "adapter": "internal_news",
+                "excerpt": "Legacy publisher reporting.",
+            },
+            {
+                "evidence_id": "evidence-general-web",
+                "source_family": "general_web",
+                "kind": "hosted_search_citation",
+                "adapter": "hosted_search",
+                "excerpt": "Inactive general web result.",
+            },
+        ):
+            _insert_automation_evidence(context, **values)
+        context["profile_conn"].commit()
+        client = _client(context, monkeypatch)
+        _add_manual(client, context["case_id"])
+
+        detail_response = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}"
+        )
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert {row["source_family"] for row in detail["evidence"]} == {
+            "regulator",
+            "listing_authority",
+            "market_infrastructure",
+            "manual",
+        }
+        assert detail["evidence_count"] == 4
+        assert set(detail["source_family_status"]) <= {
+            "regulator",
+            "listing_authority",
+            "market_infrastructure",
+            "manual",
+        }
+        listing = next(
+            row
+            for row in detail["evidence"]
+            if row["source_family"] == "listing_authority"
+        )
+        assert listing["listing"] == {
+            "authority": "massive",
+            "directory": None,
+            "candidate_ticker": "B",
+            "listing_status": "active",
+            "market": "stocks",
+            "primary_exchange": "XNAS",
+            "source_as_of": "2026-08-28",
+        }
+        assert "source_locator_json" not in listing
+
+        listed = client.get("/security-lifecycle/cases").json()["cases"][0]
+        assert listed["evidence_count"] == 4
+        assert set(listed["source_family_status"]) <= {
+            "regulator",
+            "listing_authority",
+            "market_infrastructure",
+            "manual",
+        }
+        raw_families = [
+            row["source_family"]
+            for row in context["store"].list_evidence(context["case_id"])
+        ]
+        assert raw_families.count("publisher") == 1
+        assert raw_families.count("general_web") == 1
     finally:
         context["profile_conn"].close()
 

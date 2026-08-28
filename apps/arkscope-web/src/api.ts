@@ -2560,10 +2560,17 @@ export type SecurityLifecycleAcceptanceAuthority =
   | "legacy_migration";
 export type SecurityLifecycleEvidenceSourceFamily =
   | "regulator"
+  | "listing_authority"
   | "market_infrastructure"
   | "publisher"
   | "general_web"
   | "manual";
+export type SecurityLifecycleListingAuthority = "nasdaq_trader" | "massive";
+export type SecurityLifecycleListingStatus =
+  | "active"
+  | "inactive"
+  | "not_found"
+  | "unverified";
 export type SecurityLifecycleAutomationMode = "live" | "historical";
 export type SecurityLifecycleAutomationRunStatus =
   | "queued"
@@ -2733,6 +2740,15 @@ export interface SecurityLifecycleEvidence {
   publisher?: string | null;
   source_published_at?: string | null;
   source_document_sha256?: string | null;
+  listing?: {
+    authority: SecurityLifecycleListingAuthority;
+    directory: "nasdaq_listed" | "other_listed" | null;
+    candidate_ticker: string;
+    listing_status: SecurityLifecycleListingStatus;
+    market: "stocks" | "otc";
+    primary_exchange: string | null;
+    source_as_of: string;
+  };
   translations: SecurityLifecycleEvidenceTranslation[];
 }
 

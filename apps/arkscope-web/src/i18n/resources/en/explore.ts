@@ -514,10 +514,32 @@ const explore = {
     },
     evidenceFamilies: {
       regulator: "Regulatory filing",
+      listingAuthority: "Listing authority",
       marketInfrastructure: "Market infrastructure",
       publisher: "Publisher reporting",
       generalWeb: "General web",
       manual: "Manual supplement",
+    },
+    listingEvidence: {
+      authorities: {
+        nasdaqTrader: "Nasdaq Trader",
+        massive: "Massive",
+      },
+      statuses: {
+        active: "Active",
+        inactive: "Inactive",
+        notFound: "Not found in this completed snapshot",
+        unverified: "Unverified",
+      },
+      fields: {
+        authority: "Authority",
+        directory: "Directory",
+        ticker: "Ticker",
+        status: "Listing state",
+        market: "Market",
+        venue: "Venue",
+        asOf: "As of",
+      },
     },
     factTypes: {
       sourceTicker: "Source ticker",

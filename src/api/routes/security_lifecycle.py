@@ -37,7 +37,10 @@ from src.security_lifecycle_translation import (
     prepare_evidence_translation,
     translate_evidence,
 )
-from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+from src.tools.security_lifecycle_tools import (
+    SecurityLifecycleReadService,
+    project_active_security_lifecycle_case,
+)
 
 
 router = APIRouter(prefix="/security-lifecycle", tags=["security-lifecycle"])
@@ -367,11 +370,13 @@ def get_case(
     ),
 ):
     try:
-        return service.get_case(case_id)
+        return project_active_security_lifecycle_case(service.get_case(case_id))
     except LifecycleStoreUnavailable as exc:
         raise _store_error(exc) from None
     except KeyError as exc:
         raise _not_found(exc) from None
+    except ValueError as exc:
+        raise _invalid(exc) from None
 
 
 @router.get("/investigations/{run_id}")

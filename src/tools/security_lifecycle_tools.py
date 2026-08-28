@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 from typing import Callable, Iterable, Mapping
 
@@ -30,6 +32,48 @@ from src.security_lifecycle_schema import (
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DETAIL_HISTORY_LIMIT = 20
 _DETAIL_EXCERPT_LIMIT = 2000
+_ACTIVE_SOURCE_FAMILIES = (
+    "regulator",
+    "listing_authority",
+    "market_infrastructure",
+    "manual",
+)
+_LISTING_LOCATOR_KEYS = frozenset(
+    {
+        "locator_kind",
+        "adapter",
+        "authority",
+        "directory",
+        "candidate_ticker",
+        "expected_active_state",
+        "listing_status",
+        "market",
+        "primary_exchange",
+        "security_type",
+        "issuer_cik",
+        "composite_figi",
+        "delisted_utc",
+        "source_as_of",
+        "provider_last_updated_utc",
+        "snapshot_complete",
+        "source_document_sha256",
+        "adapter_version",
+    }
+)
+_LISTING_ADAPTER_AUTHORITIES = {
+    "nasdaq_symbol_directory": "nasdaq_trader",
+    "massive_reference": "massive",
+}
+_LISTING_DIRECTORIES = frozenset({"nasdaq_listed", "other_listed"})
+_LISTING_STATUSES = frozenset({"active", "inactive", "not_found", "unverified"})
+_LISTING_MARKETS = frozenset({"stocks", "otc"})
+_TICKER = re.compile(r"^[A-Z][A-Z0-9.-]{0,15}$")
+_EXCHANGE = re.compile(r"^[A-Z][A-Z0-9]{1,11}$")
+_SECURITY_TYPE = re.compile(r"^[A-Z][A-Z0-9_-]{0,19}$")
+_CIK = re.compile(r"^\d{10}$")
+_FIGI = re.compile(r"^BBG[A-Z0-9]{9}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_ADAPTER_VERSION = re.compile(r"^[a-z][a-z0-9.-]{0,63}$")
 _HISTORY_ORDER_FIELDS = {
     "investigation_runs": ("created_at", "run_id"),
     "automation_runs": ("created_at", "run_id"),
@@ -39,6 +83,125 @@ _HISTORY_ORDER_FIELDS = {
     "acknowledgement_history": ("acknowledged_at", "acknowledgement_id"),
     "proposals": ("created_at", "proposal_id"),
 }
+
+
+def _nullable_listing_text(value: object, pattern: re.Pattern[str]) -> bool:
+    return value is None or (
+        isinstance(value, str) and pattern.fullmatch(value) is not None
+    )
+
+
+def _valid_listing_temporal(value: object, *, nullable: bool) -> bool:
+    if value is None:
+        return nullable
+    if not isinstance(value, str) or not value or len(value) > 64:
+        return False
+    try:
+        if len(value) == 10:
+            return date.fromisoformat(value).isoformat() == value
+        parsed = datetime.fromisoformat(
+            value[:-1] + "+00:00" if value.endswith("Z") else value
+        )
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
+def _compact_listing(source_locator_json: object) -> dict:
+    if not isinstance(source_locator_json, str):
+        raise ValueError("listing_locator")
+    try:
+        locator = json.loads(source_locator_json)
+    except (TypeError, json.JSONDecodeError):
+        raise ValueError("listing_locator") from None
+    if not isinstance(locator, dict) or frozenset(locator) != _LISTING_LOCATOR_KEYS:
+        raise ValueError("listing_locator")
+
+    adapter = locator["adapter"]
+    authority = locator["authority"]
+    directory = locator["directory"]
+    candidate_ticker = locator["candidate_ticker"]
+    if (
+        locator["locator_kind"] != "listing_directory_snapshot"
+        or not isinstance(adapter, str)
+        or adapter not in _LISTING_ADAPTER_AUTHORITIES
+        or authority != _LISTING_ADAPTER_AUTHORITIES[adapter]
+        or not isinstance(candidate_ticker, str)
+        or _TICKER.fullmatch(candidate_ticker) is None
+        or type(locator["expected_active_state"]) is not bool
+        or not isinstance(locator["listing_status"], str)
+        or locator["listing_status"] not in _LISTING_STATUSES
+        or not isinstance(locator["market"], str)
+        or locator["market"] not in _LISTING_MARKETS
+        or not _nullable_listing_text(locator["primary_exchange"], _EXCHANGE)
+        or not _nullable_listing_text(locator["security_type"], _SECURITY_TYPE)
+        or not _nullable_listing_text(locator["issuer_cik"], _CIK)
+        or not _nullable_listing_text(locator["composite_figi"], _FIGI)
+        or not _valid_listing_temporal(
+            locator["delisted_utc"], nullable=True
+        )
+        or not _valid_listing_temporal(locator["source_as_of"], nullable=False)
+        or not _valid_listing_temporal(
+            locator["provider_last_updated_utc"], nullable=True
+        )
+        or type(locator["snapshot_complete"]) is not bool
+        or not isinstance(locator["source_document_sha256"], str)
+        or _SHA256.fullmatch(locator["source_document_sha256"]) is None
+        or not isinstance(locator["adapter_version"], str)
+        or _ADAPTER_VERSION.fullmatch(locator["adapter_version"]) is None
+    ):
+        raise ValueError("listing_locator")
+    if adapter == "nasdaq_symbol_directory":
+        if (
+            not isinstance(directory, str)
+            or directory not in _LISTING_DIRECTORIES
+            or locator["market"] != "stocks"
+        ):
+            raise ValueError("listing_locator")
+    elif directory is not None:
+        raise ValueError("listing_locator")
+
+    return {
+        "authority": authority,
+        "directory": directory,
+        "candidate_ticker": candidate_ticker,
+        "listing_status": locator["listing_status"],
+        "market": locator["market"],
+        "primary_exchange": locator["primary_exchange"],
+        "source_as_of": locator["source_as_of"],
+    }
+
+
+def project_active_security_lifecycle_case(case: Mapping[str, object]) -> dict:
+    item = dict(case)
+    evidence = []
+    for raw in item.get("evidence", []):
+        if not isinstance(raw, Mapping):
+            raise ValueError("evidence")
+        source_family = raw.get("source_family")
+        if source_family not in _ACTIVE_SOURCE_FAMILIES:
+            continue
+        row = dict(raw)
+        if source_family == "listing_authority":
+            if row.get("kind") != "listing_directory_snapshot":
+                raise ValueError("listing_locator")
+            row["listing"] = _compact_listing(row.get("source_locator_json"))
+        row.pop("source_locator_json", None)
+        row.pop("adapter", None)
+        evidence.append(row)
+    item["evidence"] = evidence
+
+    statuses = item.get("source_family_status", {})
+    if not isinstance(statuses, Mapping):
+        raise ValueError("source_family_status")
+    item["source_family_status"] = {
+        family: statuses[family]
+        for family in _ACTIVE_SOURCE_FAMILIES
+        if family in statuses
+    }
+    if "evidence_count" in item:
+        item["evidence_count"] = len(evidence)
+    return item
 
 
 def _profile_db_path() -> str:
@@ -166,7 +329,7 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
 
 
 def _provider_neutral_case(case: Mapping[str, object]) -> dict:
-    item = dict(case)
+    item = project_active_security_lifecycle_case(case)
     histories = {
         "investigation_runs": [],
         "automation_runs": [],
@@ -435,7 +598,10 @@ class SecurityLifecycleReadService:
                 case for case in selected if case["queue_bucket"] == queue_bucket
             ]
         count = len(selected)
-        cases = [_case_summary(case) for case in selected[:bounded_limit]]
+        cases = [
+            _case_summary(project_active_security_lifecycle_case(case))
+            for case in selected[:bounded_limit]
+        ]
         return {
             "cases": cases,
             "count": count,
@@ -514,4 +680,5 @@ __all__ = [
     "SecurityLifecycleReadService",
     "get_security_lifecycle_case",
     "list_security_lifecycle_cases",
+    "project_active_security_lifecycle_case",
 ]

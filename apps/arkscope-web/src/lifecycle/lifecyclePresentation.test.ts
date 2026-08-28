@@ -3,6 +3,29 @@ import { describe, expect, it } from "vitest";
 const PRESENTATION_MODULE = "./lifecyclePresentation";
 
 describe("Lifecycle presentation", () => {
+  it("labels listing authority and snapshot states without calling not-found delisted", async () => {
+    const {
+      lifecycleEvidenceSourceFamilyLabel,
+      lifecycleListingAuthorityLabel,
+      lifecycleListingStatusLabel,
+    } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
+
+    expect(lifecycleEvidenceSourceFamilyLabel("listing_authority", "en"))
+      .toBe("Listing authority");
+    expect(lifecycleEvidenceSourceFamilyLabel("listing_authority", "zh-Hant"))
+      .toBe("上市主管機關");
+    expect(lifecycleListingAuthorityLabel("massive", "en")).toBe("Massive");
+    expect(lifecycleListingAuthorityLabel("nasdaq_trader", "en"))
+      .toBe("Nasdaq Trader");
+    expect(lifecycleListingStatusLabel("active", "en")).toBe("Active");
+    expect(lifecycleListingStatusLabel("not_found", "en"))
+      .toBe("Not found in this completed snapshot");
+    expect(lifecycleListingStatusLabel("not_found", "zh-Hant"))
+      .toBe("在這份完整快照中找不到");
+    expect(lifecycleListingStatusLabel("not_found", "en")).not.toBe("Delisted");
+    expect(lifecycleListingStatusLabel("not_found", "zh-Hant")).not.toBe("已下市");
+  });
+
   it("labels every disposition, wait reason, and source-family state", async () => {
     const {
       lifecycleDispositionLabel,

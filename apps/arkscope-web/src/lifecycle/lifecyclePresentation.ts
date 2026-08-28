@@ -11,6 +11,8 @@ import type {
   SecurityLifecycleEvidenceSourceFamily,
   SecurityLifecycleFactType,
   SecurityLifecycleInvestigationRun,
+  SecurityLifecycleListingAuthority,
+  SecurityLifecycleListingStatus,
   SecurityLifecycleOutcome,
   SecurityLifecycleProposalBlockReason,
   SecurityLifecycleProposalType,
@@ -261,10 +263,35 @@ export function lifecycleEvidenceSourceFamilyLabel(
   const copy = lifecycleCopy(locale).evidenceFamilies;
   return closedLifecycleLabel<SecurityLifecycleEvidenceSourceFamily>(value, {
     regulator: copy.regulator,
+    listing_authority: copy.listingAuthority,
     market_infrastructure: copy.marketInfrastructure,
     publisher: copy.publisher,
     general_web: copy.generalWeb,
     manual: copy.manual,
+  }, locale);
+}
+
+export function lifecycleListingAuthorityLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).listingEvidence.authorities;
+  return closedLifecycleLabel<SecurityLifecycleListingAuthority>(value, {
+    nasdaq_trader: copy.nasdaqTrader,
+    massive: copy.massive,
+  }, locale);
+}
+
+export function lifecycleListingStatusLabel(
+  value: string,
+  locale: LifecycleLocale,
+): string {
+  const copy = lifecycleCopy(locale).listingEvidence.statuses;
+  return closedLifecycleLabel<SecurityLifecycleListingStatus>(value, {
+    active: copy.active,
+    inactive: copy.inactive,
+    not_found: copy.notFound,
+    unverified: copy.unverified,
   }, locale);
 }
 

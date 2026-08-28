@@ -8,6 +8,166 @@ import sqlite3
 _AT = "2026-08-20T00:00:00Z"
 
 
+def _listing_locator(**overrides):
+    locator = {
+        "locator_kind": "listing_directory_snapshot",
+        "adapter": "massive_reference",
+        "authority": "massive",
+        "directory": None,
+        "candidate_ticker": "B",
+        "expected_active_state": True,
+        "listing_status": "active",
+        "market": "stocks",
+        "primary_exchange": "XNAS",
+        "security_type": "CS",
+        "issuer_cik": "0000000001",
+        "composite_figi": None,
+        "delisted_utc": None,
+        "source_as_of": "2026-08-28",
+        "provider_last_updated_utc": None,
+        "snapshot_complete": True,
+        "source_document_sha256": "b" * 64,
+        "adapter_version": "listing-authority-v1",
+    }
+    locator.update(overrides)
+    return locator
+
+
+def _seed_all_evidence_families(store, case_id, fingerprint):
+    from src.security_lifecycle_fact_kernel import (
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+
+    store.add_evidence(
+        case_id=case_id,
+        run_id=None,
+        kind="manual_text",
+        adapter="manual",
+        excerpt="Attended issuer note.",
+        source_url=None,
+        title="Issuer note",
+        publisher=None,
+        domain=None,
+        source_published_at=None,
+        retrieved_at=None,
+        mime_type="text/plain",
+        document_status=None,
+        at=_AT,
+    )
+    kernel = SecurityLifecycleFactKernel(store)
+    claim = kernel.reserve_run(
+        case_id=case_id,
+        observation_fingerprint_sha256=fingerprint,
+        policy_version="listing-projection-test-v1",
+        mode="historical",
+        execution_revision="listing-projection-test-r1",
+        query_context={"case_id": case_id, "ticker": "EA"},
+        diagnostics={},
+        at=_AT,
+    )
+
+    def evidence(
+        evidence_id,
+        source_family,
+        adapter,
+        kind,
+        excerpt,
+        *,
+        source_url=None,
+        source_document_sha256=None,
+        source_locator=None,
+    ):
+        return AutomationEvidence(
+            evidence_id=evidence_id,
+            source_family=source_family,
+            adapter=adapter,
+            kind=kind,
+            excerpt=excerpt,
+            content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+            source_url=source_url,
+            title=f"{source_family} fixture",
+            publisher=f"{source_family} fixture",
+            domain="example.com",
+            source_published_at="2026-08-28",
+            retrieved_at=_AT,
+            source_document_sha256=source_document_sha256,
+            source_locator=source_locator or {},
+            evidence_dedupe_key=f"projection:{evidence_id}",
+        )
+
+    listing_excerpt = json.dumps(
+        {"listing_status": "active", "ticker": "B", "secret": "canonical-only"},
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    regulator_excerpt = "EA SEC filing prose."
+    rows = (
+        evidence(
+            "evidence-regulator",
+            "regulator",
+            "sec_edgar",
+            "regulator_excerpt",
+            regulator_excerpt,
+            source_url="https://www.sec.gov/Archives/example/ea.htm",
+            source_document_sha256="a" * 64,
+            source_locator={"accession": "0000712515-26-000042"},
+        ),
+        evidence(
+            "evidence-listing",
+            "listing_authority",
+            "massive_reference",
+            "listing_directory_snapshot",
+            listing_excerpt,
+            source_url="https://api.massive.com/v3/reference/tickers",
+            source_document_sha256="b" * 64,
+            source_locator=_listing_locator(),
+        ),
+        evidence(
+            "evidence-ibkr",
+            "market_infrastructure",
+            "ibkr_contract",
+            "market_infrastructure_snapshot",
+            "IBKR exact contract snapshot.",
+        ),
+        evidence(
+            "evidence-publisher",
+            "publisher",
+            "internal_news",
+            "publisher_excerpt",
+            "Legacy publisher reporting.",
+        ),
+        evidence(
+            "evidence-general-web",
+            "general_web",
+            "hosted_search",
+            "hosted_search_citation",
+            "Inactive general web result.",
+        ),
+    )
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=rows,
+        facts=(AutomationFact(
+            evidence_id="evidence-regulator",
+            fact_type="source_ticker",
+            normalized_value="EA",
+            source_span_start=0,
+            source_span_end=2,
+            cited_text_sha256=hashlib.sha256(b"EA").hexdigest(),
+            extractor_rule_id="projection.fixture",
+            extractor_rule_version="1",
+        ),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="not_applicable",
+        retry_at=None,
+        diagnostics={},
+        at=_AT,
+    )
+
+
 def _databases(tmp_path, *, include_observation=True):
     from src.security_lifecycle import (
         LifecycleObservation,
@@ -141,6 +301,113 @@ def test_detail_tool_is_local_read_only_and_returns_source_missing_history(tmp_p
         assert missing["cases"][0]["case_id"] == case_id
     finally:
         profile.close()
+
+
+def test_active_case_projection_uses_closed_families_but_preserves_storage(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_investigation import observation_fingerprint
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    try:
+        raw_case = SecurityLifecycleReadService(
+            market_db_path=str(market_path),
+            profile_db_path=str(profile_path),
+            source_loader=lambda: {"EA": ("manual_lists",)},
+        ).get_case(case_id)
+        _seed_all_evidence_families(
+            store,
+            case_id,
+            observation_fingerprint(raw_case["observation"]),
+        )
+        tools = _configure(monkeypatch, market_path, profile_path)
+
+        detail = tools.get_security_lifecycle_case(case_id)["case"]
+        assert {row["source_family"] for row in detail["evidence"]} == {
+            "manual",
+            "regulator",
+            "listing_authority",
+            "market_infrastructure",
+        }
+        assert detail["evidence_count"] == 4
+        assert set(detail["source_family_status"]) <= {
+            "regulator",
+            "listing_authority",
+            "market_infrastructure",
+            "manual",
+        }
+        listing = next(
+            row
+            for row in detail["evidence"]
+            if row["source_family"] == "listing_authority"
+        )
+        assert listing["listing"] == {
+            "authority": "massive",
+            "directory": None,
+            "candidate_ticker": "B",
+            "listing_status": "active",
+            "market": "stocks",
+            "primary_exchange": "XNAS",
+            "source_as_of": "2026-08-28",
+        }
+        assert "source_locator_json" not in listing
+        assert "adapter" not in listing["listing"]
+        assert "expected_active_state" not in listing["listing"]
+
+        listed = tools.list_security_lifecycle_cases()["cases"][0]
+        assert listed["evidence_count"] == 4
+        assert set(listed["source_family_status"]) <= {
+            "regulator",
+            "listing_authority",
+            "market_infrastructure",
+            "manual",
+        }
+        raw_families = [row["source_family"] for row in store.list_evidence(case_id)]
+        assert raw_families.count("publisher") == 1
+        assert raw_families.count("general_web") == 1
+        assert len(raw_families) == 6
+    finally:
+        profile.close()
+
+
+def test_active_case_projection_rejects_incomplete_or_open_listing_locators():
+    from src.tools.security_lifecycle_tools import (
+        project_active_security_lifecycle_case,
+    )
+
+    base = {
+        "evidence": [{
+            "evidence_id": "listing-1",
+            "source_family": "listing_authority",
+            "kind": "listing_directory_snapshot",
+            "source_locator_json": json.dumps(_listing_locator()),
+        }],
+        "source_family_status": {"listing_authority": "present"},
+    }
+    invalid_locators = [
+        _listing_locator(authority="arbitrary_provider"),
+        _listing_locator(authority={"name": "massive"}),
+        _listing_locator(listing_status="delisted"),
+        _listing_locator(source_as_of="2026-99-99"),
+        {key: value for key, value in _listing_locator().items() if key != "adapter"},
+        _listing_locator(secret="must-not-be-forwarded"),
+    ]
+    for locator in invalid_locators:
+        case = {
+            **base,
+            "evidence": [{
+                **base["evidence"][0],
+                "source_locator_json": json.dumps(locator),
+            }],
+        }
+        try:
+            project_active_security_lifecycle_case(case)
+        except ValueError as exc:
+            assert str(exc) == "listing_locator"
+        else:
+            raise AssertionError("invalid listing locator was projected")
 
 
 def test_case_detail_projects_original_evidence_with_derived_translations(
@@ -748,11 +1015,12 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
                     for index in newest_first
                 ],
                 "evidence": [
-                    {
-                        "evidence_id": f"evidence-{index:02d}",
-                        "created_at": f"2026-08-20T00:{index:02d}:00Z",
-                        "excerpt": "evidence",
-                    }
+                        {
+                            "evidence_id": f"evidence-{index:02d}",
+                            "source_family": "manual",
+                            "created_at": f"2026-08-20T00:{index:02d}:00Z",
+                            "excerpt": "evidence",
+                        }
                     for index in ascending
                 ],
                 "assessment_history": [

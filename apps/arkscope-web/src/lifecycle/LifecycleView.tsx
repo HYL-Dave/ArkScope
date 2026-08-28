@@ -75,6 +75,8 @@ import {
   lifecycleErrorPresentation,
   lifecycleEventLabel,
   lifecycleEvidenceSourceFamilyLabel,
+  lifecycleListingAuthorityLabel,
+  lifecycleListingStatusLabel,
   lifecycleFactTypeLabel,
   lifecycleFactValueLabel,
   lifecycleOutcomeLabel,
@@ -113,11 +115,10 @@ const WORKFLOW_STATES: SecurityLifecycleWorkflowState[] = [
 ];
 const QUEUE_VIEWS = ["attention", "monitoring", "history", "all"] as const;
 type QueueView = (typeof QUEUE_VIEWS)[number];
-const SOURCE_FAMILIES: SecurityLifecycleEvidenceSourceFamily[] = [
+const ACTIVE_SOURCE_FAMILIES: SecurityLifecycleEvidenceSourceFamily[] = [
   "regulator",
+  "listing_authority",
   "market_infrastructure",
-  "publisher",
-  "general_web",
   "manual",
 ];
 const RELEVANCE: SecurityLifecycleRelevance[] = [
@@ -854,6 +855,74 @@ function EvidenceItem({
   const canRetry = error && failure?.action === "retry"
     && (error.retryable || error.code === "translation_output_invalid");
   const visibleMode = translation ? mode : "original";
+  if (evidence.kind === "listing_directory_snapshot") {
+    const listing = evidence.listing;
+    if (!listing) return null;
+    const authority = lifecycleListingAuthorityLabel(listing.authority, locale);
+    const status = lifecycleListingStatusLabel(listing.listing_status, locale);
+    const scanValues = [
+      listing.candidate_ticker,
+      status,
+      listing.primary_exchange,
+      listing.source_as_of,
+    ].filter(Boolean).join(" · ");
+    return (
+      <details className="lifecycle-evidence-item">
+        <summary>
+          <span className="lifecycle-evidence-summary">
+            <span>
+              <strong>{authority}</strong>
+              <span className="tiny">{scanValues}</span>
+            </span>
+            <span className="lifecycle-state">{
+              lifecycleEvidenceSourceFamilyLabel(evidence.source_family, locale)
+            }</span>
+          </span>
+        </summary>
+        <div className="lifecycle-evidence-body">
+          <dl className="lifecycle-assessment-facts">
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.authority)}</dt>
+              <dd>{authority}</dd>
+            </div>
+            {listing.directory ? (
+              <div>
+                <dt>{t(($) => $.lifecycle.listingEvidence.fields.directory)}</dt>
+                <dd className="mono">{listing.directory}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.ticker)}</dt>
+              <dd className="mono">{listing.candidate_ticker}</dd>
+            </div>
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.status)}</dt>
+              <dd>{status}</dd>
+            </div>
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.market)}</dt>
+              <dd>{listing.market}</dd>
+            </div>
+            {listing.primary_exchange ? (
+              <div>
+                <dt>{t(($) => $.lifecycle.listingEvidence.fields.venue)}</dt>
+                <dd className="mono">{listing.primary_exchange}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.asOf)}</dt>
+              <dd><time dateTime={listing.source_as_of}>{listing.source_as_of}</time></dd>
+            </div>
+          </dl>
+          {safeEvidenceUrl(evidence.source_url) ? (
+            <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
+            </a>
+          ) : null}
+        </div>
+      </details>
+    );
+  }
   return (
     <details className="lifecycle-evidence-item">
       <summary>
@@ -1425,16 +1494,17 @@ export function LifecycleView({
     }
   };
 
-  const currentEvidence = detail?.evidence ?? [];
-  const evidenceGroups = useMemo(() => currentEvidence.reduce<
-    Map<string, SecurityLifecycleEvidence[]>
-  >((groups, evidence) => {
-    const family = evidence.source_family || "manual";
-    const values = groups.get(family) ?? [];
-    values.push(evidence);
-    groups.set(family, values);
-    return groups;
-  }, new Map()), [currentEvidence]);
+  const currentEvidence = useMemo(
+    () => (detail?.evidence ?? []).filter(
+      (item) => ACTIVE_SOURCE_FAMILIES.includes(item.source_family)
+        && (item.kind !== "listing_directory_snapshot" || Boolean(item.listing)),
+    ),
+    [detail?.evidence],
+  );
+  const evidenceGroups = useMemo(() => ACTIVE_SOURCE_FAMILIES.flatMap((family) => {
+    const items = currentEvidence.filter((item) => item.source_family === family);
+    return items.length > 0 ? [[family, items] as const] : [];
+  }), [currentEvidence]);
   const evidenceCitations = useMemo(() => currentEvidence.filter(
     (item) => Boolean(item.evidence_id),
   ), [currentEvidence]);
@@ -1688,7 +1758,7 @@ export function LifecycleView({
                     <dd><time dateTime={detail.next_check_at}>{detail.next_check_at}</time></dd>
                   </div>
                 ) : null}
-                {SOURCE_FAMILIES.map((family) => {
+                {ACTIVE_SOURCE_FAMILIES.map((family) => {
                   const state = detail.source_family_status[family];
                   return state ? (
                     <div key={family}>
@@ -1723,7 +1793,7 @@ export function LifecycleView({
             </LifecycleCaseSection>
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.evidence)}>
-              {[...evidenceGroups.entries()].map(([family, items]) => (
+              {evidenceGroups.map(([family, items]) => (
                 <section className="lifecycle-evidence-group" key={family}>
                   <h4>{lifecycleEvidenceSourceFamilyLabel(family, locale)}</h4>
                   {items.map((item) => (
@@ -2034,7 +2104,13 @@ export function LifecycleView({
                             : current.filter((id) => id !== item.evidence_id));
                         }}
                       />
-                      {item.excerpt.slice(0, 120)}
+                      {item.kind === "listing_directory_snapshot" && item.listing
+                        ? [
+                          lifecycleListingAuthorityLabel(item.listing.authority, locale),
+                          item.listing.candidate_ticker,
+                          lifecycleListingStatusLabel(item.listing.listing_status, locale),
+                        ].join(" · ")
+                        : item.excerpt.slice(0, 120)}
                     </label>
                   ))}
                   {citationError ? (
