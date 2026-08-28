@@ -322,7 +322,8 @@ def _parse_nasdaq_component(
     expected_header = _NASDAQ_HEADER if directory == "nasdaq_listed" else _OTHER_HEADER
     if tuple(lines[0].split("|")) != expected_header:
         raise _nasdaq_failure()
-    if len(lines) - 2 > MAX_NASDAQ_DIRECTORY_ROWS:
+    source_rows = lines[1:-1]
+    if not source_rows or len(source_rows) > MAX_NASDAQ_DIRECTORY_ROWS:
         raise _nasdaq_failure()
     source_as_of, file_created_at, normalized_retrieved_at = _file_creation(
         lines[-1], retrieved_at=retrieved_at
@@ -330,7 +331,7 @@ def _parse_nasdaq_component(
 
     parsed_rows: dict[str, tuple[str | None, str | None]] = {}
     symbols: set[str] = set()
-    for line in lines[1:-1]:
+    for line in source_rows:
         fields = line.split("|")
         if len(fields) != len(expected_header):
             raise _nasdaq_failure()
@@ -396,26 +397,41 @@ def _parse_nasdaq_component(
     )
 
 
-def parse_nasdaq_directories(
-    *, nasdaq_bytes: bytes, other_bytes: bytes, retrieved_at: str
+def _parse_nasdaq_snapshot(
+    *,
+    nasdaq_bytes: bytes,
+    nasdaq_retrieved_at: str,
+    other_bytes: bytes,
+    other_retrieved_at: str,
 ) -> NasdaqDirectorySnapshot:
-    """Parse both complete Nasdaq files into one immutable lookup snapshot."""
-
     nasdaq = _parse_nasdaq_component(
         body=nasdaq_bytes,
         directory="nasdaq_listed",
         source_url=NASDAQ_LISTED_URL,
-        retrieved_at=retrieved_at,
+        retrieved_at=nasdaq_retrieved_at,
     )
     other = _parse_nasdaq_component(
         body=other_bytes,
         directory="other_listed",
         source_url=OTHER_LISTED_URL,
-        retrieved_at=retrieved_at,
+        retrieved_at=other_retrieved_at,
     )
     if nasdaq.symbols & other.symbols:
         raise _nasdaq_failure()
     return NasdaqDirectorySnapshot(nasdaq, other)
+
+
+def parse_nasdaq_directories(
+    *, nasdaq_bytes: bytes, other_bytes: bytes, retrieved_at: str
+) -> NasdaqDirectorySnapshot:
+    """Parse both complete Nasdaq files into one immutable lookup snapshot."""
+
+    return _parse_nasdaq_snapshot(
+        nasdaq_bytes=nasdaq_bytes,
+        nasdaq_retrieved_at=retrieved_at,
+        other_bytes=other_bytes,
+        other_retrieved_at=retrieved_at,
+    )
 
 
 def _massive_failure() -> ListingEvidenceFailure:
@@ -739,10 +755,9 @@ class ListingAuthoritySession:
         retrieved_at: str,
         massive_api_key: str | None,
     ) -> None:
-        normalized_retrieved_at, _ = _timestamp("retrieved_at", retrieved_at)
+        _timestamp("retrieved_at", retrieved_at)
         self._transport = transport
         self._budget = budget
-        self._retrieved_at = normalized_retrieved_at
         self._massive_api_key = (
             massive_api_key.strip()
             if isinstance(massive_api_key, str) and massive_api_key.strip()
@@ -769,10 +784,11 @@ class ListingAuthoritySession:
             self._nasdaq_blocker = "listing_directory_unavailable"
             return None, self._nasdaq_blocker
         try:
-            self._nasdaq_snapshot = parse_nasdaq_directories(
+            self._nasdaq_snapshot = _parse_nasdaq_snapshot(
                 nasdaq_bytes=nasdaq.body,
+                nasdaq_retrieved_at=nasdaq.retrieved_at,
                 other_bytes=other.body,
-                retrieved_at=self._retrieved_at,
+                other_retrieved_at=other.retrieved_at,
             )
         except ListingEvidenceFailure as exc:
             self._nasdaq_blocker = exc.code
@@ -812,7 +828,7 @@ class ListingAuthoritySession:
                 ticker,
                 expected_active=expected_active,
                 market=market,
-                retrieved_at=self._retrieved_at,
+                retrieved_at=payload.retrieved_at,
                 source_url=payload.source_url,
             )
         except ListingEvidenceFailure as exc:

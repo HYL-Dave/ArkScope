@@ -114,6 +114,63 @@ def test_nasdaq_parser_preserves_matching_component_and_per_file_hashes() -> Non
     assert snapshot.lookup("DOESNOTEXIST")[1].source_url == OTHER_LISTED_URL
 
 
+@pytest.mark.parametrize("component", ("nasdaqlisted.txt", "otherlisted.txt"))
+def test_nasdaq_parser_rejects_a_component_with_zero_source_rows(component) -> None:
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    empty_component = b"\n".join(
+        (
+            _fixture(component).splitlines()[0],
+            b"File Creation Time: 08282026|120000",
+            b"",
+        )
+    )
+    inputs = {
+        "nasdaq_bytes": _fixture("nasdaqlisted.txt"),
+        "other_bytes": _fixture("otherlisted.txt"),
+    }
+    inputs[
+        "nasdaq_bytes" if component == "nasdaqlisted.txt" else "other_bytes"
+    ] = empty_component
+
+    _assert_failure(
+        "listing_directory_schema_mismatch",
+        lambda: parse_nasdaq_directories(**inputs, retrieved_at=_AT),
+    )
+
+
+def test_nasdaq_parser_counts_source_rows_before_excluding_test_symbols() -> None:
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    nasdaq = b"\n".join(
+        (
+            _fixture("nasdaqlisted.txt").splitlines()[0],
+            b"TESTQ|Nasdaq test symbol|Q|Y|N|100|N|N",
+            b"File Creation Time: 08282026|120000",
+            b"",
+        )
+    )
+    other = b"\n".join(
+        (
+            _fixture("otherlisted.txt").splitlines()[0],
+            b"TESTN|NYSE test symbol|N|TESTN|N|100|Y|TESTN",
+            b"File Creation Time: 08282026|120000",
+            b"",
+        )
+    )
+
+    snapshot = parse_nasdaq_directories(
+        nasdaq_bytes=nasdaq,
+        other_bytes=other,
+        retrieved_at=_AT,
+    )
+
+    assert [row.listing_status for row in snapshot.lookup("MISS")] == [
+        "not_found",
+        "not_found",
+    ]
+
+
 @pytest.mark.parametrize(
     ("name", "mutate", "code"),
     (
@@ -470,10 +527,16 @@ class SurplusDiagnosticTransport(FakeListingTransport):
         return {"api_key": "secret-provider-surplus"}
 
 
-def _payload(source_url: str, body: bytes, content_type: str) -> ListingHttpPayload:
+def _payload(
+    source_url: str,
+    body: bytes,
+    content_type: str,
+    *,
+    retrieved_at: str = _AT,
+) -> ListingHttpPayload:
     return ListingHttpPayload(
         source_url=source_url,
-        retrieved_at=_AT,
+        retrieved_at=retrieved_at,
         status_code=200,
         content_type=content_type,
         body=body,
@@ -562,6 +625,88 @@ def test_listing_session_is_lazy_reuses_snapshot_and_memoizes_massive_lookup() -
 
     session.close()
     assert transport.closed is True
+
+
+def test_listing_session_uses_each_transport_payload_retrieval_timestamp() -> None:
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+
+    payloads = _session_payloads()
+    timestamps = {
+        NASDAQ_LISTED_URL: "2026-08-28T21:01:00Z",
+        OTHER_LISTED_URL: "2026-08-28T21:02:00Z",
+        ("OTCM", True, "stocks"): "2026-08-28T21:03:00Z",
+        ("OTCM", True, "otc"): "2026-08-28T21:04:00Z",
+    }
+    for identity, retrieved_at in timestamps.items():
+        payload = payloads[identity]
+        assert isinstance(payload, ListingHttpPayload)
+        payloads[identity] = _payload(
+            payload.source_url,
+            payload.body,
+            payload.content_type,
+            retrieved_at=retrieved_at,
+        )
+    session = ListingAuthoritySession(
+        transport=FakeListingTransport(payloads),
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at="2026-08-28T21:59:00Z",
+        massive_api_key="fixture-key",
+    )
+
+    result = session.lookup(
+        context=_context("AAPL"),
+        candidate_tickers=("OTCM",),
+        require_explicit_inactive=False,
+    )
+
+    assert {row.source_url: row.retrieved_at for row in result.evidence} == {
+        payloads[identity].source_url: retrieved_at
+        for identity, retrieved_at in timestamps.items()
+    }
+    assert {
+        json.loads(row.excerpt)["source_as_of"]
+        for row in result.evidence
+        if row.adapter == "massive_reference"
+    } == {
+        "2026-08-28T21:03:00Z",
+        "2026-08-28T21:04:00Z",
+    }
+
+
+@pytest.mark.parametrize("component", (NASDAQ_LISTED_URL, OTHER_LISTED_URL))
+def test_listing_session_validates_each_nasdaq_payload_retrieval_timestamp(
+    component,
+) -> None:
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+
+    payloads = _session_payloads()
+    payload = payloads[component]
+    assert isinstance(payload, ListingHttpPayload)
+    payloads[component] = _payload(
+        payload.source_url,
+        payload.body,
+        payload.content_type,
+        retrieved_at="invalid-provider-timestamp",
+    )
+    session = ListingAuthoritySession(
+        transport=FakeListingTransport(payloads),
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=_AT,
+        massive_api_key=None,
+    )
+
+    result = session.lookup(
+        context=_context("AAPL"),
+        candidate_tickers=("AAPL",),
+        require_explicit_inactive=False,
+    )
+
+    assert result.evidence == ()
+    assert result.blockers == (
+        "listing_status_unresolved",
+        "massive_credential_missing",
+    )
+    assert "invalid-provider-timestamp" not in repr(result)
 
 
 def test_listing_evidence_uses_exact_canonical_excerpt_bytes_and_cited_spans() -> None:

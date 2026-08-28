@@ -376,10 +376,15 @@ def test_listing_facts_share_sec_and_ibkr_identity_vocabulary_in_real_kernel():
         ("span", "fact_citation"),
     ),
 )
-def test_listing_producer_mutations_fail_at_real_kernel_validator(mutation, expected):
+@pytest.mark.parametrize(
+    "adapter", ("nasdaq_symbol_directory", "massive_reference")
+)
+def test_listing_producer_mutations_fail_at_real_kernel_validator(
+    adapter, mutation, expected
+):
     conn, store, kernel, case_id = _context()
     claim = _reserve(kernel, case_id, at=_LISTING_AT)
-    evidence, facts = _listing_producer_result("massive_reference")
+    evidence, facts = _listing_producer_result(adapter)
     if mutation == "excerpt":
         evidence = (
             replace(
@@ -409,6 +414,11 @@ def test_listing_producer_mutations_fail_at_real_kernel_validator(mutation, expe
     assert store.get_automation_run(claim.run_id)["status"] == "running"
     assert conn.execute(
         "SELECT COUNT(*) FROM security_lifecycle_evidence WHERE automation_run_id=?",
+        (claim.run_id,),
+    ).fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM security_lifecycle_automation_facts "
+        "WHERE automation_run_id=?",
         (claim.run_id,),
     ).fetchone()[0] == 0
 
