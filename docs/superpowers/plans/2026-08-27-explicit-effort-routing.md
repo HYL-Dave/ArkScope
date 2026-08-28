@@ -61,7 +61,7 @@ ship complete built-in defaults: Opus 5/high, Sonnet 5/medium, and Luna/xhigh.
 - Produces: one exact current model set, retained retired facts, and
   `model_retired` task-route eligibility.
 
-- [ ] **Step 1: Write failing current-lineup tests**
+- [x] **Step 1: Write failing current-lineup tests**
 
 Pin the exact set:
 
@@ -154,7 +154,7 @@ Expose one provider-neutral catalog policy with canonical `current_model_ids`
 and `retired_model_ids`. This is model-policy data, not discovery entitlement.
 It must use the same longest-prefix/canonical-ID semantics as backend lookup.
 
-- [ ] **Step 2: Run the focused RED**
+- [x] **Step 2: Run the focused RED**
 
 ```bash
 pytest tests/test_model_capabilities.py tests/test_model_effective.py tests/test_model_routing.py tests/test_agents.py tests/test_model_tiers.py tests/test_card_synthesis.py tests/test_ai_research_route.py tests/test_subagent.py tests/test_code_generator.py tests/test_compressor_layer5.py tests/test_research_runs.py tests/test_research_routes.py tests/test_model_task_test.py tests/test_investor_profile_calibration.py -q
@@ -162,7 +162,7 @@ pytest tests/test_model_capabilities.py tests/test_model_effective.py tests/test
 
 Expected: Opus 5 and retirement-policy assertions fail against the old registry.
 
-- [ ] **Step 3: Implement current/retired model policy**
+- [x] **Step 3: Implement current/retired model policy**
 
 Add an explicit task-route lifecycle fact to `ModelCapability`; do not overload
 `runtime_ready`, which remains a provider-adapter fact. Add Opus 5 from official
@@ -199,7 +199,7 @@ Do not rewrite stored routes or historical runs. The approved spec supersedes
 the stale Luna rejection and missing-Opus-5 statements; do not edit the
 user-owned dirty Priority Map in this slice.
 
-- [ ] **Step 4: Run focused GREEN plus stale-default inventory**
+- [x] **Step 4: Run focused GREEN plus stale-default inventory**
 
 ```bash
 pytest tests/test_model_capabilities.py tests/test_model_effective.py tests/test_model_routing.py tests/test_agents.py tests/test_model_tiers.py tests/test_card_synthesis.py tests/test_ai_research_route.py tests/test_subagent.py tests/test_code_generator.py tests/test_compressor_layer5.py tests/test_research_runs.py tests/test_research_routes.py tests/test_model_task_test.py tests/test_investor_profile_calibration.py -q
@@ -210,7 +210,7 @@ Expected: tests pass. Record every remaining match as one of capability/history,
 low-level diagnostic, compatibility fixture, or documentation example. No active
 task/runtime default or new-route recommendation may remain unclassified.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add src/model_capabilities.py src/model_routing.py src/model_effective.py src/agents/config.py src/agents/shared/subagent.py src/agents/shared/compressor/summary_callers.py src/investor_profile_calibration_agent.py src/tools/code_generator.py config/.env.template tests/test_model_capabilities.py tests/test_model_effective.py tests/test_model_routing.py tests/test_agents.py tests/test_model_tiers.py tests/test_card_synthesis.py tests/test_ai_research_route.py tests/test_subagent.py tests/test_code_generator.py tests/test_compressor_layer5.py tests/test_research_runs.py tests/test_research_routes.py tests/test_model_task_test.py tests/test_investor_profile_calibration.py
@@ -229,7 +229,7 @@ git commit -m "feat(models): admit current generation routes"
   `selectable_effort_ids_for_model(provider, model) -> tuple[str, ...]`
   and `is_valid_task_route_effort(provider, effort, model) -> bool`.
 
-- [ ] **Step 1: Write failing policy tests**
+- [x] **Step 1: Write failing policy tests**
 
 Add tests proving:
 
@@ -251,7 +251,7 @@ Also assert an unknown OpenAI model receives the explicit provider union without
 the identical five-value task-route set. A retired model is rejected by the
 model authority before its effort value matters.
 
-- [ ] **Step 2: Run the focused RED**
+- [x] **Step 2: Run the focused RED**
 
 Run:
 
@@ -262,7 +262,7 @@ pytest tests/test_model_routing.py -q
 Expected: only the new imports/assertions fail because the task-route policy does
 not exist.
 
-- [ ] **Step 3: Implement the pure policy**
+- [x] **Step 3: Implement the pure policy**
 
 Keep `effort_ids_for_model` and `is_valid_effort` unchanged for provider-native
 diagnostics. Add `selectable_effort_ids_for_model(...)` and
@@ -274,7 +274,7 @@ and project supported values through that order. Do not reorder or rewrite the
 provider-native `_OPUS_EFFORTS` capability tuple; task-control order is a product
 projection, not a provider fact.
 
-- [ ] **Step 4: Run the focused GREEN**
+- [x] **Step 4: Run the focused GREEN**
 
 Run:
 
@@ -284,7 +284,7 @@ pytest tests/test_model_routing.py -q
 
 Expected: pass.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add src/model_routing.py tests/test_model_routing.py
@@ -310,7 +310,7 @@ git commit -m "fix(models): define explicit task effort policy"
   from Task 2.
 - Produces: fail-closed route save/import/task-test/research-run admission.
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 Add exact tests that prove:
 
@@ -358,7 +358,7 @@ Also cover provider/model override paths: they use the approved task default
 effort (`high` for synthesis, `medium` for translation), never an implicit
 cross-provider `default`.
 
-- [ ] **Step 2: Run the route RED**
+- [x] **Step 2: Run the route RED**
 
 Run:
 
@@ -369,7 +369,7 @@ pytest tests/test_model_routing.py tests/test_research_routes.py tests/test_rese
 Expected: the new admission tests fail because current code normalizes to
 `default` and queues ambiguous research runs.
 
-- [ ] **Step 3: Implement fail-closed admission**
+- [x] **Step 3: Implement fail-closed admission**
 
 In `update_model_routes` and `run_task_model_test`, evaluate model retirement
 before effort. Return HTTP 400 with typed, bounded `model_retired`,
@@ -393,7 +393,7 @@ execution. Replace the four cross-provider task-entry fallbacks with the
 approved explicit task effort; do not add a hidden default argument at another
 layer.
 
-- [ ] **Step 4: Run the route GREEN**
+- [x] **Step 4: Run the route GREEN**
 
 Run:
 
@@ -403,7 +403,7 @@ pytest tests/test_model_routing.py tests/test_research_routes.py tests/test_rese
 
 Expected: pass.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 git add src/api/routes/config_routes.py src/api/routes/research.py src/research_runs.py src/card_synthesis.py tests/test_model_routing.py tests/test_research_routes.py tests/test_research_runs.py tests/test_ai_research_route.py tests/test_model_task_test.py tests/test_card_synthesis.py
@@ -431,7 +431,7 @@ git commit -m "fix(models): reject ambiguous task efforts"
 - Produces: updated `effortOptionsForModel(...)`, current-model projection,
   and typed `model_retired` / `effort_required` save blockers.
 
-- [ ] **Step 1: Write failing helper and Settings tests**
+- [x] **Step 1: Write failing helper and Settings tests**
 
 Require these outcomes:
 
@@ -485,7 +485,7 @@ an unchanged baseline/draft pair containing `default`, `none`, blank effort, or 
 retired model still yields its typed blocker. Also prove blank and `default` are
 not semantically equal.
 
-- [ ] **Step 2: Run the frontend RED**
+- [x] **Step 2: Run the frontend RED**
 
 Run:
 
@@ -501,7 +501,7 @@ blocking only understands credentials. The pre-change grep must return at least
 one match; record the exact active task-effort coercion sites so the closeout
 scan is a real tripwire rather than a pattern that never matched the old code.
 
-- [ ] **Step 3: Implement shared projection and Settings behavior**
+- [x] **Step 3: Implement shared projection and Settings behavior**
 
 Keep the existing exported name `effortOptionsForModel`; change its task-route
 semantics without creating a rename-only break across `Research.tsx`,
@@ -526,7 +526,7 @@ value may remain visible in warning/provenance text, but the selector value is
 empty and both Save and that row's Test remain disabled until a real effort is
 chosen.
 
-- [ ] **Step 4: Run the frontend GREEN**
+- [x] **Step 4: Run the frontend GREEN**
 
 Run:
 
@@ -537,7 +537,7 @@ npm run typecheck
 
 Expected: pass.
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```bash
 git add apps/arkscope-web/src/api.ts apps/arkscope-web/src/researchModels.ts apps/arkscope-web/src/modelRoutingUx.ts apps/arkscope-web/src/settings/ModelRoutingSection.tsx apps/arkscope-web/src/Settings.tsx apps/arkscope-web/src/i18n/resources/en/settings.ts apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts apps/arkscope-web/src/researchModels.test.ts apps/arkscope-web/src/modelRoutingUx.test.ts apps/arkscope-web/src/ModelRoutingSection.test.ts apps/arkscope-web/src/SettingsModelRouting.test.ts
@@ -559,7 +559,7 @@ git commit -m "fix(web): require explicit task effort"
 - Consumes: Task 4 selectable options/completeness helper.
 - Produces: global sticky AI Research tuples containing a real effort, or a blocked/incomplete selection that cannot submit.
 
-- [ ] **Step 1: Write failing selection and workspace tests**
+- [x] **Step 1: Write failing selection and workspace tests**
 
 Change the legacy-default owner to expect the typed explicit-effort reason for a
 current model. Add the same owner for `none`, plus a retired-model owner that
@@ -591,7 +591,7 @@ lists used by Task 4. In particular, Luna must include `xhigh`, and no fixture
 may make a retired model the recommended/default route except in an explicitly
 named legacy case.
 
-- [ ] **Step 2: Run the Research RED**
+- [x] **Step 2: Run the Research RED**
 
 Run:
 
@@ -604,7 +604,7 @@ Working directory: `apps/arkscope-web`.
 Expected: the legacy default remains ready and provider changes still persist
 `default`.
 
-- [ ] **Step 3: Implement Research selection behavior**
+- [x] **Step 3: Implement Research selection behavior**
 
 Remove the synthetic default option. A model/provider change with selectable
 efforts enters `incompleteSelection`; choosing a real effort commits the sticky
@@ -622,11 +622,11 @@ When there is no stored or thread selection, initialize the current global
 preference from `openai / gpt-5.6-luna / xhigh`. This initialization is a new
 preference only; it does not rewrite a historical route or run.
 
-- [ ] **Step 4: Run the Research GREEN**
+- [x] **Step 4: Run the Research GREEN**
 
 Run the same two-file Vitest command. Expected: pass.
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 ```bash
 git add apps/arkscope-web/src/api.ts apps/arkscope-web/src/researchSelection.ts apps/arkscope-web/src/Research.tsx apps/arkscope-web/src/i18n/resources/en/research.ts apps/arkscope-web/src/i18n/resources/zh-Hant/research.ts apps/arkscope-web/src/researchSelection.test.ts apps/arkscope-web/src/ResearchWorkspace.test.tsx
@@ -703,12 +703,18 @@ git commit -m "docs: close explicit effort routing slice"
 Do not merge or push. Report the exact branch tip, test counts, and remaining
 legacy compatibility behavior for independent review.
 
-Closeout note (2026-08-28, after product fix `5c45a845`): all focused and
-complete gates passed. Focused backend: 505 passed. Focused frontend: 6 files,
-118 tests passed. Full frontend: 106 files, 1,280 tests passed; typecheck and
-build passed, with the existing Vite large-chunk warning. Full backend: 4,593
-passed, 12 skipped, 3 known `edgartools` deprecation warnings. Static inventories
-passed; the remaining legacy matches are capability/history, diagnostics,
-documentation, or explicit compatibility fixtures, and card task execution has
-no default-effort fallback. The same-provider ready AI Research provider click
-is now a no-op; blocked/incomplete recovery remains covered.
+Closeout note (2026-08-28, after test commit `7937c406`): all Task 1-6
+checkboxes are complete. Focused backend: 505 passed. Focused frontend: 6
+files, 121 tests passed. Full frontend: 106 files, 1,283 tests passed;
+typecheck and build passed, with the existing Vite large-chunk warning. Full
+backend: 4,593 passed, 12 skipped, 3 known `edgartools` deprecation warnings.
+The three named same-provider recovery owners all pass: blocked legacy effort,
+retired historical model, and active incomplete model/effort edit. With the
+provider guard temporarily mutated to unconditional same-provider return, all
+three owners failed; after restoring the shipped guard, all three passed again.
+The explicit `gpt-5.4-mini` calibration owner asserts the supplied model is
+preserved. Static inventories and `git diff --check` passed; remaining legacy
+matches are capability/history, diagnostics, UI/source labels, documentation,
+or explicit compatibility fixtures, and card task execution has no
+default-effort fallback. After the docs commit, `git status --short` was empty;
+ignored SDD reports do not appear in status.
