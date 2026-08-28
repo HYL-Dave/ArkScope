@@ -82,6 +82,8 @@ def _active_listing(
     market="stocks",
     venue="NASDAQ",
     cik=None,
+    security_class=None,
+    current_ticker=None,
     retrieved_at="2026-08-25T01:02:03Z",
 ):
     evidence = _listing_evidence(
@@ -94,11 +96,20 @@ def _active_listing(
         directory=("nasdaq_listed" if adapter == "nasdaq_symbol_directory" else None),
         retrieved_at=retrieved_at,
     )
-    facts = [
-        _fact(evidence_id, "successor_ticker", ticker),
-        _fact(evidence_id, "destination_venue", venue),
-        _fact(evidence_id, "security_class", "common_stock"),
-    ]
+    if ticker == current_ticker:
+        facts = [
+            _fact(evidence_id, "source_ticker", ticker),
+            _fact(evidence_id, "source_venue", venue),
+        ]
+    else:
+        facts = [
+            _fact(evidence_id, "successor_ticker", ticker),
+            _fact(evidence_id, "destination_venue", venue),
+        ]
+    if security_class is None and adapter == "massive_reference":
+        security_class = "common_stock"
+    if security_class is not None:
+        facts.append(_fact(evidence_id, "security_class", security_class))
     if cik is not None:
         facts.append(_fact(evidence_id, "issuer_cik", cik))
     return evidence, tuple(facts)
@@ -165,8 +176,10 @@ def _listing_fixture(name):
         venue="OTC",
         cik=_CIK,
     )
-    same, same_facts = _active_listing("nasdaq-same", "SAME")
-    unchanged, unchanged_facts = _active_listing("nasdaq-unchanged", "KEEP")
+    same, same_facts = _active_listing("nasdaq-same", "SAME", current_ticker="SAME")
+    unchanged, unchanged_facts = _active_listing(
+        "nasdaq-unchanged", "KEEP", current_ticker="KEEP"
+    )
     terminal_sec = {
         **_evidence("sec", "regulator"),
         "source_locator": {"filing_chain_complete": True},
@@ -849,6 +862,7 @@ def _evaluate(
 ):
     from src.security_lifecycle_decision_policy import evaluate_automation_decision
 
+    selected_case = case or _case()
     selected_facts = tuple(facts or _identity_facts())
     selected_evidence = evidence
     if selected_evidence is None:
@@ -870,7 +884,12 @@ def _evaluate(
             ),
             "NASDAQ",
         )
-        listing, listing_facts = _active_listing("nasdaq", successor, venue=venue)
+        listing, listing_facts = _active_listing(
+            "nasdaq",
+            successor,
+            venue=venue,
+            current_ticker=selected_case["ticker"],
+        )
         selected_evidence = (
             _evidence("sec", "regulator"),
             listing,
@@ -878,7 +897,7 @@ def _evaluate(
         )
         selected_facts += listing_facts
     return evaluate_automation_decision(
-        case=case or _case(),
+        case=selected_case,
         evidence=selected_evidence,
         facts=selected_facts,
         current_date=current_date,
@@ -1091,11 +1110,16 @@ def test_case_already_keyed_by_successor_accepts_without_a_to_a_transition():
     assert decision.transition_requested is False
 
 
-def test_venue_transfer_is_verified_non_mutating_and_keeps_tracking():
-    facts = _identity_facts(source="QBTS", successor="QBTS")
+def test_venue_transfer_accepts_ordinary_nasdaq_listing_without_security_class():
+    facts = _identity_facts(source="QBTS", successor="QBTS")[:7]
+    listing, listing_facts = _active_listing(
+        "nasdaq-qbts", "QBTS", current_ticker="QBTS"
+    )
+    assert all(fact["fact_type"] != "security_class" for fact in listing_facts)
     decision = _evaluate(
         case=_case(ticker="QBTS"),
-        facts=facts,
+        evidence=(_evidence("sec", "regulator"), listing),
+        facts=facts + listing_facts,
         transition_preview=lambda _request: (_ for _ in ()).throw(
             AssertionError("venue transfer must not preview a ticker mutation")
         ),
@@ -1111,7 +1135,7 @@ def test_venue_transfer_is_verified_non_mutating_and_keeps_tracking():
     assert "keep tracking" in decision.impact_summary.lower()
 
 
-def test_explicit_no_identity_change_resolves_without_transition():
+def test_no_identity_change_accepts_ordinary_nasdaq_listing_without_security_class():
     transaction = {
         "kind": "asset_acquisition",
         "terms_status": "complete",
@@ -1126,7 +1150,13 @@ def test_explicit_no_identity_change_resolves_without_transition():
         _fact("sec", "transaction_structure", transaction),
         _fact("sec", "tracked_security_effect", "no_identity_change"),
     )
-    listing, listing_facts = _active_listing("nasdaq-blbd", "BLBD", cik="0001589526")
+    listing, listing_facts = _active_listing(
+        "nasdaq-blbd",
+        "BLBD",
+        cik="0001589526",
+        current_ticker="BLBD",
+    )
+    assert all(fact["fact_type"] != "security_class" for fact in listing_facts)
     decision = _evaluate(
         case={**_case(ticker="BLBD", kinds=("merger_agreement",)), "cik": "0001589526"},
         evidence=(_evidence("sec", "regulator"), listing),
@@ -1142,6 +1172,53 @@ def test_explicit_no_identity_change_resolves_without_transition():
     assert decision.outcomes == ("no_tracked_security_change",)
     assert decision.counterparty_name == "Example Assets LLC"
     assert decision.rule_id == "lifecycle.no_identity_change"
+    assert decision.transition_requested is False
+
+
+def test_missing_regulator_security_class_is_typed_and_never_previews():
+    fixture = _listing_fixture("nms_symbol_continuation")
+    facts = tuple(
+        fact
+        for fact in fixture["facts"]
+        if not (fact["evidence_id"] == "sec" and fact["fact_type"] == "security_class")
+    )
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=fixture["evidence"],
+        facts=facts,
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("missing SEC class must fail before preview")
+        ),
+    )
+
+    assert decision.decision_tier == "review_suggested"
+    assert decision.action_readiness == "action_blocked"
+    assert decision.decision_issues == ("regulator_security_class_missing",)
+    assert decision.transition_requested is False
+
+
+def test_positive_listing_security_class_conflict_fails_before_preview():
+    fixture = _listing_fixture("nms_symbol_continuation")
+    listing, listing_facts = _active_listing(
+        "nasdaq-etf",
+        "NEW",
+        security_class="exchange_traded_fund",
+    )
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=(_evidence("sec", "regulator"), listing),
+        facts=tuple(fact for fact in fixture["facts"] if fact["evidence_id"] == "sec")
+        + listing_facts,
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("conflicting positive class must fail before preview")
+        ),
+    )
+
+    assert decision.decision_tier == "review_suggested"
+    assert decision.action_readiness == "action_blocked"
+    assert decision.decision_issues == ("listing_authority_conflict",)
     assert decision.transition_requested is False
 
 

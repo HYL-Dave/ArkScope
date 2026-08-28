@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -694,6 +695,239 @@ def test_real_listing_session_active_output_drives_otc_continuation_policy() -> 
     assert decision.action_readiness == "transition_eligible"
     assert decision.destination_venue == "OTC"
     assert decision.transition_requested is True
+
+
+def _real_nasdaq_policy_result(
+    *,
+    case_ticker: str,
+    candidate_ticker: str,
+    sec_values: tuple[tuple[str, str], ...],
+):
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+    from src.security_lifecycle_fact_kernel import (
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+    from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+
+    session = ListingAuthoritySession(
+        transport=FakeListingTransport(_session_payloads()),
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=_AT,
+        massive_api_key=None,
+    )
+    listing = session.lookup(
+        context=_context(case_ticker),
+        candidate_tickers=(candidate_ticker,),
+        require_explicit_inactive=False,
+    )
+    session.close()
+    assert listing.blockers == ()
+
+    sec_excerpt = "; ".join(f"{fact_type}={value}" for fact_type, value in sec_values)
+    sec_evidence = AutomationEvidence(
+        evidence_id="sec-nms-a-to-b",
+        source_family="regulator",
+        adapter="sec_edgar",
+        kind="regulator_excerpt",
+        source_url="https://www.sec.gov/Archives/nms-a-to-b.htm",
+        title="NMS A-to-B fixture",
+        publisher="SEC EDGAR",
+        domain="sec.gov",
+        source_published_at="2026-08-20",
+        retrieved_at=_AT,
+        excerpt=sec_excerpt,
+        content_sha256=hashlib.sha256(sec_excerpt.encode()).hexdigest(),
+        source_document_sha256="d" * 64,
+        source_locator={"accession": "0000320193-26-000001"},
+        evidence_dedupe_key="sec:nms-a-to-b",
+    )
+
+    def sec_fact(fact_type: str, value: str) -> AutomationFact:
+        cited = value.encode()
+        start = sec_excerpt.encode().index(cited)
+        return AutomationFact(
+            evidence_id=sec_evidence.evidence_id,
+            fact_type=fact_type,
+            normalized_value=value,
+            source_span_start=start,
+            source_span_end=start + len(cited),
+            cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+            extractor_rule_id=f"sec.fixture.{fact_type}",
+            extractor_rule_version="1",
+        )
+
+    sec_facts = tuple(sec_fact(fact_type, value) for fact_type, value in sec_values)
+
+    conn = sqlite3.connect(":memory:")
+    store = SecurityLifecycleInvestigationStore(
+        conn,
+        id_factory=lambda prefix, ordinal: f"{prefix}_{ordinal:04d}",
+    )
+    case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0000320193-26-000001",
+        ticker=case_ticker,
+        at=_AT,
+    )
+    kernel = SecurityLifecycleFactKernel(store)
+    claim = kernel.reserve_run(
+        case_id=case_id,
+        observation_fingerprint_sha256="a" * 64,
+        policy_version="trusted-lifecycle-automation-v4",
+        mode="historical",
+        execution_revision="trusted-lifecycle-execution-r2",
+        query_context={
+            "case_id": case_id,
+            "cik": "0000320193",
+            "aliases": [case_ticker],
+        },
+        diagnostics={"sec_attempts": 0, "listing_records": 1},
+        at=_AT,
+    )
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(sec_evidence, *listing.evidence),
+        facts=(*sec_facts, *listing.facts),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="transition_eligible",
+        retry_at=None,
+        diagnostics={"sec_attempts": 0, "listing_records": 1},
+        at="2026-08-28T23:00:00Z",
+    )
+    evidence_rows = tuple(
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_evidence WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+    )
+    fact_rows = tuple(
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_automation_facts "
+            "WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+    )
+    preview_calls = []
+
+    def preview(request):
+        preview_calls.append(dict(request))
+        return {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": request["transition_kind"],
+        }
+
+    decision = evaluate_automation_decision(
+        case={"ticker": case_ticker, "cik": "0000320193"},
+        evidence=evidence_rows,
+        facts=fact_rows,
+        current_date="2026-08-28",
+        active_sources=(),
+        transition_preview=preview,
+    )
+    conn.close()
+    return listing, decision, preview_calls
+
+
+def test_real_nasdaq_common_stock_without_class_drives_nms_continuation_policy() -> None:
+    listing, decision, preview_calls = _real_nasdaq_policy_result(
+        case_ticker="OLD",
+        candidate_ticker="AAPL",
+        sec_values=(
+            ("source_ticker", "OLD"),
+            ("successor_ticker", "AAPL"),
+            ("source_venue", "NYSE"),
+            ("destination_venue", "NASDAQ"),
+            ("effective_date", "2026-08-20"),
+            ("security_class", "common_stock"),
+            ("issuer_cik", "0000320193"),
+        ),
+    )
+
+    assert {fact.fact_type for fact in listing.facts} == {
+        "destination_venue",
+        "successor_ticker",
+    }
+    assert decision.action_readiness == "transition_eligible"
+    assert decision.transition_requested is True
+    assert len(preview_calls) == 1
+
+
+def test_real_nasdaq_current_ticker_venue_corroborates_same_symbol_destination() -> None:
+    listing, decision, preview_calls = _real_nasdaq_policy_result(
+        case_ticker="AAPL",
+        candidate_ticker="AAPL",
+        sec_values=(
+            ("source_ticker", "AAPL"),
+            ("successor_ticker", "AAPL"),
+            ("source_venue", "NYSE"),
+            ("destination_venue", "NASDAQ"),
+            ("effective_date", "2026-08-20"),
+            ("security_class", "common_stock"),
+            ("issuer_cik", "0000320193"),
+        ),
+    )
+
+    assert {fact.fact_type: fact.normalized_value for fact in listing.facts} == {
+        "source_ticker": "AAPL",
+        "source_venue": "NASDAQ",
+    }
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "not_applicable"
+    assert decision.outcomes == ("venue_transfer",)
+    assert decision.decision_issues == ()
+    assert preview_calls == []
+
+
+def test_real_nasdaq_current_ticker_venue_conflict_fails_before_same_symbol_branch() -> None:
+    _listing, decision, preview_calls = _real_nasdaq_policy_result(
+        case_ticker="AAPL",
+        candidate_ticker="AAPL",
+        sec_values=(
+            ("source_ticker", "AAPL"),
+            ("successor_ticker", "AAPL"),
+            ("source_venue", "NYSE"),
+            ("destination_venue", "NYSE AMERICAN"),
+            ("effective_date", "2026-08-20"),
+            ("security_class", "common_stock"),
+            ("issuer_cik", "0000320193"),
+        ),
+    )
+
+    assert decision.decision_tier == "review_suggested"
+    assert decision.action_readiness == "action_blocked"
+    assert decision.decision_issues == ("listing_authority_conflict",)
+    assert preview_calls == []
+
+
+def test_real_nasdaq_current_ticker_drives_no_identity_change_without_class() -> None:
+    listing, decision, preview_calls = _real_nasdaq_policy_result(
+        case_ticker="AAPL",
+        candidate_ticker="AAPL",
+        sec_values=(
+            ("source_ticker", "AAPL"),
+            ("effective_date", "2026-08-20"),
+            ("security_class", "common_stock"),
+            ("issuer_cik", "0000320193"),
+            ("tracked_security_effect", "no_identity_change"),
+        ),
+    )
+
+    assert {fact.fact_type: fact.normalized_value for fact in listing.facts} == {
+        "source_ticker": "AAPL",
+        "source_venue": "NASDAQ",
+    }
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "not_applicable"
+    assert decision.outcomes == ("no_tracked_security_change",)
+    assert decision.decision_issues == ()
+    assert preview_calls == []
 
 
 def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> None:

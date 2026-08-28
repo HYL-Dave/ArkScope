@@ -129,6 +129,10 @@ def _canonical(value: Any) -> str:
     )
 
 
+def _listing_class_compatible(listing_class: Any, regulator_class: Any) -> bool:
+    return listing_class is None or listing_class == regulator_class
+
+
 def _normalized_fact_value(fact_type: str, value: Any) -> Any:
     value = normalize_automation_fact_value(fact_type, value)
     if fact_type in {"source_ticker", "successor_ticker"}:
@@ -258,6 +262,56 @@ def _one(
 ) -> Any:
     found = _values(facts, fact_type, family=family)
     return found[0] if len(found) == 1 else None
+
+
+def _facts_with_current_listing_destination_role(
+    facts: tuple[_Fact, ...], case_ticker: str
+) -> tuple[_Fact, ...]:
+    if _one(facts, "successor_ticker", family="regulator") != case_ticker:
+        return facts
+    role_map = {
+        "source_ticker": "successor_ticker",
+        "source_venue": "destination_venue",
+    }
+    aligned = tuple(
+        _Fact(
+            evidence_id=row.evidence_id,
+            source_family=row.source_family,
+            fact_type=role_map.get(row.fact_type, row.fact_type),
+            value=row.value,
+            canonical_value=row.canonical_value,
+        )
+        if row.source_family == "listing_authority"
+        else row
+        for row in facts
+    )
+    return tuple(
+        sorted(
+            aligned,
+            key=lambda row: (
+                row.fact_type,
+                row.canonical_value,
+                row.source_family,
+                row.evidence_id,
+            ),
+        )
+    )
+
+
+def _listing_identity_for_candidate(
+    facts: tuple[_Fact, ...], *, candidate_ticker: str, case_ticker: str
+) -> tuple[str | None, str | None]:
+    if candidate_ticker == case_ticker:
+        source_identity = (
+            _one(facts, "source_ticker"),
+            _one(facts, "source_venue"),
+        )
+        if source_identity != (None, None):
+            return source_identity
+    return (
+        _one(facts, "successor_ticker"),
+        _one(facts, "destination_venue"),
+    )
 
 
 def _conflicts(facts: tuple[_Fact, ...]) -> tuple[str, ...]:
@@ -729,13 +783,17 @@ def listing_authority_conflict_codes(
 ) -> tuple[str, ...]:
     """Return the one frozen blocker code for current listing conflicts."""
 
-    if _ticker(case.get("ticker")) is None:
+    case_ticker = _ticker(case.get("ticker"))
+    if case_ticker is None:
         return ()
     all_evidence = _evidence_rows(evidence)
     all_facts = _fact_rows(facts, all_evidence)
     current_evidence, current_facts = _current_decision_material(
         all_evidence,
         all_facts,
+    )
+    current_facts = _facts_with_current_listing_destination_role(
+        current_facts, case_ticker
     )
     tickers = {
         component[1]
@@ -821,7 +879,9 @@ def evaluate_automation_decision(
             decision_issues=listing_issues,
         )
 
-    conflicts = _conflicts(fact_rows)
+    conflicts = _conflicts(
+        _facts_with_current_listing_destination_role(fact_rows, case_ticker)
+    )
     if conflicts:
         return _decision(
             decision_tier="review_suggested",
@@ -988,12 +1048,16 @@ def evaluate_automation_decision(
             return _insufficient(issues=missing)
         listing_rows = _listing_active_rows(evidence_rows, case_ticker)
         listing_facts = _facts_for_evidence(fact_rows, listing_rows)
-        listing_ticker = _one(listing_facts, "successor_ticker")
+        listing_ticker, _listing_venue = _listing_identity_for_candidate(
+            listing_facts,
+            candidate_ticker=case_ticker,
+            case_ticker=case_ticker,
+        )
         listing_class = _one(listing_facts, "security_class")
         if (
             not listing_rows
             or listing_ticker != case_ticker
-            or listing_class != regulator_class
+            or not _listing_class_compatible(listing_class, regulator_class)
         ):
             return _insufficient(issues=("listing_active_missing",))
         if regulator_date is not None and today < date.fromisoformat(regulator_date):
@@ -1070,7 +1134,12 @@ def evaluate_automation_decision(
         if value is None
     )
     if missing_regulator:
-        return _insufficient(issues=("regulator_identity_facts_missing",))
+        issues = (
+            missing_regulator
+            if missing_regulator == ("regulator_security_class_missing",)
+            else ("regulator_identity_facts_missing",)
+        )
+        return _insufficient(issues=issues)
     if case_cik is None or regulator_cik != case_cik:
         return _insufficient(issues=("issuer_cik_mismatch",))
 
@@ -1102,14 +1171,17 @@ def evaluate_automation_decision(
         )
         listing_issue = "listing_active_missing"
     listing_facts = _facts_for_evidence(fact_rows, listing_rows)
-    listing_successor = _one(listing_facts, "successor_ticker")
-    listing_destination = _one(listing_facts, "destination_venue")
+    listing_successor, listing_destination = _listing_identity_for_candidate(
+        listing_facts,
+        candidate_ticker=regulator_successor,
+        case_ticker=case_ticker,
+    )
     listing_class = _one(listing_facts, "security_class")
     listing_matches = (
         bool(listing_rows)
         and listing_successor == regulator_successor
         and listing_destination is not None
-        and listing_class == regulator_class
+        and _listing_class_compatible(listing_class, regulator_class)
         and (
             regulator_destination is None
             or listing_destination == regulator_destination
