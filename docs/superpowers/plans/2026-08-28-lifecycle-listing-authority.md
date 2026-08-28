@@ -117,6 +117,7 @@ V2_PROFILE_INDEX_SQL = dict(PROFILE_INDEX_SQL)
 V2_EVIDENCE_SOURCE_FAMILIES = EVIDENCE_SOURCE_FAMILIES
 V2_EVIDENCE_ADAPTERS = EVIDENCE_ADAPTERS
 V2_EVIDENCE_KINDS = EVIDENCE_KINDS
+V2_AUTOMATION_BLOCKER_CODES = AUTOMATION_BLOCKER_CODES
 
 EVIDENCE_SOURCE_FAMILIES = V2_EVIDENCE_SOURCE_FAMILIES | {"listing_authority"}
 EVIDENCE_ADAPTERS = V2_EVIDENCE_ADAPTERS | {
@@ -124,10 +125,22 @@ EVIDENCE_ADAPTERS = V2_EVIDENCE_ADAPTERS | {
     "massive_reference",
 }
 EVIDENCE_KINDS = V2_EVIDENCE_KINDS | {"listing_directory_snapshot"}
+AUTOMATION_BLOCKER_CODES = V2_AUTOMATION_BLOCKER_CODES | {
+    "listing_directory_unavailable",
+    "listing_directory_schema_mismatch",
+    "listing_directory_stale",
+    "listing_status_unresolved",
+    "listing_authority_conflict",
+    "massive_credential_missing",
+    "massive_access_denied",
+    "massive_rate_limited",
+    "massive_reference_unavailable",
+}
 ```
 
-Define the v3 adapter CHECK as an additional branch while retaining every v2
-branch verbatim:
+Regenerate only the v3 evidence table and
+`security_lifecycle_automation_run_blockers` table. Define the v3 adapter CHECK
+as an additional branch while retaining every v2 branch verbatim:
 
 ```sql
 OR (

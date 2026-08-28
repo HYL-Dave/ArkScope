@@ -172,6 +172,25 @@ kind:          listing_directory_snapshot
 The v2 values `publisher`, `internal_news`, and `publisher_excerpt` remain legal
 legacy values. New automation must never produce them.
 
+Schema v3 also adds these persistable automation blocker codes while retaining
+every v2 code:
+
+```text
+listing_directory_unavailable
+listing_directory_schema_mismatch
+listing_directory_stale
+listing_status_unresolved
+listing_authority_conflict
+massive_credential_missing
+massive_access_denied
+massive_rate_limited
+massive_reference_unavailable
+```
+
+V2 freezes its blocker vocabulary and table SQL before this widening. V3
+therefore differs from v2 in exactly the evidence table and automation-blocker
+table; the v1-to-v2 migrator must continue targeting frozen v2 authority.
+
 ### 3.2 Listing status
 
 Every normalized listing record has exactly one status:
