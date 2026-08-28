@@ -855,6 +855,39 @@ describe("Settings provider config authority", () => {
     }]);
   });
 
+  it("runs the Massive connection test only when explicitly requested for polygon", async () => {
+    vi.mocked(testProvider).mockClear();
+    await renderDataSources();
+    expect(testProvider).not.toHaveBeenCalled();
+
+    const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
+      row.textContent?.includes("Massive (Polygon)") && row.textContent.includes("API key"));
+    if (!polygonRow) throw new Error("missing Massive (Polygon) config row");
+    const secretInput = polygonRow.querySelector<HTMLInputElement>('input[type="password"]');
+    if (!secretInput) throw new Error("missing Massive credential input");
+    await act(async () => {
+      setInputValue(secretInput, "massive-test-key");
+    });
+    const save = Array.from(polygonRow.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存");
+    if (!save) throw new Error("missing Massive credential save button");
+    await act(async () => {
+      save.click();
+      await Promise.resolve();
+    });
+    expect(testProvider).not.toHaveBeenCalled();
+
+    const testButton = Array.from(polygonRow.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "測試");
+    if (!testButton) throw new Error("missing Massive connection test button");
+    await act(async () => {
+      testButton.click();
+      await Promise.resolve();
+    });
+
+    expect(testProvider).toHaveBeenCalledExactlyOnceWith("polygon");
+  });
+
   it("confirms guarded IBKR client id edits", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     await renderDataSources();

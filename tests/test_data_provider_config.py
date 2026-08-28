@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
+from urllib.parse import quote, quote_plus
 
 import pytest
 
@@ -427,6 +430,101 @@ def test_http_probe_redacts_massive_key_from_request_errors(monkeypatch):
 
     assert result["ok"] is False
     assert key not in str(result)
+
+
+def test_http_probe_redacts_massive_key_from_urllib3_debug_logs(monkeypatch, caplog):
+    key = "massive key+/%"
+    encoded_key = quote(key, safe="")
+    form_encoded_key = quote_plus(key, safe="")
+    connectionpool_logger = logging.getLogger("urllib3.connectionpool")
+    caplog.set_level(logging.DEBUG, logger=connectionpool_logger.name)
+
+    class _Resp:
+        status_code = 200
+
+    def log_request(url, *, headers=None, params=None, timeout=None):
+        connectionpool_logger.debug(
+            "request targets raw=%s encoded=%s form=%s; other=retained",
+            params["apiKey"],
+            encoded_key,
+            form_encoded_key,
+        )
+        return _Resp()
+
+    monkeypatch.setattr("requests.get", log_request)
+
+    result = dpc._http_probe(
+        "https://api.massive.com/v3/reference/tickers?limit=1",
+        params={"apiKey": key},
+        redact_query_keys={"apiKey"},
+    )
+
+    assert result["ok"] is True
+    assert "other=retained" in caplog.text
+    for variant in (key, encoded_key, form_encoded_key):
+        assert variant not in caplog.text
+
+
+def test_http_probe_log_redaction_does_not_change_another_threads_log(monkeypatch, caplog):
+    key = "massive-probe-secret"
+    unrelated = "unrelated-connection-detail"
+    connectionpool_logger = logging.getLogger("urllib3.connectionpool")
+    caplog.set_level(logging.DEBUG, logger=connectionpool_logger.name)
+    request_started = threading.Event()
+    release_request = threading.Event()
+
+    class _Resp:
+        status_code = 200
+
+    def delayed_request(url, *, headers=None, params=None, timeout=None):
+        connectionpool_logger.debug("probe target=%s", params["apiKey"])
+        request_started.set()
+        assert release_request.wait(timeout=1)
+        return _Resp()
+
+    monkeypatch.setattr("requests.get", delayed_request)
+    result: dict[str, object] = {}
+
+    def run_probe():
+        result.update(dpc._http_probe(
+            "https://api.massive.com/v3/reference/tickers?limit=1",
+            params={"apiKey": key},
+            redact_query_keys={"apiKey"},
+        ))
+
+    probe_thread = threading.Thread(target=run_probe)
+    probe_thread.start()
+    assert request_started.wait(timeout=1)
+    connectionpool_logger.debug("other request=%s", unrelated)
+    release_request.set()
+    probe_thread.join(timeout=1)
+
+    assert result["ok"] is True
+    assert key not in caplog.text
+    assert unrelated in caplog.text
+
+
+def test_http_probe_empty_redaction_value_keeps_connectionpool_logs(monkeypatch, caplog):
+    connectionpool_logger = logging.getLogger("urllib3.connectionpool")
+    caplog.set_level(logging.DEBUG, logger=connectionpool_logger.name)
+
+    class _Resp:
+        status_code = 200
+
+    def log_request(url, *, headers=None, params=None, timeout=None):
+        connectionpool_logger.debug("ordinary connection detail")
+        return _Resp()
+
+    monkeypatch.setattr("requests.get", log_request)
+
+    result = dpc._http_probe(
+        "https://api.massive.com/v3/reference/tickers?limit=1",
+        params={"apiKey": ""},
+        redact_query_keys={"apiKey"},
+    )
+
+    assert result["ok"] is True
+    assert "ordinary connection detail" in caplog.text
 
 
 def test_paid_and_extension_have_no_live_test():

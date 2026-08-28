@@ -29,10 +29,12 @@ injected so provider-health can report ``app`` as a key's effective source.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import socket
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -502,6 +504,54 @@ def require_provider_configured(
 # --- connection tests -------------------------------------------------------------
 
 _TEST_TIMEOUT_S = 8
+_PROBE_LOG_REDACTIONS: contextvars.ContextVar[tuple[str, ...]] = contextvars.ContextVar(
+    "provider_probe_log_redactions",
+    default=(),
+)
+_PROBE_LOG_FILTER_LOCK = threading.Lock()
+
+
+def _probe_redaction_values(
+    params: Optional[dict],
+    redact_query_keys: set[str],
+) -> tuple[str, ...]:
+    if not params or not redact_query_keys:
+        return ()
+    values: list[str] = []
+    for key in redact_query_keys:
+        value = params.get(key)
+        if value is None:
+            continue
+        raw = str(value)
+        if not raw:
+            continue
+        values.extend((raw, quote(raw, safe=""), quote_plus(raw, safe="")))
+    return tuple(dict.fromkeys(values))
+
+
+def _redact_probe_text(detail: str, redactions: tuple[str, ...]) -> str:
+    for value in redactions:
+        detail = detail.replace(value, "[redacted]")
+    return detail
+
+
+class _ProbeLogRedactionFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        redactions = _PROBE_LOG_REDACTIONS.get()
+        if redactions:
+            record.msg = _redact_probe_text(record.getMessage(), redactions)
+            record.args = ()
+        return True
+
+
+_PROBE_LOG_REDACTION_FILTER = _ProbeLogRedactionFilter()
+
+
+def _ensure_probe_log_redaction_filter() -> None:
+    connectionpool_logger = logging.getLogger("urllib3.connectionpool")
+    with _PROBE_LOG_FILTER_LOCK:
+        if _PROBE_LOG_REDACTION_FILTER not in connectionpool_logger.filters:
+            connectionpool_logger.addFilter(_PROBE_LOG_REDACTION_FILTER)
 
 
 def _redact_probe_detail(
@@ -509,16 +559,10 @@ def _redact_probe_detail(
     params: Optional[dict],
     redact_query_keys: set[str],
 ) -> str:
-    if not params or not redact_query_keys:
-        return detail
-    for key in redact_query_keys:
-        value = params.get(key)
-        if value is None:
-            continue
-        raw = str(value)
-        for encoded in {raw, quote(raw, safe=""), quote_plus(raw, safe="")}:
-            detail = detail.replace(encoded, "[redacted]")
-    return detail
+    return _redact_probe_text(
+        detail,
+        _probe_redaction_values(params, redact_query_keys),
+    )
 
 
 def _http_probe(url: str, *, headers: Optional[dict] = None,
@@ -529,6 +573,10 @@ def _http_probe(url: str, *, headers: Optional[dict] = None,
     import requests
 
     redact_query_keys = redact_query_keys or set()
+    redactions = _probe_redaction_values(params, redact_query_keys)
+    if redactions:
+        _ensure_probe_log_redaction_filter()
+    redaction_token = _PROBE_LOG_REDACTIONS.set(redactions)
     t0 = time.monotonic()
     try:
         resp = requests.get(url, headers=headers, params=params, timeout=_TEST_TIMEOUT_S)
@@ -545,6 +593,8 @@ def _http_probe(url: str, *, headers: Optional[dict] = None,
             "latency_ms": None,
             "detail": _redact_probe_detail(str(e), params, redact_query_keys)[:200],
         }
+    finally:
+        _PROBE_LOG_REDACTIONS.reset(redaction_token)
 
 
 def run_connection_test(provider: str) -> Dict[str, Any]:
