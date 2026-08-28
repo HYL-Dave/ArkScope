@@ -262,7 +262,10 @@ git commit -m "feat(lifecycle): define listing authority schema v3"
 
 **Interfaces:**
 - Consumes: `requests.Session` and an API key supplied by the caller.
-- Produces: mutable dataclass `ListingRequestBudget(nasdaq_requests: int = 0, massive_requests: int = 0, total_bytes: int = 0)` and frozen dataclass `ListingHttpPayload(source_url: str, retrieved_at: str, status_code: int, content_type: str, body: bytes)`.
+- Produces: mutable dataclass `ListingRequestBudget` with separate Nasdaq and
+  Massive request/byte counters and immutable maximums, plus frozen dataclass
+  `ListingHttpPayload(source_url: str, retrieved_at: str, status_code: int,
+  content_type: str, body: bytes)`.
 - Produces: `ListingRequestBudget.lifecycle() -> ListingRequestBudget`.
 - Produces: `ListingAuthorityTransport.fetch_nasdaq(source_url: str, *, budget: ListingRequestBudget) -> ListingHttpPayload`.
 - Produces: `ListingAuthorityTransport.fetch_massive_ticker(ticker: str, *, expected_active: bool, market: str, api_key: str, budget: ListingRequestBudget) -> ListingHttpPayload`.
@@ -333,7 +336,9 @@ conditions to `ListingTransportFailure` with closed codes and no raw response
 body. The request parameters are exactly `ticker`, `active`, `market`, `limit=2`,
 and `apiKey`. Reject more than one returned exact ticker; never follow
 `next_url`. Use `active=true` to confirm current candidates and `active=false`
-to confirm terminal candidates with `delisted_utc`.
+to confirm terminal candidates with `delisted_utc`. The persisted canonical URL
+contains the first four non-secret parameters in stable order and omits
+`apiKey`.
 
 - [ ] **Step 4: Run transport tests GREEN**
 

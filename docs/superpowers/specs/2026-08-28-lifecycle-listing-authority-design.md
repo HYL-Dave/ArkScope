@@ -277,6 +277,10 @@ The Massive transport enforces:
   provider error status, and transport failure; and
 - no secret in URLs persisted to diagnostics or evidence.
 
+The persisted Massive source URL includes only the canonical non-secret query
+(`ticker`, `active`, `market`, and `limit=2`) in stable order. It never includes
+`apiKey`.
+
 Massive's documented REST example authenticates with the `apiKey` query
 parameter. The transport may attach that parameter only at the final request
 boundary. It must construct and persist a separate canonical source URL with no
