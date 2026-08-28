@@ -140,7 +140,7 @@ def _deadline_owner(*, at="2026-08-27T00:00:00Z", excerpt_prefix=""):
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(deadline,),
         at=at,

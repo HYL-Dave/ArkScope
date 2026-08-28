@@ -612,8 +612,6 @@ def test_source_family_status_uses_current_run_citations_and_typed_families():
     assert got.source_family_status == {
         "regulator": "unavailable",
         "market_infrastructure": "confirmed",
-        "publisher": "missing",
-        "general_web": "missing",
         "manual": "present",
         "listing_authority": "missing",
     }
@@ -673,9 +671,71 @@ def test_conflicting_current_fact_values_mark_only_their_source_families():
             ),
         )
     )
-    assert got.source_family_status["regulator"] == "conflict"
-    assert got.source_family_status["publisher"] == "conflict"
+    assert got.source_family_status["regulator"] == "missing"
     assert got.source_family_status["market_infrastructure"] == "missing"
+    assert "publisher" not in got.source_family_status
+
+
+def test_legacy_publisher_rows_and_blockers_do_not_affect_active_source_projection():
+    got = project_lifecycle_disposition(
+        _case(
+            automation_runs=(
+                _run(
+                    blockers=(
+                        _blocker("internal_news_unavailable", retryable=True),
+                    )
+                ),
+            ),
+            evidence=(
+                {
+                    "evidence_id": "publisher-old",
+                    "source_family": "publisher",
+                    "automation_run_id": "run-current",
+                },
+            ),
+        )
+    )
+
+    assert set(got.source_family_status) == {
+        "regulator",
+        "listing_authority",
+        "market_infrastructure",
+        "manual",
+    }
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "not_confirmed_yet",
+        "monitoring",
+        "awaiting_initial_automation",
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("listing_directory_unavailable", "unavailable"),
+        ("massive_reference_unavailable", "unavailable"),
+        ("listing_authority_conflict", "conflict"),
+    ],
+)
+def test_listing_blockers_project_to_listing_authority_component(code, expected):
+    got = project_lifecycle_disposition(
+        _case(
+            automation_runs=(
+                _run(
+                    blockers=(
+                        _blocker(
+                            code,
+                            retryable=code != "listing_authority_conflict",
+                        ),
+                    )
+                ),
+            )
+        )
+    )
+
+    assert got.source_family_status["listing_authority"] == expected
+    if code == "listing_authority_conflict":
+        assert (got.queue_bucket, got.reason_code) == ("attention", "source_conflict")
 
 
 def test_invalid_blocker_context_json_fails_closed():
@@ -710,6 +770,33 @@ def test_effective_date_is_the_first_due_time():
         _run(action_readiness="waiting_effective_date"),
         _assessment(effective_date="2026-09-05"),
     ) == "2026-09-05T00:00:00Z"
+
+
+def test_pre_effective_undetermined_draft_is_successful_monitoring():
+    draft = _assessment(
+        outcomes=("undetermined",),
+        effective_date="2026-09-05",
+        status="draft",
+    )
+    got = project_lifecycle_disposition(
+        _case(
+            assessment_history=(draft,),
+            automation_runs=(
+                _run(
+                    status="succeeded",
+                    action_readiness="waiting_effective_date",
+                    decision_tier="verified_automatic",
+                ),
+            ),
+        )
+    )
+
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "confirmed_monitoring",
+        "monitoring",
+        "waiting_effective_date",
+    )
+    assert got.next_check_at == "2026-09-05T00:00:00Z"
 
 
 def test_retry_at_transition_execute_on_and_unprocessed_due_time_are_preserved():

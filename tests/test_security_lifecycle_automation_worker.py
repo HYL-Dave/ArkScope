@@ -590,7 +590,7 @@ def _forged_deadline_bundle(case):
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(deadline,),
         at=_AT,
@@ -1174,8 +1174,8 @@ def test_nonmutating_and_review_suggested_results_never_approve_transition(
         result = harness.worker_with_transition_approver().run(limit=2)
 
         assert result["accepted"] == 0
-        assert result["drafted"] == 1
-        assert result["failed"] == 1
+        assert result["drafted"] == 2
+        assert result["failed"] == 0
         assert harness.approval_calls == []
         terminal_assessment = _store(harness).list_assessments(terminal["case_id"])[0]
         assert terminal_assessment["status"] == "draft"
@@ -1333,6 +1333,52 @@ def test_provider_blockers_remain_typed_and_retryable_without_partial_assessment
             "sec_transport_unavailable"
         ]
         assert store.list_assessments(case["case_id"]) == []
+    finally:
+        harness.conn.close()
+
+
+@pytest.mark.parametrize(
+    ("code", "retryable"),
+    [
+        ("listing_authority_conflict", False),
+        ("listing_directory_unavailable", True),
+        ("listing_directory_stale", True),
+        ("listing_directory_schema_mismatch", True),
+        ("massive_credential_missing", True),
+        ("massive_access_denied", True),
+        ("massive_rate_limited", True),
+        ("massive_reference_unavailable", True),
+        ("listing_status_unresolved", True),
+    ],
+)
+def test_scheduler_blocker_strings_persist_through_fact_kernel_readback(
+    tmp_path,
+    code,
+    retryable,
+):
+    from src.security_lifecycle_automation_worker import LifecycleAutomationEvidenceBundle
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    blockers, retry_at = scheduler._blockers([code], at=_AT)
+    harness.bundles[case["case_id"]] = LifecycleAutomationEvidenceBundle(
+        evidence=(),
+        facts=(),
+        blockers=blockers,
+        diagnostics={},
+        retry_at=retry_at,
+    )
+    try:
+        result = harness.worker().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert result["blocked"] == 1
+        assert run["status"] == "blocked"
+        assert [(row["blocker_code"], bool(row["retryable"])) for row in run["blockers"]] == [
+            (code, retryable)
+        ]
+        assert (run["retry_at"] is not None) is retryable
     finally:
         harness.conn.close()
 
@@ -1765,9 +1811,13 @@ def test_worker_uses_only_injected_evidence_sources_and_paths(tmp_path, monkeypa
         harness.conn.close()
 
 
-def test_worker_keeps_pre_effective_terminal_in_monitoring_without_task5_recheck(
+def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
     tmp_path,
 ):
+    from src.security_lifecycle_automation_worker import AUTOMATION_EXECUTION_REVISION
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+    from src.security_lifecycle_disposition import next_lifecycle_recheck_at
+
     terminal = _case(1, ticker="TERM", terminal=True)
     unrelated = _case(2, ticker="OLD")
     harness = _Harness(tmp_path, [terminal, unrelated])
@@ -1776,13 +1826,24 @@ def test_worker_keeps_pre_effective_terminal_in_monitoring_without_task5_recheck
     try:
         first = harness.worker().run(limit=2)
         assert first["accepted"] == 1
-        assert first["failed"] == 1
+        assert first["drafted"] == 1
+        assert first["failed"] == 0
         store = _store(harness)
         terminal_run = store.list_automation_runs(terminal["case_id"])[0]
         assert terminal_run["action_readiness"] == "waiting_effective_date"
         terminal_assessment = store.list_assessments(terminal["case_id"])[0]
         assert terminal_assessment["status"] == "draft"
         assert terminal_assessment["outcomes"] == ["undetermined"]
+        assert (
+            next_lifecycle_recheck_at(terminal_run, terminal_assessment)
+            == "2026-09-01T00:00:00Z"
+        )
+        first_query_context = json.loads(terminal_run["query_context_json"])
+        assert terminal_run["policy_version"] == AUTOMATION_POLICY_VERSION
+        assert (
+            first_query_context["execution_revision"]
+            == AUTOMATION_EXECUTION_REVISION
+        )
 
         harness.evidence_calls.clear()
         harness.now = "2026-09-01T12:00:00Z"
@@ -1794,14 +1855,21 @@ def test_worker_keeps_pre_effective_terminal_in_monitoring_without_task5_recheck
         second = harness.worker().run(limit=2)
 
         assert second["processed"] == 1
-        assert second["accepted"] == 0
-        assert second["failed"] == 1
+        assert second["accepted"] == 1
+        assert second["failed"] == 0
         assert second["skipped_current"] == 1
-        assert harness.evidence_calls == []
+        assert harness.evidence_calls == [
+            (terminal["case_id"], "live", "2026-09-01T12:00:00Z")
+        ]
         terminal_run = store.list_automation_runs(terminal["case_id"])[0]
-        assert terminal_run["action_readiness"] == "waiting_effective_date"
+        assert terminal_run["action_readiness"] == "transition_eligible"
+        assert terminal_run["policy_version"] == AUTOMATION_POLICY_VERSION
+        assert (
+            json.loads(terminal_run["query_context_json"])["execution_revision"]
+            == AUTOMATION_EXECUTION_REVISION
+        )
         assert len(store.list_automation_runs(unrelated["case_id"])) == 1
         assert len(store.list_automation_runs(terminal["case_id"])) == 1
-        assert len(store.list_assessments(terminal["case_id"])) == 1
+        assert len(store.list_assessments(terminal["case_id"])) == 2
     finally:
         harness.conn.close()

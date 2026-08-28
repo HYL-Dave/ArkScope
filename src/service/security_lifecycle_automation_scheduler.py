@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from contextlib import contextmanager
-from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 import json
 import logging
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -22,6 +22,13 @@ from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     compose_security_lifecycle,
     observation_fingerprint,
+)
+from src.security_lifecycle_listing_evidence import (
+    NASDAQ_LISTED_URL,
+    OTHER_LISTED_URL,
+    ListingAuthoritySession,
+    ListingAuthorityTransport,
+    ListingRequestBudget,
 )
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
@@ -40,10 +47,6 @@ _AUTOMATION_TABLES = frozenset(
         "security_lifecycle_automation_runs",
         "security_lifecycle_automation_facts",
     }
-)
-_RUN_AT: ContextVar[datetime | None] = ContextVar(
-    "security_lifecycle_automation_run_at",
-    default=None,
 )
 _STATUSES = frozenset({"succeeded", "partial", "unavailable", "not_installed"})
 _REASONS = frozenset(
@@ -64,9 +67,16 @@ _RETRYABLE_BLOCKERS = frozenset(
         "sec_transport_unavailable",
         "sec_document_unavailable",
         "sec_evidence_insufficient",
-        "internal_news_unavailable",
         "ibkr_gateway_unavailable",
         "ibkr_contract_missing",
+        "listing_directory_unavailable",
+        "listing_directory_stale",
+        "listing_directory_schema_mismatch",
+        "massive_credential_missing",
+        "massive_access_denied",
+        "massive_rate_limited",
+        "massive_reference_unavailable",
+        "listing_status_unresolved",
     }
 )
 _IDENTITY_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
@@ -120,7 +130,7 @@ def _timestamp(value: datetime) -> str:
 
 
 def _clock() -> str:
-    return _timestamp(_RUN_AT.get() or datetime.now(timezone.utc))
+    return _timestamp(datetime.now(timezone.utc))
 
 
 def _profile_path() -> Path:
@@ -502,65 +512,6 @@ def _blockers(
     return rows, max(retry_candidates)
 
 
-def _local_news_evidence(
-    context,
-    *,
-    at: str,
-) -> tuple[tuple[object, ...], tuple[str, ...], dict[str, int]]:
-    from src.sa_capture_store import resolve_sa_db_path
-    from src.security_lifecycle_news_evidence import read_local_publisher_evidence
-
-    market_path = _market_path()
-    sa_path = Path(resolve_sa_db_path())
-    if not market_path.is_file() or not sa_path.is_file():
-        return (
-            (),
-            ("internal_news_unavailable",),
-            {"news_evidence_count": 0, "news_unavailable": 1},
-        )
-    normalized_conn: sqlite3.Connection | None = None
-    sa_conn: sqlite3.Connection | None = None
-    try:
-        normalized_conn = sqlite3.connect(
-            f"{market_path.resolve().as_uri()}?mode=ro",
-            uri=True,
-            timeout=10.0,
-        )
-        sa_conn = sqlite3.connect(
-            f"{sa_path.resolve().as_uri()}?mode=ro",
-            uri=True,
-            timeout=10.0,
-        )
-        result = read_local_publisher_evidence(
-            normalized_conn=normalized_conn,
-            sa_conn=sa_conn,
-            context=context,
-            start_date=context.primary_start,
-            end_date=context.primary_end,
-            retrieved_at=at,
-        )
-        return (
-            result.evidence,
-            result.blockers,
-            {
-                "news_evidence_count": len(result.evidence),
-                "news_truncated": int(result.truncated),
-                "news_unavailable": int(bool(result.blockers)),
-            },
-        )
-    except (OSError, sqlite3.Error):
-        return (
-            (),
-            ("internal_news_unavailable",),
-            {"news_evidence_count": 0, "news_unavailable": 1},
-        )
-    finally:
-        if normalized_conn is not None:
-            normalized_conn.close()
-        if sa_conn is not None:
-            sa_conn.close()
-
-
 class _LifecycleIbkrGateway:
     def __init__(self):
         from data_sources.ibkr_client_id import ibkr_client_id_for
@@ -756,8 +707,7 @@ def _pending_event_monitoring(
 
     required_families = {
         "regulator",
-        "market_infrastructure",
-        "publisher",
+        "listing_authority",
     }
     sources_complete = all(
         source_family_results.get(family) == "available"
@@ -800,8 +750,8 @@ def _pending_event_monitoring(
 def _provider_state(codes: tuple[str, ...], *, family: str) -> str:
     conflict_codes = {
         "regulator": {"source_conflict"},
+        "listing_authority": {"listing_authority_conflict"},
         "market_infrastructure": {"ibkr_contract_ambiguous"},
-        "publisher": set(),
     }[family]
     unavailable_codes = {
         "regulator": {
@@ -817,9 +767,15 @@ def _provider_state(codes: tuple[str, ...], *, family: str) -> str:
             "ibkr_entitlement_denied",
             "ibkr_gateway_unavailable",
         },
-        "publisher": {
-            "internal_news_schema_mismatch",
-            "internal_news_unavailable",
+        "listing_authority": {
+            "listing_directory_unavailable",
+            "listing_directory_stale",
+            "listing_directory_schema_mismatch",
+            "massive_credential_missing",
+            "massive_access_denied",
+            "massive_rate_limited",
+            "massive_reference_unavailable",
+            "listing_status_unresolved",
         },
     }[family]
     if conflict_codes.intersection(codes):
@@ -834,6 +790,7 @@ def _load_evidence(
     *,
     mode: str,
     at: str,
+    listing_session: ListingAuthoritySession,
 ) -> LifecycleAutomationEvidenceBundle:
     del mode
     from data_sources.sec_transport import SecRequestBudget, SecTransport
@@ -862,14 +819,10 @@ def _load_evidence(
         codes.append("sec_evidence_insufficient")
     evidence: list[object] = list(sec.evidence)
     facts: list[object] = list(sec.facts)
-
-    news_evidence, news_codes, news_diagnostics = _local_news_evidence(
-        context,
-        at=at,
-    )
-    evidence.extend(news_evidence)
-    codes.extend(news_codes)
-    diagnostics.update(news_diagnostics)
+    source_deadlines = tuple(getattr(sec, "source_deadlines", ()))
+    deadline_dates = {str(getattr(row, "date", "")) for row in source_deadlines}
+    if len(deadline_dates) > 1:
+        raise ValueError("source_deadlines")
 
     successor_values = tuple(
         sorted(
@@ -885,17 +838,24 @@ def _load_evidence(
         and _fact_value(fact) == "terminal_delisting"
         for fact in facts
     )
+    candidate_tickers = tuple(
+        sorted({str(case.get("ticker") or "").upper(), *successor_values})
+    )
+    listing = listing_session.lookup(
+        context=context,
+        candidate_tickers=candidate_tickers,
+        require_explicit_inactive=terminal,
+    )
+    listing_codes = tuple(str(code) for code in listing.blockers)
+    evidence.extend(listing.evidence)
+    facts.extend(listing.facts)
+    codes.extend(listing_codes)
+    diagnostics.update(listing.diagnostics)
     pending_kinds = _event_kinds(case).intersection(
         {"merger_agreement", "merger_proxy", "listing_status_review"}
     )
     effective = _exact_fact_date(tuple(facts), "effective_date")
     today = datetime.fromisoformat(at.replace("Z", "+00:00")).date()
-    source_deadlines = tuple(getattr(sec, "source_deadlines", ()))
-    deadline_dates = {
-        str(getattr(row, "date", "")) for row in source_deadlines
-    }
-    if len(deadline_dates) > 1:
-        raise ValueError("source_deadlines")
     deadline_due = bool(
         deadline_dates
         and today >= date.fromisoformat(next(iter(deadline_dates)))
@@ -921,14 +881,34 @@ def _load_evidence(
         evidence.extend(ibkr.evidence)
         facts.extend(ibkr_facts)
         ibkr_codes = tuple(str(code) for code in ibkr.blockers)
-        codes.extend(ibkr_codes)
+        codes.extend(
+            code
+            for code in ibkr_codes
+            if code not in {
+                "ibkr_contract_missing",
+                "ibkr_entitlement_denied",
+                "ibkr_gateway_unavailable",
+            }
+        )
         diagnostics["ibkr_requests"] = int(ibkr.requests_made)
     else:
         diagnostics["ibkr_requests"] = 0
+    diagnostics["ibkr_unavailable"] = int(
+        bool(
+            {"ibkr_entitlement_denied", "ibkr_gateway_unavailable"}.intersection(
+                ibkr_codes
+            )
+        )
+    )
+    diagnostics["ibkr_missing"] = int("ibkr_contract_missing" in ibkr_codes)
+    diagnostics["ibkr_conflict"] = int("ibkr_contract_ambiguous" in ibkr_codes)
 
     source_family_results = {
         "regulator": _provider_state(sec_codes, family="regulator"),
-        "publisher": _provider_state(news_codes, family="publisher"),
+        "listing_authority": _provider_state(
+            listing_codes,
+            family="listing_authority",
+        ),
     }
     if market_queried:
         source_family_results["market_infrastructure"] = _provider_state(
@@ -955,16 +935,16 @@ def _load_evidence(
     )
 
 
-def _worker() -> LifecycleAutomationWorker:
+def _worker(*, evidence_loader, clock=_clock) -> LifecycleAutomationWorker:
     _assert_automation_installed()
     return LifecycleAutomationWorker(
         case_loader=_load_cases,
         profile_connection=_profile_connection,
-        evidence_loader=_load_evidence,
+        evidence_loader=evidence_loader,
         source_loader=_load_sources,
         transition_preview=_transition_preview,
         transition_approver=_transition_approver,
-        clock=_clock,
+        clock=clock,
     )
 
 
@@ -1047,9 +1027,26 @@ def run_security_lifecycle_automation(
     if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
         raise ValueError("limit")
     instant = _aware_instant(now)
-    token = _RUN_AT.set(instant)
+    at = _timestamp(instant)
+    transport = ListingAuthorityTransport()
+    budget = ListingRequestBudget.lifecycle()
+    session = ListingAuthoritySession(
+        transport=transport,
+        budget=budget,
+        retrieved_at=at,
+        massive_api_key=os.getenv("POLYGON_API_KEY"),
+    )
     try:
-        return _bounded_result(_worker().run(limit=limit, mode="live"))
+        worker = _worker(
+            evidence_loader=lambda case, *, mode, at: _load_evidence(
+                case,
+                mode=mode,
+                at=at,
+                listing_session=session,
+            ),
+            clock=lambda: at,
+        )
+        return _bounded_result(worker.run(limit=limit, mode="live"))
     except LifecycleAutomationNotInstalled:
         return _empty_summary(
             status="not_installed",
@@ -1073,7 +1070,7 @@ def run_security_lifecycle_automation(
         )
         return security_lifecycle_automation_failure("automation_scheduler_failed")
     finally:
-        _RUN_AT.reset(token)
+        session.close()
 
 
 def _job_runs_connection() -> sqlite3.Connection | None:

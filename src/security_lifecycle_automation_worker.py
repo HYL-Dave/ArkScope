@@ -68,14 +68,6 @@ def _fact_value(value: object) -> Any:
     return json.loads(str(encoded))
 
 
-def _terminal_delisting(facts: Iterable[object]) -> bool:
-    return any(
-        str(_field(fact, "fact_type") or "") == "tracked_security_effect"
-        and _fact_value(fact) == "terminal_delisting"
-        for fact in facts
-    )
-
-
 def _blocker_code(value: object) -> str:
     return str(_field(value, "code", _field(value, "blocker_code", "")) or "")
 
@@ -252,20 +244,33 @@ class LifecycleAutomationWorker:
     @staticmethod
     def _due_recheck(
         store: SecurityLifecycleInvestigationStore,
-        assessment: Mapping[str, object],
+        assessment: Mapping[str, object] | None,
         *,
+        case_id: str,
         now: datetime,
     ) -> tuple[dict[str, object], str] | None:
-        if assessment.get("author") != "automation":
+        candidate = assessment
+        if candidate is None:
+            runs = store.list_automation_runs(case_id)
+            if not runs:
+                return None
+            latest_run_id = str(runs[0]["run_id"])
+            candidate = next(
+                (
+                    row
+                    for row in store.list_assessments(case_id)
+                    if str(row.get("automation_run_id") or "") == latest_run_id
+                ),
+                None,
+            )
+        if candidate is None or candidate.get("author") != "automation":
             return None
-        run_id = str(assessment.get("automation_run_id") or "")
+        run_id = str(candidate.get("automation_run_id") or "")
         if not run_id:
             return None
         run = store.get_automation_run(run_id)
-        due_at = next_lifecycle_recheck_at(run, assessment)
-        if due_at is None:
-            return None
-        if now < _instant(due_at):
+        due_at = next_lifecycle_recheck_at(run, candidate)
+        if due_at is None or now < _instant(due_at):
             return None
         return run, due_at
 
@@ -355,11 +360,6 @@ class LifecycleAutomationWorker:
                 all_facts = (*existing_facts, *bundle.facts)
                 blockers = bundle.blockers
                 blocker_codes = {_blocker_code(value) for value in blockers}
-                if blocker_codes == {"ibkr_contract_missing"} and _terminal_delisting(
-                    all_facts
-                ):
-                    blockers = ()
-                    blocker_codes = set()
 
                 decision: AutomationDecision | None = None
                 if not blockers or "source_conflict" in blocker_codes:
@@ -433,6 +433,15 @@ class LifecycleAutomationWorker:
                 ),
                 at=at,
             )
+            if (
+                decision.action_readiness == "waiting_effective_date"
+                and decision.outcomes == ("undetermined",)
+            ):
+                kernel.complete_terminal_finalization(
+                    run_id=run_id,
+                    decision_provenance_sha256=terminal_provenance,
+                )
+                return "drafted"
             if decision.decision_tier == "verified_automatic":
                 assessment = store.get_assessment(assessment_id)
                 if assessment["status"] == "draft":
@@ -601,10 +610,11 @@ class LifecycleAutomationWorker:
                     claim.should_execute and claim.status == "succeeded"
                 )
                 if not claim.should_execute:
-                    due = (
-                        None
-                        if current is None
-                        else self._due_recheck(store, current, now=now)
+                    due = self._due_recheck(
+                        store,
+                        current,
+                        case_id=case_id,
+                        now=now,
                     )
                     if due is not None:
                         run, due_at = due

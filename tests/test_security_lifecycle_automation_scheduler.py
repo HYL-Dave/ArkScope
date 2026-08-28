@@ -10,6 +10,8 @@ import json
 import sqlite3
 from types import SimpleNamespace
 
+import pytest
+
 
 _NOW = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
 
@@ -55,7 +57,7 @@ def test_scheduler_runs_bounded_worker_batch_and_returns_sanitized_summary(
                 },
             }
 
-    monkeypatch.setattr(scheduler, "_worker", Worker)
+    monkeypatch.setattr(scheduler, "_worker", lambda **_kwargs: Worker())
 
     result = scheduler.run_security_lifecycle_automation(limit=2, now=_NOW)
 
@@ -81,7 +83,7 @@ def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch)
             del limit, mode
             raise scheduler.LifecycleAutomationNotInstalled()
 
-    monkeypatch.setattr(scheduler, "_worker", Worker)
+    monkeypatch.setattr(scheduler, "_worker", lambda **_kwargs: Worker())
 
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
@@ -173,7 +175,7 @@ def test_scheduler_program_error_is_typed_without_raw_detail(monkeypatch):
                 "/private/profile_state.db https://secret.invalid token@example.invalid"
             )
 
-    monkeypatch.setattr(scheduler, "_worker", Worker)
+    monkeypatch.setattr(scheduler, "_worker", lambda **_kwargs: Worker())
 
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
@@ -258,7 +260,8 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
         sources=("manual_lists",),
     )["transition_id"] == "tit_1"
 
-    scheduler._worker()
+    scheduler._worker(evidence_loader=marker)
+    assert captured_worker["evidence_loader"] is marker
     assert captured_worker["transition_preview"] is scheduler._transition_preview
     assert captured_worker["transition_approver"] is scheduler._transition_approver
     assert calls[0][0] == "preview"
@@ -382,10 +385,10 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
             blockers=("sec_evidence_insufficient",),
         ),
     )
-    monkeypatch.setattr(
-        scheduler,
-        "_local_news_evidence",
-        lambda _context, at: ((), (), {"news_evidence_count": 0}),
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=(), blockers=(), diagnostics={}
+        )
     )
     case = {
         "case_id": "slc_diag",
@@ -406,13 +409,316 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
         },
     }
 
-    bundle = scheduler._load_evidence(case, mode="live", at="2026-08-26T00:00:00Z")
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-26T00:00:00Z",
+        listing_session=listing_session,
+    )
 
     assert _diagnostics(bundle.diagnostics) == (
-        '{"ibkr_requests":0,"news_evidence_count":0,"sec_attempt_count":2,'
+        '{"ibkr_conflict":0,"ibkr_missing":0,"ibkr_requests":0,'
+        '"ibkr_unavailable":0,"sec_attempt_count":2,'
         '"sec_document_count":1,"sec_governor_wait_ms":25,'
         '"sec_payload_bytes":4096,"sec_rate_limit_retries":0}'
     )
+
+
+def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
+    from src.security_lifecycle_automation_worker import LifecycleAutomationEvidenceBundle
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+
+    class Budget:
+        @classmethod
+        def lifecycle(cls):
+            value = cls()
+            events.append(("budget", value))
+            return value
+
+    class Transport:
+        def __init__(self):
+            self.urls = []
+            events.append(("transport", self))
+
+    class Session:
+        def __init__(self, *, transport, budget, retrieved_at, massive_api_key):
+            self.transport = transport
+            self.budget = budget
+            self.retrieved_at = retrieved_at
+            self.massive_api_key = massive_api_key
+            self.loaded = False
+            self.massive_identities = set()
+            self.massive_requests = []
+            self.closed = False
+            events.append(("session", self))
+
+        def lookup(self, **_kwargs):
+            if not self.loaded:
+                self.transport.urls.extend(
+                    [scheduler.NASDAQ_LISTED_URL, scheduler.OTHER_LISTED_URL]
+                )
+                self.loaded = True
+            identity = ("CASE", True, "otc")
+            if identity not in self.massive_identities:
+                self.massive_requests.append(identity)
+                self.massive_identities.add(identity)
+            return SimpleNamespace(
+                evidence=(), facts=(), blockers=(), diagnostics={}
+            )
+
+        def close(self):
+            self.closed = True
+            events.append(("closed", self))
+
+    def load(case, *, mode, at, listing_session):
+        del mode, at
+        listing_session.lookup(case_id=case["case_id"])
+        return LifecycleAutomationEvidenceBundle(
+            evidence=(), facts=(), blockers=(), diagnostics={}, retry_at=None
+        )
+
+    class Worker:
+        def __init__(self, evidence_loader):
+            self.evidence_loader = evidence_loader
+
+        def run(self, limit, mode):
+            assert events == [events[0], events[1], events[2]]
+            for case_id in ("CASE-A", "CASE-B"):
+                self.evidence_loader(
+                    {"case_id": case_id}, mode=mode, at="2026-08-25T13:00:00Z"
+                )
+            return _summary(
+                selected=2,
+                processed=2,
+                drafted=2,
+                case_ids=["CASE-A", "CASE-B"],
+            )
+
+    monkeypatch.setattr(scheduler, "ListingRequestBudget", Budget, raising=False)
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport, raising=False)
+    monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session, raising=False)
+    monkeypatch.setattr(scheduler, "_load_evidence", load)
+    monkeypatch.setattr(
+        scheduler,
+        "_worker",
+        lambda *, evidence_loader, clock: Worker(evidence_loader),
+    )
+
+    result = scheduler.run_security_lifecycle_automation(limit=2, now=_NOW)
+
+    session = next(value for kind, value in events if kind == "session")
+    assert result["processed"] == 2
+    assert session.transport.urls == [
+        scheduler.NASDAQ_LISTED_URL,
+        scheduler.OTHER_LISTED_URL,
+    ]
+    assert session.massive_identities == {("CASE", True, "otc")}
+    assert session.massive_requests == [("CASE", True, "otc")]
+    assert session.closed is True
+
+
+def test_v4_load_evidence_never_opens_local_news_databases(tmp_path, monkeypatch):
+    from data_sources import sec_transport
+    from src import sa_capture_store, security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    sa_path = tmp_path / "sa.db"
+    market_path.touch()
+    sa_path.touch()
+    original_connect = sqlite3.connect
+
+    def reject_news_connection(database, *args, **kwargs):
+        rendered = str(database)
+        if str(market_path) in rendered or str(sa_path) in rendered:
+            raise AssertionError("active lifecycle path opened a news database")
+        return original_connect(database, *args, **kwargs)
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 0}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(),
+            facts=(),
+            blockers=("sec_evidence_insufficient",),
+            source_deadlines=(),
+        ),
+    )
+    monkeypatch.setattr(scheduler, "_market_path", lambda: market_path)
+    monkeypatch.setattr(sa_capture_store, "resolve_sa_db_path", lambda: sa_path)
+    monkeypatch.setattr(sqlite3, "connect", reject_news_connection)
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=(), blockers=(), diagnostics={}
+        )
+    )
+    case = {
+        "case_id": "slc_no_news",
+        "ticker": "NONEWS",
+        "ticker_aliases": ("NONEWS",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "NONEWS",
+            "cik": "0000000001",
+            "issuer_name": "No News Issuer",
+            "filing_date": "2026-08-25",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "kinds": [{"event_type": "listing_status_review", "effective_date": None}],
+        },
+    }
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-26T00:00:00Z",
+        listing_session=listing_session,
+    )
+
+    assert all(row.source_family != "publisher" for row in bundle.evidence)
+    assert "internal_news_unavailable" not in {row.code for row in bundle.blockers}
+    assert all(not key.startswith("news_") for key in bundle.diagnostics)
+
+
+@pytest.mark.parametrize(
+    (
+        "listing_codes",
+        "ibkr_codes",
+        "terminal",
+        "expected_candidates",
+        "expected_codes",
+        "ibkr_diagnostics",
+    ),
+    [
+        ((), ("ibkr_gateway_unavailable",), False, ("NEXT", "OLD"), (), (1, 0, 0)),
+        ((), ("ibkr_contract_missing",), False, ("NEXT", "OLD"), (), (0, 1, 0)),
+        (
+            (),
+            ("ibkr_contract_ambiguous",),
+            False,
+            ("NEXT", "OLD"),
+            ("ibkr_contract_ambiguous",),
+            (0, 0, 1),
+        ),
+        (
+            ("massive_credential_missing",),
+            (),
+            True,
+            ("OLD",),
+            ("massive_credential_missing",),
+            (0, 0, 0),
+        ),
+    ],
+    ids=("ibkr-unavailable", "ibkr-missing", "ibkr-ambiguity", "massive-required"),
+)
+def test_listing_requiredness_and_ibkr_blocking_are_component_specific(
+    monkeypatch,
+    listing_codes,
+    ibkr_codes,
+    terminal,
+    expected_candidates,
+    expected_codes,
+    ibkr_diagnostics,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_facts = (
+        (
+            SimpleNamespace(
+                fact_type="tracked_security_effect",
+                value="terminal_delisting",
+            ),
+        )
+        if terminal
+        else (
+            SimpleNamespace(fact_type="successor_ticker", value="NEXT"),
+            SimpleNamespace(
+                fact_type="tracked_security_effect",
+                value="symbol_change",
+            ),
+        )
+    )
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=sec_facts, blockers=(), source_deadlines=()
+        ),
+    )
+    listing_calls = []
+    listing_session = SimpleNamespace(
+        lookup=lambda **kwargs: (
+                listing_calls.append(kwargs)
+                or SimpleNamespace(
+                    evidence=(),
+                    facts=(),
+                    blockers=listing_codes,
+                    diagnostics={"massive_credential_missing": 1},
+                )
+        )
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(evidence=(), blockers=ibkr_codes, requests_made=1),
+            (),
+        ),
+    )
+    case = {
+        "case_id": "slc_components",
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Components Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "kinds": [{"event_type": "acquisition_completed", "effective_date": None}],
+        },
+    }
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-26T00:00:00Z",
+        listing_session=listing_session,
+    )
+
+    assert listing_calls[0]["candidate_tickers"] == expected_candidates
+    assert listing_calls[0]["require_explicit_inactive"] is terminal
+    assert tuple(row.code for row in bundle.blockers) == expected_codes
+    assert bundle.diagnostics["massive_credential_missing"] == 1
+    assert (
+        bundle.diagnostics["ibkr_unavailable"],
+        bundle.diagnostics["ibkr_missing"],
+        bundle.diagnostics["ibkr_conflict"],
+    ) == ibkr_diagnostics
 
 
 def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
@@ -448,7 +754,7 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(deadline,),
         at="2026-08-26T00:00:00Z",
@@ -487,7 +793,7 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(deadline,),
         at="2026-08-27T12:00:00Z",
@@ -506,7 +812,7 @@ def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "unavailable",
+            "listing_authority": "unavailable",
         },
         source_deadlines=(deadline,),
         at="2026-10-15T12:00:00Z",
@@ -612,11 +918,6 @@ def test_acquisition_scheduling_rejects_multiple_deadline_dates_before_market_wo
     )
     monkeypatch.setattr(
         scheduler,
-        "_local_news_evidence",
-        lambda _context, at: ((), (), {"news_evidence_count": 0}),
-    )
-    monkeypatch.setattr(
-        scheduler,
         "_ibkr_evidence",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("market work must not start")
@@ -624,7 +925,16 @@ def test_acquisition_scheduling_rejects_multiple_deadline_dates_before_market_wo
     )
 
     try:
-        scheduler._load_evidence(case, mode="live", at="2026-08-27T00:00:00Z")
+        scheduler._load_evidence(
+            case,
+            mode="live",
+            at="2026-08-27T00:00:00Z",
+            listing_session=SimpleNamespace(
+                lookup=lambda **_kwargs: (_ for _ in ()).throw(
+                    AssertionError("listing work must not start")
+                )
+            ),
+        )
     except ValueError as exc:
         assert str(exc) == "source_deadlines"
     else:
@@ -673,7 +983,7 @@ def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market
         (),
         source_family_results={
             "regulator": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(deadline,),
         at="2026-08-27T12:00:00Z",
@@ -700,10 +1010,10 @@ def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market
             source_deadlines=(deadline,),
         ),
     )
-    monkeypatch.setattr(
-        scheduler,
-        "_local_news_evidence",
-        lambda _context, at: ((), (), {"news_evidence_count": 0}),
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=(), blockers=(), diagnostics={}
+        )
     )
 
     def ibkr(context, *, at, regulator_successors):
@@ -715,6 +1025,7 @@ def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market
         case,
         mode="live",
         at="2026-08-30T12:00:00Z",
+        listing_session=listing_session,
     )
 
     assert market_calls == [("slc_deadline_only", "2026-08-30T12:00:00Z", ())]
@@ -739,7 +1050,7 @@ def test_pending_without_source_deadline_never_becomes_timeless_negative():
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(),
         at="2027-08-26T00:00:00Z",
@@ -768,7 +1079,7 @@ def test_effective_date_never_substitutes_for_source_termination_deadline():
         source_family_results={
             "regulator": "available",
             "market_infrastructure": "available",
-            "publisher": "available",
+            "listing_authority": "available",
         },
         source_deadlines=(),
         at="2027-08-26T00:00:00Z",

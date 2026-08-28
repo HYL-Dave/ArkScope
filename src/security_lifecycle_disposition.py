@@ -25,6 +25,12 @@ LIFECYCLE_QUEUE_BUCKETS = frozenset({"attention", "monitoring", "history"})
 SOURCE_FAMILY_STATES = frozenset(
     {"confirmed", "present", "missing", "unavailable", "conflict"}
 )
+ACTIVE_SOURCE_FAMILIES = (
+    "regulator",
+    "listing_authority",
+    "market_infrastructure",
+    "manual",
+)
 LIFECYCLE_DISPOSITION_REASONS = frozenset(
     {
         "awaiting_initial_automation",
@@ -62,7 +68,6 @@ _NONRETRYABLE_PROVIDER_BLOCKERS = frozenset(
     {
         "sec_identity_unconfigured",
         "sec_access_denied",
-        "internal_news_schema_mismatch",
         "ibkr_entitlement_denied",
     }
 )
@@ -74,11 +79,20 @@ _UNAVAILABLE_FAMILY_BY_BLOCKER = {
     "sec_access_denied": "regulator",
     "sec_transport_unavailable": "regulator",
     "sec_document_unavailable": "regulator",
-    "internal_news_unavailable": "publisher",
-    "internal_news_schema_mismatch": "publisher",
     "ibkr_gateway_unavailable": "market_infrastructure",
     "ibkr_entitlement_denied": "market_infrastructure",
+    "listing_directory_unavailable": "listing_authority",
+    "listing_directory_stale": "listing_authority",
+    "listing_directory_schema_mismatch": "listing_authority",
+    "massive_credential_missing": "listing_authority",
+    "massive_access_denied": "listing_authority",
+    "massive_rate_limited": "listing_authority",
+    "massive_reference_unavailable": "listing_authority",
+    "listing_status_unresolved": "listing_authority",
 }
+_INACTIVE_BLOCKER_CODES = frozenset(
+    {"internal_news_unavailable", "internal_news_schema_mismatch"}
+)
 
 
 @dataclass(frozen=True)
@@ -327,6 +341,8 @@ def _conflicting_families(
         code = _blocker_code(blocker)
         if code == "ibkr_contract_ambiguous":
             families.add("market_infrastructure")
+        if code == "listing_authority_conflict":
+            families.add("listing_authority")
         if code != "source_conflict":
             continue
         context = _blocker_context(blocker)
@@ -342,7 +358,8 @@ def _conflicting_families(
             family = str(candidate or "")
             if family not in EVIDENCE_SOURCE_FAMILIES:
                 raise ValueError("source_family")
-            families.add(family)
+            if family in ACTIVE_SOURCE_FAMILIES:
+                families.add(family)
 
     if run is None:
         return families
@@ -354,6 +371,8 @@ def _conflicting_families(
         family = str(fact.get("source_family") or "")
         if family not in EVIDENCE_SOURCE_FAMILIES:
             raise ValueError("source_family")
+        if family not in ACTIVE_SOURCE_FAMILIES:
+            continue
         fact_type = str(fact.get("fact_type") or "").strip()
         if not fact_type:
             raise ValueError("fact_type")
@@ -388,7 +407,11 @@ def _source_family_status(
         evidence_by_id[evidence_id] = row
         if family == "manual":
             manual_present = True
-        if run_id and str(row.get("automation_run_id") or "") == run_id:
+        if (
+            family in ACTIVE_SOURCE_FAMILIES
+            and run_id
+            and str(row.get("automation_run_id") or "") == run_id
+        ):
             current_run_families.add(family)
 
     confirmed: set[str] = set()
@@ -398,7 +421,7 @@ def _source_family_status(
                 continue
             evidence_id = str(citation.get("evidence_id") or "")
             row = evidence_by_id.get(evidence_id)
-            if row is not None:
+            if row is not None and row["source_family"] in ACTIVE_SOURCE_FAMILIES:
                 confirmed.add(str(row["source_family"]))
 
     unavailable = {
@@ -409,7 +432,7 @@ def _source_family_status(
     }
     conflicts = _conflicting_families(case, run, blockers)
     statuses: dict[str, str] = {}
-    for family in sorted(EVIDENCE_SOURCE_FAMILIES):
+    for family in ACTIVE_SOURCE_FAMILIES:
         if family in conflicts:
             status = "conflict"
         elif family in unavailable:
@@ -518,12 +541,38 @@ def _latest_automation_draft_requires_review(
     )
 
 
+def _waiting_readiness_assessment(
+    case: Mapping[str, object],
+    run: Mapping[str, object] | None,
+    assessment: Mapping[str, object] | None,
+) -> Mapping[str, object] | None:
+    if assessment is not None or run is None:
+        return assessment
+    if str(run.get("action_readiness") or "") not in _WAITING_READINESS:
+        return None
+    return next(
+        (
+            row
+            for row in _rows(case.get("assessment_history", ()), "assessment_history")
+            if row.get("author") == "automation"
+            and row.get("status") == "draft"
+            and row.get("stale") is not True
+            and row.get("automation_run_id") == run.get("run_id")
+        ),
+        None,
+    )
+
+
 def project_lifecycle_disposition(
     case: Mapping[str, object],
 ) -> LifecycleDispositionProjection:
     case = _mapping(case, "lifecycle_case")
     run = _latest_run(case)
-    blockers = _blockers(run)
+    blockers = tuple(
+        blocker
+        for blocker in _blockers(run)
+        if _blocker_code(blocker) not in _INACTIVE_BLOCKER_CODES
+    )
     assessment_value = case.get("current_assessment")
     assessment = (
         None
@@ -532,6 +581,7 @@ def project_lifecycle_disposition(
     )
     if assessment is not None and assessment.get("stale") is True:
         assessment = None
+    monitoring_assessment = _waiting_readiness_assessment(case, run, assessment)
     acknowledgement_value = case.get("current_acknowledgement")
     acknowledgement = (
         None
@@ -560,7 +610,7 @@ def project_lifecycle_disposition(
     disposition_as_of: str | None = None
     if case.get("source_presence") != "present":
         disposition, bucket, reason = "exception_required", "attention", "source_missing"
-    elif "source_conflict" in blocker_codes:
+    elif blocker_codes & {"source_conflict", "listing_authority_conflict"}:
         disposition, bucket, reason = (
             "exception_required",
             "attention",
@@ -603,7 +653,7 @@ def project_lifecycle_disposition(
         )
     else:
         readiness = "" if run is None else str(run.get("action_readiness") or "")
-        if assessment is not None and readiness in _WAITING_READINESS:
+        if monitoring_assessment is not None and readiness in _WAITING_READINESS:
             disposition, bucket, reason = "confirmed_monitoring", "monitoring", readiness
         elif assessment is not None:
             outcomes = {str(value) for value in assessment.get("outcomes", ())}
@@ -630,7 +680,13 @@ def project_lifecycle_disposition(
                 str(_blocker_context(row).get("monitoring_reason") or "")
                 for row in blockers
             }
-            if "not_confirmed_as_of" in monitoring_reasons:
+            if not blockers:
+                disposition, bucket, reason = (
+                    "not_confirmed_yet",
+                    "monitoring",
+                    "awaiting_initial_automation",
+                )
+            elif "not_confirmed_as_of" in monitoring_reasons:
                 disposition, bucket, reason = (
                     "not_confirmed_yet",
                     "history",
@@ -649,7 +705,7 @@ def project_lifecycle_disposition(
                     "monitoring",
                     "retryable_source_unavailable",
                 )
-            elif "source_conflict" in blocker_codes:
+            elif blocker_codes & {"source_conflict", "listing_authority_conflict"}:
                 disposition, bucket, reason = (
                     "exception_required",
                     "attention",
@@ -693,7 +749,11 @@ def project_lifecycle_disposition(
             )
 
     if bucket == "monitoring":
-        next_check_at = next_lifecycle_recheck_at(run, assessment, transition)
+        next_check_at = next_lifecycle_recheck_at(
+            run,
+            monitoring_assessment,
+            transition,
+        )
         if next_check_at is None and reason == "awaiting_initial_automation":
             observation = case.get("observation")
             if isinstance(observation, Mapping) and observation.get("last_observed_at"):
@@ -714,6 +774,7 @@ def project_lifecycle_disposition(
 
 
 __all__ = [
+    "ACTIVE_SOURCE_FAMILIES",
     "LIFECYCLE_DISPOSITION_REASONS",
     "LIFECYCLE_DISPOSITIONS",
     "LIFECYCLE_QUEUE_BUCKETS",
