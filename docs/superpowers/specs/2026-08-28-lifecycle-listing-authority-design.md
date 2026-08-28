@@ -194,6 +194,7 @@ Each listing evidence row stores a bounded locator with these fields:
 ```json
 {
   "authority": "nasdaq_trader | massive",
+  "directory": "nasdaq_listed | other_listed | null",
   "candidate_ticker": "B",
   "listing_status": "active | inactive | not_found | unverified",
   "market": "stocks | otc",
@@ -203,6 +204,7 @@ Each listing evidence row stores a bounded locator with these fields:
   "composite_figi": null,
   "delisted_utc": null,
   "source_as_of": "2026-08-28",
+  "provider_last_updated_utc": null,
   "snapshot_complete": true,
   "source_document_sha256": "...",
   "adapter_version": "..."
@@ -214,6 +216,17 @@ persisted excerpt is one canonical compact record, not the full directory or API
 response. `content_sha256` hashes the exact stored excerpt. For Nasdaq data,
 `source_document_sha256` hashes the complete downloaded file. For Massive, it
 hashes the exact bounded response bytes accepted by the parser.
+
+Nasdaq `not_found` is supported by two evidence rows: one for the complete
+`nasdaq_listed` file and one for the complete `other_listed` file. Each keeps its
+own exact URL and document hash; no aggregate digest pretends that two documents
+were one. Policy requires both current components before treating the directory
+lookup as complete. An active match needs only the matching positive component.
+
+For Massive, `source_as_of` is the bounded lookup time. Preserve the provider's
+optional `last_updated_utc` separately as `provider_last_updated_utc`; an
+unchanged reference row is not declared stale merely because its underlying
+record was last modified earlier.
 
 ### 3.4 Facts
 

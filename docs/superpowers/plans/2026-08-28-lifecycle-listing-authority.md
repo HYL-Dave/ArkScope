@@ -53,6 +53,7 @@
 - Modify: `tests/test_security_lifecycle_automation_schema.py`
 - Modify: `tests/test_security_lifecycle_automation_migration.py`
 - Create: `tests/test_security_lifecycle_listing_migration.py`
+- Modify: `tests/test_security_lifecycle_disposition.py` (adjacent closed-family owner only)
 
 **Interfaces:**
 - Consumes: exact v2 `PROFILE_TABLE_SQL`, `PROFILE_INDEX_SQL`, and all ticker-identity authorities at `fda1641f`.
@@ -245,7 +246,7 @@ named schema owner fails. Restore each mutation before continuing.
 - [ ] **Step 9: Commit Task 1**
 
 ```bash
-git add src/security_lifecycle_schema.py src/security_lifecycle_automation_migration.py src/security_lifecycle_listing_migration.py tests/test_security_lifecycle_automation_schema.py tests/test_security_lifecycle_automation_migration.py tests/test_security_lifecycle_listing_migration.py
+git add src/security_lifecycle_schema.py src/security_lifecycle_automation_migration.py src/security_lifecycle_listing_migration.py tests/test_security_lifecycle_automation_schema.py tests/test_security_lifecycle_automation_migration.py tests/test_security_lifecycle_listing_migration.py tests/test_security_lifecycle_disposition.py
 git commit -m "feat(lifecycle): define listing authority schema v3"
 ```
 
@@ -372,7 +373,12 @@ git commit -m "feat(lifecycle): add bounded listing transports"
 **Interfaces:**
 - Consumes: `ListingAuthorityTransport`, `ListingRequestBudget`, SEC `IdentityContext`, queried successor tickers, `src.market_sessions.latest_completed_market_date`, and `retrieved_at`.
 - Produces: `LISTING_STATUSES = frozenset({"active", "inactive", "not_found", "unverified"})`.
-- Produces: frozen dataclass `ListingEvidenceResult(evidence: tuple[ListingEvidence, ...], facts: tuple[ListingFact, ...], blockers: tuple[str, ...], diagnostics: Mapping[str, int])`.
+- Produces explicit frozen `ListingEvidence` and `ListingFact` dataclasses that
+  implement the field protocol consumed by fact-kernel `_normalize_evidence`
+  and `_normalize_facts`, plus frozen dataclass
+  `ListingEvidenceResult(evidence: tuple[ListingEvidence, ...], facts:
+  tuple[ListingFact, ...], blockers: tuple[str, ...], diagnostics: Mapping[str,
+  int])`.
 - Produces: `ListingAuthoritySession.lookup(*, context: IdentityContext, candidate_tickers: tuple[str, ...], require_explicit_inactive: bool) -> ListingEvidenceResult` and `close() -> None`.
 
 - [ ] **Step 1: Write strict parser REDs**
@@ -386,10 +392,17 @@ def test_nasdaq_parser_preserves_current_exchange_status_and_document_hash():
         other_bytes=fixture("otherlisted.txt"),
         retrieved_at="2026-08-28T22:00:00Z",
     )
-    assert snapshot.lookup("VISN").listing_status == "active"
-    assert snapshot.lookup("VISN").primary_exchange == "XNAS"
-    assert snapshot.lookup("CDE").primary_exchange == "XNYS"
-    assert snapshot.lookup("DOESNOTEXIST").listing_status == "not_found"
+    visn = snapshot.lookup("VISN")
+    cde = snapshot.lookup("CDE")
+    assert [(row.listing_status, row.primary_exchange) for row in visn] == [
+        ("active", "XNAS")
+    ]
+    assert [row.primary_exchange for row in cde] == ["XNYS"]
+    missing = snapshot.lookup("DOESNOTEXIST")
+    assert [(row.directory, row.listing_status) for row in missing] == [
+        ("nasdaq_listed", "not_found"),
+        ("other_listed", "not_found"),
+    ]
 
 
 def test_massive_inactive_requires_explicit_false_and_delisted_date():
@@ -421,6 +434,7 @@ Canonical excerpts use stable JSON with no provider payload surplus:
 excerpt = json.dumps(
     {
         "authority": authority,
+        "directory": directory,
         "ticker": ticker,
         "listing_status": status,
         "market": market,
@@ -429,6 +443,7 @@ excerpt = json.dumps(
         "issuer_cik": issuer_cik,
         "delisted_utc": delisted_utc,
         "source_as_of": source_as_of,
+        "provider_last_updated_utc": provider_last_updated_utc,
     },
     sort_keys=True,
     separators=(",", ":"),
@@ -437,7 +452,10 @@ excerpt = json.dumps(
 
 Hash the exact excerpt. Facts cite byte spans from that exact excerpt. Nasdaq
 lookups run first. Massive runs only for the four typed fallback conditions and
-is deduplicated inside `ListingAuthoritySession`.
+is deduplicated inside `ListingAuthoritySession`. A Nasdaq miss produces two
+evidence rows, one per complete directory and exact file hash; no aggregate
+document digest is allowed. For Massive, lookup time is `source_as_of` and the
+provider's optional `last_updated_utc` remains a distinct locator field.
 
 - [ ] **Step 4: Add adapter contracts to schema-facing validators**
 
@@ -465,8 +483,10 @@ massive_reference_unavailable
 
 At the translation preparation boundary, reject
 `kind == "listing_directory_snapshot"` with the existing unsupported-content
-error before route resolution. Add an owner that replaces the route resolver
-and provider runner with functions that fail the test if called.
+error immediately after reading the evidence and before cached-translation
+lookup, route resolution, provider invocation, or write authority. Add owners
+that replace each downstream boundary with functions that fail the test if
+called.
 
 - [ ] **Step 5: Write producer-to-kernel RED/GREEN contracts**
 
@@ -796,6 +816,7 @@ def test_listing_locator_is_whitelisted_without_raw_payload_or_secret():
     row = next(item for item in detail["evidence"] if item["source_family"] == "listing_authority")
     assert row["listing"] == {
         "authority": "massive",
+        "directory": None,
         "candidate_ticker": "B",
         "listing_status": "active",
         "market": "stocks",
