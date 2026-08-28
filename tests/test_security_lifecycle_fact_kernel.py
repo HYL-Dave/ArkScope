@@ -852,7 +852,7 @@ def test_current_policy_retries_a_failed_run_without_deleting_v1_history():
         at=_LATER,
     )
 
-    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v3"
+    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v4"
     assert _reserve(
         kernel,
         case_id,
@@ -876,7 +876,7 @@ def test_current_policy_retries_a_failed_run_without_deleting_v1_history():
         )
         ] == [
             ("trusted-lifecycle-automation-v1", "failed"),
-            ("trusted-lifecycle-automation-v3", "running"),
+            (AUTOMATION_POLICY_VERSION, "running"),
         ]
 
 

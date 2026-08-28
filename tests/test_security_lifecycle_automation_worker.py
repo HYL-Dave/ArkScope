@@ -105,6 +105,76 @@ def _evidence(case, *, family, payload, kind, locator):
     )
 
 
+def _listing_evidence(
+    case,
+    *,
+    label,
+    adapter,
+    ticker,
+    expected_active_state,
+    market,
+    status,
+    active=None,
+    delisted_utc=None,
+    fact_values=None,
+    retrieved_at=_AT,
+):
+    from src.security_lifecycle_fact_kernel import AutomationEvidence
+
+    normalized_facts = dict(fact_values or {})
+    payload = {
+        "listing_adapter": adapter,
+        "listing_status": status,
+        **normalized_facts,
+    }
+    excerpt = json.dumps(
+        payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    locator = {
+        "locator_kind": "listing_directory_snapshot",
+        "adapter": adapter,
+        "candidate_ticker": ticker,
+        "expected_active_state": expected_active_state,
+        "market": market,
+        "status": status,
+    }
+    if active is not None:
+        locator["active"] = active
+    if delisted_utc is not None:
+        locator["delisted_utc"] = delisted_utc
+    evidence = AutomationEvidence(
+        evidence_id=f"listing-{label}-{case['case_id'][-8:]}",
+        source_family="listing_authority",
+        adapter=adapter,
+        kind="listing_directory_snapshot",
+        source_url=(
+            f"https://api.massive.com/v3/reference/tickers/{ticker}"
+            if adapter == "massive_reference"
+            else "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.txt"
+        ),
+        title=f"{adapter} listing snapshot",
+        publisher=(
+            "Massive" if adapter == "massive_reference" else "Nasdaq Trader"
+        ),
+        domain=None,
+        source_published_at=None,
+        retrieved_at=retrieved_at,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        source_document_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+        source_locator=locator,
+        evidence_dedupe_key=f"listing:{label}:{case['case_id']}",
+    )
+    facts = tuple(
+        _fact(evidence, payload, key, key)
+        for key in normalized_facts
+    )
+    return evidence, facts
+
+
 def _bundle(
     case,
     *,
@@ -152,12 +222,47 @@ def _bundle(
             kind="regulator_excerpt",
             locator={"filing_chain_complete": True},
         )
-        facts = tuple(
+        facts = list(
             _fact(regulator, regulator_payload, key, key)
             for key in regulator_payload
         )
         evidence = [regulator]
         if market_absent:
+            for label, market in (
+                ("nasdaq-listed", "nasdaq"),
+                ("nasdaq-other", "other"),
+            ):
+                absence, absence_facts = _listing_evidence(
+                    case,
+                    label=label,
+                    adapter="nasdaq_symbol_directory",
+                    ticker=ticker,
+                    expected_active_state=False,
+                    market=market,
+                    status="not_found",
+                    retrieved_at="2026-09-01T12:00:00Z",
+                )
+                evidence.append(absence)
+                facts.extend(absence_facts)
+            inactive, inactive_facts = _listing_evidence(
+                case,
+                label="massive-inactive",
+                adapter="massive_reference",
+                ticker=ticker,
+                expected_active_state=False,
+                market="stocks",
+                status="found",
+                active=False,
+                delisted_utc="2026-09-01T00:00:00Z",
+                retrieved_at="2026-09-01T12:00:00Z",
+                fact_values={
+                    "issuer_cik": cik,
+                    "security_class": "common_stock",
+                    "source_ticker": ticker,
+                },
+            )
+            evidence.append(inactive)
+            facts.extend(inactive_facts)
             absence_payload = {
                 "contract_status": "missing",
                 "queried_ticker": ticker,
@@ -171,9 +276,27 @@ def _bundle(
                     locator={"contract_status": "missing"},
                 )
             )
+        else:
+            active_listing, active_facts = _listing_evidence(
+                case,
+                label="nasdaq-active",
+                adapter="nasdaq_symbol_directory",
+                ticker=ticker,
+                expected_active_state=False,
+                market="nasdaq",
+                status="found",
+                active=True,
+                fact_values={
+                    "destination_venue": "NASDAQ",
+                    "security_class": "common_stock",
+                    "successor_ticker": ticker,
+                },
+            )
+            evidence.append(active_listing)
+            facts.extend(active_facts)
         return LifecycleAutomationEvidenceBundle(
             evidence=tuple(evidence),
-            facts=facts,
+            facts=tuple(facts),
             blockers=(),
             diagnostics={"sec_attempts": 1, "ibkr_requests": int(market_absent)},
             retry_at=None,
@@ -252,13 +375,25 @@ def _bundle(
         kind="market_infrastructure_snapshot",
         locator=market_payload,
     )
+    listing, listing_facts = _listing_evidence(
+        case,
+        label="nasdaq-active",
+        adapter="nasdaq_symbol_directory",
+        ticker=successor,
+        expected_active_state=True,
+        market="nasdaq",
+        status="found",
+        active=True,
+        fact_values=market_snapshot,
+    )
     return LifecycleAutomationEvidenceBundle(
-        evidence=(regulator, market),
+        evidence=(regulator, listing, market),
         facts=(
             *(
                 _fact(regulator, regulator_payload, key, key)
                 for key in regulator_payload
             ),
+            *listing_facts,
             *(
                 _fact(market, market_snapshot, key, key)
                 for key in market_snapshot
@@ -478,7 +613,7 @@ def _market_recheck_bundle(case, *, retrieved_at, market_status, fresh, include_
     )
 
     base = _bundle(case)
-    regulator, prior_market = base.evidence
+    regulator, listing, prior_market = base.evidence
     market_payload = json.loads(prior_market.excerpt)
     market_payload["market_data"].update(
         {
@@ -510,9 +645,20 @@ def _market_recheck_bundle(case, *, retrieved_at, market_status, fresh, include_
     regulator_facts = tuple(
         fact for fact in base.facts if fact.evidence_id == regulator.evidence_id
     )
+    listing_facts = tuple(
+        fact for fact in base.facts if fact.evidence_id == listing.evidence_id
+    )
     return LifecycleAutomationEvidenceBundle(
-        evidence=((regulator, market) if include_regulator else (market,)),
-        facts=((*regulator_facts, *market_facts) if include_regulator else market_facts),
+        evidence=(
+            (regulator, listing, market)
+            if include_regulator
+            else (listing, market)
+        ),
+        facts=(
+            (*regulator_facts, *listing_facts, *market_facts)
+            if include_regulator
+            else (*listing_facts, *market_facts)
+        ),
         blockers=(),
         diagnostics={"ibkr_requests": 1, "sec_attempts": int(include_regulator)},
         retry_at=None,
@@ -526,7 +672,7 @@ def _conflict_bundle(case, *, pending):
     from src.security_lifecycle_fact_kernel import AutomationBlocker
 
     base = _bundle(case)
-    regulator, prior_market = base.evidence
+    regulator, listing, prior_market = base.evidence
     market_payload = json.loads(prior_market.excerpt)
     market_payload["snapshot"]["successor_ticker"] = "OTHER"
     excerpt = json.dumps(
@@ -544,7 +690,11 @@ def _conflict_bundle(case, *, pending):
         evidence_dedupe_key=f"market-conflict:{case['case_id']}",
     )
     facts = (
-        *(fact for fact in base.facts if fact.evidence_id == regulator.evidence_id),
+        *(
+            fact
+            for fact in base.facts
+            if fact.evidence_id in {regulator.evidence_id, listing.evidence_id}
+        ),
         *(
             _fact(market, market_payload["snapshot"], key, key)
             for key in market_payload["snapshot"]
@@ -569,7 +719,7 @@ def _conflict_bundle(case, *, pending):
             )
         )
     return LifecycleAutomationEvidenceBundle(
-        evidence=(regulator, market),
+        evidence=(regulator, listing, market),
         facts=facts,
         blockers=tuple(blockers),
         diagnostics={"ibkr_requests": 1, "sec_attempts": 1},
@@ -681,7 +831,7 @@ def test_verified_result_persists_automation_assessment_acceptance_and_proposals
         harness.conn.close()
 
 
-def test_market_recheck_uses_latest_snapshot_and_converges_from_frozen_to_fresh(
+def test_market_recheck_preserves_receipts_without_quote_acceptance_gate(
     tmp_path,
 ):
     case = _case(1)
@@ -697,8 +847,8 @@ def test_market_recheck_uses_latest_snapshot_and_converges_from_frozen_to_fresh(
         first = harness.worker_with_transition_approver().run()
         first_run = _store(harness).list_automation_runs(case["case_id"])[0]
         assert first["accepted"] == 1
-        assert first_run["action_readiness"] == "waiting_market_confirmation"
-        assert harness.approval_calls == []
+        assert first_run["action_readiness"] == "transition_eligible"
+        assert len(harness.approval_calls) == 1
 
         harness.now = "2026-08-26T12:00:00Z"
         harness.bundles[case["case_id"]] = _market_recheck_bundle(
@@ -711,7 +861,9 @@ def test_market_recheck_uses_latest_snapshot_and_converges_from_frozen_to_fresh(
         second = harness.worker_with_transition_approver().run()
         run = _store(harness).list_automation_runs(case["case_id"])[0]
 
-        assert second["accepted"] == 1
+        assert second["processed"] == 0
+        assert second["accepted"] == 0
+        assert second["skipped_current"] == 1
         assert run["action_readiness"] == "transition_eligible"
         assert len(harness.approval_calls) == 1
         receipts = harness.conn.execute(
@@ -722,7 +874,6 @@ def test_market_recheck_uses_latest_snapshot_and_converges_from_frozen_to_fresh(
         ).fetchall()
         assert [json.loads(row[0])["market_data"]["status"] for row in receipts] == [
             "frozen",
-            "live",
         ]
     finally:
         harness.conn.close()
@@ -1267,7 +1418,7 @@ def test_worker_records_execution_revision_without_replaying_current_failed_run(
         run = _store(harness).list_automation_runs(case["case_id"])[0]
         context = json.loads(run["query_context_json"])
 
-        assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v3"
+        assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v4"
         assert context["execution_revision"] == "trusted-lifecycle-execution-r1"
         assert AUTOMATION_EXECUTION_REVISION == "trusted-lifecycle-execution-r1"
         assert first["failed"] == 1
@@ -1409,12 +1560,12 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
         monkeypatch.setattr(
             policy_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v4",
+            "trusted-lifecycle-automation-v5",
         )
         monkeypatch.setattr(
             worker_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v4",
+            "trusted-lifecycle-automation-v5",
         )
         harness.worker().run()
 

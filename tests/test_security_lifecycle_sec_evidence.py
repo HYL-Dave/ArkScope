@@ -197,6 +197,38 @@ def _collect_real(name: str):
     return case, result
 
 
+def _active_listing_material(name, *, ticker, venue, cik, market):
+    evidence_id = f"listing-{name.lower()}"
+    evidence = {
+        "evidence_id": evidence_id,
+        "source_family": "listing_authority",
+        "source_locator": {
+            "locator_kind": "listing_directory_snapshot",
+            "adapter": "nasdaq_symbol_directory",
+            "candidate_ticker": ticker,
+            "expected_active_state": True,
+            "market": market,
+            "status": "found",
+            "active": True,
+        },
+        "retrieved_at": "2026-08-25T10:27:41.545726Z",
+    }
+    facts = tuple(
+        {
+            "evidence_id": evidence_id,
+            "fact_type": fact_type,
+            "normalized_value": value,
+        }
+        for fact_type, value in (
+            ("successor_ticker", ticker),
+            ("destination_venue", venue),
+            ("security_class", "common_stock"),
+            ("issuer_cik", cik),
+        )
+    )
+    return evidence, facts
+
+
 def _values(result, fact_type: str) -> set[str]:
     return {fact.value for fact in result.facts if fact.fact_type == fact_type}
 
@@ -435,6 +467,13 @@ def test_real_hapn_first_discovery_extracts_declared_identity_facts():
     canary = json.loads(
         (_REAL_SOURCE_ROOT / "canary-report.json").read_text(encoding="utf-8")
     )
+    listing, listing_facts = _active_listing_material(
+        "HAPN",
+        ticker="HAPN",
+        venue="NASDAQ",
+        cik="0001409970",
+        market="nasdaq",
+    )
     preview_calls = []
 
     def preview(request):
@@ -447,20 +486,20 @@ def test_real_hapn_first_discovery_extracts_declared_identity_facts():
 
     decision = evaluate_automation_decision(
         case={"ticker": "LC", "cik": case["observation"]["cik"]},
-        evidence=(*result.evidence, *canary["ibkr"]["evidence"]),
-        facts=(*result.facts, *canary["ibkr"]["facts"]),
+        evidence=(*result.evidence, listing, *canary["ibkr"]["evidence"]),
+        facts=(*result.facts, *listing_facts, *canary["ibkr"]["facts"]),
         current_date="2026-08-25",
         active_sources=("manual_lists",),
         transition_preview=preview,
     )
     assert decision.decision_tier == "verified_automatic"
-    assert decision.action_readiness == "waiting_market_confirmation"
+    assert decision.action_readiness == "transition_eligible"
     assert decision.rule_id == "lifecycle.simple_symbol_continuation"
     assert decision.successor_ticker == "HAPN"
     assert decision.destination_venue == "NASDAQ"
     assert decision.effective_date == "2026-06-22"
-    assert decision.transition_requested is False
-    assert preview_calls == []
+    assert decision.transition_requested is True
+    assert len(preview_calls) == 1
 
 
 def test_real_qbts_extracts_symbol_continuity_and_venue_transfer():
@@ -493,13 +532,20 @@ def test_real_ccl_unification_resolves_no_tracked_security_change():
         "terms_status": "not_extracted",
     }
     assert _values(result, "tracked_security_effect") == {"no_identity_change"}
+    listing, listing_facts = _active_listing_material(
+        "CCL",
+        ticker="CCL",
+        venue="NYSE",
+        cik="0000815097",
+        market="other",
+    )
     decision = evaluate_automation_decision(
         case={
             "ticker": "CCL",
             "cik": case["observation"]["cik"],
         },
-        evidence=result.evidence,
-        facts=result.facts,
+        evidence=(*result.evidence, listing),
+        facts=(*result.facts, *listing_facts),
         current_date="2026-08-25",
         active_sources=("manual_lists",),
         transition_preview=lambda _request: None,
@@ -529,13 +575,20 @@ def test_real_blbd_asset_purchase_prefills_counterparty_without_identity_change(
     assert _values(result, "tracked_security_effect") == {
         "asset_acquisition_no_registrant_change"
     }
+    listing, listing_facts = _active_listing_material(
+        "BLBD",
+        ticker="BLBD",
+        venue="NYSE",
+        cik="0001589526",
+        market="other",
+    )
     decision = evaluate_automation_decision(
         case={
             "ticker": "BLBD",
             "cik": case["observation"]["cik"],
         },
-        evidence=result.evidence,
-        facts=result.facts,
+        evidence=(*result.evidence, listing),
+        facts=(*result.facts, *listing_facts),
         current_date="2026-08-25",
         active_sources=("manual_lists",),
         transition_preview=lambda _request: None,
