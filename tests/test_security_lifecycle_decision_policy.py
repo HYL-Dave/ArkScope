@@ -380,6 +380,10 @@ def test_missing_sec_destination_uses_current_massive_otc_authority():
 
 
 def test_selected_nasdaq_and_massive_otc_active_authorities_conflict():
+    from src.security_lifecycle_decision_policy import (
+        listing_authority_conflict_codes,
+    )
+
     fixture = _listing_fixture("otc_symbol_continuation")
     nasdaq, _nasdaq_facts = _active_listing("nasdaq-conflict", "NEW")
     facts = tuple(
@@ -403,6 +407,11 @@ def test_selected_nasdaq_and_massive_otc_active_authorities_conflict():
     assert decision.action_readiness == "action_blocked"
     assert decision.outcomes == ("undetermined",)
     assert decision.decision_issues == ("listing_authority_conflict",)
+    assert listing_authority_conflict_codes(
+        case=fixture["case"],
+        evidence=fixture["evidence"] + (nasdaq,),
+        facts=facts,
+    ) == decision.decision_issues
 
 
 @pytest.mark.parametrize(
@@ -683,6 +692,11 @@ def test_publisher_evidence_cannot_change_v4_decision():
 
 
 def test_massive_sec_cik_conflict_fails_closed():
+    from src.security_lifecycle_decision_policy import (
+        listing_authority_conflict_codes,
+    )
+
+    fixture = _listing_fixture("nms_symbol_continuation")
     massive, massive_facts = _active_listing(
         "massive",
         "NEW",
@@ -691,16 +705,24 @@ def test_massive_sec_cik_conflict_fails_closed():
         venue="NASDAQ",
         cik="0000000001",
     )
-    decision = _evaluate_fixture(
-        "nms_symbol_continuation",
-        add_evidence=(massive,),
-        add_facts=massive_facts,
+    evidence = fixture["evidence"] + (massive,)
+    facts = fixture["facts"] + massive_facts
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=evidence,
+        facts=facts,
+        transition_preview=_eligible_preview,
     )
 
     assert decision.decision_tier == "review_suggested"
     assert decision.action_readiness == "action_blocked"
     assert decision.outcomes == ("undetermined",)
-    assert decision.decision_issues == ("source_conflict:issuer_cik",)
+    assert decision.decision_issues == ("listing_authority_conflict",)
+    assert listing_authority_conflict_codes(
+        case=fixture["case"],
+        evidence=evidence,
+        facts=facts,
+    ) == decision.decision_issues
 
 
 def test_equal_time_disagreement_inside_one_listing_component_fails_closed():

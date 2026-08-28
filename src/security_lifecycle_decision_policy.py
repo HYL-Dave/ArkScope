@@ -535,6 +535,57 @@ def _listing_active_rows(
     )
 
 
+def listing_authority_required_components(
+    *,
+    case: Mapping[str, object],
+    regulator_facts: Iterable[object],
+    listing_evidence: Iterable[object],
+) -> frozenset[str]:
+    """Return the listing components material to the current case."""
+
+    facts_by_type: dict[str, set[str]] = {}
+    for fact in regulator_facts:
+        fact_type = _text(_field(fact, "fact_type"))
+        if fact_type is None:
+            continue
+        normalized = _normalized_fact_value(fact_type, _fact_value(fact))
+        if normalized is not None:
+            facts_by_type.setdefault(fact_type, set()).add(_canonical(normalized))
+
+    effects = facts_by_type.get("tracked_security_effect", set())
+    if _canonical("terminal_delisting") in effects:
+        return frozenset({"nasdaq", "massive"})
+
+    destinations = {
+        str(json.loads(value)).upper()
+        for value in facts_by_type.get("destination_venue", set())
+    }
+    if len(destinations) == 1:
+        destination = next(iter(destinations))
+        return frozenset({"massive" if destination.startswith("OTC") else "nasdaq"})
+
+    successors = {
+        str(json.loads(value)).upper()
+        for value in facts_by_type.get("successor_ticker", set())
+    }
+    target = next(iter(successors)) if len(successors) == 1 else _ticker(case.get("ticker"))
+    rows = _evidence_rows(listing_evidence)
+    if target is not None and _listing_active_rows(
+        rows,
+        target,
+        adapter="massive_reference",
+        market="otc",
+    ):
+        return frozenset({"massive"})
+    if target is not None and _listing_active_rows(
+        rows,
+        target,
+        adapter="nasdaq_symbol_directory",
+    ):
+        return frozenset({"nasdaq"})
+    return frozenset({"nasdaq", "massive"})
+
+
 def _facts_for_evidence(
     facts: tuple[_Fact, ...], evidence: tuple[_Evidence, ...]
 ) -> tuple[_Fact, ...]:
@@ -670,6 +721,54 @@ def _current_decision_material(
     )
 
 
+def listing_authority_conflict_codes(
+    *,
+    case: Mapping[str, object],
+    evidence: Iterable[object],
+    facts: Iterable[object],
+) -> tuple[str, ...]:
+    """Return the one frozen blocker code for current listing conflicts."""
+
+    if _ticker(case.get("ticker")) is None:
+        return ()
+    all_evidence = _evidence_rows(evidence)
+    all_facts = _fact_rows(facts, all_evidence)
+    current_evidence, current_facts = _current_decision_material(
+        all_evidence,
+        all_facts,
+    )
+    tickers = {
+        component[1]
+        for row in current_evidence
+        for component in (_listing_component(row),)
+        if component is not None
+    }
+    if any(
+        _listing_conflicts(current_evidence, ticker)
+        for ticker in sorted(tickers)
+    ):
+        return ("listing_authority_conflict",)
+
+    identity_types = {
+        "source_ticker",
+        "successor_ticker",
+        "source_venue",
+        "destination_venue",
+        "issuer_cik",
+        "security_class",
+    }
+    for fact_type in sorted(identity_types):
+        regulator = _values(current_facts, fact_type, family="regulator")
+        listing = _values(current_facts, fact_type, family="listing_authority")
+        if (
+            regulator
+            and listing
+            and len({_canonical(value) for value in (*regulator, *listing)}) > 1
+        ):
+            return ("listing_authority_conflict",)
+    return ()
+
+
 def evaluate_automation_decision(
     *,
     case: Mapping[str, object],
@@ -681,8 +780,15 @@ def evaluate_automation_decision(
 ) -> AutomationDecision:
     """Evaluate cited facts without opening a database, provider, or model."""
 
-    all_evidence_rows = _evidence_rows(evidence)
-    all_fact_rows = _fact_rows(facts, all_evidence_rows)
+    raw_evidence = tuple(evidence)
+    raw_facts = tuple(facts)
+    listing_issues = listing_authority_conflict_codes(
+        case=case,
+        evidence=raw_evidence,
+        facts=raw_facts,
+    )
+    all_evidence_rows = _evidence_rows(raw_evidence)
+    all_fact_rows = _fact_rows(raw_facts, all_evidence_rows)
     evidence_rows, fact_rows = _current_decision_material(
         all_evidence_rows,
         all_fact_rows,
@@ -702,17 +808,6 @@ def evaluate_automation_decision(
         raise ValueError("current_date")
     sources = frozenset(str(value) for value in active_sources)
 
-    listing_tickers = {
-        component[1]
-        for row in evidence_rows
-        for component in (_listing_component(row),)
-        if component is not None
-    }
-    listing_issues = tuple(
-        issue
-        for ticker in sorted(listing_tickers)
-        for issue in _listing_conflicts(evidence_rows, ticker)
-    )
     if listing_issues:
         return _decision(
             decision_tier="review_suggested",
@@ -1201,4 +1296,6 @@ __all__ = [
     "RULE_VERSIONS",
     "AutomationDecision",
     "evaluate_automation_decision",
+    "listing_authority_conflict_codes",
+    "listing_authority_required_components",
 ]

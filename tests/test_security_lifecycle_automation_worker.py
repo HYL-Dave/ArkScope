@@ -7,6 +7,7 @@ import socket
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -1379,6 +1380,144 @@ def test_scheduler_blocker_strings_persist_through_fact_kernel_readback(
             (code, retryable)
         ]
         assert (run["retry_at"] is not None) is retryable
+    finally:
+        harness.conn.close()
+
+
+@pytest.mark.parametrize("conflict_kind", ("listing_state", "sec_listing_cik"))
+def test_real_listing_conflict_producer_matches_policy_and_persists_nonretryable(
+    tmp_path,
+    monkeypatch,
+    conflict_kind,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _case(1)
+    base = _bundle(case)
+    regulator, active_listing, _market = base.evidence
+    regulator_facts = tuple(
+        fact for fact in base.facts if fact.evidence_id == regulator.evidence_id
+    )
+    active_facts = tuple(
+        fact for fact in base.facts if fact.evidence_id == active_listing.evidence_id
+    )
+    listing_evidence = [active_listing]
+    listing_facts = list(active_facts)
+    if conflict_kind == "listing_state":
+        conflicting, conflicting_facts = _listing_evidence(
+            case,
+            label="nasdaq-inactive-conflict",
+            adapter="nasdaq_symbol_directory",
+            ticker=f"{case['ticker']}2",
+            expected_active_state=True,
+            market="stocks",
+            status="found",
+            directory="nasdaq_listed",
+            active=False,
+        )
+    else:
+        conflicting, conflicting_facts = _listing_evidence(
+            case,
+            label="massive-cik-conflict",
+            adapter="massive_reference",
+            ticker=f"{case['ticker']}2",
+            expected_active_state=True,
+            market="stocks",
+            status="found",
+            active=True,
+            fact_values={
+                "destination_venue": "NASDAQ",
+                "issuer_cik": "0000000999",
+                "security_class": "common_stock",
+                "successor_ticker": f"{case['ticker']}2",
+            },
+        )
+    listing_evidence.append(conflicting)
+    listing_facts.extend(conflicting_facts)
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(regulator,),
+            facts=regulator_facts,
+            blockers=(),
+            source_deadlines=(),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(evidence=(), blockers=(), requests_made=0),
+            (),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_pending_event_monitoring",
+        lambda *_args, **_kwargs: None,
+    )
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at=_AT,
+        listing_session=SimpleNamespace(
+            lookup=lambda **_kwargs: SimpleNamespace(
+                evidence=tuple(listing_evidence),
+                facts=tuple(listing_facts),
+                blockers=(),
+                diagnostics={},
+            )
+        ),
+    )
+
+    assert [(row.code, row.retryable) for row in bundle.blockers] == [
+        ("listing_authority_conflict", False)
+    ]
+    decision = evaluate_automation_decision(
+        case={
+            **case["observation"],
+            "case_id": case["case_id"],
+            "ticker": case["ticker"],
+            "event_kinds": ("listing_status_review",),
+        },
+        evidence=bundle.evidence,
+        facts=bundle.facts,
+        current_date="2026-08-25",
+        active_sources=("manual_lists",),
+        transition_preview=lambda _request: {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": "symbol_continuation",
+        },
+    )
+    assert decision.decision_issues == ("listing_authority_conflict",)
+
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = bundle
+    try:
+        result = harness.worker().run()
+        persisted = _store(harness).list_automation_runs(case["case_id"])[0]
+        assert result["blocked"] == 1
+        expected_blockers = [("listing_authority_conflict", False)]
+        if conflict_kind == "sec_listing_cik":
+            expected_blockers.append(("source_conflict", False))
+        assert [
+            (row["blocker_code"], bool(row["retryable"]))
+            for row in persisted["blockers"]
+        ] == expected_blockers
     finally:
         harness.conn.close()
 

@@ -360,9 +360,13 @@ class LifecycleAutomationWorker:
                 all_facts = (*existing_facts, *bundle.facts)
                 blockers = bundle.blockers
                 blocker_codes = {_blocker_code(value) for value in blockers}
+                policy_blocker_codes = {
+                    "listing_authority_conflict",
+                    "source_conflict",
+                }
 
                 decision: AutomationDecision | None = None
-                if not blockers or "source_conflict" in blocker_codes:
+                if not blockers or blocker_codes.intersection(policy_blocker_codes):
                     phase = "evaluate"
                     decision = self._evaluate(
                         case=case,
@@ -385,7 +389,7 @@ class LifecycleAutomationWorker:
                             sources=sources,
                         )
 
-                if blockers and "source_conflict" not in blocker_codes:
+                if blockers and not blocker_codes.intersection(policy_blocker_codes):
                     phase = "persist"
                     kernel.complete_run(
                         run_id=run_id,
@@ -411,7 +415,7 @@ class LifecycleAutomationWorker:
                     action_readiness=decision.action_readiness,
                     retry_at=(
                         None
-                        if "source_conflict" in blocker_codes
+                        if blocker_codes.intersection(policy_blocker_codes)
                         else bundle.retry_at
                     ),
                     diagnostics=bundle.diagnostics,

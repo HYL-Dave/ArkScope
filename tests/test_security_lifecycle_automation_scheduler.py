@@ -33,6 +33,44 @@ def _summary(**overrides):
     return result
 
 
+def _authority_evidence(
+    evidence_id,
+    *,
+    adapter,
+    ticker,
+    market,
+    listing_status,
+    expected_active=True,
+    directory=None,
+    delisted_utc=None,
+):
+    locator = {
+        "locator_kind": "listing_directory_snapshot",
+        "adapter": adapter,
+        "candidate_ticker": ticker,
+        "expected_active_state": expected_active,
+        "market": market,
+        "listing_status": listing_status,
+        "directory": directory,
+    }
+    if delisted_utc is not None:
+        locator["delisted_utc"] = delisted_utc
+    return SimpleNamespace(
+        evidence_id=evidence_id,
+        source_family="listing_authority",
+        source_locator=locator,
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+
+
+def _authority_fact(evidence_id, fact_type, value):
+    return SimpleNamespace(
+        evidence_id=evidence_id,
+        fact_type=fact_type,
+        normalized_value=value,
+    )
+
+
 def test_scheduler_runs_bounded_worker_batch_and_returns_sanitized_summary(
     monkeypatch,
 ):
@@ -424,6 +462,122 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
     )
 
 
+def test_listing_transport_constructor_failure_is_bounded_and_sanitized(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def __init__(self):
+            raise RuntimeError("private constructor detail")
+
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport)
+    monkeypatch.setattr(
+        scheduler,
+        "_worker",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("worker must not run")
+        ),
+    )
+
+    result = scheduler.run_security_lifecycle_automation(now=_NOW)
+
+    assert result == _summary(
+        status="unavailable",
+        reason="automation_scheduler_failed",
+    )
+    assert "private constructor detail" not in json.dumps(result)
+
+
+def test_listing_session_constructor_failure_closes_constructed_transport(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+
+    class Transport:
+        def __init__(self):
+            events.append("transport")
+
+        def close(self):
+            events.append("transport_closed")
+
+    class Budget:
+        @classmethod
+        def lifecycle(cls):
+            events.append("budget")
+            return cls()
+
+    class Session:
+        def __init__(self, **_kwargs):
+            events.append("session")
+            raise RuntimeError("private session detail")
+
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport)
+    monkeypatch.setattr(scheduler, "ListingRequestBudget", Budget)
+    monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session)
+
+    result = scheduler.run_security_lifecycle_automation(now=_NOW)
+
+    assert result == _summary(
+        status="unavailable",
+        reason="automation_scheduler_failed",
+    )
+    assert events == ["transport", "budget", "session", "transport_closed"]
+    assert "private session detail" not in json.dumps(result)
+
+
+def test_listing_session_close_failure_overrides_success_with_sanitized_failure(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+
+    class Transport:
+        def close(self):
+            events.append("transport_closed")
+
+    class Budget:
+        @classmethod
+        def lifecycle(cls):
+            return cls()
+
+    class Session:
+        def __init__(self, *, transport, **_kwargs):
+            self.transport = transport
+
+        def close(self):
+            events.append("session_close")
+            raise RuntimeError("private close detail")
+
+    class Worker:
+        def run(self, limit, mode):
+            del limit, mode
+            events.append("worker")
+            return _summary(
+                selected=1,
+                processed=1,
+                drafted=1,
+                case_ids=["slc_a"],
+            )
+
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport)
+    monkeypatch.setattr(scheduler, "ListingRequestBudget", Budget)
+    monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session)
+    monkeypatch.setattr(scheduler, "_worker", lambda **_kwargs: Worker())
+
+    result = scheduler.run_security_lifecycle_automation(now=_NOW)
+
+    assert result == _summary(
+        status="unavailable",
+        reason="automation_scheduler_failed",
+    )
+    assert events == ["worker", "session_close", "transport_closed"]
+    assert "private close detail" not in json.dumps(result)
+
+
 def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
     from src.security_lifecycle_automation_worker import LifecycleAutomationEvidenceBundle
     from src.service import security_lifecycle_automation_scheduler as scheduler
@@ -642,17 +796,31 @@ def test_listing_requiredness_and_ibkr_blocking_are_component_specific(
         def close(self):
             pass
 
+    sec_evidence = (
+        SimpleNamespace(
+            evidence_id="sec-components",
+            source_family="regulator",
+            source_locator={},
+            retrieved_at="2026-08-26T00:00:00Z",
+        ),
+    )
     sec_facts = (
         (
             SimpleNamespace(
+                evidence_id="sec-components",
                 fact_type="tracked_security_effect",
                 value="terminal_delisting",
             ),
         )
         if terminal
         else (
-            SimpleNamespace(fact_type="successor_ticker", value="NEXT"),
             SimpleNamespace(
+                evidence_id="sec-components",
+                fact_type="successor_ticker",
+                value="NEXT",
+            ),
+            SimpleNamespace(
+                evidence_id="sec-components",
                 fact_type="tracked_security_effect",
                 value="symbol_change",
             ),
@@ -663,7 +831,10 @@ def test_listing_requiredness_and_ibkr_blocking_are_component_specific(
         security_lifecycle_sec_evidence,
         "collect_sec_evidence",
         lambda **_kwargs: SimpleNamespace(
-            evidence=(), facts=sec_facts, blockers=(), source_deadlines=()
+            evidence=sec_evidence,
+            facts=sec_facts,
+            blockers=(),
+            source_deadlines=(),
         ),
     )
     listing_calls = []
@@ -719,6 +890,230 @@ def test_listing_requiredness_and_ibkr_blocking_are_component_specific(
         bundle.diagnostics["ibkr_missing"],
         bundle.diagnostics["ibkr_conflict"],
     ) == ibkr_diagnostics
+
+
+@pytest.mark.parametrize(
+    ("scenario", "listing_codes", "expected_codes", "expected_state"),
+    [
+        (
+            "massive_otc",
+            ("listing_directory_unavailable",),
+            (),
+            "available",
+        ),
+        (
+            "nms_missing",
+            ("listing_directory_unavailable",),
+            ("listing_directory_unavailable",),
+            "unavailable",
+        ),
+        (
+            "terminal_nasdaq_missing",
+            ("listing_directory_stale",),
+            ("listing_directory_stale",),
+            "unavailable",
+        ),
+        (
+            "terminal_massive_missing",
+            ("massive_reference_unavailable",),
+            ("massive_reference_unavailable",),
+            "unavailable",
+        ),
+        (
+            "nms_massive_optional",
+            ("massive_credential_missing",),
+            (),
+            "available",
+        ),
+    ],
+)
+def test_listing_component_requiredness_filters_before_state_and_blockers(
+    monkeypatch,
+    scenario,
+    listing_codes,
+    expected_codes,
+    expected_state,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec = SimpleNamespace(
+        evidence_id="sec-requiredness",
+        source_family="regulator",
+        source_locator={},
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+    sec_facts = [
+        _authority_fact("sec-requiredness", "source_ticker", "OLD"),
+        _authority_fact("sec-requiredness", "issuer_cik", "0000000001"),
+        _authority_fact("sec-requiredness", "security_class", "common_stock"),
+    ]
+    listing_evidence = []
+    listing_facts = []
+    if scenario.startswith("terminal_"):
+        sec.source_locator = {"filing_chain_complete": True}
+        sec_facts.extend(
+            (
+                _authority_fact(
+                    "sec-requiredness",
+                    "tracked_security_effect",
+                    "terminal_delisting",
+                ),
+                _authority_fact("sec-requiredness", "effective_date", "2026-08-25"),
+            )
+        )
+        if scenario == "terminal_nasdaq_missing":
+            massive = _authority_evidence(
+                "massive-inactive",
+                adapter="massive_reference",
+                ticker="OLD",
+                market="stocks",
+                listing_status="inactive",
+                expected_active=False,
+                delisted_utc="2026-08-25T00:00:00Z",
+            )
+            listing_evidence.append(massive)
+            listing_facts.append(
+                _authority_fact("massive-inactive", "source_ticker", "OLD")
+            )
+        else:
+            listing_evidence.extend(
+                (
+                    _authority_evidence(
+                        "nasdaq-listed-missing",
+                        adapter="nasdaq_symbol_directory",
+                        ticker="OLD",
+                        market="stocks",
+                        listing_status="not_found",
+                        directory="nasdaq_listed",
+                    ),
+                    _authority_evidence(
+                        "other-listed-missing",
+                        adapter="nasdaq_symbol_directory",
+                        ticker="OLD",
+                        market="stocks",
+                        listing_status="not_found",
+                        directory="other_listed",
+                    ),
+                )
+            )
+    else:
+        sec_facts.extend(
+            (
+                _authority_fact("sec-requiredness", "successor_ticker", "NEXT"),
+                _authority_fact(
+                    "sec-requiredness", "tracked_security_effect", "symbol_change"
+                ),
+            )
+        )
+        if scenario != "massive_otc":
+            sec_facts.append(
+                _authority_fact(
+                    "sec-requiredness", "destination_venue", "NASDAQ"
+                )
+            )
+        if scenario in {"massive_otc", "nms_massive_optional"}:
+            adapter = (
+                "massive_reference"
+                if scenario == "massive_otc"
+                else "nasdaq_symbol_directory"
+            )
+            market = "otc" if scenario == "massive_otc" else "stocks"
+            venue = "OTC" if scenario == "massive_otc" else "NASDAQ"
+            listing = _authority_evidence(
+                f"{adapter}-active",
+                adapter=adapter,
+                ticker="NEXT",
+                market=market,
+                listing_status="active",
+                directory=(
+                    "nasdaq_listed" if adapter == "nasdaq_symbol_directory" else None
+                ),
+            )
+            listing_evidence.append(listing)
+            listing_facts.extend(
+                (
+                    _authority_fact(listing.evidence_id, "successor_ticker", "NEXT"),
+                    _authority_fact(listing.evidence_id, "destination_venue", venue),
+                    _authority_fact(
+                        listing.evidence_id,
+                        "security_class",
+                        "common_stock",
+                    ),
+                )
+            )
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(sec,),
+            facts=tuple(sec_facts),
+            blockers=(),
+            source_deadlines=(),
+        ),
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=tuple(listing_evidence),
+            facts=tuple(listing_facts),
+            blockers=listing_codes,
+            diagnostics={},
+        )
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(evidence=(), blockers=(), requests_made=0),
+            (),
+        ),
+    )
+    states = []
+    monkeypatch.setattr(
+        scheduler,
+        "_pending_event_monitoring",
+        lambda *_args, source_family_results, **_kwargs: (
+            states.append(source_family_results["listing_authority"]) or None
+        ),
+    )
+    case = {
+        "case_id": f"slc_{scenario}",
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Requiredness Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "kinds": [
+                {"event_type": "acquisition_completed", "effective_date": None}
+            ],
+        },
+    }
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-26T00:00:00Z",
+        listing_session=listing_session,
+    )
+
+    assert tuple(row.code for row in bundle.blockers) == expected_codes
+    assert states == [expected_state]
 
 
 def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():

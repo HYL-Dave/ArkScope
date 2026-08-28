@@ -17,6 +17,10 @@ from src.security_lifecycle_automation_worker import (
     LifecycleAutomationEvidenceBundle,
     LifecycleAutomationWorker,
 )
+from src.security_lifecycle_decision_policy import (
+    listing_authority_conflict_codes,
+    listing_authority_required_components,
+)
 from src.security_lifecycle_fact_kernel import AutomationBlocker
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
@@ -77,6 +81,21 @@ _RETRYABLE_BLOCKERS = frozenset(
         "massive_rate_limited",
         "massive_reference_unavailable",
         "listing_status_unresolved",
+    }
+)
+_NASDAQ_LISTING_BLOCKERS = frozenset(
+    {
+        "listing_directory_unavailable",
+        "listing_directory_stale",
+        "listing_directory_schema_mismatch",
+    }
+)
+_MASSIVE_LISTING_BLOCKERS = frozenset(
+    {
+        "massive_credential_missing",
+        "massive_access_denied",
+        "massive_rate_limited",
+        "massive_reference_unavailable",
     }
 )
 _IDENTITY_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
@@ -785,6 +804,24 @@ def _provider_state(codes: tuple[str, ...], *, family: str) -> str:
     return "available"
 
 
+def _required_listing_codes(
+    codes: tuple[str, ...],
+    *,
+    required_components: frozenset[str],
+) -> tuple[str, ...]:
+    return tuple(
+        code
+        for code in codes
+        if not (
+            (code in _NASDAQ_LISTING_BLOCKERS and "nasdaq" not in required_components)
+            or (
+                code in _MASSIVE_LISTING_BLOCKERS
+                and "massive" not in required_components
+            )
+        )
+    )
+
+
 def _load_evidence(
     case: Mapping[str, object],
     *,
@@ -846,9 +883,22 @@ def _load_evidence(
         candidate_tickers=candidate_tickers,
         require_explicit_inactive=terminal,
     )
-    listing_codes = tuple(str(code) for code in listing.blockers)
     evidence.extend(listing.evidence)
     facts.extend(listing.facts)
+    required_listing_components = listing_authority_required_components(
+        case=case,
+        regulator_facts=sec.facts,
+        listing_evidence=listing.evidence,
+    )
+    listing_codes = _required_listing_codes(
+        tuple(str(code) for code in listing.blockers)
+        + listing_authority_conflict_codes(
+            case=case,
+            evidence=evidence,
+            facts=facts,
+        ),
+        required_components=required_listing_components,
+    )
     codes.extend(listing_codes)
     diagnostics.update(listing.diagnostics)
     pending_kinds = _event_kinds(case).intersection(
@@ -1028,15 +1078,35 @@ def run_security_lifecycle_automation(
         raise ValueError("limit")
     instant = _aware_instant(now)
     at = _timestamp(instant)
-    transport = ListingAuthorityTransport()
-    budget = ListingRequestBudget.lifecycle()
-    session = ListingAuthoritySession(
-        transport=transport,
-        budget=budget,
-        retrieved_at=at,
-        massive_api_key=os.getenv("POLYGON_API_KEY"),
-    )
+    transport: ListingAuthorityTransport | None = None
+    session: ListingAuthoritySession | None = None
     try:
+        transport = ListingAuthorityTransport()
+        budget = ListingRequestBudget.lifecycle()
+        session = ListingAuthoritySession(
+            transport=transport,
+            budget=budget,
+            retrieved_at=at,
+            massive_api_key=os.getenv("POLYGON_API_KEY"),
+        )
+    except Exception as exc:
+        if transport is not None:
+            try:
+                transport.close()
+            except Exception as close_exc:
+                logger.warning(
+                    "security lifecycle listing cleanup failed code=%s",
+                    type(close_exc).__name__,
+                )
+        logger.warning(
+            "security lifecycle listing construction failed code=%s",
+            type(exc).__name__,
+        )
+        return security_lifecycle_automation_failure("automation_scheduler_failed")
+
+    try:
+        assert session is not None
+        assert transport is not None
         worker = _worker(
             evidence_loader=lambda case, *, mode, at: _load_evidence(
                 case,
@@ -1046,9 +1116,9 @@ def run_security_lifecycle_automation(
             ),
             clock=lambda: at,
         )
-        return _bounded_result(worker.run(limit=limit, mode="live"))
+        result = _bounded_result(worker.run(limit=limit, mode="live"))
     except LifecycleAutomationNotInstalled:
-        return _empty_summary(
+        result = _empty_summary(
             status="not_installed",
             reason="automation_schema_absent",
         )
@@ -1058,19 +1128,34 @@ def run_security_lifecycle_automation(
             if exc.store == "market"
             else "profile_store_unavailable"
         )
-        return security_lifecycle_automation_failure(reason)
+        result = security_lifecycle_automation_failure(reason)
     except (LifecycleSchemaMismatch, LifecycleWritesUnavailable):
-        return security_lifecycle_automation_failure("profile_schema_mismatch")
+        result = security_lifecycle_automation_failure("profile_schema_mismatch")
     except (OSError, sqlite3.Error):
-        return security_lifecycle_automation_failure("profile_store_unavailable")
+        result = security_lifecycle_automation_failure("profile_store_unavailable")
     except Exception as exc:
         logger.warning(
             "security lifecycle automation tick failed code=%s",
             type(exc).__name__,
         )
-        return security_lifecycle_automation_failure("automation_scheduler_failed")
-    finally:
+        result = security_lifecycle_automation_failure("automation_scheduler_failed")
+
+    try:
         session.close()
+    except Exception as exc:
+        logger.warning(
+            "security lifecycle listing cleanup failed code=%s",
+            type(exc).__name__,
+        )
+        try:
+            transport.close()
+        except Exception as close_exc:
+            logger.warning(
+                "security lifecycle listing transport cleanup failed code=%s",
+                type(close_exc).__name__,
+            )
+        return security_lifecycle_automation_failure("automation_scheduler_failed")
+    return result
 
 
 def _job_runs_connection() -> sqlite3.Connection | None:
