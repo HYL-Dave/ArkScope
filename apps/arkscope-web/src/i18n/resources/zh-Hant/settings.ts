@@ -504,7 +504,7 @@ const settings = {
     },
     providers: {
       names: {
-        polygon: "Polygon",
+        polygon: "Massive (Polygon)",
         finnhub: "Finnhub",
         fred: "FRED",
         financialDatasets: "Financial Datasets（付費）",

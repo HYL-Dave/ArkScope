@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote, quote_plus
 
 logger = logging.getLogger(__name__)
 
@@ -503,14 +504,34 @@ def require_provider_configured(
 _TEST_TIMEOUT_S = 8
 
 
+def _redact_probe_detail(
+    detail: str,
+    params: Optional[dict],
+    redact_query_keys: set[str],
+) -> str:
+    if not params or not redact_query_keys:
+        return detail
+    for key in redact_query_keys:
+        value = params.get(key)
+        if value is None:
+            continue
+        raw = str(value)
+        for encoded in {raw, quote(raw, safe=""), quote_plus(raw, safe="")}:
+            detail = detail.replace(encoded, "[redacted]")
+    return detail
+
+
 def _http_probe(url: str, *, headers: Optional[dict] = None,
+                params: Optional[dict] = None,
+                redact_query_keys: Optional[set[str]] = None,
                 ok_statuses: tuple = (200,),
                 auth_hint: str = "金鑰無效或無權限") -> Dict[str, Any]:
     import requests
 
+    redact_query_keys = redact_query_keys or set()
     t0 = time.monotonic()
     try:
-        resp = requests.get(url, headers=headers, timeout=_TEST_TIMEOUT_S)
+        resp = requests.get(url, headers=headers, params=params, timeout=_TEST_TIMEOUT_S)
         ms = int((time.monotonic() - t0) * 1000)
         if resp.status_code in ok_statuses:
             return {"ok": True, "latency_ms": ms, "detail": f"HTTP {resp.status_code}"}
@@ -518,8 +539,12 @@ def _http_probe(url: str, *, headers: Optional[dict] = None,
             return {"ok": False, "latency_ms": ms,
                     "detail": f"HTTP {resp.status_code} — {auth_hint}"}
         return {"ok": False, "latency_ms": ms, "detail": f"HTTP {resp.status_code}"}
-    except Exception as e:  # noqa: BLE001 — surfaced verbatim to the UI
-        return {"ok": False, "latency_ms": None, "detail": str(e)[:200]}
+    except Exception as e:  # noqa: BLE001 - surfaced to the UI after secret redaction
+        return {
+            "ok": False,
+            "latency_ms": None,
+            "detail": _redact_probe_detail(str(e), params, redact_query_keys)[:200],
+        }
 
 
 def run_connection_test(provider: str) -> Dict[str, Any]:
@@ -545,7 +570,10 @@ def run_connection_test(provider: str) -> Dict[str, Any]:
         if not key:
             return {"ok": False, "latency_ms": None, "detail": "缺 API key"}
         return _http_probe(
-            f"https://api.polygon.io/v3/reference/tickers?limit=1&apiKey={key}")
+            "https://api.massive.com/v3/reference/tickers?limit=1",
+            params={"apiKey": key},
+            redact_query_keys={"apiKey"},
+        )
 
     if provider == "finnhub":
         key = os.getenv("FINNHUB_API_KEY")

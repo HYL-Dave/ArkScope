@@ -63,6 +63,13 @@ def test_store_rejects_unknown_field(store):
         store.set_field("nope", "api_key", "x")
 
 
+def test_massive_reuses_the_polygon_credential_authority():
+    assert [(f.field, f.env_var) for f in dpc.PROVIDER_FIELDS["polygon"]] == [
+        ("api_key", "POLYGON_API_KEY")
+    ]
+    assert "massive" not in dpc.PROVIDER_FIELDS
+
+
 # --- env bridge --------------------------------------------------------------------
 
 def test_provider_env_fallback_defaults_strict(store, monkeypatch):
@@ -372,13 +379,54 @@ def test_key_provider_test_paths(monkeypatch):
     class _Resp:
         status_code = 200
 
-    monkeypatch.setattr("requests.get", lambda url, headers=None, timeout=None: _Resp())
+    monkeypatch.setattr(
+        "requests.get",
+        lambda url, headers=None, params=None, timeout=None: _Resp(),
+    )
     out = dpc.run_connection_test("polygon")
     assert out["ok"] is True and out["latency_ms"] is not None
 
     _Resp.status_code = 401
     out = dpc.run_connection_test("polygon")
     assert out["ok"] is False and "金鑰" in out["detail"]
+
+
+def test_massive_connection_test_uses_polygon_key_as_redacted_request_params(monkeypatch):
+    key = "massive-test-key"
+    monkeypatch.setenv("POLYGON_API_KEY", key)
+    observed: dict[str, object] = {}
+
+    def fake_probe(url, **kwargs):
+        observed["url"] = url
+        observed.update(kwargs)
+        return {"ok": True, "latency_ms": 1, "detail": "HTTP 200"}
+
+    monkeypatch.setattr(dpc, "_http_probe", fake_probe)
+
+    result = dpc.run_connection_test("polygon")
+
+    assert observed["url"] == "https://api.massive.com/v3/reference/tickers?limit=1"
+    assert observed["params"] == {"apiKey": key}
+    assert observed["redact_query_keys"] == {"apiKey"}
+    assert key not in str((observed["url"], result))
+
+
+def test_http_probe_redacts_massive_key_from_request_errors(monkeypatch):
+    key = "massive-secret-value"
+
+    def fail_request(url, *, headers=None, params=None, timeout=None):
+        raise RuntimeError(f"request failed for {url}?apiKey={params['apiKey']}")
+
+    monkeypatch.setattr("requests.get", fail_request)
+
+    result = dpc._http_probe(
+        "https://api.massive.com/v3/reference/tickers?limit=1",
+        params={"apiKey": key},
+        redact_query_keys={"apiKey"},
+    )
+
+    assert result["ok"] is False
+    assert key not in str(result)
 
 
 def test_paid_and_extension_have_no_live_test():

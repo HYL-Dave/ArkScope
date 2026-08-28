@@ -828,6 +828,33 @@ describe("Settings provider config authority", () => {
     }
   });
 
+  it("renders Massive (Polygon) as one Polygon credential and saves the original payload", async () => {
+    await renderDataSources();
+
+    const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
+      row.textContent?.includes("Massive (Polygon)") && row.textContent.includes("API key"));
+    if (!polygonRow) throw new Error("missing Massive (Polygon) config row");
+    const secretInputs = polygonRow.querySelectorAll('input[type="password"]');
+    expect(secretInputs).toHaveLength(1);
+
+    await act(async () => {
+      setInputValue(secretInputs[0] as HTMLInputElement, "massive-test-key");
+    });
+    const save = Array.from(polygonRow.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存");
+    if (!save) throw new Error("missing Massive credential save button");
+    await act(async () => {
+      save.click();
+      await Promise.resolve();
+    });
+
+    expect(mocked.putCalls).toEqual([{
+      provider: "polygon",
+      fields: { api_key: "massive-test-key" },
+      confirmGuarded: undefined,
+    }]);
+  });
+
   it("confirms guarded IBKR client id edits", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     await renderDataSources();
@@ -1586,7 +1613,7 @@ describe("Settings provider config authority", () => {
       await Promise.resolve();
     });
 
-    expect(host!.textContent).toContain("Polygon 連線測試失敗。");
+    expect(host!.textContent).toContain("Massive (Polygon) 連線測試失敗。");
     expect(host!.textContent).toContain("Provider 設定需要修復。");
     for (const raw of [
       mocked.providerHealthDetail,
