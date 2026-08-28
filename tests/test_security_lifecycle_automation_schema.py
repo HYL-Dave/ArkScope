@@ -9,6 +9,42 @@ _AT = "2026-08-25T00:00:00Z"
 _HEX_A = "a" * 64
 _HEX_B = "b" * 64
 _HEX_C = "c" * 64
+_V2_AUTOMATION_BLOCKER_CODES = frozenset(
+    {
+        "sec_identity_unconfigured",
+        "sec_governor_unavailable",
+        "sec_request_budget_exhausted",
+        "sec_rate_limited",
+        "sec_access_denied",
+        "sec_transport_unavailable",
+        "sec_document_unavailable",
+        "sec_evidence_insufficient",
+        "internal_news_unavailable",
+        "internal_news_schema_mismatch",
+        "ibkr_gateway_unavailable",
+        "ibkr_contract_missing",
+        "ibkr_contract_ambiguous",
+        "ibkr_entitlement_denied",
+        "market_confirmation_missing",
+        "source_conflict",
+        "impact_context_requested",
+        "transition_approval_changed",
+        "transition_approval_unavailable",
+    }
+)
+_V3_LISTING_BLOCKER_CODES = frozenset(
+    {
+        "listing_directory_unavailable",
+        "listing_directory_schema_mismatch",
+        "listing_directory_stale",
+        "listing_status_unresolved",
+        "listing_authority_conflict",
+        "massive_credential_missing",
+        "massive_access_denied",
+        "massive_rate_limited",
+        "massive_reference_unavailable",
+    }
+)
 
 
 def _tables(conn: sqlite3.Connection, prefix: str) -> set[str]:
@@ -294,28 +330,8 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "tracked_security_effect",
         }
     )
-    assert getattr(schema, "AUTOMATION_BLOCKER_CODES", None) == frozenset(
-        {
-            "sec_identity_unconfigured",
-            "sec_governor_unavailable",
-            "sec_request_budget_exhausted",
-            "sec_rate_limited",
-            "sec_access_denied",
-            "sec_transport_unavailable",
-            "sec_document_unavailable",
-            "sec_evidence_insufficient",
-            "internal_news_unavailable",
-            "internal_news_schema_mismatch",
-            "ibkr_gateway_unavailable",
-            "ibkr_contract_missing",
-            "ibkr_contract_ambiguous",
-            "ibkr_entitlement_denied",
-            "market_confirmation_missing",
-            "source_conflict",
-            "impact_context_requested",
-            "transition_approval_changed",
-            "transition_approval_unavailable",
-        }
+    assert getattr(schema, "AUTOMATION_BLOCKER_CODES", None) == (
+        _V2_AUTOMATION_BLOCKER_CODES | _V3_LISTING_BLOCKER_CODES
     )
     assert getattr(schema, "FACT_SCALAR_TYPES", None) == frozenset(
         getattr(schema, "FACT_TYPES") - {"transaction_structure"}
@@ -448,6 +464,7 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
     from src.security_lifecycle_schema import (
         PROFILE_INDEX_SQL,
         PROFILE_TABLE_SQL,
+        V2_AUTOMATION_BLOCKER_CODES,
         V2_EVIDENCE_ADAPTERS,
         V2_EVIDENCE_KINDS,
         V2_EVIDENCE_SOURCE_FAMILIES,
@@ -458,6 +475,7 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
     )
 
     assert V2_PROFILE_INDEX_SQL == PROFILE_INDEX_SQL
+    assert V2_AUTOMATION_BLOCKER_CODES == _V2_AUTOMATION_BLOCKER_CODES
     assert V2_EVIDENCE_SOURCE_FAMILIES == frozenset(
         {"regulator", "market_infrastructure", "publisher", "general_web", "manual"}
     )
@@ -478,11 +496,19 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
     assert {
         name: sql
         for name, sql in V2_PROFILE_TABLE_SQL.items()
-        if name != "security_lifecycle_evidence"
+        if name
+        not in {
+            "security_lifecycle_automation_run_blockers",
+            "security_lifecycle_evidence",
+        }
     } == {
         name: sql
         for name, sql in PROFILE_TABLE_SQL.items()
-        if name != "security_lifecycle_evidence"
+        if name
+        not in {
+            "security_lifecycle_automation_run_blockers",
+            "security_lifecycle_evidence",
+        }
     }
 
     conn = sqlite3.connect(":memory:")
@@ -500,6 +526,19 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
 
         _insert_case(conn)
         _insert_automation_run(conn)
+        blocker_sql = _schema_sql(
+            conn, "security_lifecycle_automation_run_blockers"
+        )
+        for code in _V2_AUTOMATION_BLOCKER_CODES:
+            assert f"'{code}'" in blocker_sql
+        for code in _V3_LISTING_BLOCKER_CODES:
+            assert f"'{code}'" not in blocker_sql
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    "INSERT INTO security_lifecycle_automation_run_blockers "
+                    "VALUES (?,?,?,?,?)",
+                    ("sla_run", code, 1, "{}", _AT),
+                )
         with pytest.raises(sqlite3.IntegrityError):
             _insert_evidence(
                 conn,
@@ -511,6 +550,37 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
                 source_document_sha256=_HEX_C,
                 source_locator_json='{"candidate_ticker":"OLD"}',
             )
+    finally:
+        conn.close()
+
+
+def test_v3_schema_accepts_listing_blockers_and_retains_every_v2_code():
+    from src.security_lifecycle_schema import (
+        AUTOMATION_BLOCKER_CODES,
+        create_profile_schema,
+    )
+
+    assert AUTOMATION_BLOCKER_CODES == (
+        _V2_AUTOMATION_BLOCKER_CODES | _V3_LISTING_BLOCKER_CODES
+    )
+    conn = sqlite3.connect(":memory:")
+    try:
+        create_profile_schema(conn)
+        _insert_case(conn)
+        _insert_automation_run(conn)
+        blocker_sql = _schema_sql(
+            conn, "security_lifecycle_automation_run_blockers"
+        )
+        for code in AUTOMATION_BLOCKER_CODES:
+            assert f"'{code}'" in blocker_sql
+            conn.execute(
+                "INSERT INTO security_lifecycle_automation_run_blockers "
+                "VALUES (?,?,?,?,?)",
+                ("sla_run", code, 1, "{}", _AT),
+            )
+        assert conn.execute(
+            "SELECT COUNT(*) FROM security_lifecycle_automation_run_blockers"
+        ).fetchone()[0] == len(AUTOMATION_BLOCKER_CODES)
     finally:
         conn.close()
 

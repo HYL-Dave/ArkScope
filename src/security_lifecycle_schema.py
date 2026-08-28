@@ -638,10 +638,22 @@ PROFILE_INDEX_SQL = {
 # migrations, scratch verification, and rollback checks.
 V2_PROFILE_TABLE_SQL = dict(PROFILE_TABLE_SQL)
 V2_PROFILE_INDEX_SQL = dict(PROFILE_INDEX_SQL)
+V2_AUTOMATION_BLOCKER_CODES = AUTOMATION_BLOCKER_CODES
 V2_EVIDENCE_SOURCE_FAMILIES = EVIDENCE_SOURCE_FAMILIES
 V2_EVIDENCE_ADAPTERS = EVIDENCE_ADAPTERS
 V2_EVIDENCE_KINDS = EVIDENCE_KINDS
 
+AUTOMATION_BLOCKER_CODES = V2_AUTOMATION_BLOCKER_CODES | {
+    "listing_directory_unavailable",
+    "listing_directory_schema_mismatch",
+    "listing_directory_stale",
+    "listing_status_unresolved",
+    "listing_authority_conflict",
+    "massive_credential_missing",
+    "massive_access_denied",
+    "massive_rate_limited",
+    "massive_reference_unavailable",
+}
 EVIDENCE_SOURCE_FAMILIES = V2_EVIDENCE_SOURCE_FAMILIES | {"listing_authority"}
 EVIDENCE_ADAPTERS = V2_EVIDENCE_ADAPTERS | {
     "nasdaq_symbol_directory",
@@ -651,6 +663,16 @@ EVIDENCE_KINDS = V2_EVIDENCE_KINDS | {"listing_directory_snapshot"}
 
 PROFILE_TABLE_SQL = {
     **V2_PROFILE_TABLE_SQL,
+    "security_lifecycle_automation_run_blockers": f"""
+        CREATE TABLE security_lifecycle_automation_run_blockers (
+            automation_run_id TEXT NOT NULL REFERENCES security_lifecycle_automation_runs(run_id) ON DELETE CASCADE,
+            blocker_code TEXT NOT NULL CHECK (blocker_code IN ({_quoted(AUTOMATION_BLOCKER_CODES)})),
+            retryable INTEGER NOT NULL CHECK (retryable IN (0, 1)),
+            context_json TEXT NOT NULL CHECK (length(context_json) BETWEEN 2 AND 4096),
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(automation_run_id, blocker_code)
+        )
+    """,
     "security_lifecycle_evidence": f"""
         CREATE TABLE security_lifecycle_evidence (
             evidence_id TEXT PRIMARY KEY,

@@ -15,6 +15,42 @@ _HEX_A = "a" * 64
 _HEX_B = "b" * 64
 _HEX_C = "c" * 64
 _HEX_D = "d" * 64
+_V2_AUTOMATION_BLOCKER_CODES = frozenset(
+    {
+        "sec_identity_unconfigured",
+        "sec_governor_unavailable",
+        "sec_request_budget_exhausted",
+        "sec_rate_limited",
+        "sec_access_denied",
+        "sec_transport_unavailable",
+        "sec_document_unavailable",
+        "sec_evidence_insufficient",
+        "internal_news_unavailable",
+        "internal_news_schema_mismatch",
+        "ibkr_gateway_unavailable",
+        "ibkr_contract_missing",
+        "ibkr_contract_ambiguous",
+        "ibkr_entitlement_denied",
+        "market_confirmation_missing",
+        "source_conflict",
+        "impact_context_requested",
+        "transition_approval_changed",
+        "transition_approval_unavailable",
+    }
+)
+_V3_LISTING_BLOCKER_CODES = frozenset(
+    {
+        "listing_directory_unavailable",
+        "listing_directory_schema_mismatch",
+        "listing_directory_stale",
+        "listing_status_unresolved",
+        "listing_authority_conflict",
+        "massive_credential_missing",
+        "massive_access_denied",
+        "massive_rate_limited",
+        "massive_reference_unavailable",
+    }
+)
 
 
 def _sha(value: str) -> str:
@@ -121,9 +157,12 @@ def _seeded_v2_profile(tmp_path: Path, name: str = "profile.db") -> Path:
                 _AT,
             ),
         )
-        conn.execute(
+        conn.executemany(
             "INSERT INTO security_lifecycle_automation_run_blockers VALUES (?,?,?,?,?)",
-            ("slar_blocked", "sec_rate_limited", 1, "{}", _AT),
+            [
+                ("slar_blocked", code, 1, "{}", _AT)
+                for code in sorted(_V2_AUTOMATION_BLOCKER_CODES)
+            ],
         )
         excerpt = "Publisher evidence retained verbatim."
         content_sha = _sha(excerpt)
@@ -455,6 +494,21 @@ def _count_listing_evidence(path: Path) -> int:
         conn.close()
 
 
+def _count_v3_listing_blockers(path: Path) -> int:
+    conn = sqlite3.connect(path)
+    try:
+        placeholders = ",".join("?" for _ in _V3_LISTING_BLOCKER_CODES)
+        return int(
+            conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_automation_run_blockers "
+                f"WHERE blocker_code IN ({placeholders})",
+                tuple(sorted(_V3_LISTING_BLOCKER_CODES)),
+            ).fetchone()[0]
+        )
+    finally:
+        conn.close()
+
+
 def test_v2_to_v3_preserves_every_existing_cell_and_adds_no_listing_rows(tmp_path):
     from src.security_lifecycle_listing_migration import (
         create_listing_authority_backup,
@@ -493,6 +547,7 @@ def test_v2_to_v3_preserves_every_existing_cell_and_adds_no_listing_rows(tmp_pat
     assert _identity_state(source) == before_identity
     assert _unowned_state(source) == before_unowned
     assert _count_listing_evidence(source) == 0
+    assert _count_v3_listing_blockers(source) == 0
     assert stat.S_IMODE(os.stat(backup.path.parent).st_mode) == 0o700
     assert stat.S_IMODE(os.stat(backup.path).st_mode) == 0o600
     verify_profile_schema(source)
