@@ -88,9 +88,7 @@ def _evidence(case, *, family, payload, kind, locator):
         adapter="sec_edgar" if family == "regulator" else "ibkr_contract",
         kind=kind,
         source_url=(
-            case["observation"]["evidence_url"]
-            if family == "regulator"
-            else None
+            case["observation"]["evidence_url"] if family == "regulator" else None
         ),
         title=f"{family} evidence",
         publisher="SEC EDGAR" if family == "regulator" else "Interactive Brokers",
@@ -114,6 +112,7 @@ def _listing_evidence(
     expected_active_state,
     market,
     status,
+    directory=None,
     active=None,
     delisted_utc=None,
     fact_values=None,
@@ -122,9 +121,16 @@ def _listing_evidence(
     from src.security_lifecycle_fact_kernel import AutomationEvidence
 
     normalized_facts = dict(fact_values or {})
+    listing_status = (
+        "active"
+        if status == "found" and active is True
+        else "inactive"
+        if status == "found" and active is False
+        else status
+    )
     payload = {
         "listing_adapter": adapter,
-        "listing_status": status,
+        "listing_status": listing_status,
         **normalized_facts,
     }
     excerpt = json.dumps(
@@ -139,10 +145,9 @@ def _listing_evidence(
         "candidate_ticker": ticker,
         "expected_active_state": expected_active_state,
         "market": market,
-        "status": status,
+        "listing_status": listing_status,
+        "directory": directory,
     }
-    if active is not None:
-        locator["active"] = active
     if delisted_utc is not None:
         locator["delisted_utc"] = delisted_utc
     evidence = AutomationEvidence(
@@ -156,9 +161,7 @@ def _listing_evidence(
             else "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.txt"
         ),
         title=f"{adapter} listing snapshot",
-        publisher=(
-            "Massive" if adapter == "massive_reference" else "Nasdaq Trader"
-        ),
+        publisher=("Massive" if adapter == "massive_reference" else "Nasdaq Trader"),
         domain=None,
         source_published_at=None,
         retrieved_at=retrieved_at,
@@ -168,10 +171,7 @@ def _listing_evidence(
         source_locator=locator,
         evidence_dedupe_key=f"listing:{label}:{case['case_id']}",
     )
-    facts = tuple(
-        _fact(evidence, payload, key, key)
-        for key in normalized_facts
-    )
+    facts = tuple(_fact(evidence, payload, key, key) for key in normalized_facts)
     return evidence, facts
 
 
@@ -223,23 +223,23 @@ def _bundle(
             locator={"filing_chain_complete": True},
         )
         facts = list(
-            _fact(regulator, regulator_payload, key, key)
-            for key in regulator_payload
+            _fact(regulator, regulator_payload, key, key) for key in regulator_payload
         )
         evidence = [regulator]
         if market_absent:
-            for label, market in (
-                ("nasdaq-listed", "nasdaq"),
-                ("nasdaq-other", "other"),
+            for label, directory in (
+                ("nasdaq-listed", "nasdaq_listed"),
+                ("nasdaq-other", "other_listed"),
             ):
                 absence, absence_facts = _listing_evidence(
                     case,
                     label=label,
                     adapter="nasdaq_symbol_directory",
                     ticker=ticker,
-                    expected_active_state=False,
-                    market=market,
+                    expected_active_state=True,
+                    market="stocks",
                     status="not_found",
+                    directory=directory,
                     retrieved_at="2026-09-01T12:00:00Z",
                 )
                 evidence.append(absence)
@@ -282,9 +282,10 @@ def _bundle(
                 label="nasdaq-active",
                 adapter="nasdaq_symbol_directory",
                 ticker=ticker,
-                expected_active_state=False,
-                market="nasdaq",
+                expected_active_state=True,
+                market="stocks",
                 status="found",
+                directory="nasdaq_listed",
                 active=True,
                 fact_values={
                     "destination_venue": "NASDAQ",
@@ -381,8 +382,9 @@ def _bundle(
         adapter="nasdaq_symbol_directory",
         ticker=successor,
         expected_active_state=True,
-        market="nasdaq",
+        market="stocks",
         status="found",
+        directory="nasdaq_listed",
         active=True,
         fact_values=market_snapshot,
     )
@@ -394,10 +396,7 @@ def _bundle(
                 for key in regulator_payload
             ),
             *listing_facts,
-            *(
-                _fact(market, market_snapshot, key, key)
-                for key in market_snapshot
-            ),
+            *(_fact(market, market_snapshot, key, key) for key in market_snapshot),
         ),
         blockers=(),
         diagnostics={"sec_attempts": 1, "ibkr_requests": 1},
@@ -492,9 +491,10 @@ class _Harness:
             transition_preview=self.transition_preview,
             clock=self.clock,
         )
-        if "transition_approver" in inspect.signature(
-            LifecycleAutomationWorker
-        ).parameters:
+        if (
+            "transition_approver"
+            in inspect.signature(LifecycleAutomationWorker).parameters
+        ):
             kwargs["transition_approver"] = self.transition_approver
         return LifecycleAutomationWorker(**kwargs)
 
@@ -607,7 +607,9 @@ def _forged_deadline_bundle(case):
     )
 
 
-def _market_recheck_bundle(case, *, retrieved_at, market_status, fresh, include_regulator):
+def _market_recheck_bundle(
+    case, *, retrieved_at, market_status, fresh, include_regulator
+):
     from src.security_lifecycle_automation_worker import (
         LifecycleAutomationEvidenceBundle,
     )
@@ -650,9 +652,7 @@ def _market_recheck_bundle(case, *, retrieved_at, market_status, fresh, include_
     )
     return LifecycleAutomationEvidenceBundle(
         evidence=(
-            (regulator, listing, market)
-            if include_regulator
-            else (listing, market)
+            (regulator, listing, market) if include_regulator else (listing, market)
         ),
         facts=(
             (*regulator_facts, *listing_facts, *market_facts)
@@ -742,9 +742,12 @@ def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_pa
         assert result["selected"] == 2
         assert result["processed"] == 2
         assert [item[0] for item in harness.evidence_calls] == expected
-        assert harness.conn.execute(
-            "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
-        ).fetchone()[0] == 2
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
+            ).fetchone()[0]
+            == 2
+        )
     finally:
         harness.conn.close()
 
@@ -823,7 +826,9 @@ def test_verified_result_persists_automation_assessment_acceptance_and_proposals
         assert assessment["automation_method"] == "deterministic_rule"
         assert assessment["rule_id"] == "lifecycle.simple_symbol_continuation"
         assert assessment["decision_provenance_sha256"]
-        assert {row["action_type"] for row in store.list_proposals(case["case_id"])} == {
+        assert {
+            row["action_type"] for row in store.list_proposals(case["case_id"])
+        } == {
             "notify",
             "remap_symbol",
         }
@@ -879,7 +884,9 @@ def test_market_recheck_preserves_receipts_without_quote_acceptance_gate(
         harness.conn.close()
 
 
-@pytest.mark.parametrize("pending", (False, True), ids=("conflict_only", "conflict_plus_pending"))
+@pytest.mark.parametrize(
+    "pending", (False, True), ids=("conflict_only", "conflict_plus_pending")
+)
 def test_source_conflict_crosses_worker_kernel_and_attention_projection(
     tmp_path,
     pending,
@@ -893,9 +900,12 @@ def test_source_conflict_crosses_worker_kernel_and_attention_projection(
     try:
         result = harness.worker().run()
         store = _store(harness)
-        automation_runs, automation_facts, _run_total, _fact_total = (
-            _automation_history(store, case["case_id"])
-        )
+        (
+            automation_runs,
+            automation_facts,
+            _run_total,
+            _fact_total,
+        ) = _automation_history(store, case["case_id"])
         run = automation_runs[0]
         assessments = store.list_assessments(case["case_id"])
         projection = project_lifecycle_disposition(
@@ -1017,9 +1027,10 @@ def test_terminal_finalization_recovers_idempotently_after_each_boundary(
         assert len(store.list_assessments(case["case_id"])) == 1
         assert store.list_assessments(case["case_id"])[0]["status"] == "accepted"
         assert len(store.list_proposals(case["case_id"])) == 2
-        assert context["terminal_finalized_decision_provenance_sha256"] == context[
-            "terminal_decision_provenance_sha256"
-        ]
+        assert (
+            context["terminal_finalized_decision_provenance_sha256"]
+            == context["terminal_decision_provenance_sha256"]
+        )
         expected_approval_calls = 2 if boundary == "approval" else 1
         assert len(harness.approval_calls) == expected_approval_calls
 
@@ -1086,16 +1097,12 @@ def test_approval_boundary_recovery_deduplicates_real_transition_and_mutates_no_
         store = _store(harness)
         assessment = store.project_case_state(
             case["case_id"],
-            observation_fingerprint_sha256=case[
-                "observation_fingerprint_sha256"
-            ],
+            observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
         )["current_assessment"]
         assert assessment is not None
         proposals = store.project_proposals(
             case["case_id"],
-            observation_fingerprint_sha256=case[
-                "observation_fingerprint_sha256"
-            ],
+            observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
         )
         assert all(
             proposal["assessment_fingerprint_sha256"]
@@ -1107,9 +1114,7 @@ def test_approval_boundary_recovery_deduplicates_real_transition_and_mutates_no_
             case=case,
             assessment=assessment,
             proposals=proposals,
-            observation_fingerprint_sha256=case[
-                "observation_fingerprint_sha256"
-            ],
+            observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
             sources=sources,
             options=TransitionOptions(execute_on=str(request["effective_date"])),
         )
@@ -1130,17 +1135,23 @@ def test_approval_boundary_recovery_deduplicates_real_transition_and_mutates_no_
     try:
         with pytest.raises(_InjectedFinalizationCrash, match="approval"):
             harness.worker_with_transition_approver().run()
-        assert harness.conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 1
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM ticker_identity_transitions"
+            ).fetchone()[0]
+            == 1
+        )
         assert profile_rows() == before_profile
 
         recovered = harness.worker_with_transition_approver().run()
         store = _store(harness)
         assert recovered["accepted"] == 1
-        assert harness.conn.execute(
-            "SELECT COUNT(*) FROM ticker_identity_transitions"
-        ).fetchone()[0] == 1
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM ticker_identity_transitions"
+            ).fetchone()[0]
+            == 1
+        )
         assert len(store.list_assessments(case["case_id"])) == 1
         assert len(store.list_proposals(case["case_id"])) == 2
         assert profile_rows() == before_profile
@@ -1162,10 +1173,13 @@ def test_nonmutating_and_review_suggested_results_never_approve_transition(
     try:
         result = harness.worker_with_transition_approver().run(limit=2)
 
-        assert result["accepted"] == 1
+        assert result["accepted"] == 0
         assert result["drafted"] == 1
-        assert result["failed"] == 0
+        assert result["failed"] == 1
         assert harness.approval_calls == []
+        terminal_assessment = _store(harness).list_assessments(terminal["case_id"])[0]
+        assert terminal_assessment["status"] == "draft"
+        assert terminal_assessment["outcomes"] == ["undetermined"]
     finally:
         harness.conn.close()
 
@@ -1189,10 +1203,13 @@ def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_pat
             "notify",
             "remap_symbol",
         )
-        assert harness.conn.execute(
-            "SELECT COUNT(*) FROM sqlite_master "
-            "WHERE type='table' AND name='ticker_identity_transitions'"
-        ).fetchone()[0] == 0
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM sqlite_master "
+                "WHERE type='table' AND name='ticker_identity_transitions'"
+            ).fetchone()[0]
+            == 0
+        )
         assert assessment["status"] == "accepted"
         assert run["status"] == "succeeded"
         assert run["action_readiness"] == "waiting_transition_revalidation"
@@ -1329,9 +1346,7 @@ def test_program_error_fails_run_without_network_classification(
     acquire_case = _case(1)
     assessment_case = _case(2)
     harness = _Harness(tmp_path, [acquire_case, assessment_case])
-    harness.bundles[acquire_case["case_id"]] = TypeError(
-        "fixture programmer fault"
-    )
+    harness.bundles[acquire_case["case_id"]] = TypeError("fixture programmer fault")
     create_assessment = worker_module.create_automation_assessment
     monkeypatch.setattr(
         worker_module,
@@ -1374,9 +1389,10 @@ def test_program_error_fails_run_without_network_classification(
         recovered_run = store.list_automation_runs(assessment_case["case_id"])[0]
         recovered_context = json.loads(recovered_run["query_context_json"])
         assert recovered["accepted"] == 1
-        assert recovered_context[
-            "terminal_finalized_decision_provenance_sha256"
-        ] == recovered_context["terminal_decision_provenance_sha256"]
+        assert (
+            recovered_context["terminal_finalized_decision_provenance_sha256"]
+            == recovered_context["terminal_decision_provenance_sha256"]
+        )
         assert len(store.list_assessments(assessment_case["case_id"])) == 1
     finally:
         harness.conn.close()
@@ -1394,9 +1410,12 @@ def test_current_assessment_is_not_reprocessed(tmp_path):
         assert second["processed"] == 0
         assert second["skipped_current"] == 1
         assert harness.evidence_calls == calls
-        assert harness.conn.execute(
-            "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
-        ).fetchone()[0] == 1
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_automation_runs"
+            ).fetchone()[0]
+            == 1
+        )
     finally:
         harness.conn.close()
 
@@ -1452,11 +1471,14 @@ def test_forged_deadline_failure_replays_once_after_execution_revision_change(
             "sec_attempts": 7,
         }
         assert failed_run["blockers"] == []
-        assert harness.conn.execute(
-            "SELECT COUNT(*) FROM security_lifecycle_evidence "
-            "WHERE automation_run_id=?",
-            (failed_run["run_id"],),
-        ).fetchone()[0] == 0
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_evidence "
+                "WHERE automation_run_id=?",
+                (failed_run["run_id"],),
+            ).fetchone()[0]
+            == 0
+        )
 
         monkeypatch.setattr(
             worker_module,
@@ -1470,9 +1492,10 @@ def test_forged_deadline_failure_replays_once_after_execution_revision_change(
         assert replay_result["failed"] == 1
         assert len(runs) == 2
         assert runs[0]["run_id"] != failed_run["run_id"]
-        assert json.loads(runs[0]["query_context_json"])[
-            "predecessor_failed_run_id"
-        ] == failed_run["run_id"]
+        assert (
+            json.loads(runs[0]["query_context_json"])["predecessor_failed_run_id"]
+            == failed_run["run_id"]
+        )
         assert store.get_automation_run(failed_run["run_id"]) == failed_snapshot
     finally:
         harness.conn.close()
@@ -1507,9 +1530,10 @@ def test_execution_revision_does_not_change_decision_or_transition_authority(
 
         assessment_r0 = _store(r0).list_assessments(cases[0]["case_id"])[0]
         assessment_r1 = _store(r1).list_assessments(cases[0]["case_id"])[0]
-        assert assessment_r0["decision_provenance_sha256"] == assessment_r1[
-            "decision_provenance_sha256"
-        ]
+        assert (
+            assessment_r0["decision_provenance_sha256"]
+            == assessment_r1["decision_provenance_sha256"]
+        )
         assert assessment_r0["rule_id"] == assessment_r1["rule_id"]
         assert assessment_r0["rule_version"] == assessment_r1["rule_version"]
         with open("src/ticker_identity_transition.py", encoding="utf-8") as source:
@@ -1626,9 +1650,7 @@ def test_v3_reprocesses_v2_draft_without_deleting_audit_history(
         assert store.get_assessment(old["assessment_id"])["status"] == "draft"
         projected = store.project_case_state(
             case["case_id"],
-            observation_fingerprint_sha256=case[
-                "observation_fingerprint_sha256"
-            ],
+            observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
         )
         old_projection = next(
             row
@@ -1666,9 +1688,7 @@ def test_v3_reprocesses_human_accepted_v2_automation_without_rewriting_it(
         old = store.list_assessments(case["case_id"])[0]
         store.accept_assessment(
             old["assessment_id"],
-            observation_fingerprint_sha256=case[
-                "observation_fingerprint_sha256"
-            ],
+            observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
             acceptance_authority="human",
             at=_AT,
         )
@@ -1699,9 +1719,7 @@ def test_v3_reprocesses_human_accepted_v2_automation_without_rewriting_it(
             assert persisted[field] == before[field]
         projected = store.project_case_state(
             case["case_id"],
-            observation_fingerprint_sha256=case[
-                "observation_fingerprint_sha256"
-            ],
+            observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
         )
         old_projection = next(
             row
@@ -1709,9 +1727,10 @@ def test_v3_reprocesses_human_accepted_v2_automation_without_rewriting_it(
             if row["assessment_id"] == old["assessment_id"]
         )
         assert old_projection["stale"] is True
-        assert store.list_automation_runs(case["case_id"])[0][
-            "policy_version"
-        ] == "trusted-lifecycle-automation-v3"
+        assert (
+            store.list_automation_runs(case["case_id"])[0]["policy_version"]
+            == "trusted-lifecycle-automation-v3"
+        )
     finally:
         harness.conn.close()
 
@@ -1746,7 +1765,7 @@ def test_worker_uses_only_injected_evidence_sources_and_paths(tmp_path, monkeypa
         harness.conn.close()
 
 
-def test_worker_rechecks_due_action_readiness_without_reprocessing_unrelated_cases(
+def test_worker_keeps_pre_effective_terminal_in_monitoring_without_task5_recheck(
     tmp_path,
 ):
     terminal = _case(1, ticker="TERM", terminal=True)
@@ -1756,10 +1775,14 @@ def test_worker_rechecks_due_action_readiness_without_reprocessing_unrelated_cas
     harness.bundles[terminal["case_id"]] = _bundle(terminal, terminal=True)
     try:
         first = harness.worker().run(limit=2)
-        assert first["accepted"] == 2
+        assert first["accepted"] == 1
+        assert first["failed"] == 1
         store = _store(harness)
         terminal_run = store.list_automation_runs(terminal["case_id"])[0]
         assert terminal_run["action_readiness"] == "waiting_effective_date"
+        terminal_assessment = store.list_assessments(terminal["case_id"])[0]
+        assert terminal_assessment["status"] == "draft"
+        assert terminal_assessment["outcomes"] == ["undetermined"]
 
         harness.evidence_calls.clear()
         harness.now = "2026-09-01T12:00:00Z"
@@ -1771,11 +1794,14 @@ def test_worker_rechecks_due_action_readiness_without_reprocessing_unrelated_cas
         second = harness.worker().run(limit=2)
 
         assert second["processed"] == 1
-        assert second["accepted"] == 1
-        assert [row[0] for row in harness.evidence_calls] == [terminal["case_id"]]
+        assert second["accepted"] == 0
+        assert second["failed"] == 1
+        assert second["skipped_current"] == 1
+        assert harness.evidence_calls == []
         terminal_run = store.list_automation_runs(terminal["case_id"])[0]
-        assert terminal_run["action_readiness"] == "transition_eligible"
+        assert terminal_run["action_readiness"] == "waiting_effective_date"
         assert len(store.list_automation_runs(unrelated["case_id"])) == 1
-        assert len(store.list_assessments(terminal["case_id"])) == 2
+        assert len(store.list_automation_runs(terminal["case_id"])) == 1
+        assert len(store.list_assessments(terminal["case_id"])) == 1
     finally:
         harness.conn.close()

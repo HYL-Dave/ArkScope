@@ -212,9 +212,12 @@ Each listing evidence row stores a bounded locator with these fields:
 
 ```json
 {
+  "locator_kind": "listing_directory_snapshot",
+  "adapter": "nasdaq_symbol_directory | massive_reference",
   "authority": "nasdaq_trader | massive",
   "directory": "nasdaq_listed | other_listed | null",
   "candidate_ticker": "B",
+  "expected_active_state": true,
   "listing_status": "active | inactive | not_found | unverified",
   "market": "stocks | otc",
   "primary_exchange": "XNAS",
@@ -229,6 +232,12 @@ Each listing evidence row stores a bounded locator with these fields:
   "adapter_version": "..."
 }
 ```
+
+`adapter` and `expected_active_state` are durable component-identity fields,
+not user-facing claims. They are required to select current material by the
+closed `(adapter, candidate_ticker, expected_active_state, market)` key. The
+active API projector may omit them from its compact display DTO, but policy
+must consume the persisted values rather than reconstructing intent from a URL.
 
 Fields unsupported by an authority are `null`; they are never guessed. The
 persisted excerpt is one canonical compact record, not the full directory or API

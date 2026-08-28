@@ -639,9 +639,12 @@ def _evidence(record: ListingRecord) -> ListingEvidence:
     ).hexdigest()
     locator = MappingProxyType(
         {
+            "locator_kind": "listing_directory_snapshot",
+            "adapter": record.adapter,
             "authority": record.authority,
             "directory": record.directory,
             "candidate_ticker": record.ticker,
+            "expected_active_state": record.expected_active,
             "listing_status": record.listing_status,
             "market": record.market,
             "primary_exchange": record.primary_exchange,

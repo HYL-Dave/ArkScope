@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Literal
 
 from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
@@ -164,9 +164,7 @@ def _locator(value: object) -> Mapping[str, Any]:
 def _evidence_rows(values: Iterable[object]) -> tuple[_Evidence, ...]:
     rows: dict[str, _Evidence] = {}
     for value in values:
-        evidence_id = _text(
-            _field(value, "evidence_id", _field(value, "local_id"))
-        )
+        evidence_id = _text(_field(value, "evidence_id", _field(value, "local_id")))
         family = _text(_field(value, "source_family"))
         if evidence_id is None or family is None:
             raise ValueError("evidence_identity")
@@ -323,9 +321,7 @@ def _decision(
         consideration_currency=(
             _text(transaction.get("consideration_currency")) or None
         ),
-        cash_per_security_decimal=_term(
-            transaction, "cash_per_security_decimal"
-        ),
+        cash_per_security_decimal=_term(transaction, "cash_per_security_decimal"),
         exchange_ratio_decimal=_term(transaction, "exchange_ratio_decimal"),
         rule_id=rule_id,
         rule_version=RULE_VERSIONS[rule_id],
@@ -359,13 +355,7 @@ def _preview(
     if result.get("transition_kind") != expected_kind:
         return False, ("preview:kind_mismatch",)
     reasons = tuple(
-        sorted(
-            {
-                str(value)
-                for value in result.get("block_reasons", ())
-                if str(value)
-            }
-        )
+        sorted({str(value) for value in result.get("block_reasons", ()) if str(value)})
     )
     if result.get("eligible") is True and not reasons:
         return True, ()
@@ -394,6 +384,14 @@ def _market_timestamp(value: object) -> datetime | None:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         return None
     return parsed.astimezone(timezone.utc)
+
+
+def _listing_delisted_date(value: object) -> date | None:
+    normalized_date = _iso_date(value)
+    if normalized_date is not None:
+        return date.fromisoformat(normalized_date)
+    timestamp = _market_timestamp(value)
+    return None if timestamp is None else timestamp.date()
 
 
 def _listing_snapshot(row: _Evidence) -> Mapping[str, Any] | None:
@@ -440,6 +438,16 @@ def _listing_records(
 ) -> tuple[_Evidence, ...]:
     """Select current listing material independently within each component."""
 
+    def current(rows: list[_Evidence]) -> tuple[_Evidence, ...]:
+        timestamps = tuple((row, _market_timestamp(row.retrieved_at)) for row in rows)
+        if len(rows) == 1:
+            return tuple(rows)
+        if all(value is not None for _row, value in timestamps):
+            latest = max(value for _row, value in timestamps if value is not None)
+            return tuple(row for row, value in timestamps if value == latest)
+        # Unknown recency cannot safely supersede another record.
+        return tuple(rows)
+
     candidate = _ticker(ticker)
     grouped: dict[tuple[str, str, str, str], list[_Evidence]] = {}
     for row in evidence:
@@ -451,15 +459,15 @@ def _listing_records(
     selected: list[_Evidence] = []
     for component in sorted(grouped):
         rows = grouped[component]
-        timestamps = tuple((row, _market_timestamp(row.retrieved_at)) for row in rows)
-        if len(rows) == 1:
-            selected.extend(rows)
-        elif all(value is not None for _row, value in timestamps):
-            latest = max(value for _row, value in timestamps if value is not None)
-            selected.extend(row for row, value in timestamps if value == latest)
-        else:
-            # Unknown recency cannot safely supersede another record.
-            selected.extend(rows)
+        if component[0] != "nasdaq_symbol_directory":
+            selected.extend(current(rows))
+            continue
+        by_directory: dict[str | None, list[_Evidence]] = {}
+        for row in rows:
+            directory = _text((_listing_snapshot(row) or {}).get("directory"))
+            by_directory.setdefault(directory, []).append(row)
+        for directory in sorted(by_directory, key=lambda value: value or ""):
+            selected.extend(current(by_directory[directory]))
     return tuple(sorted(selected, key=lambda row: row.evidence_id))
 
 
@@ -467,16 +475,31 @@ def _listing_status(row: _Evidence) -> str | None:
     snapshot = _listing_snapshot(row)
     if snapshot is None:
         return None
-    value = snapshot.get("status", snapshot.get("result"))
-    text = _text(value)
-    return None if text is None else text.lower()
+    durable = _text(snapshot.get("listing_status"))
+    if durable is not None:
+        normalized = durable.lower()
+        return (
+            normalized
+            if normalized in {"active", "inactive", "not_found", "unverified"}
+            else None
+        )
+
+    # Compatibility for persisted v4-predecessor/test locators only.
+    legacy = _text(snapshot.get("status", snapshot.get("result")))
+    if legacy is None:
+        return None
+    normalized = legacy.lower()
+    if normalized == "found":
+        if snapshot.get("active") is True:
+            return "active"
+        if snapshot.get("active") is False:
+            return "inactive"
+        return None
+    return normalized if normalized in {"not_found", "unverified"} else None
 
 
 def _listing_row_active(row: _Evidence) -> bool:
-    snapshot = _listing_snapshot(row)
-    if snapshot is None:
-        return False
-    return _listing_status(row) == "found" and snapshot.get("active") is True
+    return _listing_status(row) == "active"
 
 
 def _listing_active(evidence: tuple[_Evidence, ...], ticker: str) -> bool:
@@ -488,9 +511,7 @@ def _listing_active_successor_present(
 ) -> bool:
     source = _ticker(source_ticker)
     return any(
-        component is not None
-        and component[1] != source
-        and _listing_row_active(row)
+        component is not None and component[1] != source and _listing_row_active(row)
         for row in _selected_listing_rows(evidence)
         for component in (_listing_component(row),)
     )
@@ -524,19 +545,17 @@ def _facts_for_evidence(
 def _listing_explicit_inactive(
     evidence: tuple[_Evidence, ...], ticker: str, today: date
 ) -> bool:
-    cutoff = datetime.combine(today, time.max, tzinfo=timezone.utc)
     for row in _listing_records(evidence, ticker):
         component = _listing_component(row)
         snapshot = _listing_snapshot(row)
         if component is None or snapshot is None:
             continue
-        delisted = _market_timestamp(snapshot.get("delisted_utc"))
+        delisted = _listing_delisted_date(snapshot.get("delisted_utc"))
         if (
             component[0] == "massive_reference"
-            and _listing_status(row) == "found"
-            and snapshot.get("active") is False
+            and _listing_status(row) == "inactive"
             and delisted is not None
-            and delisted <= cutoff
+            and delisted <= today
         ):
             return True
     return False
@@ -555,23 +574,21 @@ def _listing_not_found(
     )
 
 
-def _nasdaq_not_found_complete(
-    evidence: tuple[_Evidence, ...], ticker: str
-) -> bool:
-    markets = {
-        component[3]
+def _nasdaq_not_found_complete(evidence: tuple[_Evidence, ...], ticker: str) -> bool:
+    directories = {
+        _text((_listing_snapshot(row) or {}).get("directory"))
         for row in _listing_records(evidence, ticker)
         for component in (_listing_component(row),)
         if component is not None
         and component[0] == "nasdaq_symbol_directory"
+        and component[2] == "active"
+        and component[3] == "stocks"
         and _listing_status(row) == "not_found"
     }
-    return len(markets) >= 2
+    return directories == {"nasdaq_listed", "other_listed"}
 
 
-def _listing_conflicts(
-    evidence: tuple[_Evidence, ...], ticker: str
-) -> tuple[str, ...]:
+def _listing_conflicts(evidence: tuple[_Evidence, ...], ticker: str) -> tuple[str, ...]:
     rows = _listing_records(evidence, ticker)
     grouped: dict[tuple[str, str, str, str], list[_Evidence]] = {}
     for row in rows:
@@ -582,7 +599,6 @@ def _listing_conflicts(
         states = {
             (
                 _listing_status(row),
-                (_listing_snapshot(row) or {}).get("active"),
                 _text((_listing_snapshot(row) or {}).get("delisted_utc")),
             )
             for row in component_rows
@@ -590,9 +606,20 @@ def _listing_conflicts(
         if len(states) > 1:
             return ("listing_authority_conflict",)
     if any(_listing_row_active(row) for row in rows) and any(
-        (_listing_snapshot(row) or {}).get("active") is False
-        and _listing_status(row) == "found"
+        _listing_status(row) == "inactive" for row in rows
+    ):
+        return ("listing_authority_conflict",)
+    active_components = {
+        component
         for row in rows
+        for component in (_listing_component(row),)
+        if component is not None and _listing_row_active(row)
+    }
+    if any(
+        component[0] == "nasdaq_symbol_directory" for component in active_components
+    ) and any(
+        component[0] == "massive_reference" and component[3] == "otc"
+        for component in active_components
     ):
         return ("listing_authority_conflict",)
     return ()
@@ -624,9 +651,7 @@ def _current_decision_material(
         if row.source_family == "market_infrastructure"
         and row.source_locator.get("contract_status") == "found"
     )
-    timestamps = tuple(
-        (row, _market_timestamp(row.retrieved_at)) for row in market
-    )
+    timestamps = tuple((row, _market_timestamp(row.retrieved_at)) for row in market)
     if len(market) <= 1:
         selected_market = market
     elif any(value is None for _row, value in timestamps):
@@ -634,18 +659,12 @@ def _current_decision_material(
     else:
         latest = max(value for _row, value in timestamps if value is not None)
         selected_market = tuple(row for row, value in timestamps if value == latest)
-        if len(selected_market) != 1:
-            selected_market = ()
     selected_ids = {
-        row.evidence_id
-        for row in evidence
-        if row.source_family == "regulator"
+        row.evidence_id for row in evidence if row.source_family == "regulator"
     }
     selected_ids.update(row.evidence_id for row in listing)
     selected_ids.update(row.evidence_id for row in selected_market)
-    current_evidence = tuple(
-        row for row in evidence if row.evidence_id in selected_ids
-    )
+    current_evidence = tuple(row for row in evidence if row.evidence_id in selected_ids)
     return current_evidence, tuple(
         row for row in facts if row.evidence_id in selected_ids
     )
@@ -658,9 +677,7 @@ def evaluate_automation_decision(
     facts: Iterable[object],
     current_date: date | str,
     active_sources: Iterable[str],
-    transition_preview: Callable[
-        [Mapping[str, object]], Mapping[str, object] | None
-    ],
+    transition_preview: Callable[[Mapping[str, object]], Mapping[str, object] | None],
 ) -> AutomationDecision:
     """Evaluate cited facts without opening a database, provider, or model."""
 
@@ -735,30 +752,18 @@ def evaluate_automation_decision(
                 else _one(fact_rows, "effective_date")
             ),
             rule_id="lifecycle.source_conflict",
-            decision_issues=(
-                f"source_conflict:{fact_type}" for fact_type in conflicts
-            ),
+            decision_issues=(f"source_conflict:{fact_type}" for fact_type in conflicts),
         )
 
     regulator_source = _one(fact_rows, "source_ticker", family="regulator")
-    regulator_successor = _one(
-        fact_rows, "successor_ticker", family="regulator"
-    )
-    regulator_source_venue = _one(
-        fact_rows, "source_venue", family="regulator"
-    )
-    regulator_destination = _one(
-        fact_rows, "destination_venue", family="regulator"
-    )
+    regulator_successor = _one(fact_rows, "successor_ticker", family="regulator")
+    regulator_source_venue = _one(fact_rows, "source_venue", family="regulator")
+    regulator_destination = _one(fact_rows, "destination_venue", family="regulator")
     regulator_date = _one(fact_rows, "effective_date", family="regulator")
     regulator_class = _one(fact_rows, "security_class", family="regulator")
     regulator_cik = _one(fact_rows, "issuer_cik", family="regulator")
-    regulator_effect = _one(
-        fact_rows, "tracked_security_effect", family="regulator"
-    )
-    transaction = _terms(
-        _one(fact_rows, "transaction_structure", family="regulator")
-    )
+    regulator_effect = _one(fact_rows, "tracked_security_effect", family="regulator")
+    transaction = _terms(_one(fact_rows, "transaction_structure", family="regulator"))
     transaction_kind = _text(transaction.get("kind"))
     terms_status = _text(transaction.get("terms_status"))
     if terms_status == "not_extracted":
@@ -768,9 +773,7 @@ def evaluate_automation_decision(
         )
     elif terms_status == "partial":
         transaction_issues = ("transaction_terms_partial",)
-        transaction_impact = (
-            "Only some counterparty or consideration terms were deterministically extracted."
-        )
+        transaction_impact = "Only some counterparty or consideration terms were deterministically extracted."
     else:
         transaction_issues = ()
         transaction_impact = "Known transaction terms are prefilled."
@@ -814,15 +817,13 @@ def evaluate_automation_decision(
             readiness = "waiting_effective_date"
             issues: tuple[str, ...] = ()
             requested = False
-            outcomes = ("listing_ended",)
+            outcomes = ("undetermined",)
         elif not _nasdaq_not_found_complete(evidence_rows, regulator_source):
             readiness = "waiting_market_confirmation"
             issues = ("nasdaq_not_found_incomplete",)
             requested = False
             outcomes = ("undetermined",)
-        elif not _listing_explicit_inactive(
-            evidence_rows, regulator_source, today
-        ):
+        elif not _listing_explicit_inactive(evidence_rows, regulator_source, today):
             readiness = "waiting_market_confirmation"
             issues = ("massive_explicit_inactive_missing",)
             requested = False
@@ -831,7 +832,7 @@ def evaluate_automation_decision(
             readiness = "action_blocked"
             issues = ("portfolio_position_open",)
             requested = False
-            outcomes = ("listing_ended",)
+            outcomes = ("undetermined",)
         else:
             request = {
                 "transition_kind": "terminal_delisting",
@@ -843,7 +844,7 @@ def evaluate_automation_decision(
             eligible, issues = _preview(transition_preview, request)
             readiness = "transition_eligible" if eligible else "action_blocked"
             requested = eligible
-            outcomes = ("listing_ended",)
+            outcomes = ("listing_ended",) if eligible else ("undetermined",)
         return _decision(
             decision_tier="verified_automatic",
             action_readiness=readiness,
@@ -984,17 +985,19 @@ def evaluate_automation_decision(
     if case_ticker not in {regulator_source, regulator_successor}:
         return _insufficient(issues=("case_ticker_mismatch",))
 
+    massive_otc_rows = _listing_active_rows(
+        evidence_rows,
+        regulator_successor,
+        adapter="massive_reference",
+        market="otc",
+    )
     otc_destination = (
-        regulator_destination is not None
-        and regulator_destination.startswith("OTC")
+        regulator_destination.startswith("OTC")
+        if regulator_destination is not None
+        else bool(massive_otc_rows)
     )
     if otc_destination:
-        listing_rows = _listing_active_rows(
-            evidence_rows,
-            regulator_successor,
-            adapter="massive_reference",
-            market="otc",
-        )
+        listing_rows = massive_otc_rows
         listing_issue = "massive_otc_active_missing"
     else:
         listing_rows = _listing_active_rows(
@@ -1072,9 +1075,7 @@ def evaluate_automation_decision(
         )
 
     if regulator_source != regulator_successor:
-        outcomes = ("symbol_changed",) + (
-            ("venue_transfer",) if venue_changed else ()
-        )
+        outcomes = ("symbol_changed",) + (("venue_transfer",) if venue_changed else ())
         if not listing_matches:
             return _decision(
                 decision_tier="review_suggested",

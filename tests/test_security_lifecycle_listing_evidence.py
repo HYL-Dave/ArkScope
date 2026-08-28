@@ -627,6 +627,169 @@ def test_listing_session_is_lazy_reuses_snapshot_and_memoizes_massive_lookup() -
     assert transport.closed is True
 
 
+def test_real_listing_session_active_output_drives_otc_continuation_policy() -> None:
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+
+    session = ListingAuthoritySession(
+        transport=FakeListingTransport(_session_payloads()),
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=_AT,
+        massive_api_key="fixture-key",
+    )
+    listing = session.lookup(
+        context=_context("OLD"),
+        candidate_tickers=("OTCM",),
+        require_explicit_inactive=False,
+    )
+    assert listing.blockers == ()
+    assert {
+        (
+            row.source_locator["adapter"],
+            row.source_locator["expected_active_state"],
+            row.source_locator["market"],
+            row.source_locator["listing_status"],
+        )
+        for row in listing.evidence
+    } == {
+        ("nasdaq_symbol_directory", True, "stocks", "not_found"),
+        ("massive_reference", True, "stocks", "not_found"),
+        ("massive_reference", True, "otc", "active"),
+    }
+    sec = {
+        "evidence_id": "sec-active",
+        "source_family": "regulator",
+        "source_locator": {},
+    }
+    sec_facts = tuple(
+        {
+            "evidence_id": "sec-active",
+            "fact_type": fact_type,
+            "normalized_value": value,
+        }
+        for fact_type, value in (
+            ("source_ticker", "OLD"),
+            ("successor_ticker", "OTCM"),
+            ("source_venue", "NASDAQ"),
+            ("effective_date", "2026-08-28"),
+            ("security_class", "common_stock"),
+            ("issuer_cik", "0000000001"),
+        )
+    )
+
+    decision = evaluate_automation_decision(
+        case={"ticker": "OLD", "cik": "0000000001"},
+        evidence=(sec, *listing.evidence),
+        facts=(*sec_facts, *listing.facts),
+        current_date="2026-08-28",
+        active_sources=(),
+        transition_preview=lambda request: {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": request["transition_kind"],
+        },
+    )
+
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "transition_eligible"
+    assert decision.destination_venue == "OTC"
+    assert decision.transition_requested is True
+
+
+def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> None:
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+
+    payloads = _session_payloads()
+    for source_url, retrieved_at in (
+        (NASDAQ_LISTED_URL, "2026-08-28T21:01:00Z"),
+        (OTHER_LISTED_URL, "2026-08-28T21:02:00Z"),
+    ):
+        payload = payloads[source_url]
+        assert isinstance(payload, ListingHttpPayload)
+        payloads[source_url] = _payload(
+            payload.source_url,
+            payload.body,
+            payload.content_type,
+            retrieved_at=retrieved_at,
+        )
+    session = ListingAuthoritySession(
+        transport=FakeListingTransport(payloads),
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=_AT,
+        massive_api_key="fixture-key",
+    )
+    listing = session.lookup(
+        context=_context("OLD"),
+        candidate_tickers=("OLD",),
+        require_explicit_inactive=True,
+    )
+    assert listing.blockers == ()
+    assert {
+        (
+            row.source_locator["adapter"],
+            row.source_locator["expected_active_state"],
+            row.source_locator["market"],
+            row.source_locator["directory"],
+            row.source_locator["listing_status"],
+        )
+        for row in listing.evidence
+    } == {
+        (
+            "nasdaq_symbol_directory",
+            True,
+            "stocks",
+            "nasdaq_listed",
+            "not_found",
+        ),
+        (
+            "nasdaq_symbol_directory",
+            True,
+            "stocks",
+            "other_listed",
+            "not_found",
+        ),
+        ("massive_reference", False, "stocks", None, "inactive"),
+    }
+    sec = {
+        "evidence_id": "sec-terminal",
+        "source_family": "regulator",
+        "source_locator": {"filing_chain_complete": True},
+    }
+    sec_facts = tuple(
+        {
+            "evidence_id": "sec-terminal",
+            "fact_type": fact_type,
+            "normalized_value": value,
+        }
+        for fact_type, value in (
+            ("source_ticker", "OLD"),
+            ("effective_date", "2026-08-01"),
+            ("security_class", "common_stock"),
+            ("issuer_cik", "0000000002"),
+            ("tracked_security_effect", "terminal_delisting"),
+        )
+    )
+
+    decision = evaluate_automation_decision(
+        case={"ticker": "OLD", "cik": "0000000002"},
+        evidence=(sec, *listing.evidence),
+        facts=(*sec_facts, *listing.facts),
+        current_date="2026-08-28",
+        active_sources=(),
+        transition_preview=lambda request: {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": request["transition_kind"],
+        },
+    )
+
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "transition_eligible"
+    assert decision.outcomes == ("listing_ended",)
+    assert decision.transition_requested is True
+
+
 def test_listing_session_uses_each_transport_payload_retrieval_timestamp() -> None:
     from src.security_lifecycle_listing_evidence import ListingAuthoritySession
 
@@ -743,13 +906,16 @@ def test_listing_evidence_uses_exact_canonical_excerpt_bytes_and_cited_spans() -
     )
     assert evidence.source_locator == {
         "adapter_version": "listing-authority-v1",
+        "adapter": "nasdaq_symbol_directory",
         "authority": "nasdaq_trader",
         "candidate_ticker": "AAPL",
         "composite_figi": None,
         "delisted_utc": None,
         "directory": "nasdaq_listed",
+        "expected_active_state": True,
         "issuer_cik": None,
         "listing_status": "active",
+        "locator_kind": "listing_directory_snapshot",
         "market": "stocks",
         "primary_exchange": "XNAS",
         "provider_last_updated_utc": None,

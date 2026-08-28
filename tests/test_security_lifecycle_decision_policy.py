@@ -50,9 +50,9 @@ def _listing_evidence(
     ticker,
     expected_active_state,
     market,
-    status,
+    listing_status,
+    directory=None,
     retrieved_at="2026-08-25T01:02:03Z",
-    active=None,
     delisted_utc=None,
 ):
     snapshot = {
@@ -61,10 +61,9 @@ def _listing_evidence(
         "candidate_ticker": ticker,
         "expected_active_state": expected_active_state,
         "market": market,
-        "status": status,
+        "listing_status": listing_status,
+        "directory": directory,
     }
-    if active is not None:
-        snapshot["active"] = active
     if delisted_utc is not None:
         snapshot["delisted_utc"] = delisted_utc
     return {
@@ -80,7 +79,7 @@ def _active_listing(
     ticker,
     *,
     adapter="nasdaq_symbol_directory",
-    market="nasdaq",
+    market="stocks",
     venue="NASDAQ",
     cik=None,
     retrieved_at="2026-08-25T01:02:03Z",
@@ -91,8 +90,8 @@ def _active_listing(
         ticker=ticker,
         expected_active_state=True,
         market=market,
-        status="found",
-        active=True,
+        listing_status="active",
+        directory=("nasdaq_listed" if adapter == "nasdaq_symbol_directory" else None),
         retrieved_at=retrieved_at,
     )
     facts = [
@@ -105,14 +104,15 @@ def _active_listing(
     return evidence, tuple(facts)
 
 
-def _not_found_listing(evidence_id, ticker, *, market):
+def _not_found_listing(evidence_id, ticker, *, directory):
     return _listing_evidence(
         evidence_id,
         adapter="nasdaq_symbol_directory",
         ticker=ticker,
-        expected_active_state=False,
-        market=market,
-        status="not_found",
+        expected_active_state=True,
+        market="stocks",
+        listing_status="not_found",
+        directory=directory,
     )
 
 
@@ -123,8 +123,7 @@ def _massive_inactive(evidence_id, ticker, *, cik=_CIK):
         ticker=ticker,
         expected_active_state=False,
         market="stocks",
-        status="found",
-        active=False,
+        listing_status="inactive",
         delisted_utc="2026-08-24T00:00:00Z",
     )
     return evidence, (
@@ -132,6 +131,20 @@ def _massive_inactive(evidence_id, ticker, *, cik=_CIK):
         _fact(evidence_id, "issuer_cik", cik),
         _fact(evidence_id, "security_class", "common_stock"),
     )
+
+
+def _legacy_listing_shape(row):
+    if row["source_family"] != "listing_authority":
+        return row
+    locator = dict(row["source_locator"])
+    status = locator.pop("listing_status")
+    if status == "active":
+        locator.update({"status": "found", "active": True})
+    elif status == "inactive":
+        locator.update({"status": "found", "active": False})
+    else:
+        locator["status"] = status
+    return {**row, "source_locator": locator}
 
 
 def _eligible_preview(request):
@@ -209,8 +222,8 @@ def _listing_fixture(name):
             "case": _case(ticker="OLD", kinds=("listing_removal_notice",)),
             "evidence": (
                 terminal_sec,
-                _not_found_listing("nasdaq-listed", "OLD", market="nasdaq"),
-                _not_found_listing("nasdaq-other", "OLD", market="other"),
+                _not_found_listing("nasdaq-listed", "OLD", directory="nasdaq_listed"),
+                _not_found_listing("nasdaq-other", "OLD", directory="other_listed"),
                 massive_inactive,
             ),
             "facts": terminal_facts + massive_inactive_facts,
@@ -219,8 +232,8 @@ def _listing_fixture(name):
             "case": _case(ticker="OLD", kinds=("listing_removal_notice",)),
             "evidence": (
                 terminal_sec,
-                _not_found_listing("nasdaq-listed", "OLD", market="nasdaq"),
-                _not_found_listing("nasdaq-other", "OLD", market="other"),
+                _not_found_listing("nasdaq-listed", "OLD", directory="nasdaq_listed"),
+                _not_found_listing("nasdaq-other", "OLD", directory="other_listed"),
             ),
             "facts": terminal_facts,
         },
@@ -343,6 +356,55 @@ def test_listing_authority_decision_matrix(fixture_name, tier, readiness, outcom
     assert decision.outcomes == outcomes
 
 
+def test_missing_sec_destination_uses_current_massive_otc_authority():
+    fixture = _listing_fixture("otc_symbol_continuation")
+    facts = tuple(
+        fact
+        for fact in fixture["facts"]
+        if not (
+            fact["evidence_id"] == "sec" and fact["fact_type"] == "destination_venue"
+        )
+    )
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=fixture["evidence"],
+        facts=facts,
+        transition_preview=_eligible_preview,
+    )
+
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "transition_eligible"
+    assert decision.destination_venue == "OTC"
+    assert decision.transition_requested is True
+
+
+def test_selected_nasdaq_and_massive_otc_active_authorities_conflict():
+    fixture = _listing_fixture("otc_symbol_continuation")
+    nasdaq, _nasdaq_facts = _active_listing("nasdaq-conflict", "NEW")
+    facts = tuple(
+        fact
+        for fact in fixture["facts"]
+        if not (
+            fact["evidence_id"] == "sec" and fact["fact_type"] == "destination_venue"
+        )
+    )
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=fixture["evidence"] + (nasdaq,),
+        facts=facts,
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("conflicting authorities must not preview")
+        ),
+    )
+
+    assert decision.decision_tier == "review_suggested"
+    assert decision.action_readiness == "action_blocked"
+    assert decision.outcomes == ("undetermined",)
+    assert decision.decision_issues == ("listing_authority_conflict",)
+
+
 @pytest.mark.parametrize(
     ("fixture_name", "removed_evidence", "removed_fact", "issue"),
     [
@@ -395,9 +457,7 @@ def test_listing_authority_positive_paths_fail_when_one_material_gate_is_removed
 ):
     fixture = _listing_fixture(fixture_name)
     evidence = tuple(
-        row
-        for row in fixture["evidence"]
-        if row["evidence_id"] != removed_evidence
+        row for row in fixture["evidence"] if row["evidence_id"] != removed_evidence
     )
     evidence_ids = {row["evidence_id"] for row in evidence}
     facts = tuple(
@@ -425,6 +485,85 @@ def test_nasdaq_not_found_never_proves_terminal_without_massive_explicit_inactiv
     assert decision.outcomes == ("undetermined",)
     assert decision.action_readiness == "waiting_market_confirmation"
     assert decision.transition_requested is False
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("directory", "invented_listed"),
+        ("expected_active_state", False),
+        ("market", "otc"),
+    ),
+)
+def test_terminal_requires_exact_nasdaq_absence_component_identity(field, value):
+    fixture = _listing_fixture("terminal_delisting")
+    evidence = [
+        {
+            **row,
+            "source_locator": {**row["source_locator"], field: value},
+        }
+        if row["evidence_id"] == "nasdaq-listed"
+        else row
+        for row in fixture["evidence"]
+    ]
+    if field != "market":
+        evidence.append(
+            _listing_evidence(
+                "nasdaq-decoy",
+                adapter="nasdaq_symbol_directory",
+                ticker="OLD",
+                expected_active_state=True,
+                market="decoy",
+                listing_status="not_found",
+                directory="decoy_listed",
+            )
+        )
+    evidence = tuple(_legacy_listing_shape(row) for row in evidence)
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=evidence,
+        facts=fixture["facts"],
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("an inexact Nasdaq component must not preview")
+        ),
+    )
+
+    assert decision.action_readiness == "waiting_market_confirmation"
+    assert decision.outcomes == ("undetermined",)
+    assert decision.decision_issues == ("nasdaq_not_found_incomplete",)
+    assert decision.transition_requested is False
+
+
+def test_arbitrary_nasdaq_market_labels_do_not_complete_terminal_absence():
+    fixture = _listing_fixture("terminal_delisting")
+    markets = {"nasdaq-listed": "alpha", "nasdaq-other": "beta"}
+    evidence = tuple(
+        {
+            **row,
+            "source_locator": {
+                **row["source_locator"],
+                "market": markets[row["evidence_id"]],
+            },
+        }
+        if row["evidence_id"] in markets
+        else row
+        for row in fixture["evidence"]
+    )
+    evidence = tuple(_legacy_listing_shape(row) for row in evidence)
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=evidence,
+        facts=fixture["facts"],
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("arbitrary market labels must not preview")
+        ),
+    )
+
+    assert decision.action_readiness == "waiting_market_confirmation"
+    assert decision.outcomes == ("undetermined",)
+    assert decision.decision_issues == ("nasdaq_not_found_incomplete",)
 
 
 def test_ibkr_missing_never_proves_terminal():
@@ -571,8 +710,9 @@ def test_equal_time_disagreement_inside_one_listing_component_fails_closed():
         adapter="nasdaq_symbol_directory",
         ticker="NEW",
         expected_active_state=True,
-        market="nasdaq",
-        status="not_found",
+        market="stocks",
+        listing_status="not_found",
+        directory="nasdaq_listed",
     )
     decision = _evaluate_fixture(
         "nms_symbol_continuation",
@@ -598,9 +738,9 @@ def test_newer_listing_record_supersedes_only_its_own_component():
                 adapter="nasdaq_symbol_directory",
                 ticker="NEW",
                 expected_active_state=True,
-                market="nasdaq",
-                status="found",
-                active=True,
+                market="stocks",
+                listing_status="active",
+                directory="nasdaq_listed",
                 retrieved_at="2026-08-25T00:00:00Z",
             ),
             _listing_evidence(
@@ -608,8 +748,9 @@ def test_newer_listing_record_supersedes_only_its_own_component():
                 adapter="nasdaq_symbol_directory",
                 ticker="NEW",
                 expected_active_state=True,
-                market="nasdaq",
-                status="not_found",
+                market="stocks",
+                listing_status="not_found",
+                directory="nasdaq_listed",
                 retrieved_at="2026-08-25T02:00:00Z",
             ),
             _listing_evidence(
@@ -618,8 +759,7 @@ def test_newer_listing_record_supersedes_only_its_own_component():
                 ticker="NEW",
                 expected_active_state=True,
                 market="stocks",
-                status="found",
-                active=True,
+                listing_status="active",
                 retrieved_at="2026-08-25T01:00:00Z",
             ),
         )
@@ -629,6 +769,29 @@ def test_newer_listing_record_supersedes_only_its_own_component():
         "massive-current",
         "nasdaq-new",
     )
+
+
+def test_legacy_listing_status_and_active_shape_remains_narrowly_compatible():
+    from src.security_lifecycle_decision_policy import (
+        _evidence_rows,
+        _listing_row_active,
+    )
+
+    legacy = {
+        **_listing_evidence(
+            "legacy-active",
+            adapter="nasdaq_symbol_directory",
+            ticker="NEW",
+            expected_active_state=True,
+            market="stocks",
+            listing_status="active",
+            directory="nasdaq_listed",
+        ),
+    }
+    legacy["source_locator"].pop("listing_status")
+    legacy["source_locator"].update({"status": "found", "active": True})
+
+    assert _listing_row_active(_evidence_rows((legacy,))[0]) is True
 
 
 def _identity_facts(
@@ -685,9 +848,7 @@ def _evaluate(
             ),
             "NASDAQ",
         )
-        listing, listing_facts = _active_listing(
-            "nasdaq", successor, venue=venue
-        )
+        listing, listing_facts = _active_listing("nasdaq", successor, venue=venue)
         selected_evidence = (
             _evidence("sec", "regulator"),
             listing,
@@ -798,7 +959,7 @@ def test_ambiguous_ibkr_recency_is_inert_when_listing_authority_is_current():
     assert decision.transition_requested is True
 
 
-def test_latest_market_timestamp_tie_contributes_no_decision_material():
+def test_latest_equal_time_agreeing_positive_ibkr_receipts_are_all_preserved():
     from src.security_lifecycle_decision_policy import (
         _current_decision_material,
         _evidence_rows,
@@ -829,10 +990,68 @@ def test_latest_market_timestamp_tie_contributes_no_decision_material():
 
     current_evidence, current_facts = _current_decision_material(evidence, facts)
 
-    assert [row.evidence_id for row in current_evidence] == ["sec"]
-    assert [(row.evidence_id, row.fact_type) for row in current_facts] == [
-        ("sec", "issuer_cik")
+    assert [row.evidence_id for row in current_evidence] == [
+        "ibkr-a",
+        "ibkr-b",
+        "sec",
     ]
+    assert [(row.evidence_id, row.fact_type) for row in current_facts] == [
+        ("sec", "issuer_cik"),
+        ("ibkr-a", "successor_ticker"),
+        ("ibkr-b", "successor_ticker"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("fact_type", "disagreeing_value"),
+    (
+        ("successor_ticker", "OTHER"),
+        ("security_class", "preferred_stock"),
+        ("destination_venue", "NYSE"),
+    ),
+)
+def test_latest_equal_time_disagreeing_positive_ibkr_receipts_fail_closed(
+    fact_type, disagreeing_value
+):
+    fixture = _listing_fixture("nms_symbol_continuation")
+    receipts = tuple(
+        {
+            **_evidence(evidence_id, "market_infrastructure"),
+            "retrieved_at": "2026-08-25T01:02:03Z",
+        }
+        for evidence_id in ("ibkr-a", "ibkr-b")
+    )
+    agreeing = {
+        "successor_ticker": "NEW",
+        "security_class": "common_stock",
+        "destination_venue": "NASDAQ",
+    }
+    ibkr_facts = tuple(
+        _fact(
+            evidence_id,
+            name,
+            disagreeing_value
+            if evidence_id == "ibkr-b" and name == fact_type
+            else value,
+        )
+        for evidence_id in ("ibkr-a", "ibkr-b")
+        for name, value in agreeing.items()
+    )
+
+    decision = _evaluate(
+        case=fixture["case"],
+        evidence=fixture["evidence"] + receipts,
+        facts=fixture["facts"] + ibkr_facts,
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("disagreeing tied receipts must not preview")
+        ),
+    )
+
+    assert decision.decision_tier == "review_suggested"
+    assert decision.action_readiness == "action_blocked"
+    assert decision.outcomes == ("undetermined",)
+    assert decision.decision_issues == (f"source_conflict:{fact_type}",)
+    assert decision.transition_requested is False
 
 
 def test_case_already_keyed_by_successor_accepts_without_a_to_a_transition():
@@ -885,9 +1104,7 @@ def test_explicit_no_identity_change_resolves_without_transition():
         _fact("sec", "transaction_structure", transaction),
         _fact("sec", "tracked_security_effect", "no_identity_change"),
     )
-    listing, listing_facts = _active_listing(
-        "nasdaq-blbd", "BLBD", cik="0001589526"
-    )
+    listing, listing_facts = _active_listing("nasdaq-blbd", "BLBD", cik="0001589526")
     decision = _evaluate(
         case={**_case(ticker="BLBD", kinds=("merger_agreement",)), "cik": "0001589526"},
         evidence=(_evidence("sec", "regulator"), listing),
@@ -920,8 +1137,8 @@ def test_terminal_delisting_separates_conclusion_from_action_readiness():
     )
     massive, massive_facts = _massive_inactive("massive-inactive", "OLD")
     terminal_authority = (
-        _not_found_listing("nasdaq-listed", "OLD", market="nasdaq"),
-        _not_found_listing("nasdaq-other", "OLD", market="other"),
+        _not_found_listing("nasdaq-listed", "OLD", directory="nasdaq_listed"),
+        _not_found_listing("nasdaq-other", "OLD", directory="other_listed"),
         massive,
     )
     before = _evaluate(
@@ -932,7 +1149,7 @@ def test_terminal_delisting_separates_conclusion_from_action_readiness():
     )
     assert before.decision_tier == "verified_automatic"
     assert before.action_readiness == "waiting_effective_date"
-    assert before.outcomes == ("listing_ended",)
+    assert before.outcomes == ("undetermined",)
     assert before.transition_requested is False
 
     after = _evaluate(
@@ -1020,7 +1237,25 @@ def test_terminal_delisting_separates_conclusion_from_action_readiness():
     )
     assert portfolio_open.decision_tier == "verified_automatic"
     assert portfolio_open.action_readiness == "action_blocked"
+    assert portfolio_open.outcomes == ("undetermined",)
     assert portfolio_open.decision_issues == ("portfolio_position_open",)
+
+    preview_blocked = _evaluate(
+        case=_case(ticker="OLD", kinds=("listing_removal_notice",)),
+        evidence=(regulator_evidence, *terminal_authority),
+        facts=regulator_facts + massive_facts,
+        current_date=date(2026, 9, 1),
+        transition_preview=lambda request: {
+            "eligible": False,
+            "block_reasons": ("successor_hidden",),
+            "transition_kind": request["transition_kind"],
+        },
+    )
+    assert preview_blocked.decision_tier == "verified_automatic"
+    assert preview_blocked.action_readiness == "action_blocked"
+    assert preview_blocked.outcomes == ("undetermined",)
+    assert preview_blocked.decision_issues == ("preview:successor_hidden",)
+    assert preview_blocked.transition_requested is False
 
 
 def test_ma_structures_are_review_suggested_with_complete_prefill():

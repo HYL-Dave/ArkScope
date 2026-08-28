@@ -469,6 +469,9 @@ is deduplicated inside `ListingAuthoritySession`. A Nasdaq miss produces two
 evidence rows, one per complete directory and exact file hash; no aggregate
 document digest is allowed. For Massive, lookup time is `source_as_of` and the
 provider's optional `last_updated_utc` remains a distinct locator field.
+The durable locator also carries `locator_kind`, `adapter`, and
+`expected_active_state` so Task 4 can select current material by the exact
+component identity without reconstructing request intent from URLs.
 
 - [ ] **Step 4: Add adapter contracts to schema-facing validators**
 
