@@ -569,16 +569,29 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
             for row in detail["evidence"]
             if row["source_family"] == "listing_authority"
         )
-        assert listing["listing"] == {
-            "authority": "massive",
-            "directory": None,
-            "candidate_ticker": "B",
-            "listing_status": "active",
-            "market": "stocks",
-            "primary_exchange": "XNAS",
-            "source_as_of": "2026-08-28",
+        assert listing == {
+            "evidence_id": "evidence-listing",
+            "source_family": "listing_authority",
+            "kind": "listing_directory_snapshot",
+            "source_url": "https://api.massive.com/v3/reference/tickers",
+            "created_at": _AT,
+            "listing": {
+                "authority": "massive",
+                "directory": None,
+                "candidate_ticker": "B",
+                "listing_status": "active",
+                "market": "stocks",
+                "primary_exchange": "XNAS",
+                "source_as_of": "2026-08-28",
+            },
         }
-        assert "source_locator_json" not in listing
+        assert "canonical-only" not in detail_response.text
+        assert next(
+            row for row in detail["evidence"] if row["source_family"] == "regulator"
+        )["excerpt"] == "The tracked security may continue under ticker EA2."
+        assert next(
+            row for row in detail["evidence"] if row["source_family"] == "manual"
+        )["excerpt"] == "Official issuer evidence."
 
         listed = client.get("/security-lifecycle/cases").json()["cases"][0]
         assert listed["evidence_count"] == 4
@@ -594,6 +607,62 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
         ]
         assert raw_families.count("publisher") == 1
         assert raw_families.count("general_web") == 1
+    finally:
+        context["profile_conn"].close()
+
+
+def test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evidence(
+    tmp_path,
+    monkeypatch,
+):
+    context = _build_context(tmp_path)
+    try:
+        _create_automation_draft(context)
+        _insert_automation_evidence(
+            context,
+            evidence_id="evidence-listing",
+            source_family="listing_authority",
+            kind="listing_directory_snapshot",
+            adapter="massive_reference",
+            excerpt='{"listing_status":"active","secret":"canonical-only"}',
+            source_url="https://api.massive.com/v3/reference/tickers",
+            source_document_sha256="b" * 64,
+            source_locator=_listing_locator(authority="arbitrary_provider"),
+        )
+        _insert_automation_evidence(
+            context,
+            evidence_id="evidence-ibkr",
+            source_family="market_infrastructure",
+            kind="market_infrastructure_snapshot",
+            adapter="ibkr_contract",
+            excerpt="IBKR exact contract snapshot.",
+        )
+        context["profile_conn"].commit()
+        client = _client(context, monkeypatch)
+        _add_manual(client, context["case_id"])
+
+        detail_response = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}"
+        )
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert {row["source_family"] for row in detail["evidence"]} == {
+            "regulator",
+            "market_infrastructure",
+            "manual",
+        }
+        assert detail["evidence_count"] == 3
+        assert "canonical-only" not in detail_response.text
+        assert client.get("/security-lifecycle/cases").json()["cases"][0][
+            "evidence_count"
+        ] == 3
+        raw = context["service"].get_case(context["case_id"])
+        assert raw["evidence_count"] == 4
+        assert any(
+            row["source_family"] == "listing_authority"
+            and "canonical-only" in row["excerpt"]
+            for row in raw["evidence"]
+        )
     finally:
         context["profile_conn"].close()
 

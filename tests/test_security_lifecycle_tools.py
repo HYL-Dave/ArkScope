@@ -312,11 +312,12 @@ def test_active_case_projection_uses_closed_families_but_preserves_storage(
 
     market_path, profile_path, profile, store, case_id = _databases(tmp_path)
     try:
-        raw_case = SecurityLifecycleReadService(
+        service = SecurityLifecycleReadService(
             market_db_path=str(market_path),
             profile_db_path=str(profile_path),
             source_loader=lambda: {"EA": ("manual_lists",)},
-        ).get_case(case_id)
+        )
+        raw_case = service.get_case(case_id)
         _seed_all_evidence_families(
             store,
             case_id,
@@ -324,37 +325,69 @@ def test_active_case_projection_uses_closed_families_but_preserves_storage(
         )
         tools = _configure(monkeypatch, market_path, profile_path)
 
-        detail = tools.get_security_lifecycle_case(case_id)["case"]
-        assert {row["source_family"] for row in detail["evidence"]} == {
-            "manual",
-            "regulator",
-            "listing_authority",
-            "market_infrastructure",
-        }
-        assert detail["evidence_count"] == 4
-        assert set(detail["source_family_status"]) <= {
-            "regulator",
-            "listing_authority",
-            "market_infrastructure",
-            "manual",
-        }
-        listing = next(
+        from src.tools.security_lifecycle_tools import (
+            _provider_neutral_case,
+            project_active_security_lifecycle_case,
+        )
+
+        raw_case = service.get_case(case_id)
+        raw_listing = next(
             row
-            for row in detail["evidence"]
+            for row in raw_case["evidence"]
             if row["source_family"] == "listing_authority"
         )
-        assert listing["listing"] == {
-            "authority": "massive",
-            "directory": None,
-            "candidate_ticker": "B",
-            "listing_status": "active",
-            "market": "stocks",
-            "primary_exchange": "XNAS",
-            "source_as_of": "2026-08-28",
+        raw_listing["synthetic_surplus"] = "surplus-secret"
+        details = (
+            project_active_security_lifecycle_case(raw_case),
+            _provider_neutral_case(raw_case),
+            tools.get_security_lifecycle_case(case_id)["case"],
+        )
+        expected_listing = {
+            "evidence_id": raw_listing["evidence_id"],
+            "source_family": "listing_authority",
+            "kind": "listing_directory_snapshot",
+            "source_url": "https://api.massive.com/v3/reference/tickers",
+            "created_at": _AT,
+            "listing": {
+                "authority": "massive",
+                "directory": None,
+                "candidate_ticker": "B",
+                "listing_status": "active",
+                "market": "stocks",
+                "primary_exchange": "XNAS",
+                "source_as_of": "2026-08-28",
+            },
         }
-        assert "source_locator_json" not in listing
-        assert "adapter" not in listing["listing"]
-        assert "expected_active_state" not in listing["listing"]
+        for detail in details:
+            assert {row["source_family"] for row in detail["evidence"]} == {
+                "manual",
+                "regulator",
+                "listing_authority",
+                "market_infrastructure",
+            }
+            assert detail["evidence_count"] == 4
+            assert set(detail["source_family_status"]) <= {
+                "regulator",
+                "listing_authority",
+                "market_infrastructure",
+                "manual",
+            }
+            listing = next(
+                row
+                for row in detail["evidence"]
+                if row["source_family"] == "listing_authority"
+            )
+            assert listing == expected_listing
+            assert "canonical-only" not in json.dumps(detail)
+            assert "surplus-secret" not in json.dumps(detail)
+            regulator = next(
+                row for row in detail["evidence"] if row["source_family"] == "regulator"
+            )
+            manual = next(
+                row for row in detail["evidence"] if row["source_family"] == "manual"
+            )
+            assert regulator["excerpt"] == "EA SEC filing prose."
+            assert manual["excerpt"] == "Attended issuer note."
 
         listed = tools.list_security_lifecycle_cases()["cases"][0]
         assert listed["evidence_count"] == 4
@@ -372,18 +405,29 @@ def test_active_case_projection_uses_closed_families_but_preserves_storage(
         profile.close()
 
 
-def test_active_case_projection_rejects_incomplete_or_open_listing_locators():
+def test_active_case_projection_omits_each_malformed_listing_row_independently():
     from src.tools.security_lifecycle_tools import (
         project_active_security_lifecycle_case,
     )
 
+    regulator = {
+        "evidence_id": "regulator-1",
+        "source_family": "regulator",
+        "kind": "regulator_excerpt",
+        "excerpt": "SEC prose remains visible.",
+        "created_at": _AT,
+    }
+    listing = {
+        "evidence_id": "listing-1",
+        "source_family": "listing_authority",
+        "kind": "listing_directory_snapshot",
+        "excerpt": '{"secret":"malformed-listing"}',
+        "source_locator_json": json.dumps(_listing_locator()),
+        "created_at": _AT,
+    }
     base = {
-        "evidence": [{
-            "evidence_id": "listing-1",
-            "source_family": "listing_authority",
-            "kind": "listing_directory_snapshot",
-            "source_locator_json": json.dumps(_listing_locator()),
-        }],
+        "evidence": [regulator, listing],
+        "evidence_count": 2,
         "source_family_status": {"listing_authority": "present"},
     }
     invalid_locators = [
@@ -397,17 +441,82 @@ def test_active_case_projection_rejects_incomplete_or_open_listing_locators():
     for locator in invalid_locators:
         case = {
             **base,
-            "evidence": [{
-                **base["evidence"][0],
+            "evidence": [regulator, {
+                **listing,
                 "source_locator_json": json.dumps(locator),
             }],
         }
-        try:
-            project_active_security_lifecycle_case(case)
-        except ValueError as exc:
-            assert str(exc) == "listing_locator"
-        else:
-            raise AssertionError("invalid listing locator was projected")
+        projected = project_active_security_lifecycle_case(case)
+        assert projected["evidence"] == [regulator]
+        assert projected["evidence_count"] == 1
+        assert "malformed-listing" not in json.dumps(projected)
+
+
+def test_malformed_stored_listing_isolated_across_list_direct_and_provider_detail(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_investigation import observation_fingerprint
+    from src.tools.security_lifecycle_tools import (
+        SecurityLifecycleReadService,
+        _provider_neutral_case,
+        project_active_security_lifecycle_case,
+    )
+
+    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    service = SecurityLifecycleReadService(
+        market_db_path=str(market_path),
+        profile_db_path=str(profile_path),
+        source_loader=lambda: {"EA": ("manual_lists",)},
+    )
+    try:
+        initial = service.get_case(case_id)
+        _seed_all_evidence_families(
+            store,
+            case_id,
+            observation_fingerprint(initial["observation"]),
+        )
+        profile.execute(
+            "UPDATE security_lifecycle_evidence SET source_locator_json=? "
+            "WHERE source_family='listing_authority'",
+            (json.dumps(_listing_locator(listing_status="delisted")),),
+        )
+        profile.commit()
+        tools = _configure(monkeypatch, market_path, profile_path)
+
+        raw = service.get_case(case_id)
+        assert raw["evidence_count"] == 6
+        assert any(
+            row["source_family"] == "listing_authority"
+            and "canonical-only" in row["excerpt"]
+            for row in raw["evidence"]
+        )
+        details = (
+            project_active_security_lifecycle_case(raw),
+            _provider_neutral_case(raw),
+            tools.get_security_lifecycle_case(case_id)["case"],
+        )
+        for detail in details:
+            assert {row["source_family"] for row in detail["evidence"]} == {
+                "regulator",
+                "market_infrastructure",
+                "manual",
+            }
+            assert detail["evidence_count"] == 3
+            assert "canonical-only" not in json.dumps(detail)
+            assert next(
+                row for row in detail["evidence"] if row["source_family"] == "regulator"
+            )["excerpt"] == "EA SEC filing prose."
+        assert details[1]["truncation"]["evidence"] == {
+            "total": 3,
+            "returned": 3,
+        }
+        assert tools.list_security_lifecycle_cases()["cases"][0][
+            "evidence_count"
+        ] == 3
+        assert len(store.list_evidence(case_id)) == 6
+    finally:
+        profile.close()
 
 
 def test_case_detail_projects_original_evidence_with_derived_translations(

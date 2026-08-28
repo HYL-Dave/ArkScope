@@ -8,6 +8,7 @@ import type {
   RuntimeConfig,
   SecurityLifecycleCaseFilters,
   SecurityLifecycleCaseSummary,
+  SecurityLifecycleEvidence,
 } from "../api";
 import { withTestUiLocale } from "../test/testUiLocale";
 
@@ -531,6 +532,48 @@ describe("Lifecycle workflow", () => {
       ...detail().evidence[0],
       translations: [],
     };
+    const notFoundListing: SecurityLifecycleEvidence = {
+      evidence_id: "evidence-not-found",
+      source_family: "listing_authority",
+      kind: "listing_directory_snapshot",
+      source_url: "https://nasdaqtrader.com/symbol-directory",
+      listing: {
+        authority: "nasdaq_trader",
+        directory: "other_listed",
+        candidate_ticker: "MISS",
+        listing_status: "not_found",
+        market: "stocks",
+        primary_exchange: null,
+        source_as_of: "2026-08-28",
+      },
+      created_at: "2026-08-28T10:01:00Z",
+    };
+    const activeListing: SecurityLifecycleEvidence = {
+      evidence_id: "evidence-listing",
+      source_family: "listing_authority",
+      kind: "listing_directory_snapshot",
+      source_url: "https://api.massive.com/v3/reference/tickers/B",
+      listing: {
+        authority: "massive",
+        directory: null,
+        candidate_ticker: "B",
+        listing_status: "active",
+        market: "stocks",
+        primary_exchange: "XNAS",
+        source_as_of: "2026-08-28",
+      },
+      created_at: "2026-08-28T10:03:00Z",
+    };
+    const notFoundListingWithUnexpectedSurplus = {
+      ...notFoundListing,
+      excerpt: '{"secret":"not-found-canonical-json"}',
+      canonical_payload: { secret: "not-found-canonical-payload" },
+    };
+    const activeListingWithUnexpectedSurplus = {
+      ...activeListing,
+      excerpt: '{"secret":"active-canonical-json"}',
+      canonical_payload: { secret: "active-canonical-payload" },
+    };
     const evidence = [
       {
         evidence_id: "evidence-publisher",
@@ -542,25 +585,7 @@ describe("Lifecycle workflow", () => {
         translations: [],
         created_at: "2026-08-28T10:00:00Z",
       },
-      {
-        evidence_id: "evidence-not-found",
-        source_family: "listing_authority",
-        kind: "listing_directory_snapshot",
-        excerpt: '{"secret":"not-found-canonical-json"}',
-        source_url: "https://nasdaqtrader.com/symbol-directory",
-        title: "Nasdaq exact symbol lookup",
-        translations: [],
-        listing: {
-          authority: "nasdaq_trader",
-          directory: "other_listed",
-          candidate_ticker: "MISS",
-          listing_status: "not_found",
-          market: "stocks",
-          primary_exchange: null,
-          source_as_of: "2026-08-28",
-        },
-        created_at: "2026-08-28T10:01:00Z",
-      },
+      notFoundListingWithUnexpectedSurplus,
       {
         evidence_id: "evidence-general-web",
         source_family: "general_web",
@@ -571,25 +596,7 @@ describe("Lifecycle workflow", () => {
         translations: [],
         created_at: "2026-08-28T10:02:00Z",
       },
-      {
-        evidence_id: "evidence-listing",
-        source_family: "listing_authority",
-        kind: "listing_directory_snapshot",
-        excerpt: '{"secret":"active-canonical-json"}',
-        source_url: "https://api.massive.com/v3/reference/tickers/B",
-        title: "Massive exact ticker lookup",
-        translations: [],
-        listing: {
-          authority: "massive",
-          directory: null,
-          candidate_ticker: "B",
-          listing_status: "active",
-          market: "stocks",
-          primary_exchange: "XNAS",
-          source_as_of: "2026-08-28",
-        },
-        created_at: "2026-08-28T10:03:00Z",
-      },
+      activeListingWithUnexpectedSurplus,
       {
         evidence_id: "evidence-malformed-listing",
         source_family: "listing_authority",
@@ -655,6 +662,8 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).not.toContain("Delisted");
     expect(document.body.textContent).not.toContain("active-canonical-json");
     expect(document.body.textContent).not.toContain("not-found-canonical-json");
+    expect(document.body.textContent).not.toContain("active-canonical-payload");
+    expect(document.body.textContent).not.toContain("not-found-canonical-payload");
     expect(document.body.textContent).not.toContain("malformed-canonical-json");
 
     const listingItem = Array.from(

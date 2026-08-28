@@ -41,6 +41,8 @@ import {
   type SecurityLifecycleEventType,
   type SecurityLifecycleEvidence,
   type SecurityLifecycleEvidenceSourceFamily,
+  type SecurityLifecycleListingEvidence,
+  type SecurityLifecycleProseEvidence,
   type SecurityLifecycleProposalType,
   type SecurityLifecycleQueueBucket,
   type SecurityLifecycleRelevance,
@@ -829,15 +831,7 @@ function translationFailureForState(
   return translationFailurePresentation(error.code, t);
 }
 
-function EvidenceItem({
-  evidence,
-  locale,
-  busy,
-  error,
-  onTranslate,
-  onNavigate,
-  t,
-}: {
+interface EvidenceItemProps {
   evidence: SecurityLifecycleEvidence;
   locale: LifecycleLocale;
   busy: boolean;
@@ -845,9 +839,97 @@ function EvidenceItem({
   onTranslate: () => void;
   onNavigate?: (target: NavigationTarget) => void;
   t: TFunction<"explore">;
+}
+
+function ListingEvidenceItem({
+  evidence,
+  locale,
+  t,
+}: {
+  evidence: SecurityLifecycleListingEvidence;
+  locale: LifecycleLocale;
+  t: TFunction<"explore">;
+}) {
+  const listing = evidence.listing;
+  const authority = lifecycleListingAuthorityLabel(listing.authority, locale);
+  const status = lifecycleListingStatusLabel(listing.listing_status, locale);
+  const scanValues = [
+    listing.candidate_ticker,
+    status,
+    listing.primary_exchange,
+    listing.source_as_of,
+  ].filter(Boolean).join(" · ");
+  return (
+    <details className="lifecycle-evidence-item">
+      <summary>
+        <span className="lifecycle-evidence-summary">
+          <span>
+            <strong>{authority}</strong>
+            <span className="tiny">{scanValues}</span>
+          </span>
+          <span className="lifecycle-state">{
+            lifecycleEvidenceSourceFamilyLabel(evidence.source_family, locale)
+          }</span>
+        </span>
+      </summary>
+      <div className="lifecycle-evidence-body">
+        <dl className="lifecycle-assessment-facts">
+          <div>
+            <dt>{t(($) => $.lifecycle.listingEvidence.fields.authority)}</dt>
+            <dd>{authority}</dd>
+          </div>
+          {listing.directory ? (
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.directory)}</dt>
+              <dd className="mono">{listing.directory}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>{t(($) => $.lifecycle.listingEvidence.fields.ticker)}</dt>
+            <dd className="mono">{listing.candidate_ticker}</dd>
+          </div>
+          <div>
+            <dt>{t(($) => $.lifecycle.listingEvidence.fields.status)}</dt>
+            <dd>{status}</dd>
+          </div>
+          <div>
+            <dt>{t(($) => $.lifecycle.listingEvidence.fields.market)}</dt>
+            <dd>{listing.market}</dd>
+          </div>
+          {listing.primary_exchange ? (
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.venue)}</dt>
+              <dd className="mono">{listing.primary_exchange}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>{t(($) => $.lifecycle.listingEvidence.fields.asOf)}</dt>
+            <dd><time dateTime={listing.source_as_of}>{listing.source_as_of}</time></dd>
+          </div>
+        </dl>
+        {safeEvidenceUrl(evidence.source_url) ? (
+          <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">
+            <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
+          </a>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function ProseEvidenceItem({
+  evidence,
+  locale,
+  busy,
+  error,
+  onTranslate,
+  onNavigate,
+  t,
+}: Omit<EvidenceItemProps, "evidence"> & {
+  evidence: SecurityLifecycleProseEvidence;
 }) {
   const [mode, setMode] = useState<"original" | "translation">("original");
-  const translation = (evidence.translations ?? []).find(
+  const translation = evidence.translations.find(
     (item) => item.locale === locale,
   );
   const failure = error ? translationFailureForState(error, t) : null;
@@ -855,74 +937,6 @@ function EvidenceItem({
   const canRetry = error && failure?.action === "retry"
     && (error.retryable || error.code === "translation_output_invalid");
   const visibleMode = translation ? mode : "original";
-  if (evidence.kind === "listing_directory_snapshot") {
-    const listing = evidence.listing;
-    if (!listing) return null;
-    const authority = lifecycleListingAuthorityLabel(listing.authority, locale);
-    const status = lifecycleListingStatusLabel(listing.listing_status, locale);
-    const scanValues = [
-      listing.candidate_ticker,
-      status,
-      listing.primary_exchange,
-      listing.source_as_of,
-    ].filter(Boolean).join(" · ");
-    return (
-      <details className="lifecycle-evidence-item">
-        <summary>
-          <span className="lifecycle-evidence-summary">
-            <span>
-              <strong>{authority}</strong>
-              <span className="tiny">{scanValues}</span>
-            </span>
-            <span className="lifecycle-state">{
-              lifecycleEvidenceSourceFamilyLabel(evidence.source_family, locale)
-            }</span>
-          </span>
-        </summary>
-        <div className="lifecycle-evidence-body">
-          <dl className="lifecycle-assessment-facts">
-            <div>
-              <dt>{t(($) => $.lifecycle.listingEvidence.fields.authority)}</dt>
-              <dd>{authority}</dd>
-            </div>
-            {listing.directory ? (
-              <div>
-                <dt>{t(($) => $.lifecycle.listingEvidence.fields.directory)}</dt>
-                <dd className="mono">{listing.directory}</dd>
-              </div>
-            ) : null}
-            <div>
-              <dt>{t(($) => $.lifecycle.listingEvidence.fields.ticker)}</dt>
-              <dd className="mono">{listing.candidate_ticker}</dd>
-            </div>
-            <div>
-              <dt>{t(($) => $.lifecycle.listingEvidence.fields.status)}</dt>
-              <dd>{status}</dd>
-            </div>
-            <div>
-              <dt>{t(($) => $.lifecycle.listingEvidence.fields.market)}</dt>
-              <dd>{listing.market}</dd>
-            </div>
-            {listing.primary_exchange ? (
-              <div>
-                <dt>{t(($) => $.lifecycle.listingEvidence.fields.venue)}</dt>
-                <dd className="mono">{listing.primary_exchange}</dd>
-              </div>
-            ) : null}
-            <div>
-              <dt>{t(($) => $.lifecycle.listingEvidence.fields.asOf)}</dt>
-              <dd><time dateTime={listing.source_as_of}>{listing.source_as_of}</time></dd>
-            </div>
-          </dl>
-          {safeEvidenceUrl(evidence.source_url) ? (
-            <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">
-              <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
-            </a>
-          ) : null}
-        </div>
-      </details>
-    );
-  }
   return (
     <details className="lifecycle-evidence-item">
       <summary>
@@ -1032,6 +1046,23 @@ function EvidenceItem({
       </div>
     </details>
   );
+}
+
+function EvidenceItem(props: EvidenceItemProps) {
+  if (props.evidence.source_family === "listing_authority") {
+    if (
+      props.evidence.kind !== "listing_directory_snapshot"
+      || !props.evidence.listing
+    ) return null;
+    return (
+      <ListingEvidenceItem
+        evidence={props.evidence}
+        locale={props.locale}
+        t={props.t}
+      />
+    );
+  }
+  return <ProseEvidenceItem {...props} evidence={props.evidence} />;
 }
 
 function LifecycleDispositionReasonText({
@@ -1497,7 +1528,7 @@ export function LifecycleView({
   const currentEvidence = useMemo(
     () => (detail?.evidence ?? []).filter(
       (item) => ACTIVE_SOURCE_FAMILIES.includes(item.source_family)
-        && (item.kind !== "listing_directory_snapshot" || Boolean(item.listing)),
+        && (item.source_family !== "listing_authority" || Boolean(item.listing)),
     ),
     [detail?.evidence],
   );
@@ -2104,7 +2135,7 @@ export function LifecycleView({
                             : current.filter((id) => id !== item.evidence_id));
                         }}
                       />
-                      {item.kind === "listing_directory_snapshot" && item.listing
+                      {item.source_family === "listing_authority"
                         ? [
                           lifecycleListingAuthorityLabel(item.listing.authority, locale),
                           item.listing.candidate_ticker,

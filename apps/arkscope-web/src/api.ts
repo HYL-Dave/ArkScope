@@ -2728,29 +2728,48 @@ export interface SecurityLifecycleEvidenceTranslation {
   cached?: boolean;
 }
 
-export interface SecurityLifecycleEvidence {
+interface SecurityLifecycleEvidenceBase {
   evidence_id: string;
-  source_family: SecurityLifecycleEvidenceSourceFamily;
+  source_url: string | null;
+  created_at: string;
+}
+
+export interface SecurityLifecycleListingSnapshot {
+  authority: SecurityLifecycleListingAuthority;
+  directory: "nasdaq_listed" | "other_listed" | null;
+  candidate_ticker: string;
+  listing_status: SecurityLifecycleListingStatus;
+  market: "stocks" | "otc";
+  primary_exchange: string | null;
+  source_as_of: string;
+}
+
+export interface SecurityLifecycleListingEvidence
+  extends SecurityLifecycleEvidenceBase {
+  source_family: "listing_authority";
+  kind: "listing_directory_snapshot";
+  listing: SecurityLifecycleListingSnapshot;
+}
+
+export interface SecurityLifecycleProseEvidence
+  extends SecurityLifecycleEvidenceBase {
+  source_family: Exclude<
+    SecurityLifecycleEvidenceSourceFamily,
+    "listing_authority"
+  >;
   kind: string;
   excerpt: string;
-  source_url: string | null;
   content_sha256?: string;
-  created_at: string;
   title?: string | null;
   publisher?: string | null;
   source_published_at?: string | null;
   source_document_sha256?: string | null;
-  listing?: {
-    authority: SecurityLifecycleListingAuthority;
-    directory: "nasdaq_listed" | "other_listed" | null;
-    candidate_ticker: string;
-    listing_status: SecurityLifecycleListingStatus;
-    market: "stocks" | "otc";
-    primary_exchange: string | null;
-    source_as_of: string;
-  };
   translations: SecurityLifecycleEvidenceTranslation[];
 }
+
+export type SecurityLifecycleEvidence =
+  | SecurityLifecycleListingEvidence
+  | SecurityLifecycleProseEvidence;
 
 export interface SecurityLifecycleActionProposal {
   proposal_id: string;

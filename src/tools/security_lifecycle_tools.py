@@ -181,11 +181,25 @@ def project_active_security_lifecycle_case(case: Mapping[str, object]) -> dict:
         source_family = raw.get("source_family")
         if source_family not in _ACTIVE_SOURCE_FAMILIES:
             continue
-        row = dict(raw)
         if source_family == "listing_authority":
-            if row.get("kind") != "listing_directory_snapshot":
-                raise ValueError("listing_locator")
-            row["listing"] = _compact_listing(row.get("source_locator_json"))
+            if raw.get("kind") != "listing_directory_snapshot":
+                continue
+            try:
+                listing = _compact_listing(raw.get("source_locator_json"))
+            except ValueError:
+                continue
+            evidence.append(
+                {
+                    "evidence_id": raw.get("evidence_id"),
+                    "source_family": "listing_authority",
+                    "kind": "listing_directory_snapshot",
+                    "source_url": raw.get("source_url"),
+                    "created_at": raw.get("created_at"),
+                    "listing": listing,
+                }
+            )
+            continue
+        row = dict(raw)
         row.pop("source_locator_json", None)
         row.pop("adapter", None)
         evidence.append(row)
@@ -397,6 +411,9 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
             elif name == "evidence":
                 value.pop("adapter", None)
                 value.pop("source_locator_json", None)
+                if value.get("source_family") == "listing_authority":
+                    rendered.append(value)
+                    continue
                 value["translations"] = [
                     {
                         key: field
