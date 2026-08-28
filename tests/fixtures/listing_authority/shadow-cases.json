@@ -1,15 +1,99 @@
 {
+  "schema_version": 2,
   "cases": [
-    {"id": "HAPN", "fixture": "historical_hapn", "preview_calls": 0},
-    {"id": "QBTS", "fixture": "same_symbol_venue_transfer", "preview_calls": 0},
-    {"id": "CCL", "fixture": "historical_ccl", "preview_calls": 0},
-    {"id": "BLBD", "fixture": "historical_blbd", "preview_calls": 0},
-    {"id": "NMS-A", "fixture": "nms_symbol_continuation", "preview_calls": 1},
-    {"id": "OTC-A", "fixture": "otc_symbol_continuation", "preview_calls": 1},
-    {"id": "TERM", "fixture": "terminal_delisting", "preview_calls": 1},
-    {"id": "MISS", "fixture": "nasdaq_absence_only", "preview_calls": 0},
-    {"id": "CONFLICT", "fixture": "listing_cik_conflict", "preview_calls": 0}
+    {
+      "id": "HAPN",
+      "fixture": "historical_hapn",
+      "preview_calls": 0,
+      "listing_query": {"ticker": "HAPN", "source_ticker": "LC", "issuer_cik": "0001409970"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"}
+      ]
+    },
+    {
+      "id": "QBTS",
+      "fixture": "same_symbol_venue_transfer",
+      "preview_calls": 0,
+      "listing_query": {"ticker": "QBTS", "source_ticker": "QBTS", "issuer_cik": "0001907982"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"}
+      ]
+    },
+    {
+      "id": "CCL",
+      "fixture": "historical_ccl",
+      "preview_calls": 0,
+      "listing_query": {"ticker": "CCL", "source_ticker": "CCL", "issuer_cik": "0000815097"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"}
+      ]
+    },
+    {
+      "id": "BLBD",
+      "fixture": "historical_blbd",
+      "preview_calls": 0,
+      "listing_query": {"ticker": "BLBD", "source_ticker": "BLBD", "issuer_cik": "0001589526"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"}
+      ]
+    },
+    {
+      "id": "NMS-A",
+      "fixture": "nms_symbol_continuation",
+      "preview_calls": 1,
+      "listing_query": {"ticker": "NEW", "source_ticker": "OLD", "issuer_cik": "0001409970"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"}
+      ]
+    },
+    {
+      "id": "OTC-A",
+      "fixture": "otc_symbol_continuation",
+      "preview_calls": 1,
+      "listing_query": {"ticker": "NEW", "source_ticker": "OLD", "issuer_cik": "0001409970"},
+      "listing_payloads": [
+        {"adapter": "massive_reference", "expected_active": true, "market": "otc", "filename": "shadow-massive-otc-active.json", "sha256": "92eb7e26a79784dad80108253bebb86b6030b6566788a032f4349e68fa71a88d"}
+      ]
+    },
+    {
+      "id": "TERM",
+      "fixture": "terminal_delisting",
+      "preview_calls": 1,
+      "listing_query": {"ticker": "OLD", "source_ticker": "OLD", "issuer_cik": "0001409970"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"},
+        {"adapter": "massive_reference", "expected_active": false, "market": "stocks", "filename": "shadow-massive-term-inactive.json", "sha256": "9ee93b089344d955581c137d425ca0b23e844017d17e09bb6f6c85f94abede08"}
+      ]
+    },
+    {
+      "id": "MISS",
+      "fixture": "nasdaq_absence_only",
+      "preview_calls": 0,
+      "listing_query": {"ticker": "OLD", "source_ticker": "OLD", "issuer_cik": "0001409970"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"}
+      ]
+    },
+    {
+      "id": "CONFLICT",
+      "fixture": "listing_cik_conflict",
+      "preview_calls": 0,
+      "listing_query": {"ticker": "NEW", "source_ticker": "OLD", "issuer_cik": "0001409970"},
+      "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "shadow-nasdaqlisted.txt", "sha256": "27c01c0b6fc45f87c8771c97552a8b8c0a2bde78a550e8a32328558c1a475884"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "shadow-otherlisted.txt", "sha256": "708a0a7b2296f628cff9c64230abac2d3a02c8f4162d25f649899d97a77c5208"},
+        {"adapter": "massive_reference", "expected_active": true, "market": "stocks", "filename": "shadow-massive-conflict-active.json", "sha256": "ceb87170a1cc7d61986d849b3cad950dd583a0451be370512497bf3297498523"}
+      ]
+    }
   ],
-  "fixture_authority": "offline_repository_fixture",
-  "publisher_injection_expected": "inert"
+  "fixture_authority": "offline_repository_fixture_exact_bytes",
+  "publisher_injection_expected": "inert",
+  "sec_fact_authority": "frozen_repository_helper_no_provider_payload_bytes"
 }
