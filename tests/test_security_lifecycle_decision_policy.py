@@ -1110,6 +1110,82 @@ def test_case_already_keyed_by_successor_accepts_without_a_to_a_transition():
     assert decision.transition_requested is False
 
 
+def test_retained_old_listing_source_role_is_not_aligned_as_current_destination():
+    from src.security_lifecycle_decision_policy import (
+        _evidence_rows,
+        _fact_rows,
+        _facts_with_current_listing_destination_role,
+    )
+
+    retained_old, retained_old_facts = _active_listing(
+        "nasdaq-old-source",
+        "OLD",
+        venue="NYSE",
+        current_ticker="OLD",
+        retrieved_at="2026-08-24T01:02:03Z",
+    )
+    current_nasdaq, current_nasdaq_facts = _active_listing(
+        "nasdaq-current",
+        "NEW",
+        current_ticker="NEW",
+    )
+    current_massive, current_massive_facts = _active_listing(
+        "massive-current",
+        "NEW",
+        adapter="massive_reference",
+        current_ticker="NEW",
+        cik=_CIK,
+    )
+    evidence = (
+        _evidence("sec", "regulator"),
+        retained_old,
+        current_nasdaq,
+        current_massive,
+    )
+    facts = (
+        _identity_facts(
+            source="OLD",
+            successor="NEW",
+            source_venue="NYSE",
+            destination_venue="NASDAQ",
+        )[:7]
+        + retained_old_facts
+        + current_nasdaq_facts
+        + current_massive_facts
+    )
+    evidence_rows = _evidence_rows(evidence)
+    fact_rows = _fact_rows(facts, evidence_rows)
+
+    aligned = _facts_with_current_listing_destination_role(fact_rows, "NEW")
+    aligned_types = {
+        (row.evidence_id, row.fact_type, row.value)
+        for row in aligned
+        if row.source_family == "listing_authority"
+    }
+    assert ("nasdaq-old-source", "source_ticker", "OLD") in aligned_types
+    assert ("nasdaq-old-source", "source_venue", "NYSE") in aligned_types
+    assert ("nasdaq-old-source", "successor_ticker", "OLD") not in aligned_types
+    for evidence_id in ("nasdaq-current", "massive-current"):
+        assert (evidence_id, "successor_ticker", "NEW") in aligned_types
+        assert (evidence_id, "destination_venue", "NASDAQ") in aligned_types
+
+    decision = _evaluate(
+        case=_case(ticker="NEW"),
+        evidence=evidence,
+        facts=facts,
+        transition_preview=lambda _request: (_ for _ in ()).throw(
+            AssertionError("already-keyed successor must not preview")
+        ),
+    )
+
+    assert decision.decision_tier == "verified_automatic"
+    assert decision.action_readiness == "not_applicable"
+    assert decision.decision_issues == ()
+    assert decision.successor_ticker == "NEW"
+    assert decision.destination_venue == "NASDAQ"
+    assert decision.transition_requested is False
+
+
 def test_venue_transfer_accepts_ordinary_nasdaq_listing_without_security_class():
     facts = _identity_facts(source="QBTS", successor="QBTS")[:7]
     listing, listing_facts = _active_listing(

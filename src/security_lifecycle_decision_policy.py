@@ -273,6 +273,13 @@ def _facts_with_current_listing_destination_role(
         "source_ticker": "successor_ticker",
         "source_venue": "destination_venue",
     }
+    current_listing_evidence_ids = {
+        row.evidence_id
+        for row in facts
+        if row.source_family == "listing_authority"
+        and row.fact_type == "source_ticker"
+        and row.value == case_ticker
+    }
     aligned = tuple(
         _Fact(
             evidence_id=row.evidence_id,
@@ -281,7 +288,7 @@ def _facts_with_current_listing_destination_role(
             value=row.value,
             canonical_value=row.canonical_value,
         )
-        if row.source_family == "listing_authority"
+        if row.evidence_id in current_listing_evidence_ids
         else row
         for row in facts
     )
