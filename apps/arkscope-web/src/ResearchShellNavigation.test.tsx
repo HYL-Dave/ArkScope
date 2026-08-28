@@ -33,7 +33,7 @@ const taskRoute = (task: ModelTask): TaskRoute => ({
 const RUNTIME: RuntimeConfig = {
   anthropic: {
     model: "claude-sonnet-5",
-    model_advanced: "claude-opus-4-8",
+    model_advanced: "claude-opus-5",
     effort: null,
     thinking: false,
     key_set: true,

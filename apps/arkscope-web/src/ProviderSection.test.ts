@@ -159,7 +159,7 @@ function jsonResponse(body: unknown, status = 200) {
 function catalog(): ModelCatalog {
   return {
     providers: ["anthropic", "openai"],
-    tasks: [{ id: "ai_research", label: "AI 研究", description: "", default_provider: "openai", recommended_model: "gpt-5.4-mini" }],
+    tasks: [{ id: "ai_research", label: "AI 研究", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" }],
     models: [],
     effort_options: { openai: [], anthropic: [] },
     routes: {} as ModelCatalog["routes"],

@@ -48,6 +48,7 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     assert "default" in {x["id"] for x in res["effort_options"]["anthropic"]}
     assert "minimal" not in {x["id"] for x in res["effort_options"]["openai"]}
     assert "max" in {x["id"] for x in res["effort_options"]["openai"]}
+    assert res["task_route_effort_order"] == list(TASK_ROUTE_EFFORT_ORDER)
     by_id = {model["id"]: model for model in res["models"]}
     assert by_id["gpt-5.6-luna"]["effort_options"] == [
         "none", "low", "medium", "high", "xhigh", "max",

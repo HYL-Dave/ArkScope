@@ -111,7 +111,10 @@ export function effortOptionsForModel(
   const allowed = supported === undefined
     ? providerIds
     : new Set(supported);
-  return TASK_ROUTE_EFFORT_IDS
+  const taskRouteOrder = catalog.task_route_effort_order === undefined
+    ? TASK_ROUTE_EFFORT_IDS
+    : catalog.task_route_effort_order.filter(isTaskRouteEffort);
+  return taskRouteOrder
     .filter((id) => providerIds.has(id) && allowed.has(id))
     .map((id) => providerOptions.find((item) => item.id === id)!)
     .filter(Boolean);

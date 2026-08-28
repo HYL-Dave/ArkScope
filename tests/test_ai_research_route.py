@@ -3,7 +3,8 @@
 resolve_research_route(provider) gives the model + effort the Research surface
 should use when the request specifies none: a configured ai_research route when
 its provider MATCHES the request, else the request provider's default-tier model
-(today's behavior). 'default'/empty effort → None (agent uses its own default).
+(today's behavior). A matching legacy 'default'/empty effort stays ``None`` so
+shared admission can require an explicit correction without rewriting it.
 """
 
 from __future__ import annotations

@@ -557,6 +557,65 @@ def test_legacy_research_route_remains_readable_but_cannot_start_new_run(
     assert run_store.get_run("legacy").effort == legacy_effort
 
 
+def test_real_legacy_route_resolution_rejects_until_the_stored_route_is_corrected(
+    stores, monkeypatch
+):
+    from src.agents import config as config_module
+    from src.agents.config import AgentConfig
+    from src.model_route_store import ModelRouteStore
+
+    run_store, thread_store = stores
+    route_store = ModelRouteStore(run_store.db_path)
+    for env_name in (
+        "ARKSCOPE_AI_RESEARCH_PROVIDER",
+        "ARKSCOPE_AI_RESEARCH_MODEL",
+        "ARKSCOPE_AI_RESEARCH_EFFORT",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setattr(config_module, "_default_route_store", lambda: route_store)
+    monkeypatch.setattr(config_module, "get_agent_config", lambda: AgentConfig())
+
+    persisted = []
+    scheduled = []
+    original_create = run_store.create_run_with_user_message
+
+    def record_create(**kwargs):
+        persisted.append(kwargs)
+        return original_create(**kwargs)
+
+    monkeypatch.setattr(run_store, "create_run_with_user_message", record_create)
+    monkeypatch.setattr(r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs))
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", "local:test"))
+    request = r.ResearchRunCreate(question="real resolver", provider="openai")
+
+    route_store.set("ai_research", "openai", "gpt-5.4-mini", "default")
+    with pytest.raises(HTTPException) as retired:
+        asyncio.run(r.create_research_run(
+            request, dal=object(), thread_store=thread_store, run_store=run_store,
+        ))
+    assert retired.value.detail == {"code": "model_retired", "field": "model"}
+
+    route_store.set("ai_research", "openai", "gpt-5.6-luna", "default")
+    with pytest.raises(HTTPException) as incomplete:
+        asyncio.run(r.create_research_run(
+            request, dal=object(), thread_store=thread_store, run_store=run_store,
+        ))
+    assert incomplete.value.detail == {"code": "effort_required", "field": "effort"}
+    assert persisted == []
+    assert scheduled == []
+
+    route_store.set("ai_research", "openai", "gpt-5.6-luna", "xhigh")
+    response = asyncio.run(r.create_research_run(
+        request, dal=object(), thread_store=thread_store, run_store=run_store,
+    ))
+
+    assert (response["run"]["model"], response["run"]["effort"]) == (
+        "gpt-5.6-luna", "xhigh",
+    )
+    assert len(persisted) == 1
+    assert len(scheduled) == 1
+
+
 def test_openai_explicit_effort_persists_and_reaches_wire(stores, monkeypatch):
     run_store, thread_store = stores
     scheduled = {}

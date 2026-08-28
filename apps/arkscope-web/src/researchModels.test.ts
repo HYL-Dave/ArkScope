@@ -44,7 +44,11 @@ describe("effortNote", () => {
 
 describe("effortOptionsForModel", () => {
   const taskEfforts = ["low", "medium", "high", "xhigh", "max"];
-  const options = (provider: "openai" | "anthropic") => taskEfforts.map((id) => ({
+  const providerEfforts = {
+    openai: ["default", "none", ...taskEfforts],
+    anthropic: ["default", ...taskEfforts],
+  };
+  const options = (provider: "openai" | "anthropic") => providerEfforts[provider].map((id) => ({
     id,
     provider,
     label: id,
@@ -52,6 +56,7 @@ describe("effortOptionsForModel", () => {
     applies_to_card_tasks: true,
   }));
   const catalog = {
+    task_route_effort_order: taskEfforts,
     effort_options: { openai: options("openai"), anthropic: options("anthropic") },
     current_model_ids: [
       "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
@@ -82,11 +87,15 @@ describe("effortOptionsForModel", () => {
     ],
     models: [
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
-        id, provider: "openai" as const, effort_options: taskEfforts,
+        id, provider: "openai" as const, effort_options: ["none", ...taskEfforts],
       })),
-      ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+      ...["claude-fable-5", "claude-sonnet-5"].map((id) => ({
         id, provider: "anthropic" as const, effort_options: taskEfforts,
       })),
+      {
+        id: "claude-opus-5", provider: "anthropic" as const,
+        effort_options: ["max", "xhigh", "high", "medium", "low"],
+      },
     ],
   } as unknown as ModelCatalog;
 
@@ -94,6 +103,24 @@ describe("effortOptionsForModel", () => {
     expect(effortOptionsForModel(catalog, "openai", "gpt-5.6-luna").map((item) => item.id))
       .toEqual(["low", "medium", "high", "xhigh", "max"]);
     expect(effortOptionsForModel(catalog, "anthropic", "claude-opus-5").map((item) => item.id))
+      .toEqual(["low", "medium", "high", "xhigh", "max"]);
+  });
+
+  it("uses the catalog task-route order instead of provider-native model order", () => {
+    const catalogOrder = {
+      ...catalog,
+      task_route_effort_order: ["high", "low"],
+    } as ModelCatalog;
+    expect(effortOptionsForModel(catalogOrder, "anthropic", "claude-opus-5").map((item) => item.id))
+      .toEqual(["high", "low"]);
+  });
+
+  it("keeps the closed product order for an older sidecar without the additive field", () => {
+    const oldSidecarCatalog = {
+      ...catalog,
+      task_route_effort_order: undefined,
+    } as ModelCatalog;
+    expect(effortOptionsForModel(oldSidecarCatalog, "anthropic", "claude-opus-5").map((item) => item.id))
       .toEqual(["low", "medium", "high", "xhigh", "max"]);
   });
 

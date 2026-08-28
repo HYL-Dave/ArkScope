@@ -171,6 +171,9 @@ export interface ModelCatalog {
   tasks: TaskInfo[];
   models: ModelOption[];
   effort_options: Record<ModelProvider, EffortOption[]>;
+  // Additive for old sidecars: the backend owns task-control ordering while
+  // provider/model effort arrays retain their provider-native order.
+  task_route_effort_order?: ExplicitResearchEffort[];
   current_model_ids?: string[];
   retired_model_ids?: string[];
   model_lifecycle?: ModelLifecycleFact[];

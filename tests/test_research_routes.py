@@ -1196,6 +1196,7 @@ def test_query_stream_explicit_model_and_effort_passthrough(store, monkeypatch):
 @pytest.mark.parametrize(
     ("request_model", "request_effort", "resolved", "detail"),
     [
+        ("gpt-5.6-luna", None, None, {"code": "effort_required", "field": "effort"}),
         ("gpt-5.6-luna", "default", None, {"code": "effort_required", "field": "effort"}),
         ("gpt-5.6-luna", "future", None, {"code": "effort_not_supported", "field": "effort"}),
         ("gpt-5.4-mini-2026-08-01", "high", None, {"code": "model_retired", "field": "model"}),
@@ -1268,6 +1269,7 @@ def test_query_sync_unknown_provider_remains_bounded_400():
 @pytest.mark.parametrize(
     ("request_model", "request_effort", "resolved", "detail"),
     [
+        ("gpt-5.6-luna", None, None, {"code": "effort_required", "field": "effort"}),
         ("gpt-5.6-luna", "none", None, {"code": "effort_required", "field": "effort"}),
         ("gpt-5.6-luna", "future", None, {"code": "effort_not_supported", "field": "effort"}),
         ("gpt-5.4-mini-snapshot", "high", None, {"code": "model_retired", "field": "model"}),

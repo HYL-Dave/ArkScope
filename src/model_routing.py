@@ -15,8 +15,11 @@ Provider = Literal["anthropic", "openai"]
 TaskId = Literal["card_synthesis", "card_translation", "ai_research"]
 RouteSource = Literal["env", "db", "profile", "default"]
 EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
+TaskRouteEffortId = Literal["low", "medium", "high", "xhigh", "max"]
 
-TASK_ROUTE_EFFORT_ORDER = ("low", "medium", "high", "xhigh", "max")
+TASK_ROUTE_EFFORT_ORDER: tuple[TaskRouteEffortId, ...] = (
+    "low", "medium", "high", "xhigh", "max",
+)
 
 OPENAI_MODELS_SOURCE = "https://developers.openai.com/api/docs/models"
 OPENAI_LATEST_SOURCE = "https://developers.openai.com/api/docs/guides/latest-model"
@@ -80,6 +83,7 @@ class ModelCatalog(BaseModel):
     tasks: list[TaskInfo]
     models: list[ModelOption]
     effort_options: dict[Provider, list[EffortOption]]
+    task_route_effort_order: list[TaskRouteEffortId]
     current_model_ids: list[str]
     retired_model_ids: list[str]
     model_lifecycle: list[ModelLifecycleFact]
@@ -240,6 +244,7 @@ def catalog() -> ModelCatalog:
         tasks=TASKS,
         models=MODEL_CATALOG,
         effort_options=EFFORT_OPTIONS,
+        task_route_effort_order=list(TASK_ROUTE_EFFORT_ORDER),
         current_model_ids=[cap.id for cap in all_models() if cap.task_route_status == "current"],
         retired_model_ids=[cap.id for cap in all_models() if cap.task_route_status == "retired"],
         model_lifecycle=[

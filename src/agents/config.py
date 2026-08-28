@@ -572,9 +572,11 @@ def resolve_research_route(provider: Provider, *, route_store=None) -> tuple[str
     """Model + effort the AI 研究 surface should use for ``provider`` when the
     request specifies neither. Honors a configured ``ai_research`` route ONLY when
     its provider matches the request provider; otherwise the request provider's
-    default-tier agent model (today's behavior). A 'default'/empty effort → None
-    (the agent uses its own default). The Research page picks the provider, so the
-    model/effort are resolved for THAT provider, not forced to the route's."""
+    current built-in model and explicit research effort are used. A matching
+    stored legacy ``default``/empty effort remains ``None`` so shared admission
+    rejects it for explicit correction; this resolver never rewrites stored
+    authority. The Research page picks the provider, so model/effort resolution
+    remains scoped to that provider."""
     route = task_route("ai_research", route_store=route_store)
     if route.provider == provider and route.source != "default":
         effort = None if route.effort in ("", "default") else route.effort

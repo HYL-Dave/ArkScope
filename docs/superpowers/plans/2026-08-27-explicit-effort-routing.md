@@ -718,3 +718,44 @@ matches are capability/history, diagnostics, UI/source labels, documentation,
 or explicit compatibility fixtures, and card task execution has no
 default-effort fallback. After the docs commit, `git status --short` was empty;
 ignored SDD reports do not appear in status.
+
+#### Post-review contract amendment (2026-08-28)
+
+An independent review correctly identified that provider effort fixtures did
+not exercise the real wire shape: provider lists contain `default`/`none`, and
+the Opus 5 model capability uses provider-native descending order. It
+incorrectly classified a matching stored legacy Research route as a resolver
+bug; the approved design intentionally preserves that route as incomplete so
+admission can reject it without rewriting user authority. It also correctly
+identified that the registered `/query` compatibility endpoints were missing
+from this plan even though their fail-closed behavior is desirable.
+
+The bounded follow-up is:
+
+- [x] add `task_route_effort_order` to the backend catalog and consume it in the
+  frontend, retaining the local closed tuple only for older sidecars;
+- [x] make the frontend owner use real provider-list sentinels and Opus 5's
+  provider-native descending capability order, with a separate owner for an old
+  sidecar that omits the additive catalog-order field;
+- [x] add a real `ModelRouteStore -> resolve_research_route ->
+  create_research_run` owner proving retired/default rows reject before
+  persistence and a corrected current/explicit row succeeds;
+- [x] add exact sync and stream owners for an explicit current model with omitted
+  effort, and formally admit `/query` plus `/query/stream` in the design;
+- [x] distinguish current-shaped fixtures from deliberate history fixtures and
+  remove stale model IDs only from the former.
+
+The `default`/`none` type guard was already owned: temporarily adding those two
+values to `TASK_ROUTE_EFFORT_IDS` produced two named failures in
+`researchModels.test.ts`. The missing RED was catalog-order consumption; before
+the implementation, its owner returned the local five-value order instead of
+the catalog-supplied `high, low` probe.
+
+Final follow-up verification: backend `4651 passed / 12 skipped` with the three
+known edgartools deprecation warnings; frontend `106 files / 1300 passed`;
+TypeScript typecheck and production build passed with the existing Vite large
+chunk warning. Three contract mutations were killed by their named owners:
+silently repairing a matching legacy route, accepting an explicit `/query`
+model without effort, and ignoring catalog task-route order. The independent
+review found no blocker and one P2 old-sidecar fallback gap; its added owner
+failed when the compatibility fallback was removed and passed after restoration.

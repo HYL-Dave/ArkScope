@@ -142,10 +142,33 @@ through the existing bounded error surface. Low-level provider diagnostics may
 retain their separate fallback behavior where explicitly documented.
 
 The catalog response exposes a provider-neutral task-route policy containing the
-canonical current and retired model IDs. This policy is separate from discovery
-visibility and from provider capability facts. It lets the frontend reject a
-known retired ID entered through the custom-model field without treating a
-genuinely unknown future ID as retired.
+canonical current and retired model IDs plus `task_route_effort_order`. This
+policy is separate from discovery visibility and from provider capability
+facts. It lets the frontend reject a known retired ID entered through the
+custom-model field without treating a genuinely unknown future ID as retired,
+and it keeps product ordering independent from provider-native effort-array
+order. Older sidecars may omit the additive order field; only that compatibility
+case uses the frontend's identical closed fallback tuple.
+
+### Registered query compatibility endpoints
+
+`POST /query` and `POST /query/stream` are registered public compatibility
+surfaces and use the same task-route admission boundary as `/research/runs`:
+
+- an explicit `model` requires an explicit admitted `effort`;
+- omitting `model` resolves the configured AI Research route, which may remain
+  incomplete when it is a stored legacy route;
+- current or genuinely unknown custom models with a supported explicit effort
+  may dispatch;
+- retired models, `default`, `none`, missing effort, and unsupported effort
+  fail with typed HTTP 422 before provider dispatch;
+- the streaming endpoint performs this rejection before creating a thread,
+  persisting a message, or opening a streaming response;
+- an unknown provider remains HTTP 400.
+
+This is an intentional tightening of the legacy endpoint: the previous sync
+path discarded an explicit effort and allowed an implicit provider default. It
+must not silently revive that behavior for compatibility.
 
 ## Frontend Contract
 
@@ -178,7 +201,10 @@ effort reference owns the five-value effort ladder.
 The user's current live-path ruling, reiterated on 2026-08-28, supersedes the
 July ChatGPT OAuth Luna rejection record. Official OpenAI model documentation
 independently establishes the Luna model ID and its supported effort values, but
-does not serve as evidence for this account's subscription entitlement.
+does not serve as evidence for this account's subscription entitlement. No
+replayable 2026-07-25 entitlement artifact is stored in this repository; the
+account-specific conclusion is therefore explicitly user-supplied rather than
+independently reverified by this offline slice.
 Because `docs/design/PROJECT_PRIORITY_MAP.md` currently contains user-owned
 uncommitted work, this slice must not overwrite it. A later authorized
 reconciliation can add a dated superseding entry without replacing that work;
