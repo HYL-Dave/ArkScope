@@ -1049,6 +1049,66 @@ describe("Research workspace contracts", () => {
     await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
   });
 
+  it("retries a retired historical turn with the newly selected current tuple", async () => {
+    const threadId = "retired-model-retry";
+    const fetchMock = stubFetch({
+      threads: [thread(threadId, "Retired model retry")],
+      messages: {
+        [threadId]: [
+          message("Retry this historical question", {
+            role: "user", provider: "openai", model: "gpt-5.4-mini",
+            effort: "low", tickers: ["MU"],
+          }),
+          message("Historical provider failure", {
+            provider: "openai", model: "gpt-5.4-mini", effort: "low",
+            is_error: true, error_code: "provider_call_failed",
+            error: "Historical provider failure",
+          }),
+        ],
+      },
+      selections: {
+        [threadId]: { provider: "openai", model: "gpt-5.4-mini", effort: "low" },
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
+    await mountResearch();
+    await vi.waitFor(() => expect(host!.textContent).toContain("Provider 呼叫失敗"));
+
+    expect(host!.querySelector(".research-bubble-meta")?.textContent)
+      .toContain("gpt-5.4-mini · low");
+    expect(button("重試")).toBeUndefined();
+    expect(button("送出")?.disabled).toBe(true);
+
+    await click(buttonContaining("OpenAI")!);
+    await vi.waitFor(() => {
+      expect(select("模型")?.value).toBe("gpt-5.6-luna");
+      expect(select("effort")?.value).toBe("");
+    });
+    await setSelect(select("effort")!, "xhigh");
+    await vi.waitFor(() => expect(button("重試")).toBeDefined());
+    await click(button("重試")!);
+
+    await vi.waitFor(() => expect(fetchMock.mock.calls.some(([input, init]) => (
+      new URL(typeof input === "string" ? input : (input as Request).url).pathname
+        === "/research/runs"
+      && init?.method === "POST"
+    ))).toBe(true));
+    const create = fetchMock.mock.calls.find(([input, init]) => (
+      new URL(typeof input === "string" ? input : (input as Request).url).pathname
+        === "/research/runs"
+      && init?.method === "POST"
+    ));
+    expect(JSON.parse(String(create?.[1]?.body ?? "{}"))).toMatchObject({
+      thread_id: threadId,
+      question: "Retry this historical question",
+      provider: "openai",
+      model: "gpt-5.6-luna",
+      effort: "xhigh",
+      retry_last_failed: true,
+    });
+  });
+
   it("recovers an active incomplete edit when the selected provider is clicked", async () => {
     vi.stubGlobal("fetch", stubFetch());
     await mountResearch();
