@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {"id": "HAPN", "fixture": "historical_hapn", "preview_calls": 0},
+    {"id": "QBTS", "fixture": "same_symbol_venue_transfer", "preview_calls": 0},
+    {"id": "CCL", "fixture": "historical_ccl", "preview_calls": 0},
+    {"id": "BLBD", "fixture": "historical_blbd", "preview_calls": 0},
+    {"id": "NMS-A", "fixture": "nms_symbol_continuation", "preview_calls": 1},
+    {"id": "OTC-A", "fixture": "otc_symbol_continuation", "preview_calls": 1},
+    {"id": "TERM", "fixture": "terminal_delisting", "preview_calls": 1},
+    {"id": "MISS", "fixture": "nasdaq_absence_only", "preview_calls": 0},
+    {"id": "CONFLICT", "fixture": "listing_cik_conflict", "preview_calls": 0}
+  ],
+  "fixture_authority": "offline_repository_fixture",
+  "publisher_injection_expected": "inert"
+}
