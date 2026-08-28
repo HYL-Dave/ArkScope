@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 import sqlite3
 from dataclasses import replace
 
@@ -11,6 +12,9 @@ import pytest
 _AT = "2026-08-25T01:00:00Z"
 _LATER = "2026-08-25T02:00:00Z"
 _FINGERPRINT = "a" * 64
+_LISTING_AT = "2026-08-28T22:00:00Z"
+_LISTING_LATER = "2026-08-28T23:00:00Z"
+_LISTING_FIXTURES = Path(__file__).parent / "fixtures" / "listing_authority"
 
 
 def _context():
@@ -185,6 +189,228 @@ def _succeed(kernel, claim, *, evidence=(), facts=(), diagnostics=None, at=_LATE
         diagnostics=diagnostics or {"sec_attempts": 1},
         at=at,
     )
+
+
+class _ListingProducerTransport:
+    def __init__(self, adapter: str) -> None:
+        self.adapter = adapter
+
+    @staticmethod
+    def _payload(source_url, body, content_type):
+        from data_sources.listing_authority_transport import ListingHttpPayload
+
+        return ListingHttpPayload(
+            source_url=source_url,
+            retrieved_at=_LISTING_AT,
+            status_code=200,
+            content_type=content_type,
+            body=body,
+        )
+
+    def fetch_nasdaq(self, source_url, *, budget):
+        from data_sources.listing_authority_transport import (
+            NASDAQ_LISTED_URL,
+            ListingTransportFailure,
+        )
+
+        if self.adapter == "massive_reference":
+            raise ListingTransportFailure("nasdaq_transport_unavailable")
+        budget.reserve_nasdaq_request(source_url)
+        name = "nasdaqlisted.txt" if source_url == NASDAQ_LISTED_URL else "otherlisted.txt"
+        body = (_LISTING_FIXTURES / name).read_bytes()
+        budget.record_nasdaq_body(len(body))
+        return self._payload(source_url, body, "text/plain")
+
+    def fetch_massive_ticker(
+        self, ticker, *, expected_active, market, api_key, budget
+    ):
+        from data_sources.listing_authority_transport import MASSIVE_TICKERS_URL
+
+        del api_key
+        budget.reserve_massive_request((ticker, expected_active, market))
+        payload = json.loads((_LISTING_FIXTURES / "massive-active.json").read_bytes())
+        payload["results"][0]["ticker"] = ticker
+        body = json.dumps(payload, separators=(",", ":")).encode()
+        budget.record_massive_body(len(body))
+        source_url = (
+            f"{MASSIVE_TICKERS_URL}?ticker={ticker}&active=true"
+            f"&market={market}&limit=2"
+        )
+        return self._payload(source_url, body, "application/json")
+
+    @staticmethod
+    def diagnostics(budget):
+        return budget.diagnostics()
+
+    @staticmethod
+    def close():
+        return None
+
+
+def _listing_producer_result(adapter: str):
+    from data_sources.listing_authority_transport import ListingRequestBudget
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+    from src.security_lifecycle_sec_evidence import IdentityContext
+
+    session = ListingAuthoritySession(
+        transport=_ListingProducerTransport(adapter),
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=_LISTING_AT,
+        massive_api_key="fixture-key",
+    )
+    try:
+        result = session.lookup(
+            context=IdentityContext(
+                case_id="slc_listing",
+                cik="0000320193",
+                issuer_name="Fixture Issuer",
+                current_ticker="HAPN",
+                ticker_aliases=("HAPN",),
+                ibkr_conids=(),
+                filing_date="2026-08-28",
+                accession="0000320193-26-000001",
+                filing_form="8-K",
+                filing_items=("8.01",),
+                event_kinds=("symbol_change",),
+                primary_start="2026-07-29",
+                primary_end="2026-10-12",
+                widened_start="2026-04-30",
+                widened_end="2026-12-26",
+            ),
+            candidate_tickers=("AAPL",),
+            require_explicit_inactive=False,
+        )
+    finally:
+        session.close()
+    assert len(result.evidence) == 1
+    assert result.evidence[0].adapter == adapter
+    assert result.facts
+    return result.evidence, result.facts
+
+
+@pytest.mark.parametrize(
+    "adapter", ("nasdaq_symbol_directory", "massive_reference")
+)
+def test_listing_adapter_output_is_accepted_by_real_fact_kernel(adapter):
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at=_LISTING_AT)
+    evidence, facts = _listing_producer_result(adapter)
+
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=evidence,
+        facts=facts,
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="transition_eligible",
+        retry_at=None,
+        diagnostics={"listing_records": len(evidence)},
+        at=_LISTING_LATER,
+    )
+
+    assert result.status == "succeeded"
+    assert conn.execute(
+        "SELECT COUNT(*) FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=? AND adapter=?",
+        (claim.run_id, adapter),
+    ).fetchone()[0] == 1
+    persisted = conn.execute(
+        "SELECT source_locator_json FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=? AND adapter=?",
+        (claim.run_id, adapter),
+    ).fetchone()
+    assert json.loads(persisted[0])["candidate_ticker"] == "AAPL"
+
+
+def test_listing_facts_share_sec_and_ibkr_identity_vocabulary_in_real_kernel():
+    from src.security_lifecycle_fact_kernel import AutomationFact
+
+    conn, _store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at=_LISTING_AT)
+    listing_evidence, listing_facts = _listing_producer_result("massive_reference")
+    sec_evidence = _evidence(
+        "listing-compatible",
+        excerpt="AAPL continues as common_stock on NASDAQ.",
+    )
+
+    def sec_fact(fact_type: str, value: str) -> AutomationFact:
+        encoded = sec_evidence.excerpt.encode()
+        cited = value.encode()
+        start = encoded.index(cited)
+        return AutomationFact(
+            evidence_id=sec_evidence.evidence_id,
+            fact_type=fact_type,
+            normalized_value=value,
+            source_span_start=start,
+            source_span_end=start + len(cited),
+            cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+            extractor_rule_id=f"sec.fixture.{fact_type}",
+            extractor_rule_version="1",
+        )
+
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(sec_evidence, *listing_evidence),
+        facts=(
+            sec_fact("successor_ticker", "AAPL"),
+            sec_fact("security_class", "common_stock"),
+            sec_fact("destination_venue", "NASDAQ"),
+            *listing_facts,
+        ),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="transition_eligible",
+        retry_at=None,
+        diagnostics={"listing_records": 1},
+        at=_LISTING_LATER,
+    )
+
+    assert result.conflicts == {}
+    assert result.decision_tier == "verified_automatic"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    (
+        ("excerpt", "evidence_content_sha256"),
+        ("span", "fact_citation"),
+    ),
+)
+def test_listing_producer_mutations_fail_at_real_kernel_validator(mutation, expected):
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id, at=_LISTING_AT)
+    evidence, facts = _listing_producer_result("massive_reference")
+    if mutation == "excerpt":
+        evidence = (
+            replace(
+                evidence[0],
+                excerpt=evidence[0].excerpt.replace('"AAPL"', '"AAPX"', 1),
+            ),
+        )
+    else:
+        facts = (
+            replace(facts[0], source_span_end=facts[0].source_span_end - 1),
+            *facts[1:],
+        )
+
+    with pytest.raises(ValueError, match=f"^{expected}$"):
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=evidence,
+            facts=facts,
+            blockers=(),
+            decision_tier="verified_automatic",
+            action_readiness="transition_eligible",
+            retry_at=None,
+            diagnostics={"listing_records": 1},
+            at=_LISTING_LATER,
+        )
+
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
+    assert conn.execute(
+        "SELECT COUNT(*) FROM security_lifecycle_evidence WHERE automation_run_id=?",
+        (claim.run_id,),
+    ).fetchone()[0] == 0
 
 
 @pytest.mark.parametrize(

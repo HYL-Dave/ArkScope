@@ -619,6 +619,14 @@ class SecurityLifecycleInvestigationStore:
                 "market_infrastructure",
                 {"market_infrastructure_snapshot"},
             ),
+            "nasdaq_symbol_directory": (
+                "listing_authority",
+                {"listing_directory_snapshot"},
+            ),
+            "massive_reference": (
+                "listing_authority",
+                {"listing_directory_snapshot"},
+            ),
         }
         expected_family, expected_kinds = adapter_contract[adapter]
         family = source_family or expected_family

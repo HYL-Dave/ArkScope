@@ -55,6 +55,44 @@ def _result(text: str = "發行人將以新代號 EA2 交易。"):
     )
 
 
+def test_listing_snapshot_translation_rejects_before_every_downstream_boundary():
+    from src.security_lifecycle_translation import translate_evidence
+
+    calls: list[str] = []
+
+    class BoundaryOwner:
+        def get_evidence(self, evidence_id: str):
+            calls.append(f"evidence:{evidence_id}")
+            return {
+                "evidence_id": evidence_id,
+                "kind": "listing_directory_snapshot",
+                "content_sha256": "a" * 64,
+                "excerpt": '{"listing_status":"active","ticker":"EA"}',
+            }
+
+        @staticmethod
+        def get_evidence_translation(**_kwargs):
+            pytest.fail("listing translation reached cache lookup")
+
+        @staticmethod
+        def assert_translation_write_available():
+            pytest.fail("listing translation reached write authority")
+
+    def translator(_text: str, _locale: str):
+        pytest.fail("listing translation reached route or provider invocation")
+
+    with pytest.raises(ValueError, match="^unsupported_content$"):
+        translate_evidence(
+            BoundaryOwner(),
+            evidence_id="sle_listing",
+            locale="zh-Hant",
+            translator=translator,
+            at=_AT,
+        )
+
+    assert calls == ["evidence:sle_listing"]
+
+
 def test_translation_cache_is_bound_to_evidence_hash_and_locale():
     from src.security_lifecycle_translation import translate_evidence
 

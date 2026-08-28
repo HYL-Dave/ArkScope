@@ -81,6 +81,8 @@ def prepare_evidence_translation(
     if locale not in SUPPORTED_TRANSLATION_LOCALES:
         raise ValueError("translation_locale")
     evidence = store.get_evidence(evidence_id)
+    if evidence.get("kind") == "listing_directory_snapshot":
+        raise ValueError("unsupported_content")
     cached = store.get_evidence_translation(
         evidence_id=evidence_id,
         evidence_content_sha256=str(evidence["content_sha256"]),

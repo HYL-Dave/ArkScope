@@ -50,6 +50,65 @@ def _manual_evidence(store, case_id, *, excerpt="Official issuer notice."):
     )
 
 
+@pytest.mark.parametrize(
+    "adapter", ("nasdaq_symbol_directory", "massive_reference")
+)
+def test_investigation_store_accepts_listing_adapter_shape_for_readback(
+    tmp_path, adapter
+):
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+
+    conn, store, case_id = _context(tmp_path)
+    try:
+        claim = SecurityLifecycleFactKernel(store).reserve_run(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            policy_version="trusted-lifecycle-v1",
+            mode="historical",
+            execution_revision="trusted-lifecycle-execution-r1",
+            query_context={"case_id": case_id, "ticker": "EA"},
+            diagnostics={"listing_records": 0},
+            at=_AT,
+        )
+        document_sha256 = "d" * 64
+        evidence_id = store.add_evidence(
+            case_id=case_id,
+            run_id=None,
+            kind="listing_directory_snapshot",
+            adapter=adapter,
+            excerpt='{"listing_status":"active","ticker":"EA"}',
+            source_url="https://listing.example/reference",
+            title="Exact listing lookup",
+            publisher="Listing authority",
+            domain="listing.example",
+            source_published_at="2026-08-20",
+            retrieved_at=_AT,
+            mime_type=None,
+            document_status=None,
+            at=_AT,
+            source_family="listing_authority",
+            automation_run_id=claim.run_id,
+            source_document_sha256=document_sha256,
+            source_locator={
+                "authority": "nasdaq_trader"
+                if adapter == "nasdaq_symbol_directory"
+                else "massive",
+                "candidate_ticker": "EA",
+                "listing_status": "active",
+            },
+            evidence_dedupe_key=f"listing:{adapter}:EA",
+        )
+
+        persisted = store.get_evidence(evidence_id)
+        assert persisted["source_family"] == "listing_authority"
+        assert persisted["kind"] == "listing_directory_snapshot"
+        assert persisted["adapter"] == adapter
+        assert persisted["source_document_sha256"] == document_sha256
+        assert json.loads(persisted["source_locator_json"])["candidate_ticker"] == "EA"
+    finally:
+        conn.close()
+
+
 def _draft(
     store,
     case_id,

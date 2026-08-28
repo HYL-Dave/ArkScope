@@ -42,6 +42,11 @@ _ADAPTER_SHAPES = {
     "internal_news": ("publisher", "publisher_excerpt"),
     "ibkr_contract": ("market_infrastructure", "market_infrastructure_snapshot"),
     "hosted_search": ("general_web", "hosted_search_citation"),
+    "nasdaq_symbol_directory": (
+        "listing_authority",
+        "listing_directory_snapshot",
+    ),
+    "massive_reference": ("listing_authority", "listing_directory_snapshot"),
 }
 _SECRET_KEY_MARKERS = (
     "api_key",
