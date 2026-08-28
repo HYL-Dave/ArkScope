@@ -3,8 +3,48 @@
 from __future__ import annotations
 
 import os
+import sqlite3
+import tempfile
+from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_PROFILE_DB = (_PROJECT_ROOT / "data" / "profile_state.db").resolve()
+_SESSION_PROFILE_DIR = tempfile.TemporaryDirectory(prefix="arkscope-pytest-profile-")
+_SESSION_PROFILE_DB = Path(_SESSION_PROFILE_DIR.name) / "profile_state.db"
+os.environ["ARKSCOPE_PROFILE_DB"] = str(_SESSION_PROFILE_DB)
+
+_REAL_SQLITE_CONNECT = sqlite3.connect
+
+
+def _sqlite_target_path(database) -> Path | None:
+    try:
+        raw = os.fspath(database)
+    except TypeError:
+        return None
+    if isinstance(raw, bytes):
+        raw = os.fsdecode(raw)
+    if raw == ":memory:" or raw.startswith("file::memory:"):
+        return None
+    if raw.startswith("file:"):
+        raw = unquote(raw.removeprefix("file:").split("?", 1)[0])
+    if not raw:
+        return None
+    return Path(raw).expanduser().resolve()
+
+
+def _guarded_sqlite_connect(database, *args, **kwargs):
+    if _sqlite_target_path(database) == _PROJECT_PROFILE_DB:
+        raise RuntimeError("pytest attempted to access the production profile DB")
+    return _REAL_SQLITE_CONNECT(database, *args, **kwargs)
+
+
+# Install before test-module collection. Per-test fixtures are too late to stop
+# import-time stores from resolving the developer's profile database.
+sqlite3.connect = _guarded_sqlite_connect
 
 
 @pytest.fixture(autouse=True)
@@ -24,8 +64,7 @@ def _isolate_locks(tmp_path_factory, monkeypatch):
     """Cross-process flocks live under data/locks/ by default — tests must not
     contend with (or leave artifacts in) the real lock dir."""
     if "ARKSCOPE_LOCK_DIR" not in os.environ:
-        monkeypatch.setenv(
-            "ARKSCOPE_LOCK_DIR", str(tmp_path_factory.mktemp("locks")))
+        monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path_factory.mktemp("locks")))
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +79,24 @@ def _isolate_profile_db(tmp_path_factory, monkeypatch):
     an explicit db_path are unaffected."""
     monkeypatch.setenv(
         "ARKSCOPE_PROFILE_DB",
-        str(tmp_path_factory.mktemp("profile") / "profile_state.db"))
+        str(tmp_path_factory.mktemp("profile") / "profile_state.db"),
+    )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_agent_local_config(tmp_path_factory, monkeypatch):
+    """Operator-only model overrides must never become test authority."""
+    from src.agents import config as config_module
+
+    cached_get_agent_config = config_module.get_agent_config
+    monkeypatch.setattr(
+        config_module,
+        "_LOCAL_CONFIG_PATH",
+        tmp_path_factory.mktemp("agent_config") / "user_profile.local.yaml",
+    )
+    cached_get_agent_config.cache_clear()
+    yield
+    cached_get_agent_config.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -54,7 +110,8 @@ def _isolate_macro_calendar_db(tmp_path_factory, monkeypatch):
     """
     monkeypatch.setenv(
         "ARKSCOPE_MACRO_CALENDAR_DB",
-        str(tmp_path_factory.mktemp("macro_calendar") / "macro_calendar.db"))
+        str(tmp_path_factory.mktemp("macro_calendar") / "macro_calendar.db"),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -68,5 +125,5 @@ def _isolate_sa_db(tmp_path_factory, monkeypatch):
     DB set it themselves after this autouse fixture.
     """
     monkeypatch.setenv(
-        "ARKSCOPE_SA_DB",
-        str(tmp_path_factory.mktemp("sa_capture") / "sa_capture.db"))
+        "ARKSCOPE_SA_DB", str(tmp_path_factory.mktemp("sa_capture") / "sa_capture.db")
+    )
