@@ -42,6 +42,16 @@
 - `apps/arkscope-web/src/lifecycle/lifecyclePresentation.ts`: listing labels and deterministic explanations.
 - `apps/arkscope-web/src/settings/settingsBackendCopy.ts`: Massive (Polygon) provider presentation.
 - `src/data_provider_config.py`: official Massive endpoint for the explicit connection probe.
+- `src/api/routes/providers_config.py`: masked profile-backed Massive credential
+  writes and immediate process-bridge refresh.
+- `src/api/routes/config_routes.py` and `src/service/provider_health.py`:
+  provider presentation and health state under the new bridge.
+- `data_sources/source_factory.py`, `data_sources/polygon_source.py`,
+  `src/collectors/polygon_news.py`, `src/service/data_scheduler.py`, and
+  `src/market_data_direct.py`: existing Polygon consumers aligned to the
+  profile-backed `MASSIVE_API_KEY` bridge.
+- `data_sources/dependency_log_redaction.py`: secret-safe dependency diagnostics
+  for the renamed bridge.
 - `tests/fixtures/listing_authority/`: real-shaped offline Nasdaq and Massive payloads.
 - `docs/superpowers/evidence/2026-08-28-lifecycle-listing-authority/`: reproducible offline admission packet.
 
@@ -1264,15 +1274,30 @@ packet admission evidence.
   prove they kill broadened `_listing_snapshot` mutations.
 - [x] Re-evaluate adjacent blocker classification, compact-reader, and
   provider-as-of semantics against the same normalized listing contract.
+- [x] Retain `massive_credential_missing` as a daily retryable local
+  configuration recheck. The missing-key branch performs zero provider calls,
+  remains visible as a typed blocker, and self-recovers after Settings supplies
+  the profile-backed key.
+- [x] Record the complete credential-bridge runtime footprint instead of
+  treating the change as presentation-only.
 - [x] Rebuild the sealed packet and all gates before requesting merge.
 
 **2026-08-30 Task 10 closeout:** Product/controller authority
 `63ceb8cb5ab08b262926a3dd36ed21096ea81f49` was replayed from a clean
 tree. The resulting 67-file packet digest is
-`83f1f2cf22b74fa86272e8441eae58617a509e379dd61b060c07187ffc036055`.
+`6169077f3019c14aabfa4e98d9d3d8b8dcef59bf806aa4c5af4ce77a32386b5a`.
 It records `51/51` killed mutations, focused backend A/B `362P`,
 full backend A/B `4898P/13S/0F` with identical 4,911-node manifests,
 frontend A/B `106 files/1306P`, clean typecheck/i18n/build gates, and
 24 browser entries with zero measured external requests, writes, overlap,
 clipped text, console errors, or page errors. Provider calls, production DB
 operations, App restart, merge, and push remained unexecuted.
+
+The packet secret scanner dynamically checks every present process environment
+value whose name matches `API_KEY`, `TOKEN`, `PASSWORD`, `SECRET`, or
+`CREDENTIAL`; the three names in the sealed report are observations, not a
+hard-coded allowlist. Under the no-production-read boundary it cannot inspect a
+secret that exists only in the profile database and has not been injected into
+the process bridge. Exact verification of that value is therefore a separate,
+authorized pre-cutover check and must never be inferred from this offline
+packet's zero findings.

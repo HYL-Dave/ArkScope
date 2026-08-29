@@ -113,6 +113,31 @@ retryable blocker only for a case whose decision actually needs the fallback.
 Nasdaq Trader and Massive share the durable `listing_authority` source family,
 but their component states remain distinct. An NMS case may complete with
 Nasdaq alone; an OTC continuation or terminal decision may require Massive.
+
+`massive_credential_missing` intentionally remains retryable. The credential
+presence check happens before the transport boundary, so a missing credential
+causes zero Massive requests. The existing daily retry is a bounded local
+configuration recheck that lets a case recover after the operator saves the key
+in Settings without manufacturing a policy-version bump or requiring a manual
+case reset. Until then, the typed blocker remains visible and cannot satisfy a
+listing-authority evidence gate or move the case to History.
+
+The credential presentation and process-bridge change necessarily crosses the
+existing Polygon runtime call sites. The reviewed implementation footprint is:
+
+- `src/data_provider_config.py` and `src/api/routes/providers_config.py` for the
+  single durable profile authority and Settings writes;
+- `src/api/routes/config_routes.py` and `src/service/provider_health.py` for
+  provider presentation and health reporting;
+- `data_sources/source_factory.py`, `data_sources/polygon_source.py`,
+  `src/collectors/polygon_news.py`, `src/service/data_scheduler.py`, and
+  `src/market_data_direct.py` for the profile-backed `MASSIVE_API_KEY` bridge;
+  and
+- `data_sources/dependency_log_redaction.py` for secret-safe dependency output.
+
+These are compatibility and credential-authority changes, not additional
+listing evidence sources. No listed call site may revive `POLYGON_API_KEY` or a
+Massive key from `config/.env`.
 The scheduler and UI must not turn an optional Massive miss into a global
 listing-authority failure.
 
