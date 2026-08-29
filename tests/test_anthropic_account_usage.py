@@ -10,7 +10,7 @@ import hashlib
 import json
 from types import SimpleNamespace
 
-import httpx
+import httpx2 as httpx
 import pytest
 
 import anthropic

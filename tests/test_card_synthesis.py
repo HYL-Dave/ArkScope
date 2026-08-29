@@ -892,7 +892,7 @@ def test_openai_api_timeout_uses_one_attempt(monkeypatch):
 
 
 def test_anthropic_api_timeout_uses_one_attempt(monkeypatch):
-    import httpx
+    import httpx2
     from anthropic import Anthropic
 
     from src import card_synthesis as cs
@@ -902,12 +902,12 @@ def test_anthropic_api_timeout_uses_one_attempt(monkeypatch):
 
     def timeout(request):
         attempts.append(request)
-        raise httpx.ReadTimeout("timed out", request=request)
+        raise httpx2.ReadTimeout("timed out", request=request)
 
     client = Anthropic(
         api_key="test-key",
         base_url="https://anthropic.invalid",
-        http_client=httpx.Client(transport=httpx.MockTransport(timeout)),
+        http_client=httpx2.Client(transport=httpx2.MockTransport(timeout)),
     )
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.resolve_live_auth",
@@ -931,6 +931,7 @@ def test_anthropic_api_timeout_uses_one_attempt(monkeypatch):
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])
 def test_subscription_sdk_timeout_cause_is_typed(monkeypatch, provider):
     import httpx
+    import httpx2
     import openai
     import anthropic
 
@@ -941,6 +942,7 @@ def test_subscription_sdk_timeout_cause_is_typed(monkeypatch, provider):
 
     credential_id = "local:7" if provider == "openai" else "local:2"
     timeout_type = openai.APITimeoutError if provider == "openai" else anthropic.APITimeoutError
+    request_type = httpx.Request if provider == "openai" else httpx2.Request
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.resolve_live_auth",
         lambda selected: _oauth_resolution(selected, credential_id),
@@ -948,7 +950,7 @@ def test_subscription_sdk_timeout_cause_is_typed(monkeypatch, provider):
 
     def fail(**kwargs):
         try:
-            raise timeout_type(request=httpx.Request("POST", "https://provider.invalid"))
+            raise timeout_type(request=request_type("POST", "https://provider.invalid"))
         except timeout_type as exc:
             raise SubscriptionStructuredOutputError(
                 "provider_call_failed", "provider timed out"
