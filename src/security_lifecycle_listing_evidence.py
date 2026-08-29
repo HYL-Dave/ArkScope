@@ -236,7 +236,7 @@ def _timestamp(name: str, value: object) -> tuple[str, datetime]:
     if match is None:
         raise ListingEvidenceFailure("listing_status_unresolved")
     fraction = match.group("fraction")
-    fractional = "" if fraction is None else f".{fraction[:6]}"
+    fractional = "" if fraction is None else f".{fraction[:6].ljust(6, '0')}"
     zone = match.group("timezone")
     parseable = (
         f"{match.group('second').upper()}{fractional}"

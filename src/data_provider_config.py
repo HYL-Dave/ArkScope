@@ -418,6 +418,32 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
     file_keys = keys_loaded_from_file()
     stored = store.get_all()
     configured_vars: set[str] = set()
+
+    def honor_real_runtime_authority(fdef: FieldDef) -> str | None:
+        candidates = runtime_env_vars(fdef)
+        current_file_keys = keys_loaded_from_file()
+        real_var = next(
+            (
+                candidate
+                for candidate in candidates
+                if (os.getenv(candidate) or "").strip()
+                and candidate not in current_file_keys
+                and candidate not in _APP_APPLIED
+            ),
+            None,
+        )
+        if real_var is None:
+            return None
+        for candidate in candidates:
+            if candidate == real_var:
+                continue
+            if candidate in _APP_APPLIED:
+                _APP_APPLIED.discard(candidate)
+                os.environ.pop(candidate, None)
+            elif candidate in current_file_keys:
+                discard_loaded_key(candidate)
+        return real_var
+
     for provider, fields in stored.items():
         for field, value in fields.items():
             fdef = _FIELD_BY_KEY.get((provider, field))
@@ -425,29 +451,11 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
                 continue
             var = fdef.env_var
             configured_vars.add(var)
-            candidates = runtime_env_vars(fdef)
             # A real value under either the current name or a legacy alias is one
             # operator authority. Remove lower-authority candidates so readers do
             # not select an app/file primary ahead of a real legacy alias.
-            real_var = next(
-                (
-                    candidate
-                    for candidate in candidates
-                    if (os.getenv(candidate) or "").strip()
-                    and candidate not in file_keys
-                    and candidate not in _APP_APPLIED
-                ),
-                None,
-            )
+            real_var = honor_real_runtime_authority(fdef)
             if real_var is not None:
-                for candidate in candidates:
-                    if candidate == real_var:
-                        continue
-                    if candidate in _APP_APPLIED:
-                        _APP_APPLIED.discard(candidate)
-                        os.environ.pop(candidate, None)
-                    elif candidate in file_keys:
-                        discard_loaded_key(candidate)
                 continue
             os.environ[var] = value
             _APP_APPLIED.add(var)
@@ -471,6 +479,9 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
                 os.environ.pop(var, None)
             else:
                 discard_loaded_key(var)
+    for defs in PROVIDER_FIELDS.values():
+        for fdef in defs:
+            honor_real_runtime_authority(fdef)
     return frozenset(_APP_APPLIED)
 
 

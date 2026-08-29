@@ -291,6 +291,26 @@ def test_apply_env_explicit_fallback_true_restores_legacy_file_fallback(
     assert dpc.effective_source("POLYGON_API_KEY") == "config/.env"
 
 
+def test_real_legacy_polygon_env_wins_over_primary_file_fallback(
+    store, monkeypatch, tmp_path
+):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("MASSIVE_API_KEY=massive-file\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-real-operator")
+    store.set_setting("provider_env_fallback", "true")
+
+    dpc.apply_env(store)
+
+    assert "MASSIVE_API_KEY" not in os.environ
+    assert dpc.provider_field_env_name("polygon", "api_key") == "POLYGON_API_KEY"
+    assert dpc.provider_field_env_value("polygon", "api_key") == "polygon-real-operator"
+
+
 def test_unapply_strict_unsets_app_value(store, monkeypatch):
     store.set_field("finnhub", "api_key", "fk_app")
     dpc.apply_env(store)

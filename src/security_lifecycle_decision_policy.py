@@ -666,6 +666,7 @@ def _listing_explicit_inactive(
             snapshot.get("locator_kind") == "listing_directory_snapshot"
             and snapshot.get("adapter") == "massive_reference"
             and snapshot.get("authority") == "massive"
+            and "directory" in snapshot
             and snapshot.get("directory") is None
             and snapshot.get("candidate_ticker") == candidate
             and snapshot.get("expected_active_state") is False

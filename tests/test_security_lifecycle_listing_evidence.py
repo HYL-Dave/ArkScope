@@ -393,6 +393,34 @@ def test_massive_parser_accepts_live_rfc3339_nanoseconds_without_rewriting_body(
     assert record.source_document_sha256 == hashlib.sha256(body).hexdigest()
 
 
+@pytest.mark.parametrize("fraction_length", range(1, 10))
+def test_massive_parser_accepts_each_supported_rfc3339_fraction_length(
+    fraction_length: int,
+) -> None:
+    payload = json.loads(_fixture("massive-active-nanoseconds.json"))
+    fraction = "123456789"[:fraction_length]
+    payload["results"][0]["last_updated_utc"] = (
+        f"2026-08-28T06:10:12.{fraction}Z"
+    )
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+    record = _massive_record(body, "AAPL", expected_active=True)
+
+    assert record.provider_last_updated_utc == "2026-08-28T06:10:12Z"
+    assert record.source_document_sha256 == hashlib.sha256(body).hexdigest()
+
+
+def test_massive_parser_rejects_more_than_nine_rfc3339_fraction_digits() -> None:
+    payload = json.loads(_fixture("massive-active-nanoseconds.json"))
+    payload["results"][0]["last_updated_utc"] = "2026-08-28T06:10:12.1234567890Z"
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+    _assert_failure(
+        "listing_status_unresolved",
+        lambda: _massive_record(body, "AAPL", expected_active=True),
+    )
+
+
 def test_massive_parser_returns_one_not_found_record_for_an_empty_exact_lookup() -> None:
     body = b'{"results":[],"status":"OK","request_id":"fixture-empty"}'
     record = _massive_record(body, "MISS", expected_active=True)
@@ -1186,6 +1214,7 @@ def test_real_terminal_pipeline_rejects_inactive_massive_identity_conflicts(
         lambda locator: locator.__setitem__("snapshot_complete", False),
         _nest_listing_locator,
         lambda locator: locator.__setitem__("directory", "nasdaq_listed"),
+        lambda locator: locator.pop("directory"),
     ),
     ids=(
         "wrong_expected_intent",
@@ -1193,6 +1222,7 @@ def test_real_terminal_pipeline_rejects_inactive_massive_identity_conflicts(
         "incomplete_snapshot",
         "nested_locator",
         "massive_directory_not_none",
+        "massive_directory_missing",
     ),
 )
 def test_real_terminal_pipeline_requires_exact_inactive_massive_locator(
