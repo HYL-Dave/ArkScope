@@ -405,7 +405,9 @@ def _make_normalized_news_provider(source: str):
 
         api_key = load_env()
         if not api_key:
-            raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
+            raise RuntimeError(
+                "MASSIVE_API_KEY (or legacy POLYGON_API_KEY) is not configured in app/env"
+            )
         return PolygonNormalizedProvider(PolygonNewsCollector(api_key, CollectionConfig()))
     if source == "finnhub":
         from src.collectors.finnhub_news import (

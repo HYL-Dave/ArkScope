@@ -660,7 +660,7 @@ def load_tickers(tickers_arg: Optional[str] = None,
 
 
 def load_env() -> str:
-    """Resolve the Polygon API key, os.environ FIRST.
+    """Resolve the Massive API key, with the Polygon name as a legacy alias.
 
     The sidecar's apply_env() injects DB-managed provider values into os.environ
     (precedence real env > app-DB > config/.env), so os.environ is the resolved
@@ -669,9 +669,11 @@ def load_env() -> str:
     config/.env directly for standalone runs that never went through the env bridge.
     A placeholder ('your_'-prefixed) or empty value is rejected at each layer so a
     stub never shadows a real key."""
-    env_val = os.environ.get('POLYGON_API_KEY', '').strip()
-    if env_val and not env_val.startswith('your_'):
-        return env_val
+    env_keys = ("MASSIVE_API_KEY", "POLYGON_API_KEY")
+    for env_key in env_keys:
+        env_val = os.environ.get(env_key, '').strip()
+        if env_val and not env_val.startswith('your_'):
+            return env_val
 
     env_paths = [
         Path("config/.env"),
@@ -679,6 +681,7 @@ def load_env() -> str:
     ]
     for path in env_paths:
         if path.exists():
+            values = {}
             with open(path, 'r') as f:
                 for line in f:
                     line = line.strip()
@@ -689,8 +692,11 @@ def load_env() -> str:
                         value = value.strip()
                         while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
                             value = value[1:-1].strip()
-                        if key == 'POLYGON_API_KEY' and value and not value.startswith('your_'):
-                            return value
+                        if key in env_keys and value and not value.startswith('your_'):
+                            values[key] = value
+            for env_key in env_keys:
+                if env_key in values:
+                    return values[env_key]
     return ''
 
 
@@ -728,7 +734,9 @@ def collect_news(
     # scheduler — record a FAILED run; the CLI catches this and exits 1)
     api_key = load_env()
     if not api_key:
-        raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
+        raise RuntimeError(
+            "MASSIVE_API_KEY (or legacy POLYGON_API_KEY) is not configured in app/env"
+        )
 
     # Initialize
     config = CollectionConfig()
@@ -916,7 +924,9 @@ def run_incremental(tickers_arg: Optional[str] = None,
     tickers = load_tickers(tickers_arg, scope=scope)
     api_key = load_env()
     if not api_key:
-        raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
+        raise RuntimeError(
+            "MASSIVE_API_KEY (or legacy POLYGON_API_KEY) is not configured in app/env"
+        )
 
     collector = PolygonNewsCollector(api_key, config)
     collected_at = datetime.now()

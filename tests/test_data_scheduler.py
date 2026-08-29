@@ -655,6 +655,19 @@ def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
     assert ds._LAST_RESULT["polygon_news"]["status"] == "not_configured"
 
 
+def test_normalized_massive_provider_missing_key_names_primary_and_legacy_alias(
+    monkeypatch,
+):
+    monkeypatch.setattr("src.collectors.polygon_news.load_env", lambda: "")
+
+    with pytest.raises(RuntimeError) as captured:
+        ds._make_normalized_news_provider("polygon")
+
+    message = str(captured.value)
+    assert "MASSIVE_API_KEY" in message
+    assert "POLYGON_API_KEY" in message
+
+
 def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
     import src.collectors.polygon_news as cpn

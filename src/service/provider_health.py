@@ -121,6 +121,21 @@ def _key_info(loaded_from_file: frozenset, app_keys: frozenset, *names: str) -> 
             "vars": list(names)}
 
 
+def _first_key_info(
+    loaded_from_file: frozenset, app_keys: frozenset, *names: str
+) -> Dict[str, Any]:
+    selected = next((name for name in names if os.getenv(name)), None)
+    if selected is None:
+        return {"present": False, "source": "missing", "vars": list(names)}
+    if selected in app_keys:
+        source = "app"
+    elif selected in loaded_from_file:
+        source = "config/.env"
+    else:
+        source = "env"
+    return {"present": True, "source": source, "vars": list(names)}
+
+
 def _status(*, key_present: bool, enabled: Optional[bool],
             last_success_at: Optional[datetime], threshold_hours: Optional[float],
             now: datetime, weekend_maintenance: bool = False,
@@ -340,12 +355,22 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
                  "news_recent_7d": ibkr_news.get("recent_7d", 0)},
     )
 
-    for pid, label in (("polygon", "Polygon"), ("finnhub", "Finnhub")):
+    for pid, label in (("polygon", "Massive"), ("finnhub", "Finnhub")):
         n = news_by_src.get(pid, {})
         direct = (direct_news or {}).get("providers", {}).get(pid) if direct_news_enabled else None
+        key = (
+            _first_key_info(
+                loaded_file_keys,
+                app_keys,
+                "MASSIVE_API_KEY",
+                "POLYGON_API_KEY",
+            )
+            if pid == "polygon"
+            else _key_info(loaded_file_keys, app_keys, "FINNHUB_API_KEY")
+        )
         _add(
             pid, label, "news",
-            _key_info(loaded_file_keys, app_keys, f"{pid.upper()}_API_KEY"),
+            key,
             config_error=_config_error(pid),
             last_success=(_to_dt(direct.get("last_success")) if direct else None)
             if direct_news_enabled else n.get("latest"),

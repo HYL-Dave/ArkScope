@@ -34,7 +34,7 @@ def hermetic(monkeypatch, tmp_path):
     monkeypatch.setattr("src.env_keys.reload_var_from_file",
                         lambda name: (os.environ.pop(name, None), False)[1])
     managed_vars = (
-        "POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
+        "MASSIVE_API_KEY", "POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
         "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID",
         "ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT",
     )
@@ -67,10 +67,56 @@ def test_store_rejects_unknown_field(store):
 
 
 def test_massive_reuses_the_polygon_credential_authority():
-    assert [(f.field, f.env_var) for f in dpc.PROVIDER_FIELDS["polygon"]] == [
-        ("api_key", "POLYGON_API_KEY")
-    ]
+    fields = dpc.PROVIDER_FIELDS["polygon"]
+
+    assert len(fields) == 1
+    assert (
+        fields[0].field,
+        fields[0].env_var,
+        fields[0].import_aliases,
+        fields[0].runtime_aliases,
+    ) == (
+        "api_key",
+        "MASSIVE_API_KEY",
+        ("POLYGON_API_KEY",),
+        ("POLYGON_API_KEY",),
+    )
     assert "massive" not in dpc.PROVIDER_FIELDS
+
+
+def test_massive_env_resolution_prefers_primary_then_legacy_alias(monkeypatch):
+    assert dpc.PROVIDER_FIELDS["polygon"][0].env_var == "MASSIVE_API_KEY"
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
+
+    assert dpc.provider_field_env_value("polygon", "api_key") == "massive-primary"
+
+    monkeypatch.delenv("MASSIVE_API_KEY")
+    assert dpc.provider_field_env_value("polygon", "api_key") == "polygon-legacy"
+
+
+def test_runtime_config_reports_massive_primary_key_as_configured(monkeypatch, tmp_path):
+    from src.api.routes import config_routes
+    from src.model_credentials import CredentialStore
+
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+
+    runtime = config_routes.runtime_config(
+        store=CredentialStore(tmp_path / "profile.db")
+    )
+
+    assert runtime["data_keys"]["polygon"] is True
+
+
+def test_env_template_exposes_massive_primary_and_comments_legacy_alias():
+    template = (dpc.Path(__file__).parents[1] / "config/.env.template").read_text(
+        encoding="utf-8"
+    )
+
+    assert "\nMASSIVE_API_KEY=your_massive_api_key_here\n" in template
+    assert "\nPOLYGON_API_KEY=" not in template
+    assert "\n# POLYGON_API_KEY=your_polygon_api_key_here\n" in template
 
 
 # --- env bridge --------------------------------------------------------------------
@@ -141,20 +187,33 @@ def test_apply_env_injects_and_tracks(store):
     store.set_field("ibkr", "host", "10.0.0.5")
     store.set_field("ibkr", "port", "4001")
     applied = dpc.apply_env(store)
-    assert os.environ["POLYGON_API_KEY"] == "pk_app"
+    assert os.environ["MASSIVE_API_KEY"] == "pk_app"
+    assert "POLYGON_API_KEY" not in os.environ
     assert os.environ["IBKR_HOST"] == "10.0.0.5" and os.environ["IBKR_PORT"] == "4001"
-    assert {"POLYGON_API_KEY", "IBKR_HOST", "IBKR_PORT"} <= set(applied)
-    assert dpc.effective_source("POLYGON_API_KEY") == "app"
+    assert {"MASSIVE_API_KEY", "IBKR_HOST", "IBKR_PORT"} <= set(applied)
+    assert dpc.effective_source("MASSIVE_API_KEY") == "app"
 
 
 def test_real_env_var_wins_over_app(store, monkeypatch):
     # operator escape hatch: a REAL env var (not file-loaded, not app-applied)
     # is never overwritten by the app store.
-    monkeypatch.setenv("POLYGON_API_KEY", "pk_real_operator")
+    monkeypatch.setenv("MASSIVE_API_KEY", "pk_real_operator")
     store.set_field("polygon", "api_key", "pk_app")
     dpc.apply_env(store)
-    assert os.environ["POLYGON_API_KEY"] == "pk_real_operator"
-    assert dpc.effective_source("POLYGON_API_KEY") == "env"
+    assert os.environ["MASSIVE_API_KEY"] == "pk_real_operator"
+    assert dpc.effective_source("MASSIVE_API_KEY") == "env"
+
+
+def test_real_legacy_polygon_env_alias_wins_over_app_store(store, monkeypatch):
+    monkeypatch.delenv("MASSIVE_API_KEY", raising=False)
+    monkeypatch.setenv("POLYGON_API_KEY", "pk_legacy_operator")
+    store.set_field("polygon", "api_key", "pk_app")
+
+    dpc.apply_env(store)
+
+    assert "MASSIVE_API_KEY" not in os.environ
+    assert dpc.provider_field_env_value("polygon", "api_key") == "pk_legacy_operator"
+    assert dpc.provider_field_env_name("polygon", "api_key") == "POLYGON_API_KEY"
 
 
 def test_app_overrides_file_loaded_value(store, monkeypatch):
@@ -209,9 +268,9 @@ def test_apply_env_strict_db_value_wins_without_file_source_tracking(
 
     dpc.apply_env(store)
 
-    assert os.environ["POLYGON_API_KEY"] == "pk_app"
+    assert os.environ["MASSIVE_API_KEY"] == "pk_app"
     assert "POLYGON_API_KEY" not in env_keys.keys_loaded_from_file()
-    assert dpc.effective_source("POLYGON_API_KEY") == "app"
+    assert dpc.effective_source("MASSIVE_API_KEY") == "app"
 
 
 def test_apply_env_explicit_fallback_true_restores_legacy_file_fallback(
@@ -414,6 +473,40 @@ def test_massive_connection_test_uses_polygon_key_as_redacted_request_params(mon
     assert key not in str((observed["url"], result))
 
 
+def test_massive_connection_test_prefers_massive_key_over_legacy_alias(monkeypatch):
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
+    observed: dict[str, object] = {}
+
+    def fake_probe(url, **kwargs):
+        observed["url"] = url
+        observed.update(kwargs)
+        return {"ok": True, "latency_ms": 1, "detail": "HTTP 200"}
+
+    monkeypatch.setattr(dpc, "_http_probe", fake_probe)
+
+    dpc.run_connection_test("polygon")
+
+    assert observed["params"] == {"apiKey": "massive-primary"}
+
+
+def test_polygon_data_source_constructors_prefer_massive_then_legacy(monkeypatch):
+    from data_sources.polygon_source import PolygonDataSource
+    from data_sources.source_factory import get_data_source
+
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
+
+    direct = PolygonDataSource()
+    factory = get_data_source("polygon")
+    try:
+        assert direct.api_key == "massive-primary"
+        assert factory.api_key == "massive-primary"
+    finally:
+        direct._session.close()
+        factory._session.close()
+
+
 def test_http_probe_redacts_massive_key_from_request_errors(monkeypatch):
     key = "massive-secret-value"
 
@@ -553,7 +646,7 @@ def test_routes_masked_view_and_put(store, monkeypatch):
     assert row["app_value_masked"] == "pk_s…EFGH"               # masked, never raw
     assert "pk_secret" not in str(out).replace("pk_s…", "")     # raw value not leaked
     assert row["effective_source"] == "app"
-    assert os.environ["POLYGON_API_KEY"] == "pk_secret_ABCDEFGH"  # bridge applied
+    assert os.environ["MASSIVE_API_KEY"] == "pk_secret_ABCDEFGH"  # bridge applied
 
     # clear → falls back (no file value in hermetic env → missing)
     out = pc.put_provider_config(
@@ -590,7 +683,27 @@ def test_route_marks_file_source_as_importable(store, monkeypatch):
     assert row["effective_source"] == "config/.env"
     assert row["needs_import"] is True
     assert row["import_source"] == "POLYGON_API_KEY"
-    assert row["importable_env_vars"] == ["POLYGON_API_KEY"]
+    assert row["importable_env_vars"] == ["MASSIVE_API_KEY", "POLYGON_API_KEY"]
+
+
+def test_massive_route_prefers_primary_import_and_lists_legacy_alias(
+    store, monkeypatch, tmp_path
+):
+    from src.api.routes import providers_config as pc
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "MASSIVE_API_KEY=massive-file\nPOLYGON_API_KEY=polygon-file\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+
+    row = pc.providers_config(store=store)["providers"]["polygon"]["fields"][0]
+
+    assert row["env_var"] == "MASSIVE_API_KEY"
+    assert row["import_source"] == "MASSIVE_API_KEY"
+    assert row["importable_env_vars"] == ["MASSIVE_API_KEY", "POLYGON_API_KEY"]
 
 
 def test_strict_view_peeks_config_file_for_import_without_effective_source(
@@ -648,6 +761,24 @@ def test_import_env_field_promotes_file_value_to_db(store, monkeypatch):
     assert row["effective_source"] == "app"
     assert row["needs_import"] is False
     assert "pk_from_file" not in str(out)
+
+
+def test_massive_default_import_prefers_primary_over_legacy_alias(store, monkeypatch):
+    from src.api.routes import providers_config as pc
+
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-import")
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-import")
+
+    pc.import_provider_config_field(
+        "polygon",
+        "api_key",
+        pc.ProviderConfigImportEnv(source_env_var=None),
+        store=store,
+    )
+
+    stored = store.get_all()
+    assert stored["polygon"] == {"api_key": "massive-import"}
+    assert "massive" not in stored
 
 
 def test_sec_contact_email_import_normalizes_to_canonical_user_agent(store, monkeypatch):

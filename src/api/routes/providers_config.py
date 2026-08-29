@@ -31,6 +31,7 @@ from src.data_provider_config import (
     provider_default_available,
     provider_env_fallback_enabled,
     provider_env_fallback_source,
+    provider_field_env_name,
     ProviderConfigMissing,
     require_provider_configured,
     run_connection_test,
@@ -111,11 +112,16 @@ def _view(store: DataProviderConfigStore) -> dict:
         rows = []
         for f in fields:
             raw = (stored.get(provider) or {}).get(f.field)
-            source = effective_source(f.env_var)
+            selected_env_var = provider_field_env_name(provider, f.field)
+            source = (
+                "missing"
+                if selected_env_var is None
+                else effective_source(selected_env_var)
+            )
             imports = importable_env_vars(f)
             import_source = None
             if source == "config/.env":
-                import_source = f.env_var
+                import_source = selected_env_var
             elif source == "missing":
                 for candidate in imports:
                     if candidate and peek_env_file_value(candidate):
@@ -272,7 +278,10 @@ def import_provider_config_field(
         raise HTTPException(status_code=400, detail=f"unknown field {field!r}")
     ensure_env_loaded()
     candidates = importable_env_vars(fdef)
-    source_env_var = body.source_env_var or fdef.env_var
+    source_env_var = body.source_env_var or next(
+        (candidate for candidate in candidates if (os.getenv(candidate) or "").strip()),
+        fdef.env_var,
+    )
     if source_env_var not in candidates:
         raise HTTPException(
             status_code=400,

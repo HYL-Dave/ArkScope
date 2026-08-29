@@ -44,13 +44,13 @@ const mocked = vi.hoisted(() => ({
           field: "api_key",
           label: "PLANTED_CONFIG_API_KEY_LABEL",
           secret: true,
-          env_var: "POLYGON_API_KEY",
+          env_var: "MASSIVE_API_KEY",
           app_value_set: false,
           app_value_masked: null,
           effective_source: "config/.env",
           needs_import: true,
-          import_source: "POLYGON_API_KEY",
-          importable_env_vars: ["POLYGON_API_KEY"],
+          import_source: "MASSIVE_API_KEY",
+          importable_env_vars: ["MASSIVE_API_KEY", "POLYGON_API_KEY"],
           defaulted: false,
           guarded: false,
           guard_reason: null,
@@ -809,7 +809,7 @@ describe("Settings provider config authority", () => {
       expect(groupedConfig?.textContent).toContain("（外部）（環境變數）");
       expect(groupedConfig?.textContent).toContain("基底=1、選擇權=11、股價=21、新聞=31、IV=41");
       const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
-        row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
+        row.textContent?.includes("Massive") && row.textContent.includes("API key"));
       if (!polygonRow) throw new Error("missing polygon config row");
       expect(polygonRow.textContent).toContain("（外部）（config/.env）");
       const refreshButton = host!.querySelector(".settings-section-head button");
@@ -822,18 +822,19 @@ describe("Settings provider config authority", () => {
       await act(async () => {
         importButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       });
-      expect(mocked.importCalls).toEqual([{ provider: "polygon", field: "api_key", sourceEnvVar: "POLYGON_API_KEY" }]);
+      expect(mocked.importCalls).toEqual([{ provider: "polygon", field: "api_key", sourceEnvVar: "MASSIVE_API_KEY" }]);
     } finally {
       restoreFixtures();
     }
   });
 
-  it("renders Massive (Polygon) as one Polygon credential and saves the original payload", async () => {
+  it("renders Massive as one polygon credential and saves the original payload", async () => {
     await renderDataSources();
 
     const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
-      row.textContent?.includes("Massive (Polygon)") && row.textContent.includes("API key"));
-    if (!polygonRow) throw new Error("missing Massive (Polygon) config row");
+      row.textContent?.includes("Massive") && row.textContent.includes("API key"));
+    if (!polygonRow) throw new Error("missing Massive config row");
+    expect(polygonRow.textContent).not.toContain("(Polygon)");
     const secretInputs = polygonRow.querySelectorAll('input[type="password"]');
     expect(secretInputs).toHaveLength(1);
 
@@ -861,8 +862,8 @@ describe("Settings provider config authority", () => {
     expect(testProvider).not.toHaveBeenCalled();
 
     const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
-      row.textContent?.includes("Massive (Polygon)") && row.textContent.includes("API key"));
-    if (!polygonRow) throw new Error("missing Massive (Polygon) config row");
+      row.textContent?.includes("Massive") && row.textContent.includes("API key"));
+    if (!polygonRow) throw new Error("missing Massive config row");
     const secretInput = polygonRow.querySelector<HTMLInputElement>('input[type="password"]');
     if (!secretInput) throw new Error("missing Massive credential input");
     await act(async () => {
@@ -1577,8 +1578,8 @@ describe("Settings provider config authority", () => {
       expect(groupedConfig?.textContent)
         .toContain("Base=—, Options=11, Prices=21, News=31, IV=41");
       const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
-        row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
-      if (!polygonRow) throw new Error("missing Polygon config row");
+        row.textContent?.includes("Massive") && row.textContent.includes("API key"));
+      if (!polygonRow) throw new Error("missing Massive config row");
       expect(polygonRow.textContent).toContain("(External) (config/.env)");
       expect(host!.querySelector(".settings-section-head button")?.textContent)
         .toContain("Reload status (Running, auto-refreshing)");
@@ -1637,7 +1638,7 @@ describe("Settings provider config authority", () => {
     expect(ibkrHealthRow?.textContent).toContain("失敗");
     const polygonConfigRow = Array.from(
       host!.querySelectorAll("[data-testid='provider-config-scroll'] tbody tr"),
-    ).find((row) => row.textContent?.includes("Polygon"));
+    ).find((row) => row.textContent?.includes("Massive"));
     const testButton = Array.from(polygonConfigRow?.querySelectorAll("button") ?? [])
       .find((button) => button.textContent?.trim() === "測試");
     if (!testButton) throw new Error("missing Polygon connection test button");
@@ -1646,7 +1647,7 @@ describe("Settings provider config authority", () => {
       await Promise.resolve();
     });
 
-    expect(host!.textContent).toContain("Massive (Polygon) 連線測試失敗。");
+    expect(host!.textContent).toContain("Massive 連線測試失敗。");
     expect(host!.textContent).toContain("Provider 設定需要修復。");
     for (const raw of [
       mocked.providerHealthDetail,
@@ -1669,7 +1670,7 @@ describe("Settings provider config authority", () => {
     await renderDataSources(undefined, true);
     const polygonConfigRow = Array.from(
       host!.querySelectorAll("[data-testid='provider-config-scroll'] tbody tr"),
-    ).find((row) => row.textContent?.includes("Polygon"));
+    ).find((row) => row.textContent?.includes("Massive"));
     const testButton = Array.from(polygonConfigRow?.querySelectorAll("button") ?? [])
       .find((button) => button.textContent?.trim() === "測試");
     if (!testButton) throw new Error("missing Polygon connection test button");

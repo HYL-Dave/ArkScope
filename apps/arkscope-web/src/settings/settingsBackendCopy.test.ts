@@ -54,12 +54,12 @@ describe("Settings backend copy boundary", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        providers: ["Massive (Polygon)", "Finnhub", "FRED", "Financial Datasets（付費）", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha（Extension）"],
+        providers: ["Massive", "Finnhub", "FRED", "Financial Datasets（付費）", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha（Extension）"],
         fields: ["API key", "API key", "API key", "API key", "Gateway 主機", "Gateway 連接埠", "Client ID", "聯絡 Email"],
       },
       {
         locale: "en" as const,
-        providers: ["Massive (Polygon)", "Finnhub", "FRED", "Financial Datasets (paid)", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha (Extension)"],
+        providers: ["Massive", "Finnhub", "FRED", "Financial Datasets (paid)", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha (Extension)"],
         fields: ["API key", "API key", "API key", "API key", "Gateway host", "Gateway port", "Client ID", "Contact email"],
       },
     ];
@@ -97,14 +97,14 @@ describe("Settings backend copy boundary", () => {
         locale: "zh-Hant" as const,
         labels: ["正常", "過期", "維護中", "無訊號", "未設定", "缺少金鑰", "已停用", "future_status"],
         sources: ["App", "環境變數", "config/.env", "未設定", "混合來源", "免金鑰"],
-        unknownDetail: "Massive (Polygon)：future_status",
+        unknownDetail: "Massive：future_status",
         setup: "Provider 設定需要修復。",
       },
       {
         locale: "en" as const,
         labels: ["Connected", "Stale", "Maintenance", "No signal", "Not configured", "Missing key", "Disabled", "future_status"],
         sources: ["App", "Environment", "config/.env", "Not configured", "Mixed sources", "No key required"],
-        unknownDetail: "Massive (Polygon): future_status",
+        unknownDetail: "Massive: future_status",
         setup: "Provider settings need repair.",
       },
     ];
@@ -114,7 +114,7 @@ describe("Settings backend copy boundary", () => {
       const commonT = modelCommonT(expected.locale);
       const copies = statuses.map((status) => providerHealthCopy("polygon", status, t));
       expect(copies.map(({ label }) => label)).toEqual(expected.labels);
-      expect(copies.every(({ detail }) => detail.includes("Massive (Polygon)"))).toBe(true);
+      expect(copies.every(({ detail }) => detail.includes("Massive"))).toBe(true);
       expect(copies.at(-1)).toEqual({
         label: "future_status",
         detail: expected.unknownDetail,
@@ -139,11 +139,11 @@ describe("Settings backend copy boundary", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        values: ["Massive (Polygon) 連線測試通過。", "Massive (Polygon) 連線測試失敗。", "Massive (Polygon) 不提供即時連線測試。"],
+        values: ["Massive 連線測試通過。", "Massive 連線測試失敗。", "Massive 不提供即時連線測試。"],
       },
       {
         locale: "en" as const,
-        values: ["Massive (Polygon) connection test passed.", "Massive (Polygon) connection test failed.", "Massive (Polygon) does not offer a live connection test."],
+        values: ["Massive connection test passed.", "Massive connection test failed.", "Massive does not offer a live connection test."],
       },
     ];
 

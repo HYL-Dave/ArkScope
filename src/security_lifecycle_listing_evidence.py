@@ -49,6 +49,11 @@ _CIK = re.compile(r"^\d{10}$")
 _FIGI = re.compile(r"^BBG[A-Z0-9]{9}$")
 _EXCHANGE = re.compile(r"^[A-Z][A-Z0-9]{1,11}$")
 _SECURITY_TYPE = re.compile(r"^[A-Z][A-Z0-9_-]{0,19}$")
+_RFC3339_TIMESTAMP = re.compile(
+    r"^(?P<second>\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2})"
+    r"(?:\.(?P<fraction>\d{1,9}))?"
+    r"(?P<timezone>[Zz]|[+-]\d{2}:\d{2})$"
+)
 _FOOTER = re.compile(r"^File Creation Time: (\d{8})\|(\d{6})$")
 _NASDAQ_HEADER = (
     "Symbol",
@@ -227,7 +232,16 @@ def _timestamp(name: str, value: object) -> tuple[str, datetime]:
     del name
     if not isinstance(value, str) or not value or len(value) > 64 or "\0" in value:
         raise ListingEvidenceFailure("listing_status_unresolved")
-    parseable = value[:-1] + "+00:00" if value.endswith("Z") else value
+    match = _RFC3339_TIMESTAMP.fullmatch(value)
+    if match is None:
+        raise ListingEvidenceFailure("listing_status_unresolved")
+    fraction = match.group("fraction")
+    fractional = "" if fraction is None else f".{fraction[:6]}"
+    zone = match.group("timezone")
+    parseable = (
+        f"{match.group('second').upper()}{fractional}"
+        f"{'+00:00' if zone.lower() == 'z' else zone}"
+    )
     parsed: datetime | None = None
     invalid = False
     try:

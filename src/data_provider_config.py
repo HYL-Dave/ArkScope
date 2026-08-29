@@ -75,13 +75,23 @@ class FieldDef:
     guarded: bool = False
     guard_reason: str | None = None
     import_aliases: tuple[str, ...] = ()
+    runtime_aliases: tuple[str, ...] = ()
 
 
 # What each provider can store here. SEC EDGAR has no key but does have an
 # optional app-managed User-Agent field; Seeking Alpha is the extension capture
 # path (nothing to configure here).
 PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
-    "polygon": [FieldDef("api_key", "POLYGON_API_KEY", True, "API key")],
+    "polygon": [
+        FieldDef(
+            "api_key",
+            "MASSIVE_API_KEY",
+            True,
+            "API key",
+            import_aliases=("POLYGON_API_KEY",),
+            runtime_aliases=("POLYGON_API_KEY",),
+        )
+    ],
     "finnhub": [FieldDef("api_key", "FINNHUB_API_KEY", True, "API key")],
     "fred": [FieldDef("api_key", "FRED_API_KEY", True, "API key")],
     "financial_datasets": [
@@ -214,6 +224,25 @@ def mask_value(value: str, secret: bool) -> str:
 
 def importable_env_vars(fdef: FieldDef) -> tuple[str, ...]:
     return (fdef.env_var, *fdef.import_aliases)
+
+
+def runtime_env_vars(fdef: FieldDef) -> tuple[str, ...]:
+    return (fdef.env_var, *fdef.runtime_aliases)
+
+
+def provider_field_env_name(provider: str, field: str) -> str | None:
+    fdef = _FIELD_BY_KEY.get((provider, field))
+    if fdef is None:
+        raise KeyError(f"unknown provider field {provider}.{field}")
+    for env_var in runtime_env_vars(fdef):
+        if (os.getenv(env_var) or "").strip():
+            return env_var
+    return None
+
+
+def provider_field_env_value(provider: str, field: str) -> str | None:
+    env_var = provider_field_env_name(provider, field)
+    return None if env_var is None else (os.getenv(env_var) or "").strip() or None
 
 
 def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
@@ -396,8 +425,29 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
                 continue
             var = fdef.env_var
             configured_vars.add(var)
-            # a REAL env var (pre-existing, not file-loaded, not ours) wins
-            if var in os.environ and var not in file_keys and var not in _APP_APPLIED:
+            candidates = runtime_env_vars(fdef)
+            # A real value under either the current name or a legacy alias is one
+            # operator authority. Remove lower-authority candidates so readers do
+            # not select an app/file primary ahead of a real legacy alias.
+            real_var = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if (os.getenv(candidate) or "").strip()
+                    and candidate not in file_keys
+                    and candidate not in _APP_APPLIED
+                ),
+                None,
+            )
+            if real_var is not None:
+                for candidate in candidates:
+                    if candidate == real_var:
+                        continue
+                    if candidate in _APP_APPLIED:
+                        _APP_APPLIED.discard(candidate)
+                        os.environ.pop(candidate, None)
+                    elif candidate in file_keys:
+                        discard_loaded_key(candidate)
                 continue
             os.environ[var] = value
             _APP_APPLIED.add(var)
@@ -487,7 +537,14 @@ def missing_required_provider_fields(
     for fdef in defs:
         if fdef.optional or fdef.defaulted:
             continue
-        source = effective_source(fdef.env_var)
+        source = next(
+            (
+                effective_source(env_var)
+                for env_var in runtime_env_vars(fdef)
+                if os.getenv(env_var)
+            ),
+            "missing",
+        )
         if source == "missing" or (source == "config/.env" and not fallback):
             out.append(provider_config_missing_detail(provider, fdef.field))
     return out
@@ -567,7 +624,7 @@ def run_connection_test(provider: str) -> Dict[str, Any]:
             return {"ok": False, "latency_ms": None, "detail": f"{host}:{port} — {e}"}
 
     if provider == "polygon":
-        key = os.getenv("POLYGON_API_KEY")
+        key = provider_field_env_value("polygon", "api_key")
         if not key:
             return {"ok": False, "latency_ms": None, "detail": "缺 API key"}
         return _http_probe(

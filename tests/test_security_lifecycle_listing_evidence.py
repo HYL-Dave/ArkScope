@@ -384,6 +384,15 @@ def test_massive_parser_requires_explicit_intent_and_normalizes_inactive_date() 
     )
 
 
+def test_massive_parser_accepts_live_rfc3339_nanoseconds_without_rewriting_body() -> None:
+    body = _fixture("massive-active-nanoseconds.json")
+
+    record = _massive_record(body, "AAPL", expected_active=True)
+
+    assert record.provider_last_updated_utc == "2026-08-28T06:10:12Z"
+    assert record.source_document_sha256 == hashlib.sha256(body).hexdigest()
+
+
 def test_massive_parser_returns_one_not_found_record_for_an_empty_exact_lookup() -> None:
     body = b'{"results":[],"status":"OK","request_id":"fixture-empty"}'
     record = _massive_record(body, "MISS", expected_active=True)
@@ -1129,6 +1138,12 @@ def _real_terminal_policy_result(*, massive_mutation=None, locator_mutation=None
     return listing, decision, preview_calls
 
 
+def _nest_listing_locator(locator: dict[str, object]) -> None:
+    snapshot = dict(locator)
+    locator.clear()
+    locator["listing_directory_snapshot"] = snapshot
+
+
 def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> None:
     listing, decision, preview_calls = _real_terminal_policy_result()
 
@@ -1169,8 +1184,16 @@ def test_real_terminal_pipeline_rejects_inactive_massive_identity_conflicts(
         lambda locator: locator.__setitem__("expected_active_state", True),
         lambda locator: locator.__setitem__("market", "otc"),
         lambda locator: locator.__setitem__("snapshot_complete", False),
+        _nest_listing_locator,
+        lambda locator: locator.__setitem__("directory", "nasdaq_listed"),
     ),
-    ids=("wrong_expected_intent", "wrong_market", "incomplete_snapshot"),
+    ids=(
+        "wrong_expected_intent",
+        "wrong_market",
+        "incomplete_snapshot",
+        "nested_locator",
+        "massive_directory_not_none",
+    ),
 )
 def test_real_terminal_pipeline_requires_exact_inactive_massive_locator(
     locator_mutation,

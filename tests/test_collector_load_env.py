@@ -30,6 +30,16 @@ def test_polygon_env_wins_over_file(tmp_path, monkeypatch):
     assert cpn.load_env() == "env_key"
 
 
+def test_massive_env_wins_over_legacy_polygon_sources(tmp_path, monkeypatch):
+    cpn = importlib.import_module("src.collectors.polygon_news")
+    _write_env(tmp_path, "POLYGON_API_KEY", "file_legacy")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive_primary")
+    monkeypatch.setenv("POLYGON_API_KEY", "env_legacy")
+
+    assert cpn.load_env() == "massive_primary"
+
+
 def test_polygon_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
     cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")

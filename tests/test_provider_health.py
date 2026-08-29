@@ -50,7 +50,7 @@ def hermetic(monkeypatch):
     # undone mid-test and key_source defaults to "env" for setenv'd keys.
     monkeypatch.setattr("src.env_keys._loaded", True)
     monkeypatch.setattr("src.env_keys._loaded_keys", set())
-    for var in ("POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
+    for var in ("MASSIVE_API_KEY", "POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
                 "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT"):
         monkeypatch.delenv(var, raising=False)
     # Existing health tests exercise mirrored content timestamps. S3.2 default is direct;
@@ -71,6 +71,23 @@ def test_connected_when_signal_recent(monkeypatch):
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
     assert p["status"] == "connected"
     assert p["last_success_at"] is not None and p["signals"]["news_recent_7d"] == 50
+
+
+def test_massive_health_uses_primary_name_and_keeps_legacy_fallback(monkeypatch):
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    dal = _FakeDAL(_FakeBackend(stats=_stats(
+        news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
+
+    primary = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+
+    assert primary["label"] == "Massive"
+    assert primary["status"] == "connected"
+    assert primary["key_vars"] == ["MASSIVE_API_KEY", "POLYGON_API_KEY"]
+
+    monkeypatch.delenv("MASSIVE_API_KEY")
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
+    legacy = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+    assert legacy["status"] == "connected"
 
 
 def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypatch):

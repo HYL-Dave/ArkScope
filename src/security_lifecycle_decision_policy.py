@@ -458,10 +458,10 @@ def _listing_delisted_date(value: object) -> date | None:
 def _listing_snapshot(row: _Evidence) -> Mapping[str, Any] | None:
     if row.source_family != "listing_authority":
         return None
-    nested = row.source_locator.get("listing_directory_snapshot")
-    snapshot = nested if isinstance(nested, Mapping) else row.source_locator
-    kind = _text(snapshot.get("locator_kind"))
-    if kind not in {None, "listing_directory_snapshot"}:
+    snapshot = row.source_locator
+    if "listing_directory_snapshot" in snapshot:
+        return None
+    if _text(snapshot.get("locator_kind")) != "listing_directory_snapshot":
         return None
     if _text(snapshot.get("adapter")) is None:
         return None
@@ -666,6 +666,7 @@ def _listing_explicit_inactive(
             snapshot.get("locator_kind") == "listing_directory_snapshot"
             and snapshot.get("adapter") == "massive_reference"
             and snapshot.get("authority") == "massive"
+            and snapshot.get("directory") is None
             and snapshot.get("candidate_ticker") == candidate
             and snapshot.get("expected_active_state") is False
             and snapshot.get("market") == "stocks"

@@ -31,6 +31,7 @@ from src.model_route_store import ModelRouteStore
 from src.model_task_canary import dispatch_task_model_test
 from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
 from src.env_keys import env_file_path
+from src.data_provider_config import provider_field_env_value
 from src.model_credentials import (
     CredentialStore,
     discover_models,
@@ -263,7 +264,7 @@ def runtime_config(
         },
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
-            "polygon": key_set("POLYGON_API_KEY"),
+            "polygon": provider_field_env_value("polygon", "api_key") is not None,
             "financial_datasets": key_set("FINANCIAL_DATASETS_API_KEY"),
             "fred": key_set("FRED_API_KEY"),
         },

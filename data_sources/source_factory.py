@@ -87,12 +87,15 @@ def get_data_source(
     if api_key is None:
         env_key_names = {
             'finnhub': 'FINNHUB_API_KEY',
-            'polygon': 'POLYGON_API_KEY',
             'alpha_vantage': 'ALPHA_VANTAGE_API_KEY',
             'financial_datasets': 'FINANCIAL_DATASETS_API_KEY',
         }
-        env_key = env_key_names.get(source_name_lower)
-        if env_key:
+        if source_name_lower == "polygon":
+            api_key = (
+                os.environ.get("MASSIVE_API_KEY")
+                or os.environ.get("POLYGON_API_KEY")
+            )
+        elif (env_key := env_key_names.get(source_name_lower)) is not None:
             api_key = os.environ.get(env_key)
 
     return source_class(api_key=api_key, **kwargs)

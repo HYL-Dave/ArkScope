@@ -661,6 +661,8 @@ def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
                 case_ids=["CASE-A", "CASE-B"],
             )
 
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
     monkeypatch.setattr(scheduler, "ListingRequestBudget", Budget, raising=False)
     monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport, raising=False)
     monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session, raising=False)
@@ -681,6 +683,7 @@ def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
     ]
     assert session.massive_identities == {("CASE", True, "otc")}
     assert session.massive_requests == [("CASE", True, "otc")]
+    assert session.massive_api_key == "massive-primary"
     assert session.closed is True
 
 
