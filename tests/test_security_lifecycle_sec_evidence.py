@@ -208,8 +208,7 @@ def _active_listing_material(name, *, ticker, venue, cik, market):
             "candidate_ticker": ticker,
             "expected_active_state": True,
             "market": market,
-            "status": "found",
-            "active": True,
+            "listing_status": "active",
         },
         "retrieved_at": "2026-08-25T10:27:41.545726Z",
     }

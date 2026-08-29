@@ -31,8 +31,7 @@ def _listing_material(name: str, snapshot: dict) -> tuple[dict, tuple[dict, ...]
             "candidate_ticker": snapshot["candidate_ticker"],
             "expected_active_state": snapshot["expected_active_state"],
             "market": snapshot["market"],
-            "status": snapshot["status"],
-            "active": snapshot["active"],
+            "listing_status": "active" if snapshot["active"] else "not_found",
         },
         "retrieved_at": _AT,
     }
