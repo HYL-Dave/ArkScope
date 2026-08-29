@@ -34,7 +34,7 @@ DEFAULT_BLOCKED_MODULES: FrozenSet[str] = frozenset({
     # filesystem / OS
     "os", "sys", "subprocess", "shutil", "pathlib",
     # network
-    "socket", "http", "urllib", "requests", "httpx",
+    "socket", "http", "urllib", "requests", "httpx", "httpx2",
     "ftplib", "smtplib", "imaplib", "poplib", "telnetlib",
     # low-level / dynamic loading
     "ctypes", "importlib", "runpy", "code", "codeop",

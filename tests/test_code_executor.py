@@ -10,7 +10,9 @@ Tests cover:
 
 import json
 import os
+import re
 import time
+from importlib.metadata import requires
 
 import pytest
 
@@ -94,6 +96,30 @@ class TestValidateCode:
         result = validate_code("from http.client import HTTPConnection")
         assert result is not None
         assert "http" in result
+
+    @pytest.mark.parametrize(
+        "source",
+        (
+            "import httpx2",
+            "import httpx2 as httpx",
+            "from httpx2 import Client",
+        ),
+    )
+    def test_anthropic_httpx2_transport_imports_are_blocked(self, source):
+        result = validate_code(source)
+        assert result is not None
+        assert "httpx2" in result
+
+    def test_anthropic_declared_http_transports_are_in_the_blocklist(self):
+        transport_modules = {
+            match.group(0).replace("-", "_")
+            for requirement in (requires("anthropic") or ())
+            if (match := re.match(r"[A-Za-z0-9_.-]+", requirement))
+            and match.group(0).lower().startswith("httpx")
+        }
+
+        assert transport_modules
+        assert transport_modules <= DEFAULT_BLOCKED_MODULES
 
     def test_custom_blocklist(self):
         """Custom blocklist overrides default."""
