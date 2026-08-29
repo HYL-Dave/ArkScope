@@ -98,8 +98,8 @@ Managed / legacy names to check:
 
 - `ALPHA_VANTAGE_API_KEY`
 - `EODHD_API_KEY`
-- `POLYGON_API_KEY`
-- `MASSIVE_API_KEY` (if introduced by provider rebrand)
+- `POLYGON_API_KEY` (retired; presence is inventory only)
+- `MASSIVE_API_KEY` (current process bridge; profile DB remains durable authority)
 
 Allowed sources for this audit:
 

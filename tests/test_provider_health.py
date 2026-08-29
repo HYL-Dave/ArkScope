@@ -65,7 +65,7 @@ def _by_id(out, pid):
 
 
 def test_connected_when_signal_recent(monkeypatch):
-    monkeypatch.setenv("POLYGON_API_KEY", "k")
+    monkeypatch.setenv("MASSIVE_API_KEY", "k")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
@@ -73,7 +73,7 @@ def test_connected_when_signal_recent(monkeypatch):
     assert p["last_success_at"] is not None and p["signals"]["news_recent_7d"] == 50
 
 
-def test_massive_health_uses_primary_name_and_keeps_legacy_fallback(monkeypatch):
+def test_massive_health_uses_primary_name_and_rejects_legacy_fallback(monkeypatch):
     monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
@@ -82,12 +82,12 @@ def test_massive_health_uses_primary_name_and_keeps_legacy_fallback(monkeypatch)
 
     assert primary["label"] == "Massive"
     assert primary["status"] == "connected"
-    assert primary["key_vars"] == ["MASSIVE_API_KEY", "POLYGON_API_KEY"]
+    assert primary["key_vars"] == ["MASSIVE_API_KEY"]
 
     monkeypatch.delenv("MASSIVE_API_KEY")
     monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
     legacy = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
-    assert legacy["status"] == "connected"
+    assert legacy["status"] == "not_configured"
 
 
 def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypatch):
@@ -100,7 +100,7 @@ def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypat
 
 
 def test_stale_when_signal_old_on_weekday(monkeypatch):
-    monkeypatch.setenv("POLYGON_API_KEY", "k")
+    monkeypatch.setenv("MASSIVE_API_KEY", "k")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=100), 0)])))
     assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")["status"] == "stale"
@@ -112,7 +112,7 @@ def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
     # provider stays stale.
     monkeypatch.setenv("IBKR_HOST", "192.168.0.153")
     monkeypatch.setenv("IBKR_PORT", "4001")
-    monkeypatch.setenv("POLYGON_API_KEY", "k")
+    monkeypatch.setenv("MASSIVE_API_KEY", "k")
     old = _SATURDAY - timedelta(hours=100)
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", old, 0)], prices_latest=old)))
@@ -127,7 +127,7 @@ def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
 
 
 def test_provider_health_missing_managed_key_is_not_configured():
-    # no POLYGON_API_KEY in env (hermetic fixture) — even with a fresh signal
+    # no MASSIVE_API_KEY in env (hermetic fixture) — even with a fresh signal
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=1), 9)])))
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
@@ -233,7 +233,7 @@ def test_key_source_reports_effective_origin(monkeypatch):
     # The loader is set-if-absent, so the EFFECTIVE source of a present key is:
     # loaded-by-the-loader → config/.env; otherwise → real env (env wins even when
     # the file also names it). Multi-var keys spanning both → mixed.
-    monkeypatch.setenv("POLYGON_API_KEY", "k")    # real env (not loader-set)
+    monkeypatch.setenv("MASSIVE_API_KEY", "k")    # real env (not loader-set)
     monkeypatch.setenv("FINNHUB_API_KEY", "k")    # below: marked loader-set
     monkeypatch.setenv("IBKR_HOST", "h")          # env...
     monkeypatch.setenv("IBKR_PORT", "4001")       # ...but PORT marked loader-set → mixed
@@ -247,12 +247,12 @@ def test_key_source_reports_effective_origin(monkeypatch):
     assert _by_id(out, "fred")["key_source"] == "missing"
 
 
-def test_config_file_key_source_sets_import_suggestion(monkeypatch):
+def test_retired_polygon_file_key_is_not_a_massive_import_suggestion(monkeypatch):
     monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
     monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
     p = _by_id(out, "polygon")
-    assert p["key_source"] == "config/.env"
+    assert p["key_source"] == "missing"
     assert p["status"] == "not_configured"
     assert p["key_import_suggested"] is False
     assert p["config_error"]["code"] == "provider_config_missing"
@@ -402,7 +402,7 @@ def test_section_failure_degrades_not_raises():
 
 
 def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(monkeypatch):
-    monkeypatch.setenv("POLYGON_API_KEY", "k")
+    monkeypatch.setenv("MASSIVE_API_KEY", "k")
     monkeypatch.setenv("FINNHUB_API_KEY", "k")
     direct = {
         "status": "partial",

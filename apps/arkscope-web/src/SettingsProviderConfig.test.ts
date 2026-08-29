@@ -47,10 +47,10 @@ const mocked = vi.hoisted(() => ({
           env_var: "MASSIVE_API_KEY",
           app_value_set: false,
           app_value_masked: null,
-          effective_source: "config/.env",
-          needs_import: true,
-          import_source: "MASSIVE_API_KEY",
-          importable_env_vars: ["MASSIVE_API_KEY", "POLYGON_API_KEY"],
+          effective_source: "missing",
+          needs_import: false,
+          import_source: null,
+          importable_env_vars: [],
           defaulted: false,
           guarded: false,
           guard_reason: null,
@@ -152,7 +152,7 @@ const emptyCatalog: ModelCatalog = {
 
 const health: ProvidersHealthResponse = {
   providers: [
-    { id: "polygon", label: "PLANTED_PROVIDER_POLYGON_LABEL", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
+    { id: "polygon", label: "PLANTED_PROVIDER_POLYGON_LABEL", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: false, key_source: "missing", key_vars: ["MASSIVE_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
     { id: "ibkr", label: "PLANTED_PROVIDER_IBKR_LABEL", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: mocked.providerHealthError, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
     {
       id: "fred",
@@ -793,7 +793,7 @@ describe("Settings provider config authority", () => {
     });
   });
 
-  it("renders config-file provenance with per-field import", async () => {
+  it("keeps Massive detached from config-file import while rendering other provenance", async () => {
     const restoreFixtures = plantPunctuationFixtures();
     try {
       const source = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");
@@ -804,25 +804,20 @@ describe("Settings provider config authority", () => {
       expect(host!.textContent).toContain("來源標示會說明每個值");
       expect(host!.textContent).not.toContain("strict DB-first");
       expect(host!.textContent).toContain("config/.env");
-      expect(host!.textContent).toContain("建議匯入");
       const groupedConfig = host!.querySelector("[data-testid='ibkr-config-group']");
       expect(groupedConfig?.textContent).toContain("（外部）（環境變數）");
       expect(groupedConfig?.textContent).toContain("基底=1、選擇權=11、股價=21、新聞=31、IV=41");
       const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
         row.textContent?.includes("Massive") && row.textContent.includes("API key"));
       if (!polygonRow) throw new Error("missing polygon config row");
-      expect(polygonRow.textContent).toContain("（外部）（config/.env）");
+      expect(polygonRow.textContent).toContain("未設定");
       const refreshButton = host!.querySelector(".settings-section-head button");
       expect(refreshButton?.textContent).toContain("（執行中，自動更新）");
       expect(host!.querySelector(".ds-schedule-protection-note")?.textContent)
         .toContain("執行保護：同一資料來源與 IBKR 工作同時間只執行一次");
-      const importButton = Array.from(polygonRow.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("匯入"));
-      if (!importButton) throw new Error("missing import button");
-      await act(async () => {
-        importButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      });
-      expect(mocked.importCalls).toEqual([{ provider: "polygon", field: "api_key", sourceEnvVar: "MASSIVE_API_KEY" }]);
+      expect(Array.from(polygonRow.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("匯入"))).toBe(false);
+      expect(mocked.importCalls).toEqual([]);
     } finally {
       restoreFixtures();
     }

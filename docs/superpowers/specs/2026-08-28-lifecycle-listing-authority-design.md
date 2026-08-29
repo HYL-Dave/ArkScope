@@ -74,14 +74,22 @@ converted to `delisted`.
 
 Polygon.io is now Massive. The official service exposes the new
 `https://api.massive.com` base while continuing parallel support for
-`api.polygon.io`. ArkScope keeps the durable provider ID `polygon` and the
-existing `POLYGON_API_KEY` setting for compatibility, but user-facing Settings
-labels it **Massive (Polygon)**.
+`api.polygon.io`. ArkScope keeps the durable provider ID `polygon`, but
+user-facing Settings labels it **Massive (Polygon)**.
 
-No second secret field or environment variable is added. Existing news and
-market-data code may continue using its durable `polygon` identifiers; the new
-lifecycle adapter is named `massive_reference` and reads the same effective
-credential.
+There is one durable secret field: `polygon.api_key` in the profile database.
+`MASSIVE_API_KEY` is its sole process bridge for legacy clients and standalone
+operator environments; it is not a second durable authority.
+`POLYGON_API_KEY` is retired from runtime resolution. Neither name is loaded
+from `config/.env` for Massive execution or offered as a Massive import source.
+An old file value must not silently outrank or revive a profile value. A future
+user-selected provider-settings import/export artifact is a separate, explicit
+feature whose format and secret-handling contract require their own design; it
+is not implemented by retaining an implicit `.env` fallback.
+
+Existing news and market-data code may continue using its durable `polygon`
+identifiers; the new lifecycle adapter is named `massive_reference` and reads
+the same profile-backed process bridge.
 
 Massive is queried only when at least one typed condition is true:
 
@@ -523,7 +531,8 @@ Implementation is admitted only after all of these offline checks pass:
 7. browser tests cover English and Traditional Chinese, desktop and mobile,
    concise listing evidence, source distinction, Monitoring, History, visible
    automatic transition, acknowledgement, and reverse;
-8. Settings tests prove one masked `POLYGON_API_KEY` authority and the
+8. Settings tests prove one masked profile authority, the sole
+   `MASSIVE_API_KEY` process bridge, no Massive `.env` import/fallback, and the
    **Massive (Polygon)** label;
 9. v2-to-v3 scratch migration and reverse restore preserve every legacy row;
 10. backend, frontend, typecheck, and production build gates pass twice with

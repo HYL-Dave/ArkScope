@@ -276,8 +276,17 @@ def import_provider_config_field(
     fdef = by_name.get(field)
     if fdef is None:
         raise HTTPException(status_code=400, detail=f"unknown field {field!r}")
-    ensure_env_loaded()
     candidates = importable_env_vars(fdef)
+    if not candidates:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "provider_config_import_not_supported",
+                "provider": provider,
+                "field": field,
+            },
+        )
+    ensure_env_loaded()
     source_env_var = body.source_env_var or next(
         (candidate for candidate in candidates if (os.getenv(candidate) or "").strip()),
         fdef.env_var,

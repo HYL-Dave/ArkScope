@@ -544,19 +544,7 @@ def _listing_status(row: _Evidence) -> str | None:
             if normalized in {"active", "inactive", "not_found", "unverified"}
             else None
         )
-
-    # Compatibility for persisted v4-predecessor/test locators only.
-    legacy = _text(snapshot.get("status", snapshot.get("result")))
-    if legacy is None:
-        return None
-    normalized = legacy.lower()
-    if normalized == "found":
-        if snapshot.get("active") is True:
-            return "active"
-        if snapshot.get("active") is False:
-            return "inactive"
-        return None
-    return normalized if normalized in {"not_found", "unverified"} else None
+    return None
 
 
 def _listing_row_active(row: _Evidence) -> bool:

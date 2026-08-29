@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, quote_plus
 
@@ -97,6 +98,31 @@ def _assert_closed_failure(
     rendered = repr(error)
     for value in untrusted_values:
         assert value not in rendered
+
+
+def test_transport_timestamp_crosses_the_real_massive_parser_contract() -> None:
+    """The producer timestamp must be accepted by the real listing parser."""
+    from src.security_lifecycle_listing_evidence import parse_massive_ticker
+
+    now = datetime(2026, 8, 28, 22, 0, 0, 987654, tzinfo=timezone.utc)
+    body = b'{"status":"OK","results":[]}'
+    transport = ListingAuthorityTransport(
+        session=FakeSession([_massive_response(body)]),
+        now=lambda: now,
+    )
+    payload = _massive_call(transport, ListingRequestBudget.lifecycle())
+
+    record = parse_massive_ticker(
+        payload.body,
+        "AAPL",
+        expected_active=True,
+        market="stocks",
+        retrieved_at=payload.retrieved_at,
+        source_url=payload.source_url,
+    )
+
+    assert payload.retrieved_at == "2026-08-28T22:00:00Z"
+    assert record.retrieved_at == payload.retrieved_at
 
 
 def test_transport_allows_only_two_exact_nasdaq_files() -> None:

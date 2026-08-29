@@ -78,13 +78,13 @@ def test_massive_reuses_the_polygon_credential_authority():
     ) == (
         "api_key",
         "MASSIVE_API_KEY",
-        ("POLYGON_API_KEY",),
-        ("POLYGON_API_KEY",),
+        (),
+        (),
     )
     assert "massive" not in dpc.PROVIDER_FIELDS
 
 
-def test_massive_env_resolution_prefers_primary_then_legacy_alias(monkeypatch):
+def test_massive_env_resolution_never_revives_legacy_polygon_alias(monkeypatch):
     assert dpc.PROVIDER_FIELDS["polygon"][0].env_var == "MASSIVE_API_KEY"
     monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
     monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
@@ -92,7 +92,7 @@ def test_massive_env_resolution_prefers_primary_then_legacy_alias(monkeypatch):
     assert dpc.provider_field_env_value("polygon", "api_key") == "massive-primary"
 
     monkeypatch.delenv("MASSIVE_API_KEY")
-    assert dpc.provider_field_env_value("polygon", "api_key") == "polygon-legacy"
+    assert dpc.provider_field_env_value("polygon", "api_key") is None
 
 
 def test_runtime_config_reports_massive_primary_key_as_configured(monkeypatch, tmp_path):
@@ -109,14 +109,13 @@ def test_runtime_config_reports_massive_primary_key_as_configured(monkeypatch, t
     assert runtime["data_keys"]["polygon"] is True
 
 
-def test_env_template_exposes_massive_primary_and_comments_legacy_alias():
+def test_env_template_does_not_offer_massive_runtime_or_import_authority():
     template = (dpc.Path(__file__).parents[1] / "config/.env.template").read_text(
         encoding="utf-8"
     )
 
-    assert "\nMASSIVE_API_KEY=your_massive_api_key_here\n" in template
+    assert "\nMASSIVE_API_KEY=" not in template
     assert "\nPOLYGON_API_KEY=" not in template
-    assert "\n# POLYGON_API_KEY=your_polygon_api_key_here\n" in template
 
 
 # --- env bridge --------------------------------------------------------------------
@@ -204,16 +203,16 @@ def test_real_env_var_wins_over_app(store, monkeypatch):
     assert dpc.effective_source("MASSIVE_API_KEY") == "env"
 
 
-def test_real_legacy_polygon_env_alias_wins_over_app_store(store, monkeypatch):
+def test_real_legacy_polygon_env_alias_cannot_override_app_store(store, monkeypatch):
     monkeypatch.delenv("MASSIVE_API_KEY", raising=False)
     monkeypatch.setenv("POLYGON_API_KEY", "pk_legacy_operator")
     store.set_field("polygon", "api_key", "pk_app")
 
     dpc.apply_env(store)
 
-    assert "MASSIVE_API_KEY" not in os.environ
-    assert dpc.provider_field_env_value("polygon", "api_key") == "pk_legacy_operator"
-    assert dpc.provider_field_env_name("polygon", "api_key") == "POLYGON_API_KEY"
+    assert os.environ["MASSIVE_API_KEY"] == "pk_app"
+    assert dpc.provider_field_env_value("polygon", "api_key") == "pk_app"
+    assert dpc.provider_field_env_name("polygon", "api_key") == "MASSIVE_API_KEY"
 
 
 def test_app_overrides_file_loaded_value(store, monkeypatch):
@@ -273,7 +272,7 @@ def test_apply_env_strict_db_value_wins_without_file_source_tracking(
     assert dpc.effective_source("MASSIVE_API_KEY") == "app"
 
 
-def test_apply_env_explicit_fallback_true_restores_legacy_file_fallback(
+def test_apply_env_explicit_fallback_never_restores_retired_polygon_file_key(
     store, monkeypatch, tmp_path
 ):
     import src.env_keys as env_keys
@@ -287,11 +286,11 @@ def test_apply_env_explicit_fallback_true_restores_legacy_file_fallback(
 
     dpc.apply_env(store)
 
-    assert os.environ["POLYGON_API_KEY"] == "pk_file"
-    assert dpc.effective_source("POLYGON_API_KEY") == "config/.env"
+    assert "POLYGON_API_KEY" not in os.environ
+    assert dpc.effective_source("POLYGON_API_KEY") == "missing"
 
 
-def test_real_legacy_polygon_env_wins_over_primary_file_fallback(
+def test_real_legacy_polygon_env_does_not_become_massive_file_fallback(
     store, monkeypatch, tmp_path
 ):
     import src.env_keys as env_keys
@@ -307,8 +306,8 @@ def test_real_legacy_polygon_env_wins_over_primary_file_fallback(
     dpc.apply_env(store)
 
     assert "MASSIVE_API_KEY" not in os.environ
-    assert dpc.provider_field_env_name("polygon", "api_key") == "POLYGON_API_KEY"
-    assert dpc.provider_field_env_value("polygon", "api_key") == "polygon-real-operator"
+    assert dpc.provider_field_env_name("polygon", "api_key") is None
+    assert dpc.provider_field_env_value("polygon", "api_key") is None
 
 
 def test_unapply_strict_unsets_app_value(store, monkeypatch):
@@ -456,7 +455,7 @@ def test_key_provider_test_paths(monkeypatch):
     out = dpc.run_connection_test("polygon")          # no key
     assert out["ok"] is False and "缺" in out["detail"]
 
-    monkeypatch.setenv("POLYGON_API_KEY", "k")
+    monkeypatch.setenv("MASSIVE_API_KEY", "k")
 
     class _Resp:
         status_code = 200
@@ -473,9 +472,9 @@ def test_key_provider_test_paths(monkeypatch):
     assert out["ok"] is False and "金鑰" in out["detail"]
 
 
-def test_massive_connection_test_uses_polygon_key_as_redacted_request_params(monkeypatch):
+def test_massive_connection_test_uses_canonical_key_as_redacted_request_params(monkeypatch):
     key = "massive-test-key"
-    monkeypatch.setenv("POLYGON_API_KEY", key)
+    monkeypatch.setenv("MASSIVE_API_KEY", key)
     observed: dict[str, object] = {}
 
     def fake_probe(url, **kwargs):
@@ -693,20 +692,20 @@ def test_routes_validation(store):
     assert e.value.status_code == 400      # unknown field for this provider
 
 
-def test_route_marks_file_source_as_importable(store, monkeypatch):
+def test_route_ignores_retired_polygon_file_source(store, monkeypatch):
     from src.api.routes import providers_config as pc
 
     monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
     monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
     view = pc.providers_config(store=store)["providers"]
     row = view["polygon"]["fields"][0]
-    assert row["effective_source"] == "config/.env"
-    assert row["needs_import"] is True
-    assert row["import_source"] == "POLYGON_API_KEY"
-    assert row["importable_env_vars"] == ["MASSIVE_API_KEY", "POLYGON_API_KEY"]
+    assert row["effective_source"] == "missing"
+    assert row["needs_import"] is False
+    assert row["import_source"] is None
+    assert row["importable_env_vars"] == []
 
 
-def test_massive_route_prefers_primary_import_and_lists_legacy_alias(
+def test_massive_route_does_not_offer_config_file_import(
     store, monkeypatch, tmp_path
 ):
     from src.api.routes import providers_config as pc
@@ -722,8 +721,9 @@ def test_massive_route_prefers_primary_import_and_lists_legacy_alias(
     row = pc.providers_config(store=store)["providers"]["polygon"]["fields"][0]
 
     assert row["env_var"] == "MASSIVE_API_KEY"
-    assert row["import_source"] == "MASSIVE_API_KEY"
-    assert row["importable_env_vars"] == ["MASSIVE_API_KEY", "POLYGON_API_KEY"]
+    assert row["import_source"] is None
+    assert row["needs_import"] is False
+    assert row["importable_env_vars"] == []
 
 
 def test_strict_view_peeks_config_file_for_import_without_effective_source(
@@ -765,40 +765,43 @@ def test_provider_env_fallback_route_sets_profile_setting(store):
     assert store.get_setting("provider_env_fallback") == "false"
 
 
-def test_import_env_field_promotes_file_value_to_db(store, monkeypatch):
+def test_massive_env_import_endpoint_is_explicitly_unavailable(store, monkeypatch):
     from src.api.routes import providers_config as pc
+    from fastapi import HTTPException
 
     monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
     monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
-    out = pc.import_provider_config_field(
-        "polygon",
-        "api_key",
-        pc.ProviderConfigImportEnv(source_env_var=None),
-        store=store,
-    )
-    row = out["fields"][0]
-    assert store.get_all()["polygon"]["api_key"] == "pk_from_file"
-    assert row["effective_source"] == "app"
-    assert row["needs_import"] is False
-    assert "pk_from_file" not in str(out)
+    with pytest.raises(HTTPException) as exc:
+        pc.import_provider_config_field(
+            "polygon",
+            "api_key",
+            pc.ProviderConfigImportEnv(source_env_var=None),
+            store=store,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "provider_config_import_not_supported"
+    assert "polygon" not in store.get_all()
 
 
-def test_massive_default_import_prefers_primary_over_legacy_alias(store, monkeypatch):
+def test_massive_env_import_rejects_even_the_canonical_process_name(store, monkeypatch):
     from src.api.routes import providers_config as pc
+    from fastapi import HTTPException
 
     monkeypatch.setenv("MASSIVE_API_KEY", "massive-import")
     monkeypatch.setenv("POLYGON_API_KEY", "polygon-import")
 
-    pc.import_provider_config_field(
-        "polygon",
-        "api_key",
-        pc.ProviderConfigImportEnv(source_env_var=None),
-        store=store,
-    )
+    with pytest.raises(HTTPException) as exc:
+        pc.import_provider_config_field(
+            "polygon",
+            "api_key",
+            pc.ProviderConfigImportEnv(source_env_var="MASSIVE_API_KEY"),
+            store=store,
+        )
 
-    stored = store.get_all()
-    assert stored["polygon"] == {"api_key": "massive-import"}
-    assert "massive" not in stored
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "provider_config_import_not_supported"
+    assert "polygon" not in store.get_all()
 
 
 def test_sec_contact_email_import_normalizes_to_canonical_user_agent(store, monkeypatch):

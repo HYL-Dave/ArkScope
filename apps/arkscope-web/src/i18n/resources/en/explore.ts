@@ -538,7 +538,9 @@ const explore = {
         status: "Listing state",
         market: "Market",
         venue: "Venue",
-        asOf: "As of",
+        snapshotAsOf: "Snapshot date",
+        retrievedAt: "Retrieved",
+        providerUpdatedAt: "Provider updated",
       },
     },
     factTypes: {

@@ -916,6 +916,12 @@ def test_listing_requiredness_and_ibkr_blocking_are_component_specific(
             "available",
         ),
         (
+            "massive_otc",
+            ("listing_status_unresolved",),
+            (),
+            "available",
+        ),
+        (
             "nms_missing",
             ("listing_directory_unavailable",),
             ("listing_directory_unavailable",),
@@ -1434,7 +1440,7 @@ def test_terminal_massive_requiredness_changes_on_effective_date_through_schedul
     def profile_connection():
         yield conn
 
-    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+    monkeypatch.delenv("MASSIVE_API_KEY", raising=False)
     monkeypatch.setattr(scheduler, "ListingAuthorityTransport", FakeProductionTransport)
     monkeypatch.setattr(sec_transport, "SecTransport", SecTransport)
     monkeypatch.setattr(

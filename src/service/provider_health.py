@@ -363,7 +363,6 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
                 loaded_file_keys,
                 app_keys,
                 "MASSIVE_API_KEY",
-                "POLYGON_API_KEY",
             )
             if pid == "polygon"
             else _key_info(loaded_file_keys, app_keys, "FINNHUB_API_KEY")

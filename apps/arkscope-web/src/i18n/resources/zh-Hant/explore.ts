@@ -538,7 +538,9 @@ const explore = {
         status: "上市狀態",
         market: "市場",
         venue: "交易場所",
-        asOf: "資料日期",
+        snapshotAsOf: "快照日期",
+        retrievedAt: "擷取時間",
+        providerUpdatedAt: "供應商更新時間",
       },
     },
     factTypes: {

@@ -22,38 +22,38 @@ def _write_env(tmp_path, key, value):
 
 # --- polygon ---------------------------------------------------------------
 
-def test_polygon_env_wins_over_file(tmp_path, monkeypatch):
+def test_polygon_uses_only_massive_process_bridge(tmp_path, monkeypatch):
     cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("POLYGON_API_KEY", "env_key")  # apply_env injects the DB value here
-    assert cpn.load_env() == "env_key"
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive_bridge")
+    monkeypatch.setenv("POLYGON_API_KEY", "legacy_runtime")
+    assert cpn.load_env() == "massive_bridge"
 
 
-def test_massive_env_wins_over_legacy_polygon_sources(tmp_path, monkeypatch):
+def test_polygon_legacy_runtime_alias_is_not_resolved(tmp_path, monkeypatch):
     cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_legacy")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("MASSIVE_API_KEY", "massive_primary")
     monkeypatch.setenv("POLYGON_API_KEY", "env_legacy")
 
-    assert cpn.load_env() == "massive_primary"
+    assert cpn.load_env() == ""
 
 
-def test_polygon_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
+def test_polygon_does_not_read_config_file_when_env_absent(tmp_path, monkeypatch):
     cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("POLYGON_API_KEY", raising=False)
-    assert cpn.load_env() == "file_key"
+    assert cpn.load_env() == ""
 
 
-def test_polygon_placeholder_env_does_not_shadow_file(tmp_path, monkeypatch):
+def test_polygon_placeholder_process_bridge_does_not_revive_file(tmp_path, monkeypatch):
     cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("POLYGON_API_KEY", "your_key_here")  # stub must not win over a real file key
-    assert cpn.load_env() == "file_key"
+    monkeypatch.setenv("MASSIVE_API_KEY", "your_key_here")
+    assert cpn.load_env() == ""
 
 
 # --- finnhub ---------------------------------------------------------------

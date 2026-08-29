@@ -853,11 +853,12 @@ function ListingEvidenceItem({
   const listing = evidence.listing;
   const authority = lifecycleListingAuthorityLabel(listing.authority, locale);
   const status = lifecycleListingStatusLabel(listing.listing_status, locale);
+  const displayAsOf = listing.provider_last_updated_utc ?? listing.source_as_of;
   const scanValues = [
     listing.candidate_ticker,
     status,
     listing.primary_exchange,
-    listing.source_as_of,
+    displayAsOf,
   ].filter(Boolean).join(" · ");
   return (
     <details className="lifecycle-evidence-item">
@@ -903,9 +904,21 @@ function ListingEvidenceItem({
             </div>
           ) : null}
           <div>
-            <dt>{t(($) => $.lifecycle.listingEvidence.fields.asOf)}</dt>
+            <dt>{t(($) => listing.authority === "massive"
+              ? $.lifecycle.listingEvidence.fields.retrievedAt
+              : $.lifecycle.listingEvidence.fields.snapshotAsOf)}</dt>
             <dd><time dateTime={listing.source_as_of}>{listing.source_as_of}</time></dd>
           </div>
+          {listing.provider_last_updated_utc ? (
+            <div>
+              <dt>{t(($) => $.lifecycle.listingEvidence.fields.providerUpdatedAt)}</dt>
+              <dd>
+                <time dateTime={listing.provider_last_updated_utc}>
+                  {listing.provider_last_updated_utc}
+                </time>
+              </dd>
+            </div>
+          ) : null}
         </dl>
         {safeEvidenceUrl(evidence.source_url) ? (
           <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">

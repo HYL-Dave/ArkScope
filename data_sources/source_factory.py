@@ -91,10 +91,7 @@ def get_data_source(
             'financial_datasets': 'FINANCIAL_DATASETS_API_KEY',
         }
         if source_name_lower == "polygon":
-            api_key = (
-                os.environ.get("MASSIVE_API_KEY")
-                or os.environ.get("POLYGON_API_KEY")
-            )
+            api_key = os.environ.get("MASSIVE_API_KEY")
         elif (env_key := env_key_names.get(source_name_lower)) is not None:
             api_key = os.environ.get(env_key)
 

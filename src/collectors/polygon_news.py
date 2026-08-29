@@ -660,44 +660,14 @@ def load_tickers(tickers_arg: Optional[str] = None,
 
 
 def load_env() -> str:
-    """Resolve the Massive API key, with the Polygon name as a legacy alias.
+    """Resolve only the profile-backed Massive process bridge.
 
-    The sidecar's apply_env() injects DB-managed provider values into os.environ
-    (precedence real env > app-DB > config/.env), so os.environ is the resolved
-    source and reading it first keeps news collection consistent with the Settings
-    "test connection" button (which uses os.getenv). Falls back to reading
-    config/.env directly for standalone runs that never went through the env bridge.
-    A placeholder ('your_'-prefixed) or empty value is rejected at each layer so a
-    stub never shadows a real key."""
-    env_keys = ("MASSIVE_API_KEY", "POLYGON_API_KEY")
-    for env_key in env_keys:
-        env_val = os.environ.get(env_key, '').strip()
-        if env_val and not env_val.startswith('your_'):
-            return env_val
-
-    env_paths = [
-        Path("config/.env"),
-        Path(".env"),
-    ]
-    for path in env_paths:
-        if path.exists():
-            values = {}
-            with open(path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        key = key.strip()
-                        # unquote: strip quotes first, then whitespace (mirrors src.env_keys.unquote_env_value)
-                        value = value.strip()
-                        while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
-                            value = value[1:-1].strip()
-                        if key in env_keys and value and not value.startswith('your_'):
-                            values[key] = value
-            for env_key in env_keys:
-                if env_key in values:
-                    return values[env_key]
-    return ''
+    The sidecar injects the profile value into ``MASSIVE_API_KEY``. Standalone
+    operators may set that same process variable explicitly. Legacy Polygon
+    aliases and dotenv files are not runtime authorities.
+    """
+    value = os.environ.get("MASSIVE_API_KEY", "").strip()
+    return "" if not value or value.startswith("your_") else value
 
 
 def generate_months(start_date: date, end_date: date) -> List[Tuple[int, int]]:
@@ -735,7 +705,7 @@ def collect_news(
     api_key = load_env()
     if not api_key:
         raise RuntimeError(
-            "MASSIVE_API_KEY (or legacy POLYGON_API_KEY) is not configured in app/env"
+            "MASSIVE_API_KEY is not configured in Settings or the process environment"
         )
 
     # Initialize
@@ -925,7 +895,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
     api_key = load_env()
     if not api_key:
         raise RuntimeError(
-            "MASSIVE_API_KEY (or legacy POLYGON_API_KEY) is not configured in app/env"
+            "MASSIVE_API_KEY is not configured in Settings or the process environment"
         )
 
     collector = PolygonNewsCollector(api_key, config)

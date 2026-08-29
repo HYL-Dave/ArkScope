@@ -356,6 +356,7 @@ def test_active_case_projection_uses_closed_families_but_preserves_storage(
                 "market": "stocks",
                 "primary_exchange": "XNAS",
                 "source_as_of": "2026-08-28",
+                "provider_last_updated_utc": None,
             },
         }
         for detail in details:

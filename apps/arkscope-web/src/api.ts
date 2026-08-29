@@ -2751,6 +2751,7 @@ export interface SecurityLifecycleListingSnapshot {
   market: "stocks" | "otc";
   primary_exchange: string | null;
   source_as_of: string;
+  provider_last_updated_utc: string | null;
 }
 
 export interface SecurityLifecycleListingEvidence

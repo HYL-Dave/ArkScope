@@ -583,6 +583,7 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
                 "market": "stocks",
                 "primary_exchange": "XNAS",
                 "source_as_of": "2026-08-28",
+                "provider_last_updated_utc": None,
             },
         }
         assert "canonical-only" not in detail_response.text

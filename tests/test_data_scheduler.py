@@ -88,7 +88,7 @@ def hermetic(tmp_path, monkeypatch):
     # S-J strict provider preflight reads process env after apply_env. Seed dummy
     # managed keys so existing scheduler tests keep exercising their mocked
     # writers; explicit not_configured tests delenv what they need.
-    monkeypatch.setenv("POLYGON_API_KEY", "pk_test")
+    monkeypatch.setenv("MASSIVE_API_KEY", "pk_test")
     monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
     monkeypatch.setenv("IBKR_HOST", "127.0.0.1")
     monkeypatch.setenv("IBKR_PORT", "4001")
@@ -637,7 +637,7 @@ def test_market_writer_backpressure_is_not_failed(monkeypatch):
 # --- run_source ------------------------------------------------------------------
 
 def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
-    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+    monkeypatch.delenv("MASSIVE_API_KEY", raising=False)
     monkeypatch.setattr(
         "src.news_direct.backfill_news_direct",
         lambda *a, **k: (_ for _ in ()).throw(AssertionError("provider must not run")),
@@ -655,7 +655,7 @@ def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
     assert ds._LAST_RESULT["polygon_news"]["status"] == "not_configured"
 
 
-def test_normalized_massive_provider_missing_key_names_primary_and_legacy_alias(
+def test_normalized_massive_provider_missing_key_names_only_canonical_bridge(
     monkeypatch,
 ):
     monkeypatch.setattr("src.collectors.polygon_news.load_env", lambda: "")
@@ -665,7 +665,7 @@ def test_normalized_massive_provider_missing_key_names_primary_and_legacy_alias(
 
     message = str(captured.value)
     assert "MASSIVE_API_KEY" in message
-    assert "POLYGON_API_KEY" in message
+    assert "POLYGON_API_KEY" not in message
 
 
 def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):

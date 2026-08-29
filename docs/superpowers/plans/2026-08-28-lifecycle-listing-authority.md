@@ -16,7 +16,10 @@
 - Do not read, write, back up, restore, preflight, or migrate the production profile or market database.
 - Do not merge, restart the production App, or push.
 - Keep `publisher`, `internal_news`, and `publisher_excerpt` legal for existing v2 rows; new v4 runs must never produce or consume them.
-- Keep the durable provider ID `polygon` and environment variable `POLYGON_API_KEY`; do not create a second Massive secret authority.
+- Keep the durable provider ID `polygon` and the single profile field
+  `polygon.api_key`. Use only `MASSIVE_API_KEY` as its process bridge; do not
+  resolve `POLYGON_API_KEY` at runtime or read either key from `config/.env` for
+  Massive execution/import.
 - Use `https://api.massive.com` for new Massive requests and never persist the key in a URL, diagnostic, locator, or exception.
 - Nasdaq absence is `not_found`, never `inactive` or `delisted`.
 - IBKR contract or quote absence is not delisting evidence; a price is never listing authority.
@@ -727,7 +730,7 @@ session = ListingAuthoritySession(
     transport=ListingAuthorityTransport(),
     budget=ListingRequestBudget.lifecycle(),
     retrieved_at=_timestamp(instant),
-    massive_api_key=os.getenv("POLYGON_API_KEY"),
+    massive_api_key=provider_field_env_value("polygon", "api_key"),
 )
 try:
     worker = _worker(
@@ -909,7 +912,7 @@ git add src/tools/security_lifecycle_tools.py src/api/routes/security_lifecycle.
 git commit -m "feat(lifecycle): show concise listing authority"
 ```
 
-### Task 7: Reuse the Existing Polygon Credential as Massive Settings Authority
+### Task 7: Keep One Profile Credential For Massive
 
 **Files:**
 - Modify: `src/data_provider_config.py`
@@ -923,18 +926,20 @@ git commit -m "feat(lifecycle): show concise listing authority"
 - Modify: `apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts`
 
 **Interfaces:**
-- Consumes: provider ID `polygon`, field `api_key`, env `POLYGON_API_KEY`, existing masked storage/import bridge.
+- Consumes: provider ID `polygon`, field `api_key`, and existing masked profile storage.
 - Produces: user label **Massive (Polygon)** and an explicit one-call test against `api.massive.com`.
 
 - [x] **Step 1: Write credential-authority REDs**
 
-Assert there is still exactly one provider field and no `MASSIVE_API_KEY`:
+Assert there is exactly one provider field, one process bridge, and no dotenv
+import/runtime fallback:
 
 ```python
 def test_massive_reuses_the_polygon_credential_authority():
     assert [(f.field, f.env_var) for f in PROVIDER_FIELDS["polygon"]] == [
-        ("api_key", "POLYGON_API_KEY")
+        ("api_key", "MASSIVE_API_KEY")
     ]
+    assert importable_env_vars(PROVIDER_FIELDS["polygon"][0]) == ()
     assert "massive" not in PROVIDER_FIELDS
 ```
 
@@ -952,12 +957,12 @@ pytest tests/test_data_provider_config.py tests/test_provider_config_startup.py 
 
 - [x] **Step 3: Update the official endpoint and template copy**
 
-Change only presentation comments/links and the user-triggered probe base. Keep
-the env variable and provider ID unchanged:
+Keep the provider ID and profile field unchanged. Use the current process
+bridge and user-triggered probe base without reviving the retired alias:
 
 ```python
 if provider == "polygon":
-    key = os.getenv("POLYGON_API_KEY")
+    key = provider_field_env_value("polygon", "api_key")
     if not key:
         return {"ok": False, "latency_ms": None, "detail": "缺 API key"}
     return _http_probe(
@@ -1241,3 +1246,22 @@ plus one market-data request under the broker lock. An IBKR missing-contract
 result never proves delisting. After a schema v3 migration, rolling code back
 to v2 requires restoring the bound v2 database backup and therefore discards
 all profile writes made after that backup.
+
+### Task 10: Close Post-Admission Credential And Seam Findings
+
+**Hard boundary:** no provider call, production DB operation, App restart,
+merge, or push. The four earlier Massive observations were explicitly
+authorized in the user thread, but retained no provider bytes and are not
+packet admission evidence.
+
+- [x] Make `polygon.api_key` the sole durable Massive authority and
+  `MASSIVE_API_KEY` its sole process bridge. Remove `POLYGON_API_KEY` runtime
+  fallback and Massive reads/imports from `config/.env`. Preserve existing
+  profile rows exactly.
+- [x] Add a real transport-to-parser timestamp contract owner and prove it
+  kills an `isoformat(sep=" ")` mutation.
+- [x] Add real policy-admission owners for source family and locator kind and
+  prove they kill broadened `_listing_snapshot` mutations.
+- [x] Re-evaluate adjacent blocker classification, compact-reader, and
+  provider-as-of semantics against the same normalized listing contract.
+- [ ] Rebuild the sealed packet and all gates before requesting merge.

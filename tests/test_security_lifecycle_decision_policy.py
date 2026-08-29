@@ -545,8 +545,6 @@ def test_terminal_requires_exact_nasdaq_absence_component_identity(field, value)
                 directory="decoy_listed",
             )
         )
-    evidence = tuple(_legacy_listing_shape(row) for row in evidence)
-
     decision = _evaluate(
         case=fixture["case"],
         evidence=evidence,
@@ -577,8 +575,6 @@ def test_arbitrary_nasdaq_market_labels_do_not_complete_terminal_absence():
         else row
         for row in fixture["evidence"]
     )
-    evidence = tuple(_legacy_listing_shape(row) for row in evidence)
-
     decision = _evaluate(
         case=fixture["case"],
         evidence=evidence,
@@ -709,6 +705,53 @@ def test_publisher_evidence_cannot_change_v4_decision():
     assert with_injection == baseline
 
 
+def test_listing_snapshot_admission_requires_the_listing_authority_family():
+    from src.security_lifecycle_decision_policy import _evidence_rows, _listing_snapshot
+
+    shaped_like_listing = _listing_evidence(
+        "publisher-listing-shape",
+        adapter="massive_reference",
+        ticker="NEW",
+        expected_active_state=True,
+        market="stocks",
+        listing_status="active",
+    )
+    shaped_like_listing["source_family"] = "publisher"
+
+    row = _evidence_rows((shaped_like_listing,))[0]
+
+    assert _listing_snapshot(row) is None
+
+
+def test_listing_snapshot_admission_requires_the_exact_locator_kind():
+    from src.security_lifecycle_decision_policy import _evidence_rows, _listing_snapshot
+
+    wrong_kind = _listing_evidence(
+        "wrong-kind",
+        adapter="massive_reference",
+        ticker="NEW",
+        expected_active_state=True,
+        market="stocks",
+        listing_status="active",
+    )
+    wrong_kind["source_locator"]["locator_kind"] = "publisher_excerpt"
+    valid = _listing_evidence(
+        "valid-listing",
+        adapter="massive_reference",
+        ticker="NEW",
+        expected_active_state=True,
+        market="stocks",
+        listing_status="active",
+    )
+
+    rows = {
+        row.evidence_id: row for row in _evidence_rows((wrong_kind, valid))
+    }
+
+    assert _listing_snapshot(rows["wrong-kind"]) is None
+    assert _listing_snapshot(rows["valid-listing"]) == valid["source_locator"]
+
+
 def test_massive_sec_cik_conflict_fails_closed():
     from src.security_lifecycle_decision_policy import (
         listing_authority_conflict_codes,
@@ -811,7 +854,7 @@ def test_newer_listing_record_supersedes_only_its_own_component():
     )
 
 
-def test_legacy_listing_status_and_active_shape_remains_narrowly_compatible():
+def test_unvalidated_legacy_listing_status_shape_is_not_admitted():
     from src.security_lifecycle_decision_policy import (
         _evidence_rows,
         _listing_row_active,
@@ -831,7 +874,7 @@ def test_legacy_listing_status_and_active_shape_remains_narrowly_compatible():
     legacy["source_locator"].pop("listing_status")
     legacy["source_locator"].update({"status": "found", "active": True})
 
-    assert _listing_row_active(_evidence_rows((legacy,))[0]) is True
+    assert _listing_row_active(_evidence_rows((legacy,))[0]) is False
 
 
 def _identity_facts(

@@ -76,6 +76,8 @@ class FieldDef:
     guard_reason: str | None = None
     import_aliases: tuple[str, ...] = ()
     runtime_aliases: tuple[str, ...] = ()
+    env_file_importable: bool = True
+    env_file_runtime_fallback: bool = True
 
 
 # What each provider can store here. SEC EDGAR has no key but does have an
@@ -88,8 +90,8 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             "MASSIVE_API_KEY",
             True,
             "API key",
-            import_aliases=("POLYGON_API_KEY",),
-            runtime_aliases=("POLYGON_API_KEY",),
+            env_file_importable=False,
+            env_file_runtime_fallback=False,
         )
     ],
     "finnhub": [FieldDef("api_key", "FINNHUB_API_KEY", True, "API key")],
@@ -136,6 +138,7 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
 _FIELD_BY_KEY: Dict[tuple, FieldDef] = {
     (p, f.field): f for p, defs in PROVIDER_FIELDS.items() for f in defs
 }
+_RETIRED_PROVIDER_ENV_VARS = frozenset({"POLYGON_API_KEY"})
 
 
 def provider_default_available(provider: str) -> bool:
@@ -208,7 +211,18 @@ def managed_import_aliases() -> frozenset[str]:
 
 def managed_runtime_file_keys() -> frozenset[str]:
     """Keys config/.env must not load into runtime authority under strict mode."""
-    return managed_env_vars() | managed_import_aliases()
+    return managed_env_vars() | managed_import_aliases() | _RETIRED_PROVIDER_ENV_VARS
+
+
+def permanently_excluded_runtime_file_keys() -> frozenset[str]:
+    """Managed keys that config/.env may never promote to runtime authority."""
+    return _RETIRED_PROVIDER_ENV_VARS | frozenset(
+        name
+        for defs in PROVIDER_FIELDS.values()
+        for fdef in defs
+        if not fdef.env_file_runtime_fallback
+        for name in (fdef.env_var, *fdef.runtime_aliases)
+    )
 
 # env-var names the APP injected this process (effective source = 'app')
 _APP_APPLIED: set = set()
@@ -223,6 +237,8 @@ def mask_value(value: str, secret: bool) -> str:
 
 
 def importable_env_vars(fdef: FieldDef) -> tuple[str, ...]:
+    if not fdef.env_file_importable:
+        return ()
     return (fdef.env_var, *fdef.import_aliases)
 
 
@@ -410,10 +426,14 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
     store.seed_defaults()
     fallback = provider_env_fallback_enabled(store)
     excluded = managed_runtime_file_keys()
+    permanent_exclusions = permanently_excluded_runtime_file_keys()
     if fallback:
-        ensure_env_loaded()
+        ensure_env_loaded_excluding(permanent_exclusions)
     else:
         ensure_env_loaded_excluding(excluded)
+
+    for var in permanent_exclusions:
+        discard_loaded_key(var)
 
     file_keys = keys_loaded_from_file()
     stored = store.get_all()
@@ -461,12 +481,16 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
             _APP_APPLIED.add(var)
 
     if fallback:
-        for var in managed_env_vars() - configured_vars:
-            if var in os.environ and var not in file_keys and var not in _APP_APPLIED:
-                continue
-            if var in os.environ and var in file_keys and var not in _APP_APPLIED:
-                continue
-            reload_var_from_file(var)
+        for defs in PROVIDER_FIELDS.values():
+            for fdef in defs:
+                var = fdef.env_var
+                if var in configured_vars or not fdef.env_file_runtime_fallback:
+                    continue
+                if var in os.environ and var not in file_keys and var not in _APP_APPLIED:
+                    continue
+                if var in os.environ and var in file_keys and var not in _APP_APPLIED:
+                    continue
+                reload_var_from_file(var)
         logger.warning(
             "provider_env_fallback=true: managed provider fields may use config/.env"
         )

@@ -545,6 +545,7 @@ describe("Lifecycle workflow", () => {
         market: "stocks",
         primary_exchange: null,
         source_as_of: "2026-08-28",
+        provider_last_updated_utc: null,
       },
       created_at: "2026-08-28T10:01:00Z",
     };
@@ -560,7 +561,8 @@ describe("Lifecycle workflow", () => {
         listing_status: "active",
         market: "stocks",
         primary_exchange: "XNAS",
-        source_as_of: "2026-08-28",
+        source_as_of: "2026-08-28T10:02:00Z",
+        provider_last_updated_utc: "2026-08-28T09:59:00Z",
       },
       created_at: "2026-08-28T10:03:00Z",
     };
@@ -683,11 +685,16 @@ describe("Lifecycle workflow", () => {
     expect(listingItem!.querySelector("dl")).not.toBeNull();
     expect(listingItem!.querySelector("a")?.getAttribute("href"))
       .toBe("https://api.massive.com/v3/reference/tickers/B");
-    expect(listingItem!.textContent).toContain("2026-08-28");
+    expect(listingItem!.textContent).toContain("Retrieved");
+    expect(listingItem!.textContent).toContain("Provider updated");
+    expect(listingItem!.textContent).toContain("2026-08-28T10:02:00Z");
+    expect(listingItem!.textContent).toContain("2026-08-28T09:59:00Z");
 
     await act(async () => { await i18n.changeLanguage("zh-Hant"); });
     await flush();
     expect(document.body.textContent).toContain("在這份完整快照中找不到");
+    expect(listingItem!.textContent).toContain("擷取時間");
+    expect(listingItem!.textContent).toContain("供應商更新時間");
     expect(document.body.textContent).not.toContain("已下市");
     expect(document.body.textContent).not.toContain("active-canonical-json");
   });

@@ -81,7 +81,7 @@ def test_polygon_missing_key_raises(monkeypatch):
     monkeypatch.setattr(cpn.StorageManager, "get_latest_timestamp",
                         lambda self: datetime.now() - timedelta(hours=6))
     monkeypatch.setattr(cpn, "load_env", lambda: "")
-    with pytest.raises(RuntimeError, match="POLYGON_API_KEY"):
+    with pytest.raises(RuntimeError, match="MASSIVE_API_KEY"):
         cpn.run_incremental(tickers_arg="AAPL")
 
 

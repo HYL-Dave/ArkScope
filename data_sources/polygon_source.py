@@ -40,7 +40,7 @@ class PolygonDataSource(BaseDataSource):
         # With explicit API key
         polygon = PolygonDataSource(api_key='your_key')
 
-        # From MASSIVE_API_KEY or the legacy POLYGON_API_KEY alias
+        # From the profile-backed MASSIVE_API_KEY process bridge
         polygon = PolygonDataSource()
 
         # Fetch news
@@ -64,21 +64,18 @@ class PolygonDataSource(BaseDataSource):
         Initialize Polygon data source.
 
         Args:
-            api_key: API key. If None, reads Massive then the Polygon legacy alias.
+            api_key: API key. If None, reads the Massive process bridge.
             is_paid: If True, uses faster rate limiting for paid plans.
         """
         super().__init__(api_key)
 
         if self.api_key is None:
-            self.api_key = (
-                os.environ.get("MASSIVE_API_KEY")
-                or os.environ.get("POLYGON_API_KEY")
-            )
+            self.api_key = os.environ.get("MASSIVE_API_KEY")
 
         if not self.api_key:
             logger.warning(
-                "No Massive API key provided. Set MASSIVE_API_KEY (or legacy "
-                "POLYGON_API_KEY) environment variable "
+                "No Massive API key provided. Save it in Settings, set the "
+                "MASSIVE_API_KEY process variable, "
                 "or pass api_key parameter."
             )
 

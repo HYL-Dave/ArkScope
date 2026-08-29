@@ -31,6 +31,7 @@ function providerConfigErrorMessage(code: string, t: SettingsT): string | null {
     case "provider_config_invalid_value":
     case "provider_config_import_source_invalid":
     case "provider_config_import_source_missing":
+    case "provider_config_import_not_supported":
       return t(($) => $.errors.mutationFailed);
     default:
       return null;

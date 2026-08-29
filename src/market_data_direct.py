@@ -581,7 +581,7 @@ def backfill_prices_direct(
         if polygon_src is None:
             # IBKR primary + Polygon FALLBACK (the documented design) — also on the live
             # path, not just when a test injects polygon_src. Best-effort: a missing
-            # POLYGON_API_KEY (construction raises) must NOT break the IBKR-only backfill.
+            # A missing Massive key (construction raises) must not break IBKR-only backfill.
             try:
                 polygon_src = _default_polygon_src()
             except Exception:  # noqa: BLE001

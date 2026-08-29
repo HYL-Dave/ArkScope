@@ -137,7 +137,7 @@ admitted separately as task capabilities, not presumed data foundations.
 | **latency** | **15-minute delayed** on free tier; real-time on paid. |
 | **streaming** | `none` on free (15-min delayed); `realtime_quote` on paid. **Not bar-streaming — not charting-grade for our use** (IBKR owns charting). |
 | **cost** | Free tier (delayed, rate-limited). Paid ≈ **$29/mo** (real-time options quotes + Greeks + news sentiment + technicals). |
-| **auth/config** | `POLYGON_API_KEY`. REST. Wired in `data_preferences.prices` (historical). |
+| **auth/config** | `polygon.api_key` in profile DB; `MASSIVE_API_KEY` is the sole process bridge. `config/.env` and `POLYGON_API_KEY` are not runtime/import authority. REST. Wired in `data_preferences.prices` (historical). |
 | **limits** | Free ≈ **5 calls/min**; paid 300+ calls/min. |
 | **known_quirks** | Free-tier delay makes it historical-only; name split (Polygon/Massive). |
 | **best_for** | **Best free news archive** (3+ yr) with AI sentiment; historical price backtests; cheap real-time options ($29). |

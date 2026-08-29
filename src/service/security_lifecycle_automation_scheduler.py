@@ -89,6 +89,7 @@ _NASDAQ_LISTING_BLOCKERS = frozenset(
         "listing_directory_unavailable",
         "listing_directory_stale",
         "listing_directory_schema_mismatch",
+        "listing_status_unresolved",
     }
 )
 _MASSIVE_LISTING_BLOCKERS = frozenset(

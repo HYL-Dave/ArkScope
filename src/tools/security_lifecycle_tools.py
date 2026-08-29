@@ -169,6 +169,7 @@ def _compact_listing(source_locator_json: object) -> dict:
         "market": locator["market"],
         "primary_exchange": locator["primary_exchange"],
         "source_as_of": locator["source_as_of"],
+        "provider_last_updated_utc": locator["provider_last_updated_utc"],
     }
 
 
