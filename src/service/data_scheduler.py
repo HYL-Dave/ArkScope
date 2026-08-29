@@ -123,12 +123,12 @@ SOURCES: Dict[str, SourceDef] = {
     s.name: s
     for s in (
         SourceDef(
-            "polygon_news", "Polygon 新聞",
+            "polygon_news", "Massive 新聞",
             adapter=("src.collectors.polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
-            source_badges=("Polygon", "直寫本地"),
-            description="Polygon news incremental → normalized local records + compatibility projection",
+            source_badges=("Massive", "直寫本地"),
+            description="Massive news incremental → normalized local records + compatibility projection",
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",

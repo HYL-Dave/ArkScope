@@ -663,8 +663,8 @@ const settings = {
       },
       sources: {
         polygonNews: {
-          label: "Polygon News",
-          description: "Write incremental Polygon news to local normalized news data.",
+          label: "Massive News",
+          description: "Write incremental Massive news to local normalized news data.",
         },
         finnhubNews: {
           label: "Finnhub News",

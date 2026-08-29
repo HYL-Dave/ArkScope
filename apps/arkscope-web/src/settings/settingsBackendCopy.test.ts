@@ -166,11 +166,11 @@ describe("Settings backend copy boundary", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        labels: ["Polygon 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價", "SEC 公司事件"],
+        labels: ["Massive 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價", "SEC 公司事件"],
       },
       {
         locale: "en" as const,
-        labels: ["Polygon News", "Finnhub News", "IBKR News", "IBKR Prices", "SEC Company Events"],
+        labels: ["Massive News", "Finnhub News", "IBKR News", "IBKR Prices", "SEC Company Events"],
       },
     ];
 
@@ -197,13 +197,13 @@ describe("Settings backend copy boundary", () => {
           "上次狀態為 future_status",
         ],
         values: [
-          "Polygon 新聞：尚未執行",
-          "Polygon 新聞：執行中",
-          "Polygon 新聞：上次成功",
-          "Polygon 新聞：部分完成",
-          "Polygon 新聞：上次失敗",
-          "Polygon 新聞：上次已跳過",
-          "Polygon 新聞：上次狀態為 future_status",
+          "Massive 新聞：尚未執行",
+          "Massive 新聞：執行中",
+          "Massive 新聞：上次成功",
+          "Massive 新聞：部分完成",
+          "Massive 新聞：上次失敗",
+          "Massive 新聞：上次已跳過",
+          "Massive 新聞：上次狀態為 future_status",
         ],
       },
       {
@@ -218,13 +218,13 @@ describe("Settings backend copy boundary", () => {
           "Last status was future_status",
         ],
         values: [
-          "Polygon News: Not run yet",
-          "Polygon News: Running",
-          "Polygon News: Last run succeeded",
-          "Polygon News: Partially completed",
-          "Polygon News: Last run failed",
-          "Polygon News: Last run was skipped",
-          "Polygon News: Last status was future_status",
+          "Massive News: Not run yet",
+          "Massive News: Running",
+          "Massive News: Last run succeeded",
+          "Massive News: Partially completed",
+          "Massive News: Last run failed",
+          "Massive News: Last run was skipped",
+          "Massive News: Last status was future_status",
         ],
       },
     ];

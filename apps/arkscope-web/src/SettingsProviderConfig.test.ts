@@ -217,7 +217,7 @@ vi.mock("./api", async (importOriginal) => {
           provider_fetch: true,
           source_mode: "direct_local",
           write_target: "market_data.db",
-          source_badges: ["Polygon", "直寫本地"],
+          source_badges: ["Massive", "直寫本地"],
           enabled: true,
           interval_minutes: 30,
           default_interval_minutes: 30,
@@ -1020,7 +1020,7 @@ describe("Settings provider config authority", () => {
   it("keeps long last-run messages out of the schedule row summary", async () => {
     await renderDataSources(undefined, true);
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Polygon 新聞"));
+      node.textContent?.includes("Massive 新聞"));
     if (!row) throw new Error("missing schedule row");
 
     const summary = row.querySelector(".ds-last-run-summary");
@@ -1138,7 +1138,7 @@ describe("Settings provider config authority", () => {
     };
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
-      node.textContent?.includes("Polygon 新聞"));
+      node.textContent?.includes("Massive 新聞"));
     if (!row) throw new Error("missing schedule row");
     expect(row.querySelector(".source-run-current")?.textContent).toContain("BRK.B");
     expect(row.querySelector(".source-run-counts")?.textContent).toBe("17 / 149 · 11%");
@@ -1581,9 +1581,9 @@ describe("Settings provider config authority", () => {
         .toContain("Reload status (Running, auto-refreshing)");
       expect(host!.querySelector(".ds-schedule-protection-note")?.textContent)
         .toContain("Run protection: A data source or IBKR job runs only once at a time.");
-      expect(host!.textContent).toContain("Polygon News");
+      expect(host!.textContent).toContain("Massive News");
       expect(host!.textContent).toContain(
-        "Write incremental Polygon news to local normalized news data.",
+        "Write incremental Massive news to local normalized news data.",
       );
       expect(host!.textContent).toContain("Finnhub News");
       expect(host!.textContent).toContain("IBKR Prices");

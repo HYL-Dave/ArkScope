@@ -2020,7 +2020,7 @@ def test_schedule_status_exposes_current_news_route_metadata():
     assert prices["write_target"] == "market_data.db"
     assert prices["source_badges"] == ["IBKR", "直寫本地"]
 
-    assert snap["polygon_news"]["source_badges"] == ["Polygon", "直寫本地"]
+    assert snap["polygon_news"]["source_badges"] == ["Massive", "直寫本地"]
     assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
     assert snap["ibkr_news"]["source_badges"] == ["IBKR", "直寫本地"]
     assert snap["sec_corporate_actions"]["source_badges"] == ["SEC", "官方申報"]

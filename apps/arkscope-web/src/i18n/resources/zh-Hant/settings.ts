@@ -662,8 +662,8 @@ const settings = {
       },
       sources: {
         polygonNews: {
-          label: "Polygon 新聞",
-          description: "將 Polygon 新聞增量寫入本機標準化新聞資料。",
+          label: "Massive 新聞",
+          description: "將 Massive 新聞增量寫入本機標準化新聞資料。",
         },
         finnhubNews: {
           label: "Finnhub 新聞",
