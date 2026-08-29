@@ -57,6 +57,9 @@
       "preview_calls": 1,
       "listing_query": {"ticker": "NEW", "source_ticker": "OLD", "issuer_cik": "0001409970"},
       "listing_payloads": [
+        {"adapter": "nasdaq_symbol_directory", "component": "nasdaq_listed", "filename": "nasdaqlisted.txt", "sha256": "09c5739cb35b5318d62cbb539acdd109bf07569bd0c9a1fa08cf335189a10b4a"},
+        {"adapter": "nasdaq_symbol_directory", "component": "other_listed", "filename": "otherlisted.txt", "sha256": "71fb4b1f445be5f86ea622d7aff89fab47aaa772eac2562d774288326f67a8bd"},
+        {"adapter": "massive_reference", "expected_active": true, "market": "stocks", "filename": "shadow-massive-stocks-empty.json", "sha256": "aa13dce291cbd3791992628cd3beb392d5376b5cc3b70730736e35442007afde"},
         {"adapter": "massive_reference", "expected_active": true, "market": "otc", "filename": "shadow-massive-otc-active.json", "sha256": "92eb7e26a79784dad80108253bebb86b6030b6566788a032f4349e68fa71a88d"}
       ]
     },

@@ -875,13 +875,18 @@ def _load_evidence(
         and _fact_value(fact) == "terminal_delisting"
         for fact in facts
     )
+    effective = _exact_fact_date(tuple(facts), "effective_date")
+    today = datetime.fromisoformat(at.replace("Z", "+00:00")).date()
+    explicit_inactive_required = terminal and (
+        effective is None or today >= effective
+    )
     candidate_tickers = tuple(
         sorted({str(case.get("ticker") or "").upper(), *successor_values})
     )
     listing = listing_session.lookup(
         context=context,
         candidate_tickers=candidate_tickers,
-        require_explicit_inactive=terminal,
+        require_explicit_inactive=explicit_inactive_required,
     )
     evidence.extend(listing.evidence)
     facts.extend(listing.facts)
@@ -890,6 +895,8 @@ def _load_evidence(
         regulator_facts=sec.facts,
         listing_evidence=listing.evidence,
     )
+    if terminal and not explicit_inactive_required:
+        required_listing_components = required_listing_components - {"massive"}
     listing_codes = _required_listing_codes(
         tuple(str(code) for code in listing.blockers)
         + listing_authority_conflict_codes(
@@ -900,12 +907,15 @@ def _load_evidence(
         required_components=required_listing_components,
     )
     codes.extend(listing_codes)
-    diagnostics.update(listing.diagnostics)
+    diagnostics.update(
+        {
+            key.replace("_body_bytes", "_payload_bytes"): value
+            for key, value in listing.diagnostics.items()
+        }
+    )
     pending_kinds = _event_kinds(case).intersection(
         {"merger_agreement", "merger_proxy", "listing_status_review"}
     )
-    effective = _exact_fact_date(tuple(facts), "effective_date")
-    today = datetime.fromisoformat(at.replace("Z", "+00:00")).date()
     deadline_due = bool(
         deadline_dates
         and today >= date.fromisoformat(next(iter(deadline_dates)))
@@ -1154,7 +1164,6 @@ def run_security_lifecycle_automation(
                 "security lifecycle listing transport cleanup failed code=%s",
                 type(close_exc).__name__,
             )
-        return security_lifecycle_automation_failure("automation_scheduler_failed")
     return result
 
 

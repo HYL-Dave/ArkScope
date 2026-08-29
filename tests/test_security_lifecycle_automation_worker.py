@@ -143,11 +143,13 @@ def _listing_evidence(
     locator = {
         "locator_kind": "listing_directory_snapshot",
         "adapter": adapter,
+        "authority": "massive" if adapter == "massive_reference" else "nasdaq_trader",
         "candidate_ticker": ticker,
         "expected_active_state": expected_active_state,
         "market": market,
         "listing_status": listing_status,
         "directory": directory,
+        "snapshot_complete": True,
     }
     if delisted_utc is not None:
         locator["delisted_utc"] = delisted_utc

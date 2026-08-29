@@ -58,11 +58,17 @@ def _listing_evidence(
     snapshot = {
         "locator_kind": "listing_directory_snapshot",
         "adapter": adapter,
+        "authority": (
+            "nasdaq_trader"
+            if adapter == "nasdaq_symbol_directory"
+            else "massive"
+        ),
         "candidate_ticker": ticker,
         "expected_active_state": expected_active_state,
         "market": market,
         "listing_status": listing_status,
         "directory": directory,
+        "snapshot_complete": True,
     }
     if delisted_utc is not None:
         snapshot["delisted_utc"] = delisted_utc
@@ -138,7 +144,6 @@ def _massive_inactive(evidence_id, ticker, *, cik=_CIK):
         delisted_utc="2026-08-24T00:00:00Z",
     )
     return evidence, (
-        _fact(evidence_id, "source_ticker", ticker),
         _fact(evidence_id, "issuer_cik", cik),
         _fact(evidence_id, "security_class", "common_stock"),
     )

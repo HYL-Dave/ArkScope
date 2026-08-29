@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 
 import requests
 
+from data_sources.dependency_log_redaction import dependency_log_redaction
+
 
 NASDAQ_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
@@ -208,6 +210,37 @@ class ListingAuthorityTransport:
         maximum_bytes: int,
         aggregate_maximum_bytes: int | None = None,
         aggregate_overflow_code: str | None = None,
+    ) -> ListingHttpPayload:
+        secret_values = (
+            (params.get("apiKey"),)
+            if params is not None and "apiKey" in params
+            else ()
+        )
+        with dependency_log_redaction(secret_values):
+            return self._request_inside_redaction(
+                source_url=source_url,
+                request_url=request_url,
+                params=params,
+                expected_content_type=expected_content_type,
+                code_prefix=code_prefix,
+                status_codes=status_codes,
+                maximum_bytes=maximum_bytes,
+                aggregate_maximum_bytes=aggregate_maximum_bytes,
+                aggregate_overflow_code=aggregate_overflow_code,
+            )
+
+    def _request_inside_redaction(
+        self,
+        *,
+        source_url: str,
+        request_url: str,
+        params: Mapping[str, Any] | None,
+        expected_content_type: str,
+        code_prefix: str,
+        status_codes: Mapping[int, str],
+        maximum_bytes: int,
+        aggregate_maximum_bytes: int | None,
+        aggregate_overflow_code: str | None,
     ) -> ListingHttpPayload:
         response: Any | None = None
         request_failed = False

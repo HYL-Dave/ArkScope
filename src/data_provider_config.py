@@ -29,18 +29,20 @@ injected so provider-health can report ``app`` as a key's effective source.
 
 from __future__ import annotations
 
-import contextvars
 import logging
 import os
 import socket
 import sqlite3
-import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote, quote_plus
+
+from data_sources.dependency_log_redaction import (
+    dependency_log_redaction,
+    redact_dependency_log_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -504,64 +506,16 @@ def require_provider_configured(
 # --- connection tests -------------------------------------------------------------
 
 _TEST_TIMEOUT_S = 8
-_PROBE_LOG_REDACTIONS: contextvars.ContextVar[tuple[str, ...]] = contextvars.ContextVar(
-    "provider_probe_log_redactions",
-    default=(),
-)
-_PROBE_LOG_FILTER_LOCK = threading.Lock()
-
-
-def _probe_redaction_values(
+def _probe_redaction_inputs(
     params: Optional[dict],
     redact_query_keys: set[str],
-) -> tuple[str, ...]:
+) -> tuple[object, ...]:
     if not params or not redact_query_keys:
         return ()
-    values: list[str] = []
-    for key in redact_query_keys:
-        value = params.get(key)
-        if value is None:
-            continue
-        raw = str(value)
-        if not raw:
-            continue
-        values.extend((raw, quote(raw, safe=""), quote_plus(raw, safe="")))
-    return tuple(dict.fromkeys(values))
-
-
-def _redact_probe_text(detail: str, redactions: tuple[str, ...]) -> str:
-    for value in redactions:
-        detail = detail.replace(value, "[redacted]")
-    return detail
-
-
-class _ProbeLogRedactionFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        redactions = _PROBE_LOG_REDACTIONS.get()
-        if redactions:
-            record.msg = _redact_probe_text(record.getMessage(), redactions)
-            record.args = ()
-        return True
-
-
-_PROBE_LOG_REDACTION_FILTER = _ProbeLogRedactionFilter()
-
-
-def _ensure_probe_log_redaction_filter() -> None:
-    connectionpool_logger = logging.getLogger("urllib3.connectionpool")
-    with _PROBE_LOG_FILTER_LOCK:
-        if _PROBE_LOG_REDACTION_FILTER not in connectionpool_logger.filters:
-            connectionpool_logger.addFilter(_PROBE_LOG_REDACTION_FILTER)
-
-
-def _redact_probe_detail(
-    detail: str,
-    params: Optional[dict],
-    redact_query_keys: set[str],
-) -> str:
-    return _redact_probe_text(
-        detail,
-        _probe_redaction_values(params, redact_query_keys),
+    return tuple(
+        params[key]
+        for key in sorted(redact_query_keys)
+        if key in params and params[key] is not None
     )
 
 
@@ -573,28 +527,25 @@ def _http_probe(url: str, *, headers: Optional[dict] = None,
     import requests
 
     redact_query_keys = redact_query_keys or set()
-    redactions = _probe_redaction_values(params, redact_query_keys)
-    if redactions:
-        _ensure_probe_log_redaction_filter()
-    redaction_token = _PROBE_LOG_REDACTIONS.set(redactions)
-    t0 = time.monotonic()
-    try:
-        resp = requests.get(url, headers=headers, params=params, timeout=_TEST_TIMEOUT_S)
-        ms = int((time.monotonic() - t0) * 1000)
-        if resp.status_code in ok_statuses:
-            return {"ok": True, "latency_ms": ms, "detail": f"HTTP {resp.status_code}"}
-        if resp.status_code in (401, 403):
-            return {"ok": False, "latency_ms": ms,
-                    "detail": f"HTTP {resp.status_code} — {auth_hint}"}
-        return {"ok": False, "latency_ms": ms, "detail": f"HTTP {resp.status_code}"}
-    except Exception as e:  # noqa: BLE001 - surfaced to the UI after secret redaction
-        return {
-            "ok": False,
-            "latency_ms": None,
-            "detail": _redact_probe_detail(str(e), params, redact_query_keys)[:200],
-        }
-    finally:
-        _PROBE_LOG_REDACTIONS.reset(redaction_token)
+    with dependency_log_redaction(
+        _probe_redaction_inputs(params, redact_query_keys)
+    ) as redactions:
+        t0 = time.monotonic()
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=_TEST_TIMEOUT_S)
+            ms = int((time.monotonic() - t0) * 1000)
+            if resp.status_code in ok_statuses:
+                return {"ok": True, "latency_ms": ms, "detail": f"HTTP {resp.status_code}"}
+            if resp.status_code in (401, 403):
+                return {"ok": False, "latency_ms": ms,
+                        "detail": f"HTTP {resp.status_code} — {auth_hint}"}
+            return {"ok": False, "latency_ms": ms, "detail": f"HTTP {resp.status_code}"}
+        except Exception as e:  # noqa: BLE001 - surfaced after shared secret redaction
+            return {
+                "ok": False,
+                "latency_ms": None,
+                "detail": redact_dependency_log_text(str(e), redactions)[:200],
+            }
 
 
 def run_connection_test(provider: str) -> Dict[str, Any]:

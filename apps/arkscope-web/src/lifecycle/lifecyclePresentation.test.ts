@@ -217,6 +217,63 @@ describe("Lifecycle presentation", () => {
       .not.toBe(lifecycleActionReadinessLabel("transition_eligible", "en"));
   });
 
+  it("labels every v3 listing blocker in English and Traditional Chinese", async () => {
+    const { lifecycleAutomationBlockerLabel } = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    );
+    const labels = [
+      [
+        "listing_directory_unavailable",
+        "Listing directory is unavailable",
+        "上市名錄暫時無法取得",
+      ],
+      [
+        "listing_directory_schema_mismatch",
+        "Listing directory schema does not match",
+        "上市名錄資料結構不相符",
+      ],
+      [
+        "listing_directory_stale",
+        "Listing directory snapshot is stale",
+        "上市名錄快照已過期",
+      ],
+      [
+        "listing_status_unresolved",
+        "Listing status could not be resolved",
+        "無法解析上市狀態",
+      ],
+      [
+        "listing_authority_conflict",
+        "Listing authorities report conflicting status",
+        "上市主管機關狀態互相衝突",
+      ],
+      [
+        "massive_credential_missing",
+        "Massive credential is not configured",
+        "尚未設定 Massive 憑證",
+      ],
+      ["massive_access_denied", "Massive access was denied", "Massive 拒絕存取"],
+      ["massive_rate_limited", "Massive rate limit reached", "已達 Massive 速率限制"],
+      [
+        "massive_reference_unavailable",
+        "Massive reference data is unavailable",
+        "Massive 參考資料暫時無法取得",
+      ],
+    ] as const;
+
+    expect(labels).toHaveLength(9);
+    for (const [code, en, zhHant] of labels) {
+      expect(lifecycleAutomationBlockerLabel(code, "en")).toBe(en);
+      expect(lifecycleAutomationBlockerLabel(code, "zh-Hant")).toBe(zhHant);
+      expect(lifecycleAutomationBlockerLabel(code, "en")).not.toBe(
+        "Unrecognized value",
+      );
+      expect(lifecycleAutomationBlockerLabel(code, "zh-Hant")).not.toBe(
+        "無法辨識的值",
+      );
+    }
+  });
+
   it("rejects unsafe evidence links before rendering an external action", async () => {
     const { safeEvidenceUrl } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
 

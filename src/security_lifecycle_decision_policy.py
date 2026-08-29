@@ -657,18 +657,24 @@ def _facts_for_evidence(
 def _listing_explicit_inactive(
     evidence: tuple[_Evidence, ...], ticker: str, today: date
 ) -> bool:
+    candidate = _ticker(ticker)
     for row in _listing_records(evidence, ticker):
-        component = _listing_component(row)
         snapshot = _listing_snapshot(row)
-        if component is None or snapshot is None:
+        if snapshot is None:
+            continue
+        if not (
+            snapshot.get("locator_kind") == "listing_directory_snapshot"
+            and snapshot.get("adapter") == "massive_reference"
+            and snapshot.get("authority") == "massive"
+            and snapshot.get("candidate_ticker") == candidate
+            and snapshot.get("expected_active_state") is False
+            and snapshot.get("market") == "stocks"
+            and snapshot.get("listing_status") == "inactive"
+            and snapshot.get("snapshot_complete") is True
+        ):
             continue
         delisted = _listing_delisted_date(snapshot.get("delisted_utc"))
-        if (
-            component[0] == "massive_reference"
-            and _listing_status(row) == "inactive"
-            and delisted is not None
-            and delisted <= today
-        ):
+        if delisted is not None and delisted <= today:
             return True
     return False
 

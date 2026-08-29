@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
+from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
 
@@ -528,7 +529,8 @@ def test_listing_session_constructor_failure_closes_constructed_transport(
     assert "private session detail" not in json.dumps(result)
 
 
-def test_listing_session_close_failure_overrides_success_with_sanitized_failure(
+def test_listing_session_close_failure_retains_result_with_sanitized_cleanup_witness(
+    caplog,
     monkeypatch,
 ):
     from src.service import security_lifecycle_automation_scheduler as scheduler
@@ -538,6 +540,7 @@ def test_listing_session_close_failure_overrides_success_with_sanitized_failure(
     class Transport:
         def close(self):
             events.append("transport_closed")
+            raise RuntimeError("private transport close detail")
 
     class Budget:
         @classmethod
@@ -571,11 +574,19 @@ def test_listing_session_close_failure_overrides_success_with_sanitized_failure(
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
     assert result == _summary(
-        status="unavailable",
-        reason="automation_scheduler_failed",
+        selected=1,
+        processed=1,
+        drafted=1,
+        case_ids=["slc_a"],
     )
     assert events == ["worker", "session_close", "transport_closed"]
-    assert "private close detail" not in json.dumps(result)
+    assert caplog.messages == [
+        "security lifecycle listing cleanup failed code=RuntimeError",
+        "security lifecycle listing transport cleanup failed code=RuntimeError",
+    ]
+    rendered = json.dumps(result) + "\n".join(caplog.messages)
+    assert "private close detail" not in rendered
+    assert "private transport close detail" not in rendered
 
 
 def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
@@ -1114,6 +1125,391 @@ def test_listing_component_requiredness_filters_before_state_and_blockers(
 
     assert tuple(row.code for row in bundle.blockers) == expected_codes
     assert states == [expected_state]
+
+
+def test_real_session_filters_optional_massive_parser_failure_for_nms_successor(
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from data_sources.listing_authority_transport import (
+        MASSIVE_TICKERS_URL,
+        NASDAQ_LISTED_URL,
+        OTHER_LISTED_URL,
+        ListingHttpPayload,
+        ListingRequestBudget,
+    )
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    retrieved_at = "2026-08-29T22:00:00Z"
+    fixture_dir = Path(__file__).parent / "fixtures" / "listing_authority"
+    exact_bodies = {
+        NASDAQ_LISTED_URL: (fixture_dir / "nasdaqlisted.txt").read_bytes(),
+        OTHER_LISTED_URL: (fixture_dir / "otherlisted.txt").read_bytes(),
+    }
+
+    class FakeProductionTransport:
+        def __init__(self):
+            self.calls = []
+
+        def fetch_nasdaq(self, source_url, *, budget):
+            self.calls.append(source_url)
+            budget.reserve_nasdaq_request(source_url)
+            body = exact_bodies[source_url]
+            budget.record_nasdaq_body(len(body))
+            return ListingHttpPayload(
+                source_url=source_url,
+                retrieved_at=retrieved_at,
+                status_code=200,
+                content_type="text/plain",
+                body=body,
+            )
+
+        def fetch_massive_ticker(
+            self,
+            ticker,
+            *,
+            expected_active,
+            market,
+            api_key,
+            budget,
+        ):
+            del api_key
+            identity = (ticker, expected_active, market)
+            self.calls.append(identity)
+            budget.reserve_massive_request(identity)
+            body = b'{"results":"secret-provider-surplus","status":"OK"}'
+            budget.record_massive_body(len(body))
+            return ListingHttpPayload(
+                source_url=(
+                    f"{MASSIVE_TICKERS_URL}?ticker={ticker}&active=true"
+                    f"&market={market}&limit=2"
+                ),
+                retrieved_at=retrieved_at,
+                status_code=200,
+                content_type="application/json",
+                body=body,
+            )
+
+        def close(self):
+            pass
+
+    class SecTransport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_evidence = (
+        SimpleNamespace(
+            evidence_id="sec-nms-parser-boundary",
+            source_family="regulator",
+            source_locator={"filing_chain_complete": True},
+            retrieved_at=retrieved_at,
+        ),
+    )
+    sec_facts = tuple(
+        _authority_fact("sec-nms-parser-boundary", fact_type, value)
+        for fact_type, value in (
+            ("source_ticker", "OLD"),
+            ("successor_ticker", "AAPL"),
+            ("destination_venue", "NASDAQ"),
+            ("effective_date", "2026-08-29"),
+            ("issuer_cik", "0000320193"),
+            ("security_class", "common_stock"),
+            ("tracked_security_effect", "symbol_change"),
+        )
+    )
+    monkeypatch.setattr(sec_transport, "SecTransport", SecTransport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=sec_evidence,
+            facts=sec_facts,
+            blockers=(),
+            source_deadlines=(),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(evidence=(), blockers=(), requests_made=0),
+            (),
+        ),
+    )
+    transport = FakeProductionTransport()
+    session = ListingAuthoritySession(
+        transport=transport,
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=retrieved_at,
+        massive_api_key="fixture-key",
+    )
+    case = {
+        "case_id": "slc_nms_parser_boundary",
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000320193",
+            "issuer_name": "NMS Boundary Issuer",
+            "filing_date": "2026-08-28",
+            "source_ref": "0000320193-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["5.03"],
+            "kinds": [{"event_type": "symbol_change", "effective_date": None}],
+        },
+    }
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at=retrieved_at,
+        listing_session=session,
+    )
+
+    assert bundle.blockers == ()
+    assert any(
+        getattr(row, "adapter", None) == "nasdaq_symbol_directory"
+        and row.source_locator["candidate_ticker"] == "AAPL"
+        and row.source_locator["listing_status"] == "active"
+        for row in bundle.evidence
+    )
+    assert ("OLD", True, "stocks") in transport.calls
+    assert "secret-provider-surplus" not in repr(bundle)
+
+
+def test_terminal_massive_requiredness_changes_on_effective_date_through_scheduler(
+    tmp_path,
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from data_sources.listing_authority_transport import (
+        NASDAQ_LISTED_URL,
+        OTHER_LISTED_URL,
+        ListingHttpPayload,
+    )
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    fixture_dir = Path(__file__).parent / "fixtures" / "listing_authority"
+    exact_bodies = {
+        NASDAQ_LISTED_URL: (fixture_dir / "nasdaqlisted.txt").read_bytes(),
+        OTHER_LISTED_URL: (fixture_dir / "otherlisted.txt").read_bytes(),
+    }
+    transport_calls = []
+    transport_times = iter(
+        ("2026-08-29T12:00:00Z", "2026-08-30T12:00:00Z")
+    )
+
+    class FakeProductionTransport:
+        def __init__(self):
+            self.retrieved_at = next(transport_times)
+
+        def fetch_nasdaq(self, source_url, *, budget):
+            transport_calls.append((self.retrieved_at, source_url))
+            budget.reserve_nasdaq_request(source_url)
+            body = exact_bodies[source_url]
+            budget.record_nasdaq_body(len(body))
+            return ListingHttpPayload(
+                source_url=source_url,
+                retrieved_at=self.retrieved_at,
+                status_code=200,
+                content_type="text/plain",
+                body=body,
+            )
+
+        def fetch_massive_ticker(self, *_args, **_kwargs):
+            raise AssertionError("missing key must stop before provider transport")
+
+        @staticmethod
+        def diagnostics(budget):
+            return budget.diagnostics()
+
+        def close(self):
+            pass
+
+    class SecTransport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    source_ref = "0000000002-26-000001"
+    case_id = case_id_for("sec_edgar", source_ref, "OLD")
+    case = {
+        "case_id": case_id,
+        "source": "sec_edgar",
+        "source_ref": source_ref,
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "source_presence": "present",
+        "observation_fingerprint_sha256": "a" * 64,
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000002",
+            "issuer_name": "Boundary Issuer",
+            "filing_date": "2026-08-28",
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "filing_form": "25",
+            "filing_items": [],
+            "evidence_url": "https://www.sec.gov/Archives/boundary.htm",
+            "description": "Terminal listing event.",
+            "kinds": [
+                {"event_type": "listing_removal_notice", "effective_date": None}
+            ],
+        },
+    }
+
+    def collect_sec_evidence(*, retrieved_at, **_kwargs):
+        values = {
+            "effective_date": "2026-08-30",
+            "issuer_cik": "0000000002",
+            "security_class": "common_stock",
+            "source_ticker": "OLD",
+            "tracked_security_effect": "terminal_delisting",
+        }
+        excerpt = json.dumps(values, separators=(",", ":"), sort_keys=True)
+        evidence = AutomationEvidence(
+            evidence_id=f"sec-boundary-{retrieved_at[:10]}",
+            source_family="regulator",
+            adapter="sec_edgar",
+            kind="regulator_excerpt",
+            source_url=case["observation"]["evidence_url"],
+            title="Boundary filing fixture",
+            publisher="SEC EDGAR",
+            domain="sec.gov",
+            source_published_at="2026-08-28",
+            retrieved_at=retrieved_at,
+            excerpt=excerpt,
+            content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+            source_document_sha256="d" * 64,
+            source_locator={"filing_chain_complete": True},
+            evidence_dedupe_key=f"sec:boundary:{retrieved_at[:10]}",
+        )
+        facts = []
+        for fact_type, value in values.items():
+            cited = json.dumps(value).encode()
+            start = excerpt.encode().index(cited)
+            facts.append(
+                AutomationFact(
+                    evidence_id=evidence.evidence_id,
+                    fact_type=fact_type,
+                    normalized_value=value,
+                    source_span_start=start,
+                    source_span_end=start + len(cited),
+                    cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+                    extractor_rule_id=f"fixture.{fact_type}",
+                    extractor_rule_version="1",
+                )
+            )
+        return SimpleNamespace(
+            evidence=(evidence,),
+            facts=tuple(facts),
+            blockers=(),
+            source_deadlines=(),
+        )
+
+    conn = sqlite3.connect(tmp_path / "profile.db", check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", FakeProductionTransport)
+    monkeypatch.setattr(sec_transport, "SecTransport", SecTransport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    monkeypatch.setattr(scheduler, "_assert_automation_installed", lambda: None)
+    monkeypatch.setattr(scheduler, "_load_cases", lambda: (case,))
+    monkeypatch.setattr(scheduler, "_profile_connection", profile_connection)
+    monkeypatch.setattr(scheduler, "_load_sources", lambda: {"OLD": ("manual_lists",)})
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(evidence=(), blockers=(), requests_made=0),
+            (),
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_transition_preview",
+        lambda *, request, **_kwargs: {
+            "eligible": True,
+            "block_reasons": (),
+            "transition_kind": request["transition_kind"],
+        },
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_transition_approver",
+        lambda **_kwargs: {
+            "status": "approved",
+            "approval_authority": "automation_policy",
+        },
+    )
+    try:
+        before = scheduler.run_security_lifecycle_automation(
+            limit=1,
+            now=datetime(2026, 8, 29, 12, tzinfo=timezone.utc),
+        )
+        store = SecurityLifecycleInvestigationStore(conn)
+        assert before == _summary(
+            selected=1,
+            processed=1,
+            drafted=1,
+            case_ids=[case_id],
+        )
+        before_run = store.list_automation_runs(case_id)[0]
+        assert before_run["decision_tier"] == "verified_automatic"
+        assert before_run["action_readiness"] == "waiting_effective_date"
+        assert store.list_assessments(case_id)[0]["status"] == "draft"
+
+        due = scheduler.run_security_lifecycle_automation(
+            limit=1,
+            now=datetime(2026, 8, 30, 12, tzinfo=timezone.utc),
+        )
+        assert due == _summary(
+            status="partial",
+            reason="case_processing_blocked",
+            selected=1,
+            processed=1,
+            blocked=1,
+            case_ids=[case_id],
+        )
+        due_run = store.list_automation_runs(case_id)[0]
+        assert due_run["status"] == "blocked"
+        assert [row["blocker_code"] for row in due_run["blockers"]] == [
+            "massive_credential_missing"
+        ]
+        assert transport_calls == [
+            ("2026-08-29T12:00:00Z", NASDAQ_LISTED_URL),
+            ("2026-08-29T12:00:00Z", OTHER_LISTED_URL),
+            ("2026-08-30T12:00:00Z", NASDAQ_LISTED_URL),
+            ("2026-08-30T12:00:00Z", OTHER_LISTED_URL),
+        ]
+    finally:
+        conn.close()
 
 
 def test_pending_event_monitoring_uses_explicit_dates_and_final_source_check():

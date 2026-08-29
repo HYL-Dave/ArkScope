@@ -930,8 +930,14 @@ def test_real_nasdaq_current_ticker_drives_no_identity_change_without_class() ->
     assert preview_calls == []
 
 
-def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> None:
+def _real_terminal_policy_result(*, massive_mutation=None, locator_mutation=None):
     from src.security_lifecycle_decision_policy import evaluate_automation_decision
+    from src.security_lifecycle_fact_kernel import (
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+    from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
     from src.security_lifecycle_listing_evidence import ListingAuthoritySession
 
     payloads = _session_payloads()
@@ -947,6 +953,17 @@ def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> 
             payload.content_type,
             retrieved_at=retrieved_at,
         )
+    if massive_mutation is not None:
+        massive_payload = payloads[("OLD", False, "stocks")]
+        assert isinstance(massive_payload, ListingHttpPayload)
+        decoded = json.loads(massive_payload.body)
+        massive_mutation(decoded)
+        payloads[("OLD", False, "stocks")] = _payload(
+            massive_payload.source_url,
+            json.dumps(decoded, separators=(",", ":")).encode(),
+            massive_payload.content_type,
+            retrieved_at=massive_payload.retrieved_at,
+        )
     session = ListingAuthoritySession(
         transport=FakeListingTransport(payloads),
         budget=ListingRequestBudget.lifecycle(),
@@ -958,6 +975,7 @@ def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> 
         candidate_tickers=("OLD",),
         require_explicit_inactive=True,
     )
+    session.close()
     assert listing.blockers == ()
     assert {
         (
@@ -985,43 +1003,185 @@ def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> 
         ),
         ("massive_reference", False, "stocks", None, "inactive"),
     }
-    sec = {
-        "evidence_id": "sec-terminal",
-        "source_family": "regulator",
-        "source_locator": {"filing_chain_complete": True},
-    }
-    sec_facts = tuple(
-        {
-            "evidence_id": "sec-terminal",
-            "fact_type": fact_type,
-            "normalized_value": value,
-        }
-        for fact_type, value in (
-            ("source_ticker", "OLD"),
-            ("effective_date", "2026-08-01"),
-            ("security_class", "common_stock"),
-            ("issuer_cik", "0000000002"),
-            ("tracked_security_effect", "terminal_delisting"),
-        )
+    sec_values = (
+        ("source_ticker", "OLD"),
+        ("effective_date", "2026-08-01"),
+        ("security_class", "common_stock"),
+        ("issuer_cik", "0000000002"),
+        ("tracked_security_effect", "terminal_delisting"),
+    )
+    sec_excerpt = "; ".join(f"{fact_type}={value}" for fact_type, value in sec_values)
+    sec = AutomationEvidence(
+        evidence_id="sec-terminal",
+        source_family="regulator",
+        adapter="sec_edgar",
+        kind="regulator_excerpt",
+        source_url="https://www.sec.gov/Archives/terminal.htm",
+        title="Terminal fixture",
+        publisher="SEC EDGAR",
+        domain="sec.gov",
+        source_published_at="2026-08-01",
+        retrieved_at=_AT,
+        excerpt=sec_excerpt,
+        content_sha256=hashlib.sha256(sec_excerpt.encode()).hexdigest(),
+        source_document_sha256="d" * 64,
+        source_locator={"filing_chain_complete": True},
+        evidence_dedupe_key="sec:terminal",
     )
 
-    decision = evaluate_automation_decision(
-        case={"ticker": "OLD", "cik": "0000000002"},
+    def sec_fact(fact_type: str, value: str) -> AutomationFact:
+        cited = value.encode()
+        start = sec_excerpt.encode().index(cited)
+        return AutomationFact(
+            evidence_id=sec.evidence_id,
+            fact_type=fact_type,
+            normalized_value=value,
+            source_span_start=start,
+            source_span_end=start + len(cited),
+            cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+            extractor_rule_id=f"sec.fixture.{fact_type}",
+            extractor_rule_version="1",
+        )
+
+    conn = sqlite3.connect(":memory:")
+    store = SecurityLifecycleInvestigationStore(
+        conn,
+        id_factory=lambda prefix, ordinal: f"{prefix}_{ordinal:04d}",
+    )
+    case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="terminal-fixture",
+        ticker="OLD",
+        at=_AT,
+    )
+    kernel = SecurityLifecycleFactKernel(store)
+    claim = kernel.reserve_run(
+        case_id=case_id,
+        observation_fingerprint_sha256="a" * 64,
+        policy_version="trusted-lifecycle-automation-v4",
+        mode="historical",
+        execution_revision="trusted-lifecycle-execution-r2",
+        query_context={"case_id": case_id, "cik": "0000000002", "aliases": ["OLD"]},
+        diagnostics={"listing_records": len(listing.evidence)},
+        at=_AT,
+    )
+    sec_facts = tuple(sec_fact(fact_type, value) for fact_type, value in sec_values)
+    kernel.complete_run(
+        run_id=claim.run_id,
         evidence=(sec, *listing.evidence),
         facts=(*sec_facts, *listing.facts),
-        current_date="2026-08-28",
-        active_sources=(),
-        transition_preview=lambda request: {
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="transition_eligible",
+        retry_at=None,
+        diagnostics={"listing_records": len(listing.evidence)},
+        at="2026-08-28T23:00:00Z",
+    )
+    if locator_mutation is not None:
+        row = conn.execute(
+            "SELECT evidence_id, source_locator_json "
+            "FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? AND adapter='massive_reference'",
+            (claim.run_id,),
+        ).fetchone()
+        assert row is not None
+        locator = json.loads(row["source_locator_json"])
+        locator_mutation(locator)
+        conn.execute(
+            "UPDATE security_lifecycle_evidence SET source_locator_json=? "
+            "WHERE evidence_id=?",
+            (json.dumps(locator, sort_keys=True, separators=(",", ":")), row["evidence_id"]),
+        )
+    evidence_rows = tuple(
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_evidence WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+    )
+    fact_rows = tuple(
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_automation_facts "
+            "WHERE automation_run_id=?",
+            (claim.run_id,),
+        )
+    )
+    preview_calls = []
+
+    def preview(request):
+        preview_calls.append(dict(request))
+        return {
             "eligible": True,
             "block_reasons": (),
             "transition_kind": request["transition_kind"],
-        },
-    )
+        }
 
+    decision = evaluate_automation_decision(
+        case={"ticker": "OLD", "cik": "0000000002"},
+        evidence=evidence_rows,
+        facts=fact_rows,
+        current_date="2026-08-28",
+        active_sources=(),
+        transition_preview=preview,
+    )
+    conn.close()
+    return listing, decision, preview_calls
+
+
+def test_real_listing_session_terminal_output_drives_exact_terminal_policy() -> None:
+    listing, decision, preview_calls = _real_terminal_policy_result()
+
+    assert {fact.fact_type: fact.normalized_value for fact in listing.facts} == {
+        "issuer_cik": "0000000002",
+        "security_class": "common_stock",
+    }
     assert decision.decision_tier == "verified_automatic"
     assert decision.action_readiness == "transition_eligible"
     assert decision.outcomes == ("listing_ended",)
     assert decision.transition_requested is True
+    assert len(preview_calls) == 1
+
+
+@pytest.mark.parametrize(
+    "massive_mutation",
+    (
+        lambda payload: payload["results"][0].__setitem__("cik", "0000000001"),
+        lambda payload: payload["results"][0].__setitem__("type", "ETF"),
+    ),
+    ids=("wrong_issuer_cik", "conflicting_security_class"),
+)
+def test_real_terminal_pipeline_rejects_inactive_massive_identity_conflicts(
+    massive_mutation,
+) -> None:
+    _listing, decision, preview_calls = _real_terminal_policy_result(
+        massive_mutation=massive_mutation,
+    )
+
+    assert decision.action_readiness == "action_blocked"
+    assert decision.decision_issues == ("listing_authority_conflict",)
+    assert preview_calls == []
+
+
+@pytest.mark.parametrize(
+    "locator_mutation",
+    (
+        lambda locator: locator.__setitem__("expected_active_state", True),
+        lambda locator: locator.__setitem__("market", "otc"),
+        lambda locator: locator.__setitem__("snapshot_complete", False),
+    ),
+    ids=("wrong_expected_intent", "wrong_market", "incomplete_snapshot"),
+)
+def test_real_terminal_pipeline_requires_exact_inactive_massive_locator(
+    locator_mutation,
+) -> None:
+    _listing, decision, preview_calls = _real_terminal_policy_result(
+        locator_mutation=locator_mutation,
+    )
+
+    assert decision.action_readiness == "waiting_market_confirmation"
+    assert decision.decision_issues == ("massive_explicit_inactive_missing",)
+    assert preview_calls == []
 
 
 def test_listing_session_uses_each_transport_payload_retrieval_timestamp() -> None:
@@ -1207,6 +1367,42 @@ def test_listing_session_maps_massive_failures_to_closed_secret_free_blockers(
     assert result.blockers == (expected,)
     assert all(type(value) is int for value in result.diagnostics.values())
     assert "fixture-key" not in repr(result)
+
+
+@pytest.mark.parametrize(
+    ("context_ticker", "candidate_ticker"),
+    (("OLD", "OLD"), ("OLD", "NEXT")),
+    ids=("source-candidate", "successor-candidate"),
+)
+def test_listing_session_maps_massive_parser_failures_to_component_blocker(
+    context_ticker,
+    candidate_ticker,
+) -> None:
+    from src.security_lifecycle_listing_evidence import ListingAuthoritySession
+
+    payloads = _session_payloads()
+    payloads[(candidate_ticker, True, "stocks")] = _payload(
+        _massive_url(candidate_ticker, True, "stocks"),
+        b'{"results":"secret-provider-surplus","status":"OK"}',
+        "application/json",
+    )
+    transport = FakeListingTransport(payloads)
+    session = ListingAuthoritySession(
+        transport=transport,
+        budget=ListingRequestBudget.lifecycle(),
+        retrieved_at=_AT,
+        massive_api_key="fixture-key",
+    )
+
+    result = session.lookup(
+        context=_context(context_ticker),
+        candidate_tickers=(candidate_ticker,),
+        require_explicit_inactive=False,
+    )
+
+    assert result.blockers == ("massive_reference_unavailable",)
+    assert (candidate_ticker, True, "stocks") in transport.calls
+    assert "secret-provider-surplus" not in repr(result)
 
 
 def test_listing_session_requires_massive_credentials_only_when_fallback_is_needed() -> None:

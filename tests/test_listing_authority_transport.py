@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+from urllib.parse import quote, quote_plus
 
 import pytest
 import requests
@@ -219,6 +221,64 @@ def test_massive_query_secret_never_leaves_the_request_boundary() -> None:
     ]
     rendered = json.dumps({"payload": payload.source_url, "diagnostics": transport.diagnostics(budget)})
     assert "secret-value" not in rendered
+
+
+def test_lifecycle_transport_redacts_massive_key_from_urllib3_debug_logs(
+    caplog,
+) -> None:
+    key = "lifecycle massive key+/%"
+    encoded_key = quote(key, safe="")
+    form_encoded_key = quote_plus(key, safe="")
+    connectionpool_logger = logging.getLogger("urllib3.connectionpool")
+    caplog.set_level(logging.DEBUG, logger=connectionpool_logger.name)
+
+    def log_secret_variants(phase: str) -> None:
+        connectionpool_logger.debug(
+            "%s raw=%s encoded=%s form=%s; other=retained",
+            phase,
+            key,
+            encoded_key,
+            form_encoded_key,
+        )
+
+    class LoggingResponse(FakeResponse):
+        def iter_content(self, chunk_size: int):
+            log_secret_variants("stream")
+            yield from super().iter_content(chunk_size)
+
+        def close(self) -> None:
+            log_secret_variants("close")
+            super().close()
+
+    class LoggingSession(FakeSession):
+        def get(self, url: str, **kwargs: object) -> FakeResponse:
+            params = kwargs["params"]
+            assert isinstance(params, dict)
+            assert params["apiKey"] == key
+            log_secret_variants("request")
+            return super().get(url, **kwargs)
+
+    transport = ListingAuthorityTransport(
+        session=LoggingSession(
+            [
+                LoggingResponse(
+                    body=b'{"results":[{"ticker":"AAPL"}]}',
+                    headers={"Content-Type": "application/json"},
+                )
+            ]
+        ),
+    )
+    transport.fetch_massive_ticker(
+        "AAPL",
+        expected_active=True,
+        market="stocks",
+        api_key=key,
+        budget=ListingRequestBudget.lifecycle(),
+    )
+
+    assert "other=retained" in caplog.text
+    for variant in (key, encoded_key, form_encoded_key):
+        assert variant not in caplog.text
 
 
 def test_massive_enforces_exact_ticker_dedupe_and_four_request_budget() -> None:

@@ -686,18 +686,23 @@ def _evidence(record: ListingRecord) -> ListingEvidence:
 def _facts(
     evidence: ListingEvidence, record: ListingRecord, context: IdentityContext
 ) -> tuple[ListingFact, ...]:
-    if record.listing_status != "active":
+    inactive_massive = (
+        record.adapter == "massive_reference"
+        and record.listing_status == "inactive"
+    )
+    if record.listing_status != "active" and not inactive_massive:
         return ()
     values: list[tuple[str, str]] = []
-    venue = _FACT_VENUES.get(record.primary_exchange or "")
-    if record.ticker == context.current_ticker:
-        values.append(("source_ticker", record.ticker))
-        if venue is not None:
-            values.append(("source_venue", venue))
-    else:
-        values.append(("successor_ticker", record.ticker))
-        if venue is not None:
-            values.append(("destination_venue", venue))
+    if record.listing_status == "active":
+        venue = _FACT_VENUES.get(record.primary_exchange or "")
+        if record.ticker == context.current_ticker:
+            values.append(("source_ticker", record.ticker))
+            if venue is not None:
+                values.append(("source_venue", venue))
+        else:
+            values.append(("successor_ticker", record.ticker))
+            if venue is not None:
+                values.append(("destination_venue", venue))
     security_class = _FACT_SECURITY_CLASSES.get(record.security_type or "")
     if security_class is not None:
         values.append(("security_class", security_class))
@@ -834,8 +839,8 @@ class ListingAuthoritySession:
                 retrieved_at=payload.retrieved_at,
                 source_url=payload.source_url,
             )
-        except ListingEvidenceFailure as exc:
-            result = (None, exc.code)
+        except ListingEvidenceFailure:
+            result = (None, "massive_reference_unavailable")
         else:
             result = (record, None)
         self._massive[identity] = result
