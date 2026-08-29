@@ -66,7 +66,7 @@ migrate_listing_authority_schema(path: str | Path, *, approval_sha256: str, back
 restore_listing_authority_backup(path: str | Path, backup: str | Path, *, backup_sha256: str) -> ListingRestoreResult
 ```
 
-- [ ] **Step 1: Write schema REDs for all three authorities**
+- [x] **Step 1: Write schema REDs for all three authorities**
 
 Add tests that create v1, v2, and current schemas independently and assert the closed vocabularies:
 
@@ -95,7 +95,7 @@ def test_v2_schema_remains_byte_exact_and_rejects_v3_listing_rows():
         insert_listing_evidence(conn, adapter="nasdaq_symbol_directory")
 ```
 
-- [ ] **Step 2: Run schema REDs**
+- [x] **Step 2: Run schema REDs**
 
 Run:
 
@@ -105,7 +105,7 @@ pytest tests/test_security_lifecycle_automation_schema.py -q
 
 Expected: fail because no v2 authority or listing vocabulary exists.
 
-- [ ] **Step 3: Split the v2 authority before defining v3**
+- [x] **Step 3: Split the v2 authority before defining v3**
 
 Refactor the second-generation schema definitions so the existing SQL is first
 captured as v2, then only the evidence table is regenerated with additive v3
@@ -159,7 +159,7 @@ Add `create_v2_profile_schema` and `verify_v2_profile_connection`. Update the
 existing v1-to-v2 migration to import and target the new `V2_*` names so its
 meaning does not silently become v1-to-v3.
 
-- [ ] **Step 4: Run schema tests GREEN**
+- [x] **Step 4: Run schema tests GREEN**
 
 Run:
 
@@ -169,7 +169,7 @@ pytest tests/test_security_lifecycle_automation_schema.py tests/test_security_li
 
 Expected: pass; v1-to-v2 behavior and exact v2 verification remain covered.
 
-- [ ] **Step 5: Write v2-to-v3 migration REDs**
+- [x] **Step 5: Write v2-to-v3 migration REDs**
 
 Seed every v2 lifecycle table, including one publisher evidence row with a
 translation and one automation fact/citation chain. Assert:
@@ -204,7 +204,7 @@ Also test stale approval rejection, wrong backup digest, foreign-key failure,
 unowned table preservation, idempotent v3 no-op, restore digest mismatch,
 and successful byte-identical restore to v2.
 
-- [ ] **Step 6: Run migration REDs**
+- [x] **Step 6: Run migration REDs**
 
 Run:
 
@@ -214,7 +214,7 @@ pytest tests/test_security_lifecycle_listing_migration.py -q
 
 Expected: import failure for the missing migration module.
 
-- [ ] **Step 7: Implement the explicit migration**
+- [x] **Step 7: Implement the explicit migration**
 
 Follow the existing automation migration discipline, but expose distinct v2
 and v3 detection:
@@ -245,7 +245,7 @@ Backups use SQLite backup,
 owner-only `0700/0600` permissions, post-copy logical verification, and exact
 SHA-256 binding.
 
-- [ ] **Step 8: Run migration tests GREEN and mutation checks**
+- [x] **Step 8: Run migration tests GREEN and mutation checks**
 
 Run:
 
@@ -256,7 +256,7 @@ pytest tests/test_security_lifecycle_listing_migration.py tests/test_security_li
 Then temporarily remove each new adapter/family/kind from v3 SQL and confirm a
 named schema owner fails. Restore each mutation before continuing.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```bash
 git add src/security_lifecycle_schema.py src/security_lifecycle_automation_migration.py src/security_lifecycle_listing_migration.py tests/test_security_lifecycle_automation_schema.py tests/test_security_lifecycle_automation_migration.py tests/test_security_lifecycle_listing_migration.py tests/test_security_lifecycle_disposition.py
@@ -285,7 +285,7 @@ git commit -m "feat(lifecycle): define listing authority schema v3"
 - Produces: `ListingAuthorityTransport.fetch_massive_ticker(ticker: str, *, expected_active: bool, market: str, api_key: str, budget: ListingRequestBudget) -> ListingHttpPayload`.
 - Produces: `ListingAuthorityTransport.diagnostics(budget: ListingRequestBudget) -> Mapping[str, int]` and `close() -> None`.
 
-- [ ] **Step 1: Add transport REDs**
+- [x] **Step 1: Add transport REDs**
 
 Use an injected fake session and assert exact allowlists and budgets:
 
@@ -316,7 +316,7 @@ Cover wrong host/path, redirect, 8 MiB file cap, 12 MiB Nasdaq aggregate cap,
 1 MiB Massive response cap, four Massive requests, exact-ticker normalization,
 timeout, 401/403, 404, 429, wrong content type, and malformed response bytes.
 
-- [ ] **Step 2: Run transport REDs**
+- [x] **Step 2: Run transport REDs**
 
 Run:
 
@@ -326,7 +326,7 @@ pytest tests/test_listing_authority_transport.py -q
 
 Expected: missing module failure.
 
-- [ ] **Step 3: Implement the transport**
+- [x] **Step 3: Implement the transport**
 
 Use exact constants:
 
@@ -354,7 +354,7 @@ to confirm terminal candidates with `delisted_utc`. The persisted canonical URL
 contains the first four non-secret parameters in stable order and omits
 `apiKey`.
 
-- [ ] **Step 4: Run transport tests GREEN**
+- [x] **Step 4: Run transport tests GREEN**
 
 Run:
 
@@ -364,7 +364,7 @@ pytest tests/test_listing_authority_transport.py -q
 
 Expected: pass with zero network access.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add data_sources/listing_authority_transport.py tests/test_listing_authority_transport.py tests/fixtures/listing_authority
@@ -394,7 +394,7 @@ git commit -m "feat(lifecycle): add bounded listing transports"
   int])`.
 - Produces: `ListingAuthoritySession.lookup(*, context: IdentityContext, candidate_tickers: tuple[str, ...], require_explicit_inactive: bool) -> ListingEvidenceResult` and `close() -> None`.
 
-- [ ] **Step 1: Write strict parser REDs**
+- [x] **Step 1: Write strict parser REDs**
 
 Add real-shaped fixture tests:
 
@@ -429,7 +429,7 @@ invalid exchange code, too many rows, trailing unparsed data, `active=false`
 without `delisted_utc`, future delisted date, mismatched returned ticker, a
 Massive `next_url`, and invalid CIK/FIGI shapes.
 
-- [ ] **Step 2: Run parser REDs**
+- [x] **Step 2: Run parser REDs**
 
 Run:
 
@@ -439,7 +439,7 @@ pytest tests/test_security_lifecycle_listing_evidence.py -q
 
 Expected: missing module failure.
 
-- [ ] **Step 3: Implement canonical records and evidence**
+- [x] **Step 3: Implement canonical records and evidence**
 
 Canonical excerpts use stable JSON with no provider payload surplus:
 
@@ -473,7 +473,7 @@ The durable locator also carries `locator_kind`, `adapter`, and
 `expected_active_state` so Task 4 can select current material by the exact
 component identity without reconstructing request intent from URLs.
 
-- [ ] **Step 4: Add adapter contracts to schema-facing validators**
+- [x] **Step 4: Add adapter contracts to schema-facing validators**
 
 Extend `_ADAPTER_SHAPES` in the fact kernel:
 
@@ -504,7 +504,7 @@ lookup, route resolution, provider invocation, or write authority. Add owners
 that replace each downstream boundary with functions that fail the test if
 called.
 
-- [ ] **Step 5: Write producer-to-kernel RED/GREEN contracts**
+- [x] **Step 5: Write producer-to-kernel RED/GREEN contracts**
 
 For each adapter, feed real producer output into `SecurityLifecycleFactKernel.complete_run`:
 
@@ -529,7 +529,7 @@ Mutate the producer excerpt after hashing and mutate one cited span. Each must
 fail at the actual kernel validation point with
 `evidence_content_sha256` / `fact_citation`.
 
-- [ ] **Step 6: Run evidence and kernel tests GREEN**
+- [x] **Step 6: Run evidence and kernel tests GREEN**
 
 Run:
 
@@ -537,7 +537,7 @@ Run:
 pytest tests/test_security_lifecycle_listing_evidence.py tests/test_security_lifecycle_fact_kernel.py tests/test_security_lifecycle_investigation.py tests/test_security_lifecycle_translation.py -q
 ```
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 git add src/security_lifecycle_listing_evidence.py src/security_lifecycle_fact_kernel.py src/security_lifecycle_investigation.py src/security_lifecycle_translation.py tests/test_security_lifecycle_listing_evidence.py tests/test_security_lifecycle_fact_kernel.py tests/test_security_lifecycle_investigation.py tests/test_security_lifecycle_translation.py
@@ -558,7 +558,7 @@ git commit -m "feat(lifecycle): persist cited listing authority"
 - Produces: the existing `AutomationDecision` shape and policy version
   `trusted-lifecycle-automation-v4`.
 
-- [ ] **Step 1: Write decision REDs for the complete matrix**
+- [x] **Step 1: Write decision REDs for the complete matrix**
 
 Add a complete parametrized matrix with concrete expected decisions:
 
@@ -595,7 +595,7 @@ fails closed, a newer component record supersedes only its own older record,
 and stale publisher/general-web/manual facts cannot veto selected current
 authority.
 
-- [ ] **Step 2: Run decision REDs**
+- [x] **Step 2: Run decision REDs**
 
 Run:
 
@@ -606,7 +606,7 @@ pytest tests/test_security_lifecycle_decision_policy.py -q
 Expected: terminal and continuation tests fail because current policy selects
 IBKR as the only current market material.
 
-- [ ] **Step 3: Separate listing and broker evidence**
+- [x] **Step 3: Separate listing and broker evidence**
 
 Keep latest-only selection scoped independently per
 `(adapter, candidate_ticker, expected_active_state, market)`; never collapse
@@ -624,7 +624,7 @@ conflicts only from selected current SEC, listing-authority, and positive IBKR
 material. Legacy publisher/general-web facts and stale receipts cannot veto a
 v4 decision.
 
-- [ ] **Step 4: Implement the matrix and bump policy v4**
+- [x] **Step 4: Implement the matrix and bump policy v4**
 
 Set:
 
@@ -640,7 +640,7 @@ same-ticker listing. Nasdaq absence without explicit Massive inactivity produces
 an automatically maintained `undetermined` Monitoring assessment; it never
 persists `listing_ended` and never requests a transition.
 
-- [ ] **Step 5: Run decision and shadow tests GREEN**
+- [x] **Step 5: Run decision and shadow tests GREEN**
 
 Run:
 
@@ -651,7 +651,7 @@ pytest tests/test_security_lifecycle_decision_policy.py tests/test_security_life
 Expected: all matrix tests pass; BLBD/CCL/QBTS/HAPN remain restrained and no
 fixture depends on publisher evidence.
 
-- [ ] **Step 6: Perform policy mutations**
+- [x] **Step 6: Perform policy mutations**
 
 Independently mutate and restore:
 
@@ -663,7 +663,7 @@ Independently mutate and restore:
 
 Each mutation must kill a named owner from Step 1.
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 ```bash
 git add src/security_lifecycle_decision_policy.py tests/test_security_lifecycle_decision_policy.py tests/fixtures/security_lifecycle_grounded_shadow.json tests/test_security_lifecycle_grounded_shadow.py
@@ -685,7 +685,7 @@ git commit -m "feat(lifecycle): decide from current listing authority"
 - Consumes: Task 3 `ListingAuthoritySession.lookup`, v4 policy, existing SEC and optional IBKR adapters.
 - Produces: one lazily fetched Nasdaq snapshot and one shared Massive budget per tick; no publisher evidence/blockers; active source statuses for regulator, listing authority, optional IBKR, and manual.
 
-- [ ] **Step 1: Write scheduler REDs**
+- [x] **Step 1: Write scheduler REDs**
 
 Add tests that use injected fake sessions:
 
@@ -708,7 +708,7 @@ but blocks an OTC/terminal case with `massive_credential_missing`; IBKR
 unavailable is diagnostic-only when listing authority is sufficient; IBKR
 ambiguity/conflict blocks; and `AUTOMATION_EXECUTION_REVISION` is unchanged.
 
-- [ ] **Step 2: Run scheduler REDs**
+- [x] **Step 2: Run scheduler REDs**
 
 Run:
 
@@ -716,7 +716,7 @@ Run:
 pytest tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py tests/test_security_lifecycle_disposition.py -q
 ```
 
-- [ ] **Step 3: Add a tick-scoped lazy session**
+- [x] **Step 3: Add a tick-scoped lazy session**
 
 Create one explicit tick-local session whose value owns transport, budget,
 parsed Nasdaq snapshot, and Massive memoization. Bind it into a per-tick
@@ -745,7 +745,7 @@ finally:
 
 The session fetches nothing until the first selected case calls `lookup`.
 
-- [ ] **Step 4: Remove news from `_load_evidence`**
+- [x] **Step 4: Remove news from `_load_evidence`**
 
 Delete `_local_news_evidence` calls, news diagnostics, publisher source state,
 and publisher blockers from the active flow. Do not delete the historical module
@@ -756,7 +756,7 @@ facts. Run listing lookup after SEC. Query IBKR only when configured and useful;
 convert availability/missing results to source status/diagnostics rather than a
 decision-blocking error. Preserve positive ambiguity/conflict as a blocker.
 
-- [ ] **Step 5: Update monitoring and disposition source families**
+- [x] **Step 5: Update monitoring and disposition source families**
 
 Require `regulator` plus the listing components material to the case: Nasdaq for
 NMS checks, Massive for OTC continuation and terminal confirmation, and neither
@@ -780,7 +780,7 @@ Map new listing/Massive blocker codes to their separate component states under
 unavailable. Publisher rows in old runs must not create missing/unavailable
 source status or affect queue selection.
 
-- [ ] **Step 6: Run scheduler/worker/disposition tests GREEN**
+- [x] **Step 6: Run scheduler/worker/disposition tests GREEN**
 
 Run:
 
@@ -788,7 +788,7 @@ Run:
 pytest tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py tests/test_security_lifecycle_disposition.py -q
 ```
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 ```bash
 git add src/service/security_lifecycle_automation_scheduler.py src/security_lifecycle_automation_worker.py src/security_lifecycle_disposition.py tests/test_security_lifecycle_automation_scheduler.py tests/test_security_lifecycle_automation_worker.py tests/test_security_lifecycle_disposition.py
@@ -814,7 +814,7 @@ git commit -m "feat(lifecycle): replace news acquisition with listing checks"
 - Consumes: provider-neutral case detail with v3 evidence locator fields.
 - Produces: active detail without `publisher`; typed `listing_authority`; compact listing card; translation only for source prose, not structured listing snapshots.
 
-- [ ] **Step 1: Write API serialization REDs**
+- [x] **Step 1: Write API serialization REDs**
 
 Seed regulator, listing, IBKR, publisher, and manual evidence. Assert:
 
@@ -842,7 +842,7 @@ def test_listing_locator_is_whitelisted_without_raw_payload_or_secret():
     assert "source_locator_json" not in row
 ```
 
-- [ ] **Step 2: Run API REDs**
+- [x] **Step 2: Run API REDs**
 
 Run:
 
@@ -850,7 +850,7 @@ Run:
 pytest tests/test_security_lifecycle_tools.py tests/test_security_lifecycle_routes.py -q
 ```
 
-- [ ] **Step 3: Implement server-side filtering and explicit listing projection**
+- [x] **Step 3: Implement server-side filtering and explicit listing projection**
 
 Do not filter `SecurityLifecycleReadService.get_case()` or
 `SecurityLifecycleInvestigationStore.list_evidence()`: transition, mutation,
@@ -863,7 +863,7 @@ closed listing locator keys above before `_provider_neutral_case` removes raw
 `source_locator_json`; reject invalid status or authority rather than forwarding
 arbitrary locator JSON. Preserve facts, citations, and assessment history.
 
-- [ ] **Step 4: Write frontend REDs**
+- [x] **Step 4: Write frontend REDs**
 
 Add fixtures containing all source families and assert:
 
@@ -880,7 +880,7 @@ The same test must distinguish `not_found` as "Not found in this completed
 snapshot" / 「在這份完整快照中找不到」 and must not contain "Delisted" /
 「已下市」.
 
-- [ ] **Step 5: Implement compact listing presentation**
+- [x] **Step 5: Implement compact listing presentation**
 
 Extend the TypeScript family union with `listing_authority`. Add a compact
 definition-list rendering branch for `listing_directory_snapshot`; keep the
@@ -892,7 +892,7 @@ insertion order. Citation labels for listing evidence use the compact typed
 listing label and never `excerpt.slice(...)`, so canonical JSON cannot leak into
 the active UI.
 
-- [ ] **Step 6: Run backend and frontend GREEN**
+- [x] **Step 6: Run backend and frontend GREEN**
 
 Run:
 
@@ -902,7 +902,7 @@ npm --prefix apps/arkscope-web test -- LifecycleView.test.tsx lifecyclePresentat
 npm --prefix apps/arkscope-web run typecheck
 ```
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 ```bash
 git add src/tools/security_lifecycle_tools.py src/api/routes/security_lifecycle.py tests/test_security_lifecycle_tools.py tests/test_security_lifecycle_routes.py apps/arkscope-web/src/api.ts apps/arkscope-web/src/lifecycle/LifecycleView.tsx apps/arkscope-web/src/lifecycle/lifecyclePresentation.ts apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts apps/arkscope-web/src/i18n/resources/en/explore.ts apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts
@@ -926,7 +926,7 @@ git commit -m "feat(lifecycle): show concise listing authority"
 - Consumes: provider ID `polygon`, field `api_key`, env `POLYGON_API_KEY`, existing masked storage/import bridge.
 - Produces: user label **Massive (Polygon)** and an explicit one-call test against `api.massive.com`.
 
-- [ ] **Step 1: Write credential-authority REDs**
+- [x] **Step 1: Write credential-authority REDs**
 
 Assert there is still exactly one provider field and no `MASSIVE_API_KEY`:
 
@@ -942,7 +942,7 @@ Patch `_http_probe` and assert the explicit probe URL begins with
 `https://api.massive.com/v3/reference/tickers` and contains no persisted/logged
 secret material.
 
-- [ ] **Step 2: Run backend Settings REDs**
+- [x] **Step 2: Run backend Settings REDs**
 
 Run:
 
@@ -950,7 +950,7 @@ Run:
 pytest tests/test_data_provider_config.py tests/test_provider_config_startup.py -q
 ```
 
-- [ ] **Step 3: Update the official endpoint and template copy**
+- [x] **Step 3: Update the official endpoint and template copy**
 
 Change only presentation comments/links and the user-triggered probe base. Keep
 the env variable and provider ID unchanged:
@@ -971,7 +971,7 @@ If the existing HTTP helper cannot keep query secrets out of returned details
 and exceptions, extend the helper with the narrow `params` and
 `redact_query_keys` contract above. Do not concatenate the key into the URL.
 
-- [ ] **Step 4: Write and satisfy frontend label REDs**
+- [x] **Step 4: Write and satisfy frontend label REDs**
 
 Assert both locales render `Massive (Polygon)`, while
 the API payload and save call still use `polygon` and `api_key`. Ensure only one
@@ -983,7 +983,7 @@ Run:
 npm --prefix apps/arkscope-web test -- SettingsProviderConfig.test.ts settingsBackendCopy.test.ts
 ```
 
-- [ ] **Step 5: Run Settings gates GREEN**
+- [x] **Step 5: Run Settings gates GREEN**
 
 Run:
 
@@ -993,7 +993,7 @@ npm --prefix apps/arkscope-web test -- SettingsProviderConfig.test.ts settingsBa
 npm --prefix apps/arkscope-web run typecheck
 ```
 
-- [ ] **Step 6: Commit Task 7**
+- [x] **Step 6: Commit Task 7**
 
 ```bash
 git add src/data_provider_config.py config/.env.template tests/test_data_provider_config.py tests/test_provider_config_startup.py apps/arkscope-web/src/settings/settingsBackendCopy.ts apps/arkscope-web/src/settings/settingsBackendCopy.test.ts apps/arkscope-web/src/SettingsProviderConfig.test.ts apps/arkscope-web/src/i18n/resources/en/settings.ts apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts
@@ -1016,7 +1016,7 @@ git commit -m "feat(settings): present Polygon credentials as Massive"
 - Produces: deterministic packet with schema v2/v3, scratch migration/restore,
   decision matrix, mutations, browser matrix, full gates, and declared zero live authority.
 
-- [ ] **Step 1: Write the offline authority observer**
+- [x] **Step 1: Write the offline authority observer**
 
 Patch and calibrate every forbidden boundary before running scenarios:
 
@@ -1035,7 +1035,7 @@ Calibration must invoke and intercept every patched target in a disposable
 context. The packet labels zero provider/production/merge/push values as
 `declared_not_authorized`, not measured runtime facts.
 
-- [ ] **Step 2: Build shadow fixtures**
+- [x] **Step 2: Build shadow fixtures**
 
 Use exact offline payloads for:
 
@@ -1054,7 +1054,7 @@ CONFLICT synthetic SEC/Listing CIK mismatch: attention, no preview
 Assert publisher evidence injection changes no v4 output and
 `transition_preview_calls == 0` for all non-transition examples.
 
-- [ ] **Step 3: Add named mutations**
+- [x] **Step 3: Add named mutations**
 
 The ledger must apply and restore each mutation independently and require one
 or more named owners to fail. Include at least:
@@ -1082,7 +1082,7 @@ M19 change one v2 translated-text byte during migration
 M20 allow a v3 binary to verify a v2 database without migration
 ```
 
-- [ ] **Step 4: Build the browser matrix**
+- [x] **Step 4: Build the browser matrix**
 
 Record desktop `1440x900` and mobile `390x844`, English and Traditional Chinese,
 for active, not-found Monitoring, explicit inactive History, conflict Attention,
@@ -1090,7 +1090,7 @@ OTC continuation, and Settings Massive key. Assert zero console/page errors,
 zero external requests, no publisher family text, no listing translation button,
 no render acknowledgement, and no command calls.
 
-- [ ] **Step 5: Run focused gates twice**
+- [x] **Step 5: Run focused gates twice**
 
 ```bash
 pytest --basetemp=/tmp/arkscope-listing-focused-a \
@@ -1119,7 +1119,7 @@ pytest --basetemp=/tmp/arkscope-listing-focused-b \
 
 Expected: both pass with identical collected node sets.
 
-- [ ] **Step 6: Run complete gates twice**
+- [x] **Step 6: Run complete gates twice**
 
 ```bash
 pytest --basetemp=/tmp/arkscope-listing-full-a -q
@@ -1132,14 +1132,14 @@ npm --prefix apps/arkscope-web run build
 
 Expected: zero failures; backend collection counts match across both runs.
 
-- [ ] **Step 7: Run scratch migration and old-code restore probes**
+- [x] **Step 7: Run scratch migration and old-code restore probes**
 
 Create a v2 fixture database with rows in every owned table. Run v2 preflight,
 backup, v3 migration, v3 startup verifier, restore, and v2 startup verifier. No
 production path may appear in the report. Assert exact row/cell digests and
 foreign-key integrity at every stage.
 
-- [ ] **Step 8: Run mutation and browser packets**
+- [x] **Step 8: Run mutation and browser packets**
 
 ```bash
 python docs/superpowers/evidence/2026-08-28-lifecycle-listing-authority/run_mutations.py
@@ -1153,14 +1153,14 @@ PID, install an `EXIT` trap, wait for readiness, run the browser matrix, and
 terminate that exact process before proceeding. The two foreground commands
 above document the components only; they are not the unattended packet runner.
 
-- [ ] **Step 9: Seal and verify the packet**
+- [x] **Step 9: Seal and verify the packet**
 
 Generate `SHA256SUMS` from the exact file allowlist, verify every hash, and
 assert the manifest set equals the disk set. The README must list known limits:
 no live SEC/Nasdaq/Massive/IBKR call, no real production A-to-B execution, and
 no production migration.
 
-- [ ] **Step 10: Commit Task 8**
+- [x] **Step 10: Commit Task 8**
 
 ```bash
 git add docs/superpowers/evidence/2026-08-28-lifecycle-listing-authority tests/fixtures/listing_authority
@@ -1177,13 +1177,13 @@ git commit -m "test(lifecycle): admit listing authority offline"
 - Consumes: sealed Task 8 packet and clean branch.
 - Produces: an exact user-facing authorization inventory; no live action.
 
-- [ ] **Step 1: Record offline GREEN without claiming live admission**
+- [x] **Step 1: Record offline GREEN without claiming live admission**
 
 Add a dated decision-log entry that states the branch tip, exact gate counts,
 packet digest, schema version, policy version, and all unexercised live paths.
 Do not mark production cutover complete.
 
-- [ ] **Step 2: Verify branch and boundary state**
+- [x] **Step 2: Verify branch and boundary state**
 
 Run:
 
@@ -1197,7 +1197,7 @@ git branch -r --contains HEAD
 Expected: clean feature branch, linear commits, no remote branch containing the
 tip, and no whitespace errors.
 
-- [ ] **Step 3: Report the six separate next decisions**
+- [x] **Step 3: Report the six separate next decisions**
 
 Report, without executing:
 
@@ -1210,3 +1210,34 @@ Report, without executing:
 
 Include the exact expected provider request caps and the rollback consequence
 that v2 code requires restoring the bound v2 backup after schema v3 migration.
+
+**2026-08-29 offline closeout:** Product/controller authority `ce9c9dd5` was
+replayed from a clean tree and sealed by evidence commit `c77d3407`. The packet
+digest is `18d0a4ee8e666319e897fd313fa6199a04c6cb674fbd2946ee7136d11c09248d`.
+It records schema v3, automation policy
+`trusted-lifecycle-automation-v4`, `45/45` killed mutations, focused A/B
+`358P`, backend A/B `4894P/13S/0F` with identical 4,907-node manifests,
+frontend `106 files/1306P`, packet contracts `25P`, and 24 browser entries
+with zero measured external requests, writes, overlap, clipped text, or
+console/page errors. The 63-file seal and an independent secret rescan both
+verify with zero findings. This is offline admission only.
+
+The six remaining actions are still independent decisions and were not
+performed by this plan:
+
+1. read-only production v2 inventory;
+2. bounded live Nasdaq/Massive/IBKR canary (a prior four-request Massive
+   observation is unsealed and does not substitute for this combined gate);
+3. production v3 migration preflight, bound backup, restore probe, and
+   migration;
+4. fast-forward merge;
+5. App restart/cutover plus bounded case replay; and
+6. push.
+
+The provider ceilings are Nasdaq at most two requests per tick, 8 MiB per
+file and 12 MiB aggregate; Massive at most four requests per tick, 1 MiB per
+response and 4 MiB aggregate; and optional IBKR at most eight contract queries
+plus one market-data request under the broker lock. An IBKR missing-contract
+result never proves delisting. After a schema v3 migration, rolling code back
+to v2 requires restoring the bound v2 database backup and therefore discards
+all profile writes made after that backup.
