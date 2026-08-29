@@ -854,6 +854,9 @@ function ListingEvidenceItem({
   const authority = lifecycleListingAuthorityLabel(listing.authority, locale);
   const status = lifecycleListingStatusLabel(listing.listing_status, locale);
   const displayAsOf = listing.provider_last_updated_utc ?? listing.source_as_of;
+  const sourceAsOfLabel = listing.authority === "massive"
+    ? t(($) => $.lifecycle.listingEvidence.fields.retrievedAt)
+    : t(($) => $.lifecycle.listingEvidence.fields.snapshotAsOf);
   const scanValues = [
     listing.candidate_ticker,
     status,
@@ -904,9 +907,7 @@ function ListingEvidenceItem({
             </div>
           ) : null}
           <div>
-            <dt>{t(($) => listing.authority === "massive"
-              ? $.lifecycle.listingEvidence.fields.retrievedAt
-              : $.lifecycle.listingEvidence.fields.snapshotAsOf)}</dt>
+            <dt>{sourceAsOfLabel}</dt>
             <dd><time dateTime={listing.source_as_of}>{listing.source_as_of}</time></dd>
           </div>
           {listing.provider_last_updated_utc ? (

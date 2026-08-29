@@ -1575,7 +1575,8 @@ describe("Settings provider config authority", () => {
       const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
         row.textContent?.includes("Massive") && row.textContent.includes("API key"));
       if (!polygonRow) throw new Error("missing Massive config row");
-      expect(polygonRow.textContent).toContain("(External) (config/.env)");
+      expect(polygonRow.textContent).toContain("Not configured");
+      expect(polygonRow.textContent).not.toContain("config/.env");
       expect(host!.querySelector(".settings-section-head button")?.textContent)
         .toContain("Reload status (Running, auto-refreshing)");
       expect(host!.querySelector(".ds-schedule-protection-note")?.textContent)
