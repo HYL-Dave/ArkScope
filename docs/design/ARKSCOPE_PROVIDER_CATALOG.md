@@ -124,7 +124,7 @@ admitted separately as task capabilities, not presumed data foundations.
 
 > Same schema as the IBKR exemplar. Pricing/limits carry `verified_at` and are **last-known (source-doc dated), not live-verified** (§0.2).
 
-### 3.1 Polygon (Massive.com)
+### 3.1 Massive (legacy Polygon source IDs)
 
 | Field | Value |
 |-------|-------|
@@ -137,14 +137,14 @@ admitted separately as task capabilities, not presumed data foundations.
 | **latency** | **15-minute delayed** on free tier; real-time on paid. |
 | **streaming** | `none` on free (15-min delayed); `realtime_quote` on paid. **Not bar-streaming — not charting-grade for our use** (IBKR owns charting). |
 | **cost** | Free tier (delayed, rate-limited). Paid ≈ **$29/mo** (real-time options quotes + Greeks + news sentiment + technicals). |
-| **auth/config** | `polygon.api_key` in profile DB; `MASSIVE_API_KEY` is the sole process bridge. `config/.env` and `POLYGON_API_KEY` are not runtime/import authority. REST. Wired in `data_preferences.prices` (historical). |
+| **auth/config** | `massive.api_key` in profile DB; `MASSIVE_API_KEY` is the sole process bridge. `config/.env` and `POLYGON_API_KEY` are not runtime/import authority. REST. Historical source preferences still use `polygon`. |
 | **limits** | Free ≈ **5 calls/min**; paid 300+ calls/min. |
 | **known_quirks** | Free-tier delay makes it historical-only; name split (Polygon/Massive). |
 | **best_for** | **Best free news archive** (3+ yr) with AI sentiment; historical price backtests; cheap real-time options ($29). |
 | **not_good_for** | Real-time charting on free tier (15-min delay). |
 | **verified_at** | 2025-12. |
 | **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Polygon, `docs/data/US_STOCKS_OPTIONS_DATA_SUBSCRIPTIONS.md`, `data_sources/API_SPECIFICATIONS.md` §Polygon. |
-| **app_settings_fields** | `polygon.enabled` (toggle), `polygon.api_key` (secret), `polygon.tier` (free/paid info). |
+| **app_settings_fields** | `polygon.enabled` (historical source toggle), `massive.api_key` (secret), `polygon.tier` (free/paid source info). |
 
 ### 3.2 Finnhub
 

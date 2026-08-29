@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-28-lifecycle-listing-authority-design.md`
 
+**Configuration amendment:** The completed historical plan below retains its
+original `polygon.api_key` record. Current configuration work is owned by
+`docs/superpowers/plans/2026-08-30-massive-config-authority.md`.
+
 ## Global Constraints
 
 - Do not call SEC, Nasdaq Trader, Massive, IBKR, or any other provider while implementing or running offline gates.

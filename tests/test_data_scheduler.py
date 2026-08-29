@@ -649,10 +649,16 @@ def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
         "source": "polygon_news",
         "code": "provider_config_missing",
         "status": "not_configured",
-        "provider": "polygon",
+        "provider": "massive",
         "field": "api_key",
     }
     assert ds._LAST_RESULT["polygon_news"]["status"] == "not_configured"
+
+
+def test_polygon_news_keeps_its_source_id_but_uses_massive_config_authority():
+    assert ds._SOURCE_PROVIDER_CONFIG["polygon_news"] == "massive"
+    assert ds.SOURCES["polygon_news"].name == "polygon_news"
+    assert ds.SOURCES["polygon_news"].news_direct_source == "polygon"
 
 
 def test_normalized_massive_provider_missing_key_names_only_canonical_bridge(

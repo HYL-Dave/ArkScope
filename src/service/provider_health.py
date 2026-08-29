@@ -51,7 +51,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 # each source's collection cadence with weekend allowance. None = never judged
 # stale by age (cache-TTL-governed sources report connected while valid rows exist).
 _THRESHOLD_HOURS: Dict[str, Optional[float]] = {
-    "polygon": 48,
+    "massive": 48,
     "finnhub": 48,
     "ibkr": 72,
     "fred": 8 * 24,           # weekly-cadence macro jobs
@@ -355,16 +355,23 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
                  "news_recent_7d": ibkr_news.get("recent_7d", 0)},
     )
 
-    for pid, label in (("polygon", "Massive"), ("finnhub", "Finnhub")):
-        n = news_by_src.get(pid, {})
-        direct = (direct_news or {}).get("providers", {}).get(pid) if direct_news_enabled else None
+    for pid, source_pid, label in (
+        ("massive", "polygon", "Massive"),
+        ("finnhub", "finnhub", "Finnhub"),
+    ):
+        n = news_by_src.get(source_pid, {})
+        direct = (
+            (direct_news or {}).get("providers", {}).get(source_pid)
+            if direct_news_enabled
+            else None
+        )
         key = (
             _first_key_info(
                 loaded_file_keys,
                 app_keys,
                 "MASSIVE_API_KEY",
             )
-            if pid == "polygon"
+            if pid == "massive"
             else _key_info(loaded_file_keys, app_keys, "FINNHUB_API_KEY")
         )
         _add(

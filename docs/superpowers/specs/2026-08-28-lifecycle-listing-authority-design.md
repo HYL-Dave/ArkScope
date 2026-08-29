@@ -6,6 +6,11 @@ separate authorization gates.
 
 **Date:** 2026-08-28
 
+**Configuration amendment:** The configuration-only `polygon.api_key`
+authority and Settings naming in this document are superseded by
+`docs/superpowers/specs/2026-08-30-massive-config-authority-design.md`.
+Historical Polygon source identities remain governed by this document.
+
 **Base:** `fda1641fa35eeef9d8ff2b582e99faefcf774c34`
 
 **Supersedes only:** the use of `publisher` evidence as an automated lifecycle

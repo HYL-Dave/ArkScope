@@ -19,6 +19,14 @@ _loaded = False
 # effective origin instead of guessing from file contents.
 _loaded_keys: set = set()
 
+# These names are retained in raw file parsing only so a future explicit,
+# operator-selected migration can inspect them. Runtime loading, Settings peeks,
+# and fallback reloads must never make them credential authority again.
+_PERMANENTLY_EXCLUDED_FILE_KEYS = frozenset({
+    "MASSIVE_API_KEY",
+    "POLYGON_API_KEY",
+})
+
 
 def env_file_path() -> Path:
     """The repo's ``config/.env`` path, resolved from this file (cwd-independent)."""
@@ -58,6 +66,8 @@ def read_env_file_values() -> dict[str, str]:
 
 
 def peek_env_file_value(name: str) -> str | None:
+    if name in _PERMANENTLY_EXCLUDED_FILE_KEYS:
+        return None
     return read_env_file_values().get(name)
 
 
@@ -73,9 +83,11 @@ def ensure_env_loaded_excluding(excluded_keys: set[str] | frozenset[str]) -> Non
     while preventing managed provider keys from becoming runtime authority.
     """
     global _loaded
+    for name in _PERMANENTLY_EXCLUDED_FILE_KEYS:
+        discard_loaded_key(name)
     if _loaded:
         return
-    excluded = set(excluded_keys or set())
+    excluded = set(excluded_keys or set()) | set(_PERMANENTLY_EXCLUDED_FILE_KEYS)
     for key, value in read_env_file_values().items():
         if key in excluded:
             continue
@@ -107,7 +119,11 @@ def reload_var_from_file(name: str) -> bool:
     Used when an app-managed override is cleared: the var falls back to its
     config/.env value (tracked as file-sourced), or is removed entirely when the
     file doesn't define it. Returns True if the var is now set."""
-    value = read_env_file_values().get(name)
+    value = (
+        None
+        if name in _PERMANENTLY_EXCLUDED_FILE_KEYS
+        else read_env_file_values().get(name)
+    )
     if value:
         os.environ[name] = value
         _loaded_keys.add(name)

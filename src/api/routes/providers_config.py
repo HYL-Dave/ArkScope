@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from src.api.dependencies import get_data_provider_store
 from src.api.permissions import require_profile_state_write
 from src.data_provider_config import (
+    MASSIVE_CONFIG_PROVIDER,
     PROVIDER_FIELDS,
     DataProviderConfigStore,
     apply_env,
@@ -41,7 +42,7 @@ from src.env_keys import ensure_env_loaded, peek_env_file_value
 
 router = APIRouter(tags=["providers"])
 
-_TESTABLE = {"ibkr", "polygon", "finnhub", "fred", "sec_edgar"}
+_TESTABLE = {"ibkr", MASSIVE_CONFIG_PROVIDER, "finnhub", "fred", "sec_edgar"}
 
 
 def get_data_provider_store_lenient() -> DataProviderConfigStore | None:

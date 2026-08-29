@@ -39,10 +39,10 @@ function modelCommonT(locale: Locale): ModelCommonT {
 describe("Settings backend copy boundary", () => {
   it("maps known provider and config field ids without backend labels", () => {
     const providerIds = [
-      "polygon", "finnhub", "fred", "financial_datasets", "ibkr", "sec_edgar", "seeking_alpha",
+      "massive", "finnhub", "fred", "financial_datasets", "ibkr", "sec_edgar", "seeking_alpha",
     ];
     const fieldIds: Array<[string, string]> = [
-      ["polygon", "api_key"],
+      ["massive", "api_key"],
       ["finnhub", "api_key"],
       ["fred", "api_key"],
       ["financial_datasets", "api_key"],
@@ -112,7 +112,7 @@ describe("Settings backend copy boundary", () => {
     for (const expected of cases) {
       const t = settingsT(expected.locale);
       const commonT = modelCommonT(expected.locale);
-      const copies = statuses.map((status) => providerHealthCopy("polygon", status, t));
+      const copies = statuses.map((status) => providerHealthCopy("massive", status, t));
       expect(copies.map(({ label }) => label)).toEqual(expected.labels);
       expect(copies.every(({ detail }) => detail.includes("Massive"))).toBe(true);
       expect(copies.at(-1)).toEqual({
@@ -149,7 +149,7 @@ describe("Settings backend copy boundary", () => {
 
     for (const expected of cases) {
       const t = settingsT(expected.locale);
-      expect([true, false, null].map((ok) => providerTestCopy("polygon", ok, t)))
+      expect([true, false, null].map((ok) => providerTestCopy("massive", ok, t)))
         .toEqual(expected.values);
       expect(expected.values.join(" ")).not.toContain("PLANTED_RAW_TEST_DETAIL");
     }

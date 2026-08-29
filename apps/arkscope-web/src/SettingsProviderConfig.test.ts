@@ -39,7 +39,7 @@ const mocked = vi.hoisted(() => ({
   providerTestDetail: "PLANTED_PROVIDER_TEST_DETAIL",
   providersConfig: {
     providers: {
-      polygon: {
+      massive: {
         fields: [{
           field: "api_key",
           label: "PLANTED_CONFIG_API_KEY_LABEL",
@@ -152,7 +152,7 @@ const emptyCatalog: ModelCatalog = {
 
 const health: ProvidersHealthResponse = {
   providers: [
-    { id: "polygon", label: "PLANTED_PROVIDER_POLYGON_LABEL", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: false, key_source: "missing", key_vars: ["MASSIVE_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
+    { id: "massive", label: "PLANTED_PROVIDER_MASSIVE_LABEL", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "massive", field: "api_key" }, enabled: true, key_present: false, key_source: "missing", key_vars: ["MASSIVE_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
     { id: "ibkr", label: "PLANTED_PROVIDER_IBKR_LABEL", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: mocked.providerHealthError, detail: mocked.providerHealthDetail, signals: {}, key_import_suggested: false },
     {
       id: "fred",
@@ -809,7 +809,7 @@ describe("Settings provider config authority", () => {
       expect(groupedConfig?.textContent).toContain("基底=1、選擇權=11、股價=21、新聞=31、IV=41");
       const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
         row.textContent?.includes("Massive") && row.textContent.includes("API key"));
-      if (!polygonRow) throw new Error("missing polygon config row");
+      if (!polygonRow) throw new Error("missing Massive config row");
       expect(polygonRow.textContent).toContain("未設定");
       const refreshButton = host!.querySelector(".settings-section-head button");
       expect(refreshButton?.textContent).toContain("（執行中，自動更新）");
@@ -823,7 +823,7 @@ describe("Settings provider config authority", () => {
     }
   });
 
-  it("renders Massive as one polygon credential and saves the original payload", async () => {
+  it("renders and saves the Massive credential under its current provider id", async () => {
     await renderDataSources();
 
     const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
@@ -845,13 +845,13 @@ describe("Settings provider config authority", () => {
     });
 
     expect(mocked.putCalls).toEqual([{
-      provider: "polygon",
+      provider: "massive",
       fields: { api_key: "massive-test-key" },
       confirmGuarded: undefined,
     }]);
   });
 
-  it("runs the Massive connection test only when explicitly requested for polygon", async () => {
+  it("runs the Massive connection test only when explicitly requested", async () => {
     vi.mocked(testProvider).mockClear();
     await renderDataSources();
     expect(testProvider).not.toHaveBeenCalled();
@@ -881,7 +881,7 @@ describe("Settings provider config authority", () => {
       await Promise.resolve();
     });
 
-    expect(testProvider).toHaveBeenCalledExactlyOnceWith("polygon");
+    expect(testProvider).toHaveBeenCalledExactlyOnceWith("massive");
   });
 
   it("confirms guarded IBKR client id edits", async () => {
@@ -1340,7 +1340,7 @@ describe("Settings provider config authority", () => {
       busy: true,
       reason: "資料來源設定更新正在進行。",
     });
-    pending.resolve(mocked.providersConfig.providers.polygon);
+    pending.resolve(mocked.providersConfig.providers.massive);
     await waitForReport(onNavigationGuardChange, (report) => !report.busy && !report.dirty);
     expect(JSON.stringify(onNavigationGuardChange.mock.calls)).not.toContain("planted-busy-secret");
   });

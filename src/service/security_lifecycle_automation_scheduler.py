@@ -13,7 +13,7 @@ import re
 import sqlite3
 from typing import Iterator
 
-from src.data_provider_config import provider_field_env_value
+from src.data_provider_config import MASSIVE_CONFIG_PROVIDER, provider_field_env_value
 from src.security_lifecycle_automation_worker import (
     LifecycleAutomationEvidenceBundle,
     LifecycleAutomationWorker,
@@ -1099,7 +1099,7 @@ def run_security_lifecycle_automation(
             transport=transport,
             budget=budget,
             retrieved_at=at,
-            massive_api_key=provider_field_env_value("polygon", "api_key"),
+            massive_api_key=provider_field_env_value(MASSIVE_CONFIG_PROVIDER, "api_key"),
         )
     except Exception as exc:
         if transport is not None:

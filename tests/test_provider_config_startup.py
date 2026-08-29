@@ -442,7 +442,7 @@ def test_provider_work_routes_refuse_in_setup_only(monkeypatch):
     runtime.mark_provider_config_setup_required("profile DB unavailable")
     try:
         with pytest.raises(HTTPException) as e1:
-            providers_config.test_provider("polygon")
+            providers_config.test_provider("massive")
         assert e1.value.status_code == 503
         assert e1.value.detail["code"] == "provider_config_setup_required"
 

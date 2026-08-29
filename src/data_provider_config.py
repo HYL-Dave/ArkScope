@@ -83,8 +83,12 @@ class FieldDef:
 # What each provider can store here. SEC EDGAR has no key but does have an
 # optional app-managed User-Agent field; Seeking Alpha is the extension capture
 # path (nothing to configure here).
+MASSIVE_CONFIG_PROVIDER = "massive"
+LEGACY_POLYGON_CONFIG_PROVIDER = "polygon"
+
+
 PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
-    "polygon": [
+    MASSIVE_CONFIG_PROVIDER: [
         FieldDef(
             "api_key",
             "MASSIVE_API_KEY",
@@ -658,8 +662,8 @@ def run_connection_test(provider: str) -> Dict[str, Any]:
         except (OSError, ValueError) as e:
             return {"ok": False, "latency_ms": None, "detail": f"{host}:{port} — {e}"}
 
-    if provider == "polygon":
-        key = provider_field_env_value("polygon", "api_key")
+    if provider == MASSIVE_CONFIG_PROVIDER:
+        key = provider_field_env_value(MASSIVE_CONFIG_PROVIDER, "api_key")
         if not key:
             return {"ok": False, "latency_ms": None, "detail": "缺 API key"}
         return _http_probe(

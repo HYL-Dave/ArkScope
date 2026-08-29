@@ -273,7 +273,7 @@ _LAST_RESULT: Dict[str, Dict[str, Any]] = {}
 _LAST_RESULT_LOCK = threading.Lock()
 
 _SOURCE_PROVIDER_CONFIG = {
-    "polygon_news": "polygon",
+    "polygon_news": "massive",
     "finnhub_news": "finnhub",
     "ibkr_news": "ibkr",
     "ibkr_prices": "ibkr",

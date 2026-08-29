@@ -164,8 +164,8 @@ export function settingsErrorPresentation(
 
 export function providerName(id: string, t: SettingsT): string {
   switch (id) {
-    case "polygon":
-      return t(($) => $.dataSources.providers.names.polygon);
+    case "massive":
+      return t(($) => $.dataSources.providers.names.massive);
     case "finnhub":
       return t(($) => $.dataSources.providers.names.finnhub);
     case "fred":
@@ -189,7 +189,7 @@ export function providerConfigFieldLabel(
   t: SettingsT,
 ): string {
   switch (provider) {
-    case "polygon":
+    case "massive":
     case "finnhub":
     case "fred":
     case "financial_datasets":

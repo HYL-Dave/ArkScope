@@ -68,7 +68,7 @@ def test_connected_when_signal_recent(monkeypatch):
     monkeypatch.setenv("MASSIVE_API_KEY", "k")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
-    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")
     assert p["status"] == "connected"
     assert p["last_success_at"] is not None and p["signals"]["news_recent_7d"] == 50
 
@@ -78,7 +78,7 @@ def test_massive_health_uses_primary_name_and_rejects_legacy_fallback(monkeypatc
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
 
-    primary = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+    primary = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")
 
     assert primary["label"] == "Massive"
     assert primary["status"] == "connected"
@@ -86,7 +86,7 @@ def test_massive_health_uses_primary_name_and_rejects_legacy_fallback(monkeypatc
 
     monkeypatch.delenv("MASSIVE_API_KEY")
     monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
-    legacy = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+    legacy = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")
     assert legacy["status"] == "not_configured"
 
 
@@ -103,7 +103,7 @@ def test_stale_when_signal_old_on_weekday(monkeypatch):
     monkeypatch.setenv("MASSIVE_API_KEY", "k")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=100), 0)])))
-    assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")["status"] == "stale"
+    assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")["status"] == "stale"
 
 
 def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
@@ -118,7 +118,7 @@ def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
         news_rows=[("polygon", old, 0)], prices_latest=old)))
     out = compute_provider_health(dal, now=_SATURDAY)
     assert _by_id(out, "ibkr")["status"] == "maintenance"
-    assert _by_id(out, "polygon")["status"] == "stale"
+    assert _by_id(out, "massive")["status"] == "stale"
     # an equally-old signal relative to a WEEKDAY → ibkr reads stale (no weekend cover)
     old2 = _WEDNESDAY - timedelta(hours=100)
     dal2 = _FakeDAL(_FakeBackend(stats=_stats(prices_latest=old2)))
@@ -130,12 +130,12 @@ def test_provider_health_missing_managed_key_is_not_configured():
     # no MASSIVE_API_KEY in env (hermetic fixture) — even with a fresh signal
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=1), 9)])))
-    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")
     assert p["status"] == "not_configured"
     assert p["config_error"] == {
         "code": "provider_config_missing",
         "status": "not_configured",
-        "provider": "polygon",
+        "provider": "massive",
         "field": "api_key",
     }
 
@@ -239,7 +239,7 @@ def test_key_source_reports_effective_origin(monkeypatch):
     monkeypatch.setenv("IBKR_PORT", "4001")       # ...but PORT marked loader-set → mixed
     monkeypatch.setattr("src.env_keys._loaded_keys", {"FINNHUB_API_KEY", "IBKR_PORT"})
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
-    assert _by_id(out, "polygon")["key_source"] == "env"
+    assert _by_id(out, "massive")["key_source"] == "env"
     assert _by_id(out, "finnhub")["key_source"] == "config/.env"
     assert _by_id(out, "finnhub")["status"] == "not_configured"
     assert _by_id(out, "finnhub")["config_error"]["field"] == "api_key"
@@ -251,7 +251,7 @@ def test_retired_polygon_file_key_is_not_a_massive_import_suggestion(monkeypatch
     monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
     monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
-    p = _by_id(out, "polygon")
+    p = _by_id(out, "massive")
     assert p["key_source"] == "missing"
     assert p["status"] == "not_configured"
     assert p["key_import_suggested"] is False
@@ -428,10 +428,10 @@ def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(monkeyp
 
     out = compute_provider_health(dal, now=_WEDNESDAY)
 
-    polygon = _by_id(out, "polygon")
-    assert polygon["last_success_at"] == "2026-06-10T10:00:00+00:00"
-    assert polygon["last_attempt_at"] == "2026-06-10T11:00:00+00:00"
-    assert polygon["last_error"] == "BAD: 403"
+    massive = _by_id(out, "massive")
+    assert massive["last_success_at"] == "2026-06-10T10:00:00+00:00"
+    assert massive["last_attempt_at"] == "2026-06-10T11:00:00+00:00"
+    assert massive["last_error"] == "BAD: 403"
     assert _by_id(out, "finnhub")["status"] == "no_signal"
     assert out["local_market"]["sync"]["news"] == direct
 
@@ -453,6 +453,6 @@ def test_route_returns_aggregation(monkeypatch):
     dal = _FakeDAL(_FakeBackend())
     out = providers_health(dal=dal)
     assert {p["id"] for p in out["providers"]} == {
-        "ibkr", "polygon", "finnhub", "fred", "sec_edgar",
+        "ibkr", "massive", "finnhub", "fred", "sec_edgar",
         "financial_datasets", "seeking_alpha"}
     assert "local_market" in out and "jobs" in out
