@@ -1264,4 +1264,15 @@ packet admission evidence.
   prove they kill broadened `_listing_snapshot` mutations.
 - [x] Re-evaluate adjacent blocker classification, compact-reader, and
   provider-as-of semantics against the same normalized listing contract.
-- [ ] Rebuild the sealed packet and all gates before requesting merge.
+- [x] Rebuild the sealed packet and all gates before requesting merge.
+
+**2026-08-30 Task 10 closeout:** Product/controller authority
+`63ceb8cb5ab08b262926a3dd36ed21096ea81f49` was replayed from a clean
+tree. The resulting 67-file packet digest is
+`83f1f2cf22b74fa86272e8441eae58617a509e379dd61b060c07187ffc036055`.
+It records `51/51` killed mutations, focused backend A/B `362P`,
+full backend A/B `4898P/13S/0F` with identical 4,911-node manifests,
+frontend A/B `106 files/1306P`, clean typecheck/i18n/build gates, and
+24 browser entries with zero measured external requests, writes, overlap,
+clipped text, console errors, or page errors. Provider calls, production DB
+operations, App restart, merge, and push remained unexecuted.
