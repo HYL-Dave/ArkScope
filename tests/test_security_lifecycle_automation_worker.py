@@ -556,7 +556,7 @@ def _invalid_persistence_bundle(case, *, blockers=()):
     )
 
 
-def _forged_deadline_bundle(case):
+def _deadline_bundle(case, *, forge_citation=False):
     from src.security_lifecycle_automation_worker import (
         LifecycleAutomationEvidenceBundle,
     )
@@ -565,7 +565,7 @@ def _forged_deadline_bundle(case):
     from src.service import security_lifecycle_automation_scheduler as scheduler
 
     cited_text = (
-        "HAPN transaction may be terminated if it is not consummated by "
+        "The outside date was extended from August 23, 2026 to "
         "August 24, 2026."
     )
     encoded = cited_text.encode("utf-8")
@@ -595,6 +595,8 @@ def _forged_deadline_bundle(case):
         cited_text_sha256=hashlib.sha256(encoded).hexdigest(),
         rule_id="sec.explicit_transaction_termination_date",
         rule_version="4",
+        kind="extension",
+        supersedes_date="2026-08-23",
     )
     blocker = scheduler._pending_event_monitoring(
         case,
@@ -608,12 +610,13 @@ def _forged_deadline_bundle(case):
         at=_AT,
     )
     assert blocker is not None
-    forged_context = dict(blocker.context)
-    forged_context["source_deadline_cited_text_sha256"] = "f" * 64
+    context = dict(blocker.context)
+    if forge_citation:
+        context["source_deadline_cited_text_sha256"] = "f" * 64
     return LifecycleAutomationEvidenceBundle(
         evidence=(evidence,),
         facts=(),
-        blockers=(replace(blocker, context=forged_context),),
+        blockers=(replace(blocker, context=context),),
         diagnostics={"news_evidence_count": 20, "sec_attempts": 7},
         retry_at=None,
     )
@@ -1946,6 +1949,36 @@ def test_attended_worker_targets_exact_case_and_creates_new_attempt(tmp_path):
         harness.conn.close()
 
 
+def test_deadline_supersession_metadata_is_transient_through_worker_persistence(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _deadline_bundle(case)
+    try:
+        result = harness.worker().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert result["blocked"] == 1
+        assert run["status"] == "blocked"
+        assert len(run["blockers"]) == 1
+        context = json.loads(run["blockers"][0]["context_json"])
+        assert context["source_deadline"] == "2026-08-24"
+        assert context["source_deadline_rule_version"] == "4"
+        assert "kind" not in context
+        assert "supersedes_date" not in context
+        assert (
+            harness.conn.execute(
+                "SELECT COUNT(*) FROM security_lifecycle_automation_facts "
+                "WHERE automation_run_id=?",
+                (run["run_id"],),
+            ).fetchone()[0]
+            == 0
+        )
+    finally:
+        harness.conn.close()
+
+
 def test_forged_deadline_failure_replays_once_after_execution_revision_change(
     tmp_path,
     monkeypatch,
@@ -1954,7 +1987,10 @@ def test_forged_deadline_failure_replays_once_after_execution_revision_change(
 
     case = _case(1)
     harness = _Harness(tmp_path, [case])
-    harness.bundles[case["case_id"]] = _forged_deadline_bundle(case)
+    harness.bundles[case["case_id"]] = _deadline_bundle(
+        case,
+        forge_citation=True,
+    )
     try:
         first_result = harness.worker().run()
         store = _store(harness)

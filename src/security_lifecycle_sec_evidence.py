@@ -63,7 +63,7 @@ _CURRENT_DEADLINE = re.compile(
 )
 _EXTENDED_DEADLINE = re.compile(
     rf"\b(?:outside|termination) date\s+(?:has been|was)\s+extended"
-    rf"(?:\s+from\s+{_SOURCE_DATE_TEXT})?\s+to\s+"
+    rf"(?:\s+from\s+(?P<supersedes_date>{_SOURCE_DATE_TEXT}))?\s+to\s+"
     rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
     re.IGNORECASE,
 )
@@ -234,6 +234,8 @@ class SecSourceDeadline:
     cited_text_sha256: str
     rule_id: str
     rule_version: str
+    kind: str = "current"
+    supersedes_date: str | None = None
 
 
 @dataclass(frozen=True)
@@ -654,30 +656,50 @@ def _normalized_month_date_text(value: str) -> str:
     return datetime.strptime(value, "%B %d, %Y").date().isoformat()
 
 
-def _source_deadlines(evidence: SecEvidence) -> tuple[SecSourceDeadline, ...]:
+def _normalized_source_date_text(value: str) -> str:
+    return (
+        _normalized_month_date_text(value)
+        if _ANY_MONTH_DATE.fullmatch(value) is not None
+        else _normalized_date("source_deadline", value)
+    )
+
+
+def _source_deadlines(
+    evidence: SecEvidence,
+) -> tuple[tuple[SecSourceDeadline, ...], bool]:
     rows: list[SecSourceDeadline] = []
+    ambiguous = False
     for start, end, sentence in _sentence_spans(evidence.excerpt):
         target_matches = [
-            match
-            for pattern in (_TERMINATE_IF_BY, _CURRENT_DEADLINE, _EXTENDED_DEADLINE)
+            (match, kind)
+            for pattern, kind in (
+                (_TERMINATE_IF_BY, "termination_condition"),
+                (_CURRENT_DEADLINE, "current"),
+                (_EXTENDED_DEADLINE, "extension"),
+            )
             for match in pattern.finditer(sentence)
         ]
-        if len(target_matches) != 1 or len(_EXTENSION_ACTION.findall(sentence)) > 1:
+        extension_action_count = len(_EXTENSION_ACTION.findall(sentence))
+        if len(target_matches) != 1 or extension_action_count > 1:
+            if len(target_matches) > 1 or extension_action_count > 1:
+                ambiguous = True
             continue
-        target_match = target_matches[0]
+        target_match, kind = target_matches[0]
         target_date = target_match.group("date")
         if _COORDINATE_TARGET.match(sentence[target_match.end("date") :]) is not None:
+            ambiguous = True
             continue
-        value = (
-            _normalized_month_date_text(target_date)
-            if _ANY_MONTH_DATE.fullmatch(target_date) is not None
-            else _normalized_date("source_deadline", target_date)
+        supersedes_text = target_match.groupdict().get("supersedes_date")
+        supersedes_date = (
+            _normalized_source_date_text(supersedes_text)
+            if supersedes_text is not None
+            else None
         )
         byte_start = len(evidence.excerpt[:start].encode("utf-8"))
         byte_end = byte_start + len(sentence.encode("utf-8"))
         rows.append(
             SecSourceDeadline(
-                date=value,
+                date=_normalized_source_date_text(target_date),
                 evidence_id=evidence.evidence_id,
                 span_start_byte=byte_start,
                 span_end_byte=byte_end,
@@ -685,9 +707,38 @@ def _source_deadlines(evidence: SecEvidence) -> tuple[SecSourceDeadline, ...]:
                 cited_text_sha256=hashlib.sha256(sentence.encode("utf-8")).hexdigest(),
                 rule_id=_SOURCE_DEADLINE_RULE_ID,
                 rule_version=_SOURCE_DEADLINE_RULE_VERSION,
+                kind=kind,
+                supersedes_date=supersedes_date,
             )
         )
-    return tuple(rows)
+    return tuple(rows), ambiguous
+
+
+def _resolve_source_deadline(
+    rows: Sequence[SecSourceDeadline],
+) -> SecSourceDeadline | None:
+    active: SecSourceDeadline | None = None
+    for row in rows:
+        if row.kind in {"current", "termination_condition"}:
+            if active is None:
+                active = row
+            elif row.date != active.date:
+                return None
+            continue
+        if row.kind != "extension":
+            return None
+
+        predecessor = row.supersedes_date
+        if predecessor is None:
+            if active is None:
+                return None
+            predecessor = active.date
+        elif active is not None and active.date != predecessor:
+            return None
+        if date.fromisoformat(row.date) <= date.fromisoformat(predecessor):
+            return None
+        active = row
+    return active
 
 
 def _venue_mentions(sentence: str) -> tuple[tuple[int, str], ...]:
@@ -1187,12 +1238,18 @@ def collect_sec_evidence(
         for evidence in evidence_rows
         for fact in _extract_facts(evidence, context)
     ]
-    deadline_rows = tuple(
-        row for evidence in evidence_rows for row in _source_deadlines(evidence)
-    )
-    if len({row.date for row in deadline_rows}) > 1:
+    deadline_rows: list[SecSourceDeadline] = []
+    deadline_ambiguous = False
+    for evidence in evidence_rows:
+        extracted, ambiguous = _source_deadlines(evidence)
+        deadline_rows.extend(extracted)
+        deadline_ambiguous = deadline_ambiguous or ambiguous
+    active_deadline = _resolve_source_deadline(deadline_rows)
+    if deadline_ambiguous or (deadline_rows and active_deadline is None):
         blockers.append("sec_evidence_insufficient")
-        deadline_rows = ()
+        resolved_deadlines: tuple[SecSourceDeadline, ...] = ()
+    else:
+        resolved_deadlines = (active_deadline,) if active_deadline is not None else ()
 
     conflicts = detect_fact_conflicts(facts)
     if conflicts:
@@ -1216,6 +1273,6 @@ def collect_sec_evidence(
         conflicts=conflicts,
         blockers=tuple(dict.fromkeys(blockers)),
         symbol_transitions=transitions,
-        source_deadlines=deadline_rows,
+        source_deadlines=resolved_deadlines,
         diagnostics=shared_budget.diagnostics(),
     )

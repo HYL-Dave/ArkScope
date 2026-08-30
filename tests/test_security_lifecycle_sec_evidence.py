@@ -126,6 +126,38 @@ def _collect_deadline_sentence(sentence: str):
     )
 
 
+def _collect_deadline_chain(
+    rows: tuple[tuple[str, str], ...],
+):
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("BLBD")
+    filings = []
+    documents = []
+    for index, (filing_date, sentence) in enumerate(rows, start=1):
+        filings.append(
+            {
+                **case["filing"],
+                "form": "DEFA14A",
+                "filingDate": filing_date,
+                "accessionNumber": f"0001589526-26-{index:06d}",
+                "primaryDocument": f"deadline-{index}.htm",
+                "primaryDocDescription": f"Deadline filing {index}",
+                "items": "",
+            }
+        )
+        documents.append((200, f"<html><body><p>{sentence}</p></body></html>"))
+    return collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(
+            case,
+            filings=filings,
+            documents=documents,
+        ),
+        retrieved_at="2026-08-30T00:00:00Z",
+    )
+
+
 def _real_case(name: str) -> dict:
     legacy = json.loads(
         (
@@ -780,7 +812,7 @@ def test_deadline_closed_grammar_emits_only_one_current_target_and_exact_citatio
         "The outside date was extended from March 1, 2026 to June 1, 2026.": (
             "2026-06-01",
         ),
-        "The outside date was extended to June 1, 2026.": ("2026-06-01",),
+        "The outside date was extended to June 1, 2026.": (),
         "The termination date remains 2026-11-01.": ("2026-11-01",),
         "The agreement may be terminated if closing has not occurred by October 1, 2026.": (
             "2026-10-01",
@@ -791,9 +823,7 @@ def test_deadline_closed_grammar_emits_only_one_current_target_and_exact_citatio
         "The outside date was extended to June 1, 2026 or July 1, 2026.": (),
         "The outside date was extended from March 1, 2026 to June 1, 2026, and further extended to September 1, 2026.": (),
         "extended from March 1, 2026 to June 1, 2026": (),
-        "The outside date was extended to June 1, 2026, and the Company will file a Current Report on Form 8-K.": (
-            "2026-06-01",
-        ),
+        "The outside date was extended to June 1, 2026, and the Company will file a Current Report on Form 8-K.": (),
         "The termination date remains 2026-11-01, and the parties continue to work toward closing.": (
             "2026-11-01",
         ),
@@ -811,6 +841,176 @@ def test_deadline_closed_grammar_emits_only_one_current_target_and_exact_citatio
             ]
             assert cited.decode() == sentence
             assert deadline.cited_text_sha256 == hashlib.sha256(cited).hexdigest()
+
+
+def test_deadline_rows_carry_transient_extraction_metadata():
+    cases = {
+        "The termination date remains 2026-11-01.": (
+            "2026-11-01",
+            "current",
+            None,
+        ),
+        "The agreement may be terminated if closing has not occurred by October 1, 2026.": (
+            "2026-10-01",
+            "termination_condition",
+            None,
+        ),
+        "The outside date was extended from March 1, 2026 to June 1, 2026.": (
+            "2026-06-01",
+            "extension",
+            "2026-03-01",
+        ),
+    }
+
+    for sentence, expected in cases.items():
+        result = _collect_deadline_sentence(sentence)
+        assert len(result.source_deadlines) == 1
+        deadline = result.source_deadlines[0]
+        assert (deadline.date, deadline.kind, deadline.supersedes_date) == expected
+
+
+def test_ordered_explicit_deadline_extension_selects_new_row_unchanged():
+    old_sentence = (
+        "The merger agreement may be terminated if the merger is not "
+        "consummated by August 28, 2026."
+    )
+    new_sentence = (
+        "The outside date was extended from August 28, 2026 to August 30, 2026."
+    )
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", old_sentence),
+            ("2026-08-25", new_sentence),
+        )
+    )
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert (deadline.date, deadline.kind, deadline.supersedes_date) == (
+        "2026-08-30",
+        "extension",
+        "2026-08-28",
+    )
+    assert deadline.cited_text == new_sentence
+    assert deadline.cited_text_sha256 == hashlib.sha256(
+        new_sentence.encode()
+    ).hexdigest()
+    evidence = next(
+        row for row in result.evidence if row.evidence_id == deadline.evidence_id
+    )
+    cited = evidence.excerpt.encode()[
+        deadline.span_start_byte : deadline.span_end_byte
+    ]
+    assert cited.decode() == new_sentence
+
+
+def test_ordered_bare_deadline_extension_uses_single_current_predecessor():
+    new_sentence = "The outside date was extended to August 30, 2026."
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 28, 2026."),
+            ("2026-08-25", new_sentence),
+        )
+    )
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert (deadline.date, deadline.kind, deadline.supersedes_date) == (
+        "2026-08-30",
+        "extension",
+        None,
+    )
+    assert deadline.cited_text == new_sentence
+
+
+def test_deadline_extension_with_two_targets_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date was extended from March 1, 2026 to June 1, 2026 "
+        "or July 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_deadline_chain_with_two_extension_targets_fails_closed():
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 28, 2026."),
+            (
+                "2026-08-22",
+                "The outside date was extended from August 28, 2026 to "
+                "August 30, 2026.",
+            ),
+            (
+                "2026-08-25",
+                "The outside date was extended from August 28, 2026 to "
+                "September 1, 2026.",
+            ),
+        )
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_contradictory_current_deadlines_fail_closed_without_date_selection():
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 28, 2026."),
+            ("2026-08-25", "The termination date remains August 30, 2026."),
+        )
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_bare_deadline_extension_without_predecessor_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date was extended to June 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_deadline_extension_before_its_predecessor_fails_closed():
+    result = _collect_deadline_chain(
+        (
+            (
+                "2026-08-20",
+                "The outside date was extended from August 28, 2026 to "
+                "August 30, 2026.",
+            ),
+            (
+                "2026-08-25",
+                "The merger agreement may be terminated if the merger is not "
+                "consummated by August 28, 2026.",
+            ),
+        )
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_deadline_extension_cannot_move_backward_in_time():
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 30, 2026."),
+            (
+                "2026-08-25",
+                "The outside date was extended from August 30, 2026 to "
+                "August 28, 2026.",
+            ),
+        )
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
 
 
 def test_explicit_outside_date_is_hash_cited_and_conflicts_fail_closed():
