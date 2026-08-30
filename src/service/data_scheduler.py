@@ -66,6 +66,8 @@ from src.service.ticker_identity_scheduler import (
     ticker_identity_scheduler_failure,
 )
 from src.service.security_lifecycle_automation_scheduler import (
+    reconcile_interrupted_security_lifecycle_automation,
+    record_security_lifecycle_automation_reconciliation_failure,
     record_security_lifecycle_automation_result,
     run_and_record_security_lifecycle_automation,
     security_lifecycle_automation_failure,
@@ -1477,14 +1479,45 @@ def reconcile_interrupted_runtime_state(
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     scheduler_sources: list[str] = []
     provider_run_ids: list[int] = []
+    lifecycle_automation: Dict[str, Any] = {"status": "not_checked"}
     scheduler_error = "sidecar restarted before scheduler source reached a terminal outcome"
     provider_error = "provider worker interrupted before terminal telemetry"
     try:
         scheduler_sources = _state_store().reconcile_interrupted_running(
             error=scheduler_error,
+            excluded_sources=("security_lifecycle.automation",),
         )
     except Exception:  # noqa: BLE001 — startup repair must not block app boot
         logger.debug("scheduler_state interrupted-running reconciliation failed", exc_info=True)
+    try:
+        lifecycle_automation = reconcile_interrupted_security_lifecycle_automation(
+            now=now
+        )
+    except Exception:  # noqa: BLE001 — startup repair must not block app boot
+        lifecycle_automation = {
+            "status": "unavailable",
+            "reason": "automation_scheduler_failed",
+        }
+        try:
+            record_security_lifecycle_automation_reconciliation_failure(now=now)
+        except Exception:  # noqa: BLE001 — preserve app boot after failed repair
+            try:
+                _state_store().reconcile_interrupted_running(
+                    error=(
+                        "sidecar restarted before lifecycle automation reached "
+                        "a terminal outcome"
+                    )
+                )
+            except Exception:  # noqa: BLE001 — no remaining safe startup repair
+                pass
+            logger.debug(
+                "security lifecycle reconciliation failure telemetry unavailable",
+                exc_info=True,
+            )
+        logger.debug(
+            "security lifecycle interrupted-running reconciliation failed",
+            exc_info=True,
+        )
     try:
         from src.market_data_admin import resolve_market_db_path
         from src.market_data_direct import _reconcile_interrupted_provider_runs
@@ -1510,7 +1543,11 @@ def reconcile_interrupted_runtime_state(
             scheduler_sources,
             provider_run_ids,
         )
-    return {"scheduler_sources": scheduler_sources, "provider_run_ids": provider_run_ids}
+    return {
+        "scheduler_sources": scheduler_sources,
+        "provider_run_ids": provider_run_ids,
+        "lifecycle_automation": lifecycle_automation,
+    }
 
 
 def _seed_from_local_job_history(missing_sources: tuple[str, ...]) -> None:

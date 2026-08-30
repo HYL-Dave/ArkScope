@@ -436,12 +436,25 @@ class _Harness:
     def case_loader(self):
         return list(self.cases)
 
-    def evidence_loader(self, case, *, mode, at, prior_material):
+    def evidence_loader(
+        self,
+        case,
+        *,
+        mode,
+        at,
+        prior_material,
+        stage_callback=None,
+    ):
         del prior_material
         self.evidence_calls.append((case["case_id"], mode, at))
         value = self.bundles[case["case_id"]]
         if isinstance(value, BaseException):
             raise value
+        if stage_callback is not None:
+            stage_callback("sec")
+            stage_callback("listing")
+            if int(value.diagnostics.get("ibkr_requests", 0)) > 0:
+                stage_callback("ibkr")
         return value
 
     def source_loader(self):
@@ -536,6 +549,238 @@ def _store(harness):
     )
 
     return SecurityLifecycleInvestigationStore(harness.conn)
+
+
+class _RecordingProgressRegistry:
+    def __init__(self):
+        from src.service.security_lifecycle_automation_runtime import (
+            LifecycleAutomationProgressRegistry,
+        )
+
+        self._registry = LifecycleAutomationProgressRegistry()
+        self.events = []
+
+    def begin(self, **kwargs):
+        snapshot = self._registry.begin(**kwargs)
+        self.events.append(("begin", snapshot))
+        return snapshot
+
+    def advance(self, **kwargs):
+        snapshot = self._registry.advance(**kwargs)
+        self.events.append(("advance", snapshot))
+        return snapshot
+
+    def finish(self, **kwargs):
+        snapshot = self._registry.finish(**kwargs)
+        self.events.append(("finish", snapshot))
+        return snapshot
+
+    def clear(self, **kwargs):
+        snapshot = self._registry.clear(**kwargs)
+        self.events.append(("clear", snapshot))
+        return snapshot
+
+    def snapshot(self, **kwargs):
+        return self._registry.snapshot(**kwargs)
+
+
+class _FailingAdvanceProgressRegistry(_RecordingProgressRegistry):
+    def advance(self, **kwargs):
+        raise ValueError("progress observer failed")
+
+
+def test_progress_observer_failure_does_not_change_the_case_outcome(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    progress = _FailingAdvanceProgressRegistry()
+    try:
+        result = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id="request-observer-failure",
+            trigger="manual_case",
+        ).run(limit=1)
+
+        assert result["accepted"] == 1
+        assert result["failed"] == 0
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+        assert run["status"] == "succeeded"
+        assert run["failure_code"] is None
+        assert progress.snapshot() == ()
+    finally:
+        harness.conn.close()
+
+
+def test_worker_emits_every_real_stage_and_clears_finished_progress(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    progress = _RecordingProgressRegistry()
+    try:
+        result = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id="request-full-stage",
+            trigger="manual_case",
+        ).run(limit=1)
+
+        assert result["accepted"] == 1
+        assert [
+            event.current_stage
+            for action, event in progress.events
+            if action in {"begin", "advance"}
+        ] == [
+            "preparing",
+            "sec",
+            "listing",
+            "ibkr",
+            "evaluate",
+            "persist",
+            "approve",
+            "finalize",
+        ]
+        finished = next(
+            event for action, event in progress.events if action == "finish"
+        )
+        assert finished.completed_stages == (
+            "preparing",
+            "sec",
+            "listing",
+            "ibkr",
+            "evaluate",
+            "persist",
+            "approve",
+            "finalize",
+        )
+        assert finished.skipped_stages == ()
+        assert progress.snapshot() == ()
+    finally:
+        harness.conn.close()
+
+
+def test_action_proposal_generation_is_not_reported_as_persist(tmp_path, monkeypatch):
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    progress = _RecordingProgressRegistry()
+    observed_stages = []
+    original = SecurityLifecycleInvestigationStore.generate_action_proposals
+
+    def observe_stage(store, **kwargs):
+        snapshot = progress.snapshot(
+            request_id="request-finalization-stage",
+            case_id=case["case_id"],
+        )
+        observed_stages.append(snapshot[0].current_stage)
+        return original(store, **kwargs)
+
+    monkeypatch.setattr(
+        SecurityLifecycleInvestigationStore,
+        "generate_action_proposals",
+        observe_stage,
+    )
+    try:
+        result = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id="request-finalization-stage",
+            trigger="manual_case",
+        ).run(limit=1)
+
+        assert result["accepted"] == 1
+        assert observed_stages == ["approve"]
+        assert progress.snapshot() == ()
+    finally:
+        harness.conn.close()
+
+
+def test_blocked_case_clears_progress_without_fabricating_finalize(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _bundle(
+        case,
+        blocker="sec_evidence_insufficient",
+        retry_at="2026-08-26T12:00:00Z",
+    )
+    progress = _RecordingProgressRegistry()
+    try:
+        result = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id="request-blocked-stage",
+            trigger="scheduler",
+        ).run(limit=1)
+
+        assert result["blocked"] == 1
+        assert all(
+            event.current_stage != "finalize"
+            for action, event in progress.events
+            if action in {"begin", "advance"}
+        )
+        assert [action for action, _event in progress.events][-1] == "clear"
+        assert progress.snapshot() == ()
+    finally:
+        harness.conn.close()
+
+
+def test_worker_records_conditional_stage_omissions_without_fabricating_work(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _bundle(
+        case,
+        review_structure="cash",
+    )
+    progress = _RecordingProgressRegistry()
+    try:
+        result = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id="request-skipped-stage",
+            trigger="scheduler",
+        ).run(limit=1)
+
+        assert result["drafted"] == 1, result
+        finished = next(
+            event for action, event in progress.events if action == "finish"
+        )
+        assert finished.completed_stages == (
+            "preparing",
+            "sec",
+            "listing",
+            "evaluate",
+            "persist",
+            "finalize",
+        )
+        assert finished.skipped_stages == ("ibkr", "approve")
+        assert progress.snapshot() == ()
+    finally:
+        harness.conn.close()
+
+
+def test_worker_failure_clears_ephemeral_progress_for_durable_failure_truth(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = ValueError("provider payload")
+    progress = _RecordingProgressRegistry()
+    try:
+        result = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id="request-failed-stage",
+            trigger="scheduler",
+        ).run(limit=1)
+
+        assert result["failed"] == 1
+        assert progress.snapshot() == ()
+        assert [action for action, _event in progress.events] == [
+            "begin",
+            "clear",
+        ]
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+        assert run["status"] == "failed"
+        assert run["failure_code"] == "source_payload_invalid"
+    finally:
+        harness.conn.close()
 
 
 def _invalid_persistence_bundle(case, *, blockers=()):
@@ -1597,8 +1842,12 @@ def test_transition_revalidation_rereads_authority_after_reservation(tmp_path):
             reads.append(len(reads))
             return len(reads) == 1
 
+        progress = _RecordingProgressRegistry()
         retried = harness.worker_with_transition_approver(
             transition_mutation_allowed=mutation_allowed,
+            progress_registry=progress,
+            request_id="request-revalidation-authority-race",
+            trigger="scheduler",
         ).run()
 
         run = store.list_automation_runs(case["case_id"])[0]
@@ -1606,6 +1855,7 @@ def test_transition_revalidation_rereads_authority_after_reservation(tmp_path):
         assert retried["accepted"] == 1
         assert len(harness.approval_calls) == 1
         assert run["action_readiness"] == "waiting_transition_revalidation"
+        assert progress.events == []
     finally:
         harness.conn.close()
 

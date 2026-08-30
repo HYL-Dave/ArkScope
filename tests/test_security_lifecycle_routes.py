@@ -4,6 +4,7 @@ import hashlib
 import inspect
 import json
 import sqlite3
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -440,8 +441,15 @@ def test_automation_config_get_defaults_and_put_replaces_all_four_keys(
     tmp_path,
     monkeypatch,
 ):
+    from src.api.routes import security_lifecycle as routes
+
     context = _build_context(tmp_path)
     permission_calls = []
+    monkeypatch.setattr(
+        routes,
+        "_automation_now",
+        lambda: datetime(2026, 8, 31, 5, 0, tzinfo=timezone.utc),
+    )
     try:
         client = _client(
             context,
@@ -453,15 +461,21 @@ def test_automation_config_get_defaults_and_put_replaces_all_four_keys(
 
         initial = client.get("/security-lifecycle/automation")
         assert initial.status_code == 200
-        assert initial.json() == {
-            "config_status": "valid",
-            "config": {
-                "enabled": True,
-                "interval_minutes": 5,
-                "batch_limit": 2,
-                "apply_profile_transitions": False,
-            },
+        assert initial.json()["config_status"] == "valid"
+        assert initial.json()["config"] == {
+            "enabled": True,
+            "interval_minutes": 5,
+            "batch_limit": 2,
+            "apply_profile_transitions": False,
         }
+        assert initial.json()["schedule"] == {
+            "status": "due",
+            "last_attempt_at": None,
+            "next_scheduled_at": "2026-08-31T05:00:00Z",
+        }
+        assert initial.json()["current_progress"] == []
+        assert initial.json()["telemetry_status"] == "absent"
+        assert initial.json()["latest_failed_runs"] == []
 
         replacement = {
             "enabled": False,
@@ -478,9 +492,210 @@ def test_automation_config_get_defaults_and_put_replaces_all_four_keys(
             "config_status": "valid",
             "config": replacement,
         }
-        assert client.get("/security-lifecycle/automation").json() == updated.json()
+        after = client.get("/security-lifecycle/automation").json()
+        assert after["config_status"] == "valid"
+        assert after["config"] == replacement
+        assert after["schedule"] == {
+            "status": "disabled",
+            "last_attempt_at": None,
+            "next_scheduled_at": None,
+        }
         assert permission_calls == [
             ("security_lifecycle_automation_config_update", replacement)
+        ]
+    finally:
+        context["profile_conn"].close()
+
+
+def test_automation_status_combines_shared_schedule_durable_truth_and_live_progress(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationProgressRegistry,
+    )
+
+    context = _build_context(tmp_path)
+    registry = LifecycleAutomationProgressRegistry()
+    registry.begin(
+        trigger="manual_case",
+        request_id="slao_status_request",
+        case_id=context["case_id"],
+        started_at=datetime(2026, 8, 31, 4, 59, tzinfo=timezone.utc),
+    )
+    registry.advance(
+        request_id="slao_status_request",
+        case_id=context["case_id"],
+        stage="sec",
+    )
+    latest_result = {
+        "status": "partial",
+        "reason": "case_processing_failed",
+        "selected": 1,
+        "processed": 1,
+        "accepted": 0,
+        "drafted": 0,
+        "blocked": 0,
+        "failed": 1,
+        "skipped_current": 0,
+        "case_ids": [context["case_id"]],
+        "result_version": 2,
+        "case_outcomes": {context["case_id"]: "failed"},
+    }
+    durable = {
+        "telemetry_status": "valid",
+        "last_attempt": "2026-08-31T04:55:00Z",
+        "last_status": "failed",
+        "latest_result": latest_result,
+        "active_incident": {
+            "case_failures": {
+                context["case_id"]: {
+                    "run_id": "slar_failed",
+                    "recovery": "new_attempt",
+                }
+            },
+            "scheduler_failure": None,
+        },
+        "latest_failed_runs": [
+            {
+                "run_id": "slar_failed",
+                "case_id": context["case_id"],
+                "failure_code": "internal_error",
+                "started_at": "2026-08-31T04:55:00Z",
+                "finished_at": "2026-08-31T04:55:01Z",
+                "updated_at": "2026-08-31T04:55:01Z",
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        routes,
+        "read_security_lifecycle_automation_durable_status",
+        lambda _path: durable,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        routes,
+        "lifecycle_automation_progress_registry",
+        lambda: registry,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        routes,
+        "_automation_now",
+        lambda: datetime(2026, 8, 31, 5, 0, tzinfo=timezone.utc),
+        raising=False,
+    )
+    try:
+        response = _client(context, monkeypatch).get(
+            "/security-lifecycle/automation"
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "config_status": "valid",
+            "config": {
+                "enabled": True,
+                "interval_minutes": 5,
+                "batch_limit": 2,
+                "apply_profile_transitions": False,
+            },
+            "schedule": {
+                "status": "due",
+                "last_attempt_at": "2026-08-31T04:55:00Z",
+                "next_scheduled_at": "2026-08-31T05:00:00Z",
+            },
+            "telemetry_status": "valid",
+            "last_status": "failed",
+            "last_result": latest_result,
+            "active_incident": durable["active_incident"],
+            "latest_failed_runs": durable["latest_failed_runs"],
+            "current_progress": [
+                {
+                    "trigger": "manual_case",
+                    "request_id": "slao_status_request",
+                    "case_id": context["case_id"],
+                    "started_at": "2026-08-31T04:59:00Z",
+                    "current_stage": "sec",
+                    "completed_stages": ["preparing"],
+                    "skipped_stages": [],
+                }
+            ],
+        }
+    finally:
+        context["profile_conn"].close()
+
+
+def test_automation_status_after_restart_uses_reconciled_failure_not_fake_stage(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationProgressRegistry,
+    )
+
+    context = _build_context(tmp_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(context["profile_path"]))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    JobRunsLocalStore(context["profile_path"])
+    claim = SecurityLifecycleFactKernel(context["store"]).reserve_run(
+        case_id=context["case_id"],
+        observation_fingerprint_sha256=context["fingerprint"],
+        policy_version="trusted-lifecycle-automation-v4",
+        mode="live",
+        execution_revision="trusted-lifecycle-execution-r1",
+        execution_owner_id="previous-process-owner",
+        query_context={"case_id": context["case_id"], "ticker": "EA"},
+        diagnostics={},
+        at="2026-08-31T04:55:00Z",
+    )
+    SchedulerStateStore(context["profile_path"]).record_attempt(
+        "security_lifecycle.automation",
+        datetime(2026, 8, 31, 4, 55, tzinfo=timezone.utc),
+    )
+    assert scheduler.reconcile_interrupted_security_lifecycle_automation(
+        now=datetime(2026, 8, 31, 5, 0, tzinfo=timezone.utc)
+    )["status"] == "reconciled"
+    restarted_registry = LifecycleAutomationProgressRegistry()
+    monkeypatch.setattr(
+        routes,
+        "lifecycle_automation_progress_registry",
+        lambda: restarted_registry,
+    )
+    monkeypatch.setattr(
+        routes,
+        "_automation_now",
+        lambda: datetime(2026, 8, 31, 5, 0, tzinfo=timezone.utc),
+    )
+    try:
+        response = _client(context, monkeypatch).get(
+            "/security-lifecycle/automation"
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["current_progress"] == []
+        assert payload["last_status"] == "failed"
+        assert payload["active_incident"]["case_failures"] == {
+            context["case_id"]: {
+                "run_id": claim.run_id,
+                "recovery": "new_attempt",
+            }
+        }
+        assert payload["latest_failed_runs"] == [
+            {
+                "run_id": claim.run_id,
+                "case_id": context["case_id"],
+                "failure_code": "internal_error",
+                "started_at": "2026-08-31T04:55:00Z",
+                "finished_at": "2026-08-31T05:00:00Z",
+                "updated_at": "2026-08-31T05:00:00Z",
+            }
         ]
     finally:
         context["profile_conn"].close()
@@ -556,13 +771,17 @@ def test_invalid_stored_automation_config_is_visible_and_blocks_manual_run(
         run = client.post("/security-lifecycle/automation/run")
 
         assert status.status_code == 200
-        assert status.json() == {
-            "config_status": "invalid",
-            "config": None,
-            "invalid_keys": [
-                "security_lifecycle.automation.interval_minutes"
-            ],
+        assert status.json()["config_status"] == "invalid"
+        assert status.json()["config"] is None
+        assert status.json()["invalid_keys"] == [
+            "security_lifecycle.automation.interval_minutes"
+        ]
+        assert status.json()["schedule"] == {
+            "status": "invalid",
+            "last_attempt_at": None,
+            "next_scheduled_at": None,
         }
+        assert status.json()["current_progress"] == []
         assert run.status_code == 409
         assert run.json()["detail"] == {
             "code": "automation_config_invalid",
@@ -650,7 +869,7 @@ def test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_
         assert len(dispatch_calls) == 1
         call = dispatch_calls[0]
         mutation_allowed = call.pop("transition_mutation_allowed")
-        assert call == {"limit": 1}
+        assert call == {"limit": 1, "trigger": "manual_due"}
         assert mutation_allowed() is False
         context["settings_store"].set_setting(
             APPLY_PROFILE_TRANSITIONS_KEY,
@@ -691,7 +910,7 @@ def test_global_automation_run_dispatches_the_recorded_due_boundary(
         assert response.json() == {"scope": "due", "status": "started"}
         mutation_allowed = dispatch_calls[0].pop("transition_mutation_allowed")
         assert mutation_allowed() is False
-        assert dispatch_calls == [{"limit": 2}]
+        assert dispatch_calls == [{"limit": 2, "trigger": "manual_due"}]
         assert permission_calls == [
             ("security_lifecycle_run_automation", {"scope": "due"})
         ]
@@ -733,6 +952,7 @@ def test_case_automation_run_dispatches_exact_attended_authority(
                 "allow_new_attempt": True,
                 "limit": 1,
                 "target_case_id": context["case_id"],
+                "trigger": "manual_case",
             }
         ]
     finally:
@@ -898,14 +1118,22 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
         )
 
         assert response.status_code == 200
-        assert response.json() == {
+        payload = response.json()
+        request_id = payload.pop("request_id")
+        assert request_id.startswith("slao_")
+        assert payload == {
             "case_id": context["case_id"],
             "scope": "case",
             "status": "started",
         }
         assert len(worker_calls) == 1
         mutation_allowed = worker_calls[0].pop("transition_mutation_allowed")
+        progress_registry = worker_calls[0].pop("progress_registry")
         assert mutation_allowed() is False
+        assert (
+            progress_registry
+            is scheduler.lifecycle_automation_progress_registry()
+        )
         assert worker_calls == [
             {
                 "limit": 1,
@@ -913,6 +1141,8 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
                 "execution_owner_id": worker_calls[0]["execution_owner_id"],
                 "target_case_id": context["case_id"],
                 "allow_new_attempt": True,
+                "request_id": request_id,
+                "trigger": "manual_case",
             }
         ]
         assert context["store"].get_automation_run(running.run_id)["status"] == (

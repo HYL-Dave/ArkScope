@@ -137,7 +137,7 @@ def test_progress_registry_rejects_stage_jumps_and_nonconditional_skips_without_
 
     registry = LifecycleAutomationProgressRegistry()
     registry.begin(
-        trigger="manual_global",
+        trigger="manual_due",
         request_id="request-3",
         case_id="case-3",
         started_at=datetime(2026, 8, 31, tzinfo=timezone.utc),
@@ -225,3 +225,66 @@ def test_progress_registry_is_ephemeral_and_never_reconstructs_another_instance(
 
     restarted_process = LifecycleAutomationProgressRegistry()
     assert restarted_process.snapshot() == ()
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    (
+        ("trigger", "manual_global", "automation_progress_trigger"),
+        ("request_id", " request-1", "automation_progress_request_id"),
+        ("case_id", "case-1 ", "automation_progress_case_id"),
+        (
+            "started_at",
+            datetime(2026, 8, 31),
+            "automation_progress_started_at",
+        ),
+    ),
+)
+def test_progress_registry_rejects_noncanonical_runtime_identity(
+    field,
+    value,
+    error,
+):
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationProgressRegistry,
+    )
+
+    registry = LifecycleAutomationProgressRegistry()
+    values = {
+        "trigger": "manual_case",
+        "request_id": "request-1",
+        "case_id": "case-1",
+        "started_at": datetime(2026, 8, 31, tzinfo=timezone.utc),
+    }
+    values[field] = value
+
+    with pytest.raises(ValueError, match=error):
+        registry.begin(**values)
+
+
+@pytest.mark.parametrize("initial_stage", ("approve", "finalize"))
+def test_progress_registry_can_start_at_a_real_recovery_boundary(initial_stage):
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationProgressRegistry,
+    )
+
+    registry = LifecycleAutomationProgressRegistry()
+    snapshot = registry.begin(
+        trigger="scheduler",
+        request_id=f"request-{initial_stage}",
+        case_id=f"case-{initial_stage}",
+        started_at=datetime(2026, 8, 31, tzinfo=timezone.utc),
+        initial_stage=initial_stage,
+    )
+
+    assert snapshot.current_stage == initial_stage
+    assert snapshot.completed_stages == ()
+    assert snapshot.skipped_stages == ()
+
+    if initial_stage == "approve":
+        registry.advance(
+            request_id=snapshot.request_id,
+            case_id=snapshot.case_id,
+            stage="finalize",
+        )
+    registry.finish(request_id=snapshot.request_id, case_id=snapshot.case_id)

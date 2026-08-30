@@ -56,7 +56,11 @@ from src.scheduler_state import ensure_scheduler_state_schema
 from src.service.security_lifecycle_automation_runtime import (
     LifecycleAutomationAlreadyRunning,
     LifecycleAutomationExecutionUnavailable,
+    LifecycleAutomationProgressRegistry,
+    LifecycleAutomationStage,
+    LifecycleAutomationTrigger,
     lifecycle_automation_execution_lock,
+    lifecycle_automation_progress_registry,
 )
 
 
@@ -74,6 +78,17 @@ _AUTOMATION_TABLES = frozenset(
 )
 _STATUSES = frozenset(
     {"succeeded", "partial", "unavailable", "not_installed", "skipped"}
+)
+_DURABLE_SCHEDULER_STATUSES = frozenset(
+    {
+        "running",
+        "failed",
+        "succeeded",
+        "partial",
+        "unavailable",
+        "not_installed",
+        "skipped",
+    }
 )
 _REASONS = frozenset(
     {
@@ -1140,6 +1155,7 @@ def _load_evidence(
     listing_session: ListingAuthoritySession,
     ibkr_max_queries: int = _DEFAULT_IBKR_MAX_QUERIES,
     prior_material: AutomationPriorMaterial | None = None,
+    stage_callback: Callable[[LifecycleAutomationStage], None] | None = None,
 ) -> LifecycleAutomationEvidenceBundle:
     del mode
     from data_sources.sec_transport import SecRequestBudget, SecTransport
@@ -1172,6 +1188,13 @@ def _load_evidence(
     preserved_evidence: dict[str, Mapping[str, object]] = {}
     preserved_facts: dict[str, Mapping[str, object]] = {}
 
+    if stage_callback is not None and not callable(stage_callback):
+        raise TypeError("stage_callback")
+
+    def emit_stage(stage: LifecycleAutomationStage) -> None:
+        if stage_callback is not None:
+            stage_callback(stage)
+
     def preserve_family(source_family: str) -> None:
         family_evidence, family_facts = _prior_source_family_material(
             prior_material,
@@ -1192,6 +1215,7 @@ def _load_evidence(
         if refreshed_families is not None:
             refreshed_families.add(source_family)
 
+    emit_stage("sec")
     retained = _reusable_regulator_material(
         case,
         context=context,
@@ -1276,6 +1300,7 @@ def _load_evidence(
     candidate_tickers = tuple(
         sorted({str(case.get("ticker") or "").upper(), *successor_values})
     )
+    emit_stage("listing")
     listing = listing_session.lookup(
         context=context,
         candidate_tickers=candidate_tickers,
@@ -1336,6 +1361,7 @@ def _load_evidence(
     market_queried = False
     if successor_values or terminal or pending_market_check:
         market_queried = True
+        emit_stage("ibkr")
         identity_codes = tuple(
             str(code) for code in case.get("ibkr_identity_blockers", ())
         )
@@ -1458,6 +1484,9 @@ def _worker(
     allow_due_failed_retry: bool = False,
     allow_new_attempt: bool = False,
     target_case_id: str | None = None,
+    progress_registry: LifecycleAutomationProgressRegistry | None = None,
+    request_id: str | None = None,
+    trigger: LifecycleAutomationTrigger | None = None,
 ) -> LifecycleAutomationWorker:
     _assert_automation_installed()
     return LifecycleAutomationWorker(
@@ -1473,6 +1502,9 @@ def _worker(
         allow_due_failed_retry=allow_due_failed_retry,
         allow_new_attempt=allow_new_attempt,
         target_case_id=target_case_id,
+        progress_registry=progress_registry,
+        request_id=request_id,
+        trigger=trigger,
     )
 
 
@@ -1679,23 +1711,47 @@ def _run_owned_automation_batch(
     transition_mutation_allowed: Callable[[], bool],
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
+    progress_registry: LifecycleAutomationProgressRegistry | None = None,
+    request_id: str | None = None,
+    trigger: LifecycleAutomationTrigger = "scheduler",
 ) -> dict:
+    active_registry = (
+        lifecycle_automation_progress_registry()
+        if progress_registry is None
+        else progress_registry
+    )
+    active_request_id = execution_owner_id if request_id is None else request_id
     try:
         with _listing_authority_session(at=at) as session:
+            def load_evidence(
+                case,
+                *,
+                mode,
+                at,
+                prior_material=None,
+                stage_callback=None,
+            ):
+                kwargs = {
+                    "mode": mode,
+                    "at": at,
+                    "listing_session": session,
+                    "prior_material": prior_material,
+                }
+                if stage_callback is not None:
+                    kwargs["stage_callback"] = stage_callback
+                return _load_evidence(case, **kwargs)
+
             worker = _worker(
-                evidence_loader=lambda case, *, mode, at, prior_material=None: _load_evidence(
-                    case,
-                    mode=mode,
-                    at=at,
-                    listing_session=session,
-                    prior_material=prior_material,
-                ),
+                evidence_loader=load_evidence,
                 execution_owner_id=execution_owner_id,
                 transition_mutation_allowed=transition_mutation_allowed,
                 clock=lambda: at,
                 allow_due_failed_retry=not allow_new_attempt,
                 allow_new_attempt=allow_new_attempt,
                 target_case_id=target_case_id,
+                progress_registry=active_registry,
+                request_id=active_request_id,
+                trigger=trigger,
             )
             return _bounded_result(worker.run(limit=limit, mode="live"))
     except Exception as exc:
@@ -1746,6 +1802,8 @@ def _run_owned_and_maybe_record(
     record_result: bool,
     target_case_id: str | None,
     allow_new_attempt: bool,
+    request_id: str,
+    trigger: LifecycleAutomationTrigger,
 ) -> dict:
     try:
         startup_reconciled = False
@@ -1760,6 +1818,9 @@ def _run_owned_and_maybe_record(
                 transition_mutation_allowed=transition_mutation_allowed,
                 target_case_id=target_case_id,
                 allow_new_attempt=allow_new_attempt,
+                progress_registry=lifecycle_automation_progress_registry(),
+                request_id=request_id,
+                trigger=trigger,
             )
         except BaseException:
             active_failure = True
@@ -1793,6 +1854,7 @@ def _run_security_lifecycle_automation(
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
     transition_mutation_allowed: Callable[[], bool] | None = None,
+    trigger: LifecycleAutomationTrigger = "scheduler",
 ) -> dict:
     mutation_allowed = _mutation_authority(transition_mutation_allowed)
     instant, at = _automation_request(
@@ -1813,6 +1875,8 @@ def _run_security_lifecycle_automation(
                 record_result=record_result,
                 target_case_id=target_case_id,
                 allow_new_attempt=allow_new_attempt,
+                request_id=execution.execution_owner_id,
+                trigger=trigger,
             )
     except LifecycleAutomationAlreadyRunning:
         result = _empty_summary(status="skipped", reason="already_running")
@@ -1837,6 +1901,8 @@ def _run_dispatched_owned_automation(
     at: str,
     target_case_id: str | None,
     allow_new_attempt: bool,
+    request_id: str,
+    trigger: LifecycleAutomationTrigger,
 ) -> None:
     exit_args = (None, None, None)
     try:
@@ -1849,6 +1915,8 @@ def _run_dispatched_owned_automation(
             record_result=True,
             target_case_id=target_case_id,
             allow_new_attempt=allow_new_attempt,
+            request_id=request_id,
+            trigger=trigger,
         )
     except BaseException:
         exit_args = sys.exc_info()
@@ -1864,10 +1932,20 @@ def dispatch_and_record_security_lifecycle_automation(
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
     transition_mutation_allowed: Callable[[], bool] | None = None,
+    trigger: LifecycleAutomationTrigger | None = None,
 ) -> dict[str, str]:
     """Acquire ownership now and transfer that exact lease to one thread."""
 
     mutation_allowed = _mutation_authority(transition_mutation_allowed)
+    resolved_trigger: LifecycleAutomationTrigger = (
+        "manual_case" if target_case_id is not None else "manual_due"
+    )
+    if trigger is not None:
+        resolved_trigger = trigger
+    if resolved_trigger not in {"manual_due", "manual_case"} or (
+        (resolved_trigger == "manual_case") != (target_case_id is not None)
+    ):
+        raise ValueError("automation_trigger")
     instant, at = _automation_request(
         limit=limit,
         now=now,
@@ -1912,6 +1990,8 @@ def dispatch_and_record_security_lifecycle_automation(
                 "at": at,
                 "target_case_id": target_case_id,
                 "allow_new_attempt": allow_new_attempt,
+                "request_id": execution.execution_owner_id,
+                "trigger": resolved_trigger,
             },
             name="security-lifecycle-automation-run",
             daemon=True,
@@ -1925,7 +2005,10 @@ def dispatch_and_record_security_lifecycle_automation(
     except BaseException:
         lock_context.__exit__(*sys.exc_info())
         raise
-    return {"status": "started"}
+    return {
+        "status": "started",
+        "request_id": execution.execution_owner_id,
+    }
 
 
 def run_security_lifecycle_automation(
@@ -2188,6 +2271,272 @@ def _state_envelope(raw: object) -> dict[str, object] | None:
             value.get("active_incident")
         ),
     }
+
+
+def _status_timestamp(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value or len(value) > 40:
+        raise ValueError("automation_status_timestamp")
+    if value.endswith("Z"):
+        parseable = value[:-1] + "+00:00"
+    elif len(value) >= 5 and value[-5] in "+-" and value[-3] != ":":
+        parseable = value[:-2] + ":" + value[-2:]
+    else:
+        parseable = value
+    parsed = datetime.fromisoformat(parseable)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("automation_status_timestamp")
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )
+
+
+def _status_last_attempt(value: object) -> str | None:
+    try:
+        return _status_timestamp(value)
+    except (TypeError, ValueError):
+        return "invalid"
+
+
+def read_security_lifecycle_automation_durable_status(
+    profile_path: str | Path | None = None,
+) -> dict[str, object]:
+    """Read the bounded lifecycle status surface without creating or writing."""
+
+    path = _profile_path() if profile_path is None else Path(profile_path)
+    empty = {
+        "telemetry_status": "absent",
+        "last_attempt": None,
+        "last_status": None,
+        "latest_result": None,
+        "active_incident": None,
+        "latest_failed_runs": [],
+    }
+    if not path.is_file():
+        return empty
+
+    conn = sqlite3.connect(
+        f"{path.resolve().as_uri()}?mode=ro",
+        uri=True,
+        timeout=5.0,
+    )
+    conn.row_factory = sqlite3.Row
+    try:
+        tables = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
+                "('scheduler_state','security_lifecycle_automation_runs')"
+            )
+        }
+        row = None
+        if "scheduler_state" in tables:
+            row = conn.execute(
+                "SELECT last_attempt,last_status,last_result FROM "
+                "scheduler_state WHERE source=?",
+                (_JOB_NAME,),
+            ).fetchone()
+
+        result = dict(empty)
+        if row is not None:
+            result["last_attempt"] = _status_last_attempt(row["last_attempt"])
+            last_status = row["last_status"]
+            status_valid = last_status in _DURABLE_SCHEDULER_STATUSES
+            result["last_status"] = str(last_status) if status_valid else None
+            if not status_valid:
+                result["telemetry_status"] = "invalid"
+            elif row["last_result"] is not None:
+                try:
+                    envelope = _state_envelope(row["last_result"])
+                except ValueError:
+                    result["telemetry_status"] = "invalid"
+                else:
+                    if envelope is not None:
+                        result["telemetry_status"] = "valid"
+                        result["latest_result"] = envelope["latest_result"]
+                        result["active_incident"] = envelope[
+                            "active_incident"
+                        ]
+
+        if "security_lifecycle_automation_runs" in tables:
+            rows = conn.execute(
+                "SELECT current.run_id,current.case_id,current.failure_code,"
+                "current.started_at,current.finished_at,current.updated_at "
+                "FROM security_lifecycle_automation_runs AS current "
+                "WHERE current.status='failed' AND current.rowid=("
+                "SELECT candidate.rowid FROM "
+                "security_lifecycle_automation_runs AS candidate "
+                "WHERE candidate.case_id=current.case_id "
+                "ORDER BY candidate.created_at DESC,candidate.rowid DESC "
+                "LIMIT 1) ORDER BY current.updated_at DESC,current.run_id DESC "
+                "LIMIT 10"
+            ).fetchall()
+            result["latest_failed_runs"] = [
+                {
+                    "run_id": str(item["run_id"]),
+                    "case_id": str(item["case_id"]),
+                    "failure_code": str(item["failure_code"]),
+                    "started_at": _status_timestamp(item["started_at"]),
+                    "finished_at": _status_timestamp(item["finished_at"]),
+                    "updated_at": _status_timestamp(item["updated_at"]),
+                }
+                for item in rows
+            ]
+        return result
+    finally:
+        conn.close()
+
+
+def _persist_reconciled_automation_result(
+    result: Mapping[str, object],
+    *,
+    instant: datetime,
+    at: str,
+) -> None:
+    bounded = _bounded_result(result)
+    if record_security_lifecycle_automation_result(bounded, now=instant):
+        return
+    conn = _job_runs_connection()
+    if conn is None:
+        raise sqlite3.OperationalError("profile_store_unavailable")
+    try:
+        ensure_scheduler_state_schema(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            prior = _load_active_incident(conn, None)
+        except ValueError:
+            prior = None
+        current = _incident_from_result(conn, bounded)
+        prior_cases = (
+            {}
+            if prior is None
+            else {
+                case_id: dict(marker)
+                for case_id, marker in prior["case_failures"].items()
+            }
+        )
+        scheduler_failure = (
+            None if prior is None else prior["scheduler_failure"]
+        )
+        if current is not None:
+            prior_cases.update(current["case_failures"])
+            if current["scheduler_failure"] is not None:
+                scheduler_failure = current["scheduler_failure"]
+        active = _normalize_active_incident(
+            {
+                "case_failures": prior_cases,
+                "scheduler_failure": scheduler_failure,
+            }
+        )
+        _write_automation_state(
+            conn,
+            result=bounded,
+            active_incident=active,
+            at=at,
+        )
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def record_security_lifecycle_automation_reconciliation_failure(
+    *,
+    now: datetime | None = None,
+) -> None:
+    """Replace stale running telemetry with a typed startup-repair failure."""
+
+    instant = _aware_instant(now)
+    _persist_reconciled_automation_result(
+        security_lifecycle_automation_failure("automation_scheduler_failed"),
+        instant=instant,
+        at=_timestamp(instant),
+    )
+
+
+def reconcile_interrupted_security_lifecycle_automation(
+    *,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Terminalize prior-process lifecycle ownership under the lifecycle lock."""
+
+    instant = _aware_instant(now)
+    at = _timestamp(instant)
+    try:
+        with lifecycle_automation_execution_lock():
+            before = read_security_lifecycle_automation_durable_status()
+            run_ids = _reconcile_running_rows(at=at)
+            case_ids: list[str] = []
+            if run_ids:
+                with _profile_connection() as conn:
+                    placeholders = ",".join("?" for _ in run_ids)
+                    rows = conn.execute(
+                        "SELECT run_id,case_id FROM "
+                        "security_lifecycle_automation_runs WHERE run_id IN ("
+                        f"{placeholders})",
+                        tuple(run_ids),
+                    ).fetchall()
+                by_run = {str(row[0]): str(row[1]) for row in rows}
+                case_ids = sorted(
+                    {by_run[run_id] for run_id in run_ids if run_id in by_run}
+                )
+
+            if not run_ids and before["last_status"] != "running":
+                return {"status": "not_needed", "run_ids": [], "case_ids": []}
+
+            if case_ids:
+                for offset in range(0, len(case_ids), _MAX_CASES):
+                    chunk = case_ids[offset : offset + _MAX_CASES]
+                    _persist_reconciled_automation_result(
+                        {
+                            "result_version": 2,
+                            "status": "partial",
+                            "reason": "case_processing_failed",
+                            "selected": len(chunk),
+                            "processed": len(chunk),
+                            "accepted": 0,
+                            "drafted": 0,
+                            "blocked": 0,
+                            "failed": len(chunk),
+                            "skipped_current": 0,
+                            "case_ids": chunk,
+                            "case_outcomes": {
+                                case_id: "failed" for case_id in chunk
+                            },
+                        },
+                        instant=instant,
+                        at=at,
+                    )
+            else:
+                _persist_reconciled_automation_result(
+                    security_lifecycle_automation_failure(
+                        "automation_scheduler_failed"
+                    ),
+                    instant=instant,
+                    at=at,
+                )
+            return {
+                "status": "reconciled",
+                "run_ids": list(run_ids),
+                "case_ids": case_ids,
+            }
+    except LifecycleAutomationAlreadyRunning:
+        return {
+            "status": "skipped",
+            "reason": "already_running",
+            "run_ids": [],
+            "case_ids": [],
+        }
+    except LifecycleAutomationExecutionUnavailable:
+        return {
+            "status": "unavailable",
+            "reason": "execution_lock_unavailable",
+            "run_ids": [],
+            "case_ids": [],
+        }
 
 
 def _incident_from_result(
@@ -2493,6 +2842,9 @@ def record_security_lifecycle_automation_result(
 __all__ = [
     "dispatch_and_record_security_lifecycle_automation",
     "LifecycleAutomationNotInstalled",
+    "read_security_lifecycle_automation_durable_status",
+    "record_security_lifecycle_automation_reconciliation_failure",
+    "reconcile_interrupted_security_lifecycle_automation",
     "record_security_lifecycle_automation_result",
     "run_and_record_security_lifecycle_automation",
     "run_security_lifecycle_automation",

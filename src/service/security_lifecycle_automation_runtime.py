@@ -9,7 +9,7 @@ import stat
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Literal
 
@@ -29,6 +29,10 @@ LifecycleAutomationStage = Literal[
     "approve",
     "finalize",
 ]
+LifecycleAutomationTrigger = Literal["scheduler", "manual_due", "manual_case"]
+_LIFECYCLE_AUTOMATION_TRIGGERS = frozenset(
+    {"scheduler", "manual_due", "manual_case"}
+)
 LIFECYCLE_AUTOMATION_STAGE_ORDER: tuple[LifecycleAutomationStage, ...] = (
     "preparing",
     "sec",
@@ -72,7 +76,7 @@ class LifecycleAutomationExecutionLease:
 class LifecycleAutomationProgressSnapshot:
     """One process-local, currently executing lifecycle case."""
 
-    trigger: str
+    trigger: LifecycleAutomationTrigger
     request_id: str
     case_id: str
     started_at: datetime
@@ -92,31 +96,50 @@ class LifecycleAutomationProgressRegistry:
 
     @staticmethod
     def _identity(request_id: str, case_id: str) -> tuple[str, str]:
-        if not isinstance(request_id, str) or not request_id.strip():
+        if (
+            not isinstance(request_id, str)
+            or not request_id
+            or request_id != request_id.strip()
+            or "\0" in request_id
+            or len(request_id.encode("utf-8")) > 64
+        ):
             raise ValueError("automation_progress_request_id")
-        if not isinstance(case_id, str) or not case_id.strip():
+        if (
+            not isinstance(case_id, str)
+            or not case_id
+            or case_id != case_id.strip()
+            or "\0" in case_id
+            or len(case_id.encode("utf-8")) > 160
+        ):
             raise ValueError("automation_progress_case_id")
         return request_id, case_id
 
     def begin(
         self,
         *,
-        trigger: str,
+        trigger: LifecycleAutomationTrigger,
         request_id: str,
         case_id: str,
         started_at: datetime,
+        initial_stage: LifecycleAutomationStage = "preparing",
     ) -> LifecycleAutomationProgressSnapshot:
-        if not isinstance(trigger, str) or not trigger.strip():
+        if trigger not in _LIFECYCLE_AUTOMATION_TRIGGERS:
             raise ValueError("automation_progress_trigger")
-        if not isinstance(started_at, datetime):
+        if (
+            not isinstance(started_at, datetime)
+            or started_at.tzinfo is None
+            or started_at.utcoffset() is None
+        ):
             raise ValueError("automation_progress_started_at")
+        if initial_stage not in {"preparing", "approve", "finalize"}:
+            raise ValueError("automation_progress_initial_stage")
         identity = self._identity(request_id, case_id)
         snapshot = LifecycleAutomationProgressSnapshot(
             trigger=trigger,
             request_id=request_id,
             case_id=case_id,
-            started_at=started_at,
-            current_stage="preparing",
+            started_at=started_at.astimezone(timezone.utc),
+            current_stage=initial_stage,
             completed_stages=(),
             skipped_stages=(),
         )
@@ -318,6 +341,7 @@ __all__ = [
     "LifecycleAutomationProgressRegistry",
     "LifecycleAutomationProgressSnapshot",
     "LifecycleAutomationStage",
+    "LifecycleAutomationTrigger",
     "lifecycle_automation_execution_lock",
     "lifecycle_automation_progress_registry",
 ]

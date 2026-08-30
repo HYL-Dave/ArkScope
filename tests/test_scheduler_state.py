@@ -103,6 +103,24 @@ def test_reconcile_interrupted_running_marks_terminal(store):
     assert store.get("polygon_news")["last_status"] == "succeeded"
 
 
+def test_generic_reconciliation_excludes_lifecycle_owned_state(store):
+    lifecycle_source = "security_lifecycle.automation"
+    store.record_attempt(
+        lifecycle_source,
+        _dt("2026-06-24T10:00:00"),
+    )
+    store.record_attempt("ibkr_news", _dt("2026-06-24T10:00:00"))
+
+    changed = store.reconcile_interrupted_running(
+        error="sidecar restarted before run finished",
+        excluded_sources=(lifecycle_source,),
+    )
+
+    assert changed == ["ibkr_news"]
+    assert store.get("ibkr_news")["last_status"] == "failed"
+    assert store.get(lifecycle_source)["last_status"] == "running"
+
+
 def test_imports_with_declared_local_dependencies():
     import src.scheduler_state as mod
     assert mod.SchedulerStateStore is SchedulerStateStore

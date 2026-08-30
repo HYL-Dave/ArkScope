@@ -16,7 +16,7 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,12 @@ class SchedulerStateStore:
                     continue
         return out
 
-    def reconcile_interrupted_running(self, *, error: str) -> list[str]:
+    def reconcile_interrupted_running(
+        self,
+        *,
+        error: str,
+        excluded_sources: Iterable[str] = (),
+    ) -> list[str]:
         """Terminalize rows left ``running`` by a previous sidecar lifetime.
 
         A fresh process cannot own those in-memory source locks anymore. Keeping the
@@ -141,6 +146,7 @@ class SchedulerStateStore:
         later skip results to read as if the original job were still healthy.
         """
         now = _now_iso()
+        excluded = frozenset(str(value) for value in excluded_sources)
         changed: list[str] = []
         with self._write_lock, self._connect() as conn:
             rows = conn.execute(
@@ -149,6 +155,8 @@ class SchedulerStateStore:
             ).fetchall()
             for row in rows:
                 source = str(row["source"])
+                if source in excluded:
+                    continue
                 result = {
                     "source": source,
                     "status": "failed",

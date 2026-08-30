@@ -123,6 +123,7 @@ def test_lock_owner_blocks_a_second_connection_then_release_enables_reconciliati
         SecurityLifecycleInvestigationStore,
     )
     from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
     from src.service.security_lifecycle_automation_runtime import (
         lifecycle_automation_execution_lock,
     )
@@ -391,7 +392,10 @@ def test_dispatch_acquires_ownership_before_return_and_transfers_exact_lease(
         allow_new_attempt=True,
     )
 
-    assert dispatched == {"status": "started"}
+    assert dispatched == {
+        "status": "started",
+        "request_id": "dispatch-owner",
+    }
     assert lock_held is True
     assert [event[0] for event in events] == ["lock_acquired", "thread_started"]
     assert len(pending) == 1
@@ -411,13 +415,20 @@ def test_dispatch_acquires_ownership_before_return_and_transfers_exact_lease(
     ]
     worker_kwargs = next(value for name, value in events if name == "worker")
     mutation_allowed = worker_kwargs.pop("transition_mutation_allowed")
+    progress_registry = worker_kwargs.pop("progress_registry")
     assert mutation_allowed() is False
+    assert (
+        progress_registry
+        is scheduler.lifecycle_automation_progress_registry()
+    )
     assert worker_kwargs == {
         "limit": 1,
         "at": "2026-08-25T13:00:00Z",
         "execution_owner_id": "dispatch-owner",
         "target_case_id": "slc_attended",
         "allow_new_attempt": True,
+        "request_id": "dispatch-owner",
+        "trigger": "manual_case",
     }
 
 
@@ -569,7 +580,12 @@ def test_recorded_attended_runner_targets_one_case_and_grants_new_attempt_only(
         allow_new_attempt=True,
     ) == result
     mutation_allowed = captured[0].pop("transition_mutation_allowed")
+    progress_registry = captured[0].pop("progress_registry")
     assert mutation_allowed() is False
+    assert (
+        progress_registry
+        is scheduler.lifecycle_automation_progress_registry()
+    )
     assert captured == [
         {
             "limit": 1,
@@ -577,6 +593,8 @@ def test_recorded_attended_runner_targets_one_case_and_grants_new_attempt_only(
             "execution_owner_id": captured[0]["execution_owner_id"],
             "target_case_id": "slc_attended",
             "allow_new_attempt": True,
+            "request_id": captured[0]["execution_owner_id"],
+            "trigger": "scheduler",
         }
     ]
 
@@ -2434,6 +2452,303 @@ def _listing_result(*, label, retrieved_at, blockers=()):
         blockers=tuple(blockers),
         diagnostics={"listing_requests": 1},
     )
+
+
+@pytest.mark.parametrize(
+    ("kinds", "effective_date", "expected_stages"),
+    (
+        (
+            ({"event_type": "acquisition_completed", "effective_date": None},),
+            None,
+            ["sec", "listing"],
+        ),
+        (
+            ({"event_type": "merger_agreement", "effective_date": "2026-08-24"},),
+            "2026-08-24",
+            ["sec", "listing", "ibkr"],
+        ),
+    ),
+)
+def test_real_evidence_loader_emits_only_boundaries_it_actually_reaches(
+    monkeypatch,
+    kinds,
+    effective_date,
+    expected_stages,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case(filing_date="2026-08-20", kinds=kinds)
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: _sec_result(
+            case,
+            label="progress",
+            retrieved_at="2026-08-25T13:00:00Z",
+            effective_date=effective_date,
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(
+                evidence=(),
+                blockers=("ibkr_contract_missing",),
+                requests_made=1,
+            ),
+            (),
+        ),
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: _listing_result(
+            label="progress",
+            retrieved_at="2026-08-25T13:00:00Z",
+        )
+    )
+    stages = []
+
+    scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-25T13:00:00Z",
+        listing_session=listing_session,
+        stage_callback=stages.append,
+    )
+
+    assert stages == expected_stages
+
+
+def test_durable_status_reader_validates_envelope_and_returns_latest_failed_case(
+    tmp_path,
+):
+    from src.scheduler_state import ensure_scheduler_state_schema
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    profile_path = tmp_path / "status-profile.db"
+    conn = sqlite3.connect(profile_path)
+    try:
+        SecurityLifecycleInvestigationStore(conn)
+        ensure_scheduler_state_schema(conn)
+        case_id = "slc_status_case"
+        conn.execute(
+            "INSERT INTO security_lifecycle_cases "
+            "(case_id,source,source_ref,ticker,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (
+                case_id,
+                "sec_edgar",
+                "status-ref",
+                "OLD",
+                "2026-08-31T01:00:00Z",
+                "2026-08-31T01:00:00Z",
+            ),
+        )
+        for index, timestamp in enumerate(
+            ("2026-08-31T01:00:00Z", "2026-08-31T02:00:00Z"),
+            start=1,
+        ):
+            conn.execute(
+                "INSERT INTO security_lifecycle_automation_runs "
+                "(run_id,case_id,mode,observation_fingerprint_sha256,"
+                "policy_version,run_key,status,query_context_json,"
+                "diagnostics_json,failure_code,started_at,finished_at,"
+                "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    f"slar_status_{index}",
+                    case_id,
+                    "live",
+                    "a" * 64,
+                    "policy-v1",
+                    f"run-key-{index}",
+                    "failed",
+                    '{"private":"must-not-leak"}',
+                    '{"private_count":99}',
+                    "internal_error",
+                    timestamp,
+                    timestamp,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+        latest = _v2_summary(
+            status="partial",
+            reason="case_processing_failed",
+            selected=1,
+            processed=1,
+            failed=1,
+            case_ids=[case_id],
+            case_outcomes={case_id: "failed"},
+        )
+        scheduler._write_automation_state(
+            conn,
+            result=latest,
+            active_incident={
+                "case_failures": {
+                    case_id: {
+                        "run_id": "slar_status_2",
+                        "recovery": "new_attempt",
+                    }
+                },
+                "scheduler_failure": None,
+            },
+            at="2026-08-31T02:00:00Z",
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    status = scheduler.read_security_lifecycle_automation_durable_status(
+        profile_path
+    )
+
+    assert status == {
+        "telemetry_status": "valid",
+        "last_attempt": None,
+        "last_status": "failed",
+        "latest_result": latest,
+        "active_incident": {
+            "case_failures": {
+                case_id: {
+                    "run_id": "slar_status_2",
+                    "recovery": "new_attempt",
+                }
+            },
+            "scheduler_failure": None,
+        },
+        "latest_failed_runs": [
+            {
+                "run_id": "slar_status_2",
+                "case_id": case_id,
+                "failure_code": "internal_error",
+                "started_at": "2026-08-31T02:00:00Z",
+                "finished_at": "2026-08-31T02:00:00Z",
+                "updated_at": "2026-08-31T02:00:00Z",
+            }
+        ],
+    }
+    rendered = json.dumps(status, sort_keys=True)
+    assert "must-not-leak" not in rendered
+    assert "private_count" not in rendered
+
+
+def test_startup_reconciliation_terminalizes_orphan_under_lifecycle_lock(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationProgressRegistry,
+    )
+
+    profile_path = tmp_path / "orphan-profile.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    JobRunsLocalStore(profile_path)
+    conn, store, claim = _running_run(
+        profile_path,
+        execution_owner_id="orphaned-owner",
+    )
+    SchedulerStateStore(profile_path).record_attempt(
+        "security_lifecycle.automation",
+        _NOW,
+    )
+    with sqlite3.connect(profile_path) as state_conn:
+        state_conn.execute(
+            "UPDATE scheduler_state SET last_result=? WHERE source=?",
+            (
+                '{"source":"security_lifecycle.automation",'
+                '"status":"failed","error":"legacy generic envelope"}',
+                "security_lifecycle.automation",
+            ),
+        )
+    empty_registry = LifecycleAutomationProgressRegistry()
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_progress_registry",
+        lambda: empty_registry,
+    )
+    try:
+        result = scheduler.reconcile_interrupted_security_lifecycle_automation(
+            now=_NOW
+        )
+
+        assert result == {
+            "status": "reconciled",
+            "run_ids": [claim.run_id],
+            "case_ids": [store.get_automation_run(claim.run_id)["case_id"]],
+        }
+        run = store.get_automation_run(claim.run_id)
+        assert run["status"] == "failed"
+        assert run["failure_code"] == "internal_error"
+        durable = scheduler.read_security_lifecycle_automation_durable_status(
+            profile_path
+        )
+        assert durable["telemetry_status"] == "valid"
+        assert durable["latest_result"]["status"] == "partial"
+        assert durable["active_incident"]["case_failures"] == {
+            run["case_id"]: {
+                "run_id": claim.run_id,
+                "recovery": "new_attempt",
+            }
+        }
+        assert empty_registry.snapshot() == ()
+    finally:
+        conn.close()
+
+
+def test_durable_status_marks_malformed_telemetry_invalid_without_raw_detail(
+    tmp_path,
+):
+    from src.scheduler_state import ensure_scheduler_state_schema
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    profile_path = tmp_path / "malformed-status.db"
+    with sqlite3.connect(profile_path) as conn:
+        ensure_scheduler_state_schema(conn)
+        conn.execute(
+            "INSERT INTO scheduler_state "
+            "(source,last_status,last_error,last_result,updated_at) "
+            "VALUES (?,?,?,?,?)",
+            (
+                "security_lifecycle.automation",
+                "failed",
+                "private exception must not leak",
+                '{"private":"scheduler envelope must not leak"}',
+                "2026-08-31T05:00:00Z",
+            ),
+        )
+
+    status = scheduler.read_security_lifecycle_automation_durable_status(
+        profile_path
+    )
+
+    assert status == {
+        "telemetry_status": "invalid",
+        "last_attempt": None,
+        "last_status": "failed",
+        "latest_result": None,
+        "active_incident": None,
+        "latest_failed_runs": [],
+    }
+    assert "private" not in json.dumps(status)
 
 
 def _persisted_family_snapshot(conn, run_id, source_family):

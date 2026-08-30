@@ -300,23 +300,27 @@ transitions default off.
 - Modify: `src/service/security_lifecycle_automation_runtime.py`
 - Modify: `src/service/security_lifecycle_automation_scheduler.py`
 - Modify: `src/security_lifecycle_automation_worker.py`
+- Modify: `src/service/data_scheduler.py`
+- Modify: `src/scheduler_state.py`
 - Modify: `src/api/routes/security_lifecycle.py`
 - Test: `tests/test_security_lifecycle_automation_runtime.py`
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_security_lifecycle_automation_worker.py`
+- Test: `tests/test_data_scheduler.py`
+- Test: `tests/test_scheduler_state.py`
 - Test: `tests/test_security_lifecycle_routes.py`
 
-- [ ] Add REDs for exact stage order with and without conditional IBKR and
+- [x] Add REDs for exact stage order with and without conditional IBKR and
   conditional approval.
-- [ ] Implement a lifecycle-only locked registry keyed by request and case.
-- [ ] Emit stages at real SEC/listing/IBKR/evaluate/persist/approve/finalize
+- [x] Implement a lifecycle-only locked registry keyed by request and case.
+- [x] Emit stages at real SEC/listing/IBKR/evaluate/persist/approve/finalize
   boundaries; never infer them from elapsed time.
-- [ ] GET status combines ephemeral current progress with durable config, last
+- [x] GET status combines ephemeral current progress with durable config, last
   result, active incident, latest failed runs, and next scheduled time.
-- [ ] Simulate restart with an empty registry and orphaned DB row. The endpoint
+- [x] Simulate restart with an empty registry and orphaned DB row. The endpoint
   must show interrupted failure after reconciliation, not a reconstructed
   stage.
-- [ ] Add mutations for conditional-stage omission, request/case identity, and
+- [x] Add mutations for conditional-stage omission, request/case identity, and
   registry/durable-state separation.
 
 ## Task 10: Build the Settings and Lifecycle Controls

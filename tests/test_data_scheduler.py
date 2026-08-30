@@ -2712,6 +2712,18 @@ def test_reconcile_interrupted_runtime_state_marks_local_running_rows(tmp_path, 
     ds._state_store().record_attempt(
         "ibkr_news", datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc)
     )
+    ds._state_store().record_attempt(
+        "security_lifecycle.automation",
+        datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc),
+    )
+    lifecycle_calls = []
+    monkeypatch.setattr(
+        ds,
+        "reconcile_interrupted_security_lifecycle_automation",
+        lambda *, now: lifecycle_calls.append(now)
+        or {"status": "reconciled", "run_ids": ["slar_orphan"]},
+        raising=False,
+    )
 
     import src.market_data_direct as mdd
 
@@ -2736,7 +2748,19 @@ def test_reconcile_interrupted_runtime_state_marks_local_running_rows(tmp_path, 
 
     assert result["scheduler_sources"] == ["ibkr_news"]
     assert result["provider_run_ids"] == [stale_id]
+    assert result["lifecycle_automation"] == {
+        "status": "reconciled",
+        "run_ids": ["slar_orphan"],
+    }
+    assert lifecycle_calls == [
+        datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+    ]
     assert ds._state_store().get("ibkr_news")["last_status"] == "failed"
+    assert (
+        ds._state_store()
+        .get("security_lifecycle.automation")["last_status"]
+        == "running"
+    )
     conn = sqlite3.connect(market_db)
     assert conn.execute(
         "SELECT status FROM provider_sync_runs WHERE id=?", (stale_id,)
@@ -2745,6 +2769,83 @@ def test_reconcile_interrupted_runtime_state_marks_local_running_rows(tmp_path, 
         "SELECT status FROM provider_sync_runs WHERE id=?", (fresh_id,)
     ).fetchone()[0] == "running"
     conn.close()
+
+
+def test_lifecycle_startup_reconciliation_failure_replaces_running_telemetry(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service.security_lifecycle_automation_scheduler import (
+        read_security_lifecycle_automation_durable_status,
+    )
+
+    profile_db = tmp_path / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "missing-market.db"))
+    monkeypatch.setattr(ds, "_SCHED_STATE", None)
+    ds._state_store().record_attempt(
+        "security_lifecycle.automation",
+        datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc),
+    )
+
+    def unavailable(*, now):
+        raise RuntimeError("private reconciliation detail")
+
+    monkeypatch.setattr(
+        ds,
+        "reconcile_interrupted_security_lifecycle_automation",
+        unavailable,
+    )
+
+    result = ds.reconcile_interrupted_runtime_state(
+        now=datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+    )
+
+    assert result["lifecycle_automation"] == {
+        "status": "unavailable",
+        "reason": "automation_scheduler_failed",
+    }
+    durable = read_security_lifecycle_automation_durable_status(profile_db)
+    assert durable["last_status"] == "failed"
+    assert durable["telemetry_status"] == "valid"
+    assert durable["active_incident"] == {
+        "case_failures": {},
+        "scheduler_failure": {"reason": "automation_scheduler_failed"},
+    }
+
+
+def test_lifecycle_startup_reconciliation_uses_terminal_fallback_when_typed_write_fails(
+    tmp_path,
+    monkeypatch,
+):
+    profile_db = tmp_path / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "missing-market.db"))
+    monkeypatch.setattr(ds, "_SCHED_STATE", None)
+    ds._state_store().record_attempt(
+        "security_lifecycle.automation",
+        datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(
+        ds,
+        "reconcile_interrupted_security_lifecycle_automation",
+        lambda *, now: (_ for _ in ()).throw(RuntimeError("private repair")),
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_security_lifecycle_automation_reconciliation_failure",
+        lambda *, now: (_ for _ in ()).throw(RuntimeError("private telemetry")),
+    )
+
+    ds.reconcile_interrupted_runtime_state(
+        now=datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+    )
+
+    assert (
+        ds._state_store()
+        .get("security_lifecycle.automation")["last_status"]
+        == "failed"
+    )
 
 
 def test_v14a_status_snapshot_no_create_on_fresh_db(tmp_path, monkeypatch):

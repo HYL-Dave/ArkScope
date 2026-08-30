@@ -29,6 +29,12 @@ from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
     LifecycleWritesUnavailable,
 )
+from src.service.security_lifecycle_automation_runtime import (
+    LIFECYCLE_AUTOMATION_STAGE_ORDER,
+    LifecycleAutomationProgressRegistry,
+    LifecycleAutomationStage,
+    LifecycleAutomationTrigger,
+)
 
 
 AUTOMATION_EXECUTION_REVISION = "trusted-lifecycle-execution-r1"
@@ -36,6 +42,92 @@ _MAX_CASES_PER_TICK = 2
 _DECISION_FIELDS = tuple(AutomationDecision.__dataclass_fields__)
 
 logger = logging.getLogger(__name__)
+
+
+class _CaseProgress:
+    def __init__(
+        self,
+        *,
+        registry: LifecycleAutomationProgressRegistry,
+        request_id: str,
+        case_id: str,
+        current_stage: LifecycleAutomationStage,
+    ) -> None:
+        self._registry = registry
+        self._request_id = request_id
+        self._case_id = case_id
+        self._current_stage = current_stage
+        self._active = True
+
+    def _disable(self, operation: str) -> None:
+        if not self._active:
+            return
+        self._active = False
+        try:
+            self._registry.clear(
+                request_id=self._request_id,
+                case_id=self._case_id,
+            )
+        except Exception:
+            pass
+        logger.warning(
+            "security lifecycle progress observer disabled operation=%s",
+            operation,
+        )
+
+    def advance(self, stage: LifecycleAutomationStage) -> None:
+        if not self._active:
+            return
+        if stage == self._current_stage:
+            return
+        try:
+            current_index = LIFECYCLE_AUTOMATION_STAGE_ORDER.index(
+                self._current_stage
+            )
+            target_index = LIFECYCLE_AUTOMATION_STAGE_ORDER.index(stage)
+            skipped = LIFECYCLE_AUTOMATION_STAGE_ORDER[
+                current_index + 1 : target_index
+            ]
+            self._registry.advance(
+                request_id=self._request_id,
+                case_id=self._case_id,
+                stage=stage,
+                skipped_stages=skipped,
+            )
+        except Exception:
+            self._disable("advance")
+            return
+        self._current_stage = stage
+
+    def finish(self) -> None:
+        if not self._active:
+            return
+        if self._current_stage != "finalize":
+            self.clear()
+            return
+        try:
+            self._registry.finish(
+                request_id=self._request_id,
+                case_id=self._case_id,
+            )
+        except Exception:
+            self._disable("finish")
+            return
+        self._active = False
+
+    def clear(self) -> None:
+        if not self._active:
+            return
+        self._active = False
+        try:
+            self._registry.clear(
+                request_id=self._request_id,
+                case_id=self._case_id,
+            )
+        except Exception:
+            logger.warning(
+                "security lifecycle progress observer disabled operation=clear"
+            )
 
 
 @dataclass(frozen=True)
@@ -243,6 +335,9 @@ class LifecycleAutomationWorker:
         allow_due_failed_retry: bool = False,
         allow_new_attempt: bool = False,
         target_case_id: str | None = None,
+        progress_registry: LifecycleAutomationProgressRegistry | None = None,
+        request_id: str | None = None,
+        trigger: LifecycleAutomationTrigger | None = None,
     ):
         dependencies = {
             "case_loader": case_loader,
@@ -274,6 +369,11 @@ class LifecycleAutomationWorker:
             or len(target_case_id.encode("utf-8")) > 160
         ):
             raise ValueError("target_case_id")
+        progress_values = (progress_registry, request_id, trigger)
+        if any(value is not None for value in progress_values) and any(
+            value is None for value in progress_values
+        ):
+            raise ValueError("automation_progress_context")
         self._case_loader = case_loader
         self._profile_connection = profile_connection
         self._evidence_loader = evidence_loader
@@ -286,9 +386,51 @@ class LifecycleAutomationWorker:
         self._allow_due_failed_retry = allow_due_failed_retry
         self._allow_new_attempt = allow_new_attempt
         self._target_case_id = target_case_id
+        self._progress_registry = progress_registry
+        self._request_id = request_id
+        self._trigger = trigger
 
     def _may_mutate_profile(self) -> bool:
         return self._transition_mutation_allowed() is True
+
+    def _begin_progress(
+        self,
+        *,
+        case_id: str,
+        started_at: datetime,
+        transition_revalidation: bool,
+        finalization_only: bool,
+    ) -> _CaseProgress | None:
+        if self._progress_registry is None:
+            return None
+        assert self._request_id is not None
+        assert self._trigger is not None
+        initial_stage: LifecycleAutomationStage = (
+            "approve"
+            if transition_revalidation
+            else "finalize"
+            if finalization_only
+            else "preparing"
+        )
+        try:
+            self._progress_registry.begin(
+                trigger=self._trigger,
+                request_id=self._request_id,
+                case_id=case_id,
+                started_at=started_at,
+                initial_stage=initial_stage,
+            )
+        except Exception:
+            logger.warning(
+                "security lifecycle progress observer disabled operation=begin"
+            )
+            return None
+        return _CaseProgress(
+            registry=self._progress_registry,
+            request_id=self._request_id,
+            case_id=case_id,
+            current_stage=initial_stage,
+        )
 
     @staticmethod
     def _due_recheck(
@@ -360,7 +502,11 @@ class LifecycleAutomationWorker:
         now: datetime,
         sources: tuple[str, ...],
         transition_revalidation: bool = False,
+        transition_revalidation_authorized: bool | None = None,
         finalization_only: bool = False,
+        progress_callback: (
+            Callable[[LifecycleAutomationStage], None] | None
+        ) = None,
     ) -> str:
         phase = "acquire"
         failure_diagnostics: Mapping[str, int] = {}
@@ -368,7 +514,7 @@ class LifecycleAutomationWorker:
         try:
             if transition_revalidation:
                 phase = "approve"
-                if not self._may_mutate_profile():
+                if transition_revalidation_authorized is not True:
                     return "accepted"
                 state = store.project_case_state(
                     str(case["case_id"]),
@@ -391,6 +537,8 @@ class LifecycleAutomationWorker:
                 ):
                     raise ValueError("automation_transition_approval_changed")
                 kernel.complete_transition_revalidation(run_id=run_id, at=at)
+                if progress_callback is not None:
+                    progress_callback("finalize")
                 return "accepted"
             if finalization_only:
                 phase = "finalize"
@@ -400,12 +548,14 @@ class LifecycleAutomationWorker:
                 decision, terminal_provenance = _persisted_terminal_decision(run)
             else:
                 prior_material = kernel.prior_material(run_id)
-                bundle = self._evidence_loader(
-                    case,
-                    mode=mode,
-                    at=at,
-                    prior_material=prior_material,
-                )
+                loader_kwargs = {
+                    "mode": mode,
+                    "at": at,
+                    "prior_material": prior_material,
+                }
+                if progress_callback is not None:
+                    loader_kwargs["stage_callback"] = progress_callback
+                bundle = self._evidence_loader(case, **loader_kwargs)
                 if not isinstance(bundle, LifecycleAutomationEvidenceBundle):
                     raise TypeError("automation_evidence_bundle")
                 failure_diagnostics = bundle.diagnostics
@@ -419,6 +569,8 @@ class LifecycleAutomationWorker:
                 }
 
                 decision: AutomationDecision | None = None
+                if progress_callback is not None:
+                    progress_callback("evaluate")
                 if not blockers or blocker_codes.issubset(policy_blocker_codes):
                     phase = "evaluate"
                     decision = self._evaluate(
@@ -444,6 +596,8 @@ class LifecycleAutomationWorker:
 
                 if blockers and not blocker_codes.issubset(policy_blocker_codes):
                     phase = "persist"
+                    if progress_callback is not None:
+                        progress_callback("persist")
                     has_source_conflict = "source_conflict" in blocker_codes
                     kernel.complete_run(
                         run_id=run_id,
@@ -471,6 +625,8 @@ class LifecycleAutomationWorker:
 
                 assert decision is not None
                 phase = "persist"
+                if progress_callback is not None:
+                    progress_callback("persist")
                 completed = kernel.complete_run(
                     run_id=run_id,
                     evidence=bundle.evidence,
@@ -496,6 +652,20 @@ class LifecycleAutomationWorker:
                     return "blocked"
                 terminal_provenance = completed.decision_provenance_sha256
 
+            finalization_without_proposals = bool(
+                decision.action_readiness == "waiting_effective_date"
+                and decision.outcomes == ("undetermined",)
+            )
+            approval_stage_started = bool(
+                not finalization_without_proposals
+                and decision.decision_tier == "verified_automatic"
+                and decision.transition_requested
+                and self._may_mutate_profile()
+            )
+            if progress_callback is not None:
+                progress_callback(
+                    "approve" if approval_stage_started else "finalize"
+                )
             phase = "finalize"
             assert terminal_provenance is not None
             assessment_id = create_automation_assessment(
@@ -507,10 +677,7 @@ class LifecycleAutomationWorker:
                 ),
                 at=at,
             )
-            if (
-                decision.action_readiness == "waiting_effective_date"
-                and decision.outcomes == ("undetermined",)
-            ):
+            if finalization_without_proposals:
                 kernel.complete_terminal_finalization(
                     run_id=run_id,
                     decision_provenance_sha256=terminal_provenance,
@@ -544,7 +711,7 @@ class LifecycleAutomationWorker:
                 if proposals.get("block_reason") is not None:
                     raise ValueError("automation_proposals_blocked")
                 if decision.transition_requested:
-                    if self._may_mutate_profile():
+                    if approval_stage_started and self._may_mutate_profile():
                         phase = "approve"
                         approved = self._transition_approver(
                             case=case,
@@ -561,6 +728,8 @@ class LifecycleAutomationWorker:
                                 "automation_transition_approval_changed"
                             )
                 phase = "finalize"
+                if progress_callback is not None and approval_stage_started:
+                    progress_callback("finalize")
                 kernel.complete_terminal_finalization(
                     run_id=run_id,
                     decision_provenance_sha256=terminal_provenance,
@@ -589,6 +758,8 @@ class LifecycleAutomationWorker:
                     return "failed"
                 if terminal_provenance is not None:
                     try:
+                        if progress_callback is not None:
+                            progress_callback("finalize")
                         kernel.complete_terminal_finalization(
                             run_id=run_id,
                             decision_provenance_sha256=terminal_provenance,
@@ -765,18 +936,52 @@ class LifecycleAutomationWorker:
                         }
                     )
                 )
-                outcome = self._process_claim(
-                    store=store,
-                    kernel=kernel,
-                    case=case,
-                    run_id=claim.run_id,
-                    mode=mode,
-                    at=at,
-                    now=now,
-                    sources=sources,
-                    transition_revalidation=transition_revalidation,
-                    finalization_only=finalization_only,
-                )
+                progress = None
+                if not transition_revalidation:
+                    progress = self._begin_progress(
+                        case_id=case_id,
+                        started_at=now,
+                        transition_revalidation=False,
+                        finalization_only=finalization_only,
+                    )
+                transition_revalidation_authorized: bool | None = None
+                if transition_revalidation:
+                    transition_revalidation_authorized = self._may_mutate_profile()
+                    if transition_revalidation_authorized:
+                        progress = self._begin_progress(
+                            case_id=case_id,
+                            started_at=now,
+                            transition_revalidation=True,
+                            finalization_only=False,
+                        )
+                try:
+                    outcome = self._process_claim(
+                        store=store,
+                        kernel=kernel,
+                        case=case,
+                        run_id=claim.run_id,
+                        mode=mode,
+                        at=at,
+                        now=now,
+                        sources=sources,
+                        transition_revalidation=transition_revalidation,
+                        transition_revalidation_authorized=(
+                            transition_revalidation_authorized
+                        ),
+                        finalization_only=finalization_only,
+                        progress_callback=(
+                            progress.advance if progress is not None else None
+                        ),
+                    )
+                    if progress is not None:
+                        if outcome in {"failed", "blocked"}:
+                            progress.clear()
+                        else:
+                            progress.finish()
+                except BaseException:
+                    if progress is not None:
+                        progress.clear()
+                    raise
                 summary["processed"] = int(summary["processed"]) + 1
                 summary[outcome] = int(summary[outcome]) + 1
                 outcomes = summary["case_outcomes"]

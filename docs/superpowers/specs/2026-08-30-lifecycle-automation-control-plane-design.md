@@ -424,6 +424,18 @@ The registry is protected by a lock and read through
 restart, orphan reconciliation and durable run rows provide the terminal truth;
 the UI must not reconstruct a fictitious in-flight stage.
 
+Progress is strictly best-effort observation. A registry begin, advance,
+finish, or cleanup failure disables progress for that case and cannot change
+the automation outcome, failure class, or durable run state. Blocked or no-op
+paths clear progress without fabricating `finalize`. A disabled schedule keeps
+its last-attempt truth but reports no next scheduled time.
+
+Startup uses the lifecycle-specific reconciliation envelope. If that repair
+itself fails, startup records a typed lifecycle scheduler failure; a final
+generic terminal fallback may mark the scheduler row failed, but no read path
+may leave an orphan displayed as healthy in-flight work or infer a stage from
+that durable row.
+
 The latest aggregate outcome and active incident are also written under a
 dedicated key in the existing `scheduler_state` table. That durable state is
 for status display only; it is not a retry queue or execution authority.

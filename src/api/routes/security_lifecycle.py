@@ -45,8 +45,12 @@ from src.service.security_lifecycle_automation_config import (
     SECURITY_LIFECYCLE_AUTOMATION_SETTING_KEYS,
     SecurityLifecycleAutomationConfig,
     SecurityLifecycleAutomationConfigState,
+    calculate_security_lifecycle_automation_schedule,
     parse_security_lifecycle_automation_config,
     serialize_security_lifecycle_automation_config,
+)
+from src.service.security_lifecycle_automation_runtime import (
+    lifecycle_automation_progress_registry,
 )
 from src.security_lifecycle_translation import (
     EvidenceTranslationConflict,
@@ -57,6 +61,7 @@ from src.security_lifecycle_translation import (
 )
 from src.service.security_lifecycle_automation_scheduler import (
     dispatch_and_record_security_lifecycle_automation,
+    read_security_lifecycle_automation_durable_status,
 )
 from src.tools.security_lifecycle_tools import (
     SecurityLifecycleReadService,
@@ -69,6 +74,18 @@ router = APIRouter(prefix="/security-lifecycle", tags=["security-lifecycle"])
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )
+
+
+def _automation_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _status_time(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
         "+00:00", "Z"
     )
 
@@ -392,6 +409,64 @@ def _automation_config_envelope(
     }
 
 
+def _automation_status_envelope(
+    state: SecurityLifecycleAutomationConfigState,
+    *,
+    profile_path: str,
+) -> dict[str, object]:
+    envelope = _automation_config_envelope(state)
+    durable = read_security_lifecycle_automation_durable_status(profile_path)
+    config = state.config
+    schedule_status = "invalid"
+    last_attempt_at = durable["last_attempt"]
+    next_scheduled_at = None
+    if config is not None:
+        schedule = calculate_security_lifecycle_automation_schedule(
+            last_attempt=durable["last_attempt"],
+            interval_minutes=config.interval_minutes,
+            now=_automation_now(),
+        )
+        last_attempt_at = _status_time(schedule.last_attempt_at)
+        next_scheduled_at = _status_time(schedule.next_scheduled_at)
+        if schedule.valid:
+            schedule_status = (
+                "disabled"
+                if not config.enabled
+                else "due"
+                if schedule.due
+                else "scheduled"
+            )
+            if not config.enabled:
+                next_scheduled_at = None
+
+    current_progress = [
+        {
+            "trigger": row.trigger,
+            "request_id": row.request_id,
+            "case_id": row.case_id,
+            "started_at": _status_time(row.started_at),
+            "current_stage": row.current_stage,
+            "completed_stages": list(row.completed_stages),
+            "skipped_stages": list(row.skipped_stages),
+        }
+        for row in lifecycle_automation_progress_registry().snapshot()
+    ]
+    return {
+        **envelope,
+        "schedule": {
+            "status": schedule_status,
+            "last_attempt_at": last_attempt_at,
+            "next_scheduled_at": next_scheduled_at,
+        },
+        "telemetry_status": durable["telemetry_status"],
+        "last_status": durable["last_status"],
+        "last_result": durable["latest_result"],
+        "active_incident": durable["active_incident"],
+        "latest_failed_runs": durable["latest_failed_runs"],
+        "current_progress": current_progress,
+    }
+
+
 def _valid_automation_config(
     store: ProfileStateStore,
 ) -> SecurityLifecycleAutomationConfig:
@@ -451,6 +526,7 @@ def _dispatch_automation(
                 "target_case_id": case_id,
             }
         )
+    run_kwargs["trigger"] = "manual_case" if case_id is not None else "manual_due"
     dispatched = dispatch_and_record_security_lifecycle_automation(**run_kwargs)
     result: dict[str, object] = {
         "scope": scope,
@@ -459,6 +535,9 @@ def _dispatch_automation(
     reason = dispatched.get("reason")
     if reason is not None:
         result["reason"] = reason
+    request_id = dispatched.get("request_id")
+    if request_id is not None:
+        result["request_id"] = request_id
     if case_id is not None:
         result["case_id"] = case_id
     return result
@@ -469,8 +548,11 @@ def get_automation_config(
     store: ProfileStateStore = Depends(get_profile_store),
 ):
     try:
-        return _automation_config_envelope(_automation_config_state(store))
-    except (OSError, sqlite3.Error):
+        return _automation_status_envelope(
+            _automation_config_state(store),
+            profile_path=store.db_path,
+        )
+    except (OSError, sqlite3.Error, ValueError):
         raise HTTPException(
             status_code=503,
             detail={
