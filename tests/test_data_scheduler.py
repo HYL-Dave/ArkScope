@@ -71,7 +71,7 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ds,
         "run_and_record_security_lifecycle_automation",
-        lambda *, limit, now: automation_result,
+        lambda *, limit, now, transition_mutation_allowed: automation_result,
         raising=False,
     )
     monkeypatch.setattr(
@@ -232,7 +232,9 @@ def test_tick_uses_the_lock_owned_lifecycle_run_and_record_boundary(monkeypatch)
     monkeypatch.setattr(
         ds,
         "run_and_record_security_lifecycle_automation",
-        lambda *, limit, now: events.append(("owned", limit, now))
+        lambda *, limit, now, transition_mutation_allowed: events.append(
+            ("owned", limit, now)
+        )
         or {
             "result_version": 2,
             "case_outcomes": {},
@@ -293,14 +295,19 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     monkeypatch.setattr(
         ds,
         "run_and_record_security_lifecycle_automation",
-        lambda *, limit, now: events.append(("automation", limit, now))
+        lambda *, limit, now, transition_mutation_allowed: events.append(
+            ("automation", limit, now)
+        )
         or automation_result,
         raising=False,
     )
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: events.append(("transitions", now)) or transition_result,
+        lambda *, now, allow_automation_approved, transition_mutation_allowed: events.append(
+            ("transitions", now)
+        )
+        or transition_result,
     )
     monkeypatch.setattr(
         ds,
@@ -331,7 +338,9 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
     monkeypatch.setattr(
         ds,
         "run_and_record_security_lifecycle_automation",
-        lambda *, limit, now: events.append(("automation", limit, now))
+        lambda *, limit, now, transition_mutation_allowed: events.append(
+            ("automation", limit, now)
+        )
         or {
             "status": "succeeded",
             "reason": None,
@@ -349,7 +358,9 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: events.append(("transitions", now))
+        lambda *, now, allow_automation_approved, transition_mutation_allowed: events.append(
+            ("transitions", now)
+        )
         or {
             "status": "succeeded",
             "reason": None,
@@ -381,6 +392,174 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
     ]
 
 
+def test_lifecycle_automation_uses_durable_five_minute_clock_and_batch_limit(
+    monkeypatch,
+):
+    calls = []
+    monkeypatch.setattr(
+        ds,
+        "run_and_record_security_lifecycle_automation",
+        lambda *, limit, now, transition_mutation_allowed: calls.append(
+            (limit, now, transition_mutation_allowed())
+        )
+        or {},
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda **_kwargs: {
+            "status": "succeeded",
+            "reason": None,
+            "due": 0,
+            "applied": 0,
+            "needs_review": 0,
+            "already_applied": 0,
+            "transition_ids": [],
+            "failed_transition_ids": [],
+        },
+    )
+
+    ds.tick_once(_NOW, fire=lambda _source: None)
+    ds._state_store().record_attempt("security_lifecycle.automation", _NOW)
+    ds.tick_once(_NOW + timedelta(seconds=30), fire=lambda _source: None)
+    ds.tick_once(_NOW + timedelta(minutes=5), fire=lambda _source: None)
+
+    assert calls == [
+        (2, _NOW, False),
+        (2, _NOW + timedelta(minutes=5), False),
+    ]
+
+
+def test_lifecycle_analysis_and_profile_mutation_are_independent_controls(
+    monkeypatch,
+):
+    from src.service.security_lifecycle_automation_config import (
+        SecurityLifecycleAutomationConfig,
+        serialize_security_lifecycle_automation_config,
+    )
+
+    ds._store().update_settings(
+        serialize_security_lifecycle_automation_config(
+            SecurityLifecycleAutomationConfig(
+                enabled=False,
+                interval_minutes=5,
+                batch_limit=1,
+                apply_profile_transitions=True,
+            )
+        )
+    )
+    automation_calls = []
+    transition_calls = []
+    monkeypatch.setattr(
+        ds,
+        "run_and_record_security_lifecycle_automation",
+        lambda **kwargs: automation_calls.append(kwargs),
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda **kwargs: transition_calls.append(kwargs)
+        or {
+            "status": "succeeded",
+            "reason": None,
+            "due": 0,
+            "applied": 0,
+            "needs_review": 0,
+            "already_applied": 0,
+            "transition_ids": [],
+            "failed_transition_ids": [],
+        },
+    )
+
+    ds.tick_once(_NOW, fire=lambda _source: None)
+
+    assert automation_calls == []
+    mutation_allowed = transition_calls[0].pop("transition_mutation_allowed")
+    assert mutation_allowed() is True
+    assert transition_calls == [{"now": _NOW, "allow_automation_approved": True}]
+
+
+def test_malformed_lifecycle_config_disables_analysis_and_mutation(monkeypatch):
+    ds._store().set_setting(
+        "security_lifecycle.automation.interval_minutes",
+        "05",
+    )
+    automation_calls = []
+    transition_calls = []
+    monkeypatch.setattr(
+        ds,
+        "run_and_record_security_lifecycle_automation",
+        lambda **kwargs: automation_calls.append(kwargs),
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda **kwargs: transition_calls.append(kwargs)
+        or {
+            "status": "succeeded",
+            "reason": None,
+            "due": 0,
+            "applied": 0,
+            "needs_review": 0,
+            "already_applied": 0,
+            "transition_ids": [],
+            "failed_transition_ids": [],
+        },
+    )
+
+    ds.tick_once(_NOW, fire=lambda _source: None)
+
+    assert automation_calls == []
+    mutation_allowed = transition_calls[0].pop("transition_mutation_allowed")
+    assert mutation_allowed() is False
+    assert transition_calls == [{"now": _NOW, "allow_automation_approved": False}]
+
+
+def test_tick_rereads_mutation_authority_after_lifecycle_analysis(monkeypatch):
+    from src.service.security_lifecycle_automation_config import (
+        APPLY_PROFILE_TRANSITIONS_KEY,
+    )
+
+    ds._store().set_setting(APPLY_PROFILE_TRANSITIONS_KEY, "true")
+    boundary_reads = []
+    transition_calls = []
+
+    def run_analysis(*, limit, now, transition_mutation_allowed):
+        del limit, now
+        boundary_reads.append(transition_mutation_allowed())
+        ds._store().set_setting(APPLY_PROFILE_TRANSITIONS_KEY, "false")
+        boundary_reads.append(transition_mutation_allowed())
+        return {}
+
+    monkeypatch.setattr(
+        ds,
+        "run_and_record_security_lifecycle_automation",
+        run_analysis,
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda **kwargs: transition_calls.append(kwargs)
+        or {
+            "status": "succeeded",
+            "reason": None,
+            "due": 0,
+            "applied": 0,
+            "needs_review": 0,
+            "already_applied": 0,
+            "transition_ids": [],
+            "failed_transition_ids": [],
+        },
+    )
+
+    ds.tick_once(_NOW, fire=lambda _source: None)
+
+    assert boundary_reads == [True, False]
+    mutation_allowed = transition_calls[0].pop("transition_mutation_allowed")
+    assert mutation_allowed() is False
+    assert transition_calls == [{"now": _NOW, "allow_automation_approved": False}]
+
+
 def test_tick_records_lifecycle_automation_failure_and_continues(monkeypatch):
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
@@ -399,7 +578,7 @@ def test_tick_records_lifecycle_automation_failure_and_continues(monkeypatch):
     monkeypatch.setattr(
         ds,
         "run_and_record_security_lifecycle_automation",
-        lambda *, limit, now: (_ for _ in ()).throw(
+        lambda *, limit, now, transition_mutation_allowed: (_ for _ in ()).throw(
             RuntimeError("private scheduler detail")
         ),
         raising=False,
@@ -419,7 +598,9 @@ def test_tick_records_lifecycle_automation_failure_and_continues(monkeypatch):
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: events.append(("transitions", now))
+        lambda *, now, allow_automation_approved, transition_mutation_allowed: events.append(
+            ("transitions", now)
+        )
         or {
             "status": "succeeded",
             "reason": None,
@@ -482,7 +663,7 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: next(results),
+        lambda *, now, allow_automation_approved, transition_mutation_allowed: next(results),
     )
 
     for offset in range(4):
@@ -507,7 +688,9 @@ def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: (_ for _ in ()).throw(RuntimeError("private detail")),
+        lambda *, now, allow_automation_approved, transition_mutation_allowed: (_ for _ in ()).throw(
+            RuntimeError("private detail")
+        ),
     )
     fired = []
 
@@ -560,7 +743,7 @@ def test_tick_records_non_mapping_ticker_runner_result_as_failed_witness(
     monkeypatch.setattr(
         ds,
         "run_due_ticker_identity_transitions",
-        lambda *, now: runner_result,
+        lambda *, now, allow_automation_approved, transition_mutation_allowed: runner_result,
     )
     fired = []
 

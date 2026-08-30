@@ -123,7 +123,11 @@ def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
 
 
 def _approved_preview_sha256(service, transition_id: str) -> str:
-    rows = service.list_due_transitions(on_date="2026-08-25", limit=10)
+    rows = service.list_due_transitions(
+        on_date="2026-08-25",
+        limit=10,
+        allow_automation_approved=True,
+    )
     return next(
         str(row["approved_preview_sha256"])
         for row in rows
@@ -183,12 +187,24 @@ def test_service_threads_authority_selection_to_due_store(tmp_path, monkeypatch)
     assert store.calls == [("2026-08-25", 1, False)]
 
 
+def test_service_requires_explicit_automation_authority_selection(tmp_path):
+    service, _profile_path, _transition_id = _build_due_context(tmp_path)
+
+    with pytest.raises(TypeError, match="allow_automation_approved"):
+        service.list_due_transitions(on_date="2026-08-25", limit=1)
+
+
 def test_due_runner_requires_explicit_authority_selection():
     from src.service import ticker_identity_scheduler as scheduler
 
     with pytest.raises(TypeError, match="allow_automation_approved"):
         scheduler.run_due_ticker_identity_transitions(
             now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+        )
+    with pytest.raises(TypeError, match="transition_mutation_allowed"):
+        scheduler.run_due_ticker_identity_transitions(
+            allow_automation_approved=False,
+            now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
         )
 
 
@@ -339,7 +355,11 @@ def test_attended_retry_rechecks_expected_digest_inside_write_lock(
 
     service, profile_path, transition_id = _build_due_context(tmp_path)
     old_digest = _approved_preview_sha256(service, transition_id)
-    transition = service.list_due_transitions(on_date="2026-08-25", limit=10)[0]
+    transition = service.list_due_transitions(
+        on_date="2026-08-25",
+        limit=10,
+        allow_automation_approved=True,
+    )[0]
     case_id = str(transition["case_id"])
     with sqlite3.connect(profile_path) as conn:
         conn.execute(
@@ -431,6 +451,7 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
                 {
                     "transition_id": f"slt_{index}",
                     "approved_preview_sha256": str(index % 10) * 64,
+                    "approval_authority": "attended_user",
                 }
                 for index in range(12)
             ][:limit]
@@ -465,6 +486,7 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
 
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
         limit=10,
         now=datetime(2026, 8, 24, 3, 30, tzinfo=timezone.utc),
     )
@@ -523,10 +545,16 @@ def test_due_runner_forwards_authority_selection_and_executes_returned_transitio
                 {
                     "transition_id": selected,
                     "approved_preview_sha256": "a" * 64,
+                    "approval_authority": (
+                        "automation_policy"
+                        if allow_automation_approved
+                        else "attended_user"
+                    ),
                 }
             ]
 
-        def execute_transition(self, selected_id, **_kwargs):
+        def execute_transition(self, selected_id, *, before_write, **_kwargs):
+            before_write()
             self.executed.append(selected_id)
             return {"status": "applied"}
 
@@ -540,6 +568,7 @@ def test_due_runner_forwards_authority_selection_and_executes_returned_transitio
 
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=allow_automation_approved,
+        transition_mutation_allowed=lambda: allow_automation_approved,
         limit=1,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
     )
@@ -550,6 +579,62 @@ def test_due_runner_forwards_authority_selection_and_executes_returned_transitio
     assert service.executed == [transition_id]
     assert result["transition_ids"] == [transition_id]
     assert result["applied"] == 1
+
+
+@pytest.mark.parametrize("authority_state", ("disabled", "unavailable"))
+def test_due_runner_rereads_automation_authority_at_each_write_boundary(
+    monkeypatch,
+    authority_state,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    writes = []
+
+    class FakeService:
+        def list_due_transitions(self, **_kwargs):
+            return [
+                {
+                    "transition_id": "slt_automation",
+                    "approved_preview_sha256": "a" * 64,
+                    "approval_authority": "automation_policy",
+                }
+            ]
+
+        def execute_transition(
+            self,
+            transition_id,
+            *,
+            preview_sha256,
+            trigger,
+            before_write,
+        ):
+            del transition_id, preview_sha256, trigger
+            before_write()
+            writes.append("profile_mutated")
+            return {"status": "applied"}
+
+    monkeypatch.setattr(scheduler, "_service", FakeService)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+
+    def mutation_allowed():
+        if authority_state == "unavailable":
+            raise sqlite3.OperationalError("private config failure")
+        return False
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
+        transition_mutation_allowed=mutation_allowed,
+        limit=1,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert writes == []
+    assert result["applied"] == 0
+    assert result["failed_transition_ids"] == ["slt_automation"]
 
 
 @pytest.mark.parametrize(
@@ -582,10 +667,12 @@ def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
                 {
                     "transition_id": "slt_bad",
                     "approved_preview_sha256": "a" * 64,
+                    "approval_authority": "attended_user",
                 },
                 {
                     "transition_id": "slt_later",
                     "approved_preview_sha256": "b" * 64,
+                    "approval_authority": "attended_user",
                 },
             ]
 
@@ -600,6 +687,7 @@ def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
 
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 
@@ -661,6 +749,7 @@ def test_due_runner_is_provider_free_and_concurrent_ticks_apply_once(
             executor.map(
                 lambda _index: scheduler.run_due_ticker_identity_transitions(
                     allow_automation_approved=True,
+                    transition_mutation_allowed=lambda: True,
                     now=now
                 ),
                 range(2),
@@ -692,6 +781,7 @@ def test_due_runner_with_no_identity_component_creates_nothing(tmp_path, monkeyp
 
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 
@@ -729,6 +819,7 @@ def test_due_runner_reports_existing_profile_without_identity_schema_as_not_inst
 
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 
@@ -767,6 +858,7 @@ def test_due_runner_reports_malformed_identity_schema_as_unavailable(
 
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 

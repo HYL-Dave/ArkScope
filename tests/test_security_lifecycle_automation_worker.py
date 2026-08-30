@@ -494,10 +494,11 @@ class _Harness:
             evidence_loader=self.evidence_loader,
             source_loader=self.source_loader,
             transition_preview=self.transition_preview,
+            transition_mutation_allowed=lambda: True,
             clock=self.clock,
             execution_owner_id=execution_owner_id,
-            **overrides,
         )
+        kwargs.update(overrides)
         if (
             "transition_approver"
             in inspect.signature(LifecycleAutomationWorker).parameters
@@ -514,17 +515,19 @@ class _Harness:
             LifecycleAutomationWorker,
         )
 
-        return LifecycleAutomationWorker(
+        kwargs = dict(
             case_loader=self.case_loader,
             profile_connection=self.profile_connection,
             evidence_loader=self.evidence_loader,
             source_loader=self.source_loader,
             transition_preview=self.transition_preview,
             transition_approver=self.transition_approver,
+            transition_mutation_allowed=lambda: True,
             clock=self.clock,
             execution_owner_id=execution_owner_id,
-            **overrides,
         )
+        kwargs.update(overrides)
+        return LifecycleAutomationWorker(**kwargs)
 
 
 def _store(harness):
@@ -1004,6 +1007,58 @@ def test_transition_eligible_verified_result_approves_automation_transition(
                 "proposal_actions": ("notify", "remap_symbol"),
             }
         ]
+    finally:
+        harness.conn.close()
+
+
+def test_propose_only_verified_result_accepts_and_proposes_without_transition(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    try:
+        result = harness.worker_with_transition_approver(
+            transition_mutation_allowed=lambda: False,
+        ).run()
+
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        assessment = store.list_assessments(case["case_id"])[0]
+        proposals = store.list_proposals(case["case_id"])
+        assert result["accepted"] == 1
+        assert result["failed"] == 0
+        assert assessment["status"] == "accepted"
+        assert assessment["acceptance_authority"] == "automation_policy"
+        assert sorted(row["action_type"] for row in proposals) == [
+            "notify",
+            "remap_symbol",
+        ]
+        assert run["status"] == "succeeded"
+        assert run["action_readiness"] == "transition_eligible"
+        assert harness.approval_calls == []
+    finally:
+        harness.conn.close()
+
+
+def test_transition_approval_rereads_mutation_authority_at_boundary(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    authority = {"allowed": True}
+    original_loader = harness.evidence_loader
+
+    def disable_during_acquisition(*args, **kwargs):
+        result = original_loader(*args, **kwargs)
+        authority["allowed"] = False
+        return result
+
+    try:
+        harness.evidence_loader = disable_during_acquisition
+        result = harness.worker_with_transition_approver(
+            transition_mutation_allowed=lambda: authority["allowed"],
+        ).run()
+
+        assert result["accepted"] == 1
+        assert harness.approval_calls == []
     finally:
         harness.conn.close()
 
@@ -1490,6 +1545,67 @@ def test_transition_approval_drift_fails_closed_without_profile_mutation(tmp_pat
         assert len(store.list_proposals(case["case_id"])) == 2
         assert run["action_readiness"] == "transition_eligible"
         assert run["blockers"] == []
+    finally:
+        harness.conn.close()
+
+
+def test_transition_revalidation_remains_waiting_when_mutation_is_disabled(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.approval_error = ValueError("transition_preview_changed")
+    try:
+        first = harness.worker_with_transition_approver().run()
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        assert first["accepted"] == 1
+        assert run["action_readiness"] == "waiting_transition_revalidation"
+        assert len(harness.approval_calls) == 1
+
+        harness.approval_error = None
+        harness.now = "2026-08-26T12:00:00Z"
+        retried = harness.worker_with_transition_approver(
+            transition_mutation_allowed=lambda: False,
+        ).run()
+
+        run = store.list_automation_runs(case["case_id"])[0]
+        assert retried["processed"] == 0
+        assert retried["skipped_current"] == 1
+        assert retried["failed"] == 0
+        assert len(harness.approval_calls) == 1
+        assert run["action_readiness"] == "waiting_transition_revalidation"
+        assert [row["blocker_code"] for row in run["blockers"]] == [
+            "transition_approval_changed"
+        ]
+    finally:
+        harness.conn.close()
+
+
+def test_transition_revalidation_rereads_authority_after_reservation(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.approval_error = ValueError("transition_preview_changed")
+    try:
+        harness.worker_with_transition_approver().run()
+        store = _store(harness)
+        harness.approval_error = None
+        harness.now = "2026-08-26T12:00:00Z"
+        reads = []
+
+        def mutation_allowed():
+            reads.append(len(reads))
+            return len(reads) == 1
+
+        retried = harness.worker_with_transition_approver(
+            transition_mutation_allowed=mutation_allowed,
+        ).run()
+
+        run = store.list_automation_runs(case["case_id"])[0]
+        assert len(reads) == 2
+        assert retried["accepted"] == 1
+        assert len(harness.approval_calls) == 1
+        assert run["action_readiness"] == "waiting_transition_revalidation"
     finally:
         harness.conn.close()
 

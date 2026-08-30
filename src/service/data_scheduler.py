@@ -70,6 +70,12 @@ from src.service.security_lifecycle_automation_scheduler import (
     run_and_record_security_lifecycle_automation,
     security_lifecycle_automation_failure,
 )
+from src.service.security_lifecycle_automation_config import (
+    SECURITY_LIFECYCLE_AUTOMATION_SETTING_KEYS,
+    SecurityLifecycleAutomationConfigState,
+    calculate_security_lifecycle_automation_schedule,
+    parse_security_lifecycle_automation_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +377,40 @@ def _state_store():
         from src.scheduler_state import SchedulerStateStore
         _SCHED_STATE = SchedulerStateStore(resolve_profile_state_db_path(None))
     return _SCHED_STATE
+
+
+def _security_lifecycle_automation_config_state(
+) -> SecurityLifecycleAutomationConfigState:
+    snapshot = _store().get_settings_snapshot(
+        SECURITY_LIFECYCLE_AUTOMATION_SETTING_KEYS
+    )
+    return parse_security_lifecycle_automation_config(snapshot)
+
+
+def _security_lifecycle_profile_mutation_allowed() -> bool:
+    try:
+        return (
+            _security_lifecycle_automation_config_state()
+            .effective_apply_profile_transitions
+        )
+    except Exception:
+        return False
+
+
+def _security_lifecycle_automation_is_due(
+    state: SecurityLifecycleAutomationConfigState,
+    *,
+    now: datetime,
+) -> bool:
+    if not state.valid or state.config is None or not state.config.enabled:
+        return False
+    row = _state_store().get("security_lifecycle.automation") or {}
+    schedule = calculate_security_lifecycle_automation_schedule(
+        last_attempt=row.get("last_attempt"),
+        interval_minutes=state.config.interval_minutes,
+        now=now,
+    )
+    return schedule.valid and schedule.due
 
 
 _NORMALIZED_NEWS_MAX_ARTICLES = 50_000
@@ -1537,10 +1577,16 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     now = now or datetime.now(timezone.utc)
     fired = []
     try:
-        automation_result = run_and_record_security_lifecycle_automation(
-            limit=2,
-            now=now,
-        )
+        automation_state = _security_lifecycle_automation_config_state()
+        if _security_lifecycle_automation_is_due(automation_state, now=now):
+            assert automation_state.config is not None
+            run_and_record_security_lifecycle_automation(
+                limit=automation_state.config.batch_limit,
+                now=now,
+                transition_mutation_allowed=(
+                    _security_lifecycle_profile_mutation_allowed
+                ),
+            )
     except Exception as exc:  # lifecycle work must not stop later schedulers
         logger.warning(
             "security lifecycle automation tick failed code=%s",
@@ -1557,7 +1603,14 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
                 type(record_exc).__name__,
             )
     try:
-        transition_result = run_due_ticker_identity_transitions(now=now)
+        transition_mutation_allowed = (
+            _security_lifecycle_profile_mutation_allowed
+        )
+        transition_result = run_due_ticker_identity_transitions(
+            now=now,
+            allow_automation_approved=transition_mutation_allowed(),
+            transition_mutation_allowed=transition_mutation_allowed,
+        )
     except Exception as exc:  # lifecycle work must not stop provider scheduling
         logger.warning(
             "ticker identity scheduler tick failed code=%s",

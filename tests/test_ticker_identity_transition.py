@@ -679,10 +679,18 @@ def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_
         assert first["decision_provenance_sha256"] == _ASSESSMENT_FINGERPRINT
         assert first["proposal_ids"] == ["slp_1"]
         assert first["approved_preview"] == preview
-        assert store.list_due(on_date="2026-08-24", limit=10) == []
+        assert store.list_due(
+            on_date="2026-08-24",
+            limit=10,
+            allow_automation_approved=True,
+        ) == []
         assert [
             item["transition_id"]
-            for item in store.list_due(on_date="2026-08-25", limit=10)
+            for item in store.list_due(
+                on_date="2026-08-25",
+                limit=10,
+                allow_automation_approved=True,
+            )
         ] == [first["transition_id"]]
         assert conn.execute(
             "SELECT COUNT(*) FROM ticker_identity_transitions"
@@ -734,6 +742,18 @@ def test_list_due_filters_automation_authority_before_ordering_and_limit(tmp_pat
         assert [row["transition_id"] for row in all_authorities] == [
             "tit_automation_oldest"
         ]
+    finally:
+        conn.close()
+
+
+def test_list_due_requires_explicit_automation_authority(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        store = TickerIdentityTransitionStore(conn)
+        with pytest.raises(TypeError, match="allow_automation_approved"):
+            store.list_due(on_date="2026-08-25", limit=1)
     finally:
         conn.close()
 
@@ -1043,7 +1063,11 @@ def test_cancel_is_idempotent_before_apply_and_removes_transition_from_due_list(
         assert cancelled["status"] == "cancelled"
         assert repeated == cancelled
         assert cancelled["cancelled_at"] == "2026-08-24T01:00:00Z"
-        assert store.list_due(on_date="2026-08-25", limit=10) == []
+        assert store.list_due(
+            on_date="2026-08-25",
+            limit=10,
+            allow_automation_approved=True,
+        ) == []
     finally:
         conn.close()
 

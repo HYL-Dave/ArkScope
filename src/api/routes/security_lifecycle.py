@@ -4,16 +4,26 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import re
+import sqlite3
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from src.api.dependencies import (
     get_security_lifecycle_read_service,
     get_security_lifecycle_store,
+    get_profile_store,
 )
-from src.api.permissions import require_db_write
+from src.api.permissions import require_db_write, require_profile_state_write
 from src.agents.config import task_route
 from src.card_synthesis import translate_text, translation_harness
 from src.content_translation_failures import classify_content_translation_failure
@@ -29,6 +39,14 @@ from src.security_lifecycle_investigation import (
 from src.security_lifecycle_manual_evidence import (
     add_manual_evidence,
     canonical_manual_https_url,
+)
+from src.profile_state import ProfileStateStore
+from src.service.security_lifecycle_automation_config import (
+    SECURITY_LIFECYCLE_AUTOMATION_SETTING_KEYS,
+    SecurityLifecycleAutomationConfig,
+    SecurityLifecycleAutomationConfigState,
+    parse_security_lifecycle_automation_config,
+    serialize_security_lifecycle_automation_config,
 )
 from src.security_lifecycle_translation import (
     EvidenceTranslationConflict,
@@ -249,6 +267,22 @@ class EvidenceTranslationRequest(BaseModel):
     locale: Literal["en", "zh-Hant"]
 
 
+class LifecycleAutomationConfigRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: StrictBool
+    interval_minutes: StrictInt = Field(ge=5, le=10_080)
+    batch_limit: StrictInt
+    apply_profile_transitions: StrictBool
+
+    @field_validator("batch_limit")
+    @classmethod
+    def validate_batch_limit(cls, value):
+        if value not in {1, 2}:
+            raise ValueError("batch_limit")
+        return value
+
+
 def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResult:
     try:
         route = task_route("card_translation")
@@ -327,18 +361,96 @@ def _case_fingerprint(case: dict) -> str:
     return observation_fingerprint(observation)
 
 
+def _automation_config_state(
+    store: ProfileStateStore,
+) -> SecurityLifecycleAutomationConfigState:
+    return parse_security_lifecycle_automation_config(
+        store.get_settings_snapshot(
+            SECURITY_LIFECYCLE_AUTOMATION_SETTING_KEYS
+        )
+    )
+
+
+def _automation_config_envelope(
+    state: SecurityLifecycleAutomationConfigState,
+) -> dict[str, object]:
+    if state.config is None:
+        return {
+            "config_status": "invalid",
+            "config": None,
+            "invalid_keys": list(state.invalid_keys),
+        }
+    config = state.config
+    return {
+        "config_status": "valid",
+        "config": {
+            "enabled": config.enabled,
+            "interval_minutes": config.interval_minutes,
+            "batch_limit": config.batch_limit,
+            "apply_profile_transitions": config.apply_profile_transitions,
+        },
+    }
+
+
+def _valid_automation_config(
+    store: ProfileStateStore,
+) -> SecurityLifecycleAutomationConfig:
+    try:
+        state = _automation_config_state(store)
+    except (OSError, sqlite3.Error):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "security_lifecycle_profile_store_unavailable",
+                "store": "profile",
+            },
+        ) from None
+    if state.config is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "automation_config_invalid",
+                "invalid_keys": list(state.invalid_keys),
+            },
+        )
+    return state.config
+
+
+def _live_transition_mutation_authority(
+    store: ProfileStateStore,
+):
+    def allowed() -> bool:
+        try:
+            return _automation_config_state(
+                store
+            ).effective_apply_profile_transitions
+        except Exception:
+            return False
+
+    return allowed
+
+
 def _dispatch_automation(
     *,
     scope: Literal["due", "case"],
+    config_store: ProfileStateStore,
     case_id: str | None = None,
 ) -> dict[str, object]:
-    run_kwargs: dict[str, object] = {}
+    config = _valid_automation_config(config_store)
+    run_kwargs: dict[str, object] = {
+        "limit": config.batch_limit,
+        "transition_mutation_allowed": _live_transition_mutation_authority(
+            config_store
+        ),
+    }
     if case_id is not None:
-        run_kwargs = {
-            "allow_new_attempt": True,
-            "limit": 1,
-            "target_case_id": case_id,
-        }
+        run_kwargs.update(
+            {
+                "allow_new_attempt": True,
+                "limit": 1,
+                "target_case_id": case_id,
+            }
+        )
     dispatched = dispatch_and_record_security_lifecycle_automation(**run_kwargs)
     result: dict[str, object] = {
         "scope": scope,
@@ -352,10 +464,53 @@ def _dispatch_automation(
     return result
 
 
+@router.get("/automation")
+def get_automation_config(
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    try:
+        return _automation_config_envelope(_automation_config_state(store))
+    except (OSError, sqlite3.Error):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "security_lifecycle_profile_store_unavailable",
+                "store": "profile",
+            },
+        ) from None
+
+
+@router.put("/automation")
+def put_automation_config(
+    body: LifecycleAutomationConfigRequest,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    config = SecurityLifecycleAutomationConfig(**body.model_dump())
+    require_profile_state_write(
+        "security_lifecycle_automation_config_update",
+        body.model_dump(),
+    )
+    try:
+        store.update_settings(
+            serialize_security_lifecycle_automation_config(config)
+        )
+        return _automation_config_envelope(_automation_config_state(store))
+    except (OSError, sqlite3.Error):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "security_lifecycle_profile_store_unavailable",
+                "store": "profile",
+            },
+        ) from None
+
+
 @router.post("/automation/run")
-def run_due_automation():
+def run_due_automation(
+    config_store: ProfileStateStore = Depends(get_profile_store),
+):
     require_db_write("security_lifecycle_run_automation", {"scope": "due"})
-    return _dispatch_automation(scope="due")
+    return _dispatch_automation(scope="due", config_store=config_store)
 
 
 @router.post("/cases/{case_id}/automation/run")
@@ -364,6 +519,7 @@ def run_case_automation(
     service: SecurityLifecycleReadService = Depends(
         get_security_lifecycle_read_service
     ),
+    config_store: ProfileStateStore = Depends(get_profile_store),
 ):
     try:
         service.get_case(case_id)
@@ -371,7 +527,11 @@ def run_case_automation(
             "security_lifecycle_run_automation",
             {"case_id": case_id, "scope": "case"},
         )
-        result = _dispatch_automation(scope="case", case_id=case_id)
+        result = _dispatch_automation(
+            scope="case",
+            case_id=case_id,
+            config_store=config_store,
+        )
         if result.get("reason") == "already_running":
             raise HTTPException(
                 status_code=409,

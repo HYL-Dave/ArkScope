@@ -932,8 +932,7 @@ class ProfileStateStore:
                 f"WHERE key IN ({placeholders})",
                 unique_keys,
             ).fetchall()
-        observed = {str(row["key"]): row["value"] for row in rows}
-        return {key: observed.get(key) for key in unique_keys}
+        return {str(row["key"]): row["value"] for row in rows}
 
     def update_settings(self, values: Mapping[str, Optional[str]]) -> None:
         try:

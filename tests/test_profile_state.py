@@ -1181,14 +1181,13 @@ _AUTOMATION_SETTING_KEYS = (
 )
 
 
-def test_profile_settings_snapshot_returns_requested_missing_keys(store):
+def test_profile_settings_snapshot_distinguishes_missing_from_present_null(store):
     store.set_setting(_AUTOMATION_SETTING_KEYS[0], "true")
+    store.set_setting(_AUTOMATION_SETTING_KEYS[2], None)
 
     assert store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS) == {
         _AUTOMATION_SETTING_KEYS[0]: "true",
-        _AUTOMATION_SETTING_KEYS[1]: None,
         _AUTOMATION_SETTING_KEYS[2]: None,
-        _AUTOMATION_SETTING_KEYS[3]: None,
     }
 
 

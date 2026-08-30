@@ -228,6 +228,104 @@ def test_recorded_runner_persists_result_before_releasing_execution_lock(
     assert events == ["lock_acquired", "worker", "record", "lock_released"]
 
 
+def test_acquired_runner_records_durable_attempt_before_worker(monkeypatch):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+
+    @contextmanager
+    def execution_lock():
+        events.append("lock_acquired")
+        try:
+            yield SimpleNamespace(execution_owner_id="attempt-owner")
+        finally:
+            events.append("lock_released")
+
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_execution_lock",
+        execution_lock,
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_record_automation_attempt",
+        lambda *, now: events.append(("attempt", now)),
+        raising=False,
+    )
+    monkeypatch.setattr(scheduler, "_reconcile_running_rows", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        scheduler,
+        "_run_owned_automation_batch",
+        lambda **_kwargs: events.append("worker") or _v2_summary(),
+    )
+
+    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _v2_summary()
+    assert events == [
+        "lock_acquired",
+        ("attempt", _NOW),
+        "worker",
+        "lock_released",
+    ]
+
+
+def test_acquired_runner_persists_the_authoritative_last_attempt(monkeypatch):
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    @contextmanager
+    def execution_lock():
+        yield SimpleNamespace(execution_owner_id="durable-attempt-owner")
+
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_execution_lock",
+        execution_lock,
+    )
+    monkeypatch.setattr(scheduler, "_reconcile_running_rows", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        scheduler,
+        "_run_owned_automation_batch",
+        lambda **_kwargs: _v2_summary(),
+    )
+
+    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _v2_summary()
+
+    state = SchedulerStateStore(scheduler._profile_path()).get(
+        "security_lifecycle.automation"
+    )
+    assert state is not None
+    assert state["last_attempt"] == "2026-08-25T13:00:00Z"
+    assert state["last_status"] == "running"
+
+
+def test_execution_lock_collision_does_not_advance_attempt_clock(monkeypatch):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationAlreadyRunning,
+    )
+
+    @contextmanager
+    def busy_lock():
+        raise LifecycleAutomationAlreadyRunning()
+        yield
+
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_execution_lock",
+        busy_lock,
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_record_automation_attempt",
+        lambda **_kwargs: pytest.fail("lock miss must not advance the clock"),
+    )
+
+    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _v2_summary(
+        status="skipped",
+        reason="already_running",
+    )
+
+
 def test_dispatch_acquires_ownership_before_return_and_transfers_exact_lease(
     monkeypatch,
 ):
@@ -312,6 +410,8 @@ def test_dispatch_acquires_ownership_before_return_and_transfers_exact_lease(
         "lock_released",
     ]
     worker_kwargs = next(value for name, value in events if name == "worker")
+    mutation_allowed = worker_kwargs.pop("transition_mutation_allowed")
+    assert mutation_allowed() is False
     assert worker_kwargs == {
         "limit": 1,
         "at": "2026-08-25T13:00:00Z",
@@ -356,10 +456,55 @@ def test_dispatch_thread_start_failure_releases_transferred_ownership(
     )
     monkeypatch.setattr(scheduler.threading, "Thread", FailingThread)
 
-    with pytest.raises(RuntimeError, match="thread start failed"):
-        scheduler.dispatch_and_record_security_lifecycle_automation(now=_NOW)
+    result = scheduler.dispatch_and_record_security_lifecycle_automation(now=_NOW)
 
+    assert result == {
+        "status": "unavailable",
+        "reason": "automation_scheduler_failed",
+    }
     assert events == ["lock_acquired", "lock_released"]
+
+
+def test_dispatch_thread_start_failure_closes_the_durable_attempt(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "thread-start-failure.db"
+    JobRunsLocalStore(profile_path)
+    with sqlite3.connect(profile_path) as conn:
+        SecurityLifecycleInvestigationStore(conn)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+
+    class FailingThread:
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            raise RuntimeError("thread start failed")
+
+    monkeypatch.setattr(scheduler.threading, "Thread", FailingThread)
+
+    result = scheduler.dispatch_and_record_security_lifecycle_automation(
+        now=_NOW
+    )
+
+    assert result == {
+        "status": "unavailable",
+        "reason": "automation_scheduler_failed",
+    }
+    state = SchedulerStateStore(profile_path).get(
+        "security_lifecycle.automation"
+    )
+    assert state is not None
+    assert state["last_attempt"] == "2026-08-25T13:00:00Z"
+    assert state["last_status"] == "failed"
 
 
 def test_scheduled_runner_grants_only_due_failed_retry_authority(monkeypatch):
@@ -388,11 +533,13 @@ def test_scheduled_runner_grants_only_due_failed_retry_authority(monkeypatch):
         limit=2,
         at="2026-08-25T13:00:00Z",
         execution_owner_id="scheduled-owner",
+        transition_mutation_allowed=lambda: False,
     ) == _v2_summary()
     worker_kwargs = next(item[1] for item in captured if item[0] == "worker")
     assert worker_kwargs["allow_due_failed_retry"] is True
     assert worker_kwargs["allow_new_attempt"] is False
     assert worker_kwargs["target_case_id"] is None
+    assert worker_kwargs["transition_mutation_allowed"]() is False
 
 
 def test_recorded_attended_runner_targets_one_case_and_grants_new_attempt_only(
@@ -421,6 +568,8 @@ def test_recorded_attended_runner_targets_one_case_and_grants_new_attempt_only(
         target_case_id="slc_attended",
         allow_new_attempt=True,
     ) == result
+    mutation_allowed = captured[0].pop("transition_mutation_allowed")
+    assert mutation_allowed() is False
     assert captured == [
         {
             "limit": 1,
@@ -673,6 +822,32 @@ def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch)
     )
 
 
+def test_recorded_schema_absent_attempt_does_not_remain_running(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "pre-cutover-recorded.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+
+    result = scheduler.run_and_record_security_lifecycle_automation(now=_NOW)
+
+    assert result == _v2_summary(
+        status="not_installed",
+        reason="automation_schema_absent",
+    )
+    state = SchedulerStateStore(profile_path).get(
+        "security_lifecycle.automation"
+    )
+    assert state is not None
+    assert state["last_attempt"] == "2026-08-25T13:00:00Z"
+    assert state["last_status"] == "not_installed"
+
+
 def test_failed_case_skipped_on_next_real_tick_does_not_record_recovery(
     tmp_path,
     monkeypatch,
@@ -725,6 +900,7 @@ def test_failed_case_skipped_on_next_real_tick_does_not_record_recovery(
             transition_approver=lambda **_kwargs: pytest.fail(
                 "transition approval reached"
             ),
+            transition_mutation_allowed=lambda: True,
             clock=lambda: "2026-08-25T13:00:00Z",
             execution_owner_id=owner,
         )
@@ -915,6 +1091,7 @@ def test_blocked_case_is_not_an_operational_failure_witness(
         transition_approver=lambda **_kwargs: pytest.fail(
             "transition approval reached"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: "2026-08-25T13:00:00Z",
         execution_owner_id="blocked-owner",
     ).run(limit=1)
@@ -1080,6 +1257,7 @@ def test_version_one_mixed_batch_reconstructs_only_the_failed_case_incident(
         transition_approver=lambda **_kwargs: pytest.fail(
             "transition approval reached"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: "2026-08-25T13:00:00Z",
         execution_owner_id="legacy-mixed-owner",
     ).run(limit=2)
@@ -1251,11 +1429,13 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
     scheduler._worker(
         evidence_loader=marker,
         execution_owner_id="test-scheduler-owner",
+        transition_mutation_allowed=lambda: True,
     )
     assert captured_worker["evidence_loader"] is marker
     assert captured_worker["execution_owner_id"] == "test-scheduler-owner"
     assert captured_worker["transition_preview"] is scheduler._transition_preview
     assert captured_worker["transition_approver"] is scheduler._transition_approver
+    assert captured_worker["transition_mutation_allowed"]() is True
     assert calls[0][0] == "preview"
     assert calls[-1] == ("approve", "slc_1", request)
 
@@ -1734,6 +1914,7 @@ def test_ibkr_identity_ambiguity_blocks_one_case_and_the_later_case_runs(tmp_pat
         transition_approver=lambda **_kwargs: pytest.fail(
             "blocked cases must not approve transitions"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: "2026-08-25T13:00:00Z",
         execution_owner_id="identity-containment-owner",
     ).run(limit=2)
@@ -1931,6 +2112,7 @@ def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
         transition_approver=lambda **_kwargs: pytest.fail(
             "blocked cases must not approve transitions"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: "2026-08-25T13:00:00Z",
         execution_owner_id="identity-real-seam-owner",
     )
@@ -3178,6 +3360,7 @@ def test_due_listing_retry_preserves_closed_sec_chain_and_refreshes_listing(
         transition_approver=lambda **_kwargs: pytest.fail(
             "blocked case must not approve a transition"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: now[0],
         execution_owner_id="closed-sec-reuse-owner",
     )
@@ -3279,6 +3462,7 @@ def test_due_sec_typed_failure_retains_exact_regulator_rows_until_recovery(
         transition_approver=lambda **_kwargs: pytest.fail(
             "typed provider failure must not approve a transition"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: now[0],
         execution_owner_id="typed-sec-family-owner",
     )
@@ -3626,6 +3810,7 @@ def test_due_listing_typed_failure_keeps_old_listing_and_new_sec_until_recovery(
         transition_approver=lambda **_kwargs: pytest.fail(
             "pending provider work must not approve a transition"
         ),
+        transition_mutation_allowed=lambda: True,
         clock=lambda: now[0],
         execution_owner_id="typed-listing-family-owner",
     )
@@ -3780,6 +3965,7 @@ def test_malformed_sec_content_keeps_source_payload_invalid_single_retry(
             transition_approver=lambda **_kwargs: pytest.fail(
                 "failed case must not approve a transition"
             ),
+            transition_mutation_allowed=lambda: True,
             clock=lambda: now[0],
             execution_owner_id="malformed-sec-owner",
             allow_due_failed_retry=allow_due_failed_retry,

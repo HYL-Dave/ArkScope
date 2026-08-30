@@ -175,6 +175,42 @@ def test_config_and_state_are_immutable_and_serialize_canonically():
         state.invalid_keys = (ENABLED_KEY,)
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {
+            "enabled": 1,
+            "interval_minutes": 5,
+            "batch_limit": 2,
+            "apply_profile_transitions": False,
+        },
+        {
+            "enabled": True,
+            "interval_minutes": 4,
+            "batch_limit": 2,
+            "apply_profile_transitions": False,
+        },
+        {
+            "enabled": True,
+            "interval_minutes": 5,
+            "batch_limit": 3,
+            "apply_profile_transitions": False,
+        },
+        {
+            "enabled": True,
+            "interval_minutes": 5,
+            "batch_limit": 2,
+            "apply_profile_transitions": 0,
+        },
+    ],
+)
+def test_config_object_cannot_serialize_values_the_persisted_parser_rejects(
+    kwargs,
+):
+    with pytest.raises(ValueError):
+        SecurityLifecycleAutomationConfig(**kwargs)
+
+
 def test_first_boot_is_due_now():
     schedule = calculate_security_lifecycle_automation_schedule(
         last_attempt=None,

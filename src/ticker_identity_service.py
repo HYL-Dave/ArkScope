@@ -192,7 +192,7 @@ class TickerIdentityService:
         *,
         on_date: str,
         limit: int,
-        allow_automation_approved: bool = True,
+        allow_automation_approved: bool,
     ) -> list[dict]:
         with self._profile_connection(write=False) as conn:
             return self._store(conn).list_due(

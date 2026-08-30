@@ -266,31 +266,31 @@ transitions default off.
 - Test: `tests/test_profile_state.py`
 - Test: `tests/test_security_lifecycle_routes.py`
 
-- [ ] Add Settings contract REDs for enabled, five-minute default interval,
+- [x] Add Settings contract REDs for enabled, five-minute default interval,
   batch limit 1/2, and `apply_profile_transitions=false` default.
-- [ ] Parse present values strictly: canonical booleans, interval 5-10,080,
+- [x] Parse present values strictly: canonical booleans, interval 5-10,080,
   and batch 1/2. Malformed stored config disables background work and mutation
   authority instead of silently applying defaults.
-- [ ] Add one snapshot read and one transactional four-key update to the
+- [x] Add one snapshot read and one transactional four-key update to the
   profile-settings boundary; validate the complete effective config before
   writing and prove injected failure rolls the whole update back.
-- [ ] Add A/B REDs proving propose-only still accepts verified decisions,
+- [x] Add A/B REDs proving propose-only still accepts verified decisions,
   creates notify/remap proposals, and keeps waiting recheck clocks.
-- [ ] Gate both new transition approval and transition revalidation in the
+- [x] Gate both new transition approval and transition revalidation in the
   worker. Re-read mutation authority at each approval boundary; a run-start
   snapshot must not outlive an operator toggle.
-- [ ] Gate scheduler application of existing
+- [x] Gate scheduler application of existing
   `approval_authority=automation_policy` transitions while preserving attended
   approvals. Apply the authority predicate in SQL before `ORDER BY/LIMIT` so
   older automation rows cannot starve an attended transition.
-- [ ] Move lifecycle invocation behind one shared due calculation over the
+- [x] Move lifecycle invocation behind one shared due calculation over the
   existing durable `scheduler_state.last_attempt` instead of every 30-second
   supervisor pass. Only an invocation that acquires execution ownership
   advances the clock; Task 9 must reuse the same next-scheduled projection.
-- [ ] Expose GET/PUT automation config with a complete PUT body and stable
+- [x] Expose GET/PUT automation config with a complete PUT body and stable
   config/config-status envelope. Manual Run bypasses only enabled/interval,
   retains case limit 1, and still obeys current mutation authority.
-- [ ] Add mutations for missing-key defaults, approval gate, due-scheduler gate,
+- [x] Add mutations for missing-key defaults, approval gate, due-scheduler gate,
   malformed-value fail-closed behavior, transactional rollback, SQL pre-limit
   filtering, attended-approval preservation, and interval enforcement.
 

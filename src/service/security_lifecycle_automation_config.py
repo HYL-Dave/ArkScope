@@ -36,6 +36,19 @@ class SecurityLifecycleAutomationConfig:
     batch_limit: int
     apply_profile_transitions: bool
 
+    def __post_init__(self) -> None:
+        if type(self.enabled) is not bool:
+            raise ValueError("enabled")
+        if (
+            type(self.interval_minutes) is not int
+            or not 5 <= self.interval_minutes <= 10_080
+        ):
+            raise ValueError("interval_minutes")
+        if type(self.batch_limit) is not int or self.batch_limit not in {1, 2}:
+            raise ValueError("batch_limit")
+        if type(self.apply_profile_transitions) is not bool:
+            raise ValueError("apply_profile_transitions")
+
 
 DEFAULT_SECURITY_LIFECYCLE_AUTOMATION_CONFIG = SecurityLifecycleAutomationConfig(
     enabled=True,

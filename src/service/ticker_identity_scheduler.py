@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 import json
 from datetime import datetime, timezone
 import logging
@@ -27,6 +27,17 @@ _RUNNER_STATUSES = frozenset(
 _RUNNER_REASONS = TICKER_IDENTITY_STORE_UNAVAILABLE_REASONS | frozenset(
     {"ticker_identity_scheduler_failed", "transition_execution_failed"}
 )
+
+
+class AutomationTransitionMutationDisabled(RuntimeError):
+    """The operator disabled automation after this row was selected."""
+
+
+def _mutation_allowed(callback: Callable[[], bool]) -> bool:
+    try:
+        return callback() is True
+    except Exception:
+        return False
 
 
 def _service() -> TickerIdentityService:
@@ -329,6 +340,7 @@ def record_ticker_identity_scheduler_result(
 def run_due_ticker_identity_transitions(
     *,
     allow_automation_approved: bool,
+    transition_mutation_allowed: Callable[[], bool],
     limit: int = _DEFAULT_LIMIT,
     now: datetime | None = None,
 ) -> dict:
@@ -336,6 +348,8 @@ def run_due_ticker_identity_transitions(
 
     if not isinstance(allow_automation_approved, bool):
         raise ValueError("allow_automation_approved")
+    if not callable(transition_mutation_allowed):
+        raise TypeError("transition_mutation_allowed")
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10:
         raise ValueError("limit")
     instant = now or datetime.now(timezone.utc)
@@ -361,16 +375,30 @@ def run_due_ticker_identity_transitions(
     for transition in due:
         transition_id = str(transition["transition_id"])
         try:
+            approval_authority = transition.get("approval_authority")
+            if approval_authority not in {"attended_user", "automation_policy"}:
+                raise ValueError("transition_approval_authority")
+
+            def before_write(
+                *,
+                transition_id=transition_id,
+                approval_authority=approval_authority,
+            ) -> None:
+                if (
+                    approval_authority == "automation_policy"
+                    and not _mutation_allowed(transition_mutation_allowed)
+                ):
+                    raise AutomationTransitionMutationDisabled()
+                require_profile_state_write(
+                    "execute_approved_ticker_transition",
+                    {"transition_id": transition_id},
+                )
+
             result = service.execute_transition(
                 transition_id,
                 preview_sha256=str(transition["approved_preview_sha256"]),
                 trigger="scheduler",
-                before_write=lambda transition_id=transition_id: (
-                    require_profile_state_write(
-                        "execute_approved_ticker_transition",
-                        {"transition_id": transition_id},
-                    )
-                ),
+                before_write=before_write,
             )
             if not isinstance(result, Mapping):
                 raise ValueError("unsupported_transition_result")

@@ -102,6 +102,7 @@ def _build_context(
         observation_fingerprint,
     )
     from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+    from src.profile_state import ProfileStateStore
 
     market_path = tmp_path / "market_data.db"
     profile_path = tmp_path / "profile_state.db"
@@ -151,11 +152,13 @@ def _build_context(
         profile_db_path=str(profile_path),
         source_loader=lambda: {"EA": ("manual_lists",)},
     )
+    settings_store = ProfileStateStore(profile_path)
     return {
         "market_path": market_path,
         "profile_path": profile_path,
         "profile_conn": profile_conn,
         "store": profile_store,
+        "settings_store": settings_store,
         "service": service,
         "case_id": case_id,
         "fingerprint": fingerprint,
@@ -174,9 +177,13 @@ def _client(context, monkeypatch, *, permissions=None):
     app.dependency_overrides[dependencies.get_security_lifecycle_store] = (
         lambda: context["store"]
     )
+    app.dependency_overrides[dependencies.get_profile_store] = (
+        lambda: context["settings_store"]
+    )
     monkeypatch.setattr(routes, "_utc_now", lambda: _AT)
     if permissions is not None:
         monkeypatch.setattr(routes, "require_db_write", permissions)
+        monkeypatch.setattr(routes, "require_profile_state_write", permissions)
     return TestClient(app)
 
 
@@ -388,6 +395,8 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         if method not in {"HEAD", "OPTIONS"}
     }
     expected = {
+        ("GET", "/security-lifecycle/automation"),
+        ("PUT", "/security-lifecycle/automation"),
         ("GET", "/security-lifecycle/cases"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
         ("POST", "/security-lifecycle/automation/run"),
@@ -415,7 +424,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 189
+    assert len(rows) == 191
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",
@@ -425,6 +434,231 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("PUT", "/market-data/security-lifecycle/events/{event_id}"),
         ("PUT", "/market-data/security-lifecycle/relationships/{relationship_id}"),
     }.isdisjoint(rows)
+
+
+def test_automation_config_get_defaults_and_put_replaces_all_four_keys(
+    tmp_path,
+    monkeypatch,
+):
+    context = _build_context(tmp_path)
+    permission_calls = []
+    try:
+        client = _client(
+            context,
+            monkeypatch,
+            permissions=lambda action, detail: permission_calls.append(
+                (action, detail)
+            ),
+        )
+
+        initial = client.get("/security-lifecycle/automation")
+        assert initial.status_code == 200
+        assert initial.json() == {
+            "config_status": "valid",
+            "config": {
+                "enabled": True,
+                "interval_minutes": 5,
+                "batch_limit": 2,
+                "apply_profile_transitions": False,
+            },
+        }
+
+        replacement = {
+            "enabled": False,
+            "interval_minutes": 60,
+            "batch_limit": 1,
+            "apply_profile_transitions": True,
+        }
+        updated = client.put(
+            "/security-lifecycle/automation",
+            json=replacement,
+        )
+        assert updated.status_code == 200
+        assert updated.json() == {
+            "config_status": "valid",
+            "config": replacement,
+        }
+        assert client.get("/security-lifecycle/automation").json() == updated.json()
+        assert permission_calls == [
+            ("security_lifecycle_automation_config_update", replacement)
+        ]
+    finally:
+        context["profile_conn"].close()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "enabled": True,
+            "interval_minutes": 5,
+            "batch_limit": 2,
+        },
+        {
+            "enabled": True,
+            "interval_minutes": 5,
+            "batch_limit": 2,
+            "apply_profile_transitions": False,
+            "unexpected": True,
+        },
+        {
+            "enabled": "true",
+            "interval_minutes": 5,
+            "batch_limit": 2,
+            "apply_profile_transitions": False,
+        },
+    ],
+)
+def test_automation_config_put_requires_an_exact_strict_body(
+    tmp_path,
+    monkeypatch,
+    body,
+):
+    context = _build_context(tmp_path)
+    try:
+        response = _client(context, monkeypatch).put(
+            "/security-lifecycle/automation",
+            json=body,
+        )
+        assert response.status_code == 422
+        assert context["settings_store"].get_settings_snapshot(
+            (
+                "security_lifecycle.automation.enabled",
+                "security_lifecycle.automation.interval_minutes",
+                "security_lifecycle.automation.batch_limit",
+                "security_lifecycle.automation.apply_profile_transitions",
+            )
+        ) == {}
+    finally:
+        context["profile_conn"].close()
+
+
+def test_invalid_stored_automation_config_is_visible_and_blocks_manual_run(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path)
+    context["settings_store"].set_setting(
+        "security_lifecycle.automation.interval_minutes",
+        "05",
+    )
+    dispatch_calls = []
+    monkeypatch.setattr(
+        routes,
+        "dispatch_and_record_security_lifecycle_automation",
+        lambda **kwargs: dispatch_calls.append(kwargs) or {"status": "started"},
+    )
+    try:
+        client = _client(context, monkeypatch, permissions=lambda *_args: None)
+        status = client.get("/security-lifecycle/automation")
+        run = client.post("/security-lifecycle/automation/run")
+
+        assert status.status_code == 200
+        assert status.json() == {
+            "config_status": "invalid",
+            "config": None,
+            "invalid_keys": [
+                "security_lifecycle.automation.interval_minutes"
+            ],
+        }
+        assert run.status_code == 409
+        assert run.json()["detail"] == {
+            "code": "automation_config_invalid",
+            "invalid_keys": [
+                "security_lifecycle.automation.interval_minutes"
+            ],
+        }
+        assert dispatch_calls == []
+    finally:
+        context["profile_conn"].close()
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    (
+        "/security-lifecycle/automation/run",
+        "/security-lifecycle/cases/{case_id}/automation/run",
+    ),
+)
+def test_manual_run_reports_profile_config_store_failure_as_typed_503(
+    tmp_path,
+    monkeypatch,
+    endpoint,
+):
+    context = _build_context(tmp_path)
+
+    def unavailable(_keys):
+        raise sqlite3.OperationalError("private path must not leak")
+
+    monkeypatch.setattr(
+        context["settings_store"],
+        "get_settings_snapshot",
+        unavailable,
+    )
+    try:
+        response = _client(
+            context,
+            monkeypatch,
+            permissions=lambda *_args: None,
+        ).post(endpoint.format(case_id=context["case_id"]))
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == {
+            "code": "security_lifecycle_profile_store_unavailable",
+            "store": "profile",
+        }
+        assert "private path" not in response.text
+    finally:
+        context["profile_conn"].close()
+
+
+def test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_gate(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+    from src.service.security_lifecycle_automation_config import (
+        APPLY_PROFILE_TRANSITIONS_KEY,
+    )
+
+    context = _build_context(tmp_path)
+    context["settings_store"].update_settings(
+        {
+            "security_lifecycle.automation.enabled": "false",
+            "security_lifecycle.automation.interval_minutes": "60",
+            "security_lifecycle.automation.batch_limit": "1",
+            APPLY_PROFILE_TRANSITIONS_KEY: "false",
+        }
+    )
+    dispatch_calls = []
+    monkeypatch.setattr(
+        routes,
+        "dispatch_and_record_security_lifecycle_automation",
+        lambda **kwargs: dispatch_calls.append(kwargs) or {"status": "started"},
+    )
+    try:
+        response = _client(
+            context,
+            monkeypatch,
+            permissions=lambda *_args: None,
+        ).post("/security-lifecycle/automation/run")
+
+        assert response.status_code == 200
+        assert response.json() == {"scope": "due", "status": "started"}
+        assert len(dispatch_calls) == 1
+        call = dispatch_calls[0]
+        mutation_allowed = call.pop("transition_mutation_allowed")
+        assert call == {"limit": 1}
+        assert mutation_allowed() is False
+        context["settings_store"].set_setting(
+            APPLY_PROFILE_TRANSITIONS_KEY,
+            "true",
+        )
+        assert mutation_allowed() is True
+    finally:
+        context["profile_conn"].close()
 
 
 def test_global_automation_run_dispatches_the_recorded_due_boundary(
@@ -455,7 +689,9 @@ def test_global_automation_run_dispatches_the_recorded_due_boundary(
 
         assert response.status_code == 200
         assert response.json() == {"scope": "due", "status": "started"}
-        assert dispatch_calls == [{}]
+        mutation_allowed = dispatch_calls[0].pop("transition_mutation_allowed")
+        assert mutation_allowed() is False
+        assert dispatch_calls == [{"limit": 2}]
         assert permission_calls == [
             ("security_lifecycle_run_automation", {"scope": "due"})
         ]
@@ -490,6 +726,8 @@ def test_case_automation_run_dispatches_exact_attended_authority(
             "scope": "case",
             "status": "started",
         }
+        mutation_allowed = dispatch_calls[0].pop("transition_mutation_allowed")
+        assert mutation_allowed() is False
         assert dispatch_calls == [
             {
                 "allow_new_attempt": True,
@@ -666,6 +904,8 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
             "status": "started",
         }
         assert len(worker_calls) == 1
+        mutation_allowed = worker_calls[0].pop("transition_mutation_allowed")
+        assert mutation_allowed() is False
         assert worker_calls == [
             {
                 "limit": 1,

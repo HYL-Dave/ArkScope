@@ -237,6 +237,7 @@ class LifecycleAutomationWorker:
         source_loader: Callable[[], Mapping[str, Iterable[str]]],
         transition_preview: Callable[..., Mapping[str, object]],
         transition_approver: Callable[..., Mapping[str, object]],
+        transition_mutation_allowed: Callable[[], bool],
         clock: Callable[[], str],
         execution_owner_id: str,
         allow_due_failed_retry: bool = False,
@@ -250,6 +251,7 @@ class LifecycleAutomationWorker:
             "source_loader": source_loader,
             "transition_preview": transition_preview,
             "transition_approver": transition_approver,
+            "transition_mutation_allowed": transition_mutation_allowed,
             "clock": clock,
         }
         if any(not callable(value) for value in dependencies.values()):
@@ -278,11 +280,15 @@ class LifecycleAutomationWorker:
         self._source_loader = source_loader
         self._transition_preview = transition_preview
         self._transition_approver = transition_approver
+        self._transition_mutation_allowed = transition_mutation_allowed
         self._clock = clock
         self._execution_owner_id = execution_owner_id
         self._allow_due_failed_retry = allow_due_failed_retry
         self._allow_new_attempt = allow_new_attempt
         self._target_case_id = target_case_id
+
+    def _may_mutate_profile(self) -> bool:
+        return self._transition_mutation_allowed() is True
 
     @staticmethod
     def _due_recheck(
@@ -362,6 +368,8 @@ class LifecycleAutomationWorker:
         try:
             if transition_revalidation:
                 phase = "approve"
+                if not self._may_mutate_profile():
+                    return "accepted"
                 state = store.project_case_state(
                     str(case["case_id"]),
                     observation_fingerprint_sha256=str(
@@ -536,18 +544,22 @@ class LifecycleAutomationWorker:
                 if proposals.get("block_reason") is not None:
                     raise ValueError("automation_proposals_blocked")
                 if decision.transition_requested:
-                    phase = "approve"
-                    approved = self._transition_approver(
-                        case=case,
-                        request=_transition_request(case, decision),
-                        sources=sources,
-                    )
-                    if (
-                        not isinstance(approved, Mapping)
-                        or approved.get("status") != "approved"
-                        or approved.get("approval_authority") != "automation_policy"
-                    ):
-                        raise ValueError("automation_transition_approval_changed")
+                    if self._may_mutate_profile():
+                        phase = "approve"
+                        approved = self._transition_approver(
+                            case=case,
+                            request=_transition_request(case, decision),
+                            sources=sources,
+                        )
+                        if (
+                            not isinstance(approved, Mapping)
+                            or approved.get("status") != "approved"
+                            or approved.get("approval_authority")
+                            != "automation_policy"
+                        ):
+                            raise ValueError(
+                                "automation_transition_approval_changed"
+                            )
                 phase = "finalize"
                 kernel.complete_terminal_finalization(
                     run_id=run_id,
@@ -713,6 +725,19 @@ class LifecycleAutomationWorker:
                             run.get("action_readiness")
                             == "waiting_transition_revalidation"
                         )
+                        if (
+                            transition_revalidation
+                            and not self._may_mutate_profile()
+                        ):
+                            summary["skipped_current"] = (
+                                int(summary["skipped_current"]) + 1
+                            )
+                            outcomes = summary["case_outcomes"]
+                            assert isinstance(outcomes, dict)
+                            if case_id in outcomes:
+                                raise ValueError("duplicate_case_outcome")
+                            outcomes[case_id] = "skipped_current"
+                            continue
                         claim = kernel.reserve_readiness_recheck(
                             run_id=str(run["run_id"]),
                             due_at=due_at,

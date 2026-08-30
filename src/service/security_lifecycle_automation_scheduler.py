@@ -14,7 +14,7 @@ import sqlite3
 import sys
 import threading
 from types import SimpleNamespace
-from typing import Iterator
+from typing import Callable, Iterator
 
 from src.data_provider_config import MASSIVE_CONFIG_PROVIDER, provider_field_env_value
 from src.security_lifecycle_automation_worker import (
@@ -106,6 +106,22 @@ _RETRYABLE_BLOCKERS = frozenset(
         "listing_status_unresolved",
     }
 )
+
+
+def _profile_transition_mutation_disabled() -> bool:
+    return False
+
+
+def _mutation_authority(
+    value: Callable[[], bool] | None,
+) -> Callable[[], bool]:
+    if value is None:
+        return _profile_transition_mutation_disabled
+    if not callable(value):
+        raise TypeError("transition_mutation_allowed")
+    return value
+
+
 _NASDAQ_LISTING_BLOCKERS = frozenset(
     {
         "listing_directory_unavailable",
@@ -1437,6 +1453,7 @@ def _worker(
     *,
     evidence_loader,
     execution_owner_id: str,
+    transition_mutation_allowed: Callable[[], bool],
     clock=_clock,
     allow_due_failed_retry: bool = False,
     allow_new_attempt: bool = False,
@@ -1450,6 +1467,7 @@ def _worker(
         source_loader=_load_sources,
         transition_preview=_transition_preview,
         transition_approver=_transition_approver,
+        transition_mutation_allowed=transition_mutation_allowed,
         clock=clock,
         execution_owner_id=execution_owner_id,
         allow_due_failed_retry=allow_due_failed_retry,
@@ -1658,6 +1676,7 @@ def _run_owned_automation_batch(
     limit: int,
     at: str,
     execution_owner_id: str,
+    transition_mutation_allowed: Callable[[], bool],
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
 ) -> dict:
@@ -1672,6 +1691,7 @@ def _run_owned_automation_batch(
                     prior_material=prior_material,
                 ),
                 execution_owner_id=execution_owner_id,
+                transition_mutation_allowed=transition_mutation_allowed,
                 clock=lambda: at,
                 allow_due_failed_retry=not allow_new_attempt,
                 allow_new_attempt=allow_new_attempt,
@@ -1722,6 +1742,7 @@ def _run_owned_and_maybe_record(
     instant: datetime,
     at: str,
     execution_owner_id: str,
+    transition_mutation_allowed: Callable[[], bool],
     record_result: bool,
     target_case_id: str | None,
     allow_new_attempt: bool,
@@ -1736,6 +1757,7 @@ def _run_owned_and_maybe_record(
                 limit=limit,
                 at=at,
                 execution_owner_id=execution_owner_id,
+                transition_mutation_allowed=transition_mutation_allowed,
                 target_case_id=target_case_id,
                 allow_new_attempt=allow_new_attempt,
             )
@@ -1770,7 +1792,9 @@ def _run_security_lifecycle_automation(
     record_result: bool,
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
+    transition_mutation_allowed: Callable[[], bool] | None = None,
 ) -> dict:
+    mutation_allowed = _mutation_authority(transition_mutation_allowed)
     instant, at = _automation_request(
         limit=limit,
         now=now,
@@ -1779,11 +1803,13 @@ def _run_security_lifecycle_automation(
     )
     try:
         with lifecycle_automation_execution_lock() as execution:
+            _record_automation_attempt(now=instant)
             return _run_owned_and_maybe_record(
                 limit=limit,
                 instant=instant,
                 at=at,
                 execution_owner_id=execution.execution_owner_id,
+                transition_mutation_allowed=mutation_allowed,
                 record_result=record_result,
                 target_case_id=target_case_id,
                 allow_new_attempt=allow_new_attempt,
@@ -1805,6 +1831,7 @@ def _run_dispatched_owned_automation(
     *,
     lock_context,
     execution_owner_id: str,
+    transition_mutation_allowed: Callable[[], bool],
     limit: int,
     instant: datetime,
     at: str,
@@ -1818,6 +1845,7 @@ def _run_dispatched_owned_automation(
             instant=instant,
             at=at,
             execution_owner_id=execution_owner_id,
+            transition_mutation_allowed=transition_mutation_allowed,
             record_result=True,
             target_case_id=target_case_id,
             allow_new_attempt=allow_new_attempt,
@@ -1835,9 +1863,11 @@ def dispatch_and_record_security_lifecycle_automation(
     *,
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
+    transition_mutation_allowed: Callable[[], bool] | None = None,
 ) -> dict[str, str]:
     """Acquire ownership now and transfer that exact lease to one thread."""
 
+    mutation_allowed = _mutation_authority(transition_mutation_allowed)
     instant, at = _automation_request(
         limit=limit,
         now=now,
@@ -1863,11 +1893,20 @@ def dispatch_and_record_security_lifecycle_automation(
         return {"status": str(result["status"]), "reason": str(result["reason"])}
 
     try:
+        _record_automation_attempt(now=instant)
+    except Exception as exc:
+        lock_context.__exit__(*sys.exc_info())
+        result = _automation_exception_result(exc)
+        _record_automation_result(result, now=instant)
+        return {"status": str(result["status"]), "reason": str(result["reason"])}
+
+    try:
         thread = threading.Thread(
             target=_run_dispatched_owned_automation,
             kwargs={
                 "lock_context": lock_context,
                 "execution_owner_id": execution.execution_owner_id,
+                "transition_mutation_allowed": mutation_allowed,
                 "limit": limit,
                 "instant": instant,
                 "at": at,
@@ -1878,6 +1917,11 @@ def dispatch_and_record_security_lifecycle_automation(
             daemon=True,
         )
         thread.start()
+    except Exception as exc:
+        lock_context.__exit__(*sys.exc_info())
+        result = _automation_exception_result(exc)
+        _record_automation_result(result, now=instant)
+        return {"status": str(result["status"]), "reason": str(result["reason"])}
     except BaseException:
         lock_context.__exit__(*sys.exc_info())
         raise
@@ -1887,6 +1931,8 @@ def dispatch_and_record_security_lifecycle_automation(
 def run_security_lifecycle_automation(
     limit: int = _DEFAULT_LIMIT,
     now: datetime | None = None,
+    *,
+    transition_mutation_allowed: Callable[[], bool] | None = None,
 ) -> dict:
     """Run one exclusively owned batch without recording its result."""
 
@@ -1894,6 +1940,7 @@ def run_security_lifecycle_automation(
         limit=limit,
         now=now,
         record_result=False,
+        transition_mutation_allowed=transition_mutation_allowed,
     )
 
 
@@ -1903,6 +1950,7 @@ def run_and_record_security_lifecycle_automation(
     *,
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
+    transition_mutation_allowed: Callable[[], bool] | None = None,
 ) -> dict:
     """Run and persist one batch before releasing exclusive ownership."""
 
@@ -1912,6 +1960,7 @@ def run_and_record_security_lifecycle_automation(
         record_result=True,
         target_case_id=target_case_id,
         allow_new_attempt=allow_new_attempt,
+        transition_mutation_allowed=transition_mutation_allowed,
     )
 
 
@@ -1932,6 +1981,30 @@ def _job_runs_connection() -> sqlite3.Connection | None:
             conn.close()
         return None
     return conn
+
+
+def _record_automation_attempt(*, now: datetime) -> None:
+    conn = _job_runs_connection()
+    if conn is None:
+        raise sqlite3.OperationalError("profile_store_unavailable")
+    at = _timestamp(_aware_instant(now))
+    try:
+        ensure_scheduler_state_schema(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            "INSERT INTO scheduler_state "
+            "(source,last_attempt,last_status,updated_at) VALUES (?,?,'running',?) "
+            "ON CONFLICT(source) DO UPDATE SET "
+            "last_attempt=excluded.last_attempt,last_status='running',"
+            "updated_at=excluded.updated_at",
+            (_JOB_NAME, at, at),
+        )
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _stored_result(raw: object) -> dict | None:
@@ -2308,16 +2381,29 @@ def record_security_lifecycle_automation_result(
         bounded = security_lifecycle_automation_failure(
             "automation_scheduler_failed"
         )
-    if bounded["status"] in {"not_installed", "skipped"}:
+    if bounded["status"] == "skipped":
         return True
 
     conn = _job_runs_connection()
     if conn is None:
+        if bounded["status"] == "not_installed":
+            return True
         _log_witness_unavailable(bounded)
         return False
     try:
         ensure_scheduler_state_schema(conn)
         conn.execute("BEGIN IMMEDIATE")
+        if bounded["status"] == "not_installed":
+            at = _witness_at(now, None)
+            conn.execute(
+                "INSERT INTO scheduler_state "
+                "(source,last_status,last_error,updated_at) VALUES "
+                "(?,'not_installed',NULL,?) ON CONFLICT(source) DO UPDATE SET "
+                "last_status='not_installed',last_error=NULL,updated_at=excluded.updated_at",
+                (_JOB_NAME, at),
+            )
+            conn.commit()
+            return True
         present = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_runs'"
         ).fetchone()

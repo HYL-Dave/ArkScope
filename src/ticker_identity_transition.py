@@ -1655,7 +1655,7 @@ class TickerIdentityTransitionStore:
         *,
         on_date: str,
         limit: int,
-        allow_automation_approved: bool = True,
+        allow_automation_approved: bool,
     ) -> list[dict]:
         try:
             if date.fromisoformat(on_date).isoformat() != on_date:
