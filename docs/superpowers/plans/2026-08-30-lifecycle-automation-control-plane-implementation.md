@@ -221,11 +221,17 @@ transitions default off.
 - [ ] Preserve prior rows during reservation and pass validated prior material
   into evidence acquisition.
 - [ ] Reuse regulator material only for unchanged observation, complete chain,
-  valid citations, and a closed widened window.
+  valid citations, a closed widened window, and proof that every retained SEC
+  row was acquired strictly after that window closed.
 - [ ] Add positive controls showing an in-window retry and incomplete chain both
   reacquire SEC.
+- [ ] Preserve exact prior rows for a provider family whose current acquisition
+  returns a typed unavailable blocker, but exclude those preserved rows from
+  evaluation. Replace only successfully refreshed or deliberately unneeded
+  families, under an explicit kernel refresh contract.
 - [ ] Make `massive_credential_missing` nonretryable/operator-actionable. Saving
-  a credential plus attended case run is its recovery path.
+  a credential plus attended case run is its recovery path; reject a retryable
+  new shape and prevent legacy retryable rows from auto-reserving.
 - [ ] Keep `source_payload_invalid` distinct and cover its one automatic retry;
   do not rename malformed content into transport success.
 - [ ] Add mutations for each reuse predicate and provider-family refresh gate.
@@ -233,31 +239,51 @@ transitions default off.
 ## Task 8: Split Background Analysis From Profile Mutation Authority
 
 **Files:**
+- Add: `src/service/security_lifecycle_automation_config.py`
 - Modify: `src/service/security_lifecycle_automation_scheduler.py`
 - Modify: `src/security_lifecycle_automation_worker.py`
 - Modify: `src/service/data_scheduler.py`
 - Modify: `src/service/ticker_identity_scheduler.py`
-- Modify: `src/profile_state.py` only through existing setting accessors
+- Modify: `src/profile_state.py`
+- Modify: `src/ticker_identity_service.py`
+- Modify: `src/ticker_identity_transition.py`
 - Modify: `src/api/routes/security_lifecycle.py`
+- Test: `tests/test_security_lifecycle_automation_config.py`
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_security_lifecycle_automation_worker.py`
 - Test: `tests/test_data_scheduler.py`
 - Test: `tests/test_ticker_identity_scheduler.py`
+- Test: `tests/test_ticker_identity_transition.py`
+- Test: `tests/test_profile_state.py`
 - Test: `tests/test_security_lifecycle_routes.py`
 
 - [ ] Add Settings contract REDs for enabled, five-minute default interval,
   batch limit 1/2, and `apply_profile_transitions=false` default.
+- [ ] Parse present values strictly: canonical booleans, interval 5-10,080,
+  and batch 1/2. Malformed stored config disables background work and mutation
+  authority instead of silently applying defaults.
+- [ ] Add one snapshot read and one transactional four-key update to the
+  profile-settings boundary; validate the complete effective config before
+  writing and prove injected failure rolls the whole update back.
 - [ ] Add A/B REDs proving propose-only still accepts verified decisions,
   creates notify/remap proposals, and keeps waiting recheck clocks.
-- [ ] Gate only transition approval in the worker.
+- [ ] Gate both new transition approval and transition revalidation in the
+  worker. Re-read mutation authority at each approval boundary; a run-start
+  snapshot must not outlive an operator toggle.
 - [ ] Gate scheduler application of existing
   `approval_authority=automation_policy` transitions while preserving attended
-  approvals.
-- [ ] Move lifecycle invocation behind its own due calculation instead of every
-  30-second supervisor pass.
-- [ ] Expose GET/PUT automation config and validate bounds atomically.
+  approvals. Apply the authority predicate in SQL before `ORDER BY/LIMIT` so
+  older automation rows cannot starve an attended transition.
+- [ ] Move lifecycle invocation behind one shared due calculation over the
+  existing durable `scheduler_state.last_attempt` instead of every 30-second
+  supervisor pass. Only an invocation that acquires execution ownership
+  advances the clock; Task 9 must reuse the same next-scheduled projection.
+- [ ] Expose GET/PUT automation config with a complete PUT body and stable
+  config/config-status envelope. Manual Run bypasses only enabled/interval,
+  retains case limit 1, and still obeys current mutation authority.
 - [ ] Add mutations for missing-key defaults, approval gate, due-scheduler gate,
-  attended-approval preservation, and interval enforcement.
+  malformed-value fail-closed behavior, transactional rollback, SQL pre-limit
+  filtering, attended-approval preservation, and interval enforcement.
 
 ## Task 9: Add Runtime Stage Registry and Status API
 

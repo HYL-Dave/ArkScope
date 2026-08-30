@@ -305,13 +305,25 @@ hold:
 - observation fingerprint is unchanged;
 - the persisted regulator locator says `filing_chain_complete=true`;
 - every persisted citation still validates; and
-- the current date is later than the observation's widened 120-day end.
+- the current date is later than the observation's widened 120-day end; and
+- every retained regulator row was itself acquired strictly after that widened
+  end, so one final post-window SEC refresh has actually observed the closed
+  filing interval.
 
 Inside the window or with an incomplete chain, SEC is reacquired. Listing and
 conditional IBKR evidence are refreshed according to the blocker and current
 decision need. `massive_credential_missing` is operator-actionable and
 non-retryable; saving the credential plus attended Run again is the recovery
 path.
+
+A provider family that returns a typed acquisition failure does not replace or
+delete that family's previously persisted rows. Those rows are preserved only
+for later retry and audit; they are excluded from the current evaluation.
+Successfully refreshed families replace their old rows atomically, so a
+post-window SEC success remains reusable even when the listing refresh in the
+same attempt fails. Every retained or preserved row must exactly match current
+persisted material, and a due retry must supply an explicit family refresh
+contract.
 
 ## 9. Settings and Mutation Authority
 
@@ -329,6 +341,17 @@ current decision and monitoring behavior. The configurable interval prevents a
 full case composition every 30 seconds; its default is five minutes. Batch
 limit remains bounded to 1 or 2 and defaults to 2.
 
+Persisted booleans use only the canonical strings `true` and `false`.
+`interval_minutes` accepts integers from 5 through 10,080; `batch_limit`
+accepts only 1 or 2. Missing keys receive the defaults above. Any present,
+malformed value makes the complete stored configuration invalid: background
+analysis is not dispatched, automatic mutation is fail-closed, and attended
+Run returns a typed configuration error rather than guessing.
+
+The four values are read as one snapshot and written in one profile-store
+transaction after the complete replacement has validated. The API never
+performs four independent `set_setting` writes.
+
 `apply_profile_transitions` defaults to false. With that value:
 
 - verified-automatic decisions may still be accepted by automation policy;
@@ -341,6 +364,22 @@ limit remains bounded to 1 or 2 and defaults to 2.
 Attended approvals keep their existing scheduling behavior. Enabling automatic
 profile transitions is an explicit operator action and never follows merely
 from enabling background analysis.
+
+The worker checks mutation authority again at both approval boundaries: a new
+transition approval and a due transition revalidation. A value captured when a
+long provider run started cannot authorize approval after the operator turns
+the setting off. The due-transition query applies the allowed-authority
+predicate before ordering and limiting; disabled automation rows cannot occupy
+the batch and starve an attended transition.
+
+Background due time is derived from the existing durable
+`scheduler_state.last_attempt` field. One shared function owns
+`last_attempt -> next_scheduled_at -> due` for the supervisor and the Task 9
+status response. The 30-second supervisor may check that cheap predicate, but
+must not compose cases before it is due. An invocation advances the clock only
+after it acquires lifecycle execution ownership. Manual Run bypasses
+`enabled` and interval, but it does not bypass configuration validity or
+mutation authority.
 
 ## 10. Runtime Progress and Durable Status
 
