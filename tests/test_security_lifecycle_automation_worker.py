@@ -482,7 +482,7 @@ class _Harness:
     def clock(self):
         return self.now
 
-    def worker(self, execution_owner_id="test-worker-owner"):
+    def worker(self, execution_owner_id="test-worker-owner", **overrides):
         from src.security_lifecycle_automation_worker import (
             LifecycleAutomationWorker,
         )
@@ -495,6 +495,7 @@ class _Harness:
             transition_preview=self.transition_preview,
             clock=self.clock,
             execution_owner_id=execution_owner_id,
+            **overrides,
         )
         if (
             "transition_approver"
@@ -506,6 +507,7 @@ class _Harness:
     def worker_with_transition_approver(
         self,
         execution_owner_id="test-worker-owner",
+        **overrides,
     ):
         from src.security_lifecycle_automation_worker import (
             LifecycleAutomationWorker,
@@ -520,6 +522,7 @@ class _Harness:
             transition_approver=self.transition_approver,
             clock=self.clock,
             execution_owner_id=execution_owner_id,
+            **overrides,
         )
 
 
@@ -1154,6 +1157,7 @@ def test_terminal_finalization_failure_uses_bounded_backoff_without_hot_loop(
 
     case = _case(1)
     harness = _Harness(tmp_path, [case])
+    original = SecurityLifecycleInvestigationStore.generate_action_proposals
 
     def fail_proposals(*_args, **_kwargs):
         raise ValueError("private fixture detail")
@@ -1201,6 +1205,18 @@ def test_terminal_finalization_failure_uses_bounded_backoff_without_hot_loop(
         exhausted = harness.worker_with_transition_approver().run()
         assert exhausted["processed"] == 0
         assert exhausted["failed"] == 0
+        assert len(_store(harness).list_automation_runs(case["case_id"])) == 1
+
+        monkeypatch.setattr(
+            SecurityLifecycleInvestigationStore,
+            "generate_action_proposals",
+            original,
+        )
+        attended = harness.worker_with_transition_approver(
+            allow_new_attempt=True
+        ).run()
+        assert attended["accepted"] == 1
+        assert attended["failed"] == 0
         assert len(_store(harness).list_automation_runs(case["case_id"])) == 1
     finally:
         harness.conn.close()
@@ -1876,6 +1892,60 @@ def test_worker_records_execution_revision_without_replaying_current_failed_run(
         harness.conn.close()
 
 
+def test_worker_automatic_retry_authority_is_opt_in_and_due_only(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _invalid_persistence_bundle(case)
+    try:
+        first = harness.worker().run()
+        harness.now = "2026-08-25T12:15:00Z"
+        parked = harness.worker().run()
+        due = harness.worker(allow_due_failed_retry=True).run()
+        runs = _store(harness).list_automation_runs(case["case_id"])
+
+        assert first["failed"] == 1
+        assert parked["skipped_current"] == 1
+        assert due["failed"] == 1
+        assert len(runs) == 2
+        assert json.loads(runs[0]["query_context_json"])["predecessor_run_id"] == (
+            runs[1]["run_id"]
+        )
+    finally:
+        harness.conn.close()
+
+
+def test_attended_worker_targets_exact_case_and_creates_new_attempt(tmp_path):
+    cases = [_case(1), _case(2)]
+    harness = _Harness(tmp_path, cases)
+    try:
+        initial = harness.worker().run(limit=2)
+        before = {
+            case["case_id"]: tuple(_store(harness).list_automation_runs(case["case_id"]))
+            for case in cases
+        }
+        harness.now = "2026-08-25T13:00:00Z"
+
+        attended = harness.worker(
+            allow_new_attempt=True,
+            target_case_id=cases[1]["case_id"],
+        ).run(limit=2)
+        after = {
+            case["case_id"]: _store(harness).list_automation_runs(case["case_id"])
+            for case in cases
+        }
+
+        assert initial["accepted"] == 2
+        assert attended["selected"] == 1
+        assert attended["case_ids"] == [cases[1]["case_id"]]
+        assert after[cases[0]["case_id"]] == list(before[cases[0]["case_id"]])
+        assert len(after[cases[1]["case_id"]]) == 2
+        assert json.loads(after[cases[1]["case_id"]][0]["query_context_json"])[
+            "predecessor_run_id"
+        ] == before[cases[1]["case_id"]][0]["run_id"]
+    finally:
+        harness.conn.close()
+
+
 def test_forged_deadline_failure_replays_once_after_execution_revision_change(
     tmp_path,
     monkeypatch,
@@ -1921,7 +1991,7 @@ def test_forged_deadline_failure_replays_once_after_execution_revision_change(
         assert len(runs) == 2
         assert runs[0]["run_id"] != failed_run["run_id"]
         assert (
-            json.loads(runs[0]["query_context_json"])["predecessor_failed_run_id"]
+            json.loads(runs[0]["query_context_json"])["predecessor_run_id"]
             == failed_run["run_id"]
         )
         assert store.get_automation_run(failed_run["run_id"]) == failed_snapshot

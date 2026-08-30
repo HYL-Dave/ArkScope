@@ -1033,6 +1033,9 @@ def _worker(
     evidence_loader,
     execution_owner_id: str,
     clock=_clock,
+    allow_due_failed_retry: bool = False,
+    allow_new_attempt: bool = False,
+    target_case_id: str | None = None,
 ) -> LifecycleAutomationWorker:
     _assert_automation_installed()
     return LifecycleAutomationWorker(
@@ -1044,6 +1047,9 @@ def _worker(
         transition_approver=_transition_approver,
         clock=clock,
         execution_owner_id=execution_owner_id,
+        allow_due_failed_retry=allow_due_failed_retry,
+        allow_new_attempt=allow_new_attempt,
+        target_case_id=target_case_id,
     )
 
 
@@ -1247,6 +1253,8 @@ def _run_owned_automation_batch(
     limit: int,
     at: str,
     execution_owner_id: str,
+    target_case_id: str | None = None,
+    allow_new_attempt: bool = False,
 ) -> dict:
     try:
         with _listing_authority_session(at=at) as session:
@@ -1259,6 +1267,9 @@ def _run_owned_automation_batch(
                 ),
                 execution_owner_id=execution_owner_id,
                 clock=lambda: at,
+                allow_due_failed_retry=not allow_new_attempt,
+                allow_new_attempt=allow_new_attempt,
+                target_case_id=target_case_id,
             )
             return _bounded_result(worker.run(limit=limit, mode="live"))
     except Exception as exc:
@@ -1280,9 +1291,22 @@ def _run_security_lifecycle_automation(
     now: datetime | None = None,
     *,
     record_result: bool,
+    target_case_id: str | None = None,
+    allow_new_attempt: bool = False,
 ) -> dict:
     if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
         raise ValueError("limit")
+    if type(allow_new_attempt) is not bool:
+        raise ValueError("allow_new_attempt")
+    if target_case_id is not None and (
+        type(target_case_id) is not str
+        or not target_case_id
+        or "\0" in target_case_id
+        or len(target_case_id.encode("utf-8")) > 160
+    ):
+        raise ValueError("target_case_id")
+    if allow_new_attempt and target_case_id is None:
+        raise ValueError("target_case_id")
     instant = _aware_instant(now)
     at = _timestamp(instant)
     try:
@@ -1297,6 +1321,8 @@ def _run_security_lifecycle_automation(
                         limit=limit,
                         at=at,
                         execution_owner_id=execution.execution_owner_id,
+                        target_case_id=target_case_id,
+                        allow_new_attempt=allow_new_attempt,
                     )
                 except BaseException:
                     active_failure = True
@@ -1349,6 +1375,9 @@ def run_security_lifecycle_automation(
 def run_and_record_security_lifecycle_automation(
     limit: int = _DEFAULT_LIMIT,
     now: datetime | None = None,
+    *,
+    target_case_id: str | None = None,
+    allow_new_attempt: bool = False,
 ) -> dict:
     """Run and persist one batch before releasing exclusive ownership."""
 
@@ -1356,6 +1385,8 @@ def run_and_record_security_lifecycle_automation(
         limit=limit,
         now=now,
         record_result=True,
+        target_case_id=target_case_id,
+        allow_new_attempt=allow_new_attempt,
     )
 
 

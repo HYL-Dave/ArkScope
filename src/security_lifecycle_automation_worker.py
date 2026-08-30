@@ -257,6 +257,9 @@ class LifecycleAutomationWorker:
         transition_approver: Callable[..., Mapping[str, object]],
         clock: Callable[[], str],
         execution_owner_id: str,
+        allow_due_failed_retry: bool = False,
+        allow_new_attempt: bool = False,
+        target_case_id: str | None = None,
     ):
         dependencies = {
             "case_loader": case_loader,
@@ -276,6 +279,17 @@ class LifecycleAutomationWorker:
             or len(execution_owner_id.encode("utf-8")) > 64
         ):
             raise ValueError("execution_owner_id")
+        if type(allow_due_failed_retry) is not bool:
+            raise ValueError("allow_due_failed_retry")
+        if type(allow_new_attempt) is not bool:
+            raise ValueError("allow_new_attempt")
+        if target_case_id is not None and (
+            type(target_case_id) is not str
+            or not target_case_id
+            or "\0" in target_case_id
+            or len(target_case_id.encode("utf-8")) > 160
+        ):
+            raise ValueError("target_case_id")
         self._case_loader = case_loader
         self._profile_connection = profile_connection
         self._evidence_loader = evidence_loader
@@ -284,6 +298,9 @@ class LifecycleAutomationWorker:
         self._transition_approver = transition_approver
         self._clock = clock
         self._execution_owner_id = execution_owner_id
+        self._allow_due_failed_retry = allow_due_failed_retry
+        self._allow_new_attempt = allow_new_attempt
+        self._target_case_id = target_case_id
 
     @staticmethod
     def _due_recheck(
@@ -615,6 +632,10 @@ class LifecycleAutomationWorker:
                 for case in raw_cases
                 if isinstance(case, Mapping)
                 and case.get("source_presence") == "present"
+                and (
+                    self._target_case_id is None
+                    or case.get("case_id") == self._target_case_id
+                )
             ),
             key=lambda item: str(item.get("case_id") or ""),
         )
@@ -671,6 +692,8 @@ class LifecycleAutomationWorker:
                     query_context=_query_context(case, mode=mode),
                     diagnostics={},
                     at=at,
+                    allow_due_failed_retry=self._allow_due_failed_retry,
+                    allow_new_attempt=self._allow_new_attempt,
                 )
                 transition_revalidation = False
                 finalization_only = (

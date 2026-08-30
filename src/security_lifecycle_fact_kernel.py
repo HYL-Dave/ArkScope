@@ -85,6 +85,7 @@ _TERMINAL_DECISION_KEY = "terminal_decision"
 _TERMINAL_PROVENANCE_KEY = "terminal_decision_provenance_sha256"
 _TERMINAL_FINALIZED_KEY = "terminal_finalized_decision_provenance_sha256"
 _TERMINAL_FINALIZATION_FAILURE_KEY = "terminal_finalization_failure"
+_AUTOMATIC_RETRY_KEY = "automatic_retry"
 _LATEST_ATTEMPT_REVISION_KEY = "latest_attempt_execution_revision"
 _EXECUTION_OWNER_KEY = "execution_owner_id"
 _TERMINAL_FINALIZATION_FAILURE_CODES = frozenset({"finalization_failed"})
@@ -96,6 +97,16 @@ _TERMINAL_FINALIZATION_RETRY_DELAYS = (
 _MAX_TERMINAL_FINALIZATION_FAILURES = (
     len(_TERMINAL_FINALIZATION_RETRY_DELAYS) + 1
 )
+_AUTOMATIC_RETRY_DELAYS = {
+    "persistence_failed": (
+        timedelta(minutes=15),
+        timedelta(hours=1),
+        timedelta(hours=6),
+    ),
+    "source_payload_invalid": (timedelta(hours=1),),
+    "internal_error": (timedelta(hours=1),),
+}
+_MAX_PREDECESSOR_CHAIN = 32
 
 
 @dataclass(frozen=True)
@@ -390,6 +401,29 @@ def normalize_terminal_finalization_failure(
     }
 
 
+def _normalize_automatic_retry(value: object) -> dict[str, object] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or set(value) != {
+        "class",
+        "retry_not_before",
+    }:
+        raise ValueError(_AUTOMATIC_RETRY_KEY)
+    retry_class = value.get("class")
+    if retry_class not in _AUTOMATIC_RETRY_DELAYS:
+        raise ValueError(_AUTOMATIC_RETRY_KEY)
+    raw_not_before = value.get("retry_not_before")
+    retry_not_before = (
+        None
+        if raw_not_before is None
+        else _timestamp(_AUTOMATIC_RETRY_KEY, raw_not_before)
+    )
+    return {
+        "class": retry_class,
+        "retry_not_before": retry_not_before,
+    }
+
+
 _TRANSACTION_TERM_FIELDS = frozenset(
     {
         "cash_per_security_decimal",
@@ -536,16 +570,98 @@ def _execution_run_key(
     *,
     semantic_run_key: str,
     execution_revision: str,
-    predecessor_failed_run_id: str | None,
+    predecessor_run_id: str | None,
 ) -> str:
     payload = {
         "execution_revision": execution_revision,
-        "predecessor_failed_run_id": predecessor_failed_run_id,
+        "predecessor_run_id": predecessor_run_id,
         "semantic_run_key": semantic_run_key,
     }
     return "lifecycle-automation-execution-v1:" + hashlib.sha256(
         json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     ).hexdigest()
+
+
+def _predecessor_run_id(context: Mapping[str, object]) -> str | None:
+    current = context.get("predecessor_run_id")
+    legacy = context.get("predecessor_failed_run_id")
+    if current is not None and legacy is not None and current != legacy:
+        raise ValueError("automation_predecessor_chain")
+    value = current if current is not None else legacy
+    if value is None:
+        return None
+    if (
+        type(value) is not str
+        or not value.startswith("slar_")
+        or len(value.encode("utf-8")) > 80
+        or "\0" in value
+    ):
+        raise ValueError("automation_predecessor_chain")
+    return value
+
+
+def _attempt_chain(
+    conn: sqlite3.Connection,
+    run_id: str,
+) -> tuple[sqlite3.Row, ...]:
+    rows: list[sqlite3.Row] = []
+    visited: set[str] = set()
+    current_id: str | None = run_id
+    identity: tuple[str, str, str, str] | None = None
+    while current_id is not None:
+        if current_id in visited:
+            raise ValueError("automation_predecessor_cycle")
+        if len(rows) >= _MAX_PREDECESSOR_CHAIN:
+            raise ValueError("automation_predecessor_chain_limit")
+        visited.add(current_id)
+        row = conn.execute(
+            "SELECT run_id,case_id,observation_fingerprint_sha256,policy_version,"
+            "mode,status,failure_code,query_context_json "
+            "FROM security_lifecycle_automation_runs WHERE run_id=?",
+            (current_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("automation_predecessor_chain")
+        row_identity = (
+            str(row["case_id"]),
+            str(row["observation_fingerprint_sha256"]),
+            str(row["policy_version"]),
+            str(row["mode"]),
+        )
+        if identity is None:
+            identity = row_identity
+        elif row_identity != identity:
+            raise ValueError("automation_predecessor_chain")
+        rows.append(row)
+        context = _query_context_value(row["query_context_json"])
+        current_id = _predecessor_run_id(context)
+    return tuple(rows)
+
+
+def _automatic_retry_for_failure(
+    conn: sqlite3.Connection,
+    *,
+    run_id: str,
+    failure_code: str,
+    failed_at: str,
+) -> dict[str, object] | None:
+    delays = _AUTOMATIC_RETRY_DELAYS.get(failure_code)
+    if delays is None:
+        return None
+    prior_failures = sum(
+        1
+        for row in _attempt_chain(conn, run_id)[1:]
+        if row["status"] == "failed" and row["failure_code"] == failure_code
+    )
+    retry_not_before = None
+    if prior_failures < len(delays):
+        retry_not_before = (
+            _instant(failed_at) + delays[prior_failures]
+        ).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return {
+        "class": failure_code,
+        "retry_not_before": retry_not_before,
+    }
 
 
 def _input_evidence_set_sha256(
@@ -1140,6 +1256,8 @@ class SecurityLifecycleFactKernel:
         query_context: Mapping[str, object],
         diagnostics: Mapping[str, object],
         at: str,
+        allow_due_failed_retry: bool = False,
+        allow_new_attempt: bool = False,
     ) -> AutomationRunClaim:
         self.store.assert_automation_write_available()
         self.store.get_case_identity(case_id)
@@ -1165,6 +1283,10 @@ class SecurityLifecycleFactKernel:
         )
         owner_id = _execution_owner_id(execution_owner_id)
         assert policy is not None and execution is not None
+        if type(allow_due_failed_retry) is not bool:
+            raise ValueError("allow_due_failed_retry")
+        if type(allow_new_attempt) is not bool:
+            raise ValueError("allow_new_attempt")
         if not isinstance(query_context, Mapping):
             raise ValueError("query_context")
         if any(
@@ -1174,7 +1296,9 @@ class SecurityLifecycleFactKernel:
                 "execution_revision",
                 _EXECUTION_OWNER_KEY,
                 _LATEST_ATTEMPT_REVISION_KEY,
+                "predecessor_run_id",
                 "predecessor_failed_run_id",
+                _AUTOMATIC_RETRY_KEY,
                 _TERMINAL_DECISION_KEY,
                 _TERMINAL_PROVENANCE_KEY,
                 _TERMINAL_FINALIZED_KEY,
@@ -1188,7 +1312,7 @@ class SecurityLifecycleFactKernel:
         diagnostics_json = _diagnostics(diagnostics)
         timestamp = _timestamp("at", at)
 
-        def query_json_for(predecessor_failed_run_id: str | None) -> str:
+        def query_json_for(predecessor_run_id: str | None) -> str:
             context = {
                 **dict(query_context),
                 "semantic_run_key": semantic_run_key,
@@ -1197,8 +1321,8 @@ class SecurityLifecycleFactKernel:
                 _LATEST_ATTEMPT_REVISION_KEY: execution,
                 "input_evidence_set_sha256": input_evidence_digest,
             }
-            if predecessor_failed_run_id is not None:
-                context["predecessor_failed_run_id"] = predecessor_failed_run_id
+            if predecessor_run_id is not None:
+                context["predecessor_run_id"] = predecessor_run_id
             return _query_context_json(context)
 
         def stored_context(row: sqlite3.Row) -> Mapping[str, object] | None:
@@ -1229,16 +1353,50 @@ class SecurityLifecycleFactKernel:
                     context = candidate_context
                     break
 
+            predecessor_run_id: str | None = None
             if row is not None:
+                assert context is not None
                 existing_id = str(row["run_id"])
                 existing_run_key = str(row["run_key"])
+                existing_status = str(row["status"])
                 existing_revision = str(
                     context.get(
                         _LATEST_ATTEMPT_REVISION_KEY,
                         context.get("execution_revision", "unknown"),
                     )
                 )
-                if row["status"] == "blocked" and row["retry_at"] is not None:
+                if existing_status == "succeeded" and _terminal_finalization_pending(
+                    context
+                ):
+                    if allow_new_attempt:
+                        return AutomationRunClaim(
+                            existing_id, existing_run_key, "succeeded", True
+                        )
+                    failure = normalize_terminal_finalization_failure(
+                        context.get(_TERMINAL_FINALIZATION_FAILURE_KEY)
+                    )
+                    if failure is not None:
+                        retry_not_before = failure["retry_not_before"]
+                        if retry_not_before is None or _instant(timestamp) < _instant(
+                            str(retry_not_before)
+                        ):
+                            return AutomationRunClaim(
+                                existing_id,
+                                existing_run_key,
+                                "succeeded",
+                                False,
+                            )
+                    return AutomationRunClaim(
+                        existing_id, existing_run_key, "succeeded", True
+                    )
+                if allow_new_attempt and existing_status in {
+                    "failed",
+                    "blocked",
+                    "succeeded",
+                }:
+                    _attempt_chain(self.conn, existing_id)
+                    predecessor_run_id = existing_id
+                elif existing_status == "blocked" and row["retry_at"] is not None:
                     blocker_rows = self.conn.execute(
                         "SELECT retryable FROM security_lifecycle_automation_run_blockers "
                         "WHERE automation_run_id=?",
@@ -1284,44 +1442,58 @@ class SecurityLifecycleFactKernel:
                         return AutomationRunClaim(
                             existing_id, existing_run_key, "running", True
                         )
-                if row["status"] == "succeeded" and _terminal_finalization_pending(
-                    context
-                ):
-                    failure = normalize_terminal_finalization_failure(
-                        context.get(_TERMINAL_FINALIZATION_FAILURE_KEY)
-                    )
-                    if failure is not None:
-                        retry_not_before = failure["retry_not_before"]
-                        if retry_not_before is None or _instant(timestamp) < _instant(
-                            str(retry_not_before)
-                        ):
-                            return AutomationRunClaim(
-                                existing_id,
-                                existing_run_key,
-                                "succeeded",
-                                False,
-                            )
                     return AutomationRunClaim(
-                        existing_id, existing_run_key, "succeeded", True
+                        existing_id, existing_run_key, existing_status, False
                     )
-                if row["status"] != "failed" or existing_revision == execution:
+                elif existing_status == "failed":
+                    due_failed_retry = False
+                    if allow_due_failed_retry:
+                        retry = _normalize_automatic_retry(
+                            context.get(_AUTOMATIC_RETRY_KEY)
+                        )
+                        if retry is not None:
+                            chain = _attempt_chain(self.conn, existing_id)
+                            retry_class = str(retry["class"])
+                            retry_count = sum(
+                                1
+                                for item in chain
+                                if item["status"] == "failed"
+                                and item["failure_code"] == retry_class
+                            )
+                            retry_not_before = retry["retry_not_before"]
+                            due_failed_retry = (
+                                row["failure_code"] == retry_class
+                                and retry_count
+                                <= len(_AUTOMATIC_RETRY_DELAYS[retry_class])
+                                and retry_not_before is not None
+                                and _instant(timestamp)
+                                >= _instant(str(retry_not_before))
+                            )
+                    if due_failed_retry or existing_revision != execution:
+                        _attempt_chain(self.conn, existing_id)
+                        predecessor_run_id = existing_id
+                    else:
+                        return AutomationRunClaim(
+                            existing_id,
+                            existing_run_key,
+                            existing_status,
+                            False,
+                        )
+                elif predecessor_run_id is None:
                     return AutomationRunClaim(
                         existing_id,
                         existing_run_key,
-                        str(row["status"]),
+                        existing_status,
                         False,
                     )
-                predecessor_failed_run_id = existing_id
-            else:
-                predecessor_failed_run_id = None
 
             run_key = _execution_run_key(
                 semantic_run_key=semantic_run_key,
                 execution_revision=execution,
-                predecessor_failed_run_id=predecessor_failed_run_id,
+                predecessor_run_id=predecessor_run_id,
             )
             run_id = "slar_" + run_key.rsplit(":", 1)[1][:32]
-            query_json = query_json_for(predecessor_failed_run_id)
+            query_json = query_json_for(predecessor_run_id)
             cursor = self.conn.execute(
                 "INSERT OR IGNORE INTO security_lifecycle_automation_runs "
                 "(run_id,case_id,mode,observation_fingerprint_sha256,policy_version,"
@@ -1970,12 +2142,27 @@ class SecurityLifecycleFactKernel:
                     ):
                         continue
                 run_id = str(row["run_id"])
+                automatic_retry = _automatic_retry_for_failure(
+                    self.conn,
+                    run_id=run_id,
+                    failure_code="internal_error",
+                    failed_at=timestamp,
+                )
+                assert automatic_retry is not None
+                context[_AUTOMATIC_RETRY_KEY] = automatic_retry
                 cursor = self.conn.execute(
                     "UPDATE security_lifecycle_automation_runs SET "
                     "status='failed',decision_tier=NULL,action_readiness=NULL,"
-                    "diagnostics_json=?,retry_at=NULL,failure_code='internal_error',"
-                    "finished_at=?,updated_at=? WHERE run_id=? AND status='running'",
-                    (diagnostics_json, timestamp, timestamp, run_id),
+                    "diagnostics_json=?,query_context_json=?,retry_at=NULL,"
+                    "failure_code='internal_error',finished_at=?,updated_at=? "
+                    "WHERE run_id=? AND status='running'",
+                    (
+                        diagnostics_json,
+                        _query_context_json(context),
+                        timestamp,
+                        timestamp,
+                        run_id,
+                    ),
                 )
                 if cursor.rowcount != 1:
                     raise RuntimeError("automation_run_reconciliation_lost")
@@ -1997,7 +2184,8 @@ class SecurityLifecycleFactKernel:
         timestamp = _timestamp("at", at)
         with _immediate_transaction(self.conn):
             current = self.conn.execute(
-                "SELECT status,started_at FROM security_lifecycle_automation_runs "
+                "SELECT status,started_at,query_context_json FROM "
+                "security_lifecycle_automation_runs "
                 "WHERE run_id=?",
                 (run_id,),
             ).fetchone()
@@ -2018,10 +2206,29 @@ class SecurityLifecycleFactKernel:
                     for row in assessment_times
                 ):
                     raise ValueError("automation_run_has_current_assessment")
+            query_context = _query_context_value(current["query_context_json"])
+            automatic_retry = _automatic_retry_for_failure(
+                self.conn,
+                run_id=run_id,
+                failure_code=failure_code,
+                failed_at=timestamp,
+            )
+            if automatic_retry is None:
+                query_context.pop(_AUTOMATIC_RETRY_KEY, None)
+            else:
+                query_context[_AUTOMATIC_RETRY_KEY] = automatic_retry
             self.conn.execute(
                 "UPDATE security_lifecycle_automation_runs SET status='failed',"
                 "decision_tier=NULL,action_readiness=NULL,diagnostics_json=?,"
-                "retry_at=NULL,failure_code=?,finished_at=?,updated_at=? WHERE run_id=?",
-                (diagnostics_json, failure_code, timestamp, timestamp, run_id),
+                "query_context_json=?,retry_at=NULL,failure_code=?,finished_at=?,"
+                "updated_at=? WHERE run_id=?",
+                (
+                    diagnostics_json,
+                    _query_context_json(query_context),
+                    failure_code,
+                    timestamp,
+                    timestamp,
+                    run_id,
+                ),
             )
         return self.store.get_automation_run(run_id)

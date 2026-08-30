@@ -224,6 +224,76 @@ def test_recorded_runner_persists_result_before_releasing_execution_lock(
     assert events == ["lock_acquired", "worker", "record", "lock_released"]
 
 
+def test_scheduled_runner_grants_only_due_failed_retry_authority(monkeypatch):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    captured = []
+
+    class Worker:
+        def run(self, limit, mode):
+            captured.append(("run", limit, mode))
+            return _v2_summary()
+
+    @contextmanager
+    def listing_session(*, at):
+        captured.append(("listing", at))
+        yield object()
+
+    def worker(**kwargs):
+        captured.append(("worker", kwargs))
+        return Worker()
+
+    monkeypatch.setattr(scheduler, "_listing_authority_session", listing_session)
+    monkeypatch.setattr(scheduler, "_worker", worker)
+
+    assert scheduler._run_owned_automation_batch(
+        limit=2,
+        at="2026-08-25T13:00:00Z",
+        execution_owner_id="scheduled-owner",
+    ) == _v2_summary()
+    worker_kwargs = next(item[1] for item in captured if item[0] == "worker")
+    assert worker_kwargs["allow_due_failed_retry"] is True
+    assert worker_kwargs["allow_new_attempt"] is False
+    assert worker_kwargs["target_case_id"] is None
+
+
+def test_recorded_attended_runner_targets_one_case_and_grants_new_attempt_only(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    captured = []
+    result = _v2_summary()
+    monkeypatch.setattr(scheduler, "_reconcile_running_rows", lambda **_kwargs: ())
+
+    def run_batch(**kwargs):
+        captured.append(kwargs)
+        return result
+
+    monkeypatch.setattr(scheduler, "_run_owned_automation_batch", run_batch)
+    monkeypatch.setattr(
+        scheduler,
+        "record_security_lifecycle_automation_result",
+        lambda value, *, now: value == result and now == _NOW,
+    )
+
+    assert scheduler.run_and_record_security_lifecycle_automation(
+        limit=1,
+        now=_NOW,
+        target_case_id="slc_attended",
+        allow_new_attempt=True,
+    ) == result
+    assert captured == [
+        {
+            "limit": 1,
+            "at": "2026-08-25T13:00:00Z",
+            "execution_owner_id": captured[0]["execution_owner_id"],
+            "target_case_id": "slc_attended",
+            "allow_new_attempt": True,
+        }
+    ]
+
+
 @pytest.mark.parametrize("failure_point", ("startup", "final"))
 def test_recorded_runner_persists_reconciliation_failure_while_lock_is_held(
     monkeypatch,

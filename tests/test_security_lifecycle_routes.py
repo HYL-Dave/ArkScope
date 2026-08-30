@@ -389,6 +389,8 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
     expected = {
         ("GET", "/security-lifecycle/cases"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
+        ("POST", "/security-lifecycle/automation/run"),
+        ("POST", "/security-lifecycle/cases/{case_id}/automation/run"),
         ("GET", "/security-lifecycle/investigations/{run_id}"),
         ("POST", "/security-lifecycle/acknowledgements/{acknowledgement_id}/reopen"),
         ("POST", "/security-lifecycle/action-proposals/{proposal_id}/dismiss"),
@@ -412,7 +414,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 187
+    assert len(rows) == 189
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",
@@ -422,6 +424,209 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("PUT", "/market-data/security-lifecycle/events/{event_id}"),
         ("PUT", "/market-data/security-lifecycle/relationships/{relationship_id}"),
     }.isdisjoint(rows)
+
+
+def test_global_automation_run_dispatches_the_recorded_due_boundary(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path)
+    permission_calls = []
+    run_calls = []
+
+    class ImmediateThread:
+        def __init__(self, *, target, kwargs, **_ignored):
+            self.target = target
+            self.kwargs = kwargs
+
+        def start(self):
+            self.target(**self.kwargs)
+
+    try:
+        monkeypatch.setattr(routes.threading, "Thread", ImmediateThread)
+        monkeypatch.setattr(
+            routes,
+            "run_and_record_security_lifecycle_automation",
+            lambda **kwargs: run_calls.append(kwargs),
+        )
+        client = _client(
+            context,
+            monkeypatch,
+            permissions=lambda action, detail: permission_calls.append(
+                (action, detail)
+            ),
+        )
+
+        response = client.post("/security-lifecycle/automation/run")
+
+        assert response.status_code == 200
+        assert response.json() == {"scope": "due", "status": "started"}
+        assert run_calls == [{}]
+        assert permission_calls == [
+            ("security_lifecycle_run_automation", {"scope": "due"})
+        ]
+    finally:
+        context["profile_conn"].close()
+
+
+def test_case_automation_run_dispatches_exact_attended_authority(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path)
+    run_calls = []
+
+    class ImmediateThread:
+        def __init__(self, *, target, kwargs, **_ignored):
+            self.target = target
+            self.kwargs = kwargs
+
+        def start(self):
+            self.target(**self.kwargs)
+
+    try:
+        monkeypatch.setattr(routes.threading, "Thread", ImmediateThread)
+        monkeypatch.setattr(
+            routes,
+            "run_and_record_security_lifecycle_automation",
+            lambda **kwargs: run_calls.append(kwargs),
+        )
+        client = _client(context, monkeypatch, permissions=lambda *_args: None)
+
+        response = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "case_id": context["case_id"],
+            "scope": "case",
+            "status": "started",
+        }
+        assert run_calls == [
+            {
+                "allow_new_attempt": True,
+                "limit": 1,
+                "target_case_id": context["case_id"],
+            }
+        ]
+    finally:
+        context["profile_conn"].close()
+
+
+def test_case_automation_run_materializes_a_source_only_case_in_the_worker(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path, materialize_profile_case=False)
+
+    class ImmediateThread:
+        def __init__(self, *, target, kwargs, **_ignored):
+            self.target = target
+            self.kwargs = kwargs
+
+        def start(self):
+            self.target(**self.kwargs)
+
+    try:
+        monkeypatch.setattr(routes.threading, "Thread", ImmediateThread)
+        monkeypatch.setattr(
+            routes,
+            "run_and_record_security_lifecycle_automation",
+            lambda **_kwargs: None,
+        )
+        client = _client(context, monkeypatch, permissions=lambda *_args: None)
+
+        response = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "started"
+        assert context["profile_conn"].execute(
+            "SELECT COUNT(*) FROM security_lifecycle_cases"
+        ).fetchone()[0] == 0
+    finally:
+        context["profile_conn"].close()
+
+
+def test_automation_run_returns_typed_skip_while_local_dispatch_is_active(
+    tmp_path,
+    monkeypatch,
+):
+    import threading
+
+    from src.api.routes import security_lifecycle as routes
+
+    context = _build_context(tmp_path)
+    pending = []
+
+    class DeferredThread:
+        def __init__(self, *, target, kwargs, **_ignored):
+            pending.append((target, kwargs))
+
+        def start(self):
+            pass
+
+    try:
+        monkeypatch.setattr(routes, "_AUTOMATION_DISPATCH_LOCK", threading.Lock())
+        monkeypatch.setattr(routes.threading, "Thread", DeferredThread)
+        client = _client(context, monkeypatch, permissions=lambda *_args: None)
+
+        started = client.post("/security-lifecycle/automation/run")
+        skipped = client.post("/security-lifecycle/automation/run")
+
+        assert started.json() == {"scope": "due", "status": "started"}
+        assert skipped.json() == {
+            "reason": "already_running",
+            "scope": "due",
+            "status": "skipped",
+        }
+        assert len(pending) == 1
+    finally:
+        if routes._AUTOMATION_DISPATCH_LOCK.locked():
+            routes._AUTOMATION_DISPATCH_LOCK.release()
+        context["profile_conn"].close()
+
+
+def test_case_automation_run_rejects_a_current_running_attempt(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+
+    context = _build_context(tmp_path)
+    try:
+        SecurityLifecycleFactKernel(context["store"]).reserve_run(
+            case_id=context["case_id"],
+            observation_fingerprint_sha256=context["fingerprint"],
+            policy_version="trusted-lifecycle-automation-v4",
+            mode="live",
+            execution_revision="trusted-lifecycle-execution-r1",
+            execution_owner_id="route-running-owner",
+            query_context={"case_id": context["case_id"], "ticker": "EA"},
+            diagnostics={},
+            at=_AT,
+        )
+        client = _client(context, monkeypatch, permissions=lambda *_args: None)
+
+        response = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == {
+            "case_id": context["case_id"],
+            "code": "automation_case_running",
+        }
+    finally:
+        context["profile_conn"].close()
 
 
 def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_proposal(tmp_path, monkeypatch):

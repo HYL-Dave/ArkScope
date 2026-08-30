@@ -799,12 +799,12 @@ def test_automation_run_key_binds_case_observation_policy_and_mode():
     execution = _execution_run_key(
         semantic_run_key=base,
         execution_revision="trusted-lifecycle-execution-r1",
-        predecessor_failed_run_id=None,
+        predecessor_run_id=None,
     )
     replay_execution = _execution_run_key(
         semantic_run_key=base,
         execution_revision="trusted-lifecycle-execution-r1",
-        predecessor_failed_run_id="slar_previous",
+        predecessor_run_id="slar_previous",
     )
     assert execution.startswith("lifecycle-automation-execution-v1:")
     assert execution != replay_execution
@@ -926,7 +926,7 @@ def test_failed_semantic_run_replays_once_per_execution_revision():
     assert json.loads(replay_row["query_context_json"])["semantic_run_key"] == (
         json.loads(first_row["query_context_json"])["semantic_run_key"]
     )
-    assert json.loads(replay_row["query_context_json"])["predecessor_failed_run_id"] == (
+    assert json.loads(replay_row["query_context_json"])["predecessor_run_id"] == (
         first.run_id
     )
 
@@ -1081,6 +1081,413 @@ def test_current_execution_revision_does_not_replay_failed_semantic_run_later():
         assert claim.should_execute is False
         assert claim.run_id == failed.run_id
     assert len(store.list_automation_runs(case_id)) == 1
+
+
+def test_due_failed_retry_requires_explicit_authority_and_preserves_predecessor():
+    _conn, store, kernel, case_id = _context()
+    failed = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=failed.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"persist_failures": 1},
+        at="2026-08-25T02:00:00Z",
+    )
+    failed_snapshot = store.get_automation_run(failed.run_id)
+
+    parked = _reserve(
+        kernel,
+        case_id,
+        at="2026-08-25T02:15:00Z",
+    )
+    retry = _reserve(
+        kernel,
+        case_id,
+        at="2026-08-25T02:15:00Z",
+        allow_due_failed_retry=True,
+    )
+
+    assert parked.should_execute is False
+    assert parked.run_id == failed.run_id
+    assert retry.should_execute is True
+    assert retry.run_id != failed.run_id
+    retry_context = json.loads(
+        store.get_automation_run(retry.run_id)["query_context_json"]
+    )
+    assert retry_context["predecessor_run_id"] == failed.run_id
+    assert store.get_automation_run(failed.run_id) == failed_snapshot
+
+
+@pytest.mark.parametrize("terminal_status", ("failed", "blocked", "succeeded"))
+def test_attended_new_attempt_preserves_each_terminal_predecessor(terminal_status):
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    predecessor = _reserve(kernel, case_id)
+    if terminal_status == "failed":
+        kernel.fail_run(
+            run_id=predecessor.run_id,
+            failure_code="extractor_failed",
+            diagnostics={"failures": 1},
+            at=_LATER,
+        )
+    elif terminal_status == "blocked":
+        kernel.complete_run(
+            run_id=predecessor.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(
+                AutomationBlocker(
+                    code="massive_credential_missing",
+                    retryable=False,
+                    context={"provider": "massive"},
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at=None,
+            diagnostics={"listing_requests": 0},
+            at=_LATER,
+        )
+    else:
+        evidence = _evidence("attended-completed")
+        _succeed(
+            kernel,
+            predecessor,
+            evidence=(evidence,),
+            facts=(_fact(evidence),),
+        )
+    predecessor_snapshot = store.get_automation_run(predecessor.run_id)
+
+    without_authority = _reserve(
+        kernel,
+        case_id,
+        at="2026-08-25T03:00:00Z",
+    )
+    attended = _reserve(
+        kernel,
+        case_id,
+        at="2026-08-25T03:00:00Z",
+        allow_new_attempt=True,
+    )
+
+    assert without_authority.should_execute is False
+    assert without_authority.run_id == predecessor.run_id
+    assert attended.should_execute is True
+    assert attended.run_id != predecessor.run_id
+    attended_context = json.loads(
+        store.get_automation_run(attended.run_id)["query_context_json"]
+    )
+    assert attended_context["predecessor_run_id"] == predecessor.run_id
+    assert store.get_automation_run(predecessor.run_id) == predecessor_snapshot
+
+
+def test_retry_count_comes_from_predecessor_chain_not_caller_context():
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=first.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:00:00Z",
+    )
+    second = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at="2026-08-25T02:15:00Z",
+    )
+    kernel.fail_run(
+        run_id=second.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:16:00Z",
+    )
+    third = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at="2026-08-25T03:16:00Z",
+        query_context={
+            "case_id": case_id,
+            "cik": "0001409970",
+            "aliases": ["HAPN", "LC"],
+            "automatic_retry_attempt_count": 0,
+        },
+    )
+    kernel.fail_run(
+        run_id=third.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T03:17:00Z",
+    )
+
+    context = json.loads(
+        store.get_automation_run(third.run_id)["query_context_json"]
+    )
+    assert context["automatic_retry"] == {
+        "class": "persistence_failed",
+        "retry_not_before": "2026-08-25T09:17:00Z",
+    }
+
+
+def test_persistence_failure_allows_exactly_three_automatic_attempts():
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    failures_and_due_times = (
+        ("2026-08-25T02:00:00Z", "2026-08-25T02:15:00Z"),
+        ("2026-08-25T02:16:00Z", "2026-08-25T03:16:00Z"),
+        ("2026-08-25T03:17:00Z", "2026-08-25T09:17:00Z"),
+    )
+    for failed_at, due_at in failures_and_due_times:
+        kernel.fail_run(
+            run_id=claim.run_id,
+            failure_code="persistence_failed",
+            diagnostics={"failures": 1},
+            at=failed_at,
+        )
+        claim = _reserve(
+            kernel,
+            case_id,
+            allow_due_failed_retry=True,
+            at=due_at,
+        )
+        assert claim.should_execute is True
+
+    kernel.fail_run(
+        run_id=claim.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T09:18:00Z",
+    )
+    exhausted = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at="2027-08-25T09:18:00Z",
+    )
+    context = json.loads(
+        store.get_automation_run(claim.run_id)["query_context_json"]
+    )
+
+    assert exhausted.should_execute is False
+    assert exhausted.run_id == claim.run_id
+    assert context["automatic_retry"] == {
+        "class": "persistence_failed",
+        "retry_not_before": None,
+    }
+    assert len(store.list_automation_runs(case_id)) == 4
+
+
+@pytest.mark.parametrize(
+    ("failure_code", "due_at"),
+    (
+        ("source_payload_invalid", "2026-08-25T03:00:00Z"),
+        ("internal_error", "2026-08-25T03:00:00Z"),
+    ),
+)
+def test_single_retry_classes_allow_exactly_one_due_automatic_attempt(
+    failure_code,
+    due_at,
+):
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=first.run_id,
+        failure_code=failure_code,
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:00:00Z",
+    )
+    retry = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at=due_at,
+    )
+    kernel.fail_run(
+        run_id=retry.run_id,
+        failure_code=failure_code,
+        diagnostics={"failures": 1},
+        at="2026-08-25T03:01:00Z",
+    )
+
+    exhausted = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at="2027-08-25T03:01:00Z",
+    )
+    retry_context = json.loads(
+        store.get_automation_run(retry.run_id)["query_context_json"]
+    )
+    assert exhausted.should_execute is False
+    assert exhausted.run_id == retry.run_id
+    assert retry_context["automatic_retry"] == {
+        "class": failure_code,
+        "retry_not_before": None,
+    }
+    assert len(store.list_automation_runs(case_id)) == 2
+
+
+@pytest.mark.parametrize(
+    "failure_code",
+    ("extractor_failed", "profile_schema_mismatch"),
+)
+def test_manual_only_failure_classes_never_gain_automatic_retry(failure_code):
+    _conn, store, kernel, case_id = _context()
+    failed = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=failed.run_id,
+        failure_code=failure_code,
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:00:00Z",
+    )
+
+    automatic = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at="2027-08-25T02:00:00Z",
+    )
+    attended = _reserve(
+        kernel,
+        case_id,
+        allow_new_attempt=True,
+        at="2027-08-25T02:00:00Z",
+    )
+    context = json.loads(
+        store.get_automation_run(failed.run_id)["query_context_json"]
+    )
+
+    assert automatic.should_execute is False
+    assert attended.should_execute is True
+    assert "automatic_retry" not in context
+
+
+def test_reconciled_internal_error_receives_one_hour_retry_authority():
+    _conn, store, kernel, case_id = _context()
+    running = _reserve(kernel, case_id)
+
+    assert kernel.reconcile_running_runs(
+        at="2026-08-25T02:00:00Z",
+        execution_owner_id="test-kernel-owner",
+    ) == (running.run_id,)
+    failed = store.get_automation_run(running.run_id)
+    context = json.loads(failed["query_context_json"])
+    assert context["automatic_retry"] == {
+        "class": "internal_error",
+        "retry_not_before": "2026-08-25T03:00:00Z",
+    }
+    assert failed["retry_at"] is None
+
+
+def test_legacy_failed_predecessor_field_remains_chain_readable():
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(kernel, case_id, execution_revision="execution-r0")
+    kernel.fail_run(
+        run_id=first.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:00:00Z",
+    )
+    second = _reserve(
+        kernel,
+        case_id,
+        execution_revision="execution-r1",
+        at="2026-08-25T03:00:00Z",
+    )
+    kernel.fail_run(
+        run_id=second.run_id,
+        failure_code="persistence_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T03:01:00Z",
+    )
+    context = json.loads(
+        store.get_automation_run(second.run_id)["query_context_json"]
+    )
+    context["predecessor_failed_run_id"] = context.pop("predecessor_run_id")
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), second.run_id),
+    )
+    store.conn.commit()
+
+    third = _reserve(
+        kernel,
+        case_id,
+        execution_revision="execution-r1",
+        allow_due_failed_retry=True,
+        at="2026-08-25T04:01:00Z",
+    )
+    assert third.should_execute is True
+    assert json.loads(
+        store.get_automation_run(third.run_id)["query_context_json"]
+    )["predecessor_run_id"] == second.run_id
+
+
+def test_predecessor_cycle_fails_closed_before_creating_attended_attempt():
+    _conn, store, kernel, case_id = _context()
+    failed = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=failed.run_id,
+        failure_code="extractor_failed",
+        diagnostics={"failures": 1},
+        at=_LATER,
+    )
+    context = json.loads(
+        store.get_automation_run(failed.run_id)["query_context_json"]
+    )
+    context["predecessor_run_id"] = failed.run_id
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), failed.run_id),
+    )
+    store.conn.commit()
+    corrupted_snapshot = store.get_automation_run(failed.run_id)
+
+    with pytest.raises(ValueError, match="automation_predecessor_cycle"):
+        _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at="2026-08-25T03:00:00Z",
+        )
+    assert store.list_automation_runs(case_id) == [corrupted_snapshot]
+
+
+def test_attended_attempt_does_not_change_policy_or_decision_provenance():
+    _conn, store, kernel, case_id = _context()
+    first = _reserve(kernel, case_id, policy_version="policy-stable")
+    evidence = _evidence("policy-stable")
+    first_result = _succeed(
+        kernel,
+        first,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+    )
+    first_snapshot = store.get_automation_run(first.run_id)
+    second = _reserve(
+        kernel,
+        case_id,
+        policy_version="policy-stable",
+        allow_new_attempt=True,
+        at="2026-08-25T03:00:00Z",
+    )
+    second_result = _succeed(
+        kernel,
+        second,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        at="2026-08-25T04:00:00Z",
+    )
+
+    assert store.get_automation_run(first.run_id) == first_snapshot
+    assert store.get_automation_run(second.run_id)["policy_version"] == "policy-stable"
+    assert (
+        first_result.decision_provenance_sha256
+        == second_result.decision_provenance_sha256
+    )
 
 
 def test_latest_semantic_run_statuses_do_not_fan_out_execution_revisions():
@@ -1959,7 +2366,9 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
         ({"execution_revision": "spoofed"}, {}),
         ({"execution_owner_id": "spoofed"}, {}),
         ({"latest_attempt_execution_revision": "spoofed"}, {}),
+        ({"predecessor_run_id": "slar_spoofed"}, {}),
         ({"predecessor_failed_run_id": "slar_spoofed"}, {}),
+        ({"automatic_retry": {"class": "internal_error"}}, {}),
         ({}, {"source_url": 1}),
         ({}, {"sec_attempts": "1"}),
     ):
