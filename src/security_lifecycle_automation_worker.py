@@ -619,7 +619,9 @@ class LifecycleAutomationWorker:
             key=lambda item: str(item.get("case_id") or ""),
         )
         summary: dict[str, object] = {
+            "result_version": 2,
             "case_ids": [],
+            "case_outcomes": {},
             "selected": 0,
             "processed": 0,
             "accepted": 0,
@@ -653,6 +655,11 @@ class LifecycleAutomationWorker:
                 current = state["current_assessment"]
                 if current is not None and current.get("author") != "automation":
                     summary["skipped_current"] = int(summary["skipped_current"]) + 1
+                    outcomes = summary["case_outcomes"]
+                    assert isinstance(outcomes, dict)
+                    if case_id in outcomes:
+                        raise ValueError("duplicate_case_outcome")
+                    outcomes[case_id] = "skipped_current"
                     continue
                 claim = kernel.reserve_run(
                     case_id=case_id,
@@ -691,6 +698,11 @@ class LifecycleAutomationWorker:
                         finalization_only = False
                 if not claim.should_execute:
                     summary["skipped_current"] = int(summary["skipped_current"]) + 1
+                    outcomes = summary["case_outcomes"]
+                    assert isinstance(outcomes, dict)
+                    if case_id in outcomes:
+                        raise ValueError("duplicate_case_outcome")
+                    outcomes[case_id] = "skipped_current"
                     continue
                 cast_ids = summary["case_ids"]
                 assert isinstance(cast_ids, list)
@@ -718,6 +730,11 @@ class LifecycleAutomationWorker:
                 )
                 summary["processed"] = int(summary["processed"]) + 1
                 summary[outcome] = int(summary[outcome]) + 1
+                outcomes = summary["case_outcomes"]
+                assert isinstance(outcomes, dict)
+                if case_id in outcomes:
+                    raise ValueError("duplicate_case_outcome")
+                outcomes[case_id] = outcome
         return summary
 
 

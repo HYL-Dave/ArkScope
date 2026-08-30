@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS scheduler_state (
 """
 
 
+def ensure_scheduler_state_schema(conn: sqlite3.Connection) -> None:
+    """Install the existing auxiliary table on an already-owned connection."""
+
+    conn.executescript(_SCHEMA)
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z")
 
@@ -75,7 +81,7 @@ class SchedulerStateStore:
                 conn.execute("PRAGMA journal_mode = WAL")
             except sqlite3.OperationalError:
                 pass
-            conn.executescript(_SCHEMA)
+            ensure_scheduler_state_schema(conn)
 
     def record_attempt(self, source: str, when: datetime) -> None:
         """Genuine run-start: set last_attempt + status='running'. Preserves last_error /

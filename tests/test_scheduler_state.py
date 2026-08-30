@@ -6,6 +6,7 @@ restarts. ``partial`` is a first-class status.
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timezone
 
 import pytest
@@ -105,3 +106,20 @@ def test_reconcile_interrupted_running_marks_terminal(store):
 def test_imports_with_declared_local_dependencies():
     import src.scheduler_state as mod
     assert mod.SchedulerStateStore is SchedulerStateStore
+
+
+def test_existing_connection_schema_helper_is_idempotent():
+    from src.scheduler_state import ensure_scheduler_state_schema
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        ensure_scheduler_state_schema(conn)
+        ensure_scheduler_state_schema(conn)
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='table' AND name='scheduler_state'"
+        ).fetchone()
+        assert row is not None
+        assert "last_result" in str(row[0])
+    finally:
+        conn.close()

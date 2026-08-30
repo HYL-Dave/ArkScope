@@ -25,6 +25,7 @@ from src.security_lifecycle_decision_policy import (
 from src.security_lifecycle_fact_kernel import (
     AutomationBlocker,
     SecurityLifecycleFactKernel,
+    normalize_terminal_finalization_failure,
 )
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
@@ -44,6 +45,7 @@ from src.security_lifecycle_schema import (
     LifecycleWritesUnavailable,
     verify_profile_connection,
 )
+from src.scheduler_state import ensure_scheduler_state_schema
 from src.service.security_lifecycle_automation_runtime import (
     LifecycleAutomationAlreadyRunning,
     LifecycleAutomationExecutionUnavailable,
@@ -54,6 +56,7 @@ from src.service.security_lifecycle_automation_runtime import (
 logger = logging.getLogger(__name__)
 
 _JOB_NAME = "security_lifecycle.automation"
+_AUTOMATION_STATE_VERSION = 1
 _DEFAULT_LIMIT = 2
 _MAX_CASES = 2
 _AUTOMATION_TABLES = frozenset(
@@ -1045,6 +1048,9 @@ def _worker(
 def _bounded_result(result: Mapping[str, object]) -> dict:
     if not isinstance(result, Mapping):
         raise ValueError("result")
+    result_version = result.get("result_version", 1)
+    if type(result_version) is not int or result_version not in {1, 2}:
+        raise ValueError("result_version")
     counts: dict[str, int] = {}
     for key in (
         "selected",
@@ -1081,6 +1087,55 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
     if len(case_ids) != len(set(case_ids)):
         raise ValueError("case_ids")
 
+    case_outcomes: dict[str, str] | None = None
+    if result_version == 2:
+        raw_outcomes = result.get("case_outcomes")
+        if not isinstance(raw_outcomes, Mapping):
+            raise ValueError("case_outcomes")
+        case_outcomes = {}
+        allowed_outcomes = {
+            "accepted",
+            "drafted",
+            "blocked",
+            "failed",
+            "skipped_current",
+        }
+        for raw_case_id, raw_outcome in raw_outcomes.items():
+            if not isinstance(raw_case_id, str):
+                raise ValueError("case_outcomes")
+            normalized_case_id = raw_case_id.strip()
+            if (
+                normalized_case_id != raw_case_id
+                or not normalized_case_id
+                or len(normalized_case_id) > 160
+                or "\0" in normalized_case_id
+                or normalized_case_id in case_outcomes
+            ):
+                raise ValueError("case_outcomes")
+            if raw_outcome not in allowed_outcomes:
+                raise ValueError("case_outcomes")
+            case_outcomes[normalized_case_id] = str(raw_outcome)
+        non_skipped = {
+            case_id
+            for case_id, outcome in case_outcomes.items()
+            if outcome != "skipped_current"
+        }
+        if non_skipped != set(case_ids) or len(non_skipped) != counts["selected"]:
+            raise ValueError("case_outcomes")
+        if counts["processed"] != counts["selected"]:
+            raise ValueError("case_outcomes")
+        for outcome in (
+            "accepted",
+            "drafted",
+            "blocked",
+            "failed",
+            "skipped_current",
+        ):
+            if counts[outcome] != sum(
+                value == outcome for value in case_outcomes.values()
+            ):
+                raise ValueError("case_outcomes")
+
     supplied_status = result.get("status")
     supplied_reason = result.get("reason")
     if supplied_status in {"unavailable", "not_installed", "skipped"}:
@@ -1107,12 +1162,16 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
             raise ValueError("status")
         if supplied_reason is not None and supplied_reason != reason:
             raise ValueError("reason")
-    return {
+    bounded = {
         "status": status,
         "reason": reason,
         **counts,
         "case_ids": case_ids,
     }
+    if result_version == 2:
+        bounded["result_version"] = 2
+        bounded["case_outcomes"] = case_outcomes
+    return bounded
 
 
 @contextmanager
@@ -1276,11 +1335,280 @@ def _stored_result(raw: object) -> dict | None:
         return None
 
 
-def _failure_incident_key(result: Mapping[str, object]) -> tuple[object, ...]:
-    return (
-        result["status"],
-        result["reason"],
-        tuple(sorted(result["case_ids"])),
+def _is_operational_failure(result: Mapping[str, object]) -> bool:
+    return result.get("status") == "unavailable" or (
+        result.get("status") == "partial"
+        and result.get("reason") == "case_processing_failed"
+    )
+
+
+def _failed_case_ids(
+    conn: sqlite3.Connection,
+    result: Mapping[str, object],
+) -> tuple[str, ...]:
+    if result.get("result_version") == 2:
+        outcomes = result.get("case_outcomes")
+        if not isinstance(outcomes, Mapping):
+            raise ValueError("case_outcomes")
+        return tuple(
+            sorted(
+                str(case_id)
+                for case_id, outcome in outcomes.items()
+                if outcome == "failed"
+            )
+        )
+    failed: list[str] = []
+    for case_id in sorted(str(value) for value in result.get("case_ids", ())):
+        row = _latest_case_run(conn, case_id)
+        if row is None:
+            failed.append(case_id)
+            continue
+        if str(row["status"]) in {"failed", "running"}:
+            failed.append(case_id)
+            continue
+        if _run_finalization_failure(row) is not None:
+            failed.append(case_id)
+    return tuple(failed)
+
+
+def _latest_case_run(
+    conn: sqlite3.Connection,
+    case_id: str,
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT run_id,status,query_context_json FROM "
+        "security_lifecycle_automation_runs WHERE case_id=? "
+        "ORDER BY created_at DESC,rowid DESC LIMIT 1",
+        (case_id,),
+    ).fetchone()
+
+
+def _run_finalization_failure(row: sqlite3.Row) -> dict[str, object] | None:
+    raw_context = row["query_context_json"]
+    if not isinstance(raw_context, str):
+        raise ValueError("automation_query_context")
+    try:
+        context = json.loads(raw_context)
+    except json.JSONDecodeError as exc:
+        raise ValueError("automation_query_context") from exc
+    if not isinstance(context, Mapping):
+        raise ValueError("automation_query_context")
+    return normalize_terminal_finalization_failure(
+        context.get("terminal_finalization_failure")
+    )
+
+
+def _case_failure_marker(
+    conn: sqlite3.Connection,
+    case_id: str,
+) -> dict[str, object]:
+    row = _latest_case_run(conn, case_id)
+    if row is None:
+        return {"run_id": None, "recovery": "new_attempt"}
+    recovery = (
+        "finalization"
+        if str(row["status"]) == "succeeded"
+        and _run_finalization_failure(row) is not None
+        else "new_attempt"
+    )
+    return {"run_id": str(row["run_id"]), "recovery": recovery}
+
+
+def _normalize_active_incident(value: object) -> dict[str, object] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or set(value) != {
+        "case_failures",
+        "scheduler_failure",
+    }:
+        raise ValueError("automation_active_incident")
+    raw_cases = value.get("case_failures")
+    if not isinstance(raw_cases, Mapping):
+        raise ValueError("automation_active_incident")
+    cases: dict[str, dict[str, object]] = {}
+    for raw_case_id, raw_marker in raw_cases.items():
+        if (
+            not isinstance(raw_case_id, str)
+            or not raw_case_id
+            or len(raw_case_id) > 160
+            or "\0" in raw_case_id
+            or not isinstance(raw_marker, Mapping)
+            or set(raw_marker) != {"run_id", "recovery"}
+        ):
+            raise ValueError("automation_active_incident")
+        run_id = raw_marker.get("run_id")
+        recovery = raw_marker.get("recovery")
+        if (
+            run_id is not None
+            and (
+                not isinstance(run_id, str)
+                or not run_id
+                or len(run_id) > 160
+                or "\0" in run_id
+            )
+        ) or recovery not in {"new_attempt", "finalization"}:
+            raise ValueError("automation_active_incident")
+        cases[raw_case_id] = {"run_id": run_id, "recovery": recovery}
+    scheduler_failure = value.get("scheduler_failure")
+    if scheduler_failure is not None:
+        if (
+            not isinstance(scheduler_failure, Mapping)
+            or set(scheduler_failure) != {"reason"}
+            or scheduler_failure.get("reason") not in _REASONS
+        ):
+            raise ValueError("automation_active_incident")
+        scheduler_failure = {"reason": str(scheduler_failure["reason"])}
+    if not cases and scheduler_failure is None:
+        return None
+    return {
+        "case_failures": cases,
+        "scheduler_failure": scheduler_failure,
+    }
+
+
+def _state_envelope(raw: object) -> dict[str, object] | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("automation_scheduler_state") from exc
+    if not isinstance(value, Mapping) or set(value) != {
+        "state_version",
+        "latest_result",
+        "active_incident",
+    }:
+        raise ValueError("automation_scheduler_state")
+    if value.get("state_version") != _AUTOMATION_STATE_VERSION:
+        raise ValueError("automation_scheduler_state")
+    latest = value.get("latest_result")
+    if not isinstance(latest, Mapping):
+        raise ValueError("automation_scheduler_state")
+    return {
+        "state_version": _AUTOMATION_STATE_VERSION,
+        "latest_result": _bounded_result(latest),
+        "active_incident": _normalize_active_incident(
+            value.get("active_incident")
+        ),
+    }
+
+
+def _incident_from_result(
+    conn: sqlite3.Connection,
+    result: Mapping[str, object],
+) -> dict[str, object] | None:
+    if not _is_operational_failure(result):
+        return None
+    case_ids = _failed_case_ids(conn, result)
+    if case_ids:
+        return {
+            "case_failures": {
+                case_id: _case_failure_marker(conn, case_id)
+                for case_id in case_ids
+            },
+            "scheduler_failure": None,
+        }
+    return {
+        "case_failures": {},
+        "scheduler_failure": {"reason": str(result["reason"])},
+    }
+
+
+def _case_failure_is_active(
+    conn: sqlite3.Connection,
+    case_id: str,
+    marker: Mapping[str, object],
+) -> bool:
+    latest = _latest_case_run(conn, case_id)
+    if latest is None:
+        return True
+    baseline_run_id = marker.get("run_id")
+    latest_run_id = str(latest["run_id"])
+    latest_status = str(latest["status"])
+    finalization_failure = _run_finalization_failure(latest)
+    if marker.get("recovery") == "finalization" and latest_run_id == baseline_run_id:
+        return latest_status != "succeeded" or finalization_failure is not None
+    if latest_run_id == baseline_run_id:
+        return True
+    return latest_status in {"failed", "running"} or finalization_failure is not None
+
+
+def _reconcile_active_incident(
+    conn: sqlite3.Connection,
+    incident: Mapping[str, object] | None,
+    *,
+    scheduler_succeeded: bool,
+) -> dict[str, object] | None:
+    normalized = _normalize_active_incident(incident)
+    if normalized is None:
+        return None
+    cases = {
+        case_id: dict(marker)
+        for case_id, marker in normalized["case_failures"].items()
+        if _case_failure_is_active(conn, case_id, marker)
+    }
+    scheduler_failure = normalized["scheduler_failure"]
+    if scheduler_succeeded:
+        scheduler_failure = None
+    return _normalize_active_incident(
+        {
+            "case_failures": cases,
+            "scheduler_failure": scheduler_failure,
+        }
+    )
+
+
+def _load_active_incident(
+    conn: sqlite3.Connection,
+    latest_witness: sqlite3.Row | None,
+) -> dict[str, object] | None:
+    state_row = conn.execute(
+        "SELECT last_result FROM scheduler_state WHERE source=?",
+        (_JOB_NAME,),
+    ).fetchone()
+    if state_row is not None:
+        envelope = _state_envelope(state_row["last_result"])
+        if envelope is not None:
+            return envelope["active_incident"]
+    if latest_witness is None or latest_witness["status"] != "failed":
+        return None
+    legacy = _stored_result(latest_witness["result"])
+    if legacy is None:
+        raise ValueError("automation_legacy_witness")
+    return _incident_from_result(conn, legacy)
+
+
+def _write_automation_state(
+    conn: sqlite3.Connection,
+    *,
+    result: Mapping[str, object],
+    active_incident: Mapping[str, object] | None,
+    at: str,
+) -> None:
+    envelope = {
+        "state_version": _AUTOMATION_STATE_VERSION,
+        "latest_result": dict(result),
+        "active_incident": _normalize_active_incident(active_incident),
+    }
+    conn.execute(
+        "INSERT INTO scheduler_state "
+        "(source,last_status,last_error,continuation,last_result,updated_at) "
+        "VALUES (?,?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET "
+        "last_status=excluded.last_status,last_error=excluded.last_error,"
+        "continuation=NULL,last_result=excluded.last_result,"
+        "updated_at=excluded.updated_at",
+        (
+            _JOB_NAME,
+            "failed" if envelope["active_incident"] is not None else result["status"],
+            (
+                "active_incident"
+                if envelope["active_incident"] is not None
+                else None
+            ),
+            None,
+            json.dumps(envelope, sort_keys=True, separators=(",", ":")),
+            at,
+        ),
     )
 
 
@@ -1303,7 +1631,7 @@ def _insert_witness(
     now: datetime,
     not_before: object,
 ) -> None:
-    failed = result["status"] in {"partial", "unavailable"}
+    failed = _is_operational_failure(result)
     at = _witness_at(now, not_before)
     conn.execute(
         """
@@ -1364,6 +1692,7 @@ def record_security_lifecycle_automation_result(
         _log_witness_unavailable(bounded)
         return False
     try:
+        ensure_scheduler_state_schema(conn)
         conn.execute("BEGIN IMMEDIATE")
         present = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_runs'"
@@ -1379,40 +1708,66 @@ def record_security_lifecycle_automation_result(
             "ORDER BY id DESC LIMIT 1",
             (_JOB_NAME,),
         ).fetchone()
-        failed = bounded["status"] in {"partial", "unavailable"}
-        if failed:
-            latest_result = (
-                _stored_result(latest["result"])
-                if latest is not None and latest["status"] == "failed"
-                else None
+        prior_active = _load_active_incident(conn, latest)
+        reconciled = _reconcile_active_incident(
+            conn,
+            prior_active,
+            scheduler_succeeded=not _is_operational_failure(bounded),
+        )
+        current_incident = _incident_from_result(conn, bounded)
+        active = reconciled
+        incident_changed = False
+        if current_incident is not None:
+            base_cases = (
+                {}
+                if active is None
+                else {
+                    case_id: dict(marker)
+                    for case_id, marker in active["case_failures"].items()
+                }
             )
-            if (
-                latest_result is not None
-                and _failure_incident_key(latest_result)
-                == _failure_incident_key(bounded)
-            ):
-                conn.commit()
-                return True
+            base_scheduler_failure = (
+                None if active is None else active["scheduler_failure"]
+            )
+            base_cases.update(current_incident["case_failures"])
+            if current_incident["scheduler_failure"] is not None:
+                base_scheduler_failure = current_incident["scheduler_failure"]
+            merged = _normalize_active_incident(
+                {
+                    "case_failures": base_cases,
+                    "scheduler_failure": base_scheduler_failure,
+                }
+            )
+            incident_changed = merged != reconciled
+            active = merged
+
+        at = _witness_at(
+            now,
+            latest["started_at"] if latest is not None else None,
+        )
+        if current_incident is not None and incident_changed:
             _insert_witness(
                 conn,
                 result=bounded,
                 now=now,
                 not_before=latest["started_at"] if latest is not None else None,
             )
-            conn.commit()
-            return True
-        if latest is None or latest["status"] != "failed":
-            conn.commit()
-            return True
-        _insert_witness(
+        elif prior_active is not None and active is None:
+            _insert_witness(
+                conn,
+                result=bounded,
+                now=now,
+                not_before=latest["started_at"] if latest is not None else None,
+            )
+        _write_automation_state(
             conn,
             result=bounded,
-            now=now,
-            not_before=latest["started_at"],
+            active_incident=active,
+            at=at,
         )
         conn.commit()
         return True
-    except (OSError, sqlite3.Error):
+    except (OSError, TypeError, ValueError, sqlite3.Error):
         try:
             conn.rollback()
         except sqlite3.Error:

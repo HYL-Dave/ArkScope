@@ -35,6 +35,13 @@ def _summary(**overrides):
     return result
 
 
+def _v2_summary(*, case_outcomes=None, **overrides):
+    result = _summary(**overrides)
+    result["result_version"] = 2
+    result["case_outcomes"] = dict(case_outcomes or {})
+    return result
+
+
 @pytest.fixture(autouse=True)
 def _installed_scheduler_profile(tmp_path, monkeypatch):
     from src.security_lifecycle_investigation import (
@@ -343,51 +350,415 @@ def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch)
     )
 
 
-def test_scheduler_witness_deduplicates_failure_and_records_recovery(
+def test_failed_case_skipped_on_next_real_tick_does_not_record_recovery(
     tmp_path,
     monkeypatch,
 ):
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
     from src.service import security_lifecycle_automation_scheduler as scheduler
     from src.service.job_runs_store import JobRunsLocalStore
 
     profile_path = tmp_path / "profile_state.db"
     telemetry = JobRunsLocalStore(profile_path)
+    scheduler_state = SchedulerStateStore(profile_path)
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
-    failure = _summary(
-        status="partial",
-        reason="case_processing_failed",
-        selected=2,
-        processed=2,
-        accepted=1,
-        failed=1,
-        case_ids=["slc_ok", "slc_failed"],
-    )
-    recovery = _summary()
+    conn = sqlite3.connect(profile_path, check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+    source_ref = "0000000001-26-000001"
+    case_id = case_id_for("sec_edgar", source_ref, "FAIL")
+    case = {
+        "case_id": case_id,
+        "source": "sec_edgar",
+        "source_ref": source_ref,
+        "ticker": "FAIL",
+        "source_presence": "present",
+        "observation_fingerprint_sha256": "a" * 64,
+        "observation": {
+            "ticker": "FAIL",
+            "cik": "0000000001",
+            "filing_date": "2026-08-25",
+            "kinds": [{"event_type": "listing_status_review"}],
+        },
+    }
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    def worker(owner, evidence_loader):
+        return LifecycleAutomationWorker(
+            case_loader=lambda: (case,),
+            profile_connection=profile_connection,
+            evidence_loader=evidence_loader,
+            source_loader=lambda: {"FAIL": ()},
+            transition_preview=lambda **_kwargs: pytest.fail(
+                "transition preview reached"
+            ),
+            transition_approver=lambda **_kwargs: pytest.fail(
+                "transition approval reached"
+            ),
+            clock=lambda: "2026-08-25T13:00:00Z",
+            execution_owner_id=owner,
+        )
+
+    first = worker(
+        "failure-owner",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ValueError("source payload invalid")
+        ),
+    ).run(limit=1)
+    persisted_run_id = SecurityLifecycleInvestigationStore(conn).list_automation_runs(
+        case_id
+    )[0]["run_id"]
+    second = worker(
+        "healthy-owner",
+        lambda *_args, **_kwargs: pytest.fail(
+            "failed semantic run must remain parked"
+        ),
+    ).run(limit=1)
 
     assert scheduler.record_security_lifecycle_automation_result(
-        failure,
+        first,
         now=_NOW,
     )
     assert scheduler.record_security_lifecycle_automation_result(
-        failure,
+        second,
         now=_NOW,
     )
+
+    runs = telemetry.list_runs(job_name="security_lifecycle.automation", limit=10)
+    assert first["case_outcomes"] == {case_id: "failed"}
+    assert second["case_outcomes"] == {case_id: "skipped_current"}
+    assert [(row["status"], row["message"]) for row in runs] == [
+        ("failed", "security_lifecycle_automation_failure")
+    ]
+    state = scheduler_state.get("security_lifecycle.automation")
+    assert state is not None
+    assert state["last_result"]["active_incident"]["case_failures"] == {
+        case_id: {"run_id": persisted_run_id, "recovery": "new_attempt"}
+    }
+    assert state["last_result"]["latest_result"] == scheduler._bounded_result(
+        second
+    )
+
+    import src.security_lifecycle_automation_worker as worker_module
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    monkeypatch.setattr(
+        worker_module,
+        "AUTOMATION_EXECUTION_REVISION",
+        "trusted-lifecycle-execution-r2",
+    )
+    recovered_bundle = LifecycleAutomationEvidenceBundle(
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="sec_rate_limited",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        diagnostics={"sec_attempts": 1},
+        retry_at="2026-08-26T13:00:00Z",
+    )
+    third = worker(
+        "recovery-owner",
+        lambda *_args, **_kwargs: recovered_bundle,
+    ).run(limit=1)
+    assert third["case_outcomes"] == {case_id: "blocked"}
+    assert scheduler.record_security_lifecycle_automation_result(third, now=_NOW)
+
+    recovered_runs = telemetry.list_runs(
+        job_name="security_lifecycle.automation",
+        limit=10,
+    )
+    assert [(row["status"], row["message"]) for row in recovered_runs] == [
+        ("succeeded", "security_lifecycle_automation_recovered"),
+        ("failed", "security_lifecycle_automation_failure"),
+    ]
+    recovered_state = scheduler_state.get("security_lifecycle.automation")
+    assert recovered_state is not None
+    assert recovered_state["last_result"]["active_incident"] is None
+    conn.close()
+
+
+def test_blocked_case_is_not_an_operational_failure_witness(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+        LifecycleAutomationWorker,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = JobRunsLocalStore(profile_path)
+    scheduler_state = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    conn = sqlite3.connect(profile_path, check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+    source_ref = "0000000002-26-000002"
+    case_id = case_id_for("sec_edgar", source_ref, "WAIT")
+    case = {
+        "case_id": case_id,
+        "source": "sec_edgar",
+        "source_ref": source_ref,
+        "ticker": "WAIT",
+        "source_presence": "present",
+        "observation_fingerprint_sha256": "b" * 64,
+        "observation": {
+            "ticker": "WAIT",
+            "cik": "0000000002",
+            "filing_date": "2026-08-25",
+            "kinds": [{"event_type": "listing_status_review"}],
+        },
+    }
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    bundle = LifecycleAutomationEvidenceBundle(
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="sec_rate_limited",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        diagnostics={"sec_attempts": 1},
+        retry_at="2026-08-26T13:00:00Z",
+    )
+    result = LifecycleAutomationWorker(
+        case_loader=lambda: (case,),
+        profile_connection=profile_connection,
+        evidence_loader=lambda *_args, **_kwargs: bundle,
+        source_loader=lambda: {"WAIT": ()},
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "transition preview reached"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "transition approval reached"
+        ),
+        clock=lambda: "2026-08-25T13:00:00Z",
+        execution_owner_id="blocked-owner",
+    ).run(limit=1)
+
+    assert result["case_outcomes"] == {case_id: "blocked"}
+    assert scheduler.record_security_lifecycle_automation_result(result, now=_NOW)
+    assert telemetry.list_runs(
+        job_name="security_lifecycle.automation",
+        limit=10,
+    ) == []
+    state = scheduler_state.get("security_lifecycle.automation")
+    assert state is not None
+    assert state["last_error"] is None
+    assert state["last_result"]["active_incident"] is None
+    assert state["last_result"]["latest_result"] == scheduler._bounded_result(
+        result
+    )
+    conn.close()
+
+
+@pytest.mark.parametrize(
+    "change",
+    (
+        {"selected": 2},
+        {"failed": 0, "accepted": 1},
+        {"case_ids": []},
+        {"case_outcomes": {"slc_failed": "blocked"}},
+        {"case_outcomes": {"slc_failed": "failed", "extra": "skipped_current"}},
+    ),
+)
+def test_bounded_v2_result_rejects_counter_and_outcome_drift(change):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    value = _v2_summary(
+        status="partial",
+        reason="case_processing_failed",
+        selected=1,
+        processed=1,
+        failed=1,
+        case_ids=["slc_failed"],
+        case_outcomes={"slc_failed": "failed"},
+    )
+    value.update(change)
+
+    with pytest.raises(ValueError):
+        scheduler._bounded_result(value)
+
+
+def test_stored_result_reads_version_one_and_rejects_malformed_legacy_blobs():
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case_failure = _summary(
+        status="partial",
+        reason="case_processing_failed",
+        selected=1,
+        processed=1,
+        failed=1,
+        case_ids=["legacy-case"],
+    )
+    scheduler_failure = _summary(
+        status="unavailable",
+        reason="automation_scheduler_failed",
+    )
+    assert scheduler._stored_result(json.dumps(case_failure)) == case_failure
+    assert scheduler._stored_result(json.dumps(scheduler_failure)) == scheduler_failure
+    assert scheduler._stored_result("not-json") is None
+    assert scheduler._stored_result(json.dumps({"selected": 1})) is None
+
+
+def test_version_one_mixed_batch_reconstructs_only_the_failed_case_incident(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+        LifecycleAutomationWorker,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    state_store = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    conn = sqlite3.connect(profile_path, check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    def case(ticker, source_ref, fingerprint):
+        return {
+            "case_id": case_id_for("sec_edgar", source_ref, ticker),
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "ticker": ticker,
+            "source_presence": "present",
+            "observation_fingerprint_sha256": fingerprint * 64,
+            "observation": {
+                "ticker": ticker,
+                "cik": "0000000003",
+                "filing_date": "2026-08-25",
+                "kinds": [{"event_type": "listing_status_review"}],
+            },
+        }
+
+    failed_case = case("FAIL", "0000000003-26-000003", "c")
+    blocked_case = case("WAIT", "0000000003-26-000004", "d")
+    blocked_bundle = LifecycleAutomationEvidenceBundle(
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="sec_rate_limited",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        diagnostics={"sec_attempts": 1},
+        retry_at="2026-08-26T13:00:00Z",
+    )
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    def evidence_loader(row, **_kwargs):
+        if row["ticker"] == "FAIL":
+            raise ValueError("source payload invalid")
+        return blocked_bundle
+
+    result = LifecycleAutomationWorker(
+        case_loader=lambda: (failed_case, blocked_case),
+        profile_connection=profile_connection,
+        evidence_loader=evidence_loader,
+        source_loader=lambda: {"FAIL": (), "WAIT": ()},
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "transition preview reached"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "transition approval reached"
+        ),
+        clock=lambda: "2026-08-25T13:00:00Z",
+        execution_owner_id="legacy-mixed-owner",
+    ).run(limit=2)
+    legacy_result = {
+        key: value
+        for key, value in result.items()
+        if key not in {"result_version", "case_outcomes"}
+    }
+
+    assert result["case_outcomes"] == {
+        failed_case["case_id"]: "failed",
+        blocked_case["case_id"]: "blocked",
+    }
     assert scheduler.record_security_lifecycle_automation_result(
-        recovery,
+        legacy_result,
         now=_NOW,
     )
-    assert scheduler.record_security_lifecycle_automation_result(
-        recovery,
-        now=_NOW,
+    state = state_store.get("security_lifecycle.automation")
+    assert state is not None
+    assert set(state["last_result"]["active_incident"]["case_failures"]) == {
+        failed_case["case_id"]
+    }
+    conn.close()
+
+
+def test_scheduler_level_incident_recovers_after_a_real_successful_invocation(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = JobRunsLocalStore(profile_path)
+    state_store = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    failure = _v2_summary(
+        status="unavailable",
+        reason="automation_scheduler_failed",
     )
+    success = _v2_summary()
+
+    assert scheduler.record_security_lifecycle_automation_result(failure, now=_NOW)
+    assert scheduler.record_security_lifecycle_automation_result(success, now=_NOW)
 
     runs = telemetry.list_runs(job_name="security_lifecycle.automation", limit=10)
     assert [(row["status"], row["message"]) for row in runs] == [
         ("succeeded", "security_lifecycle_automation_recovered"),
         ("failed", "security_lifecycle_automation_failure"),
     ]
-    assert runs[1]["result"] == failure
-    assert runs[0]["result"] == recovery
+    state = state_store.get("security_lifecycle.automation")
+    assert state is not None
+    assert state["last_result"]["active_incident"] is None
+    assert state["last_result"]["latest_result"] == success
 
 
 def test_scheduler_program_error_is_typed_without_raw_detail(monkeypatch):
@@ -1673,11 +2044,12 @@ def test_terminal_massive_requiredness_changes_on_effective_date_through_schedul
             now=datetime(2026, 8, 29, 12, tzinfo=timezone.utc),
         )
         store = SecurityLifecycleInvestigationStore(conn)
-        assert before == _summary(
+        assert before == _v2_summary(
             selected=1,
             processed=1,
             drafted=1,
             case_ids=[case_id],
+            case_outcomes={case_id: "drafted"},
         )
         before_run = store.list_automation_runs(case_id)[0]
         assert before_run["decision_tier"] == "verified_automatic"
@@ -1688,13 +2060,14 @@ def test_terminal_massive_requiredness_changes_on_effective_date_through_schedul
             limit=1,
             now=datetime(2026, 8, 30, 12, tzinfo=timezone.utc),
         )
-        assert due == _summary(
+        assert due == _v2_summary(
             status="partial",
             reason="case_processing_blocked",
             selected=1,
             processed=1,
             blocked=1,
             case_ids=[case_id],
+            case_outcomes={case_id: "blocked"},
         )
         due_run = store.list_automation_runs(case_id)[0]
         assert due_run["status"] == "blocked"

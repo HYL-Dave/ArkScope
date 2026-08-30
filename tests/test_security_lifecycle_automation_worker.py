@@ -7,6 +7,7 @@ import socket
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -1212,8 +1213,15 @@ def test_due_terminal_finalization_retry_clears_failure_after_success(
     from src.security_lifecycle_investigation import (
         SecurityLifecycleInvestigationStore,
     )
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
 
     case = _case(1)
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = JobRunsLocalStore(profile_path)
+    scheduler_state = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
     harness = _Harness(tmp_path, [case])
     original = SecurityLifecycleInvestigationStore.generate_action_proposals
 
@@ -1232,6 +1240,10 @@ def test_due_terminal_finalization_retry_clears_failure_after_success(
             "terminal_finalization_failure"
         ]
         assert failed["failed"] == 1
+        assert scheduler.record_security_lifecycle_automation_result(
+            failed,
+            now=datetime.fromisoformat("2026-08-25T12:00:00+00:00"),
+        )
 
         harness.now = str(failure["retry_not_before"])
         monkeypatch.setattr(
@@ -1245,11 +1257,25 @@ def test_due_terminal_finalization_retry_clears_failure_after_success(
 
         assert recovered["accepted"] == 1
         assert recovered["failed"] == 0
+        assert scheduler.record_security_lifecycle_automation_result(
+            recovered,
+            now=datetime.fromisoformat("2026-08-25T12:15:00+00:00"),
+        )
         assert "terminal_finalization_failure" not in context
         assert (
             context["terminal_finalized_decision_provenance_sha256"]
             == context["terminal_decision_provenance_sha256"]
         )
+        assert [(row["status"], row["message"]) for row in telemetry.list_runs(
+            job_name="security_lifecycle.automation",
+            limit=10,
+        )] == [
+            ("succeeded", "security_lifecycle_automation_recovered"),
+            ("failed", "security_lifecycle_automation_failure"),
+        ]
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_result"]["active_incident"] is None
     finally:
         harness.conn.close()
 
@@ -1803,8 +1829,14 @@ def test_current_assessment_is_not_reprocessed(tmp_path):
         second = harness.worker().run()
 
         assert first["accepted"] == 1
+        assert first["result_version"] == 2
+        assert first["case_outcomes"] == {case["case_id"]: "accepted"}
         assert second["processed"] == 0
         assert second["skipped_current"] == 1
+        assert second["result_version"] == 2
+        assert second["case_outcomes"] == {
+            case["case_id"]: "skipped_current"
+        }
         assert harness.evidence_calls == calls
         assert (
             harness.conn.execute(
