@@ -77,12 +77,13 @@ _EXPLICIT_DEADLINE_TARGET_ASSERTION = re.compile(
     re.IGNORECASE,
 )
 _COMPLETE_COORDINATED_DEADLINE_TARGET = re.compile(
-    rf"\b(?:"
-    rf"(?:or|but)\s+{_DEADLINE_TARGET_MODALITY}\s+"
-    rf"|or\s+"
-    rf"|and\s+further\s+extended\s+to\s+"
-    rf"|or\s*,?\s*(?:if|unless|provided that|subject to)\b"
+    rf"\b(?:and|or|but)\b\s*,?\s*(?:"
+    rf"{_DEADLINE_TARGET_MODALITY}\s+"
+    rf"|(?:to|by)\s+"
+    rf"|further\s+extended\s+to\s+"
+    rf"|(?:if|unless|provided that|subject to)\b"
     rf"[^,.;]{{1,160}},\s*(?:to|by)\s+"
+    rf"|(?={_SOURCE_DATE_TEXT}\b)"
     rf")(?P<date>{_SOURCE_DATE_TEXT})\b{_DEADLINE_TARGET_END}",
     re.IGNORECASE,
 )

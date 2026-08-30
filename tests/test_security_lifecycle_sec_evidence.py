@@ -1110,6 +1110,37 @@ def test_but_may_be_alternate_deadline_target_fails_closed():
     assert "sec_evidence_insufficient" in result.blockers
 
 
+def test_and_coordinated_deadline_targets_fail_closed():
+    sentences = (
+        "The outside date was extended from August 28, 2026 to August 30, "
+        "2026 and September 1, 2026.",
+        "The outside date was extended from August 28, 2026 to August 30, "
+        "2026, and September 1, 2026.",
+        "The outside date is August 30, 2026 and may be September 1, 2026.",
+    )
+
+    for sentence in sentences:
+        result = _collect_deadline_sentence(sentence)
+        assert result.source_deadlines == (), sentence
+        assert "sec_evidence_insufficient" in result.blockers, sentence
+
+
+def test_but_conditional_deadline_targets_fail_closed():
+    sentences = (
+        "The outside date was extended from August 28, 2026 to August 30, "
+        "2026 but, if regulatory approval remained outstanding, to September "
+        "1, 2026.",
+        "The outside date was extended from August 28, 2026 to August 30, "
+        "2026 but, provided that regulatory approval remained outstanding, by "
+        "September 1, 2026.",
+    )
+
+    for sentence in sentences:
+        result = _collect_deadline_sentence(sentence)
+        assert result.source_deadlines == (), sentence
+        assert "sec_evidence_insufficient" in result.blockers, sentence
+
+
 def test_provided_that_alternate_deadline_target_fails_closed():
     result = _collect_deadline_sentence(
         "The outside date was extended from August 28, 2026 to August 30, 2026 "
