@@ -1588,6 +1588,98 @@ def test_terminal_finalization_rejects_changed_persisted_provenance():
     assert "terminal_finalized_decision_provenance_sha256" not in final_context
 
 
+def test_fail_run_rejects_succeeded_run_with_current_automation_assessment():
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+    result = _succeed(kernel, claim, evidence=(evidence,), facts=(_fact(evidence),))
+    persisted_evidence_id = store.list_evidence(case_id)[0]["evidence_id"]
+    store.create_assessment(
+        case_id=case_id,
+        relevance="direct_tracked_security",
+        confidence="high",
+        author="automation",
+        conclusion="The deterministic evidence confirms a symbol change.",
+        impact_summary="The tracked symbol requires review.",
+        outcomes=("symbol_changed",),
+        citations=(
+            {
+                "reference_kind": "observation",
+                "cited_content_sha256": _FINGERPRINT,
+            },
+            {
+                "reference_kind": "evidence",
+                "evidence_id": persisted_evidence_id,
+            },
+        ),
+        observation_fingerprint_sha256=_FINGERPRINT,
+        automation_method="deterministic_rule",
+        automation_run_id=claim.run_id,
+        rule_id="lifecycle.simple_symbol_continuation",
+        rule_version="1",
+        decision_provenance_sha256=result.decision_provenance_sha256,
+        at=_LATER,
+    )
+
+    with pytest.raises(ValueError, match="automation_run_has_current_assessment"):
+        kernel.fail_run(
+            run_id=claim.run_id,
+            failure_code="internal_error",
+            diagnostics={"failures": 1},
+            at="2026-08-25T03:00:00Z",
+        )
+
+    persisted = store.get_automation_run(claim.run_id)
+    assert persisted["status"] == "succeeded"
+    assert persisted["failure_code"] is None
+    conn.close()
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        {
+            "attempt_count": 1,
+            "code": "provider_private_error",
+            "failed_at": "2026-08-25T01:00:00Z",
+            "retry_not_before": "2026-08-25T01:15:00Z",
+        },
+        {
+            "attempt_count": 1,
+            "code": "finalization_failed",
+            "failed_at": "2026-08-25T01:00:00Z",
+            "retry_not_before": "2026-08-25T01:15:00Z",
+            "detail": "must not persist",
+        },
+        {
+            "attempt_count": 0,
+            "code": "finalization_failed",
+            "failed_at": "2026-08-25T01:00:00Z",
+            "retry_not_before": "2026-08-25T01:15:00Z",
+        },
+        {
+            "attempt_count": 1,
+            "code": "finalization_failed",
+            "failed_at": "2026-08-25T01:00:00Z",
+            "retry_not_before": None,
+        },
+        {
+            "attempt_count": 4,
+            "code": "finalization_failed",
+            "failed_at": "2026-08-25T01:00:00Z",
+            "retry_not_before": "2026-08-25T07:00:00Z",
+        },
+    ),
+)
+def test_terminal_finalization_failure_validator_is_closed(value):
+    from src.security_lifecycle_fact_kernel import (
+        normalize_terminal_finalization_failure,
+    )
+
+    with pytest.raises(ValueError, match="terminal_finalization_failure"):
+        normalize_terminal_finalization_failure(value)
+
+
 def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
     from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
 

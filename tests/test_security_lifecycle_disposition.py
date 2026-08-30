@@ -33,6 +33,7 @@ def _run(
     updated_at: str = "2026-08-26T00:00:00Z",
     policy_version: str = AUTOMATION_POLICY_VERSION,
     decision_tier: str | None = None,
+    query_context: dict | None = None,
 ) -> dict:
     return {
         "run_id": "run-current",
@@ -44,6 +45,7 @@ def _run(
         "created_at": updated_at,
         "policy_version": policy_version,
         "decision_tier": decision_tier,
+        "query_context": query_context or {},
     }
 
 
@@ -105,6 +107,34 @@ def _manual_evidence_digest(*rows: tuple[str, str]) -> str:
         for evidence_id, content_sha256 in sorted(rows)
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def test_unresolved_terminal_finalization_failure_preempts_accepted_history():
+    failure = {
+        "attempt_count": 2,
+        "code": "finalization_failed",
+        "failed_at": "2026-08-26T01:00:00Z",
+        "retry_not_before": "2026-08-26T02:00:00Z",
+    }
+    got = project_lifecycle_disposition(
+        _case(
+            current_assessment=_assessment(),
+            automation_runs=(
+                _run(
+                    status="succeeded",
+                    decision_tier="verified_automatic",
+                    query_context={"terminal_finalization_failure": failure},
+                ),
+            ),
+        )
+    )
+
+    assert (got.disposition, got.queue_bucket, got.reason_code) == (
+        "exception_required",
+        "attention",
+        "automation_finalization_failure",
+    )
+    assert got.next_check_at is None
 
 
 @pytest.mark.parametrize(

@@ -1079,6 +1079,181 @@ def test_terminal_finalization_recovers_idempotently_after_each_boundary(
         harness.conn.close()
 
 
+def test_human_accepted_automation_assessment_completes_pending_finalization(
+    tmp_path,
+    monkeypatch,
+):
+    import src.security_lifecycle_automation_worker as worker_module
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    original = worker_module.create_automation_assessment
+    crashed = False
+
+    def crash_after_assessment(*args, **kwargs):
+        nonlocal crashed
+        assessment_id = original(*args, **kwargs)
+        if not crashed:
+            crashed = True
+            raise _InjectedFinalizationCrash("assessment")
+        return assessment_id
+
+    monkeypatch.setattr(
+        worker_module,
+        "create_automation_assessment",
+        crash_after_assessment,
+    )
+    try:
+        with pytest.raises(_InjectedFinalizationCrash, match="assessment"):
+            harness.worker_with_transition_approver().run()
+
+        store = _store(harness)
+        assessment = store.list_assessments(case["case_id"])[0]
+        store.accept_assessment(
+            assessment["assessment_id"],
+            observation_fingerprint_sha256=case[
+                "observation_fingerprint_sha256"
+            ],
+            acceptance_authority="human",
+            at="2026-08-25T12:01:00Z",
+        )
+        monkeypatch.setattr(
+            worker_module,
+            "create_automation_assessment",
+            original,
+        )
+
+        recovered = harness.worker_with_transition_approver().run()
+        persisted = store.get_assessment(assessment["assessment_id"])
+        run = store.list_automation_runs(case["case_id"])[0]
+        context = json.loads(run["query_context_json"])
+
+        assert recovered["accepted"] == 1
+        assert recovered["failed"] == 0
+        assert persisted["status"] == "accepted"
+        assert persisted["acceptance_authority"] == "human"
+        assert len(store.list_assessments(case["case_id"])) == 1
+        assert len(store.list_proposals(case["case_id"])) == 2
+        assert (
+            context["terminal_finalized_decision_provenance_sha256"]
+            == context["terminal_decision_provenance_sha256"]
+        )
+        assert "terminal_finalization_failure" not in context
+    finally:
+        harness.conn.close()
+
+
+def test_terminal_finalization_failure_uses_bounded_backoff_without_hot_loop(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+
+    def fail_proposals(*_args, **_kwargs):
+        raise ValueError("private fixture detail")
+
+    monkeypatch.setattr(
+        SecurityLifecycleInvestigationStore,
+        "generate_action_proposals",
+        fail_proposals,
+    )
+    try:
+        expected_retry_times = (
+            "2026-08-25T12:15:00Z",
+            "2026-08-25T13:15:00Z",
+            "2026-08-25T19:15:00Z",
+            None,
+        )
+        for attempt_count, expected_retry in enumerate(
+            expected_retry_times,
+            start=1,
+        ):
+            result = harness.worker_with_transition_approver().run()
+            run = _store(harness).list_automation_runs(case["case_id"])[0]
+            context = json.loads(run["query_context_json"])
+            failure = context["terminal_finalization_failure"]
+
+            assert result["failed"] == 1
+            assert result["processed"] == 1
+            assert run["status"] == "succeeded"
+            assert run["failure_code"] is None
+            assert failure == {
+                "attempt_count": attempt_count,
+                "code": "finalization_failed",
+                "failed_at": harness.now,
+                "retry_not_before": expected_retry,
+            }
+            assert "private fixture detail" not in json.dumps(context)
+
+            immediate = harness.worker_with_transition_approver().run()
+            assert immediate["processed"] == 0
+            assert immediate["failed"] == 0
+            if expected_retry is not None:
+                harness.now = expected_retry
+
+        harness.now = "2027-08-25T12:00:00Z"
+        exhausted = harness.worker_with_transition_approver().run()
+        assert exhausted["processed"] == 0
+        assert exhausted["failed"] == 0
+        assert len(_store(harness).list_automation_runs(case["case_id"])) == 1
+    finally:
+        harness.conn.close()
+
+
+def test_due_terminal_finalization_retry_clears_failure_after_success(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    original = SecurityLifecycleInvestigationStore.generate_action_proposals
+
+    def fail_proposals(*_args, **_kwargs):
+        raise ValueError("private fixture detail")
+
+    monkeypatch.setattr(
+        SecurityLifecycleInvestigationStore,
+        "generate_action_proposals",
+        fail_proposals,
+    )
+    try:
+        failed = harness.worker_with_transition_approver().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+        failure = json.loads(run["query_context_json"])[
+            "terminal_finalization_failure"
+        ]
+        assert failed["failed"] == 1
+
+        harness.now = str(failure["retry_not_before"])
+        monkeypatch.setattr(
+            SecurityLifecycleInvestigationStore,
+            "generate_action_proposals",
+            original,
+        )
+        recovered = harness.worker_with_transition_approver().run()
+        settled = _store(harness).list_automation_runs(case["case_id"])[0]
+        context = json.loads(settled["query_context_json"])
+
+        assert recovered["accepted"] == 1
+        assert recovered["failed"] == 0
+        assert "terminal_finalization_failure" not in context
+        assert (
+            context["terminal_finalized_decision_provenance_sha256"]
+            == context["terminal_decision_provenance_sha256"]
+        )
+    finally:
+        harness.conn.close()
+
+
 def test_approval_boundary_recovery_deduplicates_real_transition_and_mutates_no_profile(
     tmp_path,
 ):

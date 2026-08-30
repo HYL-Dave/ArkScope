@@ -376,6 +376,24 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
                     if key not in {"adapter", "query_plan_json", "usage_json"}
                 }
             elif name == "automation_runs":
+                query_context = value.get("query_context")
+                if query_context is not None and not isinstance(
+                    query_context,
+                    Mapping,
+                ):
+                    raise ValueError("automation_query_context")
+                if isinstance(query_context, Mapping):
+                    from src.security_lifecycle_fact_kernel import (
+                        normalize_terminal_finalization_failure,
+                    )
+
+                    finalization_failure = normalize_terminal_finalization_failure(
+                        query_context.get("terminal_finalization_failure")
+                    )
+                    if finalization_failure is not None:
+                        value["terminal_finalization_failure"] = (
+                            finalization_failure
+                        )
                 for key in (
                     "run_key",
                     "query_context",

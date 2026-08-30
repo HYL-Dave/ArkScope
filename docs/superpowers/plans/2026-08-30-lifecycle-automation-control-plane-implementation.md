@@ -92,7 +92,9 @@ transitions default off.
   `terminal_finalization_failure` metadata in query context. Bound code,
   timestamps, count, and total JSON size.
 - [ ] Make finalization retries reuse the succeeded run, apply bounded backoff,
-  and stop hot-looping every scheduler tick.
+  and stop hot-looping every scheduler tick. The closed schedule is 15 minutes,
+  1 hour, and 6 hours; after the fourth recorded failure, automatic retries
+  stop until an attended Run again.
 - [ ] Project unresolved finalization failure to Attention with a closed reason
   code; never call it completed or running.
 - [ ] Add mutations for the human-authority branch, metadata validator,

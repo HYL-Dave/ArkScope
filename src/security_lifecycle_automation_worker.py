@@ -503,7 +503,8 @@ class LifecycleAutomationWorker:
                     )
                 elif not (
                     assessment["status"] == "accepted"
-                    and assessment["acceptance_authority"] == "automation_policy"
+                    and assessment["acceptance_authority"]
+                    in {"automation_policy", "human"}
                 ):
                     raise ValueError("automation_assessment_not_accepted")
                 proposals = store.generate_action_proposals(
@@ -566,6 +567,14 @@ class LifecycleAutomationWorker:
                         return "failed"
                 return "accepted"
             if phase == "finalize":
+                try:
+                    kernel.record_terminal_finalization_failure(
+                        run_id=run_id,
+                        code="finalization_failed",
+                        at=at,
+                    )
+                except (KeyError, ValueError, RuntimeError, sqlite3.Error):
+                    pass
                 return "failed"
             failure_code = _failure_code(exc, phase=phase)
             diagnostics = dict(failure_diagnostics)

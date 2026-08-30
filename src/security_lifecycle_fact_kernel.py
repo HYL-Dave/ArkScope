@@ -9,7 +9,7 @@ import sqlite3
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from src.security_lifecycle_investigation import (
@@ -84,8 +84,18 @@ _QUERY_CONTEXT_LIMIT = 16_384
 _TERMINAL_DECISION_KEY = "terminal_decision"
 _TERMINAL_PROVENANCE_KEY = "terminal_decision_provenance_sha256"
 _TERMINAL_FINALIZED_KEY = "terminal_finalized_decision_provenance_sha256"
+_TERMINAL_FINALIZATION_FAILURE_KEY = "terminal_finalization_failure"
 _LATEST_ATTEMPT_REVISION_KEY = "latest_attempt_execution_revision"
 _EXECUTION_OWNER_KEY = "execution_owner_id"
+_TERMINAL_FINALIZATION_FAILURE_CODES = frozenset({"finalization_failed"})
+_TERMINAL_FINALIZATION_RETRY_DELAYS = (
+    timedelta(minutes=15),
+    timedelta(hours=1),
+    timedelta(hours=6),
+)
+_MAX_TERMINAL_FINALIZATION_FAILURES = (
+    len(_TERMINAL_FINALIZATION_RETRY_DELAYS) + 1
+)
 
 
 @dataclass(frozen=True)
@@ -329,6 +339,55 @@ def _terminal_finalization_pending(context: Mapping[str, object]) -> bool:
         and _SHA256.fullmatch(provenance) is not None
         and context.get(_TERMINAL_FINALIZED_KEY) != provenance
     )
+
+
+def normalize_terminal_finalization_failure(
+    value: object,
+) -> dict[str, object] | None:
+    """Validate the closed, provider-neutral terminal-finalization state."""
+
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or set(value) != {
+        "attempt_count",
+        "code",
+        "failed_at",
+        "retry_not_before",
+    }:
+        raise ValueError(_TERMINAL_FINALIZATION_FAILURE_KEY)
+    attempt_count = value.get("attempt_count")
+    if (
+        type(attempt_count) is not int
+        or not 1 <= attempt_count <= _MAX_TERMINAL_FINALIZATION_FAILURES
+    ):
+        raise ValueError(_TERMINAL_FINALIZATION_FAILURE_KEY)
+    code = value.get("code")
+    if code not in _TERMINAL_FINALIZATION_FAILURE_CODES:
+        raise ValueError(_TERMINAL_FINALIZATION_FAILURE_KEY)
+    failed_at = _timestamp(
+        _TERMINAL_FINALIZATION_FAILURE_KEY,
+        value.get("failed_at"),
+    )
+    retry_value = value.get("retry_not_before")
+    retry_not_before = (
+        None
+        if retry_value is None
+        else _timestamp(_TERMINAL_FINALIZATION_FAILURE_KEY, retry_value)
+    )
+    if attempt_count < _MAX_TERMINAL_FINALIZATION_FAILURES:
+        if (
+            retry_not_before is None
+            or _instant(retry_not_before) <= _instant(failed_at)
+        ):
+            raise ValueError(_TERMINAL_FINALIZATION_FAILURE_KEY)
+    elif retry_not_before is not None:
+        raise ValueError(_TERMINAL_FINALIZATION_FAILURE_KEY)
+    return {
+        "attempt_count": attempt_count,
+        "code": code,
+        "failed_at": failed_at,
+        "retry_not_before": retry_not_before,
+    }
 
 
 _TRANSACTION_TERM_FIELDS = frozenset(
@@ -1119,6 +1178,7 @@ class SecurityLifecycleFactKernel:
                 _TERMINAL_DECISION_KEY,
                 _TERMINAL_PROVENANCE_KEY,
                 _TERMINAL_FINALIZED_KEY,
+                _TERMINAL_FINALIZATION_FAILURE_KEY,
             )
         ):
             raise ValueError("reserved_query_context")
@@ -1227,6 +1287,20 @@ class SecurityLifecycleFactKernel:
                 if row["status"] == "succeeded" and _terminal_finalization_pending(
                     context
                 ):
+                    failure = normalize_terminal_finalization_failure(
+                        context.get(_TERMINAL_FINALIZATION_FAILURE_KEY)
+                    )
+                    if failure is not None:
+                        retry_not_before = failure["retry_not_before"]
+                        if retry_not_before is None or _instant(timestamp) < _instant(
+                            str(retry_not_before)
+                        ):
+                            return AutomationRunClaim(
+                                existing_id,
+                                existing_run_key,
+                                "succeeded",
+                                False,
+                            )
                     return AutomationRunClaim(
                         existing_id, existing_run_key, "succeeded", True
                     )
@@ -1706,10 +1780,12 @@ class SecurityLifecycleFactKernel:
                 )
                 query_context[_TERMINAL_PROVENANCE_KEY] = provenance
                 query_context.pop(_TERMINAL_FINALIZED_KEY, None)
+                query_context.pop(_TERMINAL_FINALIZATION_FAILURE_KEY, None)
             elif status != "succeeded":
                 query_context.pop(_TERMINAL_DECISION_KEY, None)
                 query_context.pop(_TERMINAL_PROVENANCE_KEY, None)
                 query_context.pop(_TERMINAL_FINALIZED_KEY, None)
+                query_context.pop(_TERMINAL_FINALIZATION_FAILURE_KEY, None)
             self.conn.execute(
                 "UPDATE security_lifecycle_automation_runs SET status=?,decision_tier=?,"
                 "action_readiness=?,query_context_json=?,diagnostics_json=?,retry_at=?,failure_code=NULL,"
@@ -1778,7 +1854,11 @@ class SecurityLifecycleFactKernel:
                 raise ValueError("terminal_decision_provenance_changed")
             if not isinstance(context.get(_TERMINAL_DECISION_KEY), Mapping):
                 raise ValueError("terminal_decision_missing")
-            if context.get(_TERMINAL_FINALIZED_KEY) == provenance:
+            already_finalized = context.get(_TERMINAL_FINALIZED_KEY) == provenance
+            failure_removed = (
+                context.pop(_TERMINAL_FINALIZATION_FAILURE_KEY, None) is not None
+            )
+            if already_finalized and not failure_removed:
                 return
             context[_TERMINAL_FINALIZED_KEY] = provenance
             self.conn.execute(
@@ -1786,6 +1866,72 @@ class SecurityLifecycleFactKernel:
                 "query_context_json=? WHERE run_id=?",
                 (_query_context_json(context), run_id),
             )
+
+    def record_terminal_finalization_failure(
+        self,
+        *,
+        run_id: str,
+        code: str,
+        at: str,
+    ) -> dict[str, object]:
+        """Persist bounded retry state without changing a succeeded run."""
+
+        self.store.assert_automation_write_available()
+        if code not in _TERMINAL_FINALIZATION_FAILURE_CODES:
+            raise ValueError("terminal_finalization_failure_code")
+        timestamp = _timestamp("at", at)
+        with _immediate_transaction(self.conn):
+            row = self.conn.execute(
+                "SELECT status,query_context_json FROM "
+                "security_lifecycle_automation_runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError("automation_run_not_found")
+            if str(row["status"]) != "succeeded":
+                raise ValueError("automation_run_not_succeeded")
+            context = _query_context_value(row["query_context_json"])
+            if not _terminal_finalization_pending(context):
+                raise ValueError("terminal_finalization_not_pending")
+            assessment_present = self.conn.execute(
+                "SELECT 1 FROM security_lifecycle_assessments "
+                "WHERE automation_run_id=? LIMIT 1",
+                (run_id,),
+            ).fetchone()
+            if assessment_present is None:
+                raise ValueError("terminal_finalization_assessment_missing")
+            previous = normalize_terminal_finalization_failure(
+                context.get(_TERMINAL_FINALIZATION_FAILURE_KEY)
+            )
+            previous_count = 0 if previous is None else int(
+                previous["attempt_count"]
+            )
+            attempt_count = min(
+                previous_count + 1,
+                _MAX_TERMINAL_FINALIZATION_FAILURES,
+            )
+            retry_not_before = None
+            if attempt_count <= len(_TERMINAL_FINALIZATION_RETRY_DELAYS):
+                retry_not_before = (
+                    _instant(timestamp)
+                    + _TERMINAL_FINALIZATION_RETRY_DELAYS[attempt_count - 1]
+                ).isoformat(timespec="seconds").replace("+00:00", "Z")
+            failure = normalize_terminal_finalization_failure(
+                {
+                    "attempt_count": attempt_count,
+                    "code": code,
+                    "failed_at": timestamp,
+                    "retry_not_before": retry_not_before,
+                }
+            )
+            assert failure is not None
+            context[_TERMINAL_FINALIZATION_FAILURE_KEY] = failure
+            self.conn.execute(
+                "UPDATE security_lifecycle_automation_runs SET "
+                "query_context_json=?,updated_at=? WHERE run_id=?",
+                (_query_context_json(context), timestamp, run_id),
+            )
+        return failure
 
     def reconcile_running_runs(
         self,

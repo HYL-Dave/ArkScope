@@ -1053,6 +1053,45 @@ def test_tool_reads_never_write_or_generate_action_proposals(tmp_path, monkeypat
         profile.close()
 
 
+def test_provider_neutral_case_exposes_only_closed_finalization_failure_fields():
+    from src.tools.security_lifecycle_tools import _provider_neutral_case
+
+    rendered = _provider_neutral_case(
+        {
+            "automation_runs": [
+                {
+                    "run_id": "slar_pending",
+                    "created_at": "2026-08-25T12:00:00Z",
+                    "status": "succeeded",
+                    "query_context": {
+                        "case_id": "private-case-context",
+                        "terminal_finalization_failure": {
+                            "attempt_count": 1,
+                            "code": "finalization_failed",
+                            "failed_at": "2026-08-25T12:00:00Z",
+                            "retry_not_before": "2026-08-25T12:15:00Z",
+                        },
+                    },
+                    "diagnostics": {"private": 1},
+                    "blockers": [],
+                }
+            ],
+            "source_family_status": {},
+        }
+    )
+
+    run = rendered["automation_runs"][0]
+    assert run["terminal_finalization_failure"] == {
+        "attempt_count": 1,
+        "code": "finalization_failed",
+        "failed_at": "2026-08-25T12:00:00Z",
+        "retry_not_before": "2026-08-25T12:15:00Z",
+    }
+    assert "query_context" not in run
+    assert "diagnostics" not in run
+    assert "private-case-context" not in json.dumps(rendered)
+
+
 def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_path, monkeypatch):
     from src.tools.security_lifecycle_tools import _provider_neutral_case
 

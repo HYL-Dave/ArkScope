@@ -164,6 +164,10 @@ finalization retry reuses the same succeeded run because its assessment and
 decision provenance are already durable. Retries are bounded; an attended
 Run-again action may explicitly resume the pending finalization.
 
+The automatic retry schedule is closed: after the initial recorded failure,
+retry after 15 minutes, then 1 hour, then 6 hours. A fourth recorded failure
+has no automatic retry time and remains Attention until an attended Run again.
+
 ## 6. Per-Case Results and Recovery Witnesses
 
 The worker result gains a versioned per-case outcome map:

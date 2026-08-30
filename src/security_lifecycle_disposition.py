@@ -9,6 +9,9 @@ import json
 from typing import Any
 
 from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+from src.security_lifecycle_fact_kernel import (
+    normalize_terminal_finalization_failure,
+)
 from src.security_lifecycle_investigation import evidence_rows_sha256
 from src.security_lifecycle_schema import EVIDENCE_SOURCE_FAMILIES
 
@@ -46,6 +49,7 @@ LIFECYCLE_DISPOSITION_REASONS = frozenset(
         "ambiguous_event",
         "nonretryable_provider_failure",
         "automation_failure",
+        "automation_finalization_failure",
         "resolved_no_change",
         "resolved_assessment",
         "transition_applied",
@@ -603,6 +607,15 @@ def project_lifecycle_disposition(
     source_status = _source_family_status(case, run, assessment, blockers)
     last_checked_at = _last_checked_at(case, run)
     blocker_codes = {_blocker_code(row) for row in blockers}
+    finalization_failure = None
+    if run is not None:
+        query_context = run.get("query_context")
+        if query_context is not None and not isinstance(query_context, Mapping):
+            raise ValueError("automation_query_context")
+        if isinstance(query_context, Mapping):
+            finalization_failure = normalize_terminal_finalization_failure(
+                query_context.get("terminal_finalization_failure")
+            )
 
     disposition: str
     bucket: str
@@ -621,6 +634,12 @@ def project_lifecycle_disposition(
             "exception_required",
             "attention",
             "nonretryable_provider_failure",
+        )
+    elif finalization_failure is not None:
+        disposition, bucket, reason = (
+            "exception_required",
+            "attention",
+            "automation_finalization_failure",
         )
     elif transition is not None and transition.get("status") in {
         "applied",
