@@ -224,6 +224,73 @@ def test_recorded_runner_persists_result_before_releasing_execution_lock(
     assert events == ["lock_acquired", "worker", "record", "lock_released"]
 
 
+@pytest.mark.parametrize("failure_point", ("startup", "final"))
+def test_recorded_runner_persists_reconciliation_failure_while_lock_is_held(
+    monkeypatch,
+    failure_point,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+    lock_held = False
+
+    @contextmanager
+    def execution_lock():
+        nonlocal lock_held
+        lock_held = True
+        events.append("lock_acquired")
+        try:
+            yield SimpleNamespace(execution_owner_id="reconcile-owner")
+        finally:
+            events.append("lock_released")
+            lock_held = False
+
+    reconcile_calls = 0
+
+    def reconcile(**_kwargs):
+        nonlocal reconcile_calls
+        reconcile_calls += 1
+        events.append(f"reconcile_{reconcile_calls}")
+        if failure_point == "startup" or reconcile_calls == 2:
+            raise RuntimeError("private reconciliation detail")
+
+    monkeypatch.setattr(scheduler, "lifecycle_automation_execution_lock", execution_lock)
+    monkeypatch.setattr(scheduler, "_reconcile_running_rows", reconcile)
+    monkeypatch.setattr(
+        scheduler,
+        "_run_owned_automation_batch",
+        lambda **_kwargs: events.append("worker") or _v2_summary(),
+    )
+
+    def record(value, *, now):
+        assert lock_held is True
+        assert value == _v2_summary(
+            status="unavailable",
+            reason="automation_scheduler_failed",
+        )
+        assert now == _NOW
+        events.append("record")
+        return True
+
+    monkeypatch.setattr(
+        scheduler,
+        "record_security_lifecycle_automation_result",
+        record,
+    )
+
+    result = scheduler.run_and_record_security_lifecycle_automation(
+        limit=1,
+        now=_NOW,
+    )
+
+    assert result == _v2_summary(
+        status="unavailable",
+        reason="automation_scheduler_failed",
+    )
+    assert events[-2:] == ["record", "lock_released"]
+    assert ("worker" in events) is (failure_point == "final")
+
+
 @pytest.mark.parametrize("failure_point", ("fcntl", "open"))
 def test_lock_unavailable_never_reconciles_persisted_running_rows(
     failure_point,

@@ -1287,33 +1287,36 @@ def _run_security_lifecycle_automation(
     at = _timestamp(instant)
     try:
         with lifecycle_automation_execution_lock() as execution:
-            startup_reconciled = False
-            active_failure = False
             try:
-                _reconcile_running_rows(at=at)
-                startup_reconciled = True
-                result = _run_owned_automation_batch(
-                    limit=limit,
-                    at=at,
-                    execution_owner_id=execution.execution_owner_id,
-                )
-            except BaseException:
-                active_failure = True
-                raise
-            finally:
-                if startup_reconciled:
-                    try:
-                        _reconcile_running_rows(
-                            at=at,
-                            execution_owner_id=execution.execution_owner_id,
-                        )
-                    except Exception as exc:
-                        if not active_failure:
-                            raise
-                        logger.warning(
-                            "security lifecycle owner cleanup failed code=%s",
-                            type(exc).__name__,
-                        )
+                startup_reconciled = False
+                active_failure = False
+                try:
+                    _reconcile_running_rows(at=at)
+                    startup_reconciled = True
+                    result = _run_owned_automation_batch(
+                        limit=limit,
+                        at=at,
+                        execution_owner_id=execution.execution_owner_id,
+                    )
+                except BaseException:
+                    active_failure = True
+                    raise
+                finally:
+                    if startup_reconciled:
+                        try:
+                            _reconcile_running_rows(
+                                at=at,
+                                execution_owner_id=execution.execution_owner_id,
+                            )
+                        except Exception as exc:
+                            if not active_failure:
+                                raise
+                            logger.warning(
+                                "security lifecycle owner cleanup failed code=%s",
+                                type(exc).__name__,
+                            )
+            except Exception as exc:
+                result = _automation_exception_result(exc)
             if record_result:
                 _record_automation_result(result, now=instant)
             return result
