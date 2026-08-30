@@ -43,6 +43,8 @@ class ListingTransportFailure(RuntimeError):
 class ListingRequestBudget:
     """Tick-scoped independent request and response budgets."""
 
+    max_nasdaq_requests: int = MAX_NASDAQ_REQUESTS
+    max_massive_requests: int = MAX_MASSIVE_REQUESTS
     nasdaq_request_count: int = 0
     nasdaq_body_bytes: int = 0
     massive_request_count: int = 0
@@ -50,12 +52,29 @@ class ListingRequestBudget:
     _nasdaq_urls: set[str] = field(default_factory=set)
     _massive_identities: set[tuple[str, bool, str]] = field(default_factory=set)
 
+    def __post_init__(self) -> None:
+        if (
+            type(self.max_nasdaq_requests) is not int
+            or not 1 <= self.max_nasdaq_requests <= MAX_NASDAQ_REQUESTS
+            or type(self.max_massive_requests) is not int
+            or not 1 <= self.max_massive_requests <= MAX_MASSIVE_REQUESTS
+        ):
+            raise ValueError("listing_request_budget")
+
     @classmethod
-    def lifecycle(cls) -> "ListingRequestBudget":
-        return cls()
+    def lifecycle(
+        cls,
+        *,
+        max_nasdaq_requests: int = MAX_NASDAQ_REQUESTS,
+        max_massive_requests: int = MAX_MASSIVE_REQUESTS,
+    ) -> "ListingRequestBudget":
+        return cls(
+            max_nasdaq_requests=max_nasdaq_requests,
+            max_massive_requests=max_massive_requests,
+        )
 
     def reserve_nasdaq_request(self, source_url: str) -> None:
-        if self.nasdaq_request_count >= MAX_NASDAQ_REQUESTS:
+        if self.nasdaq_request_count >= self.max_nasdaq_requests:
             raise ListingTransportFailure("nasdaq_request_budget")
         if source_url in self._nasdaq_urls:
             raise ListingTransportFailure("nasdaq_request_duplicate")
@@ -70,7 +89,7 @@ class ListingRequestBudget:
     def reserve_massive_request(self, identity: tuple[str, bool, str]) -> None:
         if identity in self._massive_identities:
             raise ListingTransportFailure("massive_request_duplicate")
-        if self.massive_request_count >= MAX_MASSIVE_REQUESTS:
+        if self.massive_request_count >= self.max_massive_requests:
             raise ListingTransportFailure("massive_request_budget")
         self._massive_identities.add(identity)
         self.massive_request_count += 1

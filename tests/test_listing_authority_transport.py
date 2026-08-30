@@ -142,6 +142,51 @@ def test_transport_allows_only_two_exact_nasdaq_files() -> None:
     assert len(session.calls) == 2
 
 
+def test_listing_budget_accepts_tighter_per_instance_request_limits() -> None:
+    """A canary must stop before issuing a request beyond its own limits."""
+    session = FakeSession([
+        _nasdaq_response(),
+        _massive_response(),
+        _massive_response(),
+    ])
+    transport = ListingAuthorityTransport(session=session)
+    budget = ListingRequestBudget.lifecycle(
+        max_nasdaq_requests=1,
+        max_massive_requests=2,
+    )
+
+    transport.fetch_nasdaq(NASDAQ_LISTED_URL, budget=budget)
+    with pytest.raises(ListingTransportFailure) as exc:
+        transport.fetch_nasdaq(OTHER_LISTED_URL, budget=budget)
+    assert exc.value.code == "nasdaq_request_budget"
+
+    _massive_call(transport, budget, "AAPL")
+    _massive_call(transport, budget, "MSFT")
+    with pytest.raises(ListingTransportFailure) as exc:
+        _massive_call(transport, budget, "NVDA")
+    assert exc.value.code == "massive_request_budget"
+    assert len(session.calls) == 3
+
+    production = ListingRequestBudget.lifecycle()
+    assert production.max_nasdaq_requests == 2
+    assert production.max_massive_requests == 4
+
+
+@pytest.mark.parametrize(
+    "limits",
+    (
+        {"max_nasdaq_requests": 0},
+        {"max_nasdaq_requests": 3},
+        {"max_massive_requests": 0},
+        {"max_massive_requests": 5},
+        {"max_massive_requests": True},
+    ),
+)
+def test_listing_budget_rejects_unbounded_instance_limits(limits) -> None:
+    with pytest.raises(ValueError, match="listing_request_budget"):
+        ListingRequestBudget.lifecycle(**limits)
+
+
 def test_nasdaq_allows_each_directory_at_most_once() -> None:
     """A repeated file cannot displace the required complementary directory."""
     session = FakeSession([_nasdaq_response()])

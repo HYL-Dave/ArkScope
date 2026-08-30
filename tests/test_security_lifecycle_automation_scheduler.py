@@ -6062,3 +6062,243 @@ def test_blocker_normalization_preserves_typed_context_and_retry_schedule():
     blockers, retry_at = scheduler._blockers([pending], at="2026-08-26T00:00:00Z")
     assert blockers == (pending,)
     assert retry_at == "2026-09-05T00:00:00Z"
+
+
+def test_canary_execution_limits_stop_at_the_closed_provider_budgets():
+    from data_sources.listing_authority_transport import ListingTransportFailure
+    from data_sources.sec_transport import SecTransportFailure
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    limits = scheduler.LifecycleAutomationExecutionLimits.canary()
+    assert limits.case_limit == 1
+    assert limits.ibkr_max_queries == 3
+
+    sec_attempts = limits.sec_budget()
+    for _ in range(8):
+        sec_attempts.reserve_attempt()
+    with pytest.raises(SecTransportFailure, match="sec_request_budget_exhausted"):
+        sec_attempts.reserve_attempt()
+
+    sec_documents = limits.sec_budget()
+    for _ in range(4):
+        sec_documents.reserve_document(1_048_576)
+        sec_documents.record_body(1_048_576)
+    with pytest.raises(SecTransportFailure, match="sec_request_budget_exhausted"):
+        sec_documents.reserve_document(1_048_576)
+
+    listing = limits.listing_budget()
+    assert listing.max_nasdaq_requests == 2
+    assert listing.max_massive_requests == 2
+    listing.reserve_massive_request(("AAPL", True, "stocks"))
+    listing.reserve_massive_request(("MSFT", True, "stocks"))
+    with pytest.raises(ListingTransportFailure, match="massive_request_budget"):
+        listing.reserve_massive_request(("NVDA", True, "stocks"))
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {"case_limit": 3},
+        {"sec_max_attempts": 17},
+        {"sec_max_documents": 13},
+        {"sec_max_total_bytes": 13 * 1_048_576},
+        {"listing_max_massive_requests": 5},
+        {"ibkr_max_queries": 9},
+        {"case_limit": True},
+    ),
+)
+def test_execution_limits_cannot_expand_past_production(overrides) -> None:
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    with pytest.raises(ValueError, match="automation_execution_limits"):
+        scheduler.LifecycleAutomationExecutionLimits(**overrides)
+
+
+def test_canary_case_limit_is_enforced_before_execution() -> None:
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    with pytest.raises(ValueError, match="limit"):
+        scheduler._automation_request(
+            limit=2,
+            now=_NOW,
+            target_case_id=None,
+            allow_new_attempt=False,
+            execution_limits=scheduler.LifecycleAutomationExecutionLimits.canary(),
+        )
+
+
+def test_canary_limits_cross_real_sec_listing_and_ibkr_scheduler_boundaries(
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    limits = scheduler.LifecycleAutomationExecutionLimits.canary()
+    observed = {}
+
+    class SecTransport:
+        @staticmethod
+        def diagnostics(budget):
+            return budget.diagnostics()
+
+        def close(self):
+            pass
+
+    case = {
+        "case_id": "slc_canary_limits",
+        "source": "sec_edgar",
+        "source_ref": "0000000001-26-000001",
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Canary Limits Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["5.03"],
+            "evidence_url": "https://www.sec.gov/Archives/canary.htm",
+            "kinds": [{"event_type": "symbol_change", "effective_date": None}],
+        },
+    }
+    sec_result = _sec_result(
+        case,
+        label="canary-limits",
+        retrieved_at="2026-08-31T00:00:00Z",
+    )
+    successor = _authority_fact(
+        sec_result.evidence[0].evidence_id,
+        "successor_ticker",
+        "NEXT",
+    )
+
+    def collect_sec_evidence(*, budget, **_kwargs):
+        observed["sec"] = (
+            budget.max_attempts,
+            budget.max_documents,
+            budget.max_document_bytes,
+            budget.max_total_bytes,
+        )
+        return SimpleNamespace(
+            evidence=sec_result.evidence,
+            facts=(*sec_result.facts, successor),
+            blockers=(),
+            source_deadlines=(),
+        )
+
+    def ibkr_evidence(*_args, max_queries, **_kwargs):
+        observed["ibkr"] = max_queries
+        return SimpleNamespace(evidence=(), blockers=(), requests_made=0), ()
+
+    monkeypatch.setattr(sec_transport, "SecTransport", SecTransport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr_evidence)
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=(), blockers=(), diagnostics={}
+        )
+    )
+
+    scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-31T00:00:00Z",
+        listing_session=listing_session,
+        execution_limits=limits,
+    )
+
+    assert observed == {
+        "sec": (8, 4, 1_048_576, 4 * 1_048_576),
+        "ibkr": 3,
+    }
+
+
+def test_listing_session_receives_the_same_canary_instance_limits(monkeypatch):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    captured = {}
+
+    class Transport:
+        def close(self):
+            pass
+
+    class Session:
+        def __init__(self, *, budget, **_kwargs):
+            captured["limits"] = (
+                budget.max_nasdaq_requests,
+                budget.max_massive_requests,
+            )
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport)
+    monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session)
+    monkeypatch.setattr(scheduler, "provider_field_env_value", lambda *_args: None)
+
+    with scheduler._listing_authority_session(
+        at="2026-08-31T00:00:00Z",
+        execution_limits=scheduler.LifecycleAutomationExecutionLimits.canary(),
+    ):
+        pass
+
+    assert captured["limits"] == (2, 2)
+
+
+def test_owned_canary_batch_threads_one_limits_object_to_every_case(monkeypatch):
+    from src.security_lifecycle_automation_worker import LifecycleAutomationEvidenceBundle
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    limits = scheduler.LifecycleAutomationExecutionLimits.canary()
+    observed = []
+
+    @contextmanager
+    def listing_session(*, at, execution_limits):
+        observed.append(("listing", at, execution_limits))
+        yield object()
+
+    def load_evidence(case, *, execution_limits, **_kwargs):
+        observed.append(("case", case["case_id"], execution_limits))
+        return LifecycleAutomationEvidenceBundle(
+            evidence=(), facts=(), blockers=(), diagnostics={}, retry_at=None
+        )
+
+    class Worker:
+        def __init__(self, evidence_loader):
+            self.evidence_loader = evidence_loader
+
+        def run(self, limit, mode):
+            assert (limit, mode) == (1, "live")
+            self.evidence_loader(
+                {"case_id": "slc_canary"},
+                mode=mode,
+                at="2026-08-31T00:00:00Z",
+            )
+            return _v2_summary()
+
+    monkeypatch.setattr(scheduler, "_listing_authority_session", listing_session)
+    monkeypatch.setattr(scheduler, "_load_evidence", load_evidence)
+    monkeypatch.setattr(
+        scheduler,
+        "_worker",
+        lambda *, evidence_loader, **_kwargs: Worker(evidence_loader),
+    )
+
+    assert scheduler._run_owned_automation_batch(
+        limit=1,
+        at="2026-08-31T00:00:00Z",
+        execution_owner_id="canary-owner",
+        transition_mutation_allowed=lambda: False,
+        execution_limits=limits,
+    ) == _v2_summary()
+    assert observed == [
+        ("listing", "2026-08-31T00:00:00Z", limits),
+        ("case", "slc_canary", limits),
+    ]

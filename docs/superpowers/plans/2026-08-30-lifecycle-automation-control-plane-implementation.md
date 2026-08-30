@@ -363,19 +363,19 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_news_evidence.py`
 - Test: add/extend a product import tripwire
 
-- [ ] Add a RED proving Massive request limit cannot currently be injected per
+- [x] Add a RED proving Massive request limit cannot currently be injected per
   budget instance.
-- [ ] Add bounded instance maximums to `ListingRequestBudget`; lifecycle
+- [x] Add bounded instance maximums to `ListingRequestBudget`; lifecycle
   defaults remain 2 Nasdaq and 4 Massive.
-- [ ] Add an internal canary limits object and thread it through SEC, listing,
+- [x] Add an internal canary limits object and thread it through SEC, listing,
   IBKR, and case-limit boundaries.
-- [ ] Prove the tighter offline canary limits stop excess calls and have
+- [x] Prove the tighter offline canary limits stop excess calls and have
   positive controls that consume each allowed request.
-- [ ] Mark the publisher module as a retired acquisition adapter and add a
+- [x] Mark the publisher module as a retired acquisition adapter and add a
   tripwire proving no production import/call path exists.
-- [ ] Keep the historical investigation read owner and decision-material news
+- [x] Keep the historical investigation read owner and decision-material news
   exclusion owner.
-- [ ] Mark the older publisher-acquisition design section superseded without
+- [x] Mark the older publisher-acquisition design section superseded without
   rewriting historical decision records.
 
 ## Task 12: Offline Admission and Evidence Packet

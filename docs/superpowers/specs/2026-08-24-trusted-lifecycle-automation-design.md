@@ -214,6 +214,12 @@ excerpt SHA-256, retrieval time, and extractor/rule version. Observation
 
 ### 5.2 Internal data and IBKR
 
+> **SUPERSEDED FOR ACTIVE ACQUISITION (2026-08-28):** Publisher/news
+> acquisition below is retained as historical design context only. Active
+> lifecycle automation follows
+> `2026-08-28-lifecycle-listing-authority-design.md` and does not acquire or
+> admit publisher evidence into current decision material.
+
 Search local news first by identity context and bounded dates. This makes no
 network call and counts as one `publisher` family.
 

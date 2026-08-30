@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+from pathlib import Path
 import sqlite3
 
 
@@ -223,6 +224,36 @@ def test_news_adapter_requires_explicit_borrowed_connections_and_never_creates_s
         tuple(sa.execute("SELECT name,sql FROM sqlite_master ORDER BY name")),
     )
     assert after == before
+
+
+def test_publisher_acquisition_adapter_is_retired_and_has_no_product_caller():
+    import src.security_lifecycle_news_evidence as module
+
+    assert module.ACQUISITION_ADAPTER_STATUS == "retired"
+    repo = Path(__file__).resolve().parents[1]
+    retired_path = (repo / "src/security_lifecycle_news_evidence.py").resolve()
+    offenders = []
+    for root_name in ("src", "data_sources", "scripts"):
+        for path in sorted((repo / root_name).rglob("*.py")):
+            if path.resolve() == retired_path:
+                continue
+            source = path.read_text(encoding="utf-8")
+            if (
+                "security_lifecycle_news_evidence" in source
+                or "read_local_publisher_evidence" in source
+            ):
+                offenders.append(str(path.relative_to(repo)))
+    assert offenders == []
+
+
+def test_original_publisher_acquisition_design_is_explicitly_superseded():
+    repo = Path(__file__).resolve().parents[1]
+    design = (
+        repo / "docs/superpowers/specs/2026-08-24-trusted-lifecycle-automation-design.md"
+    ).read_text(encoding="utf-8")
+
+    assert "SUPERSEDED FOR ACTIVE ACQUISITION" in design
+    assert "2026-08-28-lifecycle-listing-authority-design.md" in design
 
 
 def test_news_adapter_reads_normalized_and_sa_rows_with_identity_and_date_bounds():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 import json
 import logging
@@ -200,6 +201,77 @@ _SQL_BATCH = 200
 
 class LifecycleAutomationNotInstalled(RuntimeError):
     """The reviewed automation schema has not been installed yet."""
+
+
+@dataclass(frozen=True)
+class LifecycleAutomationExecutionLimits:
+    """Internal closed limits for one production or attended execution."""
+
+    case_limit: int = 2
+    sec_max_attempts: int = 16
+    sec_max_documents: int = 12
+    sec_max_document_bytes: int = 1_048_576
+    sec_max_total_bytes: int = 12 * 1_048_576
+    listing_max_nasdaq_requests: int = 2
+    listing_max_massive_requests: int = 4
+    ibkr_max_queries: int = _DEFAULT_IBKR_MAX_QUERIES
+
+    def __post_init__(self) -> None:
+        bounded = (
+            (self.case_limit, 2),
+            (self.sec_max_attempts, 16),
+            (self.sec_max_documents, 12),
+            (self.sec_max_document_bytes, 1_048_576),
+            (self.sec_max_total_bytes, 12 * 1_048_576),
+            (self.ibkr_max_queries, _DEFAULT_IBKR_MAX_QUERIES),
+        )
+        if any(
+            type(value) is not int or not 1 <= value <= maximum
+            for value, maximum in bounded
+        ):
+            raise ValueError("automation_execution_limits")
+        if self.sec_max_total_bytes < self.sec_max_document_bytes:
+            raise ValueError("automation_execution_limits")
+        try:
+            self.listing_budget()
+        except ValueError:
+            raise ValueError("automation_execution_limits") from None
+
+    @classmethod
+    def production(cls) -> "LifecycleAutomationExecutionLimits":
+        return cls()
+
+    @classmethod
+    def canary(cls) -> "LifecycleAutomationExecutionLimits":
+        return cls(
+            case_limit=1,
+            sec_max_attempts=8,
+            sec_max_documents=4,
+            sec_max_document_bytes=1_048_576,
+            sec_max_total_bytes=4 * 1_048_576,
+            listing_max_nasdaq_requests=2,
+            listing_max_massive_requests=2,
+            ibkr_max_queries=3,
+        )
+
+    def sec_budget(self):
+        from data_sources.sec_transport import SecRequestBudget
+
+        return SecRequestBudget(
+            max_attempts=self.sec_max_attempts,
+            max_documents=self.sec_max_documents,
+            max_document_bytes=self.sec_max_document_bytes,
+            max_total_bytes=self.sec_max_total_bytes,
+        )
+
+    def listing_budget(self) -> ListingRequestBudget:
+        return ListingRequestBudget.lifecycle(
+            max_nasdaq_requests=self.listing_max_nasdaq_requests,
+            max_massive_requests=self.listing_max_massive_requests,
+        )
+
+
+_PRODUCTION_EXECUTION_LIMITS = LifecycleAutomationExecutionLimits.production()
 
 
 def _empty_summary(*, status: str = "succeeded", reason: str | None = None) -> dict:
@@ -1153,12 +1225,13 @@ def _load_evidence(
     mode: str,
     at: str,
     listing_session: ListingAuthoritySession,
-    ibkr_max_queries: int = _DEFAULT_IBKR_MAX_QUERIES,
+    ibkr_max_queries: int | None = None,
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
     prior_material: AutomationPriorMaterial | None = None,
     stage_callback: Callable[[LifecycleAutomationStage], None] | None = None,
 ) -> LifecycleAutomationEvidenceBundle:
     del mode
-    from data_sources.sec_transport import SecRequestBudget, SecTransport
+    from data_sources.sec_transport import SecTransport
     from src.security_lifecycle_sec_evidence import collect_sec_evidence
 
     context = _identity_context(case)
@@ -1190,6 +1263,13 @@ def _load_evidence(
 
     if stage_callback is not None and not callable(stage_callback):
         raise TypeError("stage_callback")
+    if not isinstance(execution_limits, LifecycleAutomationExecutionLimits):
+        raise TypeError("execution_limits")
+    resolved_ibkr_max_queries = (
+        execution_limits.ibkr_max_queries
+        if ibkr_max_queries is None
+        else ibkr_max_queries
+    )
 
     def emit_stage(stage: LifecycleAutomationStage) -> None:
         if stage_callback is not None:
@@ -1225,7 +1305,7 @@ def _load_evidence(
     if retained is None:
         retained_evidence: tuple[Mapping[str, object], ...] = ()
         retained_facts: tuple[Mapping[str, object], ...] = ()
-        budget = SecRequestBudget.lifecycle()
+        budget = execution_limits.sec_budget()
         transport = SecTransport()
         try:
             sec = collect_sec_evidence(
@@ -1377,7 +1457,7 @@ def _load_evidence(
                 context,
                 at=at,
                 regulator_successors=successor_values,
-                max_queries=ibkr_max_queries,
+                max_queries=resolved_ibkr_max_queries,
             )
             ibkr_evidence = tuple(ibkr.evidence)
             ibkr_fact_rows = tuple(ibkr_facts)
@@ -1643,7 +1723,13 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
 
 
 @contextmanager
-def _listing_authority_session(*, at: str) -> Iterator[ListingAuthoritySession]:
+def _listing_authority_session(
+    *,
+    at: str,
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
+) -> Iterator[ListingAuthoritySession]:
+    if not isinstance(execution_limits, LifecycleAutomationExecutionLimits):
+        raise TypeError("execution_limits")
     transport: ListingAuthorityTransport | None = None
     session: ListingAuthoritySession | None = None
     session_closed = False
@@ -1651,7 +1737,11 @@ def _listing_authority_session(*, at: str) -> Iterator[ListingAuthoritySession]:
         transport = ListingAuthorityTransport()
         session = ListingAuthoritySession(
             transport=transport,
-            budget=ListingRequestBudget.lifecycle(),
+            budget=(
+                ListingRequestBudget.lifecycle()
+                if execution_limits == _PRODUCTION_EXECUTION_LIMITS
+                else execution_limits.listing_budget()
+            ),
             retrieved_at=at,
             massive_api_key=provider_field_env_value(
                 MASSIVE_CONFIG_PROVIDER,
@@ -1714,6 +1804,7 @@ def _run_owned_automation_batch(
     progress_registry: LifecycleAutomationProgressRegistry | None = None,
     request_id: str | None = None,
     trigger: LifecycleAutomationTrigger = "scheduler",
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
 ) -> dict:
     active_registry = (
         lifecycle_automation_progress_registry()
@@ -1721,8 +1812,18 @@ def _run_owned_automation_batch(
         else progress_registry
     )
     active_request_id = execution_owner_id if request_id is None else request_id
+    if not isinstance(execution_limits, LifecycleAutomationExecutionLimits):
+        raise TypeError("execution_limits")
     try:
-        with _listing_authority_session(at=at) as session:
+        listing_context = (
+            _listing_authority_session(at=at)
+            if execution_limits == _PRODUCTION_EXECUTION_LIMITS
+            else _listing_authority_session(
+                at=at,
+                execution_limits=execution_limits,
+            )
+        )
+        with listing_context as session:
             def load_evidence(
                 case,
                 *,
@@ -1737,6 +1838,8 @@ def _run_owned_automation_batch(
                     "listing_session": session,
                     "prior_material": prior_material,
                 }
+                if execution_limits != _PRODUCTION_EXECUTION_LIMITS:
+                    kwargs["execution_limits"] = execution_limits
                 if stage_callback is not None:
                     kwargs["stage_callback"] = stage_callback
                 return _load_evidence(case, **kwargs)
@@ -1774,8 +1877,11 @@ def _automation_request(
     now: datetime | None,
     target_case_id: str | None,
     allow_new_attempt: bool,
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
 ) -> tuple[datetime, str]:
-    if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
+    if not isinstance(execution_limits, LifecycleAutomationExecutionLimits):
+        raise TypeError("execution_limits")
+    if type(limit) is not int or not 1 <= limit <= execution_limits.case_limit:
         raise ValueError("limit")
     if type(allow_new_attempt) is not bool:
         raise ValueError("allow_new_attempt")
@@ -1804,6 +1910,7 @@ def _run_owned_and_maybe_record(
     allow_new_attempt: bool,
     request_id: str,
     trigger: LifecycleAutomationTrigger,
+    execution_limits: LifecycleAutomationExecutionLimits,
 ) -> dict:
     try:
         startup_reconciled = False
@@ -1811,17 +1918,20 @@ def _run_owned_and_maybe_record(
         try:
             _reconcile_running_rows(at=at)
             startup_reconciled = True
-            result = _run_owned_automation_batch(
-                limit=limit,
-                at=at,
-                execution_owner_id=execution_owner_id,
-                transition_mutation_allowed=transition_mutation_allowed,
-                target_case_id=target_case_id,
-                allow_new_attempt=allow_new_attempt,
-                progress_registry=lifecycle_automation_progress_registry(),
-                request_id=request_id,
-                trigger=trigger,
-            )
+            batch_kwargs = {
+                "limit": limit,
+                "at": at,
+                "execution_owner_id": execution_owner_id,
+                "transition_mutation_allowed": transition_mutation_allowed,
+                "target_case_id": target_case_id,
+                "allow_new_attempt": allow_new_attempt,
+                "progress_registry": lifecycle_automation_progress_registry(),
+                "request_id": request_id,
+                "trigger": trigger,
+            }
+            if execution_limits != _PRODUCTION_EXECUTION_LIMITS:
+                batch_kwargs["execution_limits"] = execution_limits
+            result = _run_owned_automation_batch(**batch_kwargs)
         except BaseException:
             active_failure = True
             raise
@@ -1855,6 +1965,7 @@ def _run_security_lifecycle_automation(
     allow_new_attempt: bool = False,
     transition_mutation_allowed: Callable[[], bool] | None = None,
     trigger: LifecycleAutomationTrigger = "scheduler",
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
 ) -> dict:
     mutation_allowed = _mutation_authority(transition_mutation_allowed)
     instant, at = _automation_request(
@@ -1862,6 +1973,7 @@ def _run_security_lifecycle_automation(
         now=now,
         target_case_id=target_case_id,
         allow_new_attempt=allow_new_attempt,
+        execution_limits=execution_limits,
     )
     try:
         with lifecycle_automation_execution_lock() as execution:
@@ -1877,6 +1989,7 @@ def _run_security_lifecycle_automation(
                 allow_new_attempt=allow_new_attempt,
                 request_id=execution.execution_owner_id,
                 trigger=trigger,
+                execution_limits=execution_limits,
             )
     except LifecycleAutomationAlreadyRunning:
         result = _empty_summary(status="skipped", reason="already_running")
@@ -1903,6 +2016,7 @@ def _run_dispatched_owned_automation(
     allow_new_attempt: bool,
     request_id: str,
     trigger: LifecycleAutomationTrigger,
+    execution_limits: LifecycleAutomationExecutionLimits,
 ) -> None:
     exit_args = (None, None, None)
     try:
@@ -1917,6 +2031,7 @@ def _run_dispatched_owned_automation(
             allow_new_attempt=allow_new_attempt,
             request_id=request_id,
             trigger=trigger,
+            execution_limits=execution_limits,
         )
     except BaseException:
         exit_args = sys.exc_info()
@@ -1933,6 +2048,7 @@ def dispatch_and_record_security_lifecycle_automation(
     allow_new_attempt: bool = False,
     transition_mutation_allowed: Callable[[], bool] | None = None,
     trigger: LifecycleAutomationTrigger | None = None,
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
 ) -> dict[str, str]:
     """Acquire ownership now and transfer that exact lease to one thread."""
 
@@ -1951,6 +2067,7 @@ def dispatch_and_record_security_lifecycle_automation(
         now=now,
         target_case_id=target_case_id,
         allow_new_attempt=allow_new_attempt,
+        execution_limits=execution_limits,
     )
     lock_context = lifecycle_automation_execution_lock()
     try:
@@ -1992,6 +2109,7 @@ def dispatch_and_record_security_lifecycle_automation(
                 "allow_new_attempt": allow_new_attempt,
                 "request_id": execution.execution_owner_id,
                 "trigger": resolved_trigger,
+                "execution_limits": execution_limits,
             },
             name="security-lifecycle-automation-run",
             daemon=True,
@@ -2016,6 +2134,7 @@ def run_security_lifecycle_automation(
     now: datetime | None = None,
     *,
     transition_mutation_allowed: Callable[[], bool] | None = None,
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
 ) -> dict:
     """Run one exclusively owned batch without recording its result."""
 
@@ -2024,6 +2143,7 @@ def run_security_lifecycle_automation(
         now=now,
         record_result=False,
         transition_mutation_allowed=transition_mutation_allowed,
+        execution_limits=execution_limits,
     )
 
 
@@ -2034,6 +2154,7 @@ def run_and_record_security_lifecycle_automation(
     target_case_id: str | None = None,
     allow_new_attempt: bool = False,
     transition_mutation_allowed: Callable[[], bool] | None = None,
+    execution_limits: LifecycleAutomationExecutionLimits = _PRODUCTION_EXECUTION_LIMITS,
 ) -> dict:
     """Run and persist one batch before releasing exclusive ownership."""
 
@@ -2044,6 +2165,7 @@ def run_and_record_security_lifecycle_automation(
         target_case_id=target_case_id,
         allow_new_attempt=allow_new_attempt,
         transition_mutation_allowed=transition_mutation_allowed,
+        execution_limits=execution_limits,
     )
 
 

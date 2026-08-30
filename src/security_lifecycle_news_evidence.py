@@ -1,4 +1,4 @@
-"""Read bounded lifecycle evidence from caller-owned local news databases."""
+"""Retired lifecycle publisher-acquisition adapter retained for history tests."""
 
 from __future__ import annotations
 
@@ -11,6 +11,9 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 from src.security_lifecycle_sec_evidence import IdentityContext
+
+
+ACQUISITION_ADAPTER_STATUS = "retired"
 
 
 _NORMALIZED_SCHEMA = {
@@ -271,7 +274,7 @@ def read_local_publisher_evidence(
     max_rows: int = 20,
     max_excerpt_bytes: int = 2000,
 ) -> LocalPublisherEvidenceResult:
-    """Read only from two explicit borrowed connections; never create schema."""
+    """Exercise the retired adapter with borrowed connections; never create schema."""
     start = _date("start_date", start_date)
     end = _date("end_date", end_date)
     if start > end:
