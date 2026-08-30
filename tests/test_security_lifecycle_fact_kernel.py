@@ -106,6 +106,21 @@ def _fact(evidence, value="HAPN", *, rule_version="1"):
     )
 
 
+def _rehydrated_prior_material(prior):
+    evidence = tuple(
+        {**dict(row), "source_locator": json.loads(row["source_locator_json"])}
+        for row in prior.evidence
+    )
+    facts = tuple(
+        {
+            **dict(row),
+            "normalized_value": json.loads(row["normalized_value_json"]),
+        }
+        for row in prior.facts
+    )
+    return evidence, facts
+
+
 def _deadline_owner(*, at="2026-08-27T00:00:00Z", excerpt_prefix=""):
     from src.security_lifecycle_sec_evidence import SecSourceDeadline
     from src.service import security_lifecycle_automation_scheduler as scheduler
@@ -604,6 +619,8 @@ def test_blocker_citation_resolves_existing_evidence_owned_by_same_run():
         execution_owner_id="test-kernel-recheck-owner",
     )
     assert retry.run_id == claim.run_id
+    prior = kernel.prior_material(retry.run_id)
+    retained_evidence, retained_facts = _rehydrated_prior_material(prior)
     context = dict(producer_blocker.context)
     context["source_deadline_evidence_id"] = persisted_id
 
@@ -617,6 +634,9 @@ def test_blocker_citation_resolves_existing_evidence_owned_by_same_run():
         retry_at=None,
         diagnostics={"sec_attempts": 2},
         at="2026-08-28T00:00:00Z",
+        retained_evidence=retained_evidence,
+        retained_facts=retained_facts,
+        refreshed_source_families=(),
     )
 
     assert result.status == "blocked"
@@ -1952,6 +1972,181 @@ def test_due_blocked_family_replacement_is_atomic_and_retains_regulator():
     assert stale_ids.isdisjoint({row[0] for row in final_rows})
 
 
+def test_retained_material_requires_explicit_refresh_contract():
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    fresh = _evidence("fresh-contract")
+    fabricated = _evidence("fabricated-retained")
+
+    with pytest.raises(ValueError, match="refreshed_source_families"):
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(fresh,),
+            facts=(_fact(fresh),),
+            blockers=(),
+            decision_tier="verified_automatic",
+            action_readiness="transition_eligible",
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at=_LATER,
+            retained_evidence=(fabricated,),
+            retained_facts=(_fact(fabricated),),
+            refreshed_source_families=None,
+        )
+
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
+    assert store.list_evidence(case_id) == []
+
+
+def test_existing_run_material_requires_explicit_refresh_contract():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    conn, store, kernel, case_id = _context()
+    original = _evidence("existing-contract")
+    claim = _reserve(kernel, case_id)
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(original,),
+        facts=(_fact(original),),
+        blockers=(
+            AutomationBlocker(
+                code="listing_directory_unavailable",
+                retryable=True,
+                context={},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-26T00:00:00Z",
+        diagnostics={"listing_requests": 1},
+        at=_LATER,
+    )
+    retry = _reserve(kernel, case_id, at="2026-08-26T00:00:00Z")
+    before = tuple(
+        tuple(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? ORDER BY evidence_id",
+            (retry.run_id,),
+        )
+    )
+    replacement = _evidence("replacement-without-contract")
+
+    with pytest.raises(ValueError, match="refreshed_source_families"):
+        kernel.complete_run(
+            run_id=retry.run_id,
+            evidence=(replacement,),
+            facts=(_fact(replacement),),
+            blockers=(
+                AutomationBlocker(
+                    code="listing_directory_unavailable",
+                    retryable=True,
+                    context={},
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at="2026-08-27T00:00:00Z",
+            diagnostics={"listing_requests": 2},
+            at="2026-08-26T00:00:00Z",
+            refreshed_source_families=None,
+        )
+
+    after = tuple(
+        tuple(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? ORDER BY evidence_id",
+            (retry.run_id,),
+        )
+    )
+    assert after == before
+    assert store.get_automation_run(retry.run_id)["status"] == "running"
+
+
+def test_massive_credential_blocker_cannot_be_persisted_as_retryable():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+
+    with pytest.raises(ValueError, match="blocker_retryable"):
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(
+                AutomationBlocker(
+                    code="massive_credential_missing",
+                    retryable=True,
+                    context={"provider": "massive"},
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at="2026-08-26T00:00:00Z",
+            diagnostics={"listing_requests": 0},
+            at=_LATER,
+        )
+
+    assert store.get_automation_run(claim.run_id)["status"] == "running"
+
+
+def test_legacy_retryable_massive_blocker_requires_attended_new_attempt():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="massive_credential_missing",
+                retryable=False,
+                context={"provider": "massive"},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at=None,
+        diagnostics={"listing_requests": 0},
+        at=_LATER,
+    )
+    conn.execute(
+        "UPDATE security_lifecycle_automation_run_blockers SET retryable=1 "
+        "WHERE automation_run_id=? AND blocker_code='massive_credential_missing'",
+        (claim.run_id,),
+    )
+    conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET retry_at=? WHERE run_id=?",
+        ("2026-08-26T00:00:00Z", claim.run_id),
+    )
+    conn.commit()
+    legacy_snapshot = store.get_automation_run(claim.run_id)
+
+    unattended = _reserve(kernel, case_id, at="2026-08-26T00:00:00Z")
+
+    assert unattended.should_execute is False
+    assert unattended.run_id == claim.run_id
+    assert store.get_automation_run(claim.run_id) == legacy_snapshot
+
+    attended = _reserve(
+        kernel,
+        case_id,
+        at="2026-08-26T00:00:00Z",
+        allow_new_attempt=True,
+    )
+    assert attended.should_execute is True
+    assert attended.run_id != claim.run_id
+    attended_context = json.loads(
+        store.get_automation_run(attended.run_id)["query_context_json"]
+    )
+    assert attended_context["predecessor_run_id"] == claim.run_id
+    assert store.get_automation_run(claim.run_id) == legacy_snapshot
+
+
 def test_cross_revision_due_blocked_failure_does_not_replay_same_attempt_revision():
     from src.security_lifecycle_fact_kernel import AutomationBlocker
 
@@ -2523,6 +2718,8 @@ def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
         extractor_rule_id="ibkr.contract_symbol",
         extractor_rule_version="1",
     )
+    prior = kernel.prior_material(claim.run_id)
+    retained_evidence, retained_facts = _rehydrated_prior_material(prior)
     second = kernel.complete_run(
         run_id=claim.run_id,
         evidence=(market,),
@@ -2533,6 +2730,9 @@ def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
         retry_at=None,
         diagnostics={"ibkr_requests": 1},
         at="2026-08-26T00:01:00Z",
+        retained_evidence=retained_evidence,
+        retained_facts=retained_facts,
+        refreshed_source_families=("market_infrastructure",),
     )
 
     assert second.evidence_count == 2
@@ -2543,6 +2743,175 @@ def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
         "WHERE assessment_id=?",
         (assessment_id,),
     ).fetchone()[0] == 2
+
+
+def test_readiness_recheck_append_contract_keeps_cited_same_family_history():
+    conn, store, kernel, case_id = _context()
+    original = _evidence("append-original")
+    claim = _reserve(kernel, case_id)
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(original,),
+        facts=(_fact(original),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="waiting_effective_date",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+    persisted_id = conn.execute(
+        "SELECT evidence_id FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=?",
+        (claim.run_id,),
+    ).fetchone()[0]
+    assessment_id = store.create_assessment(
+        case_id=case_id,
+        relevance="direct_tracked_security",
+        confidence="high",
+        author="human",
+        conclusion="Preserve the evidence used by this assessment.",
+        impact_summary="The readiness recheck may add newer evidence.",
+        outcomes=("symbol_changed",),
+        citations=(
+            {
+                "reference_kind": "observation",
+                "cited_content_sha256": _FINGERPRINT,
+            },
+            {"reference_kind": "evidence", "evidence_id": persisted_id},
+        ),
+        observation_fingerprint_sha256=_FINGERPRINT,
+        at=_LATER,
+    )
+    retry = kernel.reserve_readiness_recheck(
+        run_id=claim.run_id,
+        due_at="2026-08-26T00:00:00Z",
+        at="2026-08-26T00:00:00Z",
+        execution_owner_id="append-readiness-owner",
+    )
+    prior = kernel.prior_material(retry.run_id)
+    retained_evidence, retained_facts = _rehydrated_prior_material(prior)
+    fresh = _evidence("append-fresh")
+
+    result = kernel.complete_run(
+        run_id=retry.run_id,
+        evidence=(fresh,),
+        facts=(_fact(fresh),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="transition_eligible",
+        retry_at=None,
+        diagnostics={"sec_attempts": 2},
+        at="2026-08-26T00:01:00Z",
+        retained_evidence=retained_evidence,
+        retained_facts=retained_facts,
+        refreshed_source_families=(),
+    )
+
+    assert result.evidence_count == 2
+    assert result.fact_count == 2
+    assert conn.execute(
+        "SELECT evidence_id FROM security_lifecycle_assessment_evidence "
+        "WHERE assessment_id=? AND reference_kind='evidence'",
+        (assessment_id,),
+    ).fetchone()[0] == persisted_id
+    assert "readiness_recheck_due_at" not in json.loads(
+        store.get_automation_run(retry.run_id)["query_context_json"]
+    )
+
+
+def test_append_contract_is_rejected_for_due_blocked_retry():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    original = _evidence("blocked-append-original")
+    claim = _reserve(kernel, case_id)
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(original,),
+        facts=(_fact(original),),
+        blockers=(
+            AutomationBlocker(
+                code="listing_directory_unavailable",
+                retryable=True,
+                context={},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-26T00:00:00Z",
+        diagnostics={"listing_requests": 1},
+        at=_LATER,
+    )
+    retry = _reserve(kernel, case_id, at="2026-08-26T00:00:00Z")
+    prior = kernel.prior_material(retry.run_id)
+    retained_evidence, retained_facts = _rehydrated_prior_material(prior)
+    fresh = _evidence("blocked-append-fresh")
+
+    with pytest.raises(ValueError, match="append_only_refresh"):
+        kernel.complete_run(
+            run_id=retry.run_id,
+            evidence=(fresh,),
+            facts=(_fact(fresh),),
+            blockers=(),
+            decision_tier="verified_automatic",
+            action_readiness="transition_eligible",
+            retry_at=None,
+            diagnostics={"sec_attempts": 1},
+            at="2026-08-26T00:01:00Z",
+            retained_evidence=retained_evidence,
+            retained_facts=retained_facts,
+            refreshed_source_families=(),
+        )
+
+    assert store.get_automation_run(retry.run_id)["status"] == "running"
+
+
+def test_append_contract_requires_the_complete_prior_material_set():
+    _conn, store, kernel, case_id = _context()
+    first = _evidence("append-complete-first")
+    second = _evidence("append-complete-second")
+    claim = _reserve(kernel, case_id)
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(first, second),
+        facts=(_fact(first), _fact(second)),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="waiting_effective_date",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+    )
+    retry = kernel.reserve_readiness_recheck(
+        run_id=claim.run_id,
+        due_at="2026-08-26T00:00:00Z",
+        at="2026-08-26T00:00:00Z",
+        execution_owner_id="append-complete-owner",
+    )
+    prior = kernel.prior_material(retry.run_id)
+    retained_evidence, retained_facts = _rehydrated_prior_material(prior)
+    kept_ids = {retained_evidence[0]["evidence_id"]}
+
+    with pytest.raises(ValueError, match="retained_evidence"):
+        kernel.complete_run(
+            run_id=retry.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(),
+            decision_tier="verified_automatic",
+            action_readiness="transition_eligible",
+            retry_at=None,
+            diagnostics={"sec_attempts": 0},
+            at="2026-08-26T00:01:00Z",
+            retained_evidence=retained_evidence[:1],
+            retained_facts=tuple(
+                row for row in retained_facts if row["evidence_id"] in kept_ids
+            ),
+            refreshed_source_families=(),
+        )
+
+    assert store.get_automation_run(retry.run_id)["status"] == "running"
 
 
 def test_source_family_set_is_derived_from_evidence_not_article_count():

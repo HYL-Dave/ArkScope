@@ -1595,6 +1595,131 @@ def test_provider_blockers_remain_typed_and_retryable_without_partial_assessment
         harness.conn.close()
 
 
+def test_mixed_provider_and_policy_blockers_do_not_enter_evaluation(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+        LifecycleAutomationWorker,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    base = _bundle(case)
+    harness.bundles[case["case_id"]] = LifecycleAutomationEvidenceBundle(
+        evidence=base.evidence,
+        facts=base.facts,
+        blockers=(
+            AutomationBlocker(
+                code="sec_rate_limited",
+                retryable=True,
+                context={},
+            ),
+            AutomationBlocker(
+                code="listing_authority_conflict",
+                retryable=False,
+                context={},
+            ),
+        ),
+        diagnostics={"sec_attempts": 1, "listing_requests": 1},
+        retry_at=None,
+    )
+    evaluate_calls = []
+    evaluate = LifecycleAutomationWorker._evaluate
+
+    def tracked_evaluate(self, **kwargs):
+        evaluate_calls.append(kwargs)
+        return evaluate(self, **kwargs)
+
+    monkeypatch.setattr(LifecycleAutomationWorker, "_evaluate", tracked_evaluate)
+    try:
+        result = harness.worker().run()
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+
+        assert result["blocked"] == 1
+        assert evaluate_calls == []
+        assert store.list_assessments(case["case_id"]) == []
+        assert [row["blocker_code"] for row in run["blockers"]] == [
+            "listing_authority_conflict",
+            "sec_rate_limited",
+        ]
+    finally:
+        harness.conn.close()
+
+
+@pytest.mark.parametrize(
+    "family",
+    ("regulator", "listing_authority"),
+)
+def test_same_family_conflict_plus_unavailable_does_not_enter_evaluation(
+    tmp_path,
+    monkeypatch,
+    family,
+):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+        LifecycleAutomationWorker,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    if family == "regulator":
+        base = _conflict_bundle(case, pending=False)
+        blockers = (
+            *base.blockers,
+            AutomationBlocker(
+                code="sec_rate_limited",
+                retryable=True,
+                context={},
+            ),
+        )
+    else:
+        base = _bundle(case)
+        blockers = (
+            AutomationBlocker(
+                code="listing_authority_conflict",
+                retryable=False,
+                context={},
+            ),
+            AutomationBlocker(
+                code="listing_directory_unavailable",
+                retryable=True,
+                context={},
+            ),
+        )
+    harness.bundles[case["case_id"]] = LifecycleAutomationEvidenceBundle(
+        evidence=base.evidence,
+        facts=base.facts,
+        blockers=blockers,
+        diagnostics={"sec_attempts": 1, "listing_requests": 1},
+        retry_at=None,
+    )
+    evaluate_calls = []
+    evaluate = LifecycleAutomationWorker._evaluate
+
+    def tracked_evaluate(self, **kwargs):
+        evaluate_calls.append(kwargs)
+        return evaluate(self, **kwargs)
+
+    monkeypatch.setattr(LifecycleAutomationWorker, "_evaluate", tracked_evaluate)
+    try:
+        result = harness.worker().run()
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+
+        assert result["blocked"] == 1
+        assert result["failed"] == 0
+        assert evaluate_calls == []
+        assert store.list_assessments(case["case_id"]) == []
+        assert run["status"] == "blocked"
+    finally:
+        harness.conn.close()
+
+
 @pytest.mark.parametrize(
     ("code", "retryable"),
     [
@@ -2429,14 +2554,63 @@ def test_worker_uses_only_injected_evidence_sources_and_paths(tmp_path, monkeypa
 
 def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
     tmp_path,
+    monkeypatch,
 ):
     from src.security_lifecycle_automation_worker import AUTOMATION_EXECUTION_REVISION
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
     from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
     from src.security_lifecycle_disposition import next_lifecycle_recheck_at
 
     terminal = _case(1, ticker="TERM", terminal=True)
     unrelated = _case(2, ticker="OLD")
     harness = _Harness(tmp_path, [terminal, unrelated])
+    evaluated_evidence_ids = []
+    original_evaluate = LifecycleAutomationWorker._evaluate
+
+    def tracked_evaluate(self, **kwargs):
+        evaluated_evidence_ids.append(
+            tuple(
+                sorted(
+                    str(getattr(row, "evidence_id", None) or row["evidence_id"])
+                    for row in kwargs["evidence"]
+                )
+            )
+        )
+        return original_evaluate(self, **kwargs)
+
+    monkeypatch.setattr(LifecycleAutomationWorker, "_evaluate", tracked_evaluate)
+    configured_loader = harness.evidence_loader
+
+    def append_only_readiness_loader(case, *, mode, at, prior_material):
+        bundle = configured_loader(
+            case,
+            mode=mode,
+            at=at,
+            prior_material=prior_material,
+        )
+        if prior_material is None or bundle.refreshed_source_families != ():
+            return bundle
+        preserved_evidence = tuple(
+            {
+                **dict(row),
+                "source_locator": json.loads(row["source_locator_json"]),
+            }
+            for row in prior_material.evidence
+        )
+        preserved_facts = tuple(
+            {
+                **dict(row),
+                "normalized_value": json.loads(row["normalized_value_json"]),
+            }
+            for row in prior_material.facts
+        )
+        return replace(
+            bundle,
+            preserved_evidence=preserved_evidence,
+            preserved_facts=preserved_facts,
+        )
+
+    harness.evidence_loader = append_only_readiness_loader
     harness.now = "2026-08-31T12:00:00Z"
     harness.bundles[terminal["case_id"]] = _bundle(terminal, terminal=True)
     try:
@@ -2462,11 +2636,15 @@ def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
         )
 
         harness.evidence_calls.clear()
+        evaluated_evidence_ids.clear()
         harness.now = "2026-09-01T12:00:00Z"
-        harness.bundles[terminal["case_id"]] = _bundle(
-            terminal,
-            terminal=True,
-            market_absent=True,
+        harness.bundles[terminal["case_id"]] = replace(
+            _bundle(
+                terminal,
+                terminal=True,
+                market_absent=True,
+            ),
+            refreshed_source_families=(),
         )
         second = harness.worker().run(limit=2)
 
@@ -2476,6 +2654,16 @@ def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
         assert second["skipped_current"] == 1
         assert harness.evidence_calls == [
             (terminal["case_id"], "live", "2026-09-01T12:00:00Z")
+        ]
+        expected_evidence_ids = tuple(
+            sorted(
+                row.evidence_id
+                for row in harness.bundles[terminal["case_id"]].evidence
+            )
+        )
+        assert evaluated_evidence_ids == [
+            expected_evidence_ids,
+            expected_evidence_ids,
         ]
         terminal_run = store.list_automation_runs(terminal["case_id"])[0]
         assert terminal_run["action_readiness"] == "transition_eligible"

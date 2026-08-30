@@ -122,6 +122,42 @@ _MASSIVE_LISTING_BLOCKERS = frozenset(
         "massive_reference_unavailable",
     }
 )
+_PROVIDER_CONFLICT_CODES = {
+    "regulator": frozenset({"source_conflict"}),
+    "listing_authority": frozenset({"listing_authority_conflict"}),
+    "market_infrastructure": frozenset({"ibkr_contract_ambiguous"}),
+}
+_PROVIDER_UNAVAILABLE_CODES = {
+    "regulator": frozenset(
+        {
+            "sec_access_denied",
+            "sec_document_unavailable",
+            "sec_governor_unavailable",
+            "sec_identity_unconfigured",
+            "sec_rate_limited",
+            "sec_request_budget_exhausted",
+            "sec_transport_unavailable",
+        }
+    ),
+    "market_infrastructure": frozenset(
+        {
+            "ibkr_entitlement_denied",
+            "ibkr_gateway_unavailable",
+        }
+    ),
+    "listing_authority": frozenset(
+        {
+            "listing_directory_unavailable",
+            "listing_directory_stale",
+            "listing_directory_schema_mismatch",
+            "massive_credential_missing",
+            "massive_access_denied",
+            "massive_rate_limited",
+            "massive_reference_unavailable",
+            "listing_status_unresolved",
+        }
+    ),
+}
 _IDENTITY_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
 _MAX_HINT_TICKERS = 256
 _MAX_ALIAS_EDGES = 512
@@ -819,41 +855,19 @@ def _pending_event_monitoring(
 
 
 def _provider_state(codes: tuple[str, ...], *, family: str) -> str:
-    conflict_codes = {
-        "regulator": {"source_conflict"},
-        "listing_authority": {"listing_authority_conflict"},
-        "market_infrastructure": {"ibkr_contract_ambiguous"},
-    }[family]
-    unavailable_codes = {
-        "regulator": {
-            "sec_access_denied",
-            "sec_document_unavailable",
-            "sec_governor_unavailable",
-            "sec_identity_unconfigured",
-            "sec_rate_limited",
-            "sec_request_budget_exhausted",
-            "sec_transport_unavailable",
-        },
-        "market_infrastructure": {
-            "ibkr_entitlement_denied",
-            "ibkr_gateway_unavailable",
-        },
-        "listing_authority": {
-            "listing_directory_unavailable",
-            "listing_directory_stale",
-            "listing_directory_schema_mismatch",
-            "massive_credential_missing",
-            "massive_access_denied",
-            "massive_rate_limited",
-            "massive_reference_unavailable",
-            "listing_status_unresolved",
-        },
-    }[family]
-    if conflict_codes.intersection(codes):
+    if _PROVIDER_CONFLICT_CODES[family].intersection(codes):
         return "conflict"
-    if unavailable_codes.intersection(codes):
+    if _provider_acquisition_unavailable(codes, family=family):
         return "unavailable"
     return "available"
+
+
+def _provider_acquisition_unavailable(
+    codes: tuple[str, ...],
+    *,
+    family: str,
+) -> bool:
+    return bool(_PROVIDER_UNAVAILABLE_CODES[family].intersection(codes))
 
 
 def _required_listing_codes(
@@ -877,13 +891,12 @@ def _required_listing_codes(
 def _ordered_retained_regulator_evidence(
     rows: list[Mapping[str, object]],
 ) -> tuple[Mapping[str, object], ...] | None:
-    if len(rows) < 2:
-        return tuple(rows)
-
     ordered: list[
-        tuple[str, str, tuple[tuple[int, int], ...] | None, Mapping[str, object]]
+        tuple[str, str, tuple[tuple[int, int], ...], Mapping[str, object]]
     ] = []
-    document_counts: dict[tuple[str, str], int] = {}
+    document_ranges: dict[
+        tuple[str, str], list[tuple[tuple[int, int], ...]]
+    ] = {}
     for row in rows:
         published = row.get("source_published_at")
         locator = row.get("source_locator")
@@ -895,51 +908,111 @@ def _ordered_retained_regulator_evidence(
         except ValueError:
             return None
         accession = locator.get("accession")
-        if type(accession) is not str or not accession:
+        if (
+            type(accession) is not str
+            or not accession
+            or accession.strip() != accession
+        ):
             return None
 
         raw_ranges = locator.get("rendered_text_ranges")
-        ranges: tuple[tuple[int, int], ...] | None = None
-        if raw_ranges is not None:
-            if not isinstance(raw_ranges, list) or not raw_ranges:
+        if not isinstance(raw_ranges, list) or not raw_ranges:
+            return None
+        parsed_ranges: list[tuple[int, int]] = []
+        previous_end: int | None = None
+        for raw_range in raw_ranges:
+            if not isinstance(raw_range, list) or len(raw_range) != 2:
                 return None
-            parsed_ranges: list[tuple[int, int]] = []
-            for raw_range in raw_ranges:
-                if not isinstance(raw_range, list) or len(raw_range) != 2:
-                    return None
-                start, end = raw_range
-                if (
-                    type(start) is not int
-                    or type(end) is not int
-                    or start < 0
-                    or end <= start
-                ):
-                    return None
-                parsed_ranges.append((start, end))
-            ranges = tuple(parsed_ranges)
+            start, end = raw_range
+            if (
+                type(start) is not int
+                or type(end) is not int
+                or start < 0
+                or end <= start
+                or (previous_end is not None and start < previous_end)
+            ):
+                return None
+            parsed_ranges.append((start, end))
+            previous_end = end
+        ranges = tuple(parsed_ranges)
 
         document = (published, accession)
-        document_counts[document] = document_counts.get(document, 0) + 1
+        document_ranges.setdefault(document, []).append(ranges)
         ordered.append((published, accession, ranges, row))
 
-    if any(
-        document_counts[(published, accession)] > 1 and ranges is None
-        for published, accession, ranges, _row in ordered
-    ):
-        return None
-    order_keys = {
-        (published, accession, ranges or ())
-        for published, accession, ranges, _row in ordered
-    }
-    if len(order_keys) != len(ordered):
-        return None
+    for ranges_by_excerpt in document_ranges.values():
+        previous_end: int | None = None
+        for ranges in sorted(ranges_by_excerpt, key=lambda value: value[0][0]):
+            first_start = ranges[0][0]
+            if previous_end is not None and first_start < previous_end:
+                return None
+            previous_end = ranges[-1][1]
     return tuple(
         row
         for _published, _accession, _ranges, row in sorted(
             ordered,
-            key=lambda item: (item[0], item[1], item[2] or ()),
+            key=lambda item: (item[0], item[1], item[2]),
         )
     )
+
+
+def _prior_source_family_material(
+    prior_material: AutomationPriorMaterial | None,
+    source_families: frozenset[str],
+) -> tuple[
+    tuple[Mapping[str, object], ...],
+    tuple[Mapping[str, object], ...],
+]:
+    if prior_material is None:
+        return (), ()
+    evidence: list[Mapping[str, object]] = []
+    for raw in prior_material.evidence:
+        if raw.get("source_family") not in source_families:
+            continue
+        locator = json.loads(str(raw.get("source_locator_json") or ""))
+        if not isinstance(locator, Mapping):
+            raise ValueError("source_locator")
+        evidence.append({**dict(raw), "source_locator": dict(locator)})
+    evidence_ids = {str(row["evidence_id"]) for row in evidence}
+    facts: list[Mapping[str, object]] = []
+    for raw in prior_material.facts:
+        if str(raw.get("evidence_id") or "") not in evidence_ids:
+            continue
+        facts.append(
+            {
+                **dict(raw),
+                "normalized_value": json.loads(
+                    str(raw.get("normalized_value_json") or "")
+                ),
+            }
+        )
+    validate_automation_material(evidence=evidence, facts=facts)
+    return tuple(evidence), tuple(facts)
+
+
+def _all_retained_regulator_rows_are_post_window(
+    evidence: tuple[Mapping[str, object], ...],
+    *,
+    widened_end: date,
+) -> bool:
+    for row in evidence:
+        retrieved_at = row.get("retrieved_at")
+        if type(retrieved_at) is not str or not retrieved_at:
+            return False
+        parseable = (
+            retrieved_at[:-1] + "+00:00"
+            if retrieved_at.endswith("Z")
+            else retrieved_at
+        )
+        try:
+            instant = datetime.fromisoformat(parseable)
+        except ValueError:
+            return False
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            return False
+        if instant.astimezone(timezone.utc).date() <= widened_end:
+            return False
+    return True
 
 
 def _reusable_regulator_material(
@@ -978,38 +1051,28 @@ def _reusable_regulator_material(
             _source_deadlines,
         )
 
+        evidence_rows, facts = _prior_source_family_material(
+            prior_material,
+            frozenset({"regulator"}),
+        )
         evidence: list[Mapping[str, object]] = []
-        for raw in prior_material.evidence:
-            if raw.get("source_family") != "regulator":
-                continue
-            locator = json.loads(str(raw.get("source_locator_json") or ""))
-            if not isinstance(locator, Mapping):
-                return None
+        for raw in evidence_rows:
+            locator = raw["source_locator"]
             if locator.get("filing_chain_complete") is not True:
                 return None
-            evidence.append({**dict(raw), "source_locator": dict(locator)})
+            evidence.append(raw)
         if not evidence:
+            return None
+        if not _all_retained_regulator_rows_are_post_window(
+            tuple(evidence),
+            widened_end=widened_end,
+        ):
             return None
         ordered_evidence = _ordered_retained_regulator_evidence(evidence)
         if ordered_evidence is None:
             return None
         evidence = list(ordered_evidence)
 
-        evidence_ids = {str(row["evidence_id"]) for row in evidence}
-        facts: list[Mapping[str, object]] = []
-        for raw in prior_material.facts:
-            if str(raw.get("evidence_id") or "") not in evidence_ids:
-                continue
-            normalized_value = json.loads(
-                str(raw.get("normalized_value_json") or "")
-            )
-            facts.append(
-                {
-                    **dict(raw),
-                    "normalized_value": normalized_value,
-                }
-            )
-        validate_automation_material(evidence=evidence, facts=facts)
         blocker_contexts: list[Mapping[str, object]] = []
         for raw in prior_material.blockers:
             blocker_context = json.loads(str(raw.get("context_json") or ""))
@@ -1050,7 +1113,7 @@ def _reusable_regulator_material(
         )
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None
-    return tuple(evidence), tuple(facts), source_deadlines
+    return tuple(evidence), facts, source_deadlines
 
 
 def _load_evidence(
@@ -1067,6 +1130,58 @@ def _load_evidence(
     from src.security_lifecycle_sec_evidence import collect_sec_evidence
 
     context = _identity_context(case)
+    has_existing_material = bool(
+        prior_material is not None
+        and (prior_material.evidence or prior_material.facts)
+    )
+    append_only_recheck = bool(
+        has_existing_material
+        and prior_material is not None
+        and not prior_material.blockers
+    )
+    refreshed_families: set[str] | None = (
+        (
+            set()
+            if append_only_recheck
+            else set(
+                EVIDENCE_SOURCE_FAMILIES
+                - {
+                    "regulator",
+                    "listing_authority",
+                    "market_infrastructure",
+                }
+            )
+        )
+        if has_existing_material
+        else None
+    )
+    preserved_evidence: dict[str, Mapping[str, object]] = {}
+    preserved_facts: dict[str, Mapping[str, object]] = {}
+
+    def preserve_family(source_family: str) -> None:
+        family_evidence, family_facts = _prior_source_family_material(
+            prior_material,
+            frozenset({source_family}),
+        )
+        for row in family_evidence:
+            evidence_id = str(row.get("evidence_id") or "")
+            if not evidence_id:
+                raise ValueError("evidence_id")
+            preserved_evidence[evidence_id] = row
+        for row in family_facts:
+            fact_id = str(row.get("fact_id") or "")
+            if not fact_id:
+                raise ValueError("fact_id")
+            preserved_facts[fact_id] = row
+
+    def mark_refreshed(source_family: str) -> None:
+        if refreshed_families is not None and not append_only_recheck:
+            refreshed_families.add(source_family)
+
+    if append_only_recheck:
+        for source_family in EVIDENCE_SOURCE_FAMILIES:
+            preserve_family(source_family)
+
     retained = _reusable_regulator_material(
         case,
         context=context,
@@ -1091,33 +1206,40 @@ def _load_evidence(
             }
         finally:
             transport.close()
-        refreshed_source_families = (
-            tuple(sorted(EVIDENCE_SOURCE_FAMILIES))
-            if prior_material is not None and prior_material.blockers
-            else None
+        sec_codes = tuple(
+            _normalize_sec_blocker(str(code)) for code in sec.blockers
         )
+        sec_failed = _provider_acquisition_unavailable(
+            sec_codes,
+            family="regulator",
+        )
+        if has_existing_material and sec_failed:
+            preserve_family("regulator")
+            sec_evidence: tuple[object, ...] = ()
+            sec_facts: tuple[object, ...] = ()
+            source_deadlines: tuple[object, ...] = ()
+        else:
+            sec_evidence = tuple(sec.evidence)
+            sec_facts = tuple(sec.facts)
+            source_deadlines = tuple(getattr(sec, "source_deadlines", ()))
+            mark_refreshed("regulator")
     else:
         retained_evidence, retained_facts, source_deadlines = retained
-        sec = SimpleNamespace(
-            evidence=retained_evidence,
-            facts=retained_facts,
-            blockers=(),
-            source_deadlines=source_deadlines,
-        )
+        sec_evidence = retained_evidence
+        sec_facts = retained_facts
+        sec_codes = ()
+        sec_failed = False
         diagnostics = {"sec_attempt_count": 0, "sec_reused": 1}
-        refreshed_source_families = tuple(
-            sorted(EVIDENCE_SOURCE_FAMILIES - {"regulator"})
-        )
 
-    sec_codes = tuple(_normalize_sec_blocker(str(code)) for code in sec.blockers)
     codes: list[str | AutomationBlocker] = list(sec_codes)
-    if not sec.facts and "sec_evidence_insufficient" not in sec_codes:
+    if not sec_facts and not sec_codes:
         codes.append("sec_evidence_insufficient")
-    evidence: list[object] = list(sec.evidence)
-    facts: list[object] = list(sec.facts)
-    fresh_evidence: list[object] = [] if retained is not None else list(sec.evidence)
-    fresh_facts: list[object] = [] if retained is not None else list(sec.facts)
-    source_deadlines = tuple(getattr(sec, "source_deadlines", ()))
+    evidence: list[object] = list(sec_evidence)
+    facts: list[object] = list(sec_facts)
+    fresh_evidence: list[object] = (
+        [] if retained is not None else list(sec_evidence)
+    )
+    fresh_facts: list[object] = [] if retained is not None else list(sec_facts)
     deadline_dates = {str(getattr(row, "date", "")) for row in source_deadlines}
     if len(deadline_dates) > 1:
         raise ValueError("source_deadlines")
@@ -1149,13 +1271,9 @@ def _load_evidence(
         candidate_tickers=candidate_tickers,
         require_explicit_inactive=explicit_inactive_required,
     )
-    evidence.extend(listing.evidence)
-    facts.extend(listing.facts)
-    fresh_evidence.extend(listing.evidence)
-    fresh_facts.extend(listing.facts)
     required_listing_components = listing_authority_required_components(
         case=case,
-        regulator_facts=sec.facts,
+        regulator_facts=sec_facts,
         listing_evidence=listing.evidence,
     )
     if terminal and not explicit_inactive_required:
@@ -1164,11 +1282,23 @@ def _load_evidence(
         tuple(str(code) for code in listing.blockers)
         + listing_authority_conflict_codes(
             case=case,
-            evidence=evidence,
-            facts=facts,
+            evidence=(*evidence, *listing.evidence),
+            facts=(*facts, *listing.facts),
         ),
         required_components=required_listing_components,
     )
+    listing_failed = _provider_acquisition_unavailable(
+        listing_codes,
+        family="listing_authority",
+    )
+    if has_existing_material and listing_failed:
+        preserve_family("listing_authority")
+    else:
+        evidence.extend(listing.evidence)
+        facts.extend(listing.facts)
+        fresh_evidence.extend(listing.evidence)
+        fresh_facts.extend(listing.facts)
+        mark_refreshed("listing_authority")
     codes.extend(listing_codes)
     diagnostics.update(
         {
@@ -1203,6 +1333,8 @@ def _load_evidence(
             raise ValueError("ibkr_identity_blockers")
         if identity_codes:
             ibkr_codes = ("ibkr_contract_ambiguous",)
+            ibkr_evidence: tuple[object, ...] = ()
+            ibkr_fact_rows: tuple[object, ...] = ()
             diagnostics["ibkr_requests"] = 0
         else:
             ibkr, ibkr_facts = _ibkr_evidence(
@@ -1211,12 +1343,22 @@ def _load_evidence(
                 regulator_successors=successor_values,
                 max_queries=ibkr_max_queries,
             )
-            evidence.extend(ibkr.evidence)
-            facts.extend(ibkr_facts)
-            fresh_evidence.extend(ibkr.evidence)
-            fresh_facts.extend(ibkr_facts)
+            ibkr_evidence = tuple(ibkr.evidence)
+            ibkr_fact_rows = tuple(ibkr_facts)
             ibkr_codes = tuple(str(code) for code in ibkr.blockers)
             diagnostics["ibkr_requests"] = int(ibkr.requests_made)
+        ibkr_failed = (
+            _provider_state(ibkr_codes, family="market_infrastructure")
+            != "available"
+        )
+        if has_existing_material and ibkr_failed:
+            preserve_family("market_infrastructure")
+        else:
+            evidence.extend(ibkr_evidence)
+            facts.extend(ibkr_fact_rows)
+            fresh_evidence.extend(ibkr_evidence)
+            fresh_facts.extend(ibkr_fact_rows)
+            mark_refreshed("market_infrastructure")
         codes.extend(
             code
             for code in ibkr_codes
@@ -1228,6 +1370,10 @@ def _load_evidence(
         )
     else:
         diagnostics["ibkr_requests"] = 0
+        if has_existing_material and sec_failed:
+            preserve_family("market_infrastructure")
+        else:
+            mark_refreshed("market_infrastructure")
     diagnostics["ibkr_unavailable"] = int(
         bool(
             {"ibkr_entitlement_denied", "ibkr_gateway_unavailable"}.intersection(
@@ -1261,6 +1407,11 @@ def _load_evidence(
         codes.append(pending)
 
     blockers, retry_at = _blockers(codes, at=at)
+    retained_ids = {
+        str(row.get("evidence_id") or "")
+        for row in retained_evidence
+        if isinstance(row, Mapping)
+    }
     return LifecycleAutomationEvidenceBundle(
         evidence=tuple(fresh_evidence),
         facts=tuple(fresh_facts),
@@ -1269,7 +1420,22 @@ def _load_evidence(
         retry_at=retry_at,
         retained_evidence=retained_evidence,
         retained_facts=retained_facts,
-        refreshed_source_families=refreshed_source_families,
+        preserved_evidence=tuple(
+            preserved_evidence[key]
+            for key in sorted(preserved_evidence)
+            if key not in retained_ids
+        ),
+        preserved_facts=tuple(
+            preserved_facts[key]
+            for key in sorted(preserved_facts)
+            if str(preserved_facts[key].get("evidence_id") or "")
+            not in retained_ids
+        ),
+        refreshed_source_families=(
+            None
+            if refreshed_families is None
+            else tuple(sorted(refreshed_families))
+        ),
     )
 
 

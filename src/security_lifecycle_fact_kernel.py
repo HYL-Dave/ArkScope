@@ -88,6 +88,7 @@ _TERMINAL_FINALIZATION_FAILURE_KEY = "terminal_finalization_failure"
 _AUTOMATIC_RETRY_KEY = "automatic_retry"
 _LATEST_ATTEMPT_REVISION_KEY = "latest_attempt_execution_revision"
 _EXECUTION_OWNER_KEY = "execution_owner_id"
+_READINESS_RECHECK_DUE_AT_KEY = "readiness_recheck_due_at"
 _TERMINAL_FINALIZATION_FAILURE_CODES = frozenset({"finalization_failed"})
 _TERMINAL_FINALIZATION_RETRY_DELAYS = (
     timedelta(minutes=15),
@@ -944,6 +945,8 @@ def _normalize_blockers(values: Iterable[object]) -> tuple[tuple[str, bool, str]
         retryable = _field(value, "retryable")
         if type(retryable) is not bool:
             raise ValueError("blocker_retryable")
+        if code == "massive_credential_missing" and retryable:
+            raise ValueError("blocker_retryable")
         context = _field(value, "context")
         if not isinstance(context, Mapping):
             raise ValueError("blocker_context")
@@ -1412,6 +1415,7 @@ class SecurityLifecycleFactKernel:
                 _TERMINAL_PROVENANCE_KEY,
                 _TERMINAL_FINALIZED_KEY,
                 _TERMINAL_FINALIZATION_FAILURE_KEY,
+                _READINESS_RECHECK_DUE_AT_KEY,
             )
         ):
             raise ValueError("reserved_query_context")
@@ -1507,12 +1511,16 @@ class SecurityLifecycleFactKernel:
                     predecessor_run_id = existing_id
                 elif existing_status == "blocked" and row["retry_at"] is not None:
                     blocker_rows = self.conn.execute(
-                        "SELECT retryable FROM security_lifecycle_automation_run_blockers "
+                        "SELECT blocker_code,retryable FROM "
+                        "security_lifecycle_automation_run_blockers "
                         "WHERE automation_run_id=?",
                         (existing_id,),
                     ).fetchall()
                     retryable = bool(blocker_rows) and all(
-                        int(item["retryable"]) == 1 for item in blocker_rows
+                        int(item["retryable"]) == 1
+                        and str(item["blocker_code"])
+                        != "massive_credential_missing"
+                        for item in blocker_rows
                     )
                     due = _instant(str(row["retry_at"])) <= _instant(timestamp)
                     if retryable and due:
@@ -1667,6 +1675,7 @@ class SecurityLifecycleFactKernel:
                 return AutomationRunClaim(run_id, run_key, status, True)
             query_context = _query_context_value(row["query_context_json"])
             query_context[_EXECUTION_OWNER_KEY] = owner_id
+            query_context[_READINESS_RECHECK_DUE_AT_KEY] = due_timestamp
             self.conn.execute(
                 "DELETE FROM security_lifecycle_automation_run_blockers "
                 "WHERE automation_run_id=?",
@@ -1798,18 +1807,23 @@ class SecurityLifecycleFactKernel:
             if refreshed_source_families is None
             else tuple(sorted(set(refreshed_source_families)))
         )
+        append_only_refresh = refreshed_families == ()
+        if refreshed_families is None and (
+            normalized_retained_evidence or normalized_retained_facts
+        ):
+            raise ValueError("refreshed_source_families")
         if refreshed_families is not None:
             if any(
                 type(family) is not str or family not in EVIDENCE_SOURCE_FAMILIES
                 for family in refreshed_families
             ):
                 raise ValueError("refreshed_source_families")
-            if any(
+            if not append_only_refresh and any(
                 row.source_family not in refreshed_families
                 for row in normalized_evidence
             ):
                 raise ValueError("refreshed_source_families")
-            if any(
+            if not append_only_refresh and any(
                 row.source_family in refreshed_families
                 for row in normalized_retained_evidence
             ):
@@ -1844,12 +1858,36 @@ class SecurityLifecycleFactKernel:
             ).fetchone()
             if current is None or str(current["status"]) != "running":
                 raise ValueError("automation_run_not_running")
+            query_context = _query_context_value(current["query_context_json"])
             all_existing_evidence = _persisted_evidence_rows(self.conn, run_id)
             all_existing_facts = _persisted_fact_rows(self.conn, run_id)
             if refreshed_families is None:
-                retained_ids = {row.local_id for row in all_existing_evidence}
+                if all_existing_evidence or all_existing_facts:
+                    raise ValueError("refreshed_source_families")
+                retained_ids: set[str] = set()
+                existing_evidence = ()
+                existing_facts = ()
+            elif append_only_refresh:
+                if (
+                    not all_existing_evidence
+                    or _READINESS_RECHECK_DUE_AT_KEY not in query_context
+                ):
+                    raise ValueError("append_only_refresh")
+                retained_ids = {
+                    row.local_id for row in normalized_retained_evidence
+                }
                 existing_evidence = all_existing_evidence
                 existing_facts = all_existing_facts
+                if (
+                    set(existing_evidence) != set(normalized_retained_evidence)
+                    or len(existing_evidence) != len(normalized_retained_evidence)
+                ):
+                    raise ValueError("retained_evidence")
+                if (
+                    set(existing_facts) != set(normalized_retained_facts)
+                    or len(existing_facts) != len(normalized_retained_facts)
+                ):
+                    raise ValueError("retained_facts")
             else:
                 retained_ids = {
                     row.local_id for row in normalized_retained_evidence
@@ -2136,7 +2174,7 @@ class SecurityLifecycleFactKernel:
                 evidence=persisted_evidence,
                 facts=persisted_facts,
             )
-            query_context = _query_context_value(current["query_context_json"])
+            query_context.pop(_READINESS_RECHECK_DUE_AT_KEY, None)
             if status == "succeeded" and normalized_terminal_decision is not None:
                 query_context[_TERMINAL_DECISION_KEY] = dict(
                     normalized_terminal_decision

@@ -47,6 +47,8 @@ class LifecycleAutomationEvidenceBundle:
     retry_at: str | None
     retained_evidence: tuple[object, ...] = ()
     retained_facts: tuple[object, ...] = ()
+    preserved_evidence: tuple[object, ...] = ()
+    preserved_facts: tuple[object, ...] = ()
     refreshed_source_families: tuple[str, ...] | None = None
 
 
@@ -409,7 +411,7 @@ class LifecycleAutomationWorker:
                 }
 
                 decision: AutomationDecision | None = None
-                if not blockers or blocker_codes.intersection(policy_blocker_codes):
+                if not blockers or blocker_codes.issubset(policy_blocker_codes):
                     phase = "evaluate"
                     decision = self._evaluate(
                         case=case,
@@ -432,20 +434,31 @@ class LifecycleAutomationWorker:
                             sources=sources,
                         )
 
-                if blockers and not blocker_codes.intersection(policy_blocker_codes):
+                if blockers and not blocker_codes.issubset(policy_blocker_codes):
                     phase = "persist"
+                    has_source_conflict = "source_conflict" in blocker_codes
                     kernel.complete_run(
                         run_id=run_id,
                         evidence=bundle.evidence,
                         facts=bundle.facts,
                         blockers=blockers,
-                        decision_tier=None,
-                        action_readiness=None,
+                        decision_tier=(
+                            "review_suggested" if has_source_conflict else None
+                        ),
+                        action_readiness=(
+                            "action_blocked" if has_source_conflict else None
+                        ),
                         retry_at=bundle.retry_at,
                         diagnostics=bundle.diagnostics,
                         at=at,
-                        retained_evidence=bundle.retained_evidence,
-                        retained_facts=bundle.retained_facts,
+                        retained_evidence=(
+                            *bundle.retained_evidence,
+                            *bundle.preserved_evidence,
+                        ),
+                        retained_facts=(
+                            *bundle.retained_facts,
+                            *bundle.preserved_facts,
+                        ),
                         refreshed_source_families=(
                             bundle.refreshed_source_families
                         ),
@@ -469,8 +482,14 @@ class LifecycleAutomationWorker:
                     diagnostics=bundle.diagnostics,
                     at=at,
                     terminal_decision=_decision_context(decision),
-                    retained_evidence=bundle.retained_evidence,
-                    retained_facts=bundle.retained_facts,
+                    retained_evidence=(
+                        *bundle.retained_evidence,
+                        *bundle.preserved_evidence,
+                    ),
+                    retained_facts=(
+                        *bundle.retained_facts,
+                        *bundle.preserved_facts,
+                    ),
                     refreshed_source_families=bundle.refreshed_source_families,
                 )
                 if completed.status == "blocked":

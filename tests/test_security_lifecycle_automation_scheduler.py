@@ -1997,6 +1997,7 @@ def _retained_sec_prior(
     excerpt="Issuer CIK 0000000001.",
     include_fact=True,
     source_locator=None,
+    retrieved_at="2026-05-02T12:00:00Z",
 ):
     from src.security_lifecycle_fact_kernel import AutomationPriorMaterial
 
@@ -2005,6 +2006,7 @@ def _retained_sec_prior(
     locator = {
         "accession": case["source_ref"],
         "filing_chain_complete": True,
+        "rendered_text_ranges": [[0, len(encoded)]],
         **dict(source_locator or {}),
     }
     evidence = {
@@ -2019,7 +2021,7 @@ def _retained_sec_prior(
         "publisher": "SEC EDGAR",
         "domain": "sec.gov",
         "source_published_at": case["observation"]["filing_date"],
-        "retrieved_at": "2026-05-01T12:00:00Z",
+        "retrieved_at": retrieved_at,
         "adapter": "sec_edgar",
         "excerpt": excerpt,
         "content_sha256": hashlib.sha256(encoded).hexdigest(),
@@ -2049,7 +2051,7 @@ def _retained_sec_prior(
                 "extractor_rule_id": "fixture.issuer_cik",
                 "extractor_rule_version": "1",
                 "fact_dedupe_key": "automation:slar_retained:fact:cik",
-                "created_at": "2026-05-01T12:00:00Z",
+                "created_at": retrieved_at,
             },
         )
     return AutomationPriorMaterial(
@@ -2067,6 +2069,212 @@ def _retained_sec_prior(
             },
         ),
     )
+
+
+def _with_retained_market_snapshot(prior, case):
+    excerpt = '{"contract_status":"found","symbol":"OLD"}'
+    encoded = excerpt.encode()
+    evidence = {
+        "evidence_id": "sle_retained_market",
+        "case_id": case["case_id"],
+        "run_id": None,
+        "automation_run_id": prior.run_id,
+        "source_family": "market_infrastructure",
+        "kind": "market_infrastructure_snapshot",
+        "source_url": None,
+        "title": "Retained IBKR contract snapshot",
+        "publisher": "Interactive Brokers",
+        "domain": None,
+        "source_published_at": None,
+        "retrieved_at": "2026-06-01T12:00:00Z",
+        "adapter": "ibkr_contract",
+        "excerpt": excerpt,
+        "content_sha256": hashlib.sha256(encoded).hexdigest(),
+        "source_document_sha256": None,
+        "source_locator_json": json.dumps(
+            {"contract_status": "found", "conid": 101, "symbol": "OLD"},
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+        "evidence_dedupe_key": "automation:slar_retained:market",
+        "created_at": "2026-06-01T12:00:00Z",
+    }
+    return replace(prior, evidence=(*prior.evidence, evidence))
+
+
+def _additional_retained_regulator_row(
+    prior,
+    *,
+    suffix,
+    retrieved_at,
+    source_published_at="2026-01-02",
+    accession="0000000001-26-000002",
+    rendered_text_ranges=None,
+):
+    row = dict(prior.evidence[0])
+    locator = json.loads(row["source_locator_json"])
+    locator.update(
+        {
+            "accession": accession,
+            "rendered_text_ranges": (
+                [[30, 60]]
+                if rendered_text_ranges is None
+                else rendered_text_ranges
+            ),
+        }
+    )
+    return {
+        **row,
+        "evidence_id": f"sle_retained_{suffix}",
+        "evidence_dedupe_key": f"automation:slar_retained:sec:{suffix}",
+        "source_published_at": source_published_at,
+        "retrieved_at": retrieved_at,
+        "source_document_sha256": "e" * 64,
+        "source_locator_json": json.dumps(
+            locator,
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+    }
+
+
+def _sec_result(case, *, label, retrieved_at, blockers=(), effective_date=None):
+    from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
+
+    excerpt = f"Issuer CIK 0000000001. Snapshot {label}."
+    if effective_date is not None:
+        excerpt += f" Effective date {effective_date}."
+    encoded = excerpt.encode()
+    cited = b"0000000001"
+    start = encoded.index(cited)
+    evidence = AutomationEvidence(
+        evidence_id=f"sec-{label}",
+        source_family="regulator",
+        adapter="sec_edgar",
+        kind="regulator_excerpt",
+        source_url=case["observation"]["evidence_url"],
+        title=f"SEC snapshot {label}",
+        publisher="SEC EDGAR",
+        domain="sec.gov",
+        source_published_at=case["observation"]["filing_date"],
+        retrieved_at=retrieved_at,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(encoded).hexdigest(),
+        source_document_sha256=hashlib.sha256(label.encode()).hexdigest(),
+        source_locator={
+            "accession": case["source_ref"],
+            "filing_chain_complete": True,
+            "rendered_text_ranges": [[0, len(encoded)]],
+        },
+        evidence_dedupe_key=f"sec:{case['case_id']}:{label}",
+    )
+    fact = AutomationFact(
+        evidence_id=evidence.evidence_id,
+        fact_type="issuer_cik",
+        normalized_value="0000000001",
+        source_span_start=start,
+        source_span_end=start + len(cited),
+        cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+        extractor_rule_id="fixture.issuer_cik",
+        extractor_rule_version="1",
+    )
+    facts = [fact]
+    if effective_date is not None:
+        effective_cited = effective_date.encode()
+        effective_start = encoded.index(effective_cited)
+        facts.append(
+            AutomationFact(
+                evidence_id=evidence.evidence_id,
+                fact_type="effective_date",
+                normalized_value=effective_date,
+                source_span_start=effective_start,
+                source_span_end=effective_start + len(effective_cited),
+                cited_text_sha256=hashlib.sha256(effective_cited).hexdigest(),
+                extractor_rule_id="fixture.effective_date",
+                extractor_rule_version="1",
+            )
+        )
+    return SimpleNamespace(
+        evidence=(evidence,),
+        facts=tuple(facts),
+        blockers=tuple(blockers),
+        source_deadlines=(),
+    )
+
+
+def _listing_result(*, label, retrieved_at, blockers=()):
+    from src.security_lifecycle_listing_evidence import ListingEvidence, ListingFact
+
+    excerpt = json.dumps(
+        {"listing_status": "active", "snapshot": label, "ticker": "OLD"},
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    encoded = excerpt.encode()
+    evidence = ListingEvidence(
+        evidence_id=f"listing-{label}",
+        source_family="listing_authority",
+        adapter="nasdaq_symbol_directory",
+        kind="listing_directory_snapshot",
+        source_url="https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt",
+        title=f"Listing snapshot {label}",
+        publisher="Nasdaq Trader",
+        domain="nasdaqtrader.com",
+        source_published_at=retrieved_at[:10],
+        retrieved_at=retrieved_at,
+        excerpt=excerpt,
+        content_sha256=hashlib.sha256(encoded).hexdigest(),
+        source_document_sha256=hashlib.sha256(label.encode()).hexdigest(),
+        source_locator={
+            "locator_kind": "listing_directory_snapshot",
+            "adapter": "nasdaq_symbol_directory",
+            "candidate_ticker": "OLD",
+            "expected_active_state": True,
+            "market": "stocks",
+            "listing_status": "active",
+            "directory": "nasdaq_listed",
+        },
+        evidence_dedupe_key=f"listing:{label}",
+    )
+    fact = ListingFact(
+        evidence_id=evidence.evidence_id,
+        fact_type="source_ticker",
+        normalized_value="OLD",
+        source_span_start=0,
+        source_span_end=len(encoded),
+        cited_text_sha256=evidence.content_sha256,
+        extractor_rule_id="fixture.listing_source_ticker",
+        extractor_rule_version="1",
+    )
+    return SimpleNamespace(
+        evidence=(evidence,),
+        facts=(fact,),
+        blockers=tuple(blockers),
+        diagnostics={"listing_requests": 1},
+    )
+
+
+def _persisted_family_snapshot(conn, run_id, source_family):
+    evidence = tuple(
+        tuple(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_evidence "
+            "WHERE automation_run_id=? AND source_family=? ORDER BY evidence_id",
+            (run_id, source_family),
+        )
+    )
+    facts = tuple(
+        tuple(row)
+        for row in conn.execute(
+            "SELECT * FROM security_lifecycle_automation_facts WHERE "
+            "automation_run_id=? AND evidence_id IN ("
+            "SELECT evidence_id FROM security_lifecycle_evidence WHERE "
+            "automation_run_id=? AND source_family=?"
+            ") ORDER BY fact_id",
+            (run_id, run_id, source_family),
+        )
+    )
+    return evidence, facts
 
 
 def _probe_sec_reuse(monkeypatch, case, prior, *, at="2026-06-02T12:00:00Z"):
@@ -2108,6 +2316,226 @@ def _probe_sec_reuse(monkeypatch, case, prior, *, at="2026-06-02T12:00:00Z"):
         prior_material=prior,
     )
     return sec_calls, bundle
+
+
+def test_first_post_window_retry_refreshes_sec_acquired_on_widened_end(
+    monkeypatch,
+):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(
+        case,
+        retrieved_at="2026-05-01T23:59:59Z",
+    )
+
+    sec_calls, bundle = _probe_sec_reuse(
+        monkeypatch,
+        case,
+        prior,
+        at="2026-05-02T00:00:00Z",
+    )
+
+    assert sec_calls == ["2026-05-02T00:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+def test_all_retained_regulator_rows_acquired_after_widened_end_may_reuse(
+    monkeypatch,
+):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(
+        case,
+        retrieved_at="2026-05-02T00:00:00Z",
+    )
+    later = _additional_retained_regulator_row(
+        prior,
+        suffix="later_post_window",
+        retrieved_at="2026-05-03T08:00:00+08:00",
+    )
+    prior = replace(prior, evidence=(*prior.evidence, later))
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == []
+    assert {row["evidence_id"] for row in bundle.retained_evidence} == {
+        "sle_retained_closed_chain",
+        "sle_retained_later_post_window",
+    }
+
+
+def test_one_non_post_window_retained_regulator_row_refreshes_entire_sec_family(
+    monkeypatch,
+):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(
+        case,
+        retrieved_at="2026-05-02T00:00:00Z",
+    )
+    boundary = _additional_retained_regulator_row(
+        prior,
+        suffix="boundary",
+        retrieved_at="2026-05-01T23:59:59Z",
+    )
+    prior = replace(prior, evidence=(*prior.evidence, boundary))
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+@pytest.mark.parametrize(
+    "retrieved_at",
+    (None, "", "not-a-timestamp", "2026-05-02T12:00:00"),
+    ids=("missing", "empty", "malformed", "timezone-naive"),
+)
+def test_retained_regulator_acquisition_timestamp_predicate_fails_closed(
+    monkeypatch,
+    retrieved_at,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(case)
+    evidence = dict(prior.evidence[0])
+    if retrieved_at is None:
+        evidence.pop("retrieved_at")
+    else:
+        evidence["retrieved_at"] = retrieved_at
+    prior = replace(prior, evidence=(evidence,))
+    monkeypatch.setattr(
+        scheduler,
+        "validate_automation_material",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "validate_automation_deadline_citations",
+        lambda **_kwargs: None,
+    )
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "publication_date_not_exact",
+        "accession_missing",
+        "ranges_missing",
+        "ranges_not_a_list",
+        "ranges_reversed",
+        "ranges_duplicated",
+        "ranges_overlapping",
+    ),
+)
+def test_single_retained_regulator_row_requires_ordering_metadata(
+    monkeypatch,
+    mutation,
+):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(case)
+    evidence = dict(prior.evidence[0])
+    locator = json.loads(evidence["source_locator_json"])
+
+    if mutation == "publication_date_not_exact":
+        evidence["source_published_at"] = "2026-1-1"
+    elif mutation == "accession_missing":
+        locator.pop("accession")
+    elif mutation == "ranges_missing":
+        locator.pop("rendered_text_ranges")
+    elif mutation == "ranges_not_a_list":
+        locator["rendered_text_ranges"] = "not-a-range-list"
+    elif mutation == "ranges_reversed":
+        locator["rendered_text_ranges"] = [[10, 20], [0, 5]]
+    elif mutation == "ranges_duplicated":
+        locator["rendered_text_ranges"] = [[0, 10], [0, 10]]
+    elif mutation == "ranges_overlapping":
+        locator["rendered_text_ranges"] = [[0, 10], [5, 15]]
+
+    evidence["source_locator_json"] = json.dumps(
+        locator,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    prior = replace(prior, evidence=(evidence,))
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+@pytest.mark.parametrize(
+    ("first_ranges", "second_ranges"),
+    (
+        ([[0, 10]], [[0, 10]]),
+        ([[0, 15]], [[10, 20]]),
+        ([[0, 10], [20, 30]], [[10, 20]]),
+    ),
+    ids=("duplicate", "overlap", "interleaving"),
+)
+def test_same_filing_retained_excerpts_reject_ambiguous_range_order(
+    monkeypatch,
+    first_ranges,
+    second_ranges,
+):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(case)
+    first = dict(prior.evidence[0])
+    first_locator = json.loads(first["source_locator_json"])
+    first_locator["rendered_text_ranges"] = first_ranges
+    first["source_locator_json"] = json.dumps(
+        first_locator,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    second = _additional_retained_regulator_row(
+        prior,
+        suffix="same_filing_ambiguous",
+        retrieved_at="2026-05-03T00:00:00Z",
+        source_published_at=first["source_published_at"],
+        accession=case["source_ref"],
+        rendered_text_ranges=second_ranges,
+    )
+    prior = replace(prior, evidence=(first, second))
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+def test_same_filing_nonoverlapping_retained_ranges_are_reusable(monkeypatch):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(case)
+    first = dict(prior.evidence[0])
+    first_locator = json.loads(first["source_locator_json"])
+    first_locator["rendered_text_ranges"] = [[0, 10], [10, 20]]
+    first["source_locator_json"] = json.dumps(
+        first_locator,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    second = _additional_retained_regulator_row(
+        prior,
+        suffix="same_filing_ordered",
+        retrieved_at="2026-05-03T00:00:00Z",
+        source_published_at=first["source_published_at"],
+        accession=case["source_ref"],
+        rendered_text_ranges=[[20, 30], [40, 50]],
+    )
+    prior = replace(prior, evidence=(second, first))
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == []
+    assert [row["evidence_id"] for row in bundle.retained_evidence] == [
+        "sle_retained_closed_chain",
+        "sle_retained_same_filing_ordered",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -2446,15 +2874,23 @@ def test_retained_same_filing_excerpts_without_positions_force_sec_refresh(
 ):
     case = _closed_chain_case()
     prior = _retained_sec_prior(case)
+    first = dict(prior.evidence[0])
+    first_locator = json.loads(first["source_locator_json"])
+    first_locator.pop("rendered_text_ranges")
+    first["source_locator_json"] = json.dumps(
+        first_locator,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
     second_excerpt = "Issuer CIK 0000000001 remains unchanged."
     second = {
-        **dict(prior.evidence[0]),
+        **first,
         "evidence_id": "sle_retained_second_excerpt",
         "evidence_dedupe_key": "automation:slar_retained:sec:second",
         "excerpt": second_excerpt,
         "content_sha256": hashlib.sha256(second_excerpt.encode()).hexdigest(),
     }
-    prior = replace(prior, evidence=(*prior.evidence, second))
+    prior = replace(prior, evidence=(first, second))
 
     sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
 
@@ -2668,6 +3104,7 @@ def test_due_listing_retry_preserves_closed_sec_chain_and_refreshes_listing(
             source_locator={
                 "accession": source_ref,
                 "filing_chain_complete": True,
+                "rendered_text_ranges": [[0, len(encoded)]],
             },
             evidence_dedupe_key=f"sec:{case_id}:closed-chain",
         )
@@ -2754,6 +3191,463 @@ def test_due_listing_retry_preserves_closed_sec_chain_and_refreshes_listing(
     assert sec_calls == ["2026-06-01T12:00:00Z"]
     assert len(listing_calls) == 2
     conn.close()
+
+
+def test_due_sec_typed_failure_retains_exact_regulator_rows_until_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case(filing_date="2026-05-01")
+    conn = sqlite3.connect(tmp_path / "profile.db", check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    now = ["2026-06-01T12:00:00Z"]
+    sec_calls = []
+
+    def collect_sec_evidence(*, retrieved_at, **_kwargs):
+        labels = (
+            "original",
+            "partial-failure",
+            "recovered",
+            "semantic-insufficient",
+        )
+        label = labels[len(sec_calls)]
+        sec_calls.append(retrieved_at)
+        return _sec_result(
+            case,
+            label=label,
+            retrieved_at=retrieved_at,
+            blockers=(
+                ("sec_rate_limited",)
+                if label == "partial-failure"
+                else (
+                    ("sec_evidence_insufficient",)
+                    if label == "semantic-insufficient"
+                    else ()
+                )
+            ),
+        )
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(),
+            facts=(),
+            blockers=("listing_directory_unavailable",),
+            diagnostics={"listing_requests": 1},
+        )
+    )
+    worker = LifecycleAutomationWorker(
+        case_loader=lambda: (case,),
+        profile_connection=profile_connection,
+        evidence_loader=lambda current, *, mode, at, prior_material: scheduler._load_evidence(
+            current,
+            mode=mode,
+            at=at,
+            listing_session=listing_session,
+            prior_material=prior_material,
+        ),
+        source_loader=lambda: {"OLD": ()},
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "typed provider failure must block before evaluation"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "typed provider failure must not approve a transition"
+        ),
+        clock=lambda: now[0],
+        execution_owner_id="typed-sec-family-owner",
+    )
+
+    try:
+        first = worker.run(limit=1)
+        store = SecurityLifecycleInvestigationStore(conn)
+        run_id = store.list_automation_runs(case["case_id"])[0]["run_id"]
+        original = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        now[0] = "2026-06-02T12:00:00Z"
+        failed = worker.run(limit=1)
+        after_failure = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        now[0] = "2026-06-03T12:00:00Z"
+        recovered = worker.run(limit=1)
+        after_recovery = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        now[0] = "2026-06-04T12:00:00Z"
+        insufficient = worker.run(limit=1)
+        after_insufficient = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        assert (
+            first["blocked"]
+            == failed["blocked"]
+            == recovered["blocked"]
+            == insufficient["blocked"]
+            == 1
+        )
+        assert after_failure == original
+        assert "partial-failure" not in repr(after_failure)
+        assert after_recovery != original
+        assert "recovered" in repr(after_recovery)
+        assert "partial-failure" not in repr(after_recovery)
+        assert after_insufficient != after_recovery
+        assert "semantic-insufficient" in repr(after_insufficient)
+        assert "recovered" not in repr(after_insufficient)
+        assert sec_calls == [
+            "2026-06-01T12:00:00Z",
+            "2026-06-02T12:00:00Z",
+            "2026-06-03T12:00:00Z",
+            "2026-06-04T12:00:00Z",
+        ]
+    finally:
+        conn.close()
+
+
+def test_mixed_sec_conflict_and_unavailable_preserves_prior_regulator_family(
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_schema import EVIDENCE_SOURCE_FAMILIES
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case()
+    prior = replace(
+        _retained_sec_prior(case),
+        observation_fingerprint_sha256="b" * 64,
+    )
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda *, retrieved_at, **_kwargs: _sec_result(
+            case,
+            label="mixed-conflict-unavailable",
+            retrieved_at=retrieved_at,
+            blockers=("source_conflict", "sec_rate_limited"),
+        ),
+    )
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-06-02T12:00:00Z",
+        listing_session=SimpleNamespace(
+            lookup=lambda **_kwargs: SimpleNamespace(
+                evidence=(),
+                facts=(),
+                blockers=(),
+                diagnostics={},
+            )
+        ),
+        prior_material=prior,
+    )
+
+    assert {row["evidence_id"] for row in bundle.preserved_evidence} == {
+        "sle_retained_closed_chain"
+    }
+    assert all(
+        getattr(row, "evidence_id", None) != "sec-mixed-conflict-unavailable"
+        for row in bundle.evidence
+    )
+    assert "regulator" not in bundle.refreshed_source_families
+    assert set(bundle.refreshed_source_families) == (
+        EVIDENCE_SOURCE_FAMILIES
+        - {"regulator", "market_infrastructure"}
+    )
+
+
+@pytest.mark.parametrize(
+    ("sec_blockers", "market_preserved", "market_refreshed"),
+    (
+        (("sec_rate_limited",), True, False),
+        ((), False, True),
+    ),
+    ids=("sec-requiredness-unknown", "sec-proves-market-unneeded"),
+)
+def test_sec_refresh_outcome_owns_prior_market_family_disposition(
+    monkeypatch,
+    sec_blockers,
+    market_preserved,
+    market_refreshed,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case(filing_date="2026-05-01")
+    prior = _with_retained_market_snapshot(_retained_sec_prior(case), case)
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda *, retrieved_at, **_kwargs: _sec_result(
+            case,
+            label="market-requiredness",
+            retrieved_at=retrieved_at,
+            blockers=sec_blockers,
+        ),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: pytest.fail(
+            "current SEC material does not require an IBKR query"
+        ),
+    )
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-06-02T12:00:00Z",
+        listing_session=SimpleNamespace(
+            lookup=lambda **_kwargs: SimpleNamespace(
+                evidence=(),
+                facts=(),
+                blockers=(),
+                diagnostics={},
+            )
+        ),
+        prior_material=prior,
+    )
+
+    preserved_ids = {
+        str(row["evidence_id"]) for row in bundle.preserved_evidence
+    }
+    assert ("sle_retained_market" in preserved_ids) is market_preserved
+    assert (
+        "market_infrastructure" in bundle.refreshed_source_families
+    ) is market_refreshed
+
+
+def test_due_listing_typed_failure_keeps_old_listing_and_new_sec_until_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case(
+        kinds=({"event_type": "merger_agreement", "effective_date": None},)
+    )
+    conn = sqlite3.connect(tmp_path / "profile.db", check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    now = ["2026-05-01T12:00:00Z"]
+    sec_calls = []
+
+    def collect_sec_evidence(*, retrieved_at, **_kwargs):
+        label = ("boundary", "post-window")[len(sec_calls)]
+        sec_calls.append(retrieved_at)
+        return _sec_result(
+            case,
+            label=label,
+            retrieved_at=retrieved_at,
+            effective_date="2026-05-02",
+        )
+
+    listing_calls = []
+
+    def lookup(**_kwargs):
+        labels = (
+            "original",
+            "partial-failure",
+            "recovered",
+            "mixed-conflict-unavailable",
+        )
+        label = labels[len(listing_calls)]
+        listing_calls.append((label, now[0]))
+        return _listing_result(
+            label=label,
+            retrieved_at=now[0],
+            blockers=(
+                ("listing_directory_unavailable",)
+                if label == "partial-failure"
+                else (
+                    (
+                        "listing_authority_conflict",
+                        "listing_directory_unavailable",
+                    )
+                    if label == "mixed-conflict-unavailable"
+                    else ()
+                )
+            ),
+        )
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    ibkr_calls = []
+
+    def ibkr_evidence(context, *, at, regulator_successors, max_queries):
+        ibkr_calls.append((context.case_id, at, regulator_successors, max_queries))
+        return (
+            SimpleNamespace(evidence=(), blockers=(), requests_made=0),
+            (),
+        )
+
+    monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr_evidence)
+    worker = LifecycleAutomationWorker(
+        case_loader=lambda: (case,),
+        profile_connection=profile_connection,
+        evidence_loader=lambda current, *, mode, at, prior_material: scheduler._load_evidence(
+            current,
+            mode=mode,
+            at=at,
+            listing_session=SimpleNamespace(lookup=lookup),
+            prior_material=prior_material,
+        ),
+        source_loader=lambda: {"OLD": ()},
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "pending provider work must block before evaluation"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "pending provider work must not approve a transition"
+        ),
+        clock=lambda: now[0],
+        execution_owner_id="typed-listing-family-owner",
+    )
+
+    try:
+        first = worker.run(limit=1)
+        store = SecurityLifecycleInvestigationStore(conn)
+        run_id = store.list_automation_runs(case["case_id"])[0]["run_id"]
+        original_listing = _persisted_family_snapshot(
+            conn,
+            run_id,
+            "listing_authority",
+        )
+        boundary_sec = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        now[0] = "2026-05-02T12:00:00Z"
+        failed = worker.run(limit=1)
+        listing_after_failure = _persisted_family_snapshot(
+            conn,
+            run_id,
+            "listing_authority",
+        )
+        sec_after_failure = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        now[0] = "2026-05-03T12:00:00Z"
+        recovered = worker.run(limit=1)
+        listing_after_recovery = _persisted_family_snapshot(
+            conn,
+            run_id,
+            "listing_authority",
+        )
+        sec_after_recovery = _persisted_family_snapshot(conn, run_id, "regulator")
+
+        now[0] = "2026-05-04T12:00:00Z"
+        mixed_failure = worker.run(limit=1)
+        listing_after_mixed_failure = _persisted_family_snapshot(
+            conn,
+            run_id,
+            "listing_authority",
+        )
+        sec_after_mixed_failure = _persisted_family_snapshot(
+            conn,
+            run_id,
+            "regulator",
+        )
+
+        assert (
+            first["blocked"]
+            == failed["blocked"]
+            == recovered["blocked"]
+            == mixed_failure["blocked"]
+            == 1
+        )
+        assert listing_after_failure == original_listing
+        assert "partial-failure" not in repr(listing_after_failure)
+        assert sec_after_failure != boundary_sec
+        assert "post-window" in repr(sec_after_failure)
+        assert listing_after_recovery != original_listing
+        assert "recovered" in repr(listing_after_recovery)
+        assert "partial-failure" not in repr(listing_after_recovery)
+        assert sec_after_recovery == sec_after_failure
+        assert listing_after_mixed_failure == listing_after_recovery
+        assert "mixed-conflict-unavailable" not in repr(
+            listing_after_mixed_failure
+        )
+        assert sec_after_mixed_failure == sec_after_recovery
+        assert sec_calls == [
+            "2026-05-01T12:00:00Z",
+            "2026-05-02T12:00:00Z",
+        ]
+        assert listing_calls == [
+            ("original", "2026-05-01T12:00:00Z"),
+            ("partial-failure", "2026-05-02T12:00:00Z"),
+            ("recovered", "2026-05-03T12:00:00Z"),
+            ("mixed-conflict-unavailable", "2026-05-04T12:00:00Z"),
+        ]
+        assert ibkr_calls == [
+            (case["case_id"], "2026-05-02T12:00:00Z", (), 8),
+            (case["case_id"], "2026-05-03T12:00:00Z", (), 8),
+            (case["case_id"], "2026-05-04T12:00:00Z", (), 8),
+        ]
+    finally:
+        conn.close()
 
 
 def test_malformed_sec_content_keeps_source_payload_invalid_single_retry(
@@ -3947,6 +4841,14 @@ def test_terminal_massive_requiredness_changes_on_effective_date_through_schedul
         assert before_run["decision_tier"] == "verified_automatic"
         assert before_run["action_readiness"] == "waiting_effective_date"
         assert store.list_assessments(case_id)[0]["status"] == "draft"
+        before_evidence_ids = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT evidence_id FROM security_lifecycle_evidence "
+                "WHERE automation_run_id=?",
+                (before_run["run_id"],),
+            )
+        }
 
         due = scheduler.run_security_lifecycle_automation(
             limit=1,
@@ -3966,6 +4868,15 @@ def test_terminal_massive_requiredness_changes_on_effective_date_through_schedul
         assert [row["blocker_code"] for row in due_run["blockers"]] == [
             "massive_credential_missing"
         ]
+        due_evidence_ids = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT evidence_id FROM security_lifecycle_evidence "
+                "WHERE automation_run_id=?",
+                (due_run["run_id"],),
+            )
+        }
+        assert before_evidence_ids < due_evidence_ids
         assert transport_calls == [
             ("2026-08-29T12:00:00Z", NASDAQ_LISTED_URL),
             ("2026-08-29T12:00:00Z", OTHER_LISTED_URL),

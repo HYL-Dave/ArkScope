@@ -229,6 +229,11 @@ transitions default off.
   returns a typed unavailable blocker, but exclude those preserved rows from
   evaluation. Replace only successfully refreshed or deliberately unneeded
   families, under an explicit kernel refresh contract.
+- [ ] Keep succeeded readiness rechecks append-only because existing accepted
+  assessments retain foreign-key citations to the original evidence. Gate the
+  exception on the kernel's readiness-recheck claim, require the complete
+  persisted evidence/fact set, keep prior rows out of current evaluation, and
+  reject the same shape for blocked or ordinary retries.
 - [ ] Make `massive_credential_missing` nonretryable/operator-actionable. Saving
   a credential plus attended case run is its recovery path; reject a retryable
   new shape and prevent legacy retryable rows from auto-reserving.

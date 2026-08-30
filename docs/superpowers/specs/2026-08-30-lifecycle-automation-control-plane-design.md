@@ -325,6 +325,17 @@ same attempt fails. Every retained or preserved row must exactly match current
 persisted material, and a due retry must supply an explicit family refresh
 contract.
 
+A succeeded readiness recheck is the narrow exception to family replacement.
+Its accepted assessment may still cite the original run evidence, so those
+rows remain immutable and the recheck appends newly acquired material to the
+same run. The kernel permits this append-only contract only for a run claimed
+through the readiness-recheck entry point and only when the caller supplies an
+exact copy of the complete persisted evidence and fact set. Existing rows are
+retained for citation history and persistence only; they are excluded from the
+current evaluation unless they separately satisfy the normal selective-reuse
+contract. Blocked retries and ordinary reservations cannot request append-only
+completion.
+
 ## 9. Settings and Mutation Authority
 
 Settings are stored in the existing `profile_settings` table:
