@@ -45,6 +45,9 @@ class LifecycleAutomationEvidenceBundle:
     blockers: tuple[AutomationBlocker, ...]
     diagnostics: Mapping[str, int]
     retry_at: str | None
+    retained_evidence: tuple[object, ...] = ()
+    retained_facts: tuple[object, ...] = ()
+    refreshed_source_families: tuple[str, ...] | None = None
 
 
 def _instant(value: str) -> datetime:
@@ -175,29 +178,6 @@ def _transition_request(
         "effective_date": _field(decision, "effective_date"),
         "outcomes": outcomes,
     }
-
-
-def _persisted_material(
-    conn: sqlite3.Connection,
-    run_id: str,
-) -> tuple[tuple[dict[str, object], ...], tuple[dict[str, object], ...]]:
-    evidence = tuple(
-        dict(row)
-        for row in conn.execute(
-            "SELECT * FROM security_lifecycle_evidence "
-            "WHERE automation_run_id=? ORDER BY evidence_id",
-            (run_id,),
-        )
-    )
-    facts = tuple(
-        dict(row)
-        for row in conn.execute(
-            "SELECT * FROM security_lifecycle_automation_facts "
-            "WHERE automation_run_id=? ORDER BY fact_id",
-            (run_id,),
-        )
-    )
-    return evidence, facts
 
 
 def _failure_code(exc: Exception, *, phase: str) -> str:
@@ -409,16 +389,18 @@ class LifecycleAutomationWorker:
                     raise ValueError("automation_run_not_succeeded")
                 decision, terminal_provenance = _persisted_terminal_decision(run)
             else:
-                bundle = self._evidence_loader(case, mode=mode, at=at)
+                prior_material = kernel.prior_material(run_id)
+                bundle = self._evidence_loader(
+                    case,
+                    mode=mode,
+                    at=at,
+                    prior_material=prior_material,
+                )
                 if not isinstance(bundle, LifecycleAutomationEvidenceBundle):
                     raise TypeError("automation_evidence_bundle")
                 failure_diagnostics = bundle.diagnostics
-                existing_evidence, existing_facts = _persisted_material(
-                    store.conn,
-                    run_id,
-                )
-                all_evidence = (*existing_evidence, *bundle.evidence)
-                all_facts = (*existing_facts, *bundle.facts)
+                all_evidence = (*bundle.retained_evidence, *bundle.evidence)
+                all_facts = (*bundle.retained_facts, *bundle.facts)
                 blockers = bundle.blockers
                 blocker_codes = {_blocker_code(value) for value in blockers}
                 policy_blocker_codes = {
@@ -462,6 +444,11 @@ class LifecycleAutomationWorker:
                         retry_at=bundle.retry_at,
                         diagnostics=bundle.diagnostics,
                         at=at,
+                        retained_evidence=bundle.retained_evidence,
+                        retained_facts=bundle.retained_facts,
+                        refreshed_source_families=(
+                            bundle.refreshed_source_families
+                        ),
                     )
                     return "blocked"
 
@@ -482,6 +469,9 @@ class LifecycleAutomationWorker:
                     diagnostics=bundle.diagnostics,
                     at=at,
                     terminal_decision=_decision_context(decision),
+                    retained_evidence=bundle.retained_evidence,
+                    retained_facts=bundle.retained_facts,
+                    refreshed_source_families=bundle.refreshed_source_families,
                 )
                 if completed.status == "blocked":
                     return "blocked"

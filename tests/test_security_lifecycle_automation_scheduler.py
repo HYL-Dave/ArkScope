@@ -1699,7 +1699,8 @@ def test_ibkr_identity_ambiguity_blocks_one_case_and_the_later_case_runs(tmp_pat
 
     calls = []
 
-    def evidence_loader(current, *, mode, at):
+    def evidence_loader(current, *, mode, at, prior_material):
+        del prior_material
         calls.append((current["case_id"], mode, at))
         code = (
             "ibkr_contract_ambiguous"
@@ -1913,11 +1914,12 @@ def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
     worker = LifecycleAutomationWorker(
         case_loader=scheduler._load_cases,
         profile_connection=profile_connection,
-        evidence_loader=lambda current, *, mode, at: scheduler._load_evidence(
+        evidence_loader=lambda current, *, mode, at, prior_material: scheduler._load_evidence(
             current,
             mode=mode,
             at=at,
             listing_session=listing_session,
+            prior_material=prior_material,
         ),
         source_loader=lambda: {
             first["ticker"]: (),
@@ -1953,6 +1955,802 @@ def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
     assert "ibkr_contract_ambiguous" not in {
         row["blocker_code"] for row in later_run["blockers"]
     }
+
+
+def _closed_chain_case(*, filing_date="2026-01-01", kinds=None):
+    from src.security_lifecycle_investigation import case_id_for
+
+    source_ref = "0000000001-26-000001"
+    case_id = case_id_for("sec_edgar", source_ref, "OLD")
+    return {
+        "case_id": case_id,
+        "source": "sec_edgar",
+        "source_ref": source_ref,
+        "ticker": "OLD",
+        "source_presence": "present",
+        "observation_fingerprint_sha256": "a" * 64,
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Closed Chain Issuer",
+            "filing_date": filing_date,
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "evidence_url": "https://www.sec.gov/Archives/closed-chain.htm",
+            "description": "Closed filing chain.",
+            "kinds": list(
+                kinds
+                or ({"event_type": "acquisition_completed", "effective_date": None},)
+            ),
+        },
+    }
+
+
+def _retained_sec_prior(
+    case,
+    *,
+    excerpt="Issuer CIK 0000000001.",
+    include_fact=True,
+    source_locator=None,
+):
+    from src.security_lifecycle_fact_kernel import AutomationPriorMaterial
+
+    encoded = excerpt.encode()
+    evidence_id = "sle_retained_closed_chain"
+    locator = {
+        "accession": case["source_ref"],
+        "filing_chain_complete": True,
+        **dict(source_locator or {}),
+    }
+    evidence = {
+        "evidence_id": evidence_id,
+        "case_id": case["case_id"],
+        "run_id": None,
+        "automation_run_id": "slar_retained",
+        "source_family": "regulator",
+        "kind": "regulator_excerpt",
+        "source_url": case["observation"]["evidence_url"],
+        "title": "Retained SEC chain",
+        "publisher": "SEC EDGAR",
+        "domain": "sec.gov",
+        "source_published_at": case["observation"]["filing_date"],
+        "retrieved_at": "2026-05-01T12:00:00Z",
+        "adapter": "sec_edgar",
+        "excerpt": excerpt,
+        "content_sha256": hashlib.sha256(encoded).hexdigest(),
+        "source_document_sha256": "d" * 64,
+        "source_locator_json": json.dumps(
+            locator,
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+        "evidence_dedupe_key": "automation:slar_retained:sec",
+    }
+    facts = ()
+    if include_fact:
+        cited = b"0000000001"
+        start = encoded.index(cited)
+        facts = (
+            {
+                "fact_id": "slf_retained_cik",
+                "automation_run_id": "slar_retained",
+                "case_id": case["case_id"],
+                "evidence_id": evidence_id,
+                "fact_type": "issuer_cik",
+                "normalized_value_json": '"0000000001"',
+                "source_span_start": start,
+                "source_span_end": start + len(cited),
+                "cited_text_sha256": hashlib.sha256(cited).hexdigest(),
+                "extractor_rule_id": "fixture.issuer_cik",
+                "extractor_rule_version": "1",
+                "fact_dedupe_key": "automation:slar_retained:fact:cik",
+                "created_at": "2026-05-01T12:00:00Z",
+            },
+        )
+    return AutomationPriorMaterial(
+        run_id="slar_retained",
+        observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
+        evidence=(evidence,),
+        facts=facts,
+        blockers=(
+            {
+                "automation_run_id": "slar_retained",
+                "blocker_code": "listing_directory_unavailable",
+                "retryable": 1,
+                "context_json": "{}",
+                "created_at": "2026-06-01T12:00:00Z",
+            },
+        ),
+    )
+
+
+def _probe_sec_reuse(monkeypatch, case, prior, *, at="2026-06-02T12:00:00Z"):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_calls = []
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda *, retrieved_at, **_kwargs: (
+            sec_calls.append(retrieved_at)
+            or SimpleNamespace(
+                evidence=(),
+                facts=(),
+                blockers=("sec_evidence_insufficient",),
+                source_deadlines=(),
+            )
+        ),
+    )
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at=at,
+        listing_session=SimpleNamespace(
+            lookup=lambda **_kwargs: SimpleNamespace(
+                evidence=(), facts=(), blockers=(), diagnostics={}
+            )
+        ),
+        prior_material=prior,
+    )
+    return sec_calls, bundle
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "observation_fingerprint",
+        "inside_widened_window",
+        "incomplete_chain",
+        "invalid_content_identity",
+        "invalid_document_identity",
+        "invalid_fact_citation",
+        "invalid_locator",
+        "invalid_deadline_citation",
+    ),
+)
+def test_each_closed_sec_reuse_predicate_independently_forces_refresh(
+    monkeypatch,
+    mutation,
+):
+    case = _closed_chain_case(
+        filing_date=("2026-05-01" if mutation == "inside_widened_window" else "2026-01-01")
+    )
+    prior = _retained_sec_prior(case)
+    evidence = dict(prior.evidence[0])
+    facts = tuple(dict(row) for row in prior.facts)
+    blockers = prior.blockers
+
+    if mutation == "observation_fingerprint":
+        prior = replace(prior, observation_fingerprint_sha256="b" * 64)
+    elif mutation == "incomplete_chain":
+        locator = json.loads(evidence["source_locator_json"])
+        locator["filing_chain_complete"] = False
+        evidence["source_locator_json"] = json.dumps(locator, sort_keys=True)
+    elif mutation == "invalid_content_identity":
+        evidence["content_sha256"] = "f" * 64
+    elif mutation == "invalid_document_identity":
+        evidence["source_document_sha256"] = "f" * 63
+    elif mutation == "invalid_fact_citation":
+        facts[0]["cited_text_sha256"] = "f" * 64
+    elif mutation == "invalid_locator":
+        evidence["source_locator_json"] = "[]"
+    elif mutation == "invalid_deadline_citation":
+        deadline_text = "The termination date remains May 30, 2026."
+        prior = _retained_sec_prior(
+            case,
+            excerpt=deadline_text,
+            include_fact=False,
+        )
+        evidence = dict(prior.evidence[0])
+        facts = ()
+        blockers = (
+            {
+                **dict(prior.blockers[0]),
+                "context_json": json.dumps(
+                    {
+                        "monitoring_reason": "not_confirmed_as_of",
+                        "source_deadline": "2026-05-30",
+                        "source_deadline_evidence_id": evidence["evidence_id"],
+                        "source_deadline_span_start_byte": 0,
+                        "source_deadline_span_end_byte": len(deadline_text.encode()),
+                        "source_deadline_cited_text_sha256": "f" * 64,
+                        "source_deadline_rule_id": (
+                            "sec.explicit_transaction_termination_date"
+                        ),
+                        "source_deadline_rule_version": "4",
+                        "as_of": "2026-06-01",
+                    },
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+            },
+        )
+
+    if mutation != "observation_fingerprint":
+        prior = replace(
+            prior,
+            evidence=(evidence,),
+            facts=facts,
+            blockers=blockers,
+        )
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+def test_unresolved_retained_sec_deadline_forces_fresh_acquisition(monkeypatch):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(
+        case,
+        excerpt=(
+            "The termination date remains August 28, 2026. "
+            "The termination date remains August 30, 2026."
+        ),
+        include_fact=False,
+    )
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_calls = []
+
+    def collect_sec_evidence(*, retrieved_at, **_kwargs):
+        sec_calls.append(retrieved_at)
+        excerpt = "Issuer CIK 0000000001."
+        encoded = excerpt.encode()
+        cited = b"0000000001"
+        start = encoded.index(cited)
+        evidence = AutomationEvidence(
+            evidence_id="sec-refreshed",
+            source_family="regulator",
+            adapter="sec_edgar",
+            kind="regulator_excerpt",
+            source_url=case["observation"]["evidence_url"],
+            title="Refreshed SEC chain",
+            publisher="SEC EDGAR",
+            domain="sec.gov",
+            source_published_at=case["observation"]["filing_date"],
+            retrieved_at=retrieved_at,
+            excerpt=excerpt,
+            content_sha256=hashlib.sha256(encoded).hexdigest(),
+            source_document_sha256="e" * 64,
+            source_locator={"filing_chain_complete": True},
+            evidence_dedupe_key="sec:refreshed",
+        )
+        return SimpleNamespace(
+            evidence=(evidence,),
+            facts=(
+                AutomationFact(
+                    evidence_id=evidence.evidence_id,
+                    fact_type="issuer_cik",
+                    normalized_value="0000000001",
+                    source_span_start=start,
+                    source_span_end=start + len(cited),
+                    cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+                    extractor_rule_id="fixture.issuer_cik",
+                    extractor_rule_version="1",
+                ),
+            ),
+            blockers=(),
+            source_deadlines=(),
+        )
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-06-02T12:00:00Z",
+        listing_session=SimpleNamespace(
+            lookup=lambda **_kwargs: SimpleNamespace(
+                evidence=(), facts=(), blockers=(), diagnostics={}
+            )
+        ),
+        prior_material=prior,
+    )
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
+def test_closed_sec_reuse_reconstructs_deadline_supersession_and_refreshes_market(
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case(
+        kinds=({"event_type": "merger_agreement", "effective_date": None},)
+    )
+    old_sentence = (
+        "The merger agreement may be terminated if the merger is not "
+        "consummated by May 28, 2026."
+    )
+    extension_sentence = (
+        "The outside date was extended from May 28, 2026 to May 30, 2026."
+    )
+    prior = _retained_sec_prior(
+        case,
+        excerpt=f"{old_sentence} {extension_sentence}",
+        include_fact=False,
+    )
+
+    monkeypatch.setattr(
+        sec_transport,
+        "SecTransport",
+        lambda: pytest.fail("closed SEC chain must not open transport"),
+    )
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: pytest.fail("closed SEC chain must not be acquired"),
+    )
+    listing_calls = []
+    listing_session = SimpleNamespace(
+        lookup=lambda **kwargs: (
+            listing_calls.append(kwargs)
+            or SimpleNamespace(evidence=(), facts=(), blockers=(), diagnostics={})
+        )
+    )
+    ibkr_calls = []
+
+    def ibkr(context, *, at, regulator_successors, max_queries):
+        ibkr_calls.append((context.case_id, at, regulator_successors, max_queries))
+        return SimpleNamespace(evidence=(), blockers=(), requests_made=1), ()
+
+    monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr)
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-06-02T12:00:00Z",
+        listing_session=listing_session,
+        ibkr_max_queries=3,
+        prior_material=prior,
+    )
+
+    assert len(bundle.retained_evidence) == 1
+    assert bundle.evidence == ()
+    assert len(listing_calls) == 1
+    assert ibkr_calls == [
+        (case["case_id"], "2026-06-02T12:00:00Z", (), 3)
+    ]
+    assert bundle.retry_at is None
+    assert len(bundle.blockers) == 1
+    blocker = bundle.blockers[0]
+    assert blocker.code == "sec_evidence_insufficient"
+    assert blocker.retryable is False
+    assert blocker.context["source_deadline"] == "2026-05-30"
+    assert blocker.context["source_deadline_evidence_id"] == (
+        prior.evidence[0]["evidence_id"]
+    )
+    assert "kind" not in blocker.context
+    assert "supersedes_date" not in blocker.context
+    retained_excerpt = prior.evidence[0]["excerpt"].encode()
+    cited = retained_excerpt[
+        blocker.context["source_deadline_span_start_byte"] :
+        blocker.context["source_deadline_span_end_byte"]
+    ]
+    assert cited.decode() == extension_sentence
+    assert hashlib.sha256(cited).hexdigest() == blocker.context[
+        "source_deadline_cited_text_sha256"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("include_successor", "expected_ibkr_calls"),
+    ((True, 1), (False, 0)),
+)
+def test_reused_sec_refreshes_current_provider_families_without_stale_rows(
+    monkeypatch,
+    include_successor,
+    expected_ibkr_calls,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_schema import EVIDENCE_SOURCE_FAMILIES
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case()
+    excerpt = "Issuer CIK 0000000001 has successor NEXT."
+    prior = _retained_sec_prior(case, excerpt=excerpt)
+    facts = list(prior.facts)
+    if include_successor:
+        cited = b"NEXT"
+        start = excerpt.encode().index(cited)
+        facts.append(
+            {
+                **dict(prior.facts[0]),
+                "fact_id": "slf_retained_successor",
+                "fact_type": "successor_ticker",
+                "normalized_value_json": '"NEXT"',
+                "source_span_start": start,
+                "source_span_end": start + len(cited),
+                "cited_text_sha256": hashlib.sha256(cited).hexdigest(),
+                "extractor_rule_id": "fixture.successor_ticker",
+                "fact_dedupe_key": "automation:slar_retained:fact:successor",
+            }
+        )
+    stale_listing = {
+        "evidence_id": "sle_stale_listing",
+        "source_family": "listing_authority",
+    }
+    stale_market = {
+        "evidence_id": "sle_stale_market",
+        "source_family": "market_infrastructure",
+    }
+    prior = replace(
+        prior,
+        evidence=(*prior.evidence, stale_listing, stale_market),
+        facts=tuple(facts),
+    )
+
+    monkeypatch.setattr(
+        sec_transport,
+        "SecTransport",
+        lambda: pytest.fail("reused SEC must not open transport"),
+    )
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: pytest.fail("reused SEC must not be acquired"),
+    )
+    listing_calls = []
+
+    def lookup(**kwargs):
+        listing_calls.append(kwargs)
+        return SimpleNamespace(
+            evidence=(
+                _authority_evidence(
+                    "fresh-listing",
+                    adapter="nasdaq_symbol_directory",
+                    ticker="NEXT" if include_successor else "OLD",
+                    market="stocks",
+                    listing_status="active",
+                    directory="nasdaq_listed",
+                ),
+            ),
+            facts=(),
+            blockers=(),
+            diagnostics={},
+        )
+
+    ibkr_calls = []
+
+    def ibkr(context, *, at, regulator_successors, max_queries):
+        ibkr_calls.append((context.case_id, at, regulator_successors, max_queries))
+        return (
+            SimpleNamespace(
+                evidence=(
+                    SimpleNamespace(
+                        evidence_id="fresh-market",
+                        source_family="market_infrastructure",
+                        source_locator={"contract_status": "found", "conid": 7},
+                        retrieved_at=at,
+                    ),
+                ),
+                blockers=(),
+                requests_made=1,
+            ),
+            (),
+        )
+
+    monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr)
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-06-02T12:00:00Z",
+        listing_session=SimpleNamespace(lookup=lookup),
+        ibkr_max_queries=3,
+        prior_material=prior,
+    )
+
+    assert len(listing_calls) == 1
+    assert len(ibkr_calls) == expected_ibkr_calls
+    assert bundle.refreshed_source_families == tuple(
+        sorted(EVIDENCE_SOURCE_FAMILIES - {"regulator"})
+    )
+    assert {row["evidence_id"] for row in bundle.retained_evidence} == {
+        prior.evidence[0]["evidence_id"]
+    }
+    current_ids = {
+        getattr(row, "evidence_id", None) for row in bundle.evidence
+    }
+    assert "fresh-listing" in current_ids
+    assert ("fresh-market" in current_ids) is include_successor
+    assert {"sle_stale_listing", "sle_stale_market"}.isdisjoint(current_ids)
+
+
+def test_due_listing_retry_preserves_closed_sec_chain_and_refreshes_listing(
+    tmp_path,
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
+    from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    source_ref = "0000000001-26-000001"
+    case_id = case_id_for("sec_edgar", source_ref, "OLD")
+    case = {
+        "case_id": case_id,
+        "source": "sec_edgar",
+        "source_ref": source_ref,
+        "ticker": "OLD",
+        "source_presence": "present",
+        "observation_fingerprint_sha256": "a" * 64,
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Closed Chain Issuer",
+            "filing_date": "2026-01-01",
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "evidence_url": "https://www.sec.gov/Archives/closed-chain.htm",
+            "description": "Closed filing chain.",
+            "kinds": [
+                {"event_type": "acquisition_completed", "effective_date": None}
+            ],
+        },
+    }
+    profile_path = tmp_path / "profile.db"
+    conn = sqlite3.connect(profile_path, check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    sec_calls = []
+
+    def collect_sec_evidence(*, context, retrieved_at, **_kwargs):
+        sec_calls.append(retrieved_at)
+        excerpt = "Issuer CIK 0000000001."
+        cited = b"0000000001"
+        encoded = excerpt.encode()
+        start = encoded.index(cited)
+        evidence = AutomationEvidence(
+            evidence_id="sec-closed-chain",
+            source_family="regulator",
+            adapter="sec_edgar",
+            kind="regulator_excerpt",
+            source_url=case["observation"]["evidence_url"],
+            title="Closed SEC chain",
+            publisher="SEC EDGAR",
+            domain="sec.gov",
+            source_published_at=context.filing_date,
+            retrieved_at=retrieved_at,
+            excerpt=excerpt,
+            content_sha256=hashlib.sha256(encoded).hexdigest(),
+            source_document_sha256="d" * 64,
+            source_locator={
+                "accession": source_ref,
+                "filing_chain_complete": True,
+            },
+            evidence_dedupe_key=f"sec:{case_id}:closed-chain",
+        )
+        fact = AutomationFact(
+            evidence_id=evidence.evidence_id,
+            fact_type="issuer_cik",
+            normalized_value="0000000001",
+            source_span_start=start,
+            source_span_end=start + len(cited),
+            cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+            extractor_rule_id="fixture.issuer_cik",
+            extractor_rule_version="1",
+        )
+        return SimpleNamespace(
+            evidence=(evidence,),
+            facts=(fact,),
+            blockers=(),
+            source_deadlines=(),
+        )
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    listing_calls = []
+    listing_session = SimpleNamespace(
+        lookup=lambda **kwargs: (
+            listing_calls.append(kwargs)
+            or SimpleNamespace(
+                evidence=(),
+                facts=(),
+                blockers=("listing_directory_unavailable",),
+                diagnostics={"listing_requests": 1},
+            )
+        )
+    )
+    visible_material_counts = []
+
+    def load(current, *, mode, at, prior_material=None):
+        visible_material_counts.append(
+            (
+                conn.execute(
+                    "SELECT COUNT(*) FROM security_lifecycle_evidence "
+                    "WHERE automation_run_id IS NOT NULL"
+                ).fetchone()[0],
+                conn.execute(
+                    "SELECT COUNT(*) FROM security_lifecycle_automation_facts"
+                ).fetchone()[0],
+            )
+        )
+        kwargs = {
+            "mode": mode,
+            "at": at,
+            "listing_session": listing_session,
+        }
+        if prior_material is not None:
+            kwargs["prior_material"] = prior_material
+        return scheduler._load_evidence(current, **kwargs)
+
+    now = ["2026-06-01T12:00:00Z"]
+    worker = LifecycleAutomationWorker(
+        case_loader=lambda: (case,),
+        profile_connection=profile_connection,
+        evidence_loader=load,
+        source_loader=lambda: {"OLD": ()},
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "blocked case must not preview a transition"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "blocked case must not approve a transition"
+        ),
+        clock=lambda: now[0],
+        execution_owner_id="closed-sec-reuse-owner",
+    )
+
+    first = worker.run(limit=1)
+    now[0] = "2026-06-02T12:00:00Z"
+    second = worker.run(limit=1)
+
+    assert first["blocked"] == second["blocked"] == 1
+    assert visible_material_counts == [(0, 0), (1, 1)]
+    assert sec_calls == ["2026-06-01T12:00:00Z"]
+    assert len(listing_calls) == 2
+    conn.close()
+
+
+def test_malformed_sec_content_keeps_source_payload_invalid_single_retry(
+    tmp_path,
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case()
+    profile_path = tmp_path / "profile.db"
+    conn = sqlite3.connect(profile_path, check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_calls = []
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda *, retrieved_at, **_kwargs: (
+            sec_calls.append(retrieved_at)
+            or SimpleNamespace(
+                evidence=(),
+                facts=(),
+                blockers=("sec_invalid_json",),
+                source_deadlines=(),
+            )
+        ),
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: pytest.fail(
+            "malformed SEC content must fail before listing acquisition"
+        )
+    )
+    now = ["2026-06-01T12:00:00Z"]
+
+    def worker(*, allow_due_failed_retry=False):
+        return LifecycleAutomationWorker(
+            case_loader=lambda: (case,),
+            profile_connection=profile_connection,
+            evidence_loader=lambda current, *, mode, at, prior_material: scheduler._load_evidence(
+                current,
+                mode=mode,
+                at=at,
+                listing_session=listing_session,
+                prior_material=prior_material,
+            ),
+            source_loader=lambda: {"OLD": ()},
+            transition_preview=lambda **_kwargs: pytest.fail(
+                "failed case must not preview a transition"
+            ),
+            transition_approver=lambda **_kwargs: pytest.fail(
+                "failed case must not approve a transition"
+            ),
+            clock=lambda: now[0],
+            execution_owner_id="malformed-sec-owner",
+            allow_due_failed_retry=allow_due_failed_retry,
+        )
+
+    try:
+        first = worker().run(limit=1)
+        now[0] = "2026-06-01T13:00:00Z"
+        retry = worker(allow_due_failed_retry=True).run(limit=1)
+        now[0] = "2027-06-01T13:00:00Z"
+        exhausted = worker(allow_due_failed_retry=True).run(limit=1)
+        store = SecurityLifecycleInvestigationStore(conn)
+        runs = store.list_automation_runs(case["case_id"])
+
+        assert first["failed"] == retry["failed"] == 1
+        assert exhausted["skipped_current"] == 1
+        assert sec_calls == ["2026-06-01T12:00:00Z", "2026-06-01T13:00:00Z"]
+        assert len(runs) == 2
+        assert {row["failure_code"] for row in runs} == {"source_payload_invalid"}
+    finally:
+        conn.close()
 
 
 def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatch):
@@ -2197,8 +2995,8 @@ def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
             self.closed = True
             events.append(("closed", self))
 
-    def load(case, *, mode, at, listing_session):
-        del mode, at
+    def load(case, *, mode, at, listing_session, prior_material=None):
+        del mode, at, prior_material
         listing_session.lookup(case_id=case["case_id"])
         return LifecycleAutomationEvidenceBundle(
             evidence=(), facts=(), blockers=(), diagnostics={}, retry_at=None

@@ -436,7 +436,8 @@ class _Harness:
     def case_loader(self):
         return list(self.cases)
 
-    def evidence_loader(self, case, *, mode, at):
+    def evidence_loader(self, case, *, mode, at, prior_material):
+        del prior_material
         self.evidence_calls.append((case["case_id"], mode, at))
         value = self.bundles[case["case_id"]]
         if isinstance(value, BaseException):
@@ -1601,7 +1602,7 @@ def test_provider_blockers_remain_typed_and_retryable_without_partial_assessment
         ("listing_directory_unavailable", True),
         ("listing_directory_stale", True),
         ("listing_directory_schema_mismatch", True),
-        ("massive_credential_missing", True),
+        ("massive_credential_missing", False),
         ("massive_access_denied", True),
         ("massive_rate_limited", True),
         ("massive_reference_unavailable", True),
@@ -1636,6 +1637,51 @@ def test_scheduler_blocker_strings_persist_through_fact_kernel_readback(
             (code, retryable)
         ]
         assert (run["retry_at"] is not None) is retryable
+    finally:
+        harness.conn.close()
+
+
+def test_massive_credential_recovery_requires_saved_key_and_attended_case_run(
+    tmp_path,
+):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    blockers, retry_at = scheduler._blockers(
+        ["massive_credential_missing"],
+        at=harness.now,
+    )
+    harness.bundles[case["case_id"]] = LifecycleAutomationEvidenceBundle(
+        evidence=(),
+        facts=(),
+        blockers=blockers,
+        diagnostics={},
+        retry_at=retry_at,
+    )
+    try:
+        blocked = harness.worker().run()
+        harness.now = "2027-08-25T12:00:00Z"
+        unattended = harness.worker(allow_due_failed_retry=True).run()
+
+        harness.bundles[case["case_id"]] = _bundle(case)
+        attended = harness.worker(
+            allow_new_attempt=True,
+            target_case_id=case["case_id"],
+        ).run()
+        runs = _store(harness).list_automation_runs(case["case_id"])
+
+        assert retry_at is None
+        assert blocked["blocked"] == 1
+        assert unattended["skipped_current"] == 1
+        assert attended["accepted"] == 1
+        assert [row["status"] for row in runs] == ["succeeded", "blocked"]
+        assert json.loads(runs[0]["query_context_json"])["predecessor_run_id"] == (
+            runs[1]["run_id"]
+        )
     finally:
         harness.conn.close()
 
@@ -1913,6 +1959,88 @@ def test_worker_automatic_retry_authority_is_opt_in_and_due_only(tmp_path):
         assert json.loads(runs[0]["query_context_json"])["predecessor_run_id"] == (
             runs[1]["run_id"]
         )
+    finally:
+        harness.conn.close()
+
+
+def test_source_payload_invalid_receives_exactly_one_automatic_retry(tmp_path):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = ValueError("malformed provider content")
+    try:
+        first = harness.worker().run()
+        harness.now = "2026-08-25T13:00:00Z"
+        retry = harness.worker(allow_due_failed_retry=True).run()
+        harness.now = "2027-08-25T13:00:00Z"
+        exhausted = harness.worker(allow_due_failed_retry=True).run()
+        runs = _store(harness).list_automation_runs(case["case_id"])
+
+        assert first["failed"] == retry["failed"] == 1
+        assert exhausted["skipped_current"] == 1
+        assert len(harness.evidence_calls) == 2
+        assert len(runs) == 2
+        assert {row["failure_code"] for row in runs} == {"source_payload_invalid"}
+        assert json.loads(runs[0]["query_context_json"])["predecessor_run_id"] == (
+            runs[1]["run_id"]
+        )
+    finally:
+        harness.conn.close()
+
+
+def test_due_acquisition_failure_retains_prior_provider_material(tmp_path):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    blockers, retry_at = scheduler._blockers(
+        ["listing_directory_unavailable"],
+        at=harness.now,
+    )
+    complete = _bundle(case)
+    harness.bundles[case["case_id"]] = LifecycleAutomationEvidenceBundle(
+        evidence=complete.evidence,
+        facts=complete.facts,
+        blockers=blockers,
+        diagnostics={"listing_requests": 1},
+        retry_at=retry_at,
+    )
+
+    def rows(table, order_by):
+        return tuple(
+            tuple(row)
+            for row in harness.conn.execute(
+                f"SELECT * FROM {table} ORDER BY {order_by}"
+            )
+        )
+
+    try:
+        first = harness.worker().run()
+        before = {
+            "evidence": rows("security_lifecycle_evidence", "evidence_id"),
+            "facts": rows("security_lifecycle_automation_facts", "fact_id"),
+            "blockers": rows(
+                "security_lifecycle_automation_run_blockers", "blocker_code"
+            ),
+        }
+        harness.now = str(retry_at)
+        harness.bundles[case["case_id"]] = ValueError("malformed provider content")
+
+        failed = harness.worker().run()
+        after = {
+            "evidence": rows("security_lifecycle_evidence", "evidence_id"),
+            "facts": rows("security_lifecycle_automation_facts", "fact_id"),
+            "blockers": rows(
+                "security_lifecycle_automation_run_blockers", "blocker_code"
+            ),
+        }
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert first["blocked"] == failed["failed"] == 1
+        assert after == before
+        assert run["failure_code"] == "source_payload_invalid"
     finally:
         harness.conn.close()
 

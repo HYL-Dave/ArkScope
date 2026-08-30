@@ -1789,6 +1789,169 @@ def test_due_retryable_blocked_semantic_run_reuses_its_execution_row():
     assert len(store.list_automation_runs(case_id)) == 1
 
 
+def test_due_blocked_family_replacement_is_atomic_and_retains_regulator():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+    from src.security_lifecycle_schema import EVIDENCE_SOURCE_FAMILIES
+
+    conn, store, kernel, case_id = _context()
+    regulator = _evidence("retained-regulator")
+    listing = replace(
+        _evidence(
+            "stale-listing",
+            family="listing_authority",
+            adapter="nasdaq_symbol_directory",
+            kind="listing_directory_snapshot",
+        ),
+        source_document_sha256="e" * 64,
+    )
+    market = _evidence(
+        "stale-market",
+        family="market_infrastructure",
+        adapter="ibkr_contract",
+        kind="market_infrastructure_snapshot",
+    )
+    blocked = _reserve(kernel, case_id)
+    kernel.complete_run(
+        run_id=blocked.run_id,
+        evidence=(regulator, listing, market),
+        facts=(_fact(regulator), _fact(listing), _fact(market)),
+        blockers=(
+            AutomationBlocker(
+                code="listing_directory_unavailable",
+                retryable=True,
+                context={"attempts": 1},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-26T00:00:00Z",
+        diagnostics={"listing_requests": 1},
+        at=_LATER,
+    )
+    retry = _reserve(kernel, case_id, at="2026-08-26T00:00:00Z")
+    prior = kernel.prior_material(retry.run_id)
+    retained_evidence = tuple(
+        {**dict(row), "source_locator": json.loads(row["source_locator_json"])}
+        for row in prior.evidence
+        if row["source_family"] == "regulator"
+    )
+    retained_ids = {row["evidence_id"] for row in retained_evidence}
+    retained_facts = tuple(
+        {
+            **dict(row),
+            "normalized_value": json.loads(row["normalized_value_json"]),
+        }
+        for row in prior.facts
+        if row["evidence_id"] in retained_ids
+    )
+    refreshed_families = tuple(
+        sorted(EVIDENCE_SOURCE_FAMILIES - {"regulator"})
+    )
+    replacement = replace(
+        _evidence(
+            "fresh-listing",
+            family="listing_authority",
+            adapter="nasdaq_symbol_directory",
+            kind="listing_directory_snapshot",
+        ),
+        source_document_sha256="f" * 64,
+    )
+
+    def rows(table, order_by):
+        return tuple(
+            tuple(row)
+            for row in conn.execute(
+                f"SELECT * FROM {table} WHERE automation_run_id=? ORDER BY {order_by}",
+                (retry.run_id,),
+            )
+        )
+
+    before = {
+        "evidence": rows("security_lifecycle_evidence", "evidence_id"),
+        "facts": rows("security_lifecycle_automation_facts", "fact_id"),
+        "blockers": rows(
+            "security_lifecycle_automation_run_blockers",
+            "blocker_code",
+        ),
+    }
+    conn.execute(
+        "CREATE TRIGGER fail_lifecycle_replacement "
+        "BEFORE INSERT ON security_lifecycle_evidence "
+        "WHEN NEW.source_family='listing_authority' "
+        "BEGIN SELECT RAISE(ABORT,'injected replacement failure'); END"
+    )
+    conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError, match="injected replacement failure"):
+        kernel.complete_run(
+            run_id=retry.run_id,
+            evidence=(replacement,),
+            facts=(_fact(replacement),),
+            blockers=(
+                AutomationBlocker(
+                    code="listing_directory_unavailable",
+                    retryable=True,
+                    context={"attempts": 2},
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at="2026-08-27T00:00:00Z",
+            diagnostics={"listing_requests": 2},
+            at="2026-08-26T00:00:00Z",
+            retained_evidence=retained_evidence,
+            retained_facts=retained_facts,
+            refreshed_source_families=refreshed_families,
+        )
+
+    assert {
+        "evidence": rows("security_lifecycle_evidence", "evidence_id"),
+        "facts": rows("security_lifecycle_automation_facts", "fact_id"),
+        "blockers": rows(
+            "security_lifecycle_automation_run_blockers",
+            "blocker_code",
+        ),
+    } == before
+
+    conn.execute("DROP TRIGGER fail_lifecycle_replacement")
+    conn.commit()
+    completed = kernel.complete_run(
+        run_id=retry.run_id,
+        evidence=(replacement,),
+        facts=(_fact(replacement),),
+        blockers=(
+            AutomationBlocker(
+                code="listing_directory_unavailable",
+                retryable=True,
+                context={"attempts": 2},
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-27T00:00:00Z",
+        diagnostics={"listing_requests": 2},
+        at="2026-08-26T00:00:00Z",
+        retained_evidence=retained_evidence,
+        retained_facts=retained_facts,
+        refreshed_source_families=refreshed_families,
+    )
+
+    final_rows = conn.execute(
+        "SELECT evidence_id,source_family FROM security_lifecycle_evidence "
+        "WHERE automation_run_id=? ORDER BY source_family,evidence_id",
+        (retry.run_id,),
+    ).fetchall()
+    assert completed.status == "blocked"
+    assert [row[1] for row in final_rows] == ["listing_authority", "regulator"]
+    assert next(row[0] for row in final_rows if row[1] == "regulator") in retained_ids
+    stale_ids = {
+        row["evidence_id"]
+        for row in prior.evidence
+        if row["source_family"] != "regulator"
+    }
+    assert stale_ids.isdisjoint({row[0] for row in final_rows})
+
+
 def test_cross_revision_due_blocked_failure_does_not_replay_same_attempt_revision():
     from src.security_lifecycle_fact_kernel import AutomationBlocker
 

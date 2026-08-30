@@ -13,6 +13,7 @@ import re
 import sqlite3
 import sys
 import threading
+from types import SimpleNamespace
 from typing import Iterator
 
 from src.data_provider_config import MASSIVE_CONFIG_PROVIDER, provider_field_env_value
@@ -26,8 +27,11 @@ from src.security_lifecycle_decision_policy import (
 )
 from src.security_lifecycle_fact_kernel import (
     AutomationBlocker,
+    AutomationPriorMaterial,
     SecurityLifecycleFactKernel,
     normalize_terminal_finalization_failure,
+    validate_automation_deadline_citations,
+    validate_automation_material,
 )
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
@@ -43,6 +47,7 @@ from src.security_lifecycle_listing_evidence import (
     ListingRequestBudget,
 )
 from src.security_lifecycle_schema import (
+    EVIDENCE_SOURCE_FAMILIES,
     LifecycleSchemaMismatch,
     LifecycleWritesUnavailable,
     verify_profile_connection,
@@ -95,7 +100,6 @@ _RETRYABLE_BLOCKERS = frozenset(
         "listing_directory_unavailable",
         "listing_directory_stale",
         "listing_directory_schema_mismatch",
-        "massive_credential_missing",
         "massive_access_denied",
         "massive_rate_limited",
         "massive_reference_unavailable",
@@ -870,6 +874,113 @@ def _required_listing_codes(
     )
 
 
+def _reusable_regulator_material(
+    case: Mapping[str, object],
+    *,
+    context: object,
+    prior_material: AutomationPriorMaterial | None,
+    at: str,
+) -> tuple[
+    tuple[Mapping[str, object], ...],
+    tuple[Mapping[str, object], ...],
+    tuple[object, ...],
+] | None:
+    if (
+        prior_material is None
+        or not prior_material.blockers
+        or not prior_material.evidence
+    ):
+        return None
+    if prior_material.observation_fingerprint_sha256 != str(
+        case.get("observation_fingerprint_sha256") or ""
+    ):
+        return None
+    try:
+        today = datetime.fromisoformat(at.replace("Z", "+00:00")).date()
+        widened_end = date.fromisoformat(str(getattr(context, "widened_end")))
+    except (TypeError, ValueError):
+        return None
+    if today <= widened_end:
+        return None
+
+    try:
+        from src.security_lifecycle_sec_evidence import (
+            SecEvidence,
+            _resolve_source_deadline,
+            _source_deadlines,
+        )
+
+        evidence: list[Mapping[str, object]] = []
+        for raw in prior_material.evidence:
+            if raw.get("source_family") != "regulator":
+                continue
+            locator = json.loads(str(raw.get("source_locator_json") or ""))
+            if not isinstance(locator, Mapping):
+                return None
+            if locator.get("filing_chain_complete") is not True:
+                return None
+            evidence.append({**dict(raw), "source_locator": dict(locator)})
+        if not evidence:
+            return None
+
+        evidence_ids = {str(row["evidence_id"]) for row in evidence}
+        facts: list[Mapping[str, object]] = []
+        for raw in prior_material.facts:
+            if str(raw.get("evidence_id") or "") not in evidence_ids:
+                continue
+            normalized_value = json.loads(
+                str(raw.get("normalized_value_json") or "")
+            )
+            facts.append(
+                {
+                    **dict(raw),
+                    "normalized_value": normalized_value,
+                }
+            )
+        validate_automation_material(evidence=evidence, facts=facts)
+        blocker_contexts: list[Mapping[str, object]] = []
+        for raw in prior_material.blockers:
+            blocker_context = json.loads(str(raw.get("context_json") or ""))
+            if not isinstance(blocker_context, Mapping):
+                return None
+            blocker_contexts.append(blocker_context)
+        validate_automation_deadline_citations(
+            evidence=evidence,
+            contexts=blocker_contexts,
+        )
+
+        deadline_rows: list[object] = []
+        deadline_ambiguous = False
+        for row in evidence:
+            retained = SecEvidence(
+                evidence_id=str(row["evidence_id"]),
+                source_family="regulator",
+                adapter="sec_edgar",
+                kind="regulator_excerpt",
+                source_url=str(row["source_url"]),
+                title=str(row["title"]),
+                publisher=str(row["publisher"]),
+                source_published_at=str(row["source_published_at"]),
+                retrieved_at=str(row["retrieved_at"]),
+                excerpt=str(row["excerpt"]),
+                content_sha256=str(row["content_sha256"]),
+                document_sha256=str(row["source_document_sha256"]),
+                source_locator=row["source_locator"],
+            )
+            extracted, ambiguous = _source_deadlines(retained)
+            deadline_rows.extend(extracted)
+            deadline_ambiguous = deadline_ambiguous or ambiguous
+        active_deadline = _resolve_source_deadline(deadline_rows)
+        if deadline_ambiguous or (deadline_rows and active_deadline is None):
+            return None
+        source_deadlines = (
+            (active_deadline,) if active_deadline is not None else ()
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return tuple(evidence), tuple(facts), source_deadlines
+
+
 def _load_evidence(
     case: Mapping[str, object],
     *,
@@ -877,27 +988,54 @@ def _load_evidence(
     at: str,
     listing_session: ListingAuthoritySession,
     ibkr_max_queries: int = _DEFAULT_IBKR_MAX_QUERIES,
+    prior_material: AutomationPriorMaterial | None = None,
 ) -> LifecycleAutomationEvidenceBundle:
     del mode
     from data_sources.sec_transport import SecRequestBudget, SecTransport
     from src.security_lifecycle_sec_evidence import collect_sec_evidence
 
     context = _identity_context(case)
-    budget = SecRequestBudget.lifecycle()
-    transport = SecTransport()
-    try:
-        sec = collect_sec_evidence(
-            context=context,
-            transport=transport,
-            retrieved_at=at,
-            budget=budget,
+    retained = _reusable_regulator_material(
+        case,
+        context=context,
+        prior_material=prior_material,
+        at=at,
+    )
+    if retained is None:
+        retained_evidence: tuple[Mapping[str, object], ...] = ()
+        retained_facts: tuple[Mapping[str, object], ...] = ()
+        budget = SecRequestBudget.lifecycle()
+        transport = SecTransport()
+        try:
+            sec = collect_sec_evidence(
+                context=context,
+                transport=transport,
+                retrieved_at=at,
+                budget=budget,
+            )
+            diagnostics = {
+                f"sec_{'payload_bytes' if key == 'body_bytes' else key}": value
+                for key, value in transport.diagnostics(budget).items()
+            }
+        finally:
+            transport.close()
+        refreshed_source_families = (
+            tuple(sorted(EVIDENCE_SOURCE_FAMILIES))
+            if prior_material is not None and prior_material.blockers
+            else None
         )
-        diagnostics = {
-            f"sec_{'payload_bytes' if key == 'body_bytes' else key}": value
-            for key, value in transport.diagnostics(budget).items()
-        }
-    finally:
-        transport.close()
+    else:
+        retained_evidence, retained_facts, source_deadlines = retained
+        sec = SimpleNamespace(
+            evidence=retained_evidence,
+            facts=retained_facts,
+            blockers=(),
+            source_deadlines=source_deadlines,
+        )
+        diagnostics = {"sec_attempt_count": 0, "sec_reused": 1}
+        refreshed_source_families = tuple(
+            sorted(EVIDENCE_SOURCE_FAMILIES - {"regulator"})
+        )
 
     sec_codes = tuple(_normalize_sec_blocker(str(code)) for code in sec.blockers)
     codes: list[str | AutomationBlocker] = list(sec_codes)
@@ -905,6 +1043,8 @@ def _load_evidence(
         codes.append("sec_evidence_insufficient")
     evidence: list[object] = list(sec.evidence)
     facts: list[object] = list(sec.facts)
+    fresh_evidence: list[object] = [] if retained is not None else list(sec.evidence)
+    fresh_facts: list[object] = [] if retained is not None else list(sec.facts)
     source_deadlines = tuple(getattr(sec, "source_deadlines", ()))
     deadline_dates = {str(getattr(row, "date", "")) for row in source_deadlines}
     if len(deadline_dates) > 1:
@@ -939,6 +1079,8 @@ def _load_evidence(
     )
     evidence.extend(listing.evidence)
     facts.extend(listing.facts)
+    fresh_evidence.extend(listing.evidence)
+    fresh_facts.extend(listing.facts)
     required_listing_components = listing_authority_required_components(
         case=case,
         regulator_facts=sec.facts,
@@ -999,6 +1141,8 @@ def _load_evidence(
             )
             evidence.extend(ibkr.evidence)
             facts.extend(ibkr_facts)
+            fresh_evidence.extend(ibkr.evidence)
+            fresh_facts.extend(ibkr_facts)
             ibkr_codes = tuple(str(code) for code in ibkr.blockers)
             diagnostics["ibkr_requests"] = int(ibkr.requests_made)
         codes.extend(
@@ -1046,11 +1190,14 @@ def _load_evidence(
 
     blockers, retry_at = _blockers(codes, at=at)
     return LifecycleAutomationEvidenceBundle(
-        evidence=tuple(evidence),
-        facts=tuple(facts),
+        evidence=tuple(fresh_evidence),
+        facts=tuple(fresh_facts),
         blockers=blockers,
         diagnostics=diagnostics,
         retry_at=retry_at,
+        retained_evidence=retained_evidence,
+        retained_facts=retained_facts,
+        refreshed_source_families=refreshed_source_families,
     )
 
 
@@ -1285,11 +1432,12 @@ def _run_owned_automation_batch(
     try:
         with _listing_authority_session(at=at) as session:
             worker = _worker(
-                evidence_loader=lambda case, *, mode, at: _load_evidence(
+                evidence_loader=lambda case, *, mode, at, prior_material=None: _load_evidence(
                     case,
                     mode=mode,
                     at=at,
                     listing_session=session,
+                    prior_material=prior_material,
                 ),
                 execution_owner_id=execution_owner_id,
                 clock=lambda: at,

@@ -156,6 +156,15 @@ class AutomationRunClaim:
 
 
 @dataclass(frozen=True)
+class AutomationPriorMaterial:
+    run_id: str
+    observation_fingerprint_sha256: str
+    evidence: tuple[Mapping[str, object], ...]
+    facts: tuple[Mapping[str, object], ...]
+    blockers: tuple[Mapping[str, object], ...]
+
+
+@dataclass(frozen=True)
 class AutomationRunResult:
     run_id: str
     status: str
@@ -915,6 +924,17 @@ def _normalize_facts(
     return tuple(rows[key] for key in sorted(rows))
 
 
+def validate_automation_material(
+    *,
+    evidence: Iterable[object],
+    facts: Iterable[object],
+) -> None:
+    """Validate evidence identity and every fact citation without persisting."""
+
+    normalized_evidence = _normalize_evidence(evidence)
+    _normalize_facts(facts, normalized_evidence)
+
+
 def _normalize_blockers(values: Iterable[object]) -> tuple[tuple[str, bool, str], ...]:
     rows: dict[str, tuple[str, bool, str]] = {}
     for value in values:
@@ -1024,6 +1044,35 @@ def _normalize_deadline_blockers(
             )
         )
     return tuple(normalized)
+
+
+def validate_automation_deadline_citations(
+    *,
+    evidence: Iterable[object],
+    contexts: Iterable[Mapping[str, object]],
+) -> None:
+    """Validate every persisted deadline context against retained evidence."""
+
+    normalized_evidence = _normalize_evidence(evidence)
+    blockers = tuple(
+        (
+            "sec_evidence_insufficient",
+            False,
+            _canonical_json(
+                context,
+                name="blocker_context",
+                max_bytes=4096,
+                diagnostics=True,
+            ),
+        )
+        for context in contexts
+    )
+    _normalize_deadline_blockers(
+        run_id="retained-validation",
+        blockers=blockers,
+        current_evidence=(),
+        existing_evidence=normalized_evidence,
+    )
 
 
 def _conflicts(facts: Iterable[_FactRow]) -> dict[str, tuple[str, ...]]:
@@ -1265,6 +1314,45 @@ class SecurityLifecycleFactKernel:
         self.store = store
         self.conn = store.conn
 
+    def prior_material(self, run_id: str) -> AutomationPriorMaterial:
+        current = self.conn.execute(
+            "SELECT run_id,status,observation_fingerprint_sha256 FROM "
+            "security_lifecycle_automation_runs WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        if current is None or str(current["status"]) != "running":
+            raise ValueError("automation_run_not_running")
+        evidence = _mapped_rows(
+            self.conn.execute(
+                "SELECT * FROM security_lifecycle_evidence "
+                "WHERE automation_run_id=? ORDER BY evidence_id",
+                (run_id,),
+            )
+        )
+        facts = _mapped_rows(
+            self.conn.execute(
+                "SELECT * FROM security_lifecycle_automation_facts "
+                "WHERE automation_run_id=? ORDER BY fact_id",
+                (run_id,),
+            )
+        )
+        blockers = _mapped_rows(
+            self.conn.execute(
+                "SELECT * FROM security_lifecycle_automation_run_blockers "
+                "WHERE automation_run_id=? ORDER BY blocker_code",
+                (run_id,),
+            )
+        )
+        return AutomationPriorMaterial(
+            run_id=str(current["run_id"]),
+            observation_fingerprint_sha256=str(
+                current["observation_fingerprint_sha256"]
+            ),
+            evidence=evidence,
+            facts=facts,
+            blockers=blockers,
+        )
+
     def reserve_run(
         self,
         *,
@@ -1431,21 +1519,6 @@ class SecurityLifecycleFactKernel:
                         retry_context = dict(context)
                         retry_context[_EXECUTION_OWNER_KEY] = owner_id
                         retry_context[_LATEST_ATTEMPT_REVISION_KEY] = execution
-                        self.conn.execute(
-                            "DELETE FROM security_lifecycle_automation_facts "
-                            "WHERE automation_run_id=?",
-                            (existing_id,),
-                        )
-                        self.conn.execute(
-                            "DELETE FROM security_lifecycle_evidence "
-                            "WHERE automation_run_id=?",
-                            (existing_id,),
-                        )
-                        self.conn.execute(
-                            "DELETE FROM security_lifecycle_automation_run_blockers "
-                            "WHERE automation_run_id=?",
-                            (existing_id,),
-                        )
                         self.conn.execute(
                             "UPDATE security_lifecycle_automation_runs SET "
                             "status='running',decision_tier=NULL,action_readiness=NULL,"
@@ -1705,6 +1778,9 @@ class SecurityLifecycleFactKernel:
         diagnostics: Mapping[str, object],
         at: str,
         terminal_decision: Mapping[str, object] | None = None,
+        retained_evidence: Iterable[object] = (),
+        retained_facts: Iterable[object] = (),
+        refreshed_source_families: Iterable[str] | None = None,
     ) -> AutomationRunResult:
         self.store.assert_automation_write_available()
         run = self.store.get_automation_run(run_id)
@@ -1712,6 +1788,32 @@ class SecurityLifecycleFactKernel:
             raise ValueError("automation_run_not_running")
         normalized_evidence = _normalize_evidence(evidence)
         normalized_facts = _normalize_facts(facts, normalized_evidence)
+        normalized_retained_evidence = _normalize_evidence(retained_evidence)
+        normalized_retained_facts = _normalize_facts(
+            retained_facts,
+            normalized_retained_evidence,
+        )
+        refreshed_families = (
+            None
+            if refreshed_source_families is None
+            else tuple(sorted(set(refreshed_source_families)))
+        )
+        if refreshed_families is not None:
+            if any(
+                type(family) is not str or family not in EVIDENCE_SOURCE_FAMILIES
+                for family in refreshed_families
+            ):
+                raise ValueError("refreshed_source_families")
+            if any(
+                row.source_family not in refreshed_families
+                for row in normalized_evidence
+            ):
+                raise ValueError("refreshed_source_families")
+            if any(
+                row.source_family in refreshed_families
+                for row in normalized_retained_evidence
+            ):
+                raise ValueError("retained_source_family_refreshed")
         structurally_normalized_blockers = _normalize_blockers(blockers)
 
         if decision_tier is not None and decision_tier not in DECISION_TIERS:
@@ -1742,8 +1844,42 @@ class SecurityLifecycleFactKernel:
             ).fetchone()
             if current is None or str(current["status"]) != "running":
                 raise ValueError("automation_run_not_running")
-            existing_evidence = _persisted_evidence_rows(self.conn, run_id)
-            existing_facts = _persisted_fact_rows(self.conn, run_id)
+            all_existing_evidence = _persisted_evidence_rows(self.conn, run_id)
+            all_existing_facts = _persisted_fact_rows(self.conn, run_id)
+            if refreshed_families is None:
+                retained_ids = {row.local_id for row in all_existing_evidence}
+                existing_evidence = all_existing_evidence
+                existing_facts = all_existing_facts
+            else:
+                retained_ids = {
+                    row.local_id for row in normalized_retained_evidence
+                }
+                existing_evidence = tuple(
+                    row
+                    for row in all_existing_evidence
+                    if row.local_id in retained_ids
+                )
+                existing_facts = tuple(
+                    row
+                    for row in all_existing_facts
+                    if row.local_evidence_id in retained_ids
+                )
+                if (
+                    set(existing_evidence) != set(normalized_retained_evidence)
+                    or len(existing_evidence) != len(normalized_retained_evidence)
+                ):
+                    raise ValueError("retained_evidence")
+                if (
+                    set(existing_facts) != set(normalized_retained_facts)
+                    or len(existing_facts) != len(normalized_retained_facts)
+                ):
+                    raise ValueError("retained_facts")
+                if any(
+                    row.source_family not in refreshed_families
+                    for row in all_existing_evidence
+                    if row.local_id not in retained_ids
+                ):
+                    raise ValueError("unowned_existing_source_family")
             normalized_blockers = list(
                 _normalize_deadline_blockers(
                     run_id=run_id,
@@ -1824,6 +1960,40 @@ class SecurityLifecycleFactKernel:
                     != terminal_readiness
                 ):
                     raise ValueError("terminal_decision_shape")
+
+            self.conn.execute(
+                "DELETE FROM security_lifecycle_automation_run_blockers "
+                "WHERE automation_run_id=?",
+                (run_id,),
+            )
+            if refreshed_families is None:
+                pass
+            elif retained_ids:
+                placeholders = ",".join("?" for _ in retained_ids)
+                retained_parameters = tuple(sorted(retained_ids))
+                self.conn.execute(
+                    "DELETE FROM security_lifecycle_automation_facts "
+                    "WHERE automation_run_id=? AND evidence_id NOT IN "
+                    f"({placeholders})",
+                    (run_id, *retained_parameters),
+                )
+                self.conn.execute(
+                    "DELETE FROM security_lifecycle_evidence "
+                    "WHERE automation_run_id=? AND evidence_id NOT IN "
+                    f"({placeholders})",
+                    (run_id, *retained_parameters),
+                )
+            else:
+                self.conn.execute(
+                    "DELETE FROM security_lifecycle_automation_facts "
+                    "WHERE automation_run_id=?",
+                    (run_id,),
+                )
+                self.conn.execute(
+                    "DELETE FROM security_lifecycle_evidence "
+                    "WHERE automation_run_id=?",
+                    (run_id,),
+                )
 
             persisted_ids: dict[str, str] = {}
             for row in normalized_evidence:
