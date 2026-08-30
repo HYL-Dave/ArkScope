@@ -325,16 +325,24 @@ same attempt fails. Every retained or preserved row must exactly match current
 persisted material, and a due retry must supply an explicit family refresh
 contract.
 
-A succeeded readiness recheck is the narrow exception to family replacement.
-Its accepted assessment may still cite the original run evidence, so those
-rows remain immutable and the recheck appends newly acquired material to the
-same run. The kernel permits this append-only contract only for a run claimed
-through the readiness-recheck entry point and only when the caller supplies an
-exact copy of the complete persisted evidence and fact set. Existing rows are
-retained for citation history and persistence only; they are excluded from the
-current evaluation unless they separately satisfy the normal selective-reuse
-contract. Blocked retries and ordinary reservations cannot request append-only
-completion.
+Same-run refreshes distinguish three bounded sets without changing the schema.
+The run query context indexes the active terminal evidence and the material
+eligible for the next retry. Active evidence alone determines conflicts,
+provenance, result counts, source families, and citations for a new assessment.
+Retry material is the union of active evidence and rows explicitly preserved
+after a typed provider failure. Evidence cited by an older assessment remains
+physically immutable for foreign-key history, but it is not automatically
+active or retryable.
+
+Readiness rechecks use the same family replacement contract as due blocked
+retries. A successful refresh may replace cited same-family evidence: the old
+row remains physically present while the active and retry indexes advance to
+the fresh row. A readiness recheck that becomes retryably blocked may preserve
+the prior family as retry material, and the later due retry may replace it
+without deleting citation-pinned history. Both readiness claims and due
+blocked claims carry an internal refresh marker, so even a rowless retry must
+provide an explicit family-refresh contract. Legacy runs without indexes use
+their complete persisted set until their first completion writes the indexes.
 
 ## 9. Settings and Mutation Authority
 

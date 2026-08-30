@@ -1595,6 +1595,103 @@ def test_provider_blockers_remain_typed_and_retryable_without_partial_assessment
         harness.conn.close()
 
 
+def test_worker_keeps_preserved_retry_material_out_of_current_material(tmp_path):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    base = _bundle(case)
+    first_blocker = AutomationBlocker(
+        code="listing_directory_unavailable",
+        retryable=True,
+        context={"attempts": 1},
+    )
+    first_bundle = LifecycleAutomationEvidenceBundle(
+        evidence=base.evidence,
+        facts=base.facts,
+        blockers=(first_blocker,),
+        diagnostics={"listing_requests": 1},
+        retry_at="2026-08-25T13:00:00Z",
+    )
+    regulator = base.evidence[0]
+    fresh_regulator = replace(
+        regulator,
+        evidence_id=f"{regulator.evidence_id}-fresh",
+        source_url=f"{regulator.source_url}?fresh=1",
+        title=f"{regulator.title} fresh",
+        evidence_dedupe_key=f"{regulator.evidence_dedupe_key}:fresh",
+    )
+    fresh_facts = tuple(
+        replace(fact, evidence_id=fresh_regulator.evidence_id)
+        for fact in base.facts
+        if fact.evidence_id == regulator.evidence_id
+    )
+    calls = []
+
+    def evidence_loader(current, *, mode, at, prior_material):
+        calls.append((current["case_id"], mode, at, prior_material))
+        if not (
+            prior_material.evidence
+            or prior_material.facts
+            or prior_material.blockers
+        ):
+            return first_bundle
+        preserved_evidence = tuple(
+            {
+                **dict(row),
+                "source_locator": json.loads(row["source_locator_json"]),
+            }
+            for row in prior_material.evidence
+        )
+        preserved_facts = tuple(
+            {
+                **dict(row),
+                "normalized_value": json.loads(row["normalized_value_json"]),
+            }
+            for row in prior_material.facts
+        )
+        return LifecycleAutomationEvidenceBundle(
+            evidence=(fresh_regulator,),
+            facts=fresh_facts,
+            blockers=(
+                AutomationBlocker(
+                    code="sec_rate_limited",
+                    retryable=True,
+                    context={"attempts": 1},
+                ),
+            ),
+            diagnostics={"sec_attempts": 1},
+            retry_at="2026-08-25T14:00:00Z",
+            preserved_evidence=preserved_evidence,
+            preserved_facts=preserved_facts,
+            refreshed_source_families=("regulator",),
+        )
+
+    harness.evidence_loader = evidence_loader
+    try:
+        first = harness.worker().run(limit=1)
+        first_run = _store(harness).list_automation_runs(case["case_id"])[0]
+        assert first_run["status"] == "blocked"
+        assert first_run["retry_at"] == "2026-08-25T13:00:00Z"
+        harness.now = "2026-08-25T13:00:00Z"
+        second = harness.worker().run(limit=1)
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert first["blocked"] == 1, first
+        assert second["blocked"] == 1, second
+        assert first["failed"] == 0, first
+        assert second["failed"] == 0, second
+        assert len(calls) == 2
+        assert calls[1][3] is not None
+        assert run["status"] == "blocked"
+        assert run["failure_code"] is None
+    finally:
+        harness.conn.close()
+
+
 def test_mixed_provider_and_policy_blockers_do_not_enter_evaluation(
     tmp_path,
     monkeypatch,
@@ -2579,38 +2676,6 @@ def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
         return original_evaluate(self, **kwargs)
 
     monkeypatch.setattr(LifecycleAutomationWorker, "_evaluate", tracked_evaluate)
-    configured_loader = harness.evidence_loader
-
-    def append_only_readiness_loader(case, *, mode, at, prior_material):
-        bundle = configured_loader(
-            case,
-            mode=mode,
-            at=at,
-            prior_material=prior_material,
-        )
-        if prior_material is None or bundle.refreshed_source_families != ():
-            return bundle
-        preserved_evidence = tuple(
-            {
-                **dict(row),
-                "source_locator": json.loads(row["source_locator_json"]),
-            }
-            for row in prior_material.evidence
-        )
-        preserved_facts = tuple(
-            {
-                **dict(row),
-                "normalized_value": json.loads(row["normalized_value_json"]),
-            }
-            for row in prior_material.facts
-        )
-        return replace(
-            bundle,
-            preserved_evidence=preserved_evidence,
-            preserved_facts=preserved_facts,
-        )
-
-    harness.evidence_loader = append_only_readiness_loader
     harness.now = "2026-08-31T12:00:00Z"
     harness.bundles[terminal["case_id"]] = _bundle(terminal, terminal=True)
     try:
@@ -2644,7 +2709,11 @@ def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
                 terminal=True,
                 market_absent=True,
             ),
-            refreshed_source_families=(),
+            refreshed_source_families=(
+                "listing_authority",
+                "market_infrastructure",
+                "regulator",
+            ),
         )
         second = harness.worker().run(limit=2)
 

@@ -1539,6 +1539,7 @@ def create_automation_assessment(
         RULE_VERSIONS,
     )
     from src.security_lifecycle_fact_kernel import (
+        persisted_decision_evidence_ids,
         persisted_decision_provenance_sha256,
     )
 
@@ -1570,22 +1571,19 @@ def create_automation_assessment(
     )
     if run["observation_fingerprint_sha256"] != fingerprint:
         raise ValueError("stale_assessment")
-    evidence_ids = [
-        str(row[0])
-        for row in store.conn.execute(
-            "SELECT evidence_id FROM security_lifecycle_evidence "
-            "WHERE automation_run_id=? ORDER BY evidence_id",
-            (run_id,),
-        )
-    ]
+    evidence_ids = list(persisted_decision_evidence_ids(store.conn, run_id))
+    if not evidence_ids:
+        raise ValueError("automation_run_evidence_missing")
+    placeholders = ",".join("?" for _ in evidence_ids)
     fact_count = int(
         store.conn.execute(
             "SELECT COUNT(*) FROM security_lifecycle_automation_facts "
-            "WHERE automation_run_id=?",
-            (run_id,),
+            "WHERE automation_run_id=? AND evidence_id IN "
+            f"({placeholders})",
+            (run_id, *evidence_ids),
         ).fetchone()[0]
     )
-    if not evidence_ids or fact_count == 0:
+    if fact_count == 0:
         raise ValueError("automation_run_evidence_missing")
     provenance = persisted_decision_provenance_sha256(store.conn, run_id)
     citations = [

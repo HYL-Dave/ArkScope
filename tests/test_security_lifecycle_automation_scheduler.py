@@ -3326,6 +3326,67 @@ def test_due_sec_typed_failure_retains_exact_regulator_rows_until_recovery(
         conn.close()
 
 
+def test_rowless_due_retry_emits_an_explicit_family_refresh_contract(monkeypatch):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_fact_kernel import AutomationPriorMaterial
+    from src.security_lifecycle_schema import EVIDENCE_SOURCE_FAMILIES
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case()
+    prior = AutomationPriorMaterial(
+        run_id="slar_rowless_due",
+        observation_fingerprint_sha256=case["observation_fingerprint_sha256"],
+        evidence=(),
+        facts=(),
+        blockers=(
+            {
+                "automation_run_id": "slar_rowless_due",
+                "blocker_code": "sec_transport_unavailable",
+                "retryable": 1,
+                "context_json": "{}",
+                "created_at": "2026-06-01T12:00:00Z",
+            },
+        ),
+        refresh_contract_required=True,
+    )
+
+    class Transport:
+        @staticmethod
+        def diagnostics(_budget):
+            return {"attempt_count": 1, "document_count": 1}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda *, retrieved_at, **_kwargs: _sec_result(
+            case,
+            label="rowless-due",
+            retrieved_at=retrieved_at,
+        ),
+    )
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-06-02T12:00:00Z",
+        listing_session=SimpleNamespace(
+            lookup=lambda **_kwargs: SimpleNamespace(
+                evidence=(),
+                facts=(),
+                blockers=(),
+                diagnostics={},
+            )
+        ),
+        prior_material=prior,
+    )
+
+    assert bundle.refreshed_source_families == tuple(sorted(EVIDENCE_SOURCE_FAMILIES))
+
+
 def test_mixed_sec_conflict_and_unavailable_preserves_prior_regulator_family(
     monkeypatch,
 ):

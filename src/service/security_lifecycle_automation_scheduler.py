@@ -1134,25 +1134,23 @@ def _load_evidence(
         prior_material is not None
         and (prior_material.evidence or prior_material.facts)
     )
-    append_only_recheck = bool(
+    explicit_refresh_contract = bool(
         has_existing_material
-        and prior_material is not None
-        and not prior_material.blockers
+        or (
+            prior_material is not None
+            and prior_material.refresh_contract_required
+        )
     )
     refreshed_families: set[str] | None = (
-        (
-            set()
-            if append_only_recheck
-            else set(
-                EVIDENCE_SOURCE_FAMILIES
-                - {
-                    "regulator",
-                    "listing_authority",
-                    "market_infrastructure",
-                }
-            )
+        set(
+            EVIDENCE_SOURCE_FAMILIES
+            - {
+                "regulator",
+                "listing_authority",
+                "market_infrastructure",
+            }
         )
-        if has_existing_material
+        if explicit_refresh_contract
         else None
     )
     preserved_evidence: dict[str, Mapping[str, object]] = {}
@@ -1175,12 +1173,8 @@ def _load_evidence(
             preserved_facts[fact_id] = row
 
     def mark_refreshed(source_family: str) -> None:
-        if refreshed_families is not None and not append_only_recheck:
+        if refreshed_families is not None:
             refreshed_families.add(source_family)
-
-    if append_only_recheck:
-        for source_family in EVIDENCE_SOURCE_FAMILIES:
-            preserve_family(source_family)
 
     retained = _reusable_regulator_material(
         case,

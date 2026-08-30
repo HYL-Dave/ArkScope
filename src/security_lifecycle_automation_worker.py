@@ -451,14 +451,10 @@ class LifecycleAutomationWorker:
                         retry_at=bundle.retry_at,
                         diagnostics=bundle.diagnostics,
                         at=at,
-                        retained_evidence=(
-                            *bundle.retained_evidence,
-                            *bundle.preserved_evidence,
-                        ),
-                        retained_facts=(
-                            *bundle.retained_facts,
-                            *bundle.preserved_facts,
-                        ),
+                        retained_evidence=bundle.retained_evidence,
+                        retained_facts=bundle.retained_facts,
+                        preserved_evidence=bundle.preserved_evidence,
+                        preserved_facts=bundle.preserved_facts,
                         refreshed_source_families=(
                             bundle.refreshed_source_families
                         ),
@@ -482,14 +478,10 @@ class LifecycleAutomationWorker:
                     diagnostics=bundle.diagnostics,
                     at=at,
                     terminal_decision=_decision_context(decision),
-                    retained_evidence=(
-                        *bundle.retained_evidence,
-                        *bundle.preserved_evidence,
-                    ),
-                    retained_facts=(
-                        *bundle.retained_facts,
-                        *bundle.preserved_facts,
-                    ),
+                    retained_evidence=bundle.retained_evidence,
+                    retained_facts=bundle.retained_facts,
+                    preserved_evidence=bundle.preserved_evidence,
+                    preserved_facts=bundle.preserved_facts,
                     refreshed_source_families=bundle.refreshed_source_families,
                 )
                 if completed.status == "blocked":

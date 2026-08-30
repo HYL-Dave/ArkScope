@@ -89,6 +89,9 @@ _AUTOMATIC_RETRY_KEY = "automatic_retry"
 _LATEST_ATTEMPT_REVISION_KEY = "latest_attempt_execution_revision"
 _EXECUTION_OWNER_KEY = "execution_owner_id"
 _READINESS_RECHECK_DUE_AT_KEY = "readiness_recheck_due_at"
+_DUE_REFRESH_CONTRACT_KEY = "due_refresh_contract"
+_MATERIAL_EVIDENCE_IDS_KEY = "material_evidence_ids"
+_TERMINAL_EVIDENCE_IDS_KEY = "terminal_evidence_ids"
 _TERMINAL_FINALIZATION_FAILURE_CODES = frozenset({"finalization_failed"})
 _TERMINAL_FINALIZATION_RETRY_DELAYS = (
     timedelta(minutes=15),
@@ -163,6 +166,7 @@ class AutomationPriorMaterial:
     evidence: tuple[Mapping[str, object], ...]
     facts: tuple[Mapping[str, object], ...]
     blockers: tuple[Mapping[str, object], ...]
+    refresh_contract_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -349,6 +353,25 @@ def _query_context_json(value: Mapping[str, object]) -> str:
         name="query_context",
         max_bytes=_QUERY_CONTEXT_LIMIT,
     )
+
+
+def _evidence_id_index(
+    context: Mapping[str, object],
+    key: str,
+) -> tuple[str, ...] | None:
+    value = context.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, list) or len(value) > 100:
+        raise ValueError(key)
+    normalized: list[str] = []
+    for item in value:
+        evidence_id = _text(key, item, max_bytes=200, required=True)
+        assert evidence_id is not None
+        normalized.append(evidence_id)
+    if len(set(normalized)) != len(normalized) or normalized != sorted(normalized):
+        raise ValueError(key)
+    return tuple(normalized)
 
 
 def _terminal_finalization_pending(context: Mapping[str, object]) -> bool:
@@ -1248,24 +1271,74 @@ def _persisted_fact_rows(
     )
 
 
+def _indexed_persisted_material(
+    conn: sqlite3.Connection,
+    run_id: str,
+    *,
+    context: Mapping[str, object],
+    key: str,
+) -> tuple[tuple[_EvidenceRow, ...], tuple[_FactRow, ...]]:
+    evidence = _persisted_evidence_rows(conn, run_id)
+    facts = _persisted_fact_rows(conn, run_id)
+    indexed = _evidence_id_index(context, key)
+    if indexed is None:
+        return evidence, facts
+    available = {row.local_id for row in evidence}
+    if not set(indexed).issubset(available):
+        raise ValueError(key)
+    selected = set(indexed)
+    return (
+        tuple(row for row in evidence if row.local_id in selected),
+        tuple(row for row in facts if row.local_evidence_id in selected),
+    )
+
+
+def persisted_decision_evidence_ids(
+    conn: sqlite3.Connection,
+    run_id: str,
+) -> tuple[str, ...]:
+    row = conn.execute(
+        "SELECT query_context_json FROM security_lifecycle_automation_runs "
+        "WHERE run_id=?",
+        (run_id,),
+    ).fetchone()
+    if row is None:
+        raise KeyError("automation_run_not_found")
+    context = _query_context_value(row[0])
+    evidence, _facts = _indexed_persisted_material(
+        conn,
+        run_id,
+        context=context,
+        key=_TERMINAL_EVIDENCE_IDS_KEY,
+    )
+    return tuple(row.local_id for row in evidence)
+
+
 def persisted_decision_provenance_sha256(
     conn: sqlite3.Connection,
     run_id: str,
 ) -> str:
     row = conn.execute(
-        "SELECT case_id,observation_fingerprint_sha256,policy_version,mode "
+        "SELECT case_id,observation_fingerprint_sha256,policy_version,mode,"
+        "query_context_json "
         "FROM security_lifecycle_automation_runs WHERE run_id=?",
         (run_id,),
     ).fetchone()
     if row is None:
         raise KeyError("automation_run_not_found")
+    evidence, facts = _indexed_persisted_material(
+        conn,
+        run_id,
+        context=_query_context_value(row[4]),
+        key=_TERMINAL_EVIDENCE_IDS_KEY,
+    )
     return _provenance(
         case_id=str(row[0]),
         observation_fingerprint_sha256=str(row[1]),
         policy_version=str(row[2]),
         mode=str(row[3]),
-        evidence=_persisted_evidence_rows(conn, run_id),
-        facts=_persisted_fact_rows(conn, run_id),
+        evidence=evidence,
+        facts=facts,
     )
 
 
@@ -1319,25 +1392,42 @@ class SecurityLifecycleFactKernel:
 
     def prior_material(self, run_id: str) -> AutomationPriorMaterial:
         current = self.conn.execute(
-            "SELECT run_id,status,observation_fingerprint_sha256 FROM "
+            "SELECT run_id,status,observation_fingerprint_sha256,query_context_json FROM "
             "security_lifecycle_automation_runs WHERE run_id=?",
             (run_id,),
         ).fetchone()
         if current is None or str(current["status"]) != "running":
             raise ValueError("automation_run_not_running")
-        evidence = _mapped_rows(
-            self.conn.execute(
-                "SELECT * FROM security_lifecycle_evidence "
-                "WHERE automation_run_id=? ORDER BY evidence_id",
-                (run_id,),
+        context = _query_context_value(current["query_context_json"])
+        indexed_evidence, _indexed_facts = _indexed_persisted_material(
+            self.conn,
+            run_id,
+            context=context,
+            key=_MATERIAL_EVIDENCE_IDS_KEY,
+        )
+        material_ids = {row.local_id for row in indexed_evidence}
+        evidence = tuple(
+            row
+            for row in _mapped_rows(
+                self.conn.execute(
+                    "SELECT * FROM security_lifecycle_evidence "
+                    "WHERE automation_run_id=? ORDER BY evidence_id",
+                    (run_id,),
+                )
             )
+            if str(row["evidence_id"]) in material_ids
         )
         facts = _mapped_rows(
             self.conn.execute(
                 "SELECT * FROM security_lifecycle_automation_facts "
-                "WHERE automation_run_id=? ORDER BY fact_id",
-                (run_id,),
+                "WHERE automation_run_id=? AND evidence_id IN "
+                "(SELECT evidence_id FROM security_lifecycle_evidence "
+                "WHERE automation_run_id=?) ORDER BY fact_id",
+                (run_id, run_id),
             )
+        )
+        facts = tuple(
+            row for row in facts if str(row["evidence_id"]) in material_ids
         )
         blockers = _mapped_rows(
             self.conn.execute(
@@ -1354,6 +1444,10 @@ class SecurityLifecycleFactKernel:
             evidence=evidence,
             facts=facts,
             blockers=blockers,
+            refresh_contract_required=(
+                _DUE_REFRESH_CONTRACT_KEY in context
+                or _READINESS_RECHECK_DUE_AT_KEY in context
+            ),
         )
 
     def reserve_run(
@@ -1416,6 +1510,9 @@ class SecurityLifecycleFactKernel:
                 _TERMINAL_FINALIZED_KEY,
                 _TERMINAL_FINALIZATION_FAILURE_KEY,
                 _READINESS_RECHECK_DUE_AT_KEY,
+                _DUE_REFRESH_CONTRACT_KEY,
+                _MATERIAL_EVIDENCE_IDS_KEY,
+                _TERMINAL_EVIDENCE_IDS_KEY,
             )
         ):
             raise ValueError("reserved_query_context")
@@ -1527,6 +1624,9 @@ class SecurityLifecycleFactKernel:
                         retry_context = dict(context)
                         retry_context[_EXECUTION_OWNER_KEY] = owner_id
                         retry_context[_LATEST_ATTEMPT_REVISION_KEY] = execution
+                        retry_context[_DUE_REFRESH_CONTRACT_KEY] = str(
+                            row["retry_at"]
+                        )
                         self.conn.execute(
                             "UPDATE security_lifecycle_automation_runs SET "
                             "status='running',decision_tier=NULL,action_readiness=NULL,"
@@ -1789,6 +1889,8 @@ class SecurityLifecycleFactKernel:
         terminal_decision: Mapping[str, object] | None = None,
         retained_evidence: Iterable[object] = (),
         retained_facts: Iterable[object] = (),
+        preserved_evidence: Iterable[object] = (),
+        preserved_facts: Iterable[object] = (),
         refreshed_source_families: Iterable[str] | None = None,
     ) -> AutomationRunResult:
         self.store.assert_automation_write_available()
@@ -1802,14 +1904,29 @@ class SecurityLifecycleFactKernel:
             retained_facts,
             normalized_retained_evidence,
         )
+        normalized_preserved_evidence = _normalize_evidence(preserved_evidence)
+        normalized_preserved_facts = _normalize_facts(
+            preserved_facts,
+            normalized_preserved_evidence,
+        )
+        retained_local_ids = {
+            row.local_id for row in normalized_retained_evidence
+        }
+        preserved_local_ids = {
+            row.local_id for row in normalized_preserved_evidence
+        }
+        if retained_local_ids.intersection(preserved_local_ids):
+            raise ValueError("preserved_evidence")
         refreshed_families = (
             None
             if refreshed_source_families is None
             else tuple(sorted(set(refreshed_source_families)))
         )
-        append_only_refresh = refreshed_families == ()
         if refreshed_families is None and (
-            normalized_retained_evidence or normalized_retained_facts
+            normalized_retained_evidence
+            or normalized_retained_facts
+            or normalized_preserved_evidence
+            or normalized_preserved_facts
         ):
             raise ValueError("refreshed_source_families")
         if refreshed_families is not None:
@@ -1818,12 +1935,12 @@ class SecurityLifecycleFactKernel:
                 for family in refreshed_families
             ):
                 raise ValueError("refreshed_source_families")
-            if not append_only_refresh and any(
+            if any(
                 row.source_family not in refreshed_families
                 for row in normalized_evidence
             ):
                 raise ValueError("refreshed_source_families")
-            if not append_only_refresh and any(
+            if any(
                 row.source_family in refreshed_families
                 for row in normalized_retained_evidence
             ):
@@ -1861,46 +1978,73 @@ class SecurityLifecycleFactKernel:
             query_context = _query_context_value(current["query_context_json"])
             all_existing_evidence = _persisted_evidence_rows(self.conn, run_id)
             all_existing_facts = _persisted_fact_rows(self.conn, run_id)
+            indexed_material = _evidence_id_index(
+                query_context,
+                _MATERIAL_EVIDENCE_IDS_KEY,
+            )
+            if indexed_material is None:
+                candidate_ids = {
+                    row.local_id for row in all_existing_evidence
+                }
+            else:
+                candidate_ids = set(indexed_material)
+                if not candidate_ids.issubset(
+                    {row.local_id for row in all_existing_evidence}
+                ):
+                    raise ValueError(_MATERIAL_EVIDENCE_IDS_KEY)
+            candidate_evidence = tuple(
+                row
+                for row in all_existing_evidence
+                if row.local_id in candidate_ids
+            )
+            candidate_facts = tuple(
+                row
+                for row in all_existing_facts
+                if row.local_evidence_id in candidate_ids
+            )
+            refresh_contract_required = (
+                _DUE_REFRESH_CONTRACT_KEY in query_context
+                or _READINESS_RECHECK_DUE_AT_KEY in query_context
+            )
             if refreshed_families is None:
-                if all_existing_evidence or all_existing_facts:
+                if (
+                    candidate_evidence
+                    or candidate_facts
+                    or refresh_contract_required
+                ):
                     raise ValueError("refreshed_source_families")
                 retained_ids: set[str] = set()
+                preserved_ids: set[str] = set()
                 existing_evidence = ()
                 existing_facts = ()
-            elif append_only_refresh:
-                if (
-                    not all_existing_evidence
-                    or _READINESS_RECHECK_DUE_AT_KEY not in query_context
-                ):
-                    raise ValueError("append_only_refresh")
-                retained_ids = {
-                    row.local_id for row in normalized_retained_evidence
-                }
-                existing_evidence = all_existing_evidence
-                existing_facts = all_existing_facts
-                if (
-                    set(existing_evidence) != set(normalized_retained_evidence)
-                    or len(existing_evidence) != len(normalized_retained_evidence)
-                ):
-                    raise ValueError("retained_evidence")
-                if (
-                    set(existing_facts) != set(normalized_retained_facts)
-                    or len(existing_facts) != len(normalized_retained_facts)
-                ):
-                    raise ValueError("retained_facts")
             else:
                 retained_ids = {
                     row.local_id for row in normalized_retained_evidence
                 }
+                preserved_ids = {
+                    row.local_id for row in normalized_preserved_evidence
+                }
+                if not retained_ids.union(preserved_ids).issubset(candidate_ids):
+                    raise ValueError("retained_evidence")
                 existing_evidence = tuple(
                     row
-                    for row in all_existing_evidence
+                    for row in candidate_evidence
                     if row.local_id in retained_ids
                 )
                 existing_facts = tuple(
                     row
-                    for row in all_existing_facts
+                    for row in candidate_facts
                     if row.local_evidence_id in retained_ids
+                )
+                existing_preserved_evidence = tuple(
+                    row
+                    for row in candidate_evidence
+                    if row.local_id in preserved_ids
+                )
+                existing_preserved_facts = tuple(
+                    row
+                    for row in candidate_facts
+                    if row.local_evidence_id in preserved_ids
                 )
                 if (
                     set(existing_evidence) != set(normalized_retained_evidence)
@@ -1912,10 +2056,24 @@ class SecurityLifecycleFactKernel:
                     or len(existing_facts) != len(normalized_retained_facts)
                 ):
                     raise ValueError("retained_facts")
+                if (
+                    set(existing_preserved_evidence)
+                    != set(normalized_preserved_evidence)
+                    or len(existing_preserved_evidence)
+                    != len(normalized_preserved_evidence)
+                ):
+                    raise ValueError("preserved_evidence")
+                if (
+                    set(existing_preserved_facts)
+                    != set(normalized_preserved_facts)
+                    or len(existing_preserved_facts)
+                    != len(normalized_preserved_facts)
+                ):
+                    raise ValueError("preserved_facts")
                 if any(
                     row.source_family not in refreshed_families
-                    for row in all_existing_evidence
-                    if row.local_id not in retained_ids
+                    for row in candidate_evidence
+                    if row.local_id not in retained_ids.union(preserved_ids)
                 ):
                     raise ValueError("unowned_existing_source_family")
             normalized_blockers = list(
@@ -2004,11 +2162,23 @@ class SecurityLifecycleFactKernel:
                 "WHERE automation_run_id=?",
                 (run_id,),
             )
+            cited_ids = {
+                str(row[0])
+                for row in self.conn.execute(
+                    "SELECT DISTINCT ae.evidence_id FROM "
+                    "security_lifecycle_assessment_evidence ae "
+                    "JOIN security_lifecycle_evidence e "
+                    "ON e.evidence_id=ae.evidence_id "
+                    "WHERE e.automation_run_id=? AND ae.evidence_id IS NOT NULL",
+                    (run_id,),
+                )
+            }
+            physical_keep_ids = retained_ids.union(preserved_ids, cited_ids)
             if refreshed_families is None:
                 pass
-            elif retained_ids:
-                placeholders = ",".join("?" for _ in retained_ids)
-                retained_parameters = tuple(sorted(retained_ids))
+            elif physical_keep_ids:
+                placeholders = ",".join("?" for _ in physical_keep_ids)
+                retained_parameters = tuple(sorted(physical_keep_ids))
                 self.conn.execute(
                     "DELETE FROM security_lifecycle_automation_facts "
                     "WHERE automation_run_id=? AND evidence_id NOT IN "
@@ -2162,8 +2332,22 @@ class SecurityLifecycleFactKernel:
                     "VALUES (?,?,?,?,?)",
                     (run_id, code, int(retryable), context_json, timestamp),
                 )
-            persisted_evidence = _persisted_evidence_rows(self.conn, run_id)
-            persisted_facts = _persisted_fact_rows(self.conn, run_id)
+            all_persisted_evidence = _persisted_evidence_rows(self.conn, run_id)
+            all_persisted_facts = _persisted_fact_rows(self.conn, run_id)
+            active_evidence_ids = retained_ids.union(persisted_ids.values())
+            material_evidence_ids = active_evidence_ids.union(preserved_ids)
+            if len(material_evidence_ids) > 100 or len(active_evidence_ids) > 100:
+                raise ValueError(_MATERIAL_EVIDENCE_IDS_KEY)
+            persisted_evidence = tuple(
+                row
+                for row in all_persisted_evidence
+                if row.local_id in active_evidence_ids
+            )
+            persisted_facts = tuple(
+                row
+                for row in all_persisted_facts
+                if row.local_evidence_id in active_evidence_ids
+            )
             provenance = _provenance(
                 case_id=str(current["case_id"]),
                 observation_fingerprint_sha256=str(
@@ -2174,7 +2358,15 @@ class SecurityLifecycleFactKernel:
                 evidence=persisted_evidence,
                 facts=persisted_facts,
             )
+            query_context[_MATERIAL_EVIDENCE_IDS_KEY] = sorted(
+                material_evidence_ids
+            )
             query_context.pop(_READINESS_RECHECK_DUE_AT_KEY, None)
+            query_context.pop(_DUE_REFRESH_CONTRACT_KEY, None)
+            if status == "succeeded":
+                query_context[_TERMINAL_EVIDENCE_IDS_KEY] = sorted(
+                    active_evidence_ids
+                )
             if status == "succeeded" and normalized_terminal_decision is not None:
                 query_context[_TERMINAL_DECISION_KEY] = dict(
                     normalized_terminal_decision
@@ -2204,14 +2396,7 @@ class SecurityLifecycleFactKernel:
                 ),
             )
 
-        families = tuple(
-            str(row[0])
-            for row in self.conn.execute(
-                "SELECT DISTINCT source_family FROM security_lifecycle_evidence "
-                "WHERE automation_run_id=? ORDER BY source_family",
-                (run_id,),
-            )
-        )
+        families = tuple(sorted({row.source_family for row in persisted_evidence}))
         return AutomationRunResult(
             run_id=run_id,
             status=status,

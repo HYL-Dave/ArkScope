@@ -136,6 +136,7 @@ transitions default off.
 
 **Files:**
 - Modify: `src/security_lifecycle_fact_kernel.py`
+- Modify: `src/security_lifecycle_investigation.py`
 - Modify: `src/security_lifecycle_automation_worker.py`
 - Modify: `src/service/security_lifecycle_automation_scheduler.py`
 - Modify: `src/api/routes/security_lifecycle.py`
@@ -216,30 +217,33 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_automation_worker.py`
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 
-- [ ] Add REDs proving a due listing retry currently deletes regulator
+- [x] Add REDs proving a due listing retry currently deletes regulator
   evidence and reacquires SEC.
-- [ ] Preserve prior rows during reservation and pass validated prior material
+- [x] Preserve prior rows during reservation and pass validated prior material
   into evidence acquisition.
-- [ ] Reuse regulator material only for unchanged observation, complete chain,
+- [x] Reuse regulator material only for unchanged observation, complete chain,
   valid citations, a closed widened window, and proof that every retained SEC
   row was acquired strictly after that window closed.
-- [ ] Add positive controls showing an in-window retry and incomplete chain both
+- [x] Add positive controls showing an in-window retry and incomplete chain both
   reacquire SEC.
-- [ ] Preserve exact prior rows for a provider family whose current acquisition
+- [x] Preserve exact prior rows for a provider family whose current acquisition
   returns a typed unavailable blocker, but exclude those preserved rows from
   evaluation. Replace only successfully refreshed or deliberately unneeded
   families, under an explicit kernel refresh contract.
-- [ ] Keep succeeded readiness rechecks append-only because existing accepted
-  assessments retain foreign-key citations to the original evidence. Gate the
-  exception on the kernel's readiness-recheck claim, require the complete
-  persisted evidence/fact set, keep prior rows out of current evaluation, and
-  reject the same shape for blocked or ordinary retries.
-- [ ] Make `massive_credential_missing` nonretryable/operator-actionable. Saving
+- [x] Separate active terminal material, next-retry material, and physically
+  citation-pinned history using bounded query-context indexes without DDL.
+  Conflicts, provenance, result counts, source families, and new assessment
+  citations use only active evidence. A successful readiness refresh replaces
+  the active family while retaining old cited rows physically; a readiness
+  attempt that becomes blocked may preserve exact prior rows for the later due
+  retry. Both readiness and due-blocked claims require an explicit family
+  refresh contract, including rowless retries.
+- [x] Make `massive_credential_missing` nonretryable/operator-actionable. Saving
   a credential plus attended case run is its recovery path; reject a retryable
   new shape and prevent legacy retryable rows from auto-reserving.
-- [ ] Keep `source_payload_invalid` distinct and cover its one automatic retry;
+- [x] Keep `source_payload_invalid` distinct and cover its one automatic retry;
   do not rename malformed content into transport success.
-- [ ] Add mutations for each reuse predicate and provider-family refresh gate.
+- [x] Add mutations for each reuse predicate and provider-family refresh gate.
 
 ## Task 8: Split Background Analysis From Profile Mutation Authority
 
