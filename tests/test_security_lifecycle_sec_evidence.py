@@ -1092,6 +1092,77 @@ def test_unrelated_post_target_date_preserves_active_deadline():
     assert deadline.cited_text == sentence
 
 
+def test_or_may_be_alternate_deadline_target_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date is August 30, 2026 or may be September 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_but_may_be_alternate_deadline_target_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date is August 30, 2026 but may be September 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_provided_that_alternate_deadline_target_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date was extended from August 28, 2026 to August 30, 2026 "
+        "or, provided that regulatory approval remained outstanding, to "
+        "September 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_coordinated_date_with_unrelated_predicate_preserves_deadline():
+    sentence = (
+        "The termination date remains August 30, 2026, and September 1, 2026 "
+        "is the shareholder meeting date."
+    )
+    result = _collect_deadline_sentence(sentence)
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert deadline.date == "2026-08-30"
+    assert deadline.cited_text == sentence
+
+
+def test_coordinated_by_date_with_unrelated_predicate_preserves_deadline():
+    sentence = (
+        "The termination date remains August 30, 2026, and by September 1, "
+        "2026 the shareholder meeting materials will be mailed."
+    )
+    result = _collect_deadline_sentence(sentence)
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert deadline.date == "2026-08-30"
+    assert deadline.cited_text == sentence
+
+
+def test_deadline_discussion_date_is_not_a_target():
+    sentence = (
+        "The outside date was discussed at the July 1, 2026 meeting, and the "
+        "termination date remains August 30, 2026."
+    )
+    result = _collect_deadline_sentence(sentence)
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert deadline.date == "2026-08-30"
+    assert deadline.cited_text == sentence
+
+
 def test_invalid_syntactic_deadline_dates_fail_closed():
     result = _collect_deadline_sentence(
         "The termination date remains February 30, 2026."

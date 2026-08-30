@@ -51,6 +51,10 @@ _SOURCE_DEADLINE_PHRASE = re.compile(
 _ANY_MONTH_DATE = re.compile(rf"\b(?P<date>{_MONTH_DATE_TEXT})\b", re.IGNORECASE)
 _ANY_ISO_DATE = re.compile(r"\b(?P<date>\d{4}-\d{2}-\d{2})\b")
 _SOURCE_DATE_TEXT = rf"(?:{_MONTH_DATE_TEXT}|\d{{4}}-\d{{2}}-\d{{2}})"
+_DEADLINE_TARGET_MODALITY = (
+    r"(?:is|shall be|remains|may be|could be|would be|will be)"
+)
+_DEADLINE_TARGET_END = r"(?=\s*(?:[.;]|$|,?\s+(?:and|or|but)\b))"
 _TERMINATE_IF_BY = re.compile(
     rf"\bmay be terminated if\b[^.]{{0,480}}?\bby\s+"
     rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
@@ -67,20 +71,19 @@ _EXTENDED_DEADLINE = re.compile(
     rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
     re.IGNORECASE,
 )
-_DEADLINE_CLAUSE_DATE = re.compile(
-    rf"\b(?:outside|termination) date\b"
-    rf"(?:(?![.;]).){{0,160}}?(?P<date>{_SOURCE_DATE_TEXT})\b",
+_EXPLICIT_DEADLINE_TARGET_ASSERTION = re.compile(
+    rf"\b(?:outside|termination) date\s+{_DEADLINE_TARGET_MODALITY}\s+"
+    rf"(?P<date>{_SOURCE_DATE_TEXT})\b{_DEADLINE_TARGET_END}",
     re.IGNORECASE,
 )
-_DIRECT_COORDINATED_DEADLINE_DATE = re.compile(
-    rf"\b(?:or|and)\b\s*,?\s*(?P<date>{_SOURCE_DATE_TEXT})\b",
-    re.IGNORECASE,
-)
-_COORDINATED_DEADLINE_ACTION_DATE = re.compile(
-    rf"\b(?:or|and)\b\s*,?\s*"
-    rf"(?:(?:if|unless)\b[^,.;]{{0,160}},\s*)?"
-    rf"(?:(?:further\s+)?extended\s+)?(?:to|by)\s+"
-    rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
+_COMPLETE_COORDINATED_DEADLINE_TARGET = re.compile(
+    rf"\b(?:"
+    rf"(?:or|but)\s+{_DEADLINE_TARGET_MODALITY}\s+"
+    rf"|or\s+"
+    rf"|and\s+further\s+extended\s+to\s+"
+    rf"|or\s*,?\s*(?:if|unless|provided that|subject to)\b"
+    rf"[^,.;]{{1,160}},\s*(?:to|by)\s+"
+    rf")(?P<date>{_SOURCE_DATE_TEXT})\b{_DEADLINE_TARGET_END}",
     re.IGNORECASE,
 )
 _NEW_REPLACING = re.compile(
@@ -729,25 +732,24 @@ def _source_deadlines(
             if group in target_match.groupdict()
             and target_match.groupdict()[group] is not None
         }
-        deadline_associated_dates = {
+        additional_target_dates = {
             match.span("date"): match.group("date")
             for pattern in (
-                _DEADLINE_CLAUSE_DATE,
-                _DIRECT_COORDINATED_DEADLINE_DATE,
-                _COORDINATED_DEADLINE_ACTION_DATE,
+                _EXPLICIT_DEADLINE_TARGET_ASSERTION,
+                _COMPLETE_COORDINATED_DEADLINE_TARGET,
             )
             for match in pattern.finditer(sentence)
         }
         try:
-            unclaimed_deadline_dates = {
+            unclaimed_target_dates = {
                 _normalized_source_date_text(value)
-                for span, value in deadline_associated_dates.items()
+                for span, value in additional_target_dates.items()
                 if span not in claimed_date_spans
             }
         except ValueError:
             ambiguous = True
             continue
-        if unclaimed_deadline_dates - target_dates:
+        if unclaimed_target_dates - target_dates:
             ambiguous = True
             continue
 
