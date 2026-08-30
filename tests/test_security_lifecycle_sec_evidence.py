@@ -1067,6 +1067,31 @@ def test_conditional_alternate_deadline_target_fails_closed():
     assert "sec_evidence_insufficient" in result.blockers
 
 
+def test_preceding_conditional_alternate_deadline_target_fails_closed():
+    result = _collect_deadline_sentence(
+        "If regulatory approval remains outstanding, the outside date may be "
+        "September 1, 2026; otherwise, the outside date was extended from "
+        "August 28, 2026 to August 30, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_unrelated_post_target_date_preserves_active_deadline():
+    sentence = (
+        "The termination date remains August 30, 2026, and the shareholder "
+        "meeting is scheduled for September 1, 2026."
+    )
+    result = _collect_deadline_sentence(sentence)
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert (deadline.date, deadline.kind) == ("2026-08-30", "current")
+    assert deadline.cited_text == sentence
+
+
 def test_invalid_syntactic_deadline_dates_fail_closed():
     result = _collect_deadline_sentence(
         "The termination date remains February 30, 2026."

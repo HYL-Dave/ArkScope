@@ -67,6 +67,22 @@ _EXTENDED_DEADLINE = re.compile(
     rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
     re.IGNORECASE,
 )
+_DEADLINE_CLAUSE_DATE = re.compile(
+    rf"\b(?:outside|termination) date\b"
+    rf"(?:(?![.;]).){{0,160}}?(?P<date>{_SOURCE_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
+_DIRECT_COORDINATED_DEADLINE_DATE = re.compile(
+    rf"\b(?:or|and)\b\s*,?\s*(?P<date>{_SOURCE_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
+_COORDINATED_DEADLINE_ACTION_DATE = re.compile(
+    rf"\b(?:or|and)\b\s*,?\s*"
+    rf"(?:(?:if|unless)\b[^,.;]{{0,160}},\s*)?"
+    rf"(?:(?:further\s+)?extended\s+)?(?:to|by)\s+"
+    rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
+    re.IGNORECASE,
+)
 _NEW_REPLACING = re.compile(
     r"\bnew ticker symbol\s+(?P<new>[A-Z][A-Z0-9.\-]{0,19})\s*,?\s*"
     r"replacing\s+(?P<old>[A-Z][A-Z0-9.\-]{0,19})\b",
@@ -713,19 +729,25 @@ def _source_deadlines(
             if group in target_match.groupdict()
             and target_match.groupdict()[group] is not None
         }
-        first_target_end = min(
-            target_match.end("date") for target_match, _kind in target_matches
-        )
-        source_date_spans = {
-            match.span("date")
-            for pattern in (_ANY_MONTH_DATE, _ANY_ISO_DATE)
+        deadline_associated_dates = {
+            match.span("date"): match.group("date")
+            for pattern in (
+                _DEADLINE_CLAUSE_DATE,
+                _DIRECT_COORDINATED_DEADLINE_DATE,
+                _COORDINATED_DEADLINE_ACTION_DATE,
+            )
             for match in pattern.finditer(sentence)
         }
-        if any(
-            date_start >= first_target_end
-            and (date_start, date_end) not in claimed_date_spans
-            for date_start, date_end in source_date_spans
-        ):
+        try:
+            unclaimed_deadline_dates = {
+                _normalized_source_date_text(value)
+                for span, value in deadline_associated_dates.items()
+                if span not in claimed_date_spans
+            }
+        except ValueError:
+            ambiguous = True
+            continue
+        if unclaimed_deadline_dates - target_dates:
             ambiguous = True
             continue
 
