@@ -195,6 +195,14 @@ def _shadow(name: str):
             )
         )
 
+    decision, preview_calls = _evaluate_shadow(name, evidence, facts)
+    return decision, sec, tuple(evidence), tuple(facts), preview_calls
+
+
+def _evaluate_shadow(name: str, evidence, facts):
+    from src.security_lifecycle_decision_policy import evaluate_automation_decision
+
+    source_case = _payload(_SOURCE_SHAPES)["cases"][name]
     preview_calls = []
 
     def preview(request):
@@ -216,7 +224,7 @@ def _shadow(name: str):
         active_sources=("manual_lists",),
         transition_preview=preview,
     )
-    return decision, sec, tuple(evidence), tuple(facts), preview_calls
+    return decision, preview_calls
 
 
 def _assert_expected(name: str) -> None:
@@ -302,3 +310,59 @@ def test_blbd_shadow_accepts_asset_acquisition_without_registrant_identity_chang
     assert sec.symbol_transitions == ()
     _assert_expected("BLBD")
     assert decision.outcomes == ("no_tracked_security_change",)
+
+
+def test_contract_missing_receipt_is_excluded_from_automatic_decision_material():
+    from src.security_lifecycle_decision_policy import (
+        _current_decision_material,
+        _evidence_rows,
+    )
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+    from src.security_lifecycle_sec_evidence import build_identity_context
+
+    baseline, _sec, evidence, facts, _preview_calls = _shadow("HAPN")
+    source_case = _payload(_SOURCE_SHAPES)["cases"]["HAPN"]
+    context = build_identity_context(
+        case_id=source_case["case_id"],
+        observation=source_case["observation"],
+        ticker_aliases=source_case["aliases"],
+        ibkr_conids=(),
+    )
+
+    class MissingGateway:
+        def isConnected(self):
+            return True
+
+        def reqContractDetails(self, _contract):
+            return ()
+
+        def reqMktData(self, *_args, **_kwargs):
+            raise AssertionError("missing contract must not request market data")
+
+        def sleep(self, _seconds):
+            raise AssertionError("missing contract must not wait for a quote")
+
+    missing = read_ibkr_contract_evidence(
+        gateway=MissingGateway(),
+        gateway_lock=_ibkr_lock,
+        context=context,
+        retrieved_at=_AT,
+    )
+    assert missing.contract_status == "missing"
+
+    current_evidence, _current_facts = _current_decision_material(
+        _evidence_rows((*evidence, *missing.evidence)),
+        (),
+    )
+    assert missing.evidence[0].evidence_id not in {
+        row.evidence_id for row in current_evidence
+    }
+
+    with_missing, preview_calls = _evaluate_shadow(
+        "HAPN",
+        (*evidence, *missing.evidence),
+        facts,
+    )
+
+    assert with_missing == baseline
+    assert preview_calls == []

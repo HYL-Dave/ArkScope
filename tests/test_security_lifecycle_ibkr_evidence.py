@@ -31,6 +31,26 @@ def _context():
     )
 
 
+def _identity_context(*, aliases=(), conids=(), ticker="CUR"):
+    from src.security_lifecycle_sec_evidence import build_identity_context
+
+    return build_identity_context(
+        case_id=f"case-{ticker.lower()}",
+        observation={
+            "ticker": ticker,
+            "cik": "0001409970",
+            "issuer_name": "Candidate Planning, Inc.",
+            "filing_date": "2026-06-27",
+            "source_ref": "0001409970-26-000132",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "event_kinds": ["listing_status_review"],
+        },
+        ticker_aliases=aliases,
+        ibkr_conids=conids,
+    )
+
+
 def _details(
     *,
     symbol="HAPN",
@@ -346,6 +366,96 @@ def test_regulator_declared_successor_is_queried_without_persisting_an_alias():
     assert result.requests_made == 2
     assert result.blockers == ("ibkr_contract_missing",)
     assert context.ticker_aliases == ("LC",)
+
+
+def test_ibkr_candidate_plan_prioritizes_exact_current_successor_then_aliases():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+
+    context = _identity_context(aliases=("ZZZ", "AAA"), conids=(4242,))
+    state, lock = _lock_recorder()
+    gateway = _Gateway(responses=([], [], [], [], []), lock_state=state)
+
+    result = read_ibkr_contract_evidence(
+        gateway=gateway,
+        gateway_lock=lock,
+        context=context,
+        candidate_tickers=("NEXT",),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+        max_queries=5,
+    )
+
+    assert [
+        (int(contract.conId or 0), str(contract.symbol or ""))
+        for contract in gateway.requests
+    ] == [
+        (4242, ""),
+        (0, "CUR"),
+        (0, "NEXT"),
+        (0, "AAA"),
+        (0, "ZZZ"),
+    ]
+    assert result.contract_status == "missing"
+    assert result.requests_made == 5
+
+
+def test_ibkr_candidate_budget_distinguishes_complete_missing_from_ambiguity():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+
+    six_aliases = tuple(f"A{index}" for index in range(6))
+    state, lock = _lock_recorder()
+    complete_gateway = _Gateway(responses=([],) * 8, lock_state=state)
+    complete = read_ibkr_contract_evidence(
+        gateway=complete_gateway,
+        gateway_lock=lock,
+        context=_identity_context(aliases=six_aliases),
+        candidate_tickers=("NEXT",),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+        max_queries=8,
+    )
+
+    assert complete.contract_status == "missing"
+    assert complete.blockers == ("ibkr_contract_missing",)
+    assert complete.requests_made == 8
+    assert len(complete_gateway.requests) == 8
+
+    seven_aliases = tuple(f"A{index}" for index in range(7))
+    state, lock = _lock_recorder()
+    overflow_gateway = _Gateway(lock_state=state)
+    overflow = read_ibkr_contract_evidence(
+        gateway=overflow_gateway,
+        gateway_lock=lock,
+        context=_identity_context(aliases=seven_aliases),
+        candidate_tickers=("NEXT",),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+        max_queries=8,
+    )
+
+    assert overflow.contract_status == "ambiguous"
+    assert overflow.blockers == ("ibkr_contract_ambiguous",)
+    assert overflow.evidence == ()
+    assert overflow.requests_made == 0
+    assert overflow_gateway.requests == []
+    assert state["timeouts"] == []
+
+
+def test_multiple_known_conids_are_ambiguous_before_provider_access():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+
+    state, lock = _lock_recorder()
+    gateway = _Gateway(lock_state=state)
+    result = read_ibkr_contract_evidence(
+        gateway=gateway,
+        gateway_lock=lock,
+        context=_identity_context(conids=(101, 202)),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+
+    assert result.contract_status == "ambiguous"
+    assert result.blockers == ("ibkr_contract_ambiguous",)
+    assert result.evidence == ()
+    assert result.requests_made == 0
+    assert gateway.requests == []
+    assert state["timeouts"] == []
 
 
 def test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separately():

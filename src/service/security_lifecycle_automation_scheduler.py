@@ -123,7 +123,7 @@ _MAX_HINT_TICKERS = 256
 _MAX_ALIAS_EDGES = 512
 _MAX_ALIASES_PER_TICKER = 64
 _MAX_IBKR_POSITION_ROWS = 512
-_MAX_IBKR_CONIDS_PER_TICKER = 32
+_DEFAULT_IBKR_MAX_QUERIES = 8
 _SQL_BATCH = 200
 
 
@@ -234,93 +234,93 @@ def _hint_ticker(value: object) -> str:
 def _alias_closures(
     conn: sqlite3.Connection,
     requested: tuple[str, ...],
-) -> dict[str, tuple[str, ...]]:
+) -> tuple[dict[str, tuple[str, ...]], frozenset[str]]:
     columns = _table_columns(conn, "ticker_aliases")
     if not columns:
-        return {ticker: (ticker,) for ticker in requested}
+        return {ticker: (ticker,) for ticker in requested}, frozenset()
     if not {"alias", "canonical"} <= columns:
         raise ValueError("ticker_aliases_schema")
 
-    graph: dict[str, set[str]] = {ticker: {ticker} for ticker in requested}
-    queried: set[str] = set()
-    frontier = set(requested)
-    edges: set[tuple[str, str]] = set()
-    while frontier:
-        batch = tuple(sorted(frontier))
-        queried.update(batch)
-        frontier.clear()
-        for offset in range(0, len(batch), _SQL_BATCH):
-            current = batch[offset : offset + _SQL_BATCH]
-            placeholders = ",".join("?" for _ in current)
-            rows = conn.execute(
-                "SELECT alias,canonical FROM ticker_aliases "
-                f"WHERE UPPER(alias) IN ({placeholders}) "
-                f"OR UPPER(canonical) IN ({placeholders}) "
-                "ORDER BY alias,canonical LIMIT ?",
-                (*current, *current, _MAX_ALIAS_EDGES + 1),
-            ).fetchall()
-            if len(rows) > _MAX_ALIAS_EDGES:
-                raise ValueError("ticker_aliases_exceed_limit")
-            for raw_alias, raw_canonical in rows:
-                alias = _hint_ticker(raw_alias)
-                canonical = _hint_ticker(raw_canonical)
-                edge = (alias, canonical)
-                if edge in edges:
-                    continue
-                edges.add(edge)
-                if len(edges) > _MAX_ALIAS_EDGES:
-                    raise ValueError("ticker_aliases_exceed_limit")
-                graph.setdefault(alias, {alias}).add(canonical)
-                graph.setdefault(canonical, {canonical}).add(alias)
-                for value in edge:
-                    if value not in queried:
-                        frontier.add(value)
-
     closures: dict[str, tuple[str, ...]] = {}
+    ambiguous: set[str] = set()
     for ticker in requested:
         found = {ticker}
-        pending = [ticker]
-        while pending:
-            current = pending.pop()
-            for adjacent in graph.get(current, ()):
-                if adjacent not in found:
-                    found.add(adjacent)
-                    pending.append(adjacent)
-                    if len(found) > _MAX_ALIASES_PER_TICKER:
-                        raise ValueError("ticker_aliases_exceed_limit")
-        closures[ticker] = tuple(sorted(found))
-    return closures
+        queried: set[str] = set()
+        frontier = {ticker}
+        edges: set[tuple[str, str]] = set()
+        overflow = False
+        while frontier and not overflow:
+            batch = tuple(sorted(frontier))
+            queried.update(batch)
+            frontier.clear()
+            for offset in range(0, len(batch), _SQL_BATCH):
+                current = batch[offset : offset + _SQL_BATCH]
+                placeholders = ",".join("?" for _ in current)
+                rows = conn.execute(
+                    "SELECT alias,canonical FROM ticker_aliases "
+                    f"WHERE UPPER(alias) IN ({placeholders}) "
+                    f"OR UPPER(canonical) IN ({placeholders}) "
+                    "ORDER BY alias,canonical LIMIT ?",
+                    (*current, *current, _MAX_ALIAS_EDGES + 1),
+                ).fetchall()
+                if len(rows) > _MAX_ALIAS_EDGES:
+                    overflow = True
+                    break
+                for raw_alias, raw_canonical in rows:
+                    alias = _hint_ticker(raw_alias)
+                    canonical = _hint_ticker(raw_canonical)
+                    edge = (alias, canonical)
+                    if edge in edges:
+                        continue
+                    edges.add(edge)
+                    found.update(edge)
+                    if (
+                        len(edges) > _MAX_ALIAS_EDGES
+                        or len(found) > _MAX_ALIASES_PER_TICKER
+                    ):
+                        overflow = True
+                        break
+                    for value in edge:
+                        if value not in queried:
+                            frontier.add(value)
+                if overflow:
+                    break
+        if overflow:
+            ambiguous.add(ticker)
+            closures[ticker] = (ticker,)
+        else:
+            closures[ticker] = tuple(sorted(found))
+    return closures, frozenset(ambiguous)
 
 
 def _ibkr_conids(
     conn: sqlite3.Connection,
     closures: Mapping[str, tuple[str, ...]],
-) -> dict[str, tuple[int, ...]]:
+    ambiguous: frozenset[str],
+) -> tuple[dict[str, tuple[int, ...]], frozenset[str]]:
     result: dict[str, set[int]] = {ticker: set() for ticker in closures}
     columns = _table_columns(conn, "portfolio_positions")
     if not columns:
-        return {ticker: () for ticker in closures}
+        return {ticker: () for ticker in closures}, ambiguous
     if not {"broker", "broker_con_id", "symbol"} <= columns:
         raise ValueError("portfolio_positions_schema")
 
-    roots_by_alias: dict[str, set[str]] = {}
+    updated_ambiguous = set(ambiguous)
     for ticker, aliases in closures.items():
-        for alias in aliases:
-            roots_by_alias.setdefault(alias, set()).add(ticker)
-    aliases = tuple(sorted(roots_by_alias))
-    seen_rows: set[tuple[str, str]] = set()
-    for offset in range(0, len(aliases), _SQL_BATCH):
-        current = aliases[offset : offset + _SQL_BATCH]
-        placeholders = ",".join("?" for _ in current)
+        if ticker in updated_ambiguous:
+            continue
+        placeholders = ",".join("?" for _ in aliases)
         rows = conn.execute(
             "SELECT broker_con_id,symbol FROM portfolio_positions "
             "WHERE LOWER(broker)='ibkr' AND broker_con_id IS NOT NULL "
             f"AND UPPER(symbol) IN ({placeholders}) "
             "ORDER BY symbol,broker_con_id LIMIT ?",
-            (*current, _MAX_IBKR_POSITION_ROWS + 1),
+            (*aliases, _MAX_IBKR_POSITION_ROWS + 1),
         ).fetchall()
         if len(rows) > _MAX_IBKR_POSITION_ROWS:
-            raise ValueError("ibkr_identity_candidates_exceed_limit")
+            updated_ambiguous.add(ticker)
+            continue
+        seen_rows: set[tuple[str, str]] = set()
         for raw_conid, raw_symbol in rows:
             symbol = _hint_ticker(raw_symbol)
             conid_text = str(raw_conid or "").strip()
@@ -330,14 +330,17 @@ def _ibkr_conids(
             if row in seen_rows:
                 continue
             seen_rows.add(row)
-            if len(seen_rows) > _MAX_IBKR_POSITION_ROWS:
-                raise ValueError("ibkr_identity_candidates_exceed_limit")
-            conid = int(conid_text)
-            for ticker in roots_by_alias.get(symbol, ()):
-                result[ticker].add(conid)
-                if len(result[ticker]) > _MAX_IBKR_CONIDS_PER_TICKER:
-                    raise ValueError("ibkr_identity_candidates_exceed_limit")
-    return {ticker: tuple(sorted(values)) for ticker, values in result.items()}
+            if symbol not in aliases:
+                raise ValueError("ibkr_position_symbol")
+            result[ticker].add(int(conid_text))
+            if len(result[ticker]) > 1:
+                updated_ambiguous.add(ticker)
+                result[ticker].clear()
+                break
+    return (
+        {ticker: tuple(sorted(values)) for ticker, values in result.items()},
+        frozenset(updated_ambiguous),
+    )
 
 
 def _load_local_identity_hints(
@@ -352,13 +355,16 @@ def _load_local_identity_hints(
     if not requested:
         return {}
     with _read_only_connection(market_path) as market_conn:
-        closures = _alias_closures(market_conn, requested)
+        closures, ambiguous = _alias_closures(market_conn, requested)
     with _read_only_connection(profile_path) as profile_conn:
-        conids = _ibkr_conids(profile_conn, closures)
+        conids, ambiguous = _ibkr_conids(profile_conn, closures, ambiguous)
     return {
         ticker: {
             "ticker_aliases": closures[ticker],
             "ibkr_conids": conids[ticker],
+            "ibkr_identity_blockers": (
+                ("ibkr_contract_ambiguous",) if ticker in ambiguous else ()
+            ),
         }
         for ticker in requested
     }
@@ -613,7 +619,13 @@ class _LifecycleIbkrGateway:
         self._source.disconnect()
 
 
-def _ibkr_evidence(context, *, at: str, regulator_successors: tuple[str, ...]):
+def _ibkr_evidence(
+    context,
+    *,
+    at: str,
+    regulator_successors: tuple[str, ...],
+    max_queries: int = _DEFAULT_IBKR_MAX_QUERIES,
+):
     from src.ibkr_gateway_lock import ibkr_gateway_lock
     from src.security_lifecycle_ibkr_evidence import (
         contract_snapshot_facts,
@@ -636,6 +648,7 @@ def _ibkr_evidence(context, *, at: str, regulator_successors: tuple[str, ...]):
         context=context,
         candidate_tickers=regulator_successors,
         retrieved_at=at,
+        max_queries=max_queries,
     )
     facts = tuple(
         fact
@@ -863,6 +876,7 @@ def _load_evidence(
     mode: str,
     at: str,
     listing_session: ListingAuthoritySession,
+    ibkr_max_queries: int = _DEFAULT_IBKR_MAX_QUERIES,
 ) -> LifecycleAutomationEvidenceBundle:
     del mode
     from data_sources.sec_transport import SecRequestBudget, SecTransport
@@ -967,15 +981,26 @@ def _load_evidence(
     ibkr_codes: tuple[str, ...] = ()
     market_queried = False
     if successor_values or terminal or pending_market_check:
-        ibkr, ibkr_facts = _ibkr_evidence(
-            context,
-            at=at,
-            regulator_successors=successor_values,
-        )
         market_queried = True
-        evidence.extend(ibkr.evidence)
-        facts.extend(ibkr_facts)
-        ibkr_codes = tuple(str(code) for code in ibkr.blockers)
+        identity_codes = tuple(
+            str(code) for code in case.get("ibkr_identity_blockers", ())
+        )
+        if any(code != "ibkr_contract_ambiguous" for code in identity_codes):
+            raise ValueError("ibkr_identity_blockers")
+        if identity_codes:
+            ibkr_codes = ("ibkr_contract_ambiguous",)
+            diagnostics["ibkr_requests"] = 0
+        else:
+            ibkr, ibkr_facts = _ibkr_evidence(
+                context,
+                at=at,
+                regulator_successors=successor_values,
+                max_queries=ibkr_max_queries,
+            )
+            evidence.extend(ibkr.evidence)
+            facts.extend(ibkr_facts)
+            ibkr_codes = tuple(str(code) for code in ibkr.blockers)
+            diagnostics["ibkr_requests"] = int(ibkr.requests_made)
         codes.extend(
             code
             for code in ibkr_codes
@@ -985,7 +1010,6 @@ def _load_evidence(
                 "ibkr_gateway_unavailable",
             }
         )
-        diagnostics["ibkr_requests"] = int(ibkr.requests_made)
     else:
         diagnostics["ibkr_requests"] = 0
     diagnostics["ibkr_unavailable"] = int(

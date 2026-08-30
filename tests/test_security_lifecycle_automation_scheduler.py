@@ -1302,11 +1302,13 @@ def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
     assert hints == {
         "HAPN": {
             "ticker_aliases": ("HAPN", "HAPN.PRE", "LC"),
-            "ibkr_conids": (1001, 1002),
+            "ibkr_conids": (),
+            "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
         },
         "QBTS": {
             "ticker_aliases": ("QBTS",),
             "ibkr_conids": (2001,),
+            "ibkr_identity_blockers": (),
         },
     }
     case = {
@@ -1341,11 +1343,287 @@ def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
     assert len(loaded) == 1
     context = scheduler._identity_context(loaded[0])
     assert context.ticker_aliases == ("HAPN", "HAPN.PRE", "LC")
-    assert context.ibkr_conids == (1001, 1002)
+    assert context.ibkr_conids == ()
+    assert loaded[0]["ibkr_identity_blockers"] == ("ibkr_contract_ambiguous",)
     assert {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (market_path, profile_path)
     } == before
+
+
+def test_alias_closure_overflow_is_a_per_case_ibkr_ambiguity(tmp_path):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+    aliases = tuple(f"OV{index:02d}" for index in range(65))
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+        conn.executemany(
+            "INSERT INTO ticker_aliases VALUES (?,?)",
+            tuple(zip(aliases, aliases[1:])),
+        )
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+
+    hints = scheduler._load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=(aliases[0], "GOOD"),
+    )
+
+    assert hints[aliases[0]] == {
+        "ticker_aliases": (aliases[0],),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
+    }
+    assert hints["GOOD"] == {
+        "ticker_aliases": ("GOOD",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": (),
+    }
+
+
+def test_multiple_local_conids_do_not_poison_a_later_case(tmp_path):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO portfolio_positions VALUES (?,?,?)",
+            (
+                ("ibkr", "101", "MULTI"),
+                ("ibkr", "202", "MULTI"),
+                ("ibkr", "303", "GOOD"),
+            ),
+        )
+
+    hints = scheduler._load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=("MULTI", "GOOD"),
+    )
+
+    assert hints["MULTI"] == {
+        "ticker_aliases": ("MULTI",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
+    }
+    assert hints["GOOD"] == {
+        "ticker_aliases": ("GOOD",),
+        "ibkr_conids": (303,),
+        "ibkr_identity_blockers": (),
+    }
+
+
+def test_scheduler_ibkr_seam_forwards_an_injected_query_cap(monkeypatch):
+    from src import security_lifecycle_ibkr_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    captured = []
+    monkeypatch.setattr(scheduler, "_LifecycleIbkrGateway", lambda: SimpleNamespace())
+    monkeypatch.setattr(
+        security_lifecycle_ibkr_evidence,
+        "read_ibkr_contract_evidence",
+        lambda **kwargs: (
+            captured.append(kwargs)
+            or SimpleNamespace(evidence=(), blockers=(), requests_made=0)
+        ),
+    )
+    monkeypatch.setattr(
+        security_lifecycle_ibkr_evidence,
+        "contract_snapshot_facts",
+        lambda *_args, **_kwargs: (),
+    )
+
+    scheduler._ibkr_evidence(
+        SimpleNamespace(),
+        at="2026-08-26T00:00:00Z",
+        regulator_successors=("NEXT",),
+        max_queries=3,
+    )
+
+    assert captured[0]["max_queries"] == 3
+
+
+def test_precomputed_ibkr_ambiguity_never_reaches_the_gateway(monkeypatch):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_evidence = SimpleNamespace(
+        evidence_id="sec-identity-ambiguity",
+        source_family="regulator",
+        source_locator={},
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+    successor = SimpleNamespace(
+        evidence_id=sec_evidence.evidence_id,
+        fact_type="successor_ticker",
+        value="NEXT",
+    )
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(sec_evidence,),
+            facts=(successor,),
+            blockers=(),
+            source_deadlines=(),
+        ),
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=(), blockers=(), diagnostics={}
+        )
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: pytest.fail("ambiguous identity reached IBKR"),
+    )
+    case = {
+        "case_id": "slc_identity_ambiguity",
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Ambiguous Identity Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "kinds": [{"event_type": "acquisition_completed", "effective_date": None}],
+        },
+    }
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-26T00:00:00Z",
+        listing_session=listing_session,
+    )
+
+    assert tuple(row.code for row in bundle.blockers) == (
+        "ibkr_contract_ambiguous",
+    )
+    assert bundle.diagnostics["ibkr_requests"] == 0
+    assert bundle.diagnostics["ibkr_missing"] == 0
+    assert bundle.diagnostics["ibkr_conflict"] == 1
+
+
+def test_ibkr_identity_ambiguity_blocks_one_case_and_the_later_case_runs(tmp_path):
+    from src.security_lifecycle_automation_worker import (
+        LifecycleAutomationEvidenceBundle,
+        LifecycleAutomationWorker,
+    )
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
+
+    def case(index, ticker):
+        source_ref = f"000000000{index}-26-00000{index}"
+        return {
+            "case_id": case_id_for("sec_edgar", source_ref, ticker),
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "ticker": ticker,
+            "source_presence": "present",
+            "observation_fingerprint_sha256": str(index) * 64,
+            "ticker_aliases": (ticker,),
+            "ibkr_conids": (),
+            "ibkr_identity_blockers": (),
+            "observation": {
+                "ticker": ticker,
+                "cik": f"{index:010d}",
+                "filing_date": "2026-08-20",
+                "kinds": [{"event_type": "listing_status_review"}],
+            },
+        }
+
+    first, second = sorted(
+        (case(1, "AMB"), case(2, "GOOD")),
+        key=lambda row: row["case_id"],
+    )
+    first["ibkr_identity_blockers"] = ("ibkr_contract_ambiguous",)
+    conn = sqlite3.connect(tmp_path / "profile.db", check_same_thread=False)
+    SecurityLifecycleInvestigationStore(conn)
+
+    @contextmanager
+    def profile_connection():
+        yield conn
+
+    calls = []
+
+    def evidence_loader(current, *, mode, at):
+        calls.append((current["case_id"], mode, at))
+        code = (
+            "ibkr_contract_ambiguous"
+            if current["ibkr_identity_blockers"]
+            else "sec_rate_limited"
+        )
+        return LifecycleAutomationEvidenceBundle(
+            evidence=(),
+            facts=(),
+            blockers=(
+                AutomationBlocker(
+                    code=code,
+                    retryable=code == "sec_rate_limited",
+                    context={},
+                ),
+            ),
+            diagnostics={},
+            retry_at=(
+                "2026-08-26T13:00:00Z" if code == "sec_rate_limited" else None
+            ),
+        )
+
+    result = LifecycleAutomationWorker(
+        case_loader=lambda: (first, second),
+        profile_connection=profile_connection,
+        evidence_loader=evidence_loader,
+        source_loader=lambda: {first["ticker"]: (), second["ticker"]: ()},
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "blocked cases must not preview transitions"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "blocked cases must not approve transitions"
+        ),
+        clock=lambda: "2026-08-25T13:00:00Z",
+        execution_owner_id="identity-containment-owner",
+    ).run(limit=2)
+
+    assert [row[0] for row in calls] == [first["case_id"], second["case_id"]]
+    assert result["processed"] == 2
+    assert result["blocked"] == 2
+    assert result["case_outcomes"] == {
+        first["case_id"]: "blocked",
+        second["case_id"]: "blocked",
+    }
+    conn.close()
 
 
 def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatch):
@@ -2771,8 +3049,8 @@ def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market
         )
     )
 
-    def ibkr(context, *, at, regulator_successors):
-        market_calls.append((context.case_id, at, regulator_successors))
+    def ibkr(context, *, at, regulator_successors, max_queries):
+        market_calls.append((context.case_id, at, regulator_successors, max_queries))
         return SimpleNamespace(evidence=(), blockers=(), requests_made=1), ()
 
     monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr)
@@ -2781,9 +3059,12 @@ def test_deadline_without_effective_date_caps_schedule_and_triggers_final_market
         mode="live",
         at="2026-08-30T12:00:00Z",
         listing_session=listing_session,
+        ibkr_max_queries=3,
     )
 
-    assert market_calls == [("slc_deadline_only", "2026-08-30T12:00:00Z", ())]
+    assert market_calls == [
+        ("slc_deadline_only", "2026-08-30T12:00:00Z", (), 3)
+    ]
     assert bundle.diagnostics["ibkr_requests"] == 1
     assert len(bundle.blockers) == 1
     assert bundle.blockers[0].retryable is False

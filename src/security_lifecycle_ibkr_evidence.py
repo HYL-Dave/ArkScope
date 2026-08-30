@@ -247,12 +247,15 @@ def _queries(
     *,
     candidate_tickers: Iterable[str],
     max_queries: int,
-) -> tuple[Contract, ...]:
+) -> tuple[Contract, ...] | None:
+    if len(context.ibkr_conids) > 1:
+        return None
+
     aliases: list[str] = []
     for raw in (
         context.current_ticker,
-        *context.ticker_aliases,
         *candidate_tickers,
+        *context.ticker_aliases,
     ):
         ticker = str(raw or "").strip().upper()
         if not _TICKER.fullmatch(ticker):
@@ -263,7 +266,7 @@ def _queries(
         Contract(conId=con_id, exchange="SMART") for con_id in context.ibkr_conids
     ) + tuple(Stock(alias, "SMART", "USD") for alias in aliases)
     if len(queries) > max_queries:
-        raise ValueError("ibkr_identity_candidates_exceed_max_queries")
+        return None
     return queries
 
 
@@ -474,6 +477,8 @@ def read_ibkr_contract_evidence(
         candidate_tickers=candidate_tickers,
         max_queries=max_queries,
     )
+    if queries is None:
+        return _blocked("ibkr_contract_ambiguous", requests_made=0)
     requests_made = 0
     detail_rows: list[object] = []
     snapshot: dict[str, Any] | None = None
