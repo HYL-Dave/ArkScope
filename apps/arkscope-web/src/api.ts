@@ -3041,6 +3041,359 @@ export interface SecurityLifecycleCaseListResponse {
   data_integrity: { source_missing_count: number };
 }
 
+export interface SecurityLifecycleAutomationConfig {
+  enabled: boolean;
+  interval_minutes: number;
+  batch_limit: 1 | 2;
+  apply_profile_transitions: boolean;
+}
+
+export type SecurityLifecycleAutomationStage =
+  | "preparing"
+  | "sec"
+  | "listing"
+  | "ibkr"
+  | "evaluate"
+  | "persist"
+  | "approve"
+  | "finalize";
+export type SecurityLifecycleAutomationTrigger =
+  | "scheduler"
+  | "manual_due"
+  | "manual_case";
+export type SecurityLifecycleAutomationScheduleStatus =
+  | "invalid"
+  | "disabled"
+  | "due"
+  | "scheduled";
+export type SecurityLifecycleAutomationSchedulerStatus =
+  | "running"
+  | "failed"
+  | "succeeded"
+  | "partial"
+  | "unavailable"
+  | "not_installed"
+  | "skipped";
+export type SecurityLifecycleAutomationResultStatus = Exclude<
+  SecurityLifecycleAutomationSchedulerStatus,
+  "running" | "failed"
+>;
+export type SecurityLifecycleAutomationCaseOutcome =
+  | "accepted"
+  | "drafted"
+  | "blocked"
+  | "failed"
+  | "skipped_current";
+export type SecurityLifecycleAutomationFailureReason =
+  | "already_running"
+  | "automation_schema_absent"
+  | "case_processing_blocked"
+  | "case_processing_failed"
+  | "market_store_unavailable"
+  | "profile_schema_mismatch"
+  | "profile_store_unavailable"
+  | "automation_scheduler_failed"
+  | "execution_lock_unavailable";
+
+export interface SecurityLifecycleAutomationResult {
+  status: SecurityLifecycleAutomationResultStatus;
+  reason: SecurityLifecycleAutomationFailureReason | null;
+  selected: number;
+  processed: number;
+  accepted: number;
+  drafted: number;
+  blocked: number;
+  failed: number;
+  skipped_current: number;
+  case_ids: string[];
+  result_version?: 2;
+  case_outcomes?: Record<string, SecurityLifecycleAutomationCaseOutcome>;
+}
+
+export interface SecurityLifecycleAutomationProgress {
+  trigger: SecurityLifecycleAutomationTrigger;
+  request_id: string;
+  case_id: string;
+  started_at: string;
+  current_stage: SecurityLifecycleAutomationStage | null;
+  completed_stages: SecurityLifecycleAutomationStage[];
+  skipped_stages: SecurityLifecycleAutomationStage[];
+}
+
+export interface SecurityLifecycleAutomationIncident {
+  case_failures: Record<string, {
+    run_id: string | null;
+    recovery: "new_attempt" | "finalization";
+  }>;
+  scheduler_failure: {
+    reason: SecurityLifecycleAutomationFailureReason;
+  } | null;
+}
+
+export interface SecurityLifecycleAutomationFailedRun {
+  run_id: string;
+  case_id: string;
+  failure_code: string;
+  started_at: string;
+  finished_at: string;
+  updated_at: string;
+}
+
+export type SecurityLifecycleAutomationConfigResponse =
+  | {
+    config_status: "valid";
+    config: SecurityLifecycleAutomationConfig;
+  }
+  | {
+    config_status: "invalid";
+    config: null;
+    invalid_keys: string[];
+  };
+
+export type SecurityLifecycleAutomationStatusResponse =
+  SecurityLifecycleAutomationConfigResponse & {
+    schedule: {
+      status: SecurityLifecycleAutomationScheduleStatus;
+      last_attempt_at: string | null;
+      next_scheduled_at: string | null;
+    };
+    telemetry_status: "absent" | "valid" | "invalid";
+    last_status: SecurityLifecycleAutomationSchedulerStatus | null;
+    last_result: SecurityLifecycleAutomationResult | null;
+    active_incident: SecurityLifecycleAutomationIncident | null;
+    latest_failed_runs: SecurityLifecycleAutomationFailedRun[];
+    current_progress: SecurityLifecycleAutomationProgress[];
+  };
+
+export interface SecurityLifecycleAutomationDispatchResponse {
+  scope: "due" | "case";
+  status: "started" | "skipped" | "unavailable" | "not_installed";
+  reason?: SecurityLifecycleAutomationFailureReason;
+  request_id?: string;
+  case_id?: string;
+}
+
+const AUTOMATION_STAGES: readonly SecurityLifecycleAutomationStage[] = [
+  "preparing", "sec", "listing", "ibkr", "evaluate", "persist", "approve", "finalize",
+];
+const AUTOMATION_REASONS: readonly SecurityLifecycleAutomationFailureReason[] = [
+  "already_running",
+  "automation_schema_absent",
+  "case_processing_blocked",
+  "case_processing_failed",
+  "market_store_unavailable",
+  "profile_schema_mismatch",
+  "profile_store_unavailable",
+  "automation_scheduler_failed",
+  "execution_lock_unavailable",
+];
+
+function automationContractError(): never {
+  throw new Error("security_lifecycle_automation_contract");
+}
+
+function automationRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return automationContractError();
+  }
+  return value as Record<string, unknown>;
+}
+
+function automationString(value: unknown): string {
+  if (typeof value !== "string" || !value || value.includes("\0")) {
+    return automationContractError();
+  }
+  return value;
+}
+
+function automationNullableString(value: unknown): string | null {
+  return value === null ? null : automationString(value);
+}
+
+function automationEnum<Value extends string>(
+  value: unknown,
+  allowed: readonly Value[],
+): Value {
+  if (typeof value !== "string" || !allowed.includes(value as Value)) {
+    return automationContractError();
+  }
+  return value as Value;
+}
+
+function automationCount(value: unknown): number {
+  if (!Number.isInteger(value) || (value as number) < 0) return automationContractError();
+  return value as number;
+}
+
+function automationStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return automationContractError();
+  return value.map(automationString);
+}
+
+function automationStageArray(value: unknown): SecurityLifecycleAutomationStage[] {
+  if (!Array.isArray(value)) return automationContractError();
+  return value.map((item) => automationEnum(item, AUTOMATION_STAGES));
+}
+
+function parseAutomationConfig(value: unknown): SecurityLifecycleAutomationConfig {
+  const row = automationRecord(value);
+  if (
+    typeof row.enabled !== "boolean"
+    || !Number.isInteger(row.interval_minutes)
+    || (row.interval_minutes as number) < 5
+    || (row.interval_minutes as number) > 10_080
+    || (row.batch_limit !== 1 && row.batch_limit !== 2)
+    || typeof row.apply_profile_transitions !== "boolean"
+  ) {
+    return automationContractError();
+  }
+  return {
+    enabled: row.enabled,
+    interval_minutes: row.interval_minutes as number,
+    batch_limit: row.batch_limit,
+    apply_profile_transitions: row.apply_profile_transitions,
+  };
+}
+
+function parseAutomationConfigResponse(
+  value: unknown,
+): SecurityLifecycleAutomationConfigResponse {
+  const row = automationRecord(value);
+  const status = automationEnum(row.config_status, ["valid", "invalid"] as const);
+  if (status === "valid") {
+    return { config_status: status, config: parseAutomationConfig(row.config) };
+  }
+  if (row.config !== null || !Array.isArray(row.invalid_keys)) {
+    return automationContractError();
+  }
+  return {
+    config_status: status,
+    config: null,
+    invalid_keys: row.invalid_keys.map(automationString),
+  };
+}
+
+function parseAutomationResult(value: unknown): SecurityLifecycleAutomationResult {
+  const row = automationRecord(value);
+  const result: SecurityLifecycleAutomationResult = {
+    status: automationEnum(
+      row.status,
+      ["succeeded", "partial", "unavailable", "not_installed", "skipped"] as const,
+    ),
+    reason: row.reason === null ? null : automationEnum(row.reason, AUTOMATION_REASONS),
+    selected: automationCount(row.selected),
+    processed: automationCount(row.processed),
+    accepted: automationCount(row.accepted),
+    drafted: automationCount(row.drafted),
+    blocked: automationCount(row.blocked),
+    failed: automationCount(row.failed),
+    skipped_current: automationCount(row.skipped_current),
+    case_ids: automationStringArray(row.case_ids),
+  };
+  if (row.result_version !== undefined || row.case_outcomes !== undefined) {
+    if (row.result_version !== 2) return automationContractError();
+    const rawOutcomes = automationRecord(row.case_outcomes);
+    result.result_version = 2;
+    result.case_outcomes = Object.fromEntries(Object.entries(rawOutcomes).map(
+      ([caseId, outcome]) => [
+        automationString(caseId),
+        automationEnum(
+          outcome,
+          ["accepted", "drafted", "blocked", "failed", "skipped_current"] as const,
+        ),
+      ],
+    ));
+  }
+  return result;
+}
+
+function parseAutomationIncident(value: unknown): SecurityLifecycleAutomationIncident | null {
+  if (value === null) return null;
+  const row = automationRecord(value);
+  const rawFailures = automationRecord(row.case_failures);
+  const caseFailures = Object.fromEntries(Object.entries(rawFailures).map(([caseId, marker]) => {
+    const detail = automationRecord(marker);
+    return [automationString(caseId), {
+      run_id: automationNullableString(detail.run_id),
+      recovery: automationEnum(detail.recovery, ["new_attempt", "finalization"] as const),
+    }];
+  }));
+  let schedulerFailure: SecurityLifecycleAutomationIncident["scheduler_failure"] = null;
+  if (row.scheduler_failure !== null) {
+    const detail = automationRecord(row.scheduler_failure);
+    schedulerFailure = { reason: automationEnum(detail.reason, AUTOMATION_REASONS) };
+  }
+  return { case_failures: caseFailures, scheduler_failure: schedulerFailure };
+}
+
+function parseAutomationStatus(value: unknown): SecurityLifecycleAutomationStatusResponse {
+  const row = automationRecord(value);
+  const config = parseAutomationConfigResponse(row);
+  const schedule = automationRecord(row.schedule);
+  const progress = row.current_progress;
+  const failedRuns = row.latest_failed_runs;
+  if (!Array.isArray(progress) || !Array.isArray(failedRuns)) return automationContractError();
+  return {
+    ...config,
+    schedule: {
+      status: automationEnum(schedule.status, ["invalid", "disabled", "due", "scheduled"] as const),
+      last_attempt_at: automationNullableString(schedule.last_attempt_at),
+      next_scheduled_at: automationNullableString(schedule.next_scheduled_at),
+    },
+    telemetry_status: automationEnum(row.telemetry_status, ["absent", "valid", "invalid"] as const),
+    last_status: row.last_status === null
+      ? null
+      : automationEnum(
+        row.last_status,
+        ["running", "failed", "succeeded", "partial", "unavailable", "not_installed", "skipped"] as const,
+      ),
+    last_result: row.last_result === null ? null : parseAutomationResult(row.last_result),
+    active_incident: parseAutomationIncident(row.active_incident),
+    latest_failed_runs: failedRuns.map((item) => {
+      const detail = automationRecord(item);
+      return {
+        run_id: automationString(detail.run_id),
+        case_id: automationString(detail.case_id),
+        failure_code: automationString(detail.failure_code),
+        started_at: automationString(detail.started_at),
+        finished_at: automationString(detail.finished_at),
+        updated_at: automationString(detail.updated_at),
+      };
+    }),
+    current_progress: progress.map((item) => {
+      const detail = automationRecord(item);
+      return {
+        trigger: automationEnum(detail.trigger, ["scheduler", "manual_due", "manual_case"] as const),
+        request_id: automationString(detail.request_id),
+        case_id: automationString(detail.case_id),
+        started_at: automationString(detail.started_at),
+        current_stage: detail.current_stage === null
+          ? null
+          : automationEnum(detail.current_stage, AUTOMATION_STAGES),
+        completed_stages: automationStageArray(detail.completed_stages),
+        skipped_stages: automationStageArray(detail.skipped_stages),
+      };
+    }),
+  };
+}
+
+function parseAutomationDispatch(
+  value: unknown,
+): SecurityLifecycleAutomationDispatchResponse {
+  const row = automationRecord(value);
+  const result: SecurityLifecycleAutomationDispatchResponse = {
+    scope: automationEnum(row.scope, ["due", "case"] as const),
+    status: automationEnum(
+      row.status,
+      ["started", "skipped", "unavailable", "not_installed"] as const,
+    ),
+  };
+  if (row.reason !== undefined) result.reason = automationEnum(row.reason, AUTOMATION_REASONS);
+  if (row.request_id !== undefined) result.request_id = automationString(row.request_id);
+  if (row.case_id !== undefined) result.case_id = automationString(row.case_id);
+  return result;
+}
+
 export interface SecurityLifecycleCaseFilters {
   ticker?: string;
   workflow_state?: SecurityLifecycleWorkflowState | "";
@@ -3067,6 +3420,40 @@ export function listSecurityLifecycleCases(
   return getJSON<SecurityLifecycleCaseListResponse>(
     `/security-lifecycle/cases${lifecycleQuery(filters)}`,
   );
+}
+
+export async function getSecurityLifecycleAutomationStatus(): Promise<
+  SecurityLifecycleAutomationStatusResponse
+> {
+  return parseAutomationStatus(await getJSON<unknown>("/security-lifecycle/automation"));
+}
+
+export async function updateSecurityLifecycleAutomationConfig(
+  config: SecurityLifecycleAutomationConfig,
+): Promise<SecurityLifecycleAutomationConfigResponse> {
+  return parseAutomationConfigResponse(await sendJSON<unknown>(
+    "/security-lifecycle/automation",
+    "PUT",
+    config,
+  ));
+}
+
+export async function runDueSecurityLifecycleAutomation(): Promise<
+  SecurityLifecycleAutomationDispatchResponse
+> {
+  return parseAutomationDispatch(await sendJSON<unknown>(
+    "/security-lifecycle/automation/run",
+    "POST",
+  ));
+}
+
+export async function runSecurityLifecycleCaseAutomation(
+  caseId: string,
+): Promise<SecurityLifecycleAutomationDispatchResponse> {
+  return parseAutomationDispatch(await sendJSON<unknown>(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/automation/run`,
+    "POST",
+  ));
 }
 
 export function getSecurityLifecycleCase(

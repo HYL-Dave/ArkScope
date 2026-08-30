@@ -337,17 +337,17 @@ transitions default off.
   existing owner
 - Test: `apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx`
 
-- [ ] Add typed API REDs for config/status/run responses and unknown enum
+- [x] Add typed API REDs for config/status/run responses and unknown enum
   rejection.
-- [ ] Add Settings controls using a toggle, interval menu, batch segmented
+- [x] Add Settings controls using a toggle, interval menu, batch segmented
   control, mutation toggle, and Run due now command.
-- [ ] Show current real stage, last result, active incident, next scheduled
+- [x] Show current real stage, last result, active incident, next scheduled
   time, and a concise provider-family summary. Do not render raw evidence here.
-- [ ] Add Run this case to the drawer and bind completion refresh to the latest
+- [x] Add Run this case to the drawer and bind completion refresh to the latest
   selected case/request keys.
-- [ ] Render no IBKR stage when it was skipped and no success state while an
+- [x] Render no IBKR stage when it was skipped and no success state while an
   incident remains active.
-- [ ] Add bilingual visible-behavior tests, rapid request-order tests, disabled
+- [x] Add bilingual visible-behavior tests, rapid request-order tests, disabled
   states, and narrow/mobile layout owners.
 
 ## Task 11: Make Canary Budgets Injectable and Retire Publisher Acquisition

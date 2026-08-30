@@ -988,6 +988,77 @@ table.wl tbody tr.archived td {
   margin: 0 0 4px;
   font-size: 16px;
 }
+.lifecycle-automation-settings {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.lifecycle-automation-settings h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.lifecycle-automation-status {
+  grid-template-columns: minmax(130px, max-content) minmax(0, 1fr);
+  gap: 6px 16px;
+}
+.lifecycle-automation-status dd {
+  overflow-wrap: anywhere;
+}
+.lifecycle-automation-status [data-automation-state="incident"],
+.lifecycle-automation-status [data-automation-state="failed"] {
+  color: var(--bad);
+}
+.lifecycle-automation-status [data-automation-state="running"] {
+  color: var(--accent);
+}
+.lifecycle-automation-status [data-automation-state="success"] {
+  color: var(--ok);
+}
+.lifecycle-automation-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.lifecycle-automation-toggle {
+  min-height: 34px;
+  margin-left: 0;
+}
+.lifecycle-automation-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.lifecycle-automation-field select {
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--fg);
+  font: inherit;
+}
+.lifecycle-automation-segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.lifecycle-automation-segmented .ui-button {
+  width: 100%;
+  min-width: 0;
+}
+.lifecycle-automation-run,
+.lifecycle-automation-invalid {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -1788,6 +1859,22 @@ table.wl tbody tr.archived td {
 .lifecycle-head {
   align-items: center;
 }
+.lifecycle-automation-band {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin: 0 0 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.lifecycle-automation-band[data-automation-state="incident"] {
+  color: var(--bad);
+}
+.lifecycle-automation-band[data-automation-state="running"] {
+  color: var(--accent);
+}
 .lifecycle-view-switch {
   display: flex;
   flex-wrap: wrap;
@@ -1971,6 +2058,41 @@ table.lifecycle-table tbody tr:last-child td {
 .lifecycle-detail-section p {
   margin: 6px 0;
   overflow-wrap: anywhere;
+}
+.lifecycle-case-automation {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.lifecycle-case-automation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lifecycle-automation-progress {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lifecycle-automation-progress li {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.lifecycle-automation-progress li[aria-current="step"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .lifecycle-provider-evidence {
   white-space: pre-wrap;
@@ -2282,10 +2404,31 @@ table.lifecycle-table tbody tr:last-child td {
 }
 
 @media (max-width: 600px) {
+  .lifecycle-automation-status,
+  .lifecycle-automation-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lifecycle-automation-status dt {
+    margin-top: 4px;
+  }
+  .lifecycle-automation-run,
+  .lifecycle-automation-invalid {
+    grid-column: 1;
+  }
+  .lifecycle-automation-run {
+    width: 100%;
+  }
   .lifecycle-head > .spacer {
     display: none;
   }
   .lifecycle-head > .ui-button {
+    width: 100%;
+  }
+  .lifecycle-case-automation-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .lifecycle-case-automation-head .ui-button {
     width: 100%;
   }
   .lifecycle-view-switch .ui-button {

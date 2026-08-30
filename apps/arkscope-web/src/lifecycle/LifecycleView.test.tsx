@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   RuntimeConfig,
+  SecurityLifecycleAutomationStatusResponse,
   SecurityLifecycleCaseFilters,
   SecurityLifecycleCaseSummary,
   SecurityLifecycleEvidence,
@@ -21,6 +22,7 @@ const apiMocks = vi.hoisted(() => ({
   createSecurityLifecycleAssessment: vi.fn(),
   dismissSecurityLifecycleProposal: vi.fn(),
   getSecurityLifecycleCase: vi.fn(),
+  getSecurityLifecycleAutomationStatus: vi.fn(),
   getSecurityLifecycleInvestigation: vi.fn(),
   getTickerIdentityTransitionPreview: vi.fn(),
   listTickerIdentityTransitionActivity: vi.fn(),
@@ -29,6 +31,7 @@ const apiMocks = vi.hoisted(() => ({
   reopenSecurityLifecycleAcknowledgement: vi.fn(),
   retryTickerIdentityTransition: vi.fn(),
   reverseTickerIdentityTransition: vi.fn(),
+  runSecurityLifecycleCaseAutomation: vi.fn(),
   translateSecurityLifecycleEvidence: vi.fn(),
 }));
 
@@ -374,6 +377,45 @@ function detail(overrides: object = {}) {
   };
 }
 
+function automationStatus(
+  overrides: Partial<SecurityLifecycleAutomationStatusResponse> = {},
+): SecurityLifecycleAutomationStatusResponse {
+  return {
+    config_status: "valid",
+    config: {
+      enabled: true,
+      interval_minutes: 30,
+      batch_limit: 2,
+      apply_profile_transitions: false,
+    },
+    schedule: {
+      status: "scheduled",
+      last_attempt_at: "2026-08-31T04:55:00Z",
+      next_scheduled_at: "2026-08-31T05:25:00Z",
+    },
+    telemetry_status: "valid",
+    last_status: "succeeded",
+    last_result: {
+      status: "succeeded",
+      reason: null,
+      selected: 1,
+      processed: 1,
+      accepted: 1,
+      drafted: 0,
+      blocked: 0,
+      failed: 0,
+      skipped_current: 0,
+      case_ids: [CASE_ID],
+      result_version: 2,
+      case_outcomes: { [CASE_ID]: "accepted" },
+    },
+    active_incident: null,
+    latest_failed_runs: [],
+    current_progress: [],
+    ...overrides,
+  } as SecurityLifecycleAutomationStatusResponse;
+}
+
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
 
@@ -413,12 +455,17 @@ async function mountLifecycle(
 }
 
 async function click(label: string, scope: ParentNode = document.body) {
+  const button = buttonIn(scope, label);
+  await act(async () => button.click());
+  await flush();
+}
+
+function buttonIn(scope: ParentNode, label: string): HTMLButtonElement {
   const button = Array.from(scope.querySelectorAll<HTMLButtonElement>("button"))
     .find((candidate) => candidate.textContent?.includes(label)
       || candidate.getAttribute("aria-label")?.includes(label));
   if (!button) throw new Error(`missing button: ${label}; rendered=${scope.textContent ?? ""}`);
-  await act(async () => button.click());
-  await flush();
+  return button;
 }
 
 async function setField(label: string, value: string) {
@@ -463,6 +510,7 @@ beforeEach(async () => {
     data_integrity: { source_missing_count: 1 },
   });
   apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail());
+  apiMocks.getSecurityLifecycleAutomationStatus.mockResolvedValue(automationStatus());
   apiMocks.addSecurityLifecycleEvidence.mockResolvedValue({ evidence_id: "evidence-new" });
   apiMocks.createSecurityLifecycleAssessment.mockResolvedValue({
     assessment_id: "assessment-new",
@@ -504,6 +552,12 @@ beforeEach(async () => {
   apiMocks.reverseTickerIdentityTransition.mockResolvedValue({
     transition_id: "transition-1",
     status: "reversed",
+  });
+  apiMocks.runSecurityLifecycleCaseAutomation.mockResolvedValue({
+    scope: "case",
+    status: "started",
+    request_id: "slao_case_default",
+    case_id: CASE_ID,
   });
   apiMocks.translateSecurityLifecycleEvidence.mockResolvedValue({
     evidence_id: "evidence-sec",
@@ -1083,6 +1137,165 @@ describe("Lifecycle workflow", () => {
     const drawer = document.body.querySelector('[role="dialog"]');
     expect(drawer?.textContent).toContain("SECOND");
     expect(drawer?.textContent).not.toContain("FIRST");
+  });
+
+  it("shows only real lifecycle stages and prioritizes an active incident over success", async () => {
+    apiMocks.getSecurityLifecycleAutomationStatus.mockResolvedValue(automationStatus({
+      active_incident: {
+        case_failures: {
+          slc_failed_elsewhere: { run_id: "slar_failed", recovery: "new_attempt" },
+        },
+        scheduler_failure: null,
+      },
+      current_progress: [{
+        trigger: "manual_case",
+        request_id: "slao_visible",
+        case_id: CASE_ID,
+        started_at: "2026-08-31T05:00:00Z",
+        current_stage: "evaluate",
+        completed_stages: ["preparing", "sec", "listing"],
+        skipped_stages: ["ibkr"],
+      }],
+    }));
+
+    await mountLifecycle();
+
+    const progress = document.body.querySelector<HTMLElement>(
+      '[data-testid="lifecycle-automation-progress"]',
+    );
+    expect(progress?.textContent).toContain("Preparing");
+    expect(progress?.textContent).toContain("SEC");
+    expect(progress?.textContent).toContain("Listing directories");
+    expect(progress?.textContent).toContain("Evaluate");
+    expect(progress?.textContent).not.toContain("IBKR");
+    expect(document.body.textContent).toContain("Automatic checking needs attention");
+    expect(document.body.querySelector('[data-automation-state="success"]')).toBeNull();
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(true);
+  });
+
+  it("keeps automation status bound to the newest request when responses resolve out of order", async () => {
+    const staleInitial = deferred<SecurityLifecycleAutomationStatusResponse>();
+    const running = automationStatus({
+      current_progress: [{
+        trigger: "manual_case",
+        request_id: "slao_case_default",
+        case_id: CASE_ID,
+        started_at: "2026-08-31T05:00:00Z",
+        current_stage: "evaluate",
+        completed_stages: ["preparing", "sec", "listing"],
+        skipped_stages: ["ibkr"],
+      }],
+    });
+    let statusReads = 0;
+    apiMocks.getSecurityLifecycleAutomationStatus.mockImplementation(() => {
+      statusReads += 1;
+      return statusReads === 1 ? staleInitial.promise : Promise.resolve(running);
+    });
+
+    await mountLifecycle();
+    await click("Run this case");
+
+    const progress = document.body.querySelector<HTMLElement>(
+      '[data-testid="lifecycle-automation-progress"]',
+    );
+    expect(progress?.textContent).toContain("Evaluate");
+
+    await act(async () => {
+      staleInitial.resolve(automationStatus());
+      await staleInitial.promise;
+    });
+    await flush();
+
+    expect(document.body.querySelector(
+      '[data-testid="lifecycle-automation-progress"]',
+    )?.textContent).toContain("Evaluate");
+  });
+
+  it("refreshes only the latest selected case after an attended run completes", async () => {
+    const dispatch = deferred<{
+      scope: "case";
+      status: "started";
+      request_id: string;
+      case_id: string;
+    }>();
+    const currentCase = {
+      ...SUMMARY,
+      case_id: "case-automation-current",
+      ticker: "CURRENT",
+    };
+    const nextCase = {
+      ...SUMMARY,
+      case_id: "case-automation-next",
+      ticker: "NEXT",
+    };
+    let currentReads = 0;
+    let nextReads = 0;
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [currentCase, nextCase],
+      count: 2,
+      queue_counts: { attention: 2, monitoring: 0, history: 0 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.getSecurityLifecycleCase.mockImplementation((caseId: string) => {
+      if (caseId === currentCase.case_id) {
+        currentReads += 1;
+        return Promise.resolve(detail({
+          ...currentCase,
+          issuer_name: "Current issuer",
+        }));
+      }
+      if (caseId === nextCase.case_id) {
+        nextReads += 1;
+        return Promise.resolve(detail({
+          ...nextCase,
+          issuer_name: nextReads === 1 ? "Next initial" : "Next refreshed",
+        }));
+      }
+      throw new Error(`unexpected case read: ${caseId}`);
+    });
+    apiMocks.runSecurityLifecycleCaseAutomation.mockReturnValue(dispatch.promise);
+
+    await mountLifecycle(currentCase.case_id);
+    await click("Run this case");
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(true);
+
+    const nextTrigger = Array.from(
+      host!.querySelectorAll<HTMLButtonElement>(".lifecycle-case-trigger"),
+    ).find((candidate) => candidate.textContent?.includes("NEXT"));
+    if (!nextTrigger) throw new Error("missing next-case trigger");
+    await act(async () => nextTrigger.click());
+    await flush();
+
+    await act(async () => {
+      dispatch.resolve({
+        scope: "case",
+        status: "started",
+        request_id: "slao_completed",
+        case_id: currentCase.case_id,
+      });
+      await dispatch.promise;
+    });
+    await flush();
+
+    const drawer = document.body.querySelector('[role="dialog"]');
+    expect(apiMocks.runSecurityLifecycleCaseAutomation).toHaveBeenCalledWith(currentCase.case_id);
+    expect(currentReads).toBe(1);
+    expect(nextReads).toBe(2);
+    expect(drawer?.textContent).toContain("NEXT");
+    expect(drawer?.textContent).toContain("Next refreshed");
+    expect(drawer?.textContent).not.toContain("Current issuer");
+  });
+
+  it("exposes the attended command in Traditional Chinese on a narrow viewport", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 480 });
+    window.dispatchEvent(new Event("resize"));
+    await i18n.changeLanguage("zh-Hant");
+
+    await mountLifecycle();
+
+    const command = buttonIn(document.body, "執行此案件");
+    expect(command.disabled).toBe(false);
+    expect(document.body.querySelector(".lifecycle-case-automation")).not.toBeNull();
   });
 
   it("keeps the newly selected case detail after a pending case command completes", async () => {

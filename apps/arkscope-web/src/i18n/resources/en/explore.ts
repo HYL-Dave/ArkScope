@@ -301,6 +301,22 @@ const explore = {
       structuredPrefix: "Structured details:",
       structuredSeparator: " · ",
     },
+    automationControl: {
+      title: "Automatic check",
+      runCase: "Run this case",
+      incident: "Automatic checking needs attention",
+      running: "Automatic checks in progress: {{count}}",
+      stages: {
+        preparing: "Preparing",
+        sec: "SEC",
+        listing: "Listing directories",
+        ibkr: "IBKR",
+        evaluate: "Evaluate",
+        persist: "Save result",
+        approve: "Prepare action",
+        finalize: "Finalize",
+      },
+    },
     actions: {
       refresh: "Refresh cases",
       addText: "Add text evidence",

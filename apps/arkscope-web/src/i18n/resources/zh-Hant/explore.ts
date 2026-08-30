@@ -301,6 +301,22 @@ const explore = {
       structuredPrefix: "結構化資訊：",
       structuredSeparator: " · ",
     },
+    automationControl: {
+      title: "自動查核",
+      runCase: "執行此案件",
+      incident: "自動查核需要處理",
+      running: "執行中的自動查核：{{count}}",
+      stages: {
+        preparing: "準備",
+        sec: "SEC",
+        listing: "上市名錄",
+        ibkr: "IBKR",
+        evaluate: "判定",
+        persist: "儲存結果",
+        approve: "準備動作",
+        finalize: "完成",
+      },
+    },
     actions: {
       refresh: "重新整理案件",
       addText: "加入文字證據",

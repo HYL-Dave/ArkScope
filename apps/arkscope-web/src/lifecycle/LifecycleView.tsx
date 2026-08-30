@@ -5,6 +5,7 @@ import {
   ArrowRightLeft,
   Check,
   ExternalLink,
+  Play,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -22,12 +23,14 @@ import {
   createSecurityLifecycleAssessment,
   dismissSecurityLifecycleProposal,
   getSecurityLifecycleCase,
+  getSecurityLifecycleAutomationStatus,
   getTickerIdentityTransitionPreview,
   listTickerIdentityTransitionActivity,
   listSecurityLifecycleCases,
   reopenSecurityLifecycleAcknowledgement,
   retryTickerIdentityTransition,
   reverseTickerIdentityTransition,
+  runSecurityLifecycleCaseAutomation,
   translateSecurityLifecycleEvidence,
   type RuntimeConfig,
   type SecurityLifecycleCaseDetail,
@@ -35,6 +38,9 @@ import {
   type SecurityLifecycleCaseSummary,
   type SecurityLifecycleDispositionReason,
   type SecurityLifecycleAssessment,
+  type SecurityLifecycleAutomationProgress,
+  type SecurityLifecycleAutomationStage,
+  type SecurityLifecycleAutomationStatusResponse,
   type SecurityLifecycleAutomationFact,
   type SecurityLifecycleAssessmentOutcome,
   type SecurityLifecycleConfidence,
@@ -159,6 +165,37 @@ const ASSESSMENT_OUTCOMES: SecurityLifecycleAssessmentOutcome[] = [
   "other",
   "not_applicable",
 ];
+
+function lifecycleAutomationStageLabel(
+  stage: SecurityLifecycleAutomationStage,
+  t: TFunction<"explore">,
+): string {
+  switch (stage) {
+    case "preparing": return t(($) => $.lifecycle.automationControl.stages.preparing);
+    case "sec": return t(($) => $.lifecycle.automationControl.stages.sec);
+    case "listing": return t(($) => $.lifecycle.automationControl.stages.listing);
+    case "ibkr": return t(($) => $.lifecycle.automationControl.stages.ibkr);
+    case "evaluate": return t(($) => $.lifecycle.automationControl.stages.evaluate);
+    case "persist": return t(($) => $.lifecycle.automationControl.stages.persist);
+    case "approve": return t(($) => $.lifecycle.automationControl.stages.approve);
+    case "finalize": return t(($) => $.lifecycle.automationControl.stages.finalize);
+  }
+}
+
+function visibleAutomationStages(
+  progress: SecurityLifecycleAutomationProgress,
+): SecurityLifecycleAutomationStage[] {
+  const skipped = new Set(progress.skipped_stages);
+  const seen = new Set<SecurityLifecycleAutomationStage>();
+  const candidates = progress.current_stage === null
+    ? progress.completed_stages
+    : [...progress.completed_stages, progress.current_stage];
+  return candidates.filter((stage) => {
+    if (skipped.has(stage) || seen.has(stage)) return false;
+    seen.add(stage);
+    return true;
+  });
+}
 
 function localeValue(locale: string | undefined): LifecycleLocale {
   return locale === "en" ? "en" : "zh-Hant";
@@ -1246,6 +1283,19 @@ export function LifecycleView({
   >(null);
   const [transitionUnhideSuccessor, setTransitionUnhideSuccessor] = useState(false);
   const [transitionDialog, setTransitionDialog] = useState<"approve" | "reverse" | null>(null);
+  const [automationStatusSnapshot, setAutomationStatusSnapshot] = useState<{
+    sequence: number;
+    response: SecurityLifecycleAutomationStatusResponse;
+  } | null>(null);
+  const [automationStatusError, setAutomationStatusError] = useState<ReturnType<
+    typeof lifecycleErrorPresentation
+  > | null>(null);
+  const [pendingAutomationRun, setPendingAutomationRun] = useState<{
+    caseId: string;
+    minimumStatusSequence: number;
+    requestId: string;
+    runSequence: number;
+  } | null>(null);
   const caseQuery = useMemo(() => ({ filters, queueView, sourcePresence }), [
     filters,
     queueView,
@@ -1254,6 +1304,8 @@ export function LifecycleView({
   const transitionPreviewRequestRef = useRef(0);
   const caseRequestRef = useRef(0);
   const detailRequestRef = useRef(0);
+  const automationStatusRequestRef = useRef(0);
+  const automationRunRequestRef = useRef(0);
   const caseQueryRef = useRef(caseQuery);
   const selectedCaseIdRef = useRef(selectedCaseId);
   const pendingQueueViewRef = useRef<QueueView | null>(null);
@@ -1345,6 +1397,21 @@ export function LifecycleView({
     }
   }, [locale]);
 
+  const loadAutomationStatus = useCallback(async () => {
+    const sequence = ++automationStatusRequestRef.current;
+    try {
+      const response = await getSecurityLifecycleAutomationStatus();
+      if (sequence !== automationStatusRequestRef.current) return null;
+      setAutomationStatusSnapshot({ response, sequence });
+      setAutomationStatusError(null);
+      return response;
+    } catch (error) {
+      if (sequence !== automationStatusRequestRef.current) return null;
+      setAutomationStatusError(lifecycleErrorPresentation(error, locale));
+      return null;
+    }
+  }, [locale]);
+
   const loadTransitionPreview = useCallback(async (
     caseId: string,
     options: {
@@ -1378,6 +1445,21 @@ export function LifecycleView({
 
   useEffect(() => { void loadCases(); }, [caseQuery, loadCases]);
   useEffect(() => { void loadActivity(); }, [loadActivity]);
+  useEffect(() => { void loadAutomationStatus(); }, [loadAutomationStatus]);
+  useEffect(() => {
+    if (
+      !pendingAutomationRun
+      && !automationStatusSnapshot?.response.current_progress.length
+    ) return undefined;
+    const timeout = window.setTimeout(() => {
+      void loadAutomationStatus();
+    }, 1000);
+    return () => window.clearTimeout(timeout);
+  }, [automationStatusSnapshot, loadAutomationStatus, pendingAutomationRun]);
+  useEffect(() => () => {
+    automationStatusRequestRef.current += 1;
+    automationRunRequestRef.current += 1;
+  }, []);
   useEffect(() => {
     if (selectedCaseId) void loadDetail(selectedCaseId);
     else {
@@ -1494,6 +1576,65 @@ export function LifecycleView({
     }
   };
 
+  const runCaseAutomation = async () => {
+    const caseId = selectedCaseIdRef.current;
+    if (!caseId || busy) return;
+    const runSequence = ++automationRunRequestRef.current;
+    let waitForCompletion = false;
+    setBusy("automation-case");
+    setCommandError(null);
+    try {
+      const dispatched = await runSecurityLifecycleCaseAutomation(caseId);
+      if (runSequence !== automationRunRequestRef.current) return;
+      if (dispatched.status === "started" && dispatched.request_id) {
+        waitForCompletion = true;
+        setPendingAutomationRun({
+          caseId,
+          minimumStatusSequence: automationStatusRequestRef.current + 1,
+          requestId: dispatched.request_id,
+          runSequence,
+        });
+        await loadAutomationStatus();
+        return;
+      }
+      const currentCaseId = selectedCaseIdRef.current;
+      await Promise.all([
+        loadAutomationStatus(),
+        loadCases(),
+        currentCaseId ? loadDetail(currentCaseId) : Promise.resolve(),
+      ]);
+    } catch (error) {
+      if (runSequence !== automationRunRequestRef.current) return;
+      setCommandError(commandErrorPresentation(error, locale, t));
+    } finally {
+      if (runSequence === automationRunRequestRef.current && !waitForCompletion) {
+        setBusy(null);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (
+      !pendingAutomationRun
+      || !automationStatusSnapshot
+      || automationStatusSnapshot.sequence < pendingAutomationRun.minimumStatusSequence
+      || automationStatusSnapshot.response.current_progress.some(
+        (row) => row.request_id === pendingAutomationRun.requestId,
+      )
+    ) return;
+    const runSequence = pendingAutomationRun.runSequence;
+    setPendingAutomationRun(null);
+    setBusy((current) => current === "automation-case" ? null : current);
+    void (async () => {
+      const currentCaseId = selectedCaseIdRef.current;
+      await Promise.all([
+        loadCases(),
+        currentCaseId ? loadDetail(currentCaseId) : Promise.resolve(),
+      ]);
+      if (runSequence !== automationRunRequestRef.current) return;
+    })();
+  }, [automationStatusSnapshot, loadCases, loadDetail, pendingAutomationRun]);
+
   const runActivityCommand = async (
     name: string,
     command: () => Promise<unknown>,
@@ -1553,6 +1694,13 @@ export function LifecycleView({
   const evidenceCitations = useMemo(() => currentEvidence.filter(
     (item) => Boolean(item.evidence_id),
   ), [currentEvidence]);
+  const automationStatus = automationStatusSnapshot?.response ?? null;
+  const caseAutomationProgress = detail
+    ? automationStatus?.current_progress.find((row) => row.case_id === detail.case_id) ?? null
+    : null;
+  const caseAutomationStages = caseAutomationProgress
+    ? visibleAutomationStages(caseAutomationProgress)
+    : [];
   const currentDecisionNarrative = detail?.current_assessment
     ? lifecycleAutomationNarrative(detail.current_assessment, detail.ticker, locale)
     : null;
@@ -1627,6 +1775,23 @@ export function LifecycleView({
           {t(($) => $.lifecycle.actions.refresh)}
         </Button>
       </div>
+
+      {automationStatusError ? (
+        <p className="errorbox" data-error-code={automationStatusError.code}>
+          {automationStatusError.message}
+        </p>
+      ) : null}
+      {automationStatus?.active_incident ? (
+        <div className="lifecycle-automation-band" data-automation-state="incident">
+          <strong>{t(($) => $.lifecycle.automationControl.incident)}</strong>
+        </div>
+      ) : automationStatus?.current_progress.length ? (
+        <div className="lifecycle-automation-band" data-automation-state="running">
+          <strong>{t(($) => $.lifecycle.automationControl.running, {
+            count: automationStatus.current_progress.length,
+          })}</strong>
+        </div>
+      ) : null}
 
       {activityError ? (
         <p className="errorbox" data-error-code={activityError.code}>{activityError.message}</p>
@@ -1757,6 +1922,41 @@ export function LifecycleView({
               <p className="errorbox" data-error-code={commandError.code}>{commandError.message}</p>
             ) : null}
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.status)}>
+              <div
+                className="lifecycle-case-automation"
+                data-automation-state={caseAutomationProgress ? "running" : "idle"}
+              >
+                <div className="lifecycle-case-automation-head">
+                  <strong>{t(($) => $.lifecycle.automationControl.title)}</strong>
+                  <Button
+                    size="compact"
+                    tone="secondary"
+                    icon={<Play size={14} />}
+                    busy={busy === "automation-case"}
+                    disabled={Boolean(busy) || Boolean(caseAutomationProgress)}
+                    onClick={() => void runCaseAutomation()}
+                  >
+                    {t(($) => $.lifecycle.automationControl.runCase)}
+                  </Button>
+                </div>
+                {caseAutomationProgress ? (
+                  <ol
+                    className="lifecycle-automation-progress"
+                    data-testid="lifecycle-automation-progress"
+                  >
+                    {caseAutomationStages.map((stage) => (
+                      <li
+                        aria-current={caseAutomationProgress.current_stage === stage
+                          ? "step"
+                          : undefined}
+                        key={stage}
+                      >
+                        {lifecycleAutomationStageLabel(stage, t)}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+              </div>
               {detail.current_assessment && currentDecisionNarrative ? (
                 <div
                   className="lifecycle-decision-summary"

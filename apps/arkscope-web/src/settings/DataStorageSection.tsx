@@ -4,12 +4,20 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Play,
 } from "lucide-react";
 import {
+  getSecurityLifecycleAutomationStatus,
   getMarketDataStatus,
   listSecurityLifecycleCases,
   getTradingDayCoverage,
+  runDueSecurityLifecycleAutomation,
+  updateSecurityLifecycleAutomationConfig,
   type MarketDataStatus,
+  type SecurityLifecycleAutomationConfig,
+  type SecurityLifecycleAutomationSchedulerStatus,
+  type SecurityLifecycleAutomationStage,
+  type SecurityLifecycleAutomationStatusResponse,
   type SecurityLifecycleCaseListResponse,
   type TradingDayCoverage,
   type TradingDayRow,
@@ -39,6 +47,39 @@ import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
+}
+
+function lifecycleAutomationStageLabel(
+  stage: SecurityLifecycleAutomationStage,
+  t: SettingsT,
+): string {
+  switch (stage) {
+    case "preparing": return t(($) => $.dataStorage.lifecycle.automation.stages.preparing);
+    case "sec": return t(($) => $.dataStorage.lifecycle.automation.stages.sec);
+    case "listing": return t(($) => $.dataStorage.lifecycle.automation.stages.listing);
+    case "ibkr": return t(($) => $.dataStorage.lifecycle.automation.stages.ibkr);
+    case "evaluate": return t(($) => $.dataStorage.lifecycle.automation.stages.evaluate);
+    case "persist": return t(($) => $.dataStorage.lifecycle.automation.stages.persist);
+    case "approve": return t(($) => $.dataStorage.lifecycle.automation.stages.approve);
+    case "finalize": return t(($) => $.dataStorage.lifecycle.automation.stages.finalize);
+  }
+}
+
+function lifecycleAutomationStateLabel(
+  status: SecurityLifecycleAutomationSchedulerStatus | "absent" | "invalid",
+  t: SettingsT,
+): string {
+  switch (status) {
+    case "running": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.running);
+    case "failed": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.failed);
+    case "succeeded": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.succeeded);
+    case "partial": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.partial);
+    case "unavailable": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.unavailable);
+    case "not_installed": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.not_installed);
+    case "skipped": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.skipped);
+    case "absent": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.absent);
+    case "invalid": return t(($) => $.dataStorage.lifecycle.automation.stateLabels.invalid);
+  }
 }
 
 function coverageDeveloperDiagnostics(coverage: TradingDayCoverage): string[] {
@@ -197,6 +238,10 @@ function SecurityLifecyclePanel({
   });
   const [err, setErr] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
+  const [automation, setAutomation] = useState<SecurityLifecycleAutomationStatusResponse | null>(null);
+  const [automationErr, setAutomationErr] = useState<Error | null>(null);
+  const [automationBusy, setAutomationBusy] = useState<"config" | "run" | null>(null);
+  const automationRequestRef = useRef(0);
   const load = useCallback(async (force = false) => {
     setBusy(true);
     const result = await settingsReadCache.load(
@@ -219,7 +264,92 @@ function SecurityLifecyclePanel({
     "security_lifecycle",
     () => { void load(false); },
   ), [load, settingsReadCache]);
+  const loadAutomation = useCallback(async () => {
+    const request = ++automationRequestRef.current;
+    try {
+      const value = await getSecurityLifecycleAutomationStatus();
+      if (request !== automationRequestRef.current) return null;
+      setAutomation(value);
+      setAutomationErr(null);
+      return value;
+    } catch (error) {
+      if (request !== automationRequestRef.current) return null;
+      setAutomationErr(error instanceof Error ? error : new Error(String(error)));
+      return null;
+    }
+  }, []);
+  useEffect(() => {
+    void loadAutomation();
+  }, [loadAutomation]);
+  const automationRunning = Boolean(automation?.current_progress.length);
+  useEffect(() => {
+    if (!automationRunning) return undefined;
+    const timer = window.setTimeout(() => { void loadAutomation(); }, 1_000);
+    return () => window.clearTimeout(timer);
+  }, [automationRunning, automation, loadAutomation]);
+
+  const saveAutomationConfig = async (next: SecurityLifecycleAutomationConfig) => {
+    if (automationBusy || automation?.config_status !== "valid") return;
+    setAutomationBusy("config");
+    setAutomationErr(null);
+    try {
+      const response = await updateSecurityLifecycleAutomationConfig(next);
+      setAutomation((current) => current ? { ...current, ...response } : current);
+    } catch (error) {
+      setAutomationErr(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      setAutomationBusy(null);
+    }
+  };
+  const runDueAutomation = async () => {
+    if (automationBusy || automation?.config_status !== "valid") return;
+    setAutomationBusy("run");
+    setAutomationErr(null);
+    try {
+      await runDueSecurityLifecycleAutomation();
+      await loadAutomation();
+    } catch (error) {
+      setAutomationErr(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      setAutomationBusy(null);
+    }
+  };
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
+  const automationErrorPresentation = automationErr
+    ? settingsErrorPresentation(automationErr, t, commonT)
+    : null;
+  const config = automation?.config_status === "valid" ? automation.config : null;
+  const automationDisabled = !config || automationBusy !== null;
+  const currentProgress = automation?.current_progress[0] ?? null;
+  const incidentCaseCount = automation
+    ? Object.keys(automation.active_incident?.case_failures ?? {}).length
+    : 0;
+  const schedulerIncident = Boolean(automation?.active_incident?.scheduler_failure);
+  const stateKey: SecurityLifecycleAutomationSchedulerStatus | "absent" | "invalid" = (
+    automation?.telemetry_status === "invalid"
+      ? "invalid"
+      : currentProgress
+        ? "running"
+        : automation?.last_status ?? "absent"
+  );
+  const stateLabel = schedulerIncident
+    ? t(($) => $.dataStorage.lifecycle.automation.incidentScheduler)
+    : incidentCaseCount > 0
+      ? incidentCaseCount === 1
+        ? t(($) => $.dataStorage.lifecycle.automation.incidentCases_one, {
+          count: incidentCaseCount,
+        })
+        : t(($) => $.dataStorage.lifecycle.automation.incidentCases_other, {
+          count: incidentCaseCount,
+        })
+      : lifecycleAutomationStateLabel(stateKey, t);
+  const automationState = schedulerIncident || incidentCaseCount > 0
+    ? "incident"
+    : currentProgress
+      ? "running"
+      : stateKey === "succeeded"
+        ? "success"
+        : stateKey;
 
   return (
     <div style={{ marginTop: 24, borderTop: "1px solid var(--border, #333)", paddingTop: 16 }}>
@@ -228,12 +358,19 @@ function SecurityLifecyclePanel({
           <h2>{t(($) => $.dataStorage.lifecycle.title)}</h2>
           <p className="muted tiny">{t(($) => $.dataStorage.lifecycle.description)}</p>
         </div>
-        <button className="btn-ghost" onClick={() => void load(true)} disabled={busy}>
+        <button
+          className="btn-ghost"
+          onClick={() => void Promise.all([load(true), loadAutomation()])}
+          disabled={busy}
+        >
           ↻ {t(($) => $.actions.refreshStatus)}
         </button>
       </div>
       {errorPresentation ? (
         <div className="errorbox"><p className="muted">{errorPresentation.message}</p></div>
+      ) : null}
+      {automationErrorPresentation ? (
+        <div className="errorbox"><p className="muted">{automationErrorPresentation.message}</p></div>
       ) : null}
       {developerMode ? (
         <DeveloperDiagnostics diagnostics={[errorPresentation?.diagnostic]} t={t} />
@@ -248,6 +385,144 @@ function SecurityLifecyclePanel({
             <dt>{t(($) => $.dataStorage.lifecycle.summary.sourceMissing)}</dt>
             <dd>{snapshot.data_integrity.source_missing_count.toLocaleString()}</dd>
           </dl>
+          <section className="lifecycle-automation-settings" aria-labelledby="lifecycle-automation-title">
+            <h3 id="lifecycle-automation-title">
+              {t(($) => $.dataStorage.lifecycle.automation.title)}
+            </h3>
+            {!automation ? (
+              <p className="muted tiny">{t(($) => $.dataStorage.loading)}</p>
+            ) : (
+              <>
+                <dl className="ds-kv lifecycle-automation-status">
+                  <dt>{t(($) => $.dataStorage.lifecycle.automation.state)}</dt>
+                  <dd>
+                    <strong data-automation-state={automationState}>{stateLabel}</strong>
+                  </dd>
+                  {currentProgress?.current_stage ? (
+                    <>
+                      <dt>{t(($) => $.dataStorage.lifecycle.automation.currentStage)}</dt>
+                      <dd>{lifecycleAutomationStageLabel(currentProgress.current_stage, t)}</dd>
+                    </>
+                  ) : null}
+                  <dt>{t(($) => $.dataStorage.lifecycle.automation.lastResult)}</dt>
+                  <dd>{automation.last_result
+                    ? t(($) => $.dataStorage.lifecycle.automation.resultSummary, {
+                      processed: automation.last_result.processed,
+                      accepted: automation.last_result.accepted,
+                      drafted: automation.last_result.drafted,
+                      blocked: automation.last_result.blocked,
+                      failed: automation.last_result.failed,
+                    })
+                    : t(($) => $.dataStorage.lifecycle.automation.noResult)}</dd>
+                  <dt>{t(($) => $.dataStorage.lifecycle.automation.lastAttempt)}</dt>
+                  <dd>{automation.schedule.last_attempt_at
+                    ? shortTs(automation.schedule.last_attempt_at)
+                    : t(($) => $.dataStorage.lifecycle.automation.notScheduled)}</dd>
+                  <dt>{t(($) => $.dataStorage.lifecycle.automation.nextScheduled)}</dt>
+                  <dd>{automation.schedule.next_scheduled_at
+                    ? shortTs(automation.schedule.next_scheduled_at)
+                    : t(($) => $.dataStorage.lifecycle.automation.notScheduled)}</dd>
+                  <dt>{t(($) => $.dataStorage.lifecycle.automation.providers)}</dt>
+                  <dd>{t(($) => $.dataStorage.lifecycle.automation.providerSummary)}</dd>
+                </dl>
+
+                <div
+                  className="lifecycle-automation-controls"
+                  data-testid="lifecycle-automation-controls"
+                >
+                  {config ? (
+                    <>
+                      <label className="ds-toggle lifecycle-automation-toggle">
+                        <input
+                          type="checkbox"
+                          aria-label={t(($) => $.dataStorage.lifecycle.automation.backgroundEnabled)}
+                          checked={config.enabled}
+                          disabled={automationDisabled}
+                          onChange={(event) => void saveAutomationConfig({
+                            ...config,
+                            enabled: event.target.checked,
+                          })}
+                        />
+                        <span>{t(($) => $.dataStorage.lifecycle.automation.backgroundEnabled)}</span>
+                      </label>
+                      <label className="lifecycle-automation-field">
+                        <span>{t(($) => $.dataStorage.lifecycle.automation.interval)}</span>
+                        <select
+                          aria-label={t(($) => $.dataStorage.lifecycle.automation.interval)}
+                          value={config.interval_minutes}
+                          disabled={automationDisabled}
+                          onChange={(event) => void saveAutomationConfig({
+                            ...config,
+                            interval_minutes: Number(event.target.value),
+                          })}
+                        >
+                          {[5, 15, 30, 60, 360, 1440].map((minutes) => (
+                            <option value={minutes} key={minutes}>
+                              {t(($) => $.dataStorage.lifecycle.automation.intervalMinutes, {
+                                count: minutes,
+                              })}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="lifecycle-automation-field">
+                        <span>{t(($) => $.dataStorage.lifecycle.automation.batchSize)}</span>
+                        <div className="lifecycle-automation-segmented" role="group">
+                          {([1, 2] as const).map((limit) => (
+                            <Button
+                              size="compact"
+                              tone={config.batch_limit === limit ? "primary" : "ghost"}
+                              aria-pressed={config.batch_limit === limit}
+                              disabled={automationDisabled}
+                              onClick={() => void saveAutomationConfig({
+                                ...config,
+                                batch_limit: limit,
+                              })}
+                              key={limit}
+                            >
+                              {t(($) => $.dataStorage.lifecycle.automation.batchOption, {
+                                count: limit,
+                              })}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                      <label className="ds-toggle lifecycle-automation-toggle">
+                        <input
+                          type="checkbox"
+                          aria-label={t(($) => $.dataStorage.lifecycle.automation.applyTransitions)}
+                          checked={config.apply_profile_transitions}
+                          disabled={automationDisabled}
+                          onChange={(event) => void saveAutomationConfig({
+                            ...config,
+                            apply_profile_transitions: event.target.checked,
+                          })}
+                        />
+                        <span>{t(($) => $.dataStorage.lifecycle.automation.applyTransitions)}</span>
+                      </label>
+                    </>
+                  ) : (
+                    <p className="errorbox lifecycle-automation-invalid">
+                      {t(($) => $.dataStorage.lifecycle.automation.invalidConfig)}
+                    </p>
+                  )}
+                  <Button
+                    className="lifecycle-automation-run"
+                    size="compact"
+                    tone="secondary"
+                    icon={<Play size={15} />}
+                    busy={automationBusy === "run"}
+                    disabled={automationDisabled}
+                    onClick={() => void runDueAutomation()}
+                  >
+                    {automationBusy === "run"
+                      ? t(($) => $.dataStorage.lifecycle.automation.runningCommand)
+                      : t(($) => $.dataStorage.lifecycle.automation.runDue)}
+                  </Button>
+                </div>
+              </>
+            )}
+          </section>
           <p className="muted tiny">
             {t(($) => $.dataStorage.lifecycle.handoff)}
           </p>
