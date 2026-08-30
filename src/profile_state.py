@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -915,6 +915,55 @@ class ProfileStateStore:
                 (key, value, _now()),
             )
             conn.commit()
+
+    def get_settings_snapshot(
+        self, keys: Iterable[str]
+    ) -> dict[str, Optional[str]]:
+        requested = tuple(keys)
+        if any(not isinstance(key, str) or not key for key in requested):
+            raise TypeError("setting key must be a nonempty string")
+        unique_keys = tuple(dict.fromkeys(requested))
+        if not unique_keys:
+            return {}
+        placeholders = ",".join("?" for _ in unique_keys)
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM profile_settings "
+                f"WHERE key IN ({placeholders})",
+                unique_keys,
+            ).fetchall()
+        observed = {str(row["key"]): row["value"] for row in rows}
+        return {key: observed.get(key) for key in unique_keys}
+
+    def update_settings(self, values: Mapping[str, Optional[str]]) -> None:
+        try:
+            materialized = tuple(values.items())
+        except AttributeError as exc:
+            raise TypeError("settings update must be a mapping") from exc
+        for key, value in materialized:
+            if not isinstance(key, str) or not key:
+                raise TypeError("setting key must be a nonempty string")
+            if value is not None and not isinstance(value, str):
+                raise TypeError("setting value must be a string or None")
+        if not materialized:
+            return
+
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                for key, value in materialized:
+                    conn.execute(
+                        "INSERT INTO profile_settings (key, value, updated_at) "
+                        "VALUES (?, ?, ?) "
+                        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+                        "updated_at = excluded.updated_at",
+                        (key, value, now),
+                    )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     def list_notes(self, ticker: str) -> list[Note]:
         t = _norm(ticker)

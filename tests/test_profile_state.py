@@ -1173,6 +1173,148 @@ def test_profile_settings_get_set(store):
     assert store.get_setting("default_watchlist_id") is None
 
 
+_AUTOMATION_SETTING_KEYS = (
+    "security_lifecycle.automation.enabled",
+    "security_lifecycle.automation.interval_minutes",
+    "security_lifecycle.automation.batch_limit",
+    "security_lifecycle.automation.apply_profile_transitions",
+)
+
+
+def test_profile_settings_snapshot_returns_requested_missing_keys(store):
+    store.set_setting(_AUTOMATION_SETTING_KEYS[0], "true")
+
+    assert store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS) == {
+        _AUTOMATION_SETTING_KEYS[0]: "true",
+        _AUTOMATION_SETTING_KEYS[1]: None,
+        _AUTOMATION_SETTING_KEYS[2]: None,
+        _AUTOMATION_SETTING_KEYS[3]: None,
+    }
+
+
+def test_profile_settings_snapshot_cannot_mix_two_generations(store, monkeypatch):
+    old_values = {
+        _AUTOMATION_SETTING_KEYS[0]: "true",
+        _AUTOMATION_SETTING_KEYS[1]: "5",
+        _AUTOMATION_SETTING_KEYS[2]: "2",
+        _AUTOMATION_SETTING_KEYS[3]: "false",
+    }
+    new_values = {
+        _AUTOMATION_SETTING_KEYS[0]: "false",
+        _AUTOMATION_SETTING_KEYS[1]: "60",
+        _AUTOMATION_SETTING_KEYS[2]: "1",
+        _AUTOMATION_SETTING_KEYS[3]: "true",
+    }
+    for key, value in old_values.items():
+        store.set_setting(key, value)
+
+    original_connect = store._connect
+    changed = False
+
+    class InterleavingConnection:
+        def __init__(self):
+            self.connection = original_connect()
+
+        def __enter__(self):
+            self.connection.__enter__()
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return self.connection.__exit__(exc_type, exc, traceback)
+
+        def execute(self, sql, parameters=()):
+            nonlocal changed
+            cursor = self.connection.execute(sql, parameters)
+            if not changed and sql.lstrip().upper().startswith("SELECT"):
+                changed = True
+                with sqlite3.connect(store.db_path) as writer:
+                    writer.executemany(
+                        "UPDATE profile_settings SET value = ?, updated_at = ? "
+                        "WHERE key = ?",
+                        [
+                            (value, ROUTE_NOW_TEXT, key)
+                            for key, value in new_values.items()
+                        ],
+                    )
+            return cursor
+
+        def __getattr__(self, name):
+            return getattr(self.connection, name)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(store, "_connect", InterleavingConnection)
+        observed = store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS)
+
+    assert observed == old_values
+    assert store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS) == new_values
+
+
+def test_profile_settings_bulk_update_changes_all_keys_together(store):
+    values = {
+        _AUTOMATION_SETTING_KEYS[0]: "false",
+        _AUTOMATION_SETTING_KEYS[1]: "60",
+        _AUTOMATION_SETTING_KEYS[2]: "1",
+        _AUTOMATION_SETTING_KEYS[3]: "true",
+    }
+
+    store.update_settings(values)
+
+    assert store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS) == values
+
+
+def test_profile_settings_bulk_update_materializes_and_validates_before_writing(store):
+    old_values = {
+        _AUTOMATION_SETTING_KEYS[0]: "true",
+        _AUTOMATION_SETTING_KEYS[1]: "5",
+        _AUTOMATION_SETTING_KEYS[2]: "2",
+        _AUTOMATION_SETTING_KEYS[3]: "false",
+    }
+    for key, value in old_values.items():
+        store.set_setting(key, value)
+    invalid_replacement = {
+        _AUTOMATION_SETTING_KEYS[0]: "false",
+        _AUTOMATION_SETTING_KEYS[1]: "60",
+        _AUTOMATION_SETTING_KEYS[2]: "1",
+        _AUTOMATION_SETTING_KEYS[3]: object(),
+    }
+
+    with pytest.raises(TypeError, match="setting value"):
+        store.update_settings(invalid_replacement)
+
+    assert store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS) == old_values
+
+
+def test_profile_settings_bulk_update_rolls_back_an_injected_mid_transaction_failure(
+    store,
+):
+    old_values = {
+        _AUTOMATION_SETTING_KEYS[0]: "true",
+        _AUTOMATION_SETTING_KEYS[1]: "5",
+        _AUTOMATION_SETTING_KEYS[2]: "2",
+        _AUTOMATION_SETTING_KEYS[3]: "false",
+    }
+    for key, value in old_values.items():
+        store.set_setting(key, value)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute(
+            "CREATE TRIGGER inject_profile_setting_failure "
+            "BEFORE UPDATE OF value ON profile_settings "
+            "WHEN OLD.key = 'security_lifecycle.automation.batch_limit' "
+            "BEGIN SELECT RAISE(ABORT, 'injected_mid_transaction'); END"
+        )
+
+    replacement = {
+        _AUTOMATION_SETTING_KEYS[0]: "false",
+        _AUTOMATION_SETTING_KEYS[1]: "60",
+        _AUTOMATION_SETTING_KEYS[2]: "1",
+        _AUTOMATION_SETTING_KEYS[3]: "true",
+    }
+    with pytest.raises(sqlite3.IntegrityError, match="injected_mid_transaction"):
+        store.update_settings(replacement)
+
+    assert store.get_settings_snapshot(_AUTOMATION_SETTING_KEYS) == old_values
+
+
 def test_universe_batch_summary_fills_universe_only(api_store, monkeypatch):
     # A universe-only ticker (not in overview) gets market data from the batch
     # summary — so it is NOT stuck at has_summary=False.
