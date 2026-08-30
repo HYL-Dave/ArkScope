@@ -101,3 +101,18 @@ def test_product_and_current_document_surfaces_have_only_reviewed_polygon_mentio
         "stale_allowlist": sorted(expected - actual),
     }
     assert all(reason.strip() for reason in _ALLOWLIST.values())
+
+
+def test_scheduler_exposes_the_current_massive_news_label():
+    from src.service.data_scheduler import SOURCES
+
+    assert SOURCES["polygon_news"].label == "Massive 新聞"
+
+
+def test_current_subscription_candidate_uses_the_massive_brand():
+    priority_map = (
+        _REPO_ROOT / "docs" / "design" / "PROJECT_PRIORITY_MAP.md"
+    ).read_text(encoding="utf-8")
+
+    assert "| Massive Premium |" in priority_map
+    assert "| Polygon Premium |" not in priority_map

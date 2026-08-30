@@ -128,7 +128,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_ticker_news(
         ticker: str,
         days: int = 30,
-        source: str = "auto",
+        source: Literal["auto", "ibkr", "massive"] = "auto",
         limit: int = 20,
     ) -> str:
         """Get recent news articles for a stock ticker. Returns up to `limit` most recent articles. The response includes `count` (total available) so you know if more exist.
@@ -136,7 +136,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Args:
             ticker: Stock ticker symbol (e.g. NVDA, AMD)
             days: Lookback period in days (default: 30)
-            source: Data source - auto, ibkr, or Massive (legacy wire value: polygon; default: auto)
+            source: Data source - auto, ibkr, or massive (default: auto)
             limit: Max articles to return, 1-500 (default: 20)
         """
         result = get_ticker_news(dal, ticker, days=days, source=source, limit=limit)

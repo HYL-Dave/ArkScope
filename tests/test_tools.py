@@ -283,6 +283,38 @@ class TestNewsTools:
         assert result.count == 2
         assert result.source_breakdown == {"polygon": 1, "ibkr": 1}
 
+    @pytest.mark.parametrize("source", ["massive", "polygon"])
+    def test_get_ticker_news_maps_current_and_legacy_names_to_durable_source(
+        self,
+        hermetic_dal,
+        source,
+    ):
+        from src.tools.news_tools import get_ticker_news
+
+        result = get_ticker_news(
+            hermetic_dal,
+            ticker="NVDA",
+            days=9999,
+            source=source,
+        )
+
+        assert result.count == 1
+        assert result.source_breakdown == {"polygon": 1}
+
+    def test_get_ticker_news_rejects_unknown_source_instead_of_returning_empty(
+        self,
+        hermetic_dal,
+    ):
+        from src.tools.news_tools import get_ticker_news
+
+        with pytest.raises(ValueError, match="^news_source$"):
+            get_ticker_news(
+                hermetic_dal,
+                ticker="NVDA",
+                days=9999,
+                source="unregistered-provider",
+            )
+
     def test_search_news_by_keyword(self, hermetic_dal):
         from src.tools.news_tools import search_news_by_keyword
         result = search_news_by_keyword(

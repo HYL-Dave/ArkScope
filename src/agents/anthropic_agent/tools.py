@@ -44,7 +44,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     },
                     "source": {
                         "type": "string",
-                        "enum": ["auto", "ibkr", "polygon"],
+                        "enum": ["auto", "ibkr", "massive"],
                         "description": "Data source (default: auto)"
                     },
                     "limit": {

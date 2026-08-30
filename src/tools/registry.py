@@ -191,8 +191,14 @@ class ToolRegistry:
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol (e.g. NVDA)"),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
-                ToolParameter("source", "string", "Data source", required=False, default="auto",
-                              enum=["auto", "ibkr", "polygon"]),
+                ToolParameter(
+                    "source",
+                    "string",
+                    "Data source (auto, ibkr, or massive)",
+                    required=False,
+                    default="auto",
+                    enum=["auto", "ibkr", "massive"],
+                ),
                 ToolParameter("limit", "integer", "Max articles to return (1-500, default 20)", required=False, default=20),
             ],
         ))

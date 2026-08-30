@@ -608,6 +608,26 @@ def test_market_data_transport_builds_requests_on_the_current_massive_api_host(m
     }
 
 
+def test_legacy_market_adapter_separates_publisher_brand_from_durable_source():
+    from data_sources.polygon_source import PolygonDataSource
+
+    source = PolygonDataSource(api_key="secret")
+    try:
+        article = source._parse_news_item(
+            {
+                "published_utc": "2026-08-30T00:00:00Z",
+                "tickers": ["AAPL"],
+                "title": "Fixture",
+            }
+        )
+    finally:
+        source._session.close()
+
+    assert article is not None
+    assert article.source == "Massive"
+    assert article.data_source == "polygon"
+
+
 def test_http_probe_redacts_massive_key_from_request_errors(monkeypatch):
     key = "massive-secret-value"
 

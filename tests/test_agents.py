@@ -189,6 +189,38 @@ class TestAnthropicToolSchemas:
             tool_names,
         )
 
+    def test_news_source_schemas_expose_current_brand_not_durable_wire_id(self):
+        from unittest.mock import MagicMock
+
+        from src.agents.anthropic_agent.tools import get_anthropic_tools
+        from src.agents.openai_agent.tools import create_openai_tools
+        from src.tools.registry import create_default_registry
+
+        expected = ["auto", "ibkr", "massive"]
+        anthropic_tool = next(
+            tool for tool in get_anthropic_tools() if tool["name"] == "get_ticker_news"
+        )
+        openai_tool = next(
+            tool
+            for tool in create_openai_tools(MagicMock())
+            if tool.name == "tool_get_ticker_news"
+        )
+        registry_tool = create_default_registry().get("get_ticker_news")
+        assert registry_tool is not None
+        registry_source = next(
+            parameter for parameter in registry_tool.parameters if parameter.name == "source"
+        )
+
+        assert (
+            anthropic_tool["input_schema"]["properties"]["source"]["enum"]
+            == expected
+        )
+        assert (
+            openai_tool.params_json_schema["properties"]["source"]["enum"]
+            == expected
+        )
+        assert registry_source.enum == expected
+
 
 # ============================================================
 # Anthropic Tool Execution Tests

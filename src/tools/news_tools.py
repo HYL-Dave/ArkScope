@@ -13,6 +13,21 @@ from .schemas import NewsBrief, NewsArticle, NewsQueryResult
 # Long descriptions bloat the LLM context; callers can fetch full text via URL.
 _MAX_DESC_CHARS = 200
 
+_NEWS_SOURCE_TO_DURABLE = {
+    "auto": "auto",
+    "ibkr": "ibkr",
+    "massive": "polygon",
+    "polygon": "polygon",
+}
+
+
+def _durable_news_source(source: str) -> str:
+    normalized = str(source or "auto").strip().casefold()
+    try:
+        return _NEWS_SOURCE_TO_DURABLE[normalized]
+    except KeyError:
+        raise ValueError("news_source") from None
+
 
 def _trim_articles(articles: list[NewsArticle], limit: int) -> list[NewsArticle]:
     """Sort by date descending, take top *limit*, truncate descriptions."""
@@ -39,14 +54,18 @@ def get_ticker_news(
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol
         days: Lookback period in days
-        source: Data source (IBKR, Massive, auto; Massive uses the legacy polygon wire value)
+        source: Data source (auto, ibkr, or massive)
         limit: Maximum number of articles to return (default 20, max 500)
 
     Returns:
         NewsQueryResult with articles, count, and source breakdown
     """
     limit = min(max(limit, 1), 500)
-    result = dal.get_news(ticker=ticker, days=days, source=source)
+    result = dal.get_news(
+        ticker=ticker,
+        days=days,
+        source=_durable_news_source(source),
+    )
     result.articles = _trim_articles(result.articles, limit)
     # count reflects total available; articles is the trimmed subset
     return result
