@@ -481,7 +481,7 @@ class _Harness:
     def clock(self):
         return self.now
 
-    def worker(self):
+    def worker(self, execution_owner_id="test-worker-owner"):
         from src.security_lifecycle_automation_worker import (
             LifecycleAutomationWorker,
         )
@@ -493,6 +493,7 @@ class _Harness:
             source_loader=self.source_loader,
             transition_preview=self.transition_preview,
             clock=self.clock,
+            execution_owner_id=execution_owner_id,
         )
         if (
             "transition_approver"
@@ -501,7 +502,10 @@ class _Harness:
             kwargs["transition_approver"] = self.transition_approver
         return LifecycleAutomationWorker(**kwargs)
 
-    def worker_with_transition_approver(self):
+    def worker_with_transition_approver(
+        self,
+        execution_owner_id="test-worker-owner",
+    ):
         from src.security_lifecycle_automation_worker import (
             LifecycleAutomationWorker,
         )
@@ -514,6 +518,7 @@ class _Harness:
             transition_preview=self.transition_preview,
             transition_approver=self.transition_approver,
             clock=self.clock,
+            execution_owner_id=execution_owner_id,
         )
 
 
@@ -732,6 +737,35 @@ def _conflict_bundle(case, *, pending):
 
 class _InjectedFinalizationCrash(BaseException):
     pass
+
+
+class _InjectedEvidenceCrash(BaseException):
+    pass
+
+
+def test_base_exception_during_evidence_terminalizes_the_owned_running_run(
+    tmp_path,
+):
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    harness.bundles[case["case_id"]] = _InjectedEvidenceCrash()
+    try:
+        with pytest.raises(_InjectedEvidenceCrash):
+            harness.worker().run()
+
+        harness.bundles[case["case_id"]] = _bundle(case)
+        recovered = harness.worker().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+
+        assert recovered["skipped_current"] == 1
+        assert len(harness.evidence_calls) == 1
+        assert run["status"] == "failed"
+        assert run["failure_code"] == "internal_error"
+        assert json.loads(run["diagnostics_json"]) == {
+            "interrupted_execution": 1,
+        }
+    finally:
+        harness.conn.close()
 
 
 def test_worker_selects_at_most_two_changed_present_cases_in_stable_order(tmp_path):
@@ -2012,5 +2046,44 @@ def test_worker_rechecks_pre_effective_terminal_when_effective_date_becomes_due(
         assert len(store.list_automation_runs(unrelated["case_id"])) == 1
         assert len(store.list_automation_runs(terminal["case_id"])) == 1
         assert len(store.list_assessments(terminal["case_id"])) == 2
+    finally:
+        harness.conn.close()
+
+
+def test_base_exception_during_due_readiness_recheck_reaps_the_current_owner(
+    tmp_path,
+):
+    terminal = _case(1, ticker="TERM", terminal=True)
+    harness = _Harness(tmp_path, [terminal])
+    harness.now = "2026-08-31T12:00:00Z"
+    harness.bundles[terminal["case_id"]] = _bundle(terminal, terminal=True)
+    try:
+        first = harness.worker(execution_owner_id="initial-readiness-owner").run()
+        assert first["drafted"] == 1
+
+        store = _store(harness)
+        waiting_run = store.list_automation_runs(terminal["case_id"])[0]
+        assert waiting_run["status"] == "succeeded"
+        assert waiting_run["action_readiness"] == "waiting_effective_date"
+        assert json.loads(waiting_run["query_context_json"])[
+            "execution_owner_id"
+        ] == "initial-readiness-owner"
+
+        harness.now = "2026-09-01T12:00:00Z"
+        harness.bundles[terminal["case_id"]] = _InjectedEvidenceCrash(
+            "due readiness recheck"
+        )
+        with pytest.raises(_InjectedEvidenceCrash, match="due readiness recheck"):
+            harness.worker(execution_owner_id="due-readiness-owner").run()
+
+        recovered_run = store.list_automation_runs(terminal["case_id"])[0]
+        assert recovered_run["status"] == "failed"
+        assert recovered_run["failure_code"] == "internal_error"
+        assert json.loads(recovered_run["diagnostics_json"]) == {
+            "interrupted_execution": 1,
+        }
+        assert json.loads(recovered_run["query_context_json"])[
+            "execution_owner_id"
+        ] == "due-readiness-owner"
     finally:
         harness.conn.close()

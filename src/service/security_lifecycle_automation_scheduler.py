@@ -22,9 +22,13 @@ from src.security_lifecycle_decision_policy import (
     listing_authority_conflict_codes,
     listing_authority_required_components,
 )
-from src.security_lifecycle_fact_kernel import AutomationBlocker
+from src.security_lifecycle_fact_kernel import (
+    AutomationBlocker,
+    SecurityLifecycleFactKernel,
+)
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
+    SecurityLifecycleInvestigationStore,
     compose_security_lifecycle,
     observation_fingerprint,
 )
@@ -40,6 +44,11 @@ from src.security_lifecycle_schema import (
     LifecycleWritesUnavailable,
     verify_profile_connection,
 )
+from src.service.security_lifecycle_automation_runtime import (
+    LifecycleAutomationAlreadyRunning,
+    LifecycleAutomationExecutionUnavailable,
+    lifecycle_automation_execution_lock,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -53,9 +62,12 @@ _AUTOMATION_TABLES = frozenset(
         "security_lifecycle_automation_facts",
     }
 )
-_STATUSES = frozenset({"succeeded", "partial", "unavailable", "not_installed"})
+_STATUSES = frozenset(
+    {"succeeded", "partial", "unavailable", "not_installed", "skipped"}
+)
 _REASONS = frozenset(
     {
+        "already_running",
         "automation_schema_absent",
         "case_processing_blocked",
         "case_processing_failed",
@@ -63,6 +75,7 @@ _REASONS = frozenset(
         "profile_schema_mismatch",
         "profile_store_unavailable",
         "automation_scheduler_failed",
+        "execution_lock_unavailable",
     }
 )
 _RETRYABLE_BLOCKERS = frozenset(
@@ -362,6 +375,19 @@ def _profile_connection() -> Iterator[sqlite3.Connection]:
     finally:
         if conn is not None:
             conn.close()
+
+
+def _reconcile_running_rows(
+    *,
+    at: str,
+    execution_owner_id: str | None = None,
+) -> tuple[str, ...]:
+    with _profile_connection() as conn:
+        store = SecurityLifecycleInvestigationStore(conn)
+        return SecurityLifecycleFactKernel(store).reconcile_running_runs(
+            at=at,
+            execution_owner_id=execution_owner_id,
+        )
 
 
 def _load_cases() -> tuple[dict[str, object], ...]:
@@ -997,7 +1023,12 @@ def _load_evidence(
     )
 
 
-def _worker(*, evidence_loader, clock=_clock) -> LifecycleAutomationWorker:
+def _worker(
+    *,
+    evidence_loader,
+    execution_owner_id: str,
+    clock=_clock,
+) -> LifecycleAutomationWorker:
     _assert_automation_installed()
     return LifecycleAutomationWorker(
         case_loader=_load_cases,
@@ -1007,6 +1038,7 @@ def _worker(*, evidence_loader, clock=_clock) -> LifecycleAutomationWorker:
         transition_preview=_transition_preview,
         transition_approver=_transition_approver,
         clock=clock,
+        execution_owner_id=execution_owner_id,
     )
 
 
@@ -1051,13 +1083,16 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
 
     supplied_status = result.get("status")
     supplied_reason = result.get("reason")
-    if supplied_status in {"unavailable", "not_installed"}:
+    if supplied_status in {"unavailable", "not_installed", "skipped"}:
         if any(counts.values()) or case_ids:
             raise ValueError("status")
         status = str(supplied_status)
         reason = str(supplied_reason or "")
         if status == "not_installed":
             if reason != "automation_schema_absent":
+                raise ValueError("reason")
+        elif status == "skipped":
+            if reason != "already_running":
                 raise ValueError("reason")
         elif reason not in _REASONS or reason == "automation_schema_absent":
             raise ValueError("reason")
@@ -1080,93 +1115,136 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
     }
 
 
-def run_security_lifecycle_automation(
-    limit: int = _DEFAULT_LIMIT,
-    now: datetime | None = None,
-) -> dict:
-    """Run one bounded batch and return no provider payload or raw error detail."""
-
-    if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
-        raise ValueError("limit")
-    instant = _aware_instant(now)
-    at = _timestamp(instant)
+@contextmanager
+def _listing_authority_session(*, at: str) -> Iterator[ListingAuthoritySession]:
     transport: ListingAuthorityTransport | None = None
     session: ListingAuthoritySession | None = None
+    session_closed = False
     try:
         transport = ListingAuthorityTransport()
-        budget = ListingRequestBudget.lifecycle()
         session = ListingAuthoritySession(
             transport=transport,
-            budget=budget,
+            budget=ListingRequestBudget.lifecycle(),
             retrieved_at=at,
-            massive_api_key=provider_field_env_value(MASSIVE_CONFIG_PROVIDER, "api_key"),
+            massive_api_key=provider_field_env_value(
+                MASSIVE_CONFIG_PROVIDER,
+                "api_key",
+            ),
         )
-    except Exception as exc:
-        if transport is not None:
+        yield session
+    finally:
+        if session is not None:
             try:
-                transport.close()
-            except Exception as close_exc:
+                session.close()
+                session_closed = True
+            except Exception as exc:
                 logger.warning(
                     "security lifecycle listing cleanup failed code=%s",
-                    type(close_exc).__name__,
+                    type(exc).__name__,
                 )
-        logger.warning(
-            "security lifecycle listing construction failed code=%s",
-            type(exc).__name__,
-        )
-        return security_lifecycle_automation_failure("automation_scheduler_failed")
+        if transport is not None and not session_closed:
+            try:
+                transport.close()
+            except Exception as exc:
+                logger.warning(
+                    "security lifecycle listing transport cleanup failed code=%s",
+                    type(exc).__name__,
+                )
 
-    try:
-        assert session is not None
-        assert transport is not None
-        worker = _worker(
-            evidence_loader=lambda case, *, mode, at: _load_evidence(
-                case,
-                mode=mode,
-                at=at,
-                listing_session=session,
-            ),
-            clock=lambda: at,
-        )
-        result = _bounded_result(worker.run(limit=limit, mode="live"))
-    except LifecycleAutomationNotInstalled:
-        result = _empty_summary(
+
+def _automation_exception_result(exc: Exception) -> dict:
+    if isinstance(exc, LifecycleAutomationNotInstalled):
+        return _empty_summary(
             status="not_installed",
             reason="automation_schema_absent",
         )
-    except LifecycleStoreUnavailable as exc:
+    if isinstance(exc, LifecycleStoreUnavailable):
         reason = (
             "market_store_unavailable"
             if exc.store == "market"
             else "profile_store_unavailable"
         )
-        result = security_lifecycle_automation_failure(reason)
-    except (LifecycleSchemaMismatch, LifecycleWritesUnavailable):
-        result = security_lifecycle_automation_failure("profile_schema_mismatch")
-    except (OSError, sqlite3.Error):
-        result = security_lifecycle_automation_failure("profile_store_unavailable")
-    except Exception as exc:
-        logger.warning(
-            "security lifecycle automation tick failed code=%s",
-            type(exc).__name__,
-        )
-        result = security_lifecycle_automation_failure("automation_scheduler_failed")
+        return security_lifecycle_automation_failure(reason)
+    if isinstance(exc, (LifecycleSchemaMismatch, LifecycleWritesUnavailable)):
+        return security_lifecycle_automation_failure("profile_schema_mismatch")
+    if isinstance(exc, (OSError, sqlite3.Error)):
+        return security_lifecycle_automation_failure("profile_store_unavailable")
+    logger.warning(
+        "security lifecycle automation tick failed code=%s",
+        type(exc).__name__,
+    )
+    return security_lifecycle_automation_failure("automation_scheduler_failed")
 
+
+def _run_owned_automation_batch(
+    *,
+    limit: int,
+    at: str,
+    execution_owner_id: str,
+) -> dict:
     try:
-        session.close()
-    except Exception as exc:
-        logger.warning(
-            "security lifecycle listing cleanup failed code=%s",
-            type(exc).__name__,
-        )
-        try:
-            transport.close()
-        except Exception as close_exc:
-            logger.warning(
-                "security lifecycle listing transport cleanup failed code=%s",
-                type(close_exc).__name__,
+        with _listing_authority_session(at=at) as session:
+            worker = _worker(
+                evidence_loader=lambda case, *, mode, at: _load_evidence(
+                    case,
+                    mode=mode,
+                    at=at,
+                    listing_session=session,
+                ),
+                execution_owner_id=execution_owner_id,
+                clock=lambda: at,
             )
-    return result
+            return _bounded_result(worker.run(limit=limit, mode="live"))
+    except Exception as exc:
+        return _automation_exception_result(exc)
+
+
+def run_security_lifecycle_automation(
+    limit: int = _DEFAULT_LIMIT,
+    now: datetime | None = None,
+) -> dict:
+    """Run one exclusively owned batch without returning sensitive detail."""
+
+    if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
+        raise ValueError("limit")
+    at = _timestamp(_aware_instant(now))
+    try:
+        with lifecycle_automation_execution_lock() as execution:
+            startup_reconciled = False
+            active_failure = False
+            try:
+                _reconcile_running_rows(at=at)
+                startup_reconciled = True
+                return _run_owned_automation_batch(
+                    limit=limit,
+                    at=at,
+                    execution_owner_id=execution.execution_owner_id,
+                )
+            except BaseException:
+                active_failure = True
+                raise
+            finally:
+                if startup_reconciled:
+                    try:
+                        _reconcile_running_rows(
+                            at=at,
+                            execution_owner_id=execution.execution_owner_id,
+                        )
+                    except Exception as exc:
+                        if not active_failure:
+                            raise
+                        logger.warning(
+                            "security lifecycle owner cleanup failed code=%s",
+                            type(exc).__name__,
+                        )
+    except LifecycleAutomationAlreadyRunning:
+        return _empty_summary(status="skipped", reason="already_running")
+    except LifecycleAutomationExecutionUnavailable:
+        return security_lifecycle_automation_failure(
+            "execution_lock_unavailable"
+        )
+    except Exception as exc:
+        return _automation_exception_result(exc)
 
 
 def _job_runs_connection() -> sqlite3.Connection | None:
@@ -1278,7 +1356,7 @@ def record_security_lifecycle_automation_result(
         bounded = security_lifecycle_automation_failure(
             "automation_scheduler_failed"
         )
-    if bounded["status"] == "not_installed":
+    if bounded["status"] in {"not_installed", "skipped"}:
         return True
 
     conn = _job_runs_connection()

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any, ContextManager
@@ -32,6 +34,8 @@ from src.security_lifecycle_schema import (
 AUTOMATION_EXECUTION_REVISION = "trusted-lifecycle-execution-r1"
 _MAX_CASES_PER_TICK = 2
 _DECISION_FIELDS = tuple(AutomationDecision.__dataclass_fields__)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -210,6 +214,37 @@ def _failure_code(exc: Exception, *, phase: str) -> str:
     return "internal_error"
 
 
+@contextmanager
+def _owned_profile_context(
+    connection_factory: Callable[[], ContextManager[sqlite3.Connection]],
+    *,
+    execution_owner_id: str,
+    at: str,
+) -> Iterator[tuple[SecurityLifecycleInvestigationStore, SecurityLifecycleFactKernel]]:
+    with connection_factory() as conn:
+        store = SecurityLifecycleInvestigationStore(conn)
+        kernel = SecurityLifecycleFactKernel(store)
+        active_failure = False
+        try:
+            yield store, kernel
+        except BaseException:
+            active_failure = True
+            raise
+        finally:
+            try:
+                kernel.reconcile_running_runs(
+                    execution_owner_id=execution_owner_id,
+                    at=at,
+                )
+            except Exception as exc:
+                if not active_failure:
+                    raise
+                logger.warning(
+                    "security lifecycle owner cleanup failed code=%s",
+                    type(exc).__name__,
+                )
+
+
 class LifecycleAutomationWorker:
     def __init__(
         self,
@@ -221,6 +256,7 @@ class LifecycleAutomationWorker:
         transition_preview: Callable[..., Mapping[str, object]],
         transition_approver: Callable[..., Mapping[str, object]],
         clock: Callable[[], str],
+        execution_owner_id: str,
     ):
         dependencies = {
             "case_loader": case_loader,
@@ -233,6 +269,13 @@ class LifecycleAutomationWorker:
         }
         if any(not callable(value) for value in dependencies.values()):
             raise TypeError("automation_worker_dependency")
+        if (
+            type(execution_owner_id) is not str
+            or not execution_owner_id
+            or "\0" in execution_owner_id
+            or len(execution_owner_id.encode("utf-8")) > 64
+        ):
+            raise ValueError("execution_owner_id")
         self._case_loader = case_loader
         self._profile_connection = profile_connection
         self._evidence_loader = evidence_loader
@@ -240,6 +283,7 @@ class LifecycleAutomationWorker:
         self._transition_preview = transition_preview
         self._transition_approver = transition_approver
         self._clock = clock
+        self._execution_owner_id = execution_owner_id
 
     @staticmethod
     def _due_recheck(
@@ -576,9 +620,11 @@ class LifecycleAutomationWorker:
             "skipped_current": 0,
         }
 
-        with self._profile_connection() as conn:
-            store = SecurityLifecycleInvestigationStore(conn)
-            kernel = SecurityLifecycleFactKernel(store)
+        with _owned_profile_context(
+            self._profile_connection,
+            execution_owner_id=self._execution_owner_id,
+            at=at,
+        ) as (store, kernel):
             for case in cases:
                 if int(summary["selected"]) >= bounded_limit:
                     break
@@ -605,6 +651,7 @@ class LifecycleAutomationWorker:
                     policy_version=AUTOMATION_POLICY_VERSION,
                     mode=mode,
                     execution_revision=AUTOMATION_EXECUTION_REVISION,
+                    execution_owner_id=self._execution_owner_id,
                     query_context=_query_context(case, mode=mode),
                     diagnostics={},
                     at=at,
@@ -630,6 +677,7 @@ class LifecycleAutomationWorker:
                             run_id=str(run["run_id"]),
                             due_at=due_at,
                             at=at,
+                            execution_owner_id=self._execution_owner_id,
                         )
                         finalization_only = False
                 if not claim.should_execute:

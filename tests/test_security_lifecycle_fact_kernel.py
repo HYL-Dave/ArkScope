@@ -42,6 +42,7 @@ def _reserve(kernel, case_id, **overrides):
         "policy_version": "trusted-lifecycle-v1",
         "mode": "historical",
         "execution_revision": "trusted-lifecycle-execution-r1",
+        "execution_owner_id": "test-kernel-owner",
         "query_context": {
             "case_id": case_id,
             "cik": "0001409970",
@@ -600,6 +601,7 @@ def test_blocker_citation_resolves_existing_evidence_owned_by_same_run():
         run_id=claim.run_id,
         due_at="2026-08-28T00:00:00Z",
         at="2026-08-28T00:00:00Z",
+        execution_owner_id="test-kernel-recheck-owner",
     )
     assert retry.run_id == claim.run_id
     context = dict(producer_blocker.context)
@@ -1630,17 +1632,33 @@ def test_readiness_recheck_preserves_cited_history_and_recomputes_provenance():
         at=_LATER,
     )
 
+    with pytest.raises(ValueError, match="execution_owner_id"):
+        kernel.reserve_readiness_recheck(
+            run_id=claim.run_id,
+            due_at="2026-08-26T00:00:00Z",
+            at="2026-08-26T00:00:00Z",
+            execution_owner_id="invalid owner",
+        )
+    assert store.get_automation_run(claim.run_id)["status"] == "succeeded"
     assert kernel.reserve_readiness_recheck(
         run_id=claim.run_id,
         due_at="2026-08-26T00:00:00Z",
         at="2026-08-25T23:59:59Z",
+        execution_owner_id="early-readiness-owner",
     ).should_execute is False
+    assert json.loads(store.get_automation_run(claim.run_id)["query_context_json"])[
+        "execution_owner_id"
+    ] == "test-kernel-owner"
     recheck = kernel.reserve_readiness_recheck(
         run_id=claim.run_id,
         due_at="2026-08-26T00:00:00Z",
         at="2026-08-26T00:00:00Z",
+        execution_owner_id="due-readiness-owner",
     )
     assert recheck.should_execute is True
+    assert json.loads(store.get_automation_run(claim.run_id)["query_context_json"])[
+        "execution_owner_id"
+    ] == "due-readiness-owner"
     assert store.get_assessment(assessment_id)["citations"][1]["evidence_id"] == (
         persisted_regulator_id
     )
@@ -1821,6 +1839,7 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
     row = store.get_automation_run(claim.run_id)
     assert json.loads(row["query_context_json"]) == {
         "a": {"ticker": "HAPN"},
+        "execution_owner_id": "test-kernel-owner",
         "execution_revision": "trusted-lifecycle-execution-r1",
         "latest_attempt_execution_revision": "trusted-lifecycle-execution-r1",
         "input_evidence_set_sha256": (
@@ -1846,6 +1865,7 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
         ({"input_evidence_set_sha256": "1" * 64}, {}),
         ({"semantic_run_key": "spoofed"}, {}),
         ({"execution_revision": "spoofed"}, {}),
+        ({"execution_owner_id": "spoofed"}, {}),
         ({"latest_attempt_execution_revision": "spoofed"}, {}),
         ({"predecessor_failed_run_id": "slar_spoofed"}, {}),
         ({}, {"source_url": 1}),
@@ -1861,3 +1881,106 @@ def test_query_context_and_diagnostics_are_canonical_bounded_and_secret_safe():
                 query_context=query_context,
                 diagnostics=diagnostics,
             )
+
+
+def test_reservation_persists_a_reserved_owner_without_changing_run_identity():
+    first_conn, first_store, first_kernel, first_case_id = _context()
+    second_conn, second_store, second_kernel, second_case_id = _context()
+    try:
+        first = _reserve(
+            first_kernel,
+            first_case_id,
+            execution_owner_id="lifecycle-owner-a",
+        )
+        second = _reserve(
+            second_kernel,
+            second_case_id,
+            execution_owner_id="lifecycle-owner-b",
+        )
+
+        first_context = json.loads(
+            first_store.get_automation_run(first.run_id)["query_context_json"]
+        )
+        second_context = json.loads(
+            second_store.get_automation_run(second.run_id)["query_context_json"]
+        )
+        assert first.run_key == second.run_key
+        assert first_context["execution_owner_id"] == "lifecycle-owner-a"
+        assert second_context["execution_owner_id"] == "lifecycle-owner-b"
+
+        with pytest.raises(ValueError, match="reserved_query_context"):
+            _reserve(
+                first_kernel,
+                first_case_id,
+                policy_version="reserved-owner-spoof",
+                execution_owner_id="lifecycle-owner-a",
+                query_context={"execution_owner_id": "caller-owner"},
+            )
+    finally:
+        first_conn.close()
+        second_conn.close()
+
+
+def test_reconciliation_is_owner_scoped_and_only_terminalizes_running_rows():
+    conn, store, kernel, first_case_id = _context()
+    second_case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0001409970-26-000132",
+        ticker="HAPN",
+        at=_AT,
+    )
+    third_case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0001409970-26-000133",
+        ticker="HAPN",
+        at=_AT,
+    )
+    first = _reserve(
+        kernel,
+        first_case_id,
+        execution_owner_id="lifecycle-owner-a",
+    )
+    second = _reserve(
+        kernel,
+        second_case_id,
+        observation_fingerprint_sha256="b" * 64,
+        execution_owner_id="lifecycle-owner-b",
+    )
+    succeeded = _reserve(
+        kernel,
+        third_case_id,
+        observation_fingerprint_sha256="c" * 64,
+        execution_owner_id="lifecycle-owner-c",
+    )
+    succeeded_evidence = _evidence("succeeded")
+    _succeed(
+        kernel,
+        succeeded,
+        evidence=(succeeded_evidence,),
+        facts=(_fact(succeeded_evidence),),
+    )
+    succeeded_before = store.get_automation_run(succeeded.run_id)
+    try:
+        reconciled = kernel.reconcile_running_runs(
+            execution_owner_id="lifecycle-owner-a",
+            at=_LATER,
+        )
+
+        assert reconciled == (first.run_id,)
+        assert store.get_automation_run(first.run_id)["status"] == "failed"
+        assert store.get_automation_run(second.run_id)["status"] == "running"
+        assert store.get_automation_run(succeeded.run_id) == succeeded_before
+
+        remaining = kernel.reconcile_running_runs(at=_LATER)
+        first_after = store.get_automation_run(first.run_id)
+        second_after = store.get_automation_run(second.run_id)
+        assert remaining == (second.run_id,)
+        assert first_after["failure_code"] == "internal_error"
+        assert json.loads(first_after["diagnostics_json"]) == {
+            "interrupted_execution": 1,
+        }
+        assert second_after["status"] == "failed"
+        assert second_after["failure_code"] == "internal_error"
+        assert store.get_automation_run(succeeded.run_id) == succeeded_before
+    finally:
+        conn.close()

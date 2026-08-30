@@ -34,6 +34,7 @@ from src.security_lifecycle_schema import (
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_EXECUTION_OWNER_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 _TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
 _CIK = re.compile(r"^\d{10}$")
 _DECIMAL = re.compile(r"^(?:0|[1-9]\d*)(?:\.\d+)?$")
@@ -84,6 +85,7 @@ _TERMINAL_DECISION_KEY = "terminal_decision"
 _TERMINAL_PROVENANCE_KEY = "terminal_decision_provenance_sha256"
 _TERMINAL_FINALIZED_KEY = "terminal_finalized_decision_provenance_sha256"
 _LATEST_ATTEMPT_REVISION_KEY = "latest_attempt_execution_revision"
+_EXECUTION_OWNER_KEY = "execution_owner_id"
 
 
 @dataclass(frozen=True)
@@ -207,6 +209,12 @@ def _sha256(name: str, value: object) -> str:
     if not _SHA256.fullmatch(text):
         raise ValueError(name)
     return text
+
+
+def _execution_owner_id(value: object) -> str:
+    if type(value) is not str or _EXECUTION_OWNER_ID.fullmatch(value) is None:
+        raise ValueError(_EXECUTION_OWNER_KEY)
+    return value
 
 
 def _timestamp(name: str, value: object) -> str:
@@ -1069,6 +1077,7 @@ class SecurityLifecycleFactKernel:
         policy_version: str,
         mode: str,
         execution_revision: str,
+        execution_owner_id: str,
         query_context: Mapping[str, object],
         diagnostics: Mapping[str, object],
         at: str,
@@ -1095,6 +1104,7 @@ class SecurityLifecycleFactKernel:
             max_bytes=120,
             required=True,
         )
+        owner_id = _execution_owner_id(execution_owner_id)
         assert policy is not None and execution is not None
         if not isinstance(query_context, Mapping):
             raise ValueError("query_context")
@@ -1103,6 +1113,7 @@ class SecurityLifecycleFactKernel:
             for key in (
                 "semantic_run_key",
                 "execution_revision",
+                _EXECUTION_OWNER_KEY,
                 _LATEST_ATTEMPT_REVISION_KEY,
                 "predecessor_failed_run_id",
                 _TERMINAL_DECISION_KEY,
@@ -1122,6 +1133,7 @@ class SecurityLifecycleFactKernel:
                 **dict(query_context),
                 "semantic_run_key": semantic_run_key,
                 "execution_revision": execution,
+                _EXECUTION_OWNER_KEY: owner_id,
                 _LATEST_ATTEMPT_REVISION_KEY: execution,
                 "input_evidence_set_sha256": input_evidence_digest,
             }
@@ -1178,6 +1190,7 @@ class SecurityLifecycleFactKernel:
                     due = _instant(str(row["retry_at"])) <= _instant(timestamp)
                     if retryable and due:
                         retry_context = dict(context)
+                        retry_context[_EXECUTION_OWNER_KEY] = owner_id
                         retry_context[_LATEST_ATTEMPT_REVISION_KEY] = execution
                         self.conn.execute(
                             "DELETE FROM security_lifecycle_automation_facts "
@@ -1277,13 +1290,15 @@ class SecurityLifecycleFactKernel:
         run_id: str,
         due_at: str,
         at: str,
+        execution_owner_id: str,
     ) -> AutomationRunClaim:
         self.store.assert_automation_write_available()
+        owner_id = _execution_owner_id(execution_owner_id)
         due_timestamp = _timestamp("due_at", due_at)
         timestamp = _timestamp("at", at)
         with _immediate_transaction(self.conn):
             row = self.conn.execute(
-                "SELECT run_key,status,action_readiness FROM "
+                "SELECT run_key,status,action_readiness,query_context_json FROM "
                 "security_lifecycle_automation_runs WHERE run_id=?",
                 (run_id,),
             ).fetchone()
@@ -1310,6 +1325,8 @@ class SecurityLifecycleFactKernel:
                     (timestamp, run_id),
                 )
                 return AutomationRunClaim(run_id, run_key, status, True)
+            query_context = _query_context_value(row["query_context_json"])
+            query_context[_EXECUTION_OWNER_KEY] = owner_id
             self.conn.execute(
                 "DELETE FROM security_lifecycle_automation_run_blockers "
                 "WHERE automation_run_id=?",
@@ -1318,9 +1335,15 @@ class SecurityLifecycleFactKernel:
             self.conn.execute(
                 "UPDATE security_lifecycle_automation_runs SET "
                 "status='running',decision_tier=NULL,action_readiness=NULL,"
-                "retry_at=NULL,failure_code=NULL,started_at=?,finished_at=NULL,"
+                "query_context_json=?,retry_at=NULL,failure_code=NULL,"
+                "started_at=?,finished_at=NULL,"
                 "updated_at=? WHERE run_id=?",
-                (timestamp, timestamp, run_id),
+                (
+                    _query_context_json(query_context),
+                    timestamp,
+                    timestamp,
+                    run_id,
+                ),
             )
             return AutomationRunClaim(run_id, run_key, "running", True)
 
@@ -1763,6 +1786,55 @@ class SecurityLifecycleFactKernel:
                 "query_context_json=? WHERE run_id=?",
                 (_query_context_json(context), run_id),
             )
+
+    def reconcile_running_runs(
+        self,
+        *,
+        at: str,
+        execution_owner_id: str | None = None,
+    ) -> tuple[str, ...]:
+        """Fail interrupted running rows, optionally limited to one owner."""
+
+        self.store.assert_automation_write_available()
+        requested_owner = (
+            None
+            if execution_owner_id is None
+            else _execution_owner_id(execution_owner_id)
+        )
+        timestamp = _timestamp("at", at)
+        diagnostics_json = _diagnostics({"interrupted_execution": 1})
+        reconciled: list[str] = []
+        with _immediate_transaction(self.conn):
+            rows = self.conn.execute(
+                "SELECT run_id,query_context_json FROM "
+                "security_lifecycle_automation_runs WHERE status='running' "
+                "ORDER BY created_at,rowid"
+            ).fetchall()
+            for row in rows:
+                context = _query_context_value(row["query_context_json"])
+                persisted_owner = context.get(_EXECUTION_OWNER_KEY)
+                if persisted_owner is None:
+                    if requested_owner is not None:
+                        continue
+                else:
+                    normalized_owner = _execution_owner_id(persisted_owner)
+                    if (
+                        requested_owner is not None
+                        and normalized_owner != requested_owner
+                    ):
+                        continue
+                run_id = str(row["run_id"])
+                cursor = self.conn.execute(
+                    "UPDATE security_lifecycle_automation_runs SET "
+                    "status='failed',decision_tier=NULL,action_readiness=NULL,"
+                    "diagnostics_json=?,retry_at=NULL,failure_code='internal_error',"
+                    "finished_at=?,updated_at=? WHERE run_id=? AND status='running'",
+                    (diagnostics_json, timestamp, timestamp, run_id),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("automation_run_reconciliation_lost")
+                reconciled.append(run_id)
+        return tuple(reconciled)
 
     def fail_run(
         self,

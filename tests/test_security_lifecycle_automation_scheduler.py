@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -32,6 +33,191 @@ def _summary(**overrides):
     }
     result.update(overrides)
     return result
+
+
+@pytest.fixture(autouse=True)
+def _installed_scheduler_profile(tmp_path, monkeypatch):
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+
+    profile_path = tmp_path / "installed-profile-state.db"
+    conn = sqlite3.connect(profile_path)
+    try:
+        SecurityLifecycleInvestigationStore(conn)
+    finally:
+        conn.close()
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+
+
+def _running_run(db_path: Path, *, execution_owner_id: str):
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    store = SecurityLifecycleInvestigationStore(conn)
+    case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0001409970-26-000131",
+        ticker="HAPN",
+        at="2026-08-25T13:00:00Z",
+    )
+    claim = SecurityLifecycleFactKernel(store).reserve_run(
+        case_id=case_id,
+        observation_fingerprint_sha256="a" * 64,
+        policy_version="trusted-lifecycle-v1",
+        mode="live",
+        execution_revision="trusted-lifecycle-execution-r1",
+        execution_owner_id=execution_owner_id,
+        query_context={"case_id": case_id, "ticker": "HAPN"},
+        diagnostics={},
+        at="2026-08-25T13:00:00Z",
+    )
+    return conn, store, claim
+
+
+def _patch_provider_free_empty_worker(monkeypatch, scheduler, calls):
+    class Transport:
+        def close(self):
+            pass
+
+    class Session:
+        def __init__(self, **_kwargs):
+            pass
+
+        def close(self):
+            pass
+
+    class Worker:
+        def __init__(self, execution_owner_id):
+            self.execution_owner_id = execution_owner_id
+
+        def run(self, limit, mode):
+            calls.append((self.execution_owner_id, limit, mode))
+            return _summary()
+
+    monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport)
+    monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session)
+    monkeypatch.setattr(scheduler, "provider_field_env_value", lambda *_args: None)
+    monkeypatch.setattr(
+        scheduler,
+        "_worker",
+        lambda *, execution_owner_id, **_kwargs: Worker(execution_owner_id),
+    )
+
+
+def test_lock_owner_blocks_a_second_connection_then_release_enables_reconciliation(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.security_lifecycle_automation_runtime import (
+        lifecycle_automation_execution_lock,
+    )
+
+    db_path = tmp_path / "profile_state.db"
+    lock_path = tmp_path / "locks"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db_path))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(lock_path))
+    calls = []
+    _patch_provider_free_empty_worker(monkeypatch, scheduler, calls)
+
+    first_conn = None
+    second_conn = None
+    try:
+        with lifecycle_automation_execution_lock() as owner:
+            first_conn, first_store, claim = _running_run(
+                db_path,
+                execution_owner_id=owner.execution_owner_id,
+            )
+            second_conn = sqlite3.connect(db_path, check_same_thread=False)
+            SecurityLifecycleInvestigationStore(second_conn)
+
+            @contextmanager
+            def second_profile_connection():
+                yield second_conn
+
+            monkeypatch.setattr(
+                scheduler,
+                "_profile_connection",
+                second_profile_connection,
+            )
+            busy = scheduler.run_security_lifecycle_automation(now=_NOW)
+
+            assert busy == _summary(status="skipped", reason="already_running")
+            assert calls == []
+            assert first_store.get_automation_run(claim.run_id)["status"] == "running"
+
+        recovered = scheduler.run_security_lifecycle_automation(now=_NOW)
+        row = first_store.get_automation_run(claim.run_id)
+        assert recovered == _summary()
+        assert len(calls) == 1
+        assert row["status"] == "failed"
+        assert row["failure_code"] == "internal_error"
+        assert json.loads(row["diagnostics_json"]) == {
+            "interrupted_execution": 1,
+        }
+    finally:
+        if second_conn is not None:
+            second_conn.close()
+        if first_conn is not None:
+            first_conn.close()
+
+
+@pytest.mark.parametrize("failure_point", ("fcntl", "open"))
+def test_lock_unavailable_never_reconciles_persisted_running_rows(
+    failure_point,
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    db_path = tmp_path / "profile_state.db"
+    lock_root = tmp_path / "locks"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db_path))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(lock_root))
+    conn, store, claim = _running_run(
+        db_path,
+        execution_owner_id="orphaned-owner",
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_worker",
+        lambda **_kwargs: pytest.fail("worker reached without an execution lock"),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "ListingAuthorityTransport",
+        lambda: pytest.fail("provider setup reached without an execution lock"),
+    )
+
+    if failure_point == "fcntl":
+        real_import = builtins.__import__
+
+        def without_fcntl(name, *args, **kwargs):
+            if name == "fcntl":
+                raise ImportError("test fcntl absence")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", without_fcntl)
+    else:
+        lock_root.write_text("not a directory", encoding="utf-8")
+
+    try:
+        result = scheduler.run_security_lifecycle_automation(now=_NOW)
+
+        assert result == _summary(
+            status="unavailable",
+            reason="execution_lock_unavailable",
+        )
+        assert store.get_automation_run(claim.run_id)["status"] == "running"
+    finally:
+        conn.close()
 
 
 def _authority_evidence(
@@ -299,8 +485,12 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
         sources=("manual_lists",),
     )["transition_id"] == "tit_1"
 
-    scheduler._worker(evidence_loader=marker)
+    scheduler._worker(
+        evidence_loader=marker,
+        execution_owner_id="test-scheduler-owner",
+    )
     assert captured_worker["evidence_loader"] is marker
+    assert captured_worker["execution_owner_id"] == "test-scheduler-owner"
     assert captured_worker["transition_preview"] is scheduler._transition_preview
     assert captured_worker["transition_approver"] is scheduler._transition_approver
     assert calls[0][0] == "preview"
@@ -670,7 +860,7 @@ def test_two_case_tick_uses_one_lazy_listing_session_and_closes_it(monkeypatch):
     monkeypatch.setattr(
         scheduler,
         "_worker",
-        lambda *, evidence_loader, clock: Worker(evidence_loader),
+        lambda *, evidence_loader, **_kwargs: Worker(evidence_loader),
     )
 
     result = scheduler.run_security_lifecycle_automation(limit=2, now=_NOW)

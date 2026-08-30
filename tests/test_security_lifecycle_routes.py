@@ -227,6 +227,7 @@ def _create_automation_draft(context):
         policy_version=AUTOMATION_POLICY_VERSION,
         mode="historical",
         execution_revision="trusted-lifecycle-execution-r1",
+        execution_owner_id="test-routes-owner",
         query_context={"case_id": context["case_id"], "ticker": "EA"},
         diagnostics={"sec_attempts": 0},
         at=_AT,

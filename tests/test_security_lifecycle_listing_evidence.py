@@ -816,6 +816,7 @@ def _real_nasdaq_policy_result(
         policy_version="trusted-lifecycle-automation-v4",
         mode="historical",
         execution_revision="trusted-lifecycle-execution-r2",
+        execution_owner_id="test-listing-owner",
         query_context={
             "case_id": case_id,
             "cik": "0000320193",
@@ -1098,6 +1099,7 @@ def _real_terminal_policy_result(*, massive_mutation=None, locator_mutation=None
         policy_version="trusted-lifecycle-automation-v4",
         mode="historical",
         execution_revision="trusted-lifecycle-execution-r2",
+        execution_owner_id="test-listing-owner",
         query_context={"case_id": case_id, "cik": "0000000002", "aliases": ["OLD"]},
         diagnostics={"listing_records": len(listing.evidence)},
         at=_AT,
