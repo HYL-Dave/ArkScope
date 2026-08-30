@@ -55,6 +55,8 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
     automation_result = {
+        "result_version": 2,
+        "case_outcomes": {},
         "status": "succeeded",
         "reason": None,
         "selected": 0,
@@ -68,7 +70,7 @@ def hermetic(tmp_path, monkeypatch):
     }
     monkeypatch.setattr(
         ds,
-        "run_security_lifecycle_automation",
+        "run_and_record_security_lifecycle_automation",
         lambda *, limit, now: automation_result,
         raising=False,
     )
@@ -225,6 +227,44 @@ def test_tick_fires_only_enabled_and_due():
     assert out == fired == ["finnhub_news"]
 
 
+def test_tick_uses_the_lock_owned_lifecycle_run_and_record_boundary(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        ds,
+        "run_and_record_security_lifecycle_automation",
+        lambda *, limit, now: events.append(("owned", limit, now))
+        or {
+            "result_version": 2,
+            "case_outcomes": {},
+            "status": "succeeded",
+            "reason": None,
+            "selected": 0,
+            "processed": 0,
+            "accepted": 0,
+            "drafted": 0,
+            "blocked": 0,
+            "failed": 0,
+            "skipped_current": 0,
+            "case_ids": [],
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_security_lifecycle_automation",
+        lambda **_kwargs: pytest.fail("unrecorded lifecycle runner reached"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ds,
+        "record_security_lifecycle_automation_result",
+        lambda *_args, **_kwargs: pytest.fail("separate lifecycle recorder reached"),
+    )
+
+    assert ds.tick_once(_NOW, fire=lambda _source: None) == []
+    assert events == [("owned", 2, _NOW)]
+
+
 def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
@@ -252,15 +292,9 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     }
     monkeypatch.setattr(
         ds,
-        "run_security_lifecycle_automation",
+        "run_and_record_security_lifecycle_automation",
         lambda *, limit, now: events.append(("automation", limit, now))
         or automation_result,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ds,
-        "record_security_lifecycle_automation_result",
-        lambda result, *, now: events.append(("automation-result", result, now)),
         raising=False,
     )
     monkeypatch.setattr(
@@ -283,7 +317,6 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
     assert fired == ["finnhub_news"]
     assert events == [
         ("automation", 2, _NOW),
-        ("automation-result", automation_result, _NOW),
         ("transitions", _NOW),
         ("transition-result", transition_result, _NOW),
         ("provider", "finnhub_news"),
@@ -297,7 +330,7 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
     monkeypatch.setattr(
         ds,
-        "run_security_lifecycle_automation",
+        "run_and_record_security_lifecycle_automation",
         lambda *, limit, now: events.append(("automation", limit, now))
         or {
             "status": "succeeded",
@@ -311,12 +344,6 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
             "skipped_current": 0,
             "case_ids": [],
         },
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ds,
-        "record_security_lifecycle_automation_result",
-        lambda result, *, now: events.append(("automation-result", now)),
         raising=False,
     )
     monkeypatch.setattr(
@@ -348,7 +375,6 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
     assert fired == ["finnhub_news"]
     assert events == [
         ("automation", 2, _NOW),
-        ("automation-result", _NOW),
         ("transitions", _NOW),
         ("transition-result", _NOW),
         ("provider", "finnhub_news"),
@@ -372,7 +398,7 @@ def test_tick_records_lifecycle_automation_failure_and_continues(monkeypatch):
     }
     monkeypatch.setattr(
         ds,
-        "run_security_lifecycle_automation",
+        "run_and_record_security_lifecycle_automation",
         lambda *, limit, now: (_ for _ in ()).throw(
             RuntimeError("private scheduler detail")
         ),

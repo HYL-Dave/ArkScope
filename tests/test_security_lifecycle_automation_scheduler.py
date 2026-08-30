@@ -103,7 +103,7 @@ def _patch_provider_free_empty_worker(monkeypatch, scheduler, calls):
 
         def run(self, limit, mode):
             calls.append((self.execution_owner_id, limit, mode))
-            return _summary()
+            return _v2_summary()
 
     monkeypatch.setattr(scheduler, "ListingAuthorityTransport", Transport)
     monkeypatch.setattr(scheduler, "ListingAuthoritySession", Session)
@@ -156,13 +156,13 @@ def test_lock_owner_blocks_a_second_connection_then_release_enables_reconciliati
             )
             busy = scheduler.run_security_lifecycle_automation(now=_NOW)
 
-            assert busy == _summary(status="skipped", reason="already_running")
+            assert busy == _v2_summary(status="skipped", reason="already_running")
             assert calls == []
             assert first_store.get_automation_run(claim.run_id)["status"] == "running"
 
         recovered = scheduler.run_security_lifecycle_automation(now=_NOW)
         row = first_store.get_automation_run(claim.run_id)
-        assert recovered == _summary()
+        assert recovered == _v2_summary()
         assert len(calls) == 1
         assert row["status"] == "failed"
         assert row["failure_code"] == "internal_error"
@@ -174,6 +174,54 @@ def test_lock_owner_blocks_a_second_connection_then_release_enables_reconciliati
             second_conn.close()
         if first_conn is not None:
             first_conn.close()
+
+
+def test_recorded_runner_persists_result_before_releasing_execution_lock(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+    lock_held = False
+
+    @contextmanager
+    def execution_lock():
+        nonlocal lock_held
+        lock_held = True
+        events.append("lock_acquired")
+        try:
+            yield SimpleNamespace(execution_owner_id="record-owner")
+        finally:
+            events.append("lock_released")
+            lock_held = False
+
+    result = _v2_summary()
+    monkeypatch.setattr(scheduler, "lifecycle_automation_execution_lock", execution_lock)
+    monkeypatch.setattr(scheduler, "_reconcile_running_rows", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        scheduler,
+        "_run_owned_automation_batch",
+        lambda **_kwargs: events.append("worker") or result,
+    )
+
+    def record(value, *, now):
+        assert lock_held is True
+        assert value == result
+        assert now == _NOW
+        events.append("record")
+        return True
+
+    monkeypatch.setattr(
+        scheduler,
+        "record_security_lifecycle_automation_result",
+        record,
+    )
+
+    assert scheduler.run_and_record_security_lifecycle_automation(
+        limit=1,
+        now=_NOW,
+    ) == result
+    assert events == ["lock_acquired", "worker", "record", "lock_released"]
 
 
 @pytest.mark.parametrize("failure_point", ("fcntl", "open"))
@@ -218,7 +266,7 @@ def test_lock_unavailable_never_reconciles_persisted_running_rows(
     try:
         result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
-        assert result == _summary(
+        assert result == _v2_summary(
             status="unavailable",
             reason="execution_lock_unavailable",
         )
@@ -319,7 +367,7 @@ def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch)
 
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
-    assert result == _summary(
+    assert result == _v2_summary(
         status="not_installed",
         reason="automation_schema_absent",
     )
@@ -344,7 +392,7 @@ def test_scheduler_reports_schema_absent_as_not_installed(tmp_path, monkeypatch)
         ),
     )
 
-    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _summary(
+    assert scheduler.run_security_lifecycle_automation(now=_NOW) == _v2_summary(
         status="not_installed",
         reason="automation_schema_absent",
     )
@@ -456,6 +504,39 @@ def test_failed_case_skipped_on_next_real_tick_does_not_record_recovery(
         worker_module,
         "AUTOMATION_EXECUTION_REVISION",
         "trusted-lifecycle-execution-r2",
+    )
+    repeated_failure = worker(
+        "second-failure-owner",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ValueError("source payload invalid again")
+        ),
+    ).run(limit=1)
+    repeated_run_id = SecurityLifecycleInvestigationStore(
+        conn
+    ).list_automation_runs(case_id)[0]["run_id"]
+    assert repeated_run_id != persisted_run_id
+    assert repeated_failure["case_outcomes"] == {case_id: "failed"}
+    assert scheduler.record_security_lifecycle_automation_result(
+        repeated_failure,
+        now=_NOW,
+    )
+    repeated_runs = telemetry.list_runs(
+        job_name="security_lifecycle.automation",
+        limit=10,
+    )
+    assert [(row["status"], row["message"]) for row in repeated_runs] == [
+        ("failed", "security_lifecycle_automation_failure")
+    ]
+    repeated_state = scheduler_state.get("security_lifecycle.automation")
+    assert repeated_state is not None
+    assert repeated_state["last_result"]["active_incident"]["case_failures"] == {
+        case_id: {"run_id": repeated_run_id, "recovery": "new_attempt"}
+    }
+
+    monkeypatch.setattr(
+        worker_module,
+        "AUTOMATION_EXECUTION_REVISION",
+        "trusted-lifecycle-execution-r3",
     )
     recovered_bundle = LifecycleAutomationEvidenceBundle(
         evidence=(),
@@ -585,6 +666,7 @@ def test_blocked_case_is_not_an_operational_failure_witness(
         {"selected": 2},
         {"failed": 0, "accepted": 1},
         {"case_ids": []},
+        {"case_ids": [" slc_failed"]},
         {"case_outcomes": {"slc_failed": "blocked"}},
         {"case_outcomes": {"slc_failed": "failed", "extra": "skipped_current"}},
     ),
@@ -626,6 +708,25 @@ def test_stored_result_reads_version_one_and_rejects_malformed_legacy_blobs():
     assert scheduler._stored_result(json.dumps(scheduler_failure)) == scheduler_failure
     assert scheduler._stored_result("not-json") is None
     assert scheduler._stored_result(json.dumps({"selected": 1})) is None
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    (
+        ("succeeded", None),
+        ("not_installed", "automation_schema_absent"),
+        ("skipped", "already_running"),
+        ("unavailable", "automation_scheduler_failed"),
+    ),
+)
+def test_current_empty_result_producers_emit_version_two(status, reason):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    result = scheduler._empty_summary(status=status, reason=reason)
+
+    assert result["result_version"] == 2
+    assert result["case_outcomes"] == {}
+    assert scheduler._bounded_result(result) == result
 
 
 def test_version_one_mixed_batch_reconstructs_only_the_failed_case_incident(
@@ -729,9 +830,26 @@ def test_version_one_mixed_batch_reconstructs_only_the_failed_case_incident(
     conn.close()
 
 
-def test_scheduler_level_incident_recovers_after_a_real_successful_invocation(
+@pytest.mark.parametrize(
+    "recovery",
+    (
+        _v2_summary(),
+        _v2_summary(
+            status="partial",
+            reason="case_processing_blocked",
+            selected=1,
+            processed=1,
+            blocked=1,
+            case_ids=["slc_blocked"],
+            case_outcomes={"slc_blocked": "blocked"},
+        ),
+    ),
+    ids=("empty-success", "completed-blocked-attempt"),
+)
+def test_scheduler_level_incident_recovers_after_a_nonoperational_invocation(
     tmp_path,
     monkeypatch,
+    recovery,
 ):
     from src.scheduler_state import SchedulerStateStore
     from src.service import security_lifecycle_automation_scheduler as scheduler
@@ -745,10 +863,9 @@ def test_scheduler_level_incident_recovers_after_a_real_successful_invocation(
         status="unavailable",
         reason="automation_scheduler_failed",
     )
-    success = _v2_summary()
 
     assert scheduler.record_security_lifecycle_automation_result(failure, now=_NOW)
-    assert scheduler.record_security_lifecycle_automation_result(success, now=_NOW)
+    assert scheduler.record_security_lifecycle_automation_result(recovery, now=_NOW)
 
     runs = telemetry.list_runs(job_name="security_lifecycle.automation", limit=10)
     assert [(row["status"], row["message"]) for row in runs] == [
@@ -758,7 +875,7 @@ def test_scheduler_level_incident_recovers_after_a_real_successful_invocation(
     state = state_store.get("security_lifecycle.automation")
     assert state is not None
     assert state["last_result"]["active_incident"] is None
-    assert state["last_result"]["latest_result"] == success
+    assert state["last_result"]["latest_result"] == recovery
 
 
 def test_scheduler_program_error_is_typed_without_raw_detail(monkeypatch):
@@ -775,7 +892,7 @@ def test_scheduler_program_error_is_typed_without_raw_detail(monkeypatch):
 
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
-    assert result == _summary(
+    assert result == _v2_summary(
         status="unavailable",
         reason="automation_scheduler_failed",
     )
@@ -1044,7 +1161,7 @@ def test_listing_transport_constructor_failure_is_bounded_and_sanitized(
 
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
-    assert result == _summary(
+    assert result == _v2_summary(
         status="unavailable",
         reason="automation_scheduler_failed",
     )
@@ -1082,7 +1199,7 @@ def test_listing_session_constructor_failure_closes_constructed_transport(
 
     result = scheduler.run_security_lifecycle_automation(now=_NOW)
 
-    assert result == _summary(
+    assert result == _v2_summary(
         status="unavailable",
         reason="automation_scheduler_failed",
     )

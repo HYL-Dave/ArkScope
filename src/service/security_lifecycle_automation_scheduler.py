@@ -131,6 +131,8 @@ class LifecycleAutomationNotInstalled(RuntimeError):
 
 def _empty_summary(*, status: str = "succeeded", reason: str | None = None) -> dict:
     return {
+        "result_version": 2,
+        "case_outcomes": {},
         "status": status,
         "reason": reason,
         "selected": 0,
@@ -1081,7 +1083,12 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
         if not isinstance(raw_id, str):
             raise ValueError("case_ids")
         case_id = raw_id.strip()
-        if not case_id or len(case_id) > 160 or "\0" in case_id:
+        if (
+            not case_id
+            or len(case_id) > 160
+            or "\0" in case_id
+            or (result_version == 2 and case_id != raw_id)
+        ):
             raise ValueError("case_ids")
         case_ids.append(case_id)
     if len(case_ids) != len(set(case_ids)):
@@ -1258,15 +1265,26 @@ def _run_owned_automation_batch(
         return _automation_exception_result(exc)
 
 
-def run_security_lifecycle_automation(
+def _record_automation_result(result: Mapping[str, object], *, now: datetime) -> None:
+    try:
+        record_security_lifecycle_automation_result(result, now=now)
+    except Exception as exc:
+        logger.warning(
+            "security lifecycle automation result recording failed code=%s",
+            type(exc).__name__,
+        )
+
+
+def _run_security_lifecycle_automation(
     limit: int = _DEFAULT_LIMIT,
     now: datetime | None = None,
+    *,
+    record_result: bool,
 ) -> dict:
-    """Run one exclusively owned batch without returning sensitive detail."""
-
     if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
         raise ValueError("limit")
-    at = _timestamp(_aware_instant(now))
+    instant = _aware_instant(now)
+    at = _timestamp(instant)
     try:
         with lifecycle_automation_execution_lock() as execution:
             startup_reconciled = False
@@ -1274,7 +1292,7 @@ def run_security_lifecycle_automation(
             try:
                 _reconcile_running_rows(at=at)
                 startup_reconciled = True
-                return _run_owned_automation_batch(
+                result = _run_owned_automation_batch(
                     limit=limit,
                     at=at,
                     execution_owner_id=execution.execution_owner_id,
@@ -1296,14 +1314,46 @@ def run_security_lifecycle_automation(
                             "security lifecycle owner cleanup failed code=%s",
                             type(exc).__name__,
                         )
+            if record_result:
+                _record_automation_result(result, now=instant)
+            return result
     except LifecycleAutomationAlreadyRunning:
-        return _empty_summary(status="skipped", reason="already_running")
+        result = _empty_summary(status="skipped", reason="already_running")
     except LifecycleAutomationExecutionUnavailable:
-        return security_lifecycle_automation_failure(
+        result = security_lifecycle_automation_failure(
             "execution_lock_unavailable"
         )
     except Exception as exc:
-        return _automation_exception_result(exc)
+        result = _automation_exception_result(exc)
+    if record_result:
+        _record_automation_result(result, now=instant)
+    return result
+
+
+def run_security_lifecycle_automation(
+    limit: int = _DEFAULT_LIMIT,
+    now: datetime | None = None,
+) -> dict:
+    """Run one exclusively owned batch without recording its result."""
+
+    return _run_security_lifecycle_automation(
+        limit=limit,
+        now=now,
+        record_result=False,
+    )
+
+
+def run_and_record_security_lifecycle_automation(
+    limit: int = _DEFAULT_LIMIT,
+    now: datetime | None = None,
+) -> dict:
+    """Run and persist one batch before releasing exclusive ownership."""
+
+    return _run_security_lifecycle_automation(
+        limit=limit,
+        now=now,
+        record_result=True,
+    )
 
 
 def _job_runs_connection() -> sqlite3.Connection | None:
@@ -1464,6 +1514,21 @@ def _normalize_active_incident(value: object) -> dict[str, object] | None:
         "case_failures": cases,
         "scheduler_failure": scheduler_failure,
     }
+
+
+def _incident_identity(
+    value: Mapping[str, object] | None,
+) -> tuple[tuple[str, ...], str | None]:
+    normalized = _normalize_active_incident(value)
+    if normalized is None:
+        return (), None
+    scheduler_failure = normalized["scheduler_failure"]
+    reason = (
+        None
+        if scheduler_failure is None
+        else str(scheduler_failure["reason"])
+    )
+    return tuple(sorted(normalized["case_failures"])), reason
 
 
 def _state_envelope(raw: object) -> dict[str, object] | None:
@@ -1738,7 +1803,9 @@ def record_security_lifecycle_automation_result(
                     "scheduler_failure": base_scheduler_failure,
                 }
             )
-            incident_changed = merged != reconciled
+            incident_changed = _incident_identity(merged) != _incident_identity(
+                reconciled
+            )
             active = merged
 
         at = _witness_at(
@@ -1781,6 +1848,7 @@ def record_security_lifecycle_automation_result(
 __all__ = [
     "LifecycleAutomationNotInstalled",
     "record_security_lifecycle_automation_result",
+    "run_and_record_security_lifecycle_automation",
     "run_security_lifecycle_automation",
     "security_lifecycle_automation_failure",
 ]

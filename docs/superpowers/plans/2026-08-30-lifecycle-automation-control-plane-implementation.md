@@ -29,6 +29,9 @@ transitions default off.
   persisted predecessor chain.
 - Runtime progress is ephemeral and is not a lease. Orphan recovery must work
   with the progress registry empty.
+- Scheduled and attended production callers must use the lock-owned
+  run-and-record boundary; they may not release ownership between a worker
+  result and its incident-state persistence.
 - `apply_profile_transitions=false` must stop both new automation approval and
   later scheduler application of an already automation-approved transition.
 - Existing human-approved transition scheduling remains unchanged.
@@ -123,6 +126,8 @@ transitions default off.
   empty batch may not recover a case incident.
 - [ ] Store latest aggregate outcome and active incident under a dedicated
   scheduler-state key; do not use `continuation` as a retry queue.
+- [ ] Keep result persistence inside execution ownership for every production
+  caller so a newer invocation cannot replace the per-case row being recorded.
 - [ ] Deduplicate identical active incidents without periodic restatement.
 - [ ] Add mutations for dropping case outcomes, treating blocked as failed,
   trusting an empty batch, and accepting counter/map drift.

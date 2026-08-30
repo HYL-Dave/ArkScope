@@ -196,6 +196,13 @@ Identical unresolved incidents are not appended every 30 seconds. The latest
 failure witness remains authoritative, and the status endpoint exposes it as
 an active incident until genuine recovery.
 
+Scheduled and attended production callers persist the bounded result before
+releasing the shared execution lock. This binds each result to the run rows
+created by that invocation without widening the public result DTO with an
+internal run identifier. A blocked attempt is a completed, non-operational
+invocation: it may clear a scheduler-level operational failure while its
+policy blocker remains visible on the case.
+
 ## 7. Retry and Manual New-Attempt Authority
 
 ### 7.1 Default reservation remains unchanged
