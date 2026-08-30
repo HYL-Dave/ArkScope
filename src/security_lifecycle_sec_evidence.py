@@ -67,15 +67,6 @@ _EXTENDED_DEADLINE = re.compile(
     rf"(?P<date>{_SOURCE_DATE_TEXT})\b",
     re.IGNORECASE,
 )
-_COORDINATE_TARGET = re.compile(
-    rf"\A\s*(?:,\s*)?(?:or|and)\s+{_SOURCE_DATE_TEXT}\b",
-    re.IGNORECASE,
-)
-_EXTENSION_ACTION = re.compile(
-    rf"\bextended\b(?:\s+from\s+{_SOURCE_DATE_TEXT})?\s+to\s+"
-    rf"{_SOURCE_DATE_TEXT}\b",
-    re.IGNORECASE,
-)
 _NEW_REPLACING = re.compile(
     r"\bnew ticker symbol\s+(?P<new>[A-Z][A-Z0-9.\-]{0,19})\s*,?\s*"
     r"replacing\s+(?P<old>[A-Z][A-Z0-9.\-]{0,19})\b",
@@ -670,36 +661,92 @@ def _source_deadlines(
     rows: list[SecSourceDeadline] = []
     ambiguous = False
     for start, end, sentence in _sentence_spans(evidence.excerpt):
-        target_matches = [
-            (match, kind)
-            for pattern, kind in (
-                (_TERMINATE_IF_BY, "termination_condition"),
-                (_CURRENT_DEADLINE, "current"),
-                (_EXTENDED_DEADLINE, "extension"),
-            )
-            for match in pattern.finditer(sentence)
-        ]
-        extension_action_count = len(_EXTENSION_ACTION.findall(sentence))
-        if len(target_matches) != 1 or extension_action_count > 1:
-            if len(target_matches) > 1 or extension_action_count > 1:
-                ambiguous = True
+        target_matches = sorted(
+            (
+                (match, kind)
+                for pattern, kind in (
+                    (_TERMINATE_IF_BY, "termination_condition"),
+                    (_CURRENT_DEADLINE, "current"),
+                    (_EXTENDED_DEADLINE, "extension"),
+                )
+                for match in pattern.finditer(sentence)
+            ),
+            key=lambda item: item[0].start(),
+        )
+        if not target_matches:
             continue
-        target_match, kind = target_matches[0]
-        target_date = target_match.group("date")
-        if _COORDINATE_TARGET.match(sentence[target_match.end("date") :]) is not None:
+
+        normalized_matches = []
+        try:
+            for target_match, kind in target_matches:
+                supersedes_text = target_match.groupdict().get("supersedes_date")
+                normalized_matches.append(
+                    (
+                        target_match,
+                        kind,
+                        _normalized_source_date_text(target_match.group("date")),
+                        (
+                            _normalized_source_date_text(supersedes_text)
+                            if supersedes_text is not None
+                            else None
+                        ),
+                    )
+                )
+        except ValueError:
             ambiguous = True
             continue
-        supersedes_text = target_match.groupdict().get("supersedes_date")
-        supersedes_date = (
-            _normalized_source_date_text(supersedes_text)
-            if supersedes_text is not None
-            else None
+
+        target_dates = {item[2] for item in normalized_matches}
+        predecessors = {
+            item[3]
+            for item in normalized_matches
+            if item[1] == "extension" and item[3] is not None
+        }
+        if len(target_dates) != 1 or len(predecessors) > 1:
+            ambiguous = True
+            continue
+
+        claimed_date_spans = {
+            target_match.span(group)
+            for target_match, _kind in target_matches
+            for group in ("date", "supersedes_date")
+            if group in target_match.groupdict()
+            and target_match.groupdict()[group] is not None
+        }
+        first_target_end = min(
+            target_match.end("date") for target_match, _kind in target_matches
         )
+        source_date_spans = {
+            match.span("date")
+            for pattern in (_ANY_MONTH_DATE, _ANY_ISO_DATE)
+            for match in pattern.finditer(sentence)
+        }
+        if any(
+            date_start >= first_target_end
+            and (date_start, date_end) not in claimed_date_spans
+            for date_start, date_end in source_date_spans
+        ):
+            ambiguous = True
+            continue
+
+        extension_matches = [
+            item for item in normalized_matches if item[1] == "extension"
+        ]
+        explicit_extensions = [
+            item for item in extension_matches if item[3] is not None
+        ]
+        if explicit_extensions:
+            selected_match = explicit_extensions[-1]
+        elif extension_matches:
+            selected_match = extension_matches[-1]
+        else:
+            selected_match = normalized_matches[-1]
+        _target_match, kind, target_date, supersedes_date = selected_match
         byte_start = len(evidence.excerpt[:start].encode("utf-8"))
         byte_end = byte_start + len(sentence.encode("utf-8"))
         rows.append(
             SecSourceDeadline(
-                date=_normalized_source_date_text(target_date),
+                date=target_date,
                 evidence_id=evidence.evidence_id,
                 span_start_byte=byte_start,
                 span_end_byte=byte_end,
@@ -718,12 +765,15 @@ def _resolve_source_deadline(
     rows: Sequence[SecSourceDeadline],
 ) -> SecSourceDeadline | None:
     active: SecSourceDeadline | None = None
+    seen_edges: set[tuple[str, str]] = set()
     for row in rows:
         if row.kind in {"current", "termination_condition"}:
             if active is None:
                 active = row
             elif row.date != active.date:
                 return None
+            else:
+                active = row
             continue
         if row.kind != "extension":
             return None
@@ -732,11 +782,22 @@ def _resolve_source_deadline(
         if predecessor is None:
             if active is None:
                 return None
+            if row.date == active.date:
+                active = row
+                continue
+            if any(target == row.date for _source, target in seen_edges):
+                continue
             predecessor = active.date
-        elif active is not None and active.date != predecessor:
-            return None
         if date.fromisoformat(row.date) <= date.fromisoformat(predecessor):
             return None
+        edge = (predecessor, row.date)
+        if edge in seen_edges:
+            if active is not None and active.date == row.date:
+                active = row
+            continue
+        if active is not None and active.date != predecessor:
+            return None
+        seen_edges.add(edge)
         active = row
     return active
 

@@ -3303,8 +3303,16 @@ def test_acquisition_scheduling_rejects_multiple_deadline_dates_before_market_wo
         raise AssertionError("conflicting deadline dates must fail before market work")
 
 
+@pytest.mark.parametrize(
+    "duplicate_extension",
+    (
+        pytest.param(False, id="single-extension"),
+        pytest.param(True, id="duplicate-extension"),
+    ),
+)
 def test_real_sec_deadline_supersession_reaches_due_ibkr_check_with_new_citation(
     monkeypatch,
+    duplicate_extension,
 ):
     from data_sources import sec_transport
     from data_sources.sec_transport import SecResponse
@@ -3317,7 +3325,7 @@ def test_real_sec_deadline_supersession_reaches_due_ibkr_check_with_new_citation
     new_sentence = (
         "The outside date was extended from August 28, 2026 to August 30, 2026."
     )
-    filings = (
+    filings = [
         {
             "form": "DEFM14A",
             "filingDate": "2026-08-20",
@@ -3338,7 +3346,20 @@ def test_real_sec_deadline_supersession_reaches_due_ibkr_check_with_new_citation
             "cik": "0000000001",
             "ticker": "DEAD",
         },
-    )
+    ]
+    if duplicate_extension:
+        filings.append(
+            {
+                "form": "DEFA14A",
+                "filingDate": "2026-08-27",
+                "accessionNumber": "0000000001-26-000003",
+                "primaryDocument": "extension-recap.htm",
+                "primaryDocDescription": "Outside date extension recap",
+                "items": "",
+                "cik": "0000000001",
+                "ticker": "DEAD",
+            }
+        )
     fields = (
         "form",
         "filingDate",
@@ -3360,6 +3381,7 @@ def test_real_sec_deadline_supersession_reaches_due_ibkr_check_with_new_citation
     documents = {
         "agreement.htm": f"<html><body><p>{old_sentence}</p></body></html>",
         "extension.htm": f"<html><body><p>{new_sentence}</p></body></html>",
+        "extension-recap.htm": f"<html><body><p>{new_sentence}</p></body></html>",
     }
 
     class Transport:
@@ -3438,8 +3460,17 @@ def test_real_sec_deadline_supersession_reaches_due_ibkr_check_with_new_citation
     assert blocker.context["as_of"] == "2026-08-30"
 
     extension_evidence = next(
-        row for row in bundle.evidence if new_sentence in row.excerpt
+        row
+        for row in bundle.evidence
+        if row.evidence_id == blocker.context["source_deadline_evidence_id"]
     )
+    assert new_sentence in extension_evidence.excerpt
+    expected_accession = (
+        "0000000001-26-000003"
+        if duplicate_extension
+        else "0000000001-26-000002"
+    )
+    assert extension_evidence.source_locator["accession"] == expected_accession
     span_start = blocker.context["source_deadline_span_start_byte"]
     span_end = blocker.context["source_deadline_span_end_byte"]
     cited = extension_evidence.excerpt.encode()[

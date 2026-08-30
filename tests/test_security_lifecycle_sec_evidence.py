@@ -925,10 +925,160 @@ def test_ordered_bare_deadline_extension_uses_single_current_predecessor():
     assert deadline.cited_text == new_sentence
 
 
+def test_repeated_explicit_deadline_extension_is_idempotent_and_selects_latest_row():
+    old_sentence = "The termination date remains August 28, 2026."
+    extension_sentence = (
+        "The outside date was extended from August 28, 2026 to August 30, 2026."
+    )
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", old_sentence),
+            ("2026-08-22", extension_sentence),
+            ("2026-08-25", extension_sentence),
+        )
+    )
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    selected = next(
+        row for row in result.evidence if row.evidence_id == deadline.evidence_id
+    )
+    assert (deadline.date, deadline.supersedes_date) == (
+        "2026-08-30",
+        "2026-08-28",
+    )
+    assert selected.source_locator["accession"] == "0001589526-26-000003"
+    assert deadline.cited_text == extension_sentence
+
+
+def test_repeated_bare_deadline_extension_is_idempotent_and_selects_latest_row():
+    extension_sentence = "The outside date was extended to August 30, 2026."
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 28, 2026."),
+            ("2026-08-22", extension_sentence),
+            ("2026-08-25", extension_sentence),
+        )
+    )
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    selected = next(
+        row for row in result.evidence if row.evidence_id == deadline.evidence_id
+    )
+    assert (deadline.date, deadline.supersedes_date) == ("2026-08-30", None)
+    assert selected.source_locator["accession"] == "0001589526-26-000003"
+    assert deadline.cited_text == extension_sentence
+
+
+def test_duplicate_same_target_grammar_matches_are_idempotent():
+    sentence = (
+        "The termination date remains August 30, 2026, and the outside date "
+        "is August 30, 2026."
+    )
+    result = _collect_deadline_sentence(sentence)
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    assert (deadline.date, deadline.kind) == ("2026-08-30", "current")
+    assert deadline.cited_text == sentence
+
+
+def test_deadline_extension_recap_before_next_extension_preserves_chain():
+    first_extension = (
+        "The outside date was extended from August 28, 2026 to August 30, 2026."
+    )
+    next_extension = (
+        "The outside date was extended from August 30, 2026 to September 1, 2026."
+    )
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 28, 2026."),
+            ("2026-08-22", first_extension),
+            ("2026-08-25", first_extension),
+            ("2026-08-27", next_extension),
+        )
+    )
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    selected = next(
+        row for row in result.evidence if row.evidence_id == deadline.evidence_id
+    )
+    assert (deadline.date, deadline.supersedes_date) == (
+        "2026-09-01",
+        "2026-08-30",
+    )
+    assert selected.source_locator["accession"] == "0001589526-26-000004"
+    assert deadline.cited_text == next_extension
+
+
+def test_historical_deadline_edge_recap_after_next_extension_is_ignored():
+    first_extension = (
+        "The outside date was extended from August 28, 2026 to August 30, 2026."
+    )
+    next_extension = (
+        "The outside date was extended from August 30, 2026 to September 1, 2026."
+    )
+    result = _collect_deadline_chain(
+        (
+            ("2026-08-20", "The termination date remains August 28, 2026."),
+            ("2026-08-22", first_extension),
+            ("2026-08-25", next_extension),
+            ("2026-08-27", first_extension),
+        )
+    )
+
+    assert result.blockers == ()
+    assert len(result.source_deadlines) == 1
+    deadline = result.source_deadlines[0]
+    selected = next(
+        row for row in result.evidence if row.evidence_id == deadline.evidence_id
+    )
+    assert (deadline.date, deadline.supersedes_date) == (
+        "2026-09-01",
+        "2026-08-30",
+    )
+    assert selected.source_locator["accession"] == "0001589526-26-000003"
+    assert deadline.cited_text == next_extension
+
+
 def test_deadline_extension_with_two_targets_fails_closed():
     result = _collect_deadline_sentence(
         "The outside date was extended from March 1, 2026 to June 1, 2026 "
         "or July 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_conditional_alternate_deadline_target_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date was extended from August 28, 2026 to August 30, 2026 "
+        "or, if regulatory approval remained outstanding, to September 1, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_invalid_syntactic_deadline_dates_fail_closed():
+    result = _collect_deadline_sentence(
+        "The termination date remains February 30, 2026."
+    )
+
+    assert result.source_deadlines == ()
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_invalid_explicit_deadline_predecessor_fails_closed():
+    result = _collect_deadline_sentence(
+        "The outside date was extended from February 30, 2026 to June 1, 2026."
     )
 
     assert result.source_deadlines == ()
