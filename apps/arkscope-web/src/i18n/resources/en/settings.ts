@@ -117,7 +117,7 @@ const settings = {
       newsStorage: {
         title: "News Data",
         description: "Review news volume, collection status, and recent updates.",
-        searchAliases: "news|ingestion|articles|polygon|finnhub|ibkr|news data|Review news volume, ingestion status, and recent updates.",
+        searchAliases: "news|ingestion|articles|massive|polygon|finnhub|ibkr|news data|Review news volume, ingestion status, and recent updates.",
       },
       macroStorage: {
         title: "Macro Data",

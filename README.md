@@ -66,7 +66,7 @@ python -m src.daily_update --all --scope active-universe --dry-run
 python -m src.daily_update --all --scope active-universe  # provider calls + local writes
 ```
 
-The wrapper requires an explicit ticker scope. Its `--all` flag covers the Polygon,
+The wrapper requires an explicit ticker scope. Its `--all` flag covers the Massive,
 Finnhub, and IBKR news sources plus IBKR prices; macro and SEC schedules are managed
 separately by the app.
 

@@ -507,16 +507,16 @@ with IBKRDataSource(host=os.environ.get('IBKR_HOST', '127.0.0.1'), port=4001) as
         print(body[:500])  # HTML 格式
 ```
 
-### 與 Polygon/Finnhub 比較
+### 與 Massive/Finnhub 比較
 
 | 來源 | 歷史深度 | 品質 | 情緒分數 | 費用 |
 |------|---------|------|---------|------|
 | **IBKR** | ~1 個月 | **專業 (Dow Jones)** | ❌ | 需訂閱 |
-| Polygon | 3+ 年 | 中 (Benzinga, Motley Fool) | ✅ | 免費方案 |
+| Massive | 3+ 年 | 中 (Benzinga, Motley Fool) | ✅ | 免費方案 |
 | Finnhub | 7 天 | 中 (Yahoo 70%) | ❌ | 免費方案 |
 
 **建議策略**：
-- **歷史數據**: 使用 Polygon (3+ 年)
+- **歷史數據**: 使用 Massive (3+ 年)
 - **即時高品質**: 使用 IBKR (Dow Jones)
 - **補充覆蓋**: 使用 Finnhub
 

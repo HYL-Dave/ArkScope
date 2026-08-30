@@ -16,7 +16,7 @@
 | Path | What |
 |------|------|
 | `src/` | Agent, tools, DAL, API, monitor, and data ingestion (`src/collectors/`, `src/daily_update.py` — **protected runtime path**) |
-| `data_sources/` | Data-source API clients (Finnhub, SEC EDGAR, Polygon, IBKR, Alpha Vantage, EODHD, …) |
+| `data_sources/` | Data-source API clients (Finnhub, SEC EDGAR, Massive, IBKR, Alpha Vantage, EODHD, …) |
 | `extensions/sa_alpha_picks/` | Seeking Alpha browser extension + Native Messaging host |
 | `config/` | `.env`, `user_profile.yaml`, watchlists, sectors, skills |
 | `docs/` | Design docs, data/feature guides, project history |

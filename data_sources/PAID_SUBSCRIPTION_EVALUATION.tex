@@ -137,7 +137,7 @@
 \toprule
 \textbf{Provider} & \textbf{月費起} & \textbf{資產類別} & \textbf{獨特價值} & \textbf{評分} \\
 \midrule
-\textbf{Polygon/Massive} & \$29 & 6 類 & Options + Futures + 經濟數據 & \starmark\starmark\starmark\starmark\starmark \\
+\textbf{Massive} & \$29 & 6 類 & Options + Futures + 經濟數據 & \starmark\starmark\starmark\starmark\starmark \\
 \textbf{Finnhub} & \$0--75 & 3 類 & 國會交易 + ESG + 專利 & \starmark\starmark\starmark\starmark \\
 \textbf{Alpha Vantage} & \$49.99 & 5 類 & 50+ 技術指標 + 大宗商品 & \starmark\starmark\starmark \\
 \textbf{EODHD} & \$19.99 & 6 類 & 全球 60+ 交易所 + ID 對照 & \starmark\starmark\starmark\starmark \\
@@ -150,7 +150,7 @@
 \begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={\textbf{推薦組合}}]
 \begin{enumerate}[leftmargin=*]
     \item \textbf{IBKR} (免費) -- 交易執行 + 專業新聞 (Dow Jones, Briefing) + 基本面數據
-    \item \textbf{Polygon} (\$29/月) -- Options/Futures 數據 + 經濟指標
+    \item \textbf{Massive} (\$29/月) -- Options/Futures 數據 + 經濟指標
     \item \textbf{Tiingo} (免費) -- 30+ 年歷史股價
     \item \textbf{Finnhub} (免費版) -- 即時報價 + 公司新聞
 \end{enumerate}
@@ -160,7 +160,7 @@
 % Provider Details
 % ============================================================
 \newpage
-\section{Polygon.io / Massive}
+\section{Massive}
 
 \subsection{完整 API 生態系統}
 
@@ -923,7 +923,7 @@ Finnhub & 基本面 & 基礎 (52週高低、PE等) & 免費/\$50+ \\
 EODHD & 基本面 & 30+ 年財務數據 & \$59.99/月 \\
 \midrule
 Alpha Vantage & \textbf{技術} & 50+ SMA, EMA, RSI, MACD... & \$49.99/月 \\
-Polygon & \textbf{技術} & 基礎技術指標 & \$29/月 \\
+Massive & \textbf{技術} & 基礎技術指標 & \$29/月 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -934,7 +934,7 @@ Polygon & \textbf{技術} & 基礎技術指標 & \$29/月 \\
 \centering
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{功能} & \textbf{IBKR} & \textbf{Polygon} & \textbf{Finnhub} & \textbf{EODHD} & \textbf{FDS} \\
+\textbf{功能} & \textbf{IBKR} & \textbf{Massive} & \textbf{Finnhub} & \textbf{EODHD} & \textbf{FDS} \\
 \midrule
 交易執行 & \cmark & \xmark & \xmark & \xmark & \xmark \\
 Options 數據 & \cmark & \cmark & \xmark & \cmark & \xmark \\
@@ -956,7 +956,7 @@ LLM 優化 & \xmark & \xmark & \xmark & \xmark & \cmark \\
 \centering
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{資產} & \textbf{Polygon} & \textbf{Finnhub} & \textbf{Alpha V} & \textbf{EODHD} & \textbf{IBKR} \\
+\textbf{資產} & \textbf{Massive} & \textbf{Finnhub} & \textbf{Alpha V} & \textbf{EODHD} & \textbf{IBKR} \\
 \midrule
 美股 & \cmark & \cmark & \cmark & \cmark & \cmark \\
 全球股票 & \xmark & \xmark & \wmark & \cmark & \cmark \\
@@ -987,7 +987,7 @@ ETF/基金 & \wmark & \wmark & \xmark & \cmark & \cmark \\
         \item 60+ 免費研究來源
     \end{itemize}
 
-    \item \textbf{Polygon Starter} (\$29)
+    \item \textbf{Massive Starter} (\$29)
     \begin{itemize}
         \item Options/Futures 即時數據
         \item 經濟指標
@@ -1017,9 +1017,9 @@ ETF/基金 & \wmark & \wmark & \xmark & \cmark & \cmark \\
 \toprule
 \textbf{策略} & \textbf{推薦組合} & \textbf{月費} \\
 \midrule
-純美股日內交易 & Polygon (\$29) + IBKR (執行) & \textasciitilde\$40 \\
-美股 + Options 策略 & Polygon + IBKR + Alpha Vantage (\$50) & \textasciitilde\$90 \\
-全球多市場輪動 & EODHD (\$100) + IBKR + Polygon & \textasciitilde\$130 \\
+純美股日內交易 & Massive (\$29) + IBKR (執行) & \textasciitilde\$40 \\
+美股 + Options 策略 & Massive + IBKR + Alpha Vantage (\$50) & \textasciitilde\$90 \\
+全球多市場輪動 & EODHD (\$100) + IBKR + Massive & \textasciitilde\$130 \\
 另類數據阿爾法 & Finnhub (付費) + IBKR & \textasciitilde\$85+ \\
 跨資產宏觀配置 & Alpha Vantage + EODHD + IBKR & \textasciitilde\$160 \\
 \bottomrule
@@ -1066,7 +1066,7 @@ PEAD 策略 (細分營收) & + Financial Datasets & +\$20 (PAYG) \\
 \toprule
 \textbf{訂閱組合} & \textbf{月費} & \textbf{需要的超額回報} \\
 \midrule
-基礎 (Polygon + IBKR) & \textasciitilde\$40 & 0.10\%/月 \\
+基礎 (Massive + IBKR) & \textasciitilde\$40 & 0.10\%/月 \\
 進階 (+ EODHD) & \textasciitilde\$140 & 0.28\%/月 \\
 完整 (全部) & \textasciitilde\$300 & 0.60\%/月 \\
 \bottomrule
@@ -1412,7 +1412,7 @@ Earnings Calendar & Finnhub (免費) & PEAD 研究 \\
 \toprule
 \textbf{項目} & \textbf{來源} & \textbf{月費} & \textbf{用途} \\
 \midrule
-Options 即時數據 & Polygon Starter & \$29 & Smart Money 偵測 \\
+Options 即時數據 & Massive Starter & \$29 & Smart Money 偵測 \\
 API 即時報價 & IBKR US Bundle & \$4.50--10 & 實盤執行 \\
 歷史股價 & Tiingo & \$0 & 持續使用 \\
 新聞+Form 4 & Finnhub & \$0 & 持續使用 \\
@@ -1451,7 +1451,7 @@ API 即時報價 & IBKR US Bundle & \$4.50--10 & 實盤執行 \\
     \node (need) [decision, below of=start, yshift=-0.5cm] {需要交易執行?};
     \node (ibkr) [process, right of=need, xshift=3.5cm] {必須使用 IBKR};
     \node (realtime) [decision, below of=need, yshift=-0.8cm] {需要即時數據?};
-    \node (polygon) [process, right of=realtime, xshift=3.5cm] {Polygon Starter \$29};
+    \node (polygon) [process, right of=realtime, xshift=3.5cm] {Massive Starter \$29};
     \node (global) [decision, below of=realtime, yshift=-0.8cm] {需要全球市場?};
     \node (eodhd) [process, right of=global, xshift=3.5cm] {EODHD \$20--100};
     \node (free) [process, below of=global, yshift=-0.5cm] {使用免費資源};

@@ -753,6 +753,9 @@ const explore = {
     publisher: "{{publisher}} ·",
     seekingAlphaDescription: "Seeking Alpha 文章＋市場新聞（本地 sa_capture.db）",
     allSources: "全部來源",
+    sources: {
+      massive: "Massive",
+    },
     marketDescription: "本地新聞庫（score-free）· 搜尋為字詞 AND",
     marketSearchSummary: "· 搜尋「{{query}}」（按相關性排序，標題加權）",
     seekingAlphaSearchSummary: "· 搜尋「{{query}}」",

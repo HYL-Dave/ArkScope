@@ -154,7 +154,7 @@ SOURCES: Dict[str, SourceDef] = {
             source_mode="direct_local",
             write_target="market_data.db",
             source_badges=("IBKR", "直寫本地"),
-            description="IBKR/Polygon 15min bars for the active universe → market_data.db",
+            description="IBKR/Massive 15min bars for the active universe → market_data.db",
         ),
         SourceDef(
             "sec_corporate_actions", "SEC 公司事件",
@@ -431,7 +431,7 @@ def _run_normalized_news_writer(
     continuation=None,
     progress_cb=None,
 ) -> Dict[str, Any]:
-    """Write Polygon/Finnhub REST news through normalized tables plus legacy projection."""
+    """Write Massive/Finnhub REST news through normalized tables plus legacy projection."""
     import sqlite3
 
     from src.market_data_admin import resolve_market_db_path

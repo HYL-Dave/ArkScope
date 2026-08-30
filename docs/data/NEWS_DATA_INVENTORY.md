@@ -25,7 +25,7 @@
 |----------|------|------|----------|--------------|-----------|
 | **FinRL DeepSeek** | `/mnt/md0/finrl/huggingface_datasets/` | 127,176 | 2009-2024 | ✅ 已有 `sentiment_deepseek` (99%) | ⚠️ Article 61% + 4種摘要 61% |
 | **FNSPID** (歷史) | `NewsExtraction/fnspid_89_2013_2023_cleaned.csv` | 218,654 | 2013-2023 | ❌ 全部是 0 (佔位符) | ✅ Article + Lsa_summary |
-| **Polygon** | `data/news/polygon_for_scoring.csv` | 63,412 | 2022-2025 | ❌ 82% NULL | ❌ 只有 description |
+| **Massive** | `data/news/polygon_for_scoring.csv` | 63,412 | 2022-2025 | ❌ 82% NULL | ❌ 只有 description |
 | **IBKR** | `data/news/raw/ibkr/` | 52,755 | 2023-2025 | ❌ 100% NULL | ✅ content 全文 |
 | **Finnhub** | `data/news/raw/finnhub/2025/` | ~9,419 | 2025 | 未評分 | 待確認 |
 
@@ -163,9 +163,9 @@ IBKR 新聞同時使用 **Title** 和 **Content** 進行評分，然後合併：
 
 **合併邏輯**: Content 評分優先，對於沒有 content 的 ~7,500 筆記錄 (14.2%)，使用 Title 評分補充。
 
-#### Polygon 評分結構 (僅 Title)
+#### Massive 評分結構 (僅 Title)
 
-Polygon 新聞只有 `description` 欄位 (無完整 content)，因此僅使用 Title 評分：
+Massive 新聞只有 `description` 欄位 (無完整 content)，因此僅使用 Title 評分：
 
 | 欄位 | 非空數 | 說明 |
 |------|--------|------|
@@ -178,15 +178,15 @@ Polygon 新聞只有 `description` 欄位 (無完整 content)，因此僅使用 
 |------|------|------|----------|
 | IBKR 原始 | `data/news/ibkr_all_news.parquet` | 52,755 | - |
 | IBKR 評分完成 | `data/news/ibkr_scored_final.parquet` | 52,755 | Title + Content 合併 |
-| Polygon 原始 | `data/news/polygon_for_scoring.csv` | 63,412 | - |
-| Polygon 評分完成 | `data/news/polygon_scored_final.csv` | 63,412 | 僅 Title |
+| Massive 原始 | `data/news/polygon_for_scoring.csv` | 63,412 | - |
+| Massive 評分完成 | `data/news/polygon_scored_final.csv` | 63,412 | 僅 Title |
 
 ### 10.4 評分優先順序建議
 
 | 優先級 | 數據集 | 任務 | 原因 |
 |--------|--------|------|------|
 | **1** | IBKR (52K) | sentiment + risk | 最新數據 (2023-2025)，有全文，完全沒有評分 |
-| **2** | Polygon (63K) | sentiment + risk | 較新數據，無評分 |
+| **2** | Massive (63K) | sentiment + risk | 較新數據，無評分 |
 | **3** | FNSPID (218K) | sentiment + risk | 歷史數據，Sentiment=0 是佔位符 |
 | 低 | FinRL DeepSeek (127K) | 可選 Anthropic 評分對照 | 已有 DeepSeek 評分 |
 
@@ -422,7 +422,7 @@ python score_risk_anthropic.py \
     --symbol-column ticker \
     --text-column title
 
-# Polygon 增量評分 (CSV 使用 dedup_hash 作為 merge key)
+# Massive 增量評分 (CSV 使用 dedup_hash 作為 merge key)
 python score_sentiment_anthropic.py \
     --input data/news/polygon_for_scoring.csv \
     --output data/news/polygon_scored_final.csv \

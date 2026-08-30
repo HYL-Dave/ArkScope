@@ -570,6 +570,44 @@ def test_polygon_data_source_constructors_prefer_massive_then_legacy(monkeypatch
         factory._session.close()
 
 
+def test_market_data_transport_builds_requests_on_the_current_massive_api_host(monkeypatch):
+    from data_sources.polygon_source import PolygonDataSource
+
+    observed = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"status": "OK", "results": []}
+
+    class Session:
+        @staticmethod
+        def get(url, *, params, timeout):
+            observed.update(url=url, params=params, timeout=timeout)
+            return Response()
+
+        @staticmethod
+        def close():
+            return None
+
+    source = PolygonDataSource(api_key="secret")
+    source._session.close()
+    source._session = Session()
+    monkeypatch.setattr(source, "_rate_limit_wait", lambda: None)
+
+    assert source._make_request("/v2/aggs/ticker/AAPL", {"limit": 1}) == {
+        "status": "OK",
+        "results": [],
+    }
+    assert observed == {
+        "url": "https://api.massive.com/v2/aggs/ticker/AAPL",
+        "params": {"limit": 1, "apiKey": "secret"},
+        "timeout": 30,
+    }
+
+
 def test_http_probe_redacts_massive_key_from_request_errors(monkeypatch):
     key = "massive-secret-value"
 

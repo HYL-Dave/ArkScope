@@ -242,15 +242,15 @@ ib.reqNewsBulletins(allMessages=True)
 
 | Provider | 歷史深度 | 日期範圍查詢 | 每次結果上限 | 月費 | 備註 |
 |----------|----------|--------------|--------------|------|------|
-| **Polygon/Massive** | Starter: All history | ✅ `published_utc` | 1,000 (可分頁) | $29 | 🔥 **推薦** |
+| **Massive** | Starter: All history | ✅ `published_utc` | 1,000 (可分頁) | $29 | 🔥 **推薦** |
 | **Finnhub** | 未明確說明 | ✅ `from/to` | 無記載 | $0-75 | 免費版可能有限 |
 | **EODHD** | 有歷史 | ✅ 支援 | 1,000 | $19.99 | 便宜但新聞非主力 |
 | **Tiingo** | 2014+ | ✅ 支援 | 100 per request | $0 | 免費但深度有限 |
 
-#### Polygon/Massive News API 詳情
+#### Massive News API 詳情
 
 ```python
-# Polygon News API - 支援完整歷史查詢
+# Massive News API - 支援完整歷史查詢
 import requests
 
 params = {
@@ -260,12 +260,12 @@ params = {
     "limit": 1000,  # 最多 1000 篇/請求
     "apiKey": "YOUR_KEY"
 }
-resp = requests.get("https://api.polygon.io/v2/reference/news", params=params)
+resp = requests.get("https://api.massive.com/v2/reference/news", params=params)
 
 # 分頁: 使用 next_url 取得下一批
 ```
 
-**結論**: 解決歷史深度問題的最佳方案是 **Polygon Starter ($29/mo)**，可查詢任意日期範圍的完整新聞歷史。
+**結論**: 解決歷史深度問題的最佳方案是 **Massive Starter ($29/mo)**，可查詢任意日期範圍的完整新聞歷史。
 
 ---
 
@@ -337,7 +337,7 @@ articles:
 1. **Remove time-based splitting code** - It's useless and wastes API requests ✅ Done
 2. **Implement real-time streaming** - Essential for complete coverage
 3. **Run daily collection** - As backup and for batch processing
-4. **Use alternative sources for historical** - Finnhub/Polygon for date-range queries
+4. **Use alternative sources for historical** - Finnhub/Massive for date-range queries
 5. **Monitor collection gaps** - Alert if collector hasn't run in 24+ hours
 6. **Fix deduplication** - Use article_id as primary key to eliminate 57.6% redundancy
 
@@ -409,7 +409,7 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 ### Q4: 需要重新評分嗎？
 
 **建議順序**:
-1. 先解決歷史深度問題 (訂閱 Polygon)
+1. 先解決歷史深度問題 (訂閱 Massive)
 2. 修復儲存架構 (減少重複)
 3. 最後考慮重新評分
 
@@ -432,7 +432,7 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 | 免費層極限 | 20 calls/day = 4 次新聞查詢 |
 
 #### 方案 B: 摘要即可接受
-**推薦**: **Polygon/Massive Starter ($29/mo)**
+**推薦**: **Massive Starter ($29/mo)**
 
 | 優點 | 說明 |
 |------|------|
@@ -455,8 +455,8 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 |------|----------|----------|----------|----------|------|------|
 | **IBKR** | ✅ 完整文章 | `content` | **3,467 chars** | 23-50 天 | $0 | 55% 文章有 body |
 | **EODHD** | ✅ 完整文章 | `content` | **待實測** | 有歷史 | $19.99+ | 只有 200 char 預覽 |
-| **Alpha Vantage** | ⚠️ 摘要 | `summary` | ~300 chars | 有歷史 | $49.99 | 比 Polygon 略長 |
-| **Polygon** | ❌ 摘要 | `description` | 247 chars | 4+ 年 | $29 | 付費版相同欄位 |
+| **Alpha Vantage** | ⚠️ 摘要 | `summary` | ~300 chars | 有歷史 | $49.99 | 比 Massive 略長 |
+| **Massive** | ❌ 摘要 | `description` | 247 chars | 4+ 年 | $29 | 付費版相同欄位 |
 | **Finnhub** | ❌ 摘要 | `summary` | ~200 chars | ~1 個月 | $0-75 | 付費版相同欄位 |
 | **Tiingo** | ❌ 句子摘要 | `description` | ~50-100 chars | 2014+ | $10+ | "Sentence summary" |
 | **Financial Datasets** | ❓ 未確認 | `news` | - | 有歷史 | $0.02/次 | 非新聞專長 |
@@ -467,7 +467,7 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 |----------|----------|----------|
 | IBKR | 實測數據 | `data/news/raw/ibkr/*.parquet` |
 | EODHD | 程式碼確認 | `data_sources/eodhd_source.py:234` |
-| Polygon | 實測數據 | `data/news/raw/polygon/*.parquet` |
+| Massive | 實測數據 | `data/news/raw/polygon/*.parquet` |
 | Finnhub | 現行產品 adapter | `data_sources/finnhub_source.py` |
 | Alpha Vantage | 現行產品 adapter | `data_sources/alpha_vantage_source.py` |
 | Tiingo | QuantConnect 文檔 | [Tiingo News](https://www.quantconnect.com/docs/v2/our-platform/user-guides/alternative-data/tiingo-news) |
@@ -479,15 +479,15 @@ BroadTape 是即時串流，無法查詢過去的新聞。
    - 驗證: `eodhd_source.py` line 234: `description=item.get('content', '')`
    - 免費層限制: 20 calls/day，**每次新聞查詢消耗 5 calls**
 
-2. **Polygon 付費版不提供完整文章**
+2. **Massive 付費版不提供完整文章**
    - 所有層級 (Starter/Developer/Business) 回傳相同欄位
    - 只有 `description` 欄位 (~247 chars 摘要)
 
 3. **Alpha Vantage NEWS_SENTIMENT API 有摘要**
    - 回傳欄位: `title`, `source`, `published`, `overall_sentiment_label`, `ticker_sentiments`, **`summary`**
-   - `summary` 欄位約 300 chars，比 Polygon 略長
+   - `summary` 欄位約 300 chars，比 Massive 略長
 
-### IBKR vs Polygon 評分比較 (抽樣分析)
+### IBKR vs Massive 評分比較 (抽樣分析)
 
 **樣本**: 49 篇完全相同標題的文章
 
@@ -496,12 +496,12 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 | 情緒評分完全相同 | 34.7% (17/49) | - |
 | 情緒評分差異 ≤1 | 91.8% (45/49) | - |
 | 風險評分完全相同 | 83.7% (41/49) | - |
-| 情緒分數 Mean 差異 | -0.58 | Polygon 略偏 bullish |
+| 情緒分數 Mean 差異 | -0.58 | Massive 略偏 bullish |
 | 情緒分數相關係數 | 0.012 | 極低相關 |
 
 **按股票比較 (不限標題匹配)**:
 
-| 股票 | IBKR 文章數 | IBKR Sent | Polygon 文章數 | Polygon Sent | Sent 差異 |
+| 股票 | IBKR 文章數 | IBKR Sent | Massive 文章數 | Massive Sent | Sent 差異 |
 |------|-------------|-----------|----------------|--------------|-----------|
 | AAPL | 437 | 3.03 | 7,697 | 3.07 | -0.04 |
 | NVDA | 413 | 2.95 | 7,770 | 3.26 | -0.31 |
@@ -510,7 +510,7 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 
 **整體分佈差異**:
 
-| 指標 | IBKR | Polygon |
+| 指標 | IBKR | Massive |
 |------|------|---------|
 | Sentiment Mean | 3.09 | 3.17 |
 | Sentiment Std | 0.77 | 0.73 |
@@ -525,5 +525,5 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 
 - IBKR API Documentation: https://interactivebrokers.github.io/tws-api/historical_news.html
 - ib_insync Documentation: https://ib-insync.readthedocs.io/
-- Polygon News API: https://massive.com/docs/stocks/get_v2_reference_news
+- Massive News API: https://massive.com/docs/stocks/get_v2_reference_news
 - Discovery commit: (this documentation)

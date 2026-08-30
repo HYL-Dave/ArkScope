@@ -21,7 +21,8 @@ import type { NavigationTarget } from "./shell/navigation";
 
 const PAGE = 50;
 const DAY_OPTIONS = [7, 30, 90, 365] as const;
-const SOURCE_OPTIONS = ["auto", "polygon", "finnhub", "ibkr"] as const;
+const MASSIVE_SOURCE_ID = "polygon" as const;
+const SOURCE_OPTIONS = ["auto", MASSIVE_SOURCE_ID, "finnhub", "ibkr"] as const;
 const SA_TYPE_OPTIONS = ["", "article", "market_news"] as const;
 
 const NEWS_STORAGE_TARGET = {
@@ -35,6 +36,10 @@ const DATA_SOURCES_TARGET = {
 } as const satisfies NavigationTarget;
 
 type Mode = "market" | "sa";
+
+function marketSourceLabel(source: string, t: ExploreT): string {
+  return source === MASSIVE_SOURCE_ID ? t(($) => $.news.sources.massive) : source;
+}
 
 export function NewsView({
   onOpenTicker,
@@ -183,7 +188,9 @@ export function NewsView({
           >
             {SOURCE_OPTIONS.map((sourceOption) => (
               <option key={sourceOption} value={sourceOption}>
-                {sourceOption === "auto" ? t(($) => $.news.allSources) : sourceOption}
+                {sourceOption === "auto"
+                  ? t(($) => $.news.allSources)
+                  : marketSourceLabel(sourceOption, t)}
               </option>
             ))}
           </select>
@@ -302,7 +309,7 @@ function MarketFeedBody({
         <p className="muted tiny news-stats">
           {t(($) => $.news.totalPrefix)} {feed.total.toLocaleString()} {t(($) => $.news.articlesSuffix)}
           {Object.entries(feed.sources).map(([source, count]) => (
-            <span key={source}> · {source} {count.toLocaleString()}</span>
+            <span key={source}> · {marketSourceLabel(source, t)} {count.toLocaleString()}</span>
           ))}
           {q && (
             <span> {t(($) => $.news.marketSearchSummary, { query: q })}</span>
@@ -355,7 +362,7 @@ function MarketFeedBody({
                       {item.publisher ? (
                         <>{t(($) => $.news.publisher, { publisher: item.publisher })} </>
                       ) : null}
-                      {item.source}
+                      {marketSourceLabel(item.source, t)}
                     </span>
                   </div>
                   {item.description && <div className="news-desc muted tiny">{item.description}</div>}

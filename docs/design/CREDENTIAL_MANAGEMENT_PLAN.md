@@ -54,7 +54,7 @@ secrets onto the keyring is a deliberate **later** pass (open question §10).
 |---|---|---|
 | `llm_credentials` (SQLite `profile_state.db`) | api_key metadata **+ secret**, `active` flag, alias | single-active-per-provider invariant already enforced (`model_credentials.py:353`); `0o600` |
 | token-store (keyring → plaintext `0o600` dev fallback) | OAuth / setup tokens | `add_oauth_credential` inserts `secret=NULL`; token NEVER in `llm_credentials.secret` (guarded at `:322`/`:344`) |
-| `config/.env` | import source + export target + **fallback** for api_key | data-source keys (FINNHUB/POLYGON/…) stay here untouched, out of the credential model |
+| `config/.env` | import source + export target + **fallback** for api_key | Most data-source keys remain outside this LLM credential model; Massive is profile-DB authoritative per `ARKSCOPE_PROVIDER_CATALOG.md`. |
 
 ---
 

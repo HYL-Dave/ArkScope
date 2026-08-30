@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Polygon.io 新聞收集腳本
+Massive 新聞收集腳本
 
 收集 3+ 年歷史新聞：
 - 儲存位置: data/news/raw/polygon/YYYY/YYYY-MM.parquet
@@ -88,7 +88,7 @@ class CollectionConfig:
     requests_per_minute: int = 5
 
     # Pagination
-    articles_per_request: int = 1000  # Max allowed by Polygon
+    articles_per_request: int = 1000  # Maximum allowed by Massive
 
     # Storage paths (repo-root anchored — see _REPO_ROOT note above)
     data_dir: Path = _REPO_ROOT / "data/news/raw/polygon"
@@ -209,13 +209,13 @@ class CheckpointManager:
 
 
 # =============================================================================
-# Polygon API Client
+# Massive API client (durable module/class identity remains polygon)
 # =============================================================================
 
 class PolygonNewsCollector:
-    """Polygon 新聞收集器"""
+    """Massive 新聞收集器，保留既有類別名稱以維持相容。"""
 
-    BASE_URL = "https://api.polygon.io"
+    BASE_URL = "https://api.massive.com"
 
     def __init__(self, api_key: str, config: CollectionConfig):
         self.api_key = api_key
@@ -663,7 +663,7 @@ def load_env() -> str:
     """Resolve only the profile-backed Massive process bridge.
 
     The sidecar injects the profile value into ``MASSIVE_API_KEY``. Standalone
-    operators may set that same process variable explicitly. Legacy Polygon
+    operators may set that same process variable explicitly. Retired credential
     aliases and dotenv files are not runtime authorities.
     """
     value = os.environ.get("MASSIVE_API_KEY", "").strip()
@@ -943,7 +943,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Collect news from Polygon.io API',
+        description='Collect news from the Massive API',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -990,7 +990,7 @@ Examples:
         status = storage.get_data_status()
 
         logger.info("\n" + "=" * 60)
-        logger.info("POLYGON NEWS DATA STATUS")
+        logger.info("MASSIVE NEWS DATA STATUS")
         logger.info("=" * 60)
         logger.info(f"Total articles: {status['total_articles']:,}")
         logger.info(f"Total files: {status['total_files']}")

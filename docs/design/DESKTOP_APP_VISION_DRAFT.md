@@ -157,7 +157,7 @@ S7 把右側證據面板畫成幾張**獨立子卡**，不是一坨：
 | Local-KB vs Web live-search 檢索切換 | P1,S7 | web 後端（Tavily/SerpAPI/Brave/Bocha/SearXNG）未選 |
 | Decision Log + Workstream + Thesis Tracking | S4 | 三者邊界未定 |
 | 外部通知通道（Webhook/Discord/飛書/企業微信） | P1 | 單一來源；僅屬未來 alerts transport 設計候選，現有 monitor core 不代表任何外部 transport 已實作 |
-| 多資料源（SEC/FRED/Polygon/Alpha Vantage/News API） | S4,S6 | **只有 SEC + FRED 跨來源確認**；其餘單一來源、decided=false |
+| 多資料源（SEC/FRED/Massive/Alpha Vantage/News API） | S4,S6 | **只有 SEC + FRED 跨來源確認**；其餘單一來源、decided=false |
 | 更廣 provider menu（Gemini/Grok/DeepSeek/Moonshot/OpenRouter） | P1 | 超出鎖定 4-provider，aspirational |
 | Settings Simple vs Expert 模式 | P1 | 哪些欄位歸哪邊未定 |
 | Plugins 卡 | S5 | 第三方安裝範圍未定；skills 系統是天然 host |

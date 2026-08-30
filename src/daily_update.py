@@ -24,7 +24,7 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
     python -m src.daily_update --all --scope active-universe
 
     # 單一 source / 顯式清單
-    python -m src.daily_update --polygon --scope active-universe
+    python -m src.daily_update --massive --scope active-universe
     python -m src.daily_update --ibkr-prices --tickers AAPL,MSFT,NVDA
 
     # 模擬執行 (印出 per-source 計畫，不碰 IBKR/DB/job_runs)
@@ -32,7 +32,7 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
 
 重要限制 — 新 Ticker 的歷史資料:
     --all / --news 底層用 --incremental，以「全域最新文章時間」為起點。
-    新加入的 ticker 不會被自動補抓歷史新聞。補抓方式 (Polygon 為例):
+    新加入的 ticker 不會被自動補抓歷史新聞。補抓方式 (Massive 為例):
         python -m src.collectors.polygon_news \\
             --tickers GM,NEM,AFRM --start 2022-01-01
 """
@@ -172,7 +172,7 @@ class _RunTelemetry:
 
 
 def get_polygon_status() -> Dict:
-    """Get Polygon news data status."""
+    """Get Massive news data status from the durable polygon source path."""
     data_dir = Path("data/news/raw/polygon")
 
     if not data_dir.exists():
@@ -198,7 +198,7 @@ def get_polygon_status() -> Dict:
                         if latest_date is None or max_dt > latest_date:
                             latest_date = max_dt
     except Exception as e:
-        logger.warning(f"Error reading Polygon data: {e}")
+        logger.warning(f"Error reading Massive data: {e}")
 
     return {
         'exists': True,
@@ -306,15 +306,15 @@ def show_status():
 
     today = date.today()
 
-    # Polygon status
+    # Massive status (durable source ID: polygon)
     polygon = get_polygon_status()
     if polygon['exists']:
         days_behind = (today - polygon['latest_date']).days if polygon['latest_date'] else '?'
-        logger.info(f"\n📰 POLYGON NEWS:")
+        logger.info(f"\n📰 MASSIVE NEWS:")
         logger.info(f"   Total articles: {polygon['total_articles']:,}")
         logger.info(f"   Latest data:    {polygon['latest_date']} ({days_behind} days ago)")
     else:
-        logger.info(f"\n📰 POLYGON NEWS: No data found")
+        logger.info(f"\n📰 MASSIVE NEWS: No data found")
 
     # Finnhub status
     finnhub = get_finnhub_status()
@@ -355,7 +355,7 @@ def show_status():
     logger.info("\n📋 RECOMMENDED ACTIONS:")
 
     if not polygon['exists'] or (polygon['latest_date'] and (today - polygon['latest_date']).days > 1):
-        logger.info("   - Run: python -m src.daily_update --polygon")
+        logger.info("   - Run: python -m src.daily_update --massive")
 
     if not finnhub['exists'] or (finnhub['latest_date'] and (today - finnhub['latest_date']).days > 1):
         logger.info("   - Run: python -m src.daily_update --finnhub")
@@ -384,14 +384,14 @@ Examples:
     # Show all data status
     python -m src.daily_update --status
 
-    # Update all news (Polygon + Finnhub + IBKR news)
+    # Update all news (Massive + Finnhub + IBKR news)
     python -m src.daily_update --news --scope active-universe
 
     # Update all news + prices (explicit scope required; nothing guesses)
     python -m src.daily_update --all --scope active-universe
 
     # Update specific source
-    python -m src.daily_update --polygon --scope active-universe
+    python -m src.daily_update --massive --scope active-universe
     python -m src.daily_update --ibkr-prices --tickers AAPL,MSFT
 
     # Dry run (prints the per-source plan; never touches IBKR/DB)
@@ -411,9 +411,11 @@ Note: IBKR sources require TWS/Gateway running.
     parser.add_argument('--all', action='store_true',
                        help='Update all news sources + prices (needs --scope/--tickers)')
     parser.add_argument('--news', action='store_true',
-                       help='Update all news sources (Polygon + Finnhub + IBKR news)')
-    parser.add_argument('--polygon', action='store_true',
-                       help='Update Polygon news only')
+                       help='Update all news sources (Massive + Finnhub + IBKR news)')
+    parser.add_argument('--massive', action='store_true',
+                       help='Update Massive news only')
+    parser.add_argument('--polygon', dest='massive', action='store_true',
+                       help=argparse.SUPPRESS)
     parser.add_argument('--finnhub', action='store_true',
                        help='Update Finnhub news only')
     parser.add_argument('--ibkr-news', action='store_true',
@@ -440,7 +442,7 @@ Note: IBKR sources require TWS/Gateway running.
         logging.getLogger().setLevel(logging.WARNING)
 
     # Default to status if no action is specified.
-    if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
+    if not any([args.status, args.all, args.news, args.massive, args.finnhub,
                 args.ibkr_news, args.ibkr_prices]):
         args.status = True
 
@@ -451,7 +453,7 @@ Note: IBKR sources require TWS/Gateway running.
     # The ordered per-source plan (same step set as before the thin-wrapper
     # rewrite.
     sources: List[str] = []
-    if args.all or args.news or args.polygon:
+    if args.all or args.news or args.massive:
         sources.append("polygon_news")
     if args.all or args.news or args.finnhub:
         sources.append("finnhub_news")
@@ -505,7 +507,7 @@ Note: IBKR sources require TWS/Gateway running.
 
     telem = _RunTelemetry(enabled=True, payload={
         "flags": {k: bool(getattr(args, k, False)) for k in (
-            "all", "news", "polygon", "finnhub", "ibkr_news", "ibkr_prices",
+            "all", "news", "massive", "finnhub", "ibkr_news", "ibkr_prices",
             "parallel")},
         "scope": args.scope,
         "tickers": args.tickers,

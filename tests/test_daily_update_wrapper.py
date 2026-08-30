@@ -9,6 +9,7 @@ only).
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from datetime import date
@@ -61,14 +62,29 @@ def _run(
 def test_help_exits_zero_with_full_flag_set():
     r = _run("--help")
     assert r.returncode == 0
-    for flag in ("--status", "--all", "--news", "--polygon", "--finnhub",
+    for flag in ("--status", "--all", "--news", "--massive", "--finnhub",
                  "--ibkr-news", "--ibkr-prices", "--dry-run",
                  "--parallel", "--quiet",
                  "--tickers", "--scope"):
         assert flag in r.stdout, f"flag {flag} missing from --help"
+    assert re.search(
+        r"(?m)^  --massive\s+Update Massive news only$",
+        r.stdout,
+    )
+    assert "--polygon" not in r.stdout
     assert "--iv-history" not in r.stdout
     assert "--sync-db" not in r.stdout
     assert "--scores" not in r.stdout
+
+
+@pytest.mark.parametrize("flag", ["--massive", "--polygon"])
+def test_massive_flag_and_hidden_legacy_alias_select_the_same_source(flag):
+    result = _run(flag, "--tickers", "AAPL", "--dry-run")
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 0
+    assert "polygon_news: direct-local collect" in output
+    assert "finnhub_news" not in output
 
 
 def test_protected_command_dry_run_plan(universe_dbs):

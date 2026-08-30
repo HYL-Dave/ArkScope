@@ -3,13 +3,13 @@
 Finnhub 新聞收集腳本
 
 Finnhub 特點:
-- 免費方案: 60 calls/min (比 Polygon 快 12 倍)
+- 免費方案: 60 calls/min (比 Massive 快 12 倍)
 - 歷史限制: 僅 ~7 天 (無法取得歷史)
 - 來源: Yahoo, SeekingAlpha, CNBC
 
 適合用於:
 - 即時/最近的新聞收集 (每日更新)
-- 補充 Polygon 的 Yahoo 新聞 (Polygon 沒有)
+- 補充 Massive 的 Yahoo 新聞 (Massive 沒有)
 
 使用方式:
     # 收集最近 7 天新聞

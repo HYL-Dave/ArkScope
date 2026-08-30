@@ -753,6 +753,9 @@ const explore = {
     publisher: "{{publisher}} ·",
     seekingAlphaDescription: "Seeking Alpha articles and Market News (local sa_capture.db)",
     allSources: "All sources",
+    sources: {
+      massive: "Massive",
+    },
     marketDescription: "Local news store (score-free) · Search terms use AND",
     marketSearchSummary: "· Search “{{query}}” (sorted by relevance with title weighting)",
     seekingAlphaSearchSummary: "· Search “{{query}}”",

@@ -2,7 +2,8 @@
 
 The direct-local writer (`news_direct.backfill_news_direct`) wants a provider with
 ``fetch_news(ticker, since_iso) -> list[raw article dict]``. These adapters wrap the EXISTING
-collectors' fetch+parse (``PolygonNewsCollector.fetch_news_range`` / ``FinnhubNewsCollector.fetch_news``
+collectors' fetch+parse (the legacy-named ``PolygonNewsCollector.fetch_news_range`` /
+``FinnhubNewsCollector.fetch_news``
 + ``parse_article``) but DELIBERATELY never call ``StorageManager.save_articles`` — so the direct
 path writes only the local SQLite ``news`` table, no Parquet, and is cursored against the local DB
 (``backfill_news_direct`` passes the local newest-published_at as ``since_iso``), not the Parquet
@@ -54,7 +55,7 @@ def resolve_use_local_news(profile_value: Any, env_value: Any = None) -> bool:
 
 
 def use_local_news_enabled() -> bool:
-    """Whether Polygon/Finnhub news ingest routes to the direct-local writer.
+    """Whether Massive/Finnhub news ingest routes to the direct-local writer.
 
     Both true and false are explicit overrides. Unset defaults ON; setting either
     ``ARKSCOPE_USE_LOCAL_NEWS=false`` or profile ``use_local_news=false`` restores

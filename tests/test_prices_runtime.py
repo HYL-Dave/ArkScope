@@ -37,6 +37,27 @@ def test_prices_worker_requires_tickers_without_source_selector():
     assert retired.value.code == 2
 
 
+def test_prices_worker_exposes_massive_and_normalizes_the_hidden_legacy_alias(capsys):
+    from src import prices_runtime as worker
+
+    massive = worker.parse_args([
+        "--tickers", "AAPL", "--provider", "massive",
+    ])
+    legacy = worker.parse_args([
+        "--tickers", "AAPL", "--provider", "polygon",
+    ])
+
+    assert massive.provider == "polygon"
+    assert legacy.provider == "polygon"
+
+    with pytest.raises(SystemExit) as help_exit:
+        worker.parse_args(["--help"])
+    assert help_exit.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "massive" in help_text
+    assert "polygon" not in help_text.lower()
+
+
 def test_prices_worker_prints_sanitized_success_json(monkeypatch, capsys):
     from src import prices_runtime as worker
 

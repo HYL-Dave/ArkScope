@@ -116,7 +116,7 @@ const settings = {
       newsStorage: {
         title: "新聞資料",
         description: "查看新聞資料量、收集狀態與最近更新。",
-        searchAliases: "news|新聞|ingestion|文章|polygon|finnhub|ibkr|news data|查看新聞資料量、攝入狀態與最近更新。",
+        searchAliases: "news|新聞|ingestion|文章|massive|polygon|finnhub|ibkr|news data|查看新聞資料量、攝入狀態與最近更新。",
       },
       macroStorage: {
         title: "總經資料",

@@ -1,4 +1,4 @@
-"""Parquet-free Polygon and Finnhub adapters for the normalized writer."""
+"""Parquet-free Massive and Finnhub adapters for the normalized writer."""
 
 from __future__ import annotations
 

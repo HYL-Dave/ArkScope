@@ -3453,7 +3453,7 @@ export interface NewsFeedItem {
   title: string;
   url: string | null;
   publisher: string | null;
-  source: string; // polygon | finnhub | ibkr
+  source: string; // massive (durable value: polygon) | finnhub | ibkr
   description: string | null;
   content_availability?: NewsContentAvailability;
   content_recovery?: NewsContentRecovery | null;

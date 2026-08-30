@@ -14,7 +14,7 @@
 
 ## Goal
 
-Produce a small, reproducible evidence packet that decides whether Massive/Polygon,
+Produce a small, reproducible evidence packet that decides whether Massive,
 Alpha Vantage, and EODHD/Unicorn can feed the same provider-neutral IV snapshot shape
 for ArkScope-owned IV computation. The packet must run before S-D locks the local IV
 schema.
@@ -46,7 +46,7 @@ The packet answers four questions:
 
 ### Candidate Providers
 
-1. **Massive / Polygon** — candidate A. Best raw quote-history / forward snapshot
+1. **Massive** — candidate A. Best raw quote-history / forward snapshot
    candidate if Advanced-tier access and 2022+ history are acceptable.
 2. **Alpha Vantage** — candidate B. Historical backfill candidate with deep date
    support, but request limits and field completeness must be measured.

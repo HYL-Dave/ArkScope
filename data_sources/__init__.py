@@ -2,7 +2,7 @@
 Unified Data Sources Module for ArkScope
 
 This module provides a unified interface for fetching financial data from
-multiple sources (Finnhub, SEC EDGAR, Polygon, etc.)
+multiple sources (Finnhub, SEC EDGAR, Massive, etc.)
 
 Usage:
     from data_sources import FinnhubDataSource, get_data_source

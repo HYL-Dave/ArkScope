@@ -167,7 +167,7 @@ Filing 結構:
 
 ---
 
-## Polygon.io 新聞 API
+## Massive 新聞 API
 
 ### 原始 API 回傳結構
 
@@ -282,7 +282,7 @@ news = ticker.news
 |-----|------------------|---------|
 | Alpha Vantage | 1000 篇新聞 | 分時間段取 |
 | Finnhub | 無硬限制 | 建議每 30 天一次 |
-| Polygon | 1000 條記錄 | 使用 pagination |
+| Massive | 1000 條記錄 | 使用 pagination |
 | Tiingo | 無限制 | 可一次取多年 |
 | SEC EDGAR | 無限制 | 單次取完整歷史 |
 | yfinance | 無限制 | 可一次取完整歷史 |
@@ -446,7 +446,7 @@ business_text = ten_k.business  # 直接取得純文字
 | 財報數據 (結構化) | SEC EDGAR API | edgartools |
 | 財報內容 (文字) | **edgartools** | SEC HTML |
 | 即時報價 | Finnhub | Alpha Vantage |
-| 公司資訊 | Polygon | Finnhub |
+| 公司資訊 | Massive | Finnhub |
 
 ---
 

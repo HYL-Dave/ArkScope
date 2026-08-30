@@ -27,7 +27,7 @@
 |---------|----------|------|:------:|------|
 | **股票即時報價** | [IBKR](https://interactivebrokers.github.io/tws-api/) | 免費(有帳戶) | ✅ 必備 | 執行用 |
 | **股票歷史價格** | [Tiingo](https://www.tiingo.com/) | 免費 | ✅ 必備 | 30+年 EOD |
-| **Options 即時報價** | [Polygon/Massive](https://massive.com/) | $29/月 | ✅ 必備 | 即時 Greeks |
+| **Options 即時報價** | [Massive](https://massive.com/) | $29/月 | ✅ 必備 | 即時 Greeks |
 | **Options 歷史數據** | [ORATS](https://orats.com/data-api) | $99/月 | ⭐ 高價值 | 2007年起，含 IV surface |
 | **Options Greeks/IV** | [ORATS Live](https://orats.com/blog/new-live-data-api-for-options-prices-greeks-theos-and-ivs) | +$50/月 | ⭐ 高價值 | 10秒延遲 |
 
@@ -80,7 +80,7 @@ Smart Money 足跡：
 |---------|----------|------|:------:|------|
 | **即時新聞** | [Benzinga Pro](https://www.benzinga.com/apis/) | ~$99/月 | ⭐ 高價值 | 原創新聞最快 |
 | **新聞 (免費)** | [Finnhub](https://finnhub.io/) | 免費 | ✅ 必備 | ~7天歷史 |
-| **新聞 + 情緒** | [Polygon](https://polygon.io/) | $29/月 | 含即時報價 | AI 情緒分數 |
+| **新聞 + 情緒** | [Massive](https://massive.com/) | $29/月 | 含即時報價 | AI 情緒分數 |
 | **社群情緒** | [Finnhub Premium](https://finnhub.io/) | $75+/月 | ⭐ 高價值 | Reddit/Twitter |
 | **即時新聞 (專業)** | [IBKR Dow Jones](https://interactivebrokers.github.io/tws-api/news.html) | ~$10-20/月 | 可選 | 專業級最快 |
 | **新聞聚合** | [Massive + Benzinga](https://massive.com/blog/tag/announcement) | $29/月 | 可選 | 分析師評級+財報 |
@@ -202,7 +202,7 @@ Whisper Number vs 共識預測：
 | 數據類型 | Provider | 價格 | 必要性 | 說明 |
 |---------|----------|------|:------:|------|
 | **技術指標 API** | [Alpha Vantage](https://www.alphavantage.co/) | $49.99/月 | 可選 | 50+ 指標 |
-| **技術指標 (免費)** | [Polygon](https://polygon.io/) | $29/月 | 含即時報價 | SMA/EMA/RSI |
+| **技術指標 (免費)** | [Massive](https://massive.com/) | $29/月 | 含即時報價 | SMA/EMA/RSI |
 | **交易執行** | [IBKR](https://www.interactivebrokers.com/) | $0+ | ✅ **必備** | 唯一能執行 |
 | **交易執行 (替代)** | [Alpaca](https://alpaca.markets/) | 免費 | 可選 | 零佣金 API |
 | **交易執行 (替代)** | [Tradier](https://tradier.com/) | ~$10/月 | 可選 | Options 專精 |
@@ -239,7 +239,7 @@ Whisper Number vs 共識預測：
 └── FINRA (Short Interest)
 
 付費：
-├── Polygon ($29) - Options 即時 + 新聞情緒
+├── Massive ($29) - Options 即時 + 新聞情緒
 └── Unusual Whales ($48) - Options Flow + Dark Pool
 ```
 
@@ -303,7 +303,7 @@ Whisper Number vs 共識預測：
 |:------:|---------|---------|-----:|---------|
 | 1️⃣ | 交易執行 | IBKR | $0-30 | 唯一能將策略變現 |
 | 2️⃣ | Options Flow + Dark Pool | Unusual Whales | $48 | Smart Money 訊號，比新聞更快 |
-| 3️⃣ | Options 即時報價 | Polygon | $29 | 即時 Greeks 和定價 |
+| 3️⃣ | Options 即時報價 | Massive | $29 | 即時 Greeks 和定價 |
 | 4️⃣ | Options 歷史 + Greeks | ORATS | $99 | 回測和策略開發必備 |
 | 5️⃣ | 另類數據 | Finnhub Premium | $75 | 社群情緒、ESG、專利 |
 | 6️⃣ | Short Interest | ORTEX | $50 | 即時空頭數據 |
@@ -360,7 +360,7 @@ Whisper Number vs 共識預測：
 | 服務 | 狀態 | 建議 |
 |------|------|------|
 | TD Ameritrade API | ❌ 已停用 | 改用 IBKR 或 Alpaca |
-| IEX Cloud | ❌ 2024/8/31 停用 | 改用 Polygon 或 Alpha Vantage |
+| IEX Cloud | ❌ 2024/8/31 停用 | 改用 Massive 或 Alpha Vantage |
 | Yahoo Finance | ⚠️ 非官方 | 僅供參考，不建議依賴 |
 
 ---
@@ -370,7 +370,7 @@ Whisper Number vs 共識預測：
 ### 官方文檔
 
 - [ORATS API Documentation](https://docs.orats.io/)
-- [Polygon.io API](https://polygon.io/docs)
+- [Massive API](https://massive.com/docs)
 - [Finnhub API](https://finnhub.io/docs/api)
 - [SEC EDGAR APIs](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)
 - [IBKR TWS API](https://interactivebrokers.github.io/tws-api/)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from datetime import date
 from datetime import datetime, timedelta
 
 import pytest
@@ -83,6 +84,42 @@ def test_polygon_missing_key_raises(monkeypatch):
     monkeypatch.setattr(cpn, "load_env", lambda: "")
     with pytest.raises(RuntimeError, match="MASSIVE_API_KEY"):
         cpn.run_incremental(tickers_arg="AAPL")
+
+
+def test_massive_news_transport_builds_requests_on_the_current_api_host(monkeypatch):
+    observed = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"results": []}
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+    class Session:
+        @staticmethod
+        def get(url, *, params, timeout):
+            observed.update(url=url, params=params, timeout=timeout)
+            return Response()
+
+        @staticmethod
+        def close():
+            return None
+
+    collector = cpn.PolygonNewsCollector("secret", cpn.CollectionConfig())
+    collector.session.close()
+    collector.session = Session()
+    monkeypatch.setattr(collector.rate_limiter, "wait", lambda: None)
+
+    assert collector.fetch_news_range(
+        "AAPL", date(2026, 8, 1), date(2026, 8, 2),
+    ) == []
+    assert observed["url"] == "https://api.massive.com/v2/reference/news"
+    assert observed["params"]["apiKey"] == "secret"
 
 
 def test_finnhub_up_to_date_short_circuit(monkeypatch):

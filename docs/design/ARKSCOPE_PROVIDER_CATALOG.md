@@ -21,7 +21,7 @@ Three fields use **controlled vocabularies** (added round-2 so future readers do
 
 - **`implementation_status`** ∈ `live` (wired + usable now) · `optional-live` (wired but paid / toggle-gated, may be off) · `protected-pipeline` (the SA extension→native-host path — operational, **must not break**) · `planned` (catalogued, not yet wired) · `reference-only` · `retired` (no current request path; retained only to explain stored history). Guards against "appears in catalog ⇒ fully productised."
 - **`connected_via`** — the concrete wiring: a `data_sources/<client>.py`, a `src/tools/<tool>.py`, the `extension→native-host` pipeline, or `planned settings`. Makes explicit that cataloged providers are *not* the same kind of thing (local socket vs public REST vs scraped vs tool).
-- **`streaming`** ∈ `none` · `realtime_quote` (live last price, **no** bar stream) · `realtime_bars` (streamed OHLC — **charting-grade**) · `websocket_streaming` · `extension_capture` (scraped, not a feed). **Charting feasibility derives from this**: only `realtime_bars` / `websocket_streaming` support stable low-latency price/volume charts. Per ProductSpec §5, **only IBKR clears this bar in-stack.** *This is a fact about the **currently-connected stack**, not a permanent market claim — if Polygon/Massive or another provider is later wired as true `realtime_bars` / `websocket_streaming`, update its enum value and this line.*
+- **`streaming`** ∈ `none` · `realtime_quote` (live last price, **no** bar stream) · `realtime_bars` (streamed OHLC — **charting-grade**) · `websocket_streaming` · `extension_capture` (scraped, not a feed). **Charting feasibility derives from this**: only `realtime_bars` / `websocket_streaming` support stable low-latency price/volume charts. Per ProductSpec §5, **only IBKR clears this bar in-stack.** *This is a fact about the **currently-connected stack**, not a permanent market claim — if Massive or another provider is later wired as true `realtime_bars` / `websocket_streaming`, update its enum value and this line.*
 
 ### 0.2 Freshness rule (IMPORTANT — read before trusting any price)
 
@@ -34,7 +34,7 @@ Three fields use **controlled vocabularies** (added round-2 so future readers do
 | Class | Providers |
 |-------|-----------|
 | **Real-time market data** | IBKR (only in-stack real-time / charting-grade) |
-| **Delayed / historical market data** | Polygon, Alpha Vantage, Finnhub, EODHD |
+| **Delayed / historical market data** | Massive, Alpha Vantage, Finnhub, EODHD |
 | **Fundamentals** | SEC EDGAR (free), IBKR (snapshot ratios), Financial Datasets (paid), EODHD |
 | **Macro / calendar** | FRED (macro series), Finnhub (earnings/IPO/economic calendar) |
 | **Curated research (scraped)** | Seeking Alpha — Alpha Picks + comments + market news, via browser extension → Native Messaging host (PROTECTED; not an API) |
@@ -49,7 +49,7 @@ not through another research-everything-first sweep.
 | Tier | Providers | Why |
 |------|-----------|-----|
 | **Foundation (基本盤)** | **IBKR** (market/contract/account facts) · **SEC EDGAR** (issuer filings and authoritative lifecycle evidence) · **Seeking Alpha** (captured research/news/community context) | Structured and source-labelled evidence already used by core workflows |
-| **Supporting** | Polygon · Finnhub · Alpha Vantage · EODHD · Financial Datasets · FRED | Fallbacks, breadth, fundamentals, macro — valuable but admitted per proven gap |
+| **Supporting** | Massive · Finnhub · Alpha Vantage · EODHD · Financial Datasets · FRED | Fallbacks, breadth, fundamentals, macro — valuable but admitted per proven gap |
 
 **Effort priority follows this**: strengthen structured internal/provider coverage
 first. General search is optional fallback/context only after a provider-neutral
@@ -64,7 +64,7 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 |------|-----------|-----------------|--------|
 | **0 — Foundation** | The basic structured-evidence spine, already in daily use | IBKR (Gateway access), SEC EDGAR, Seeking Alpha | Strengthen stability + UX **first**; everything else is secondary |
 | **1 — Free / Free-Enough** | Fully free, or free quota sufficient for personal use | FRED/ALFRED, Finnhub, Alpha Vantage* | **Prioritise into Settings** — near-zero cost to admit. *(\*Alpha Vantage free = 25 req/day, quota-constrained — admit but flag.)* |
-| **2 — Cheap High-Value** | Cheap, fills an obvious gap or has hard-to-replace data | Polygon/Massive (~$29), EODHD ($19.99–99), Financial Datasets (PAYG ~$30), **IBKR paid streaming add-on (~$4.50)** | Admit when the gap is real; gate spend via `metered_spend` / paid toggles |
+| **2 — Cheap High-Value** | Cheap, fills an obvious gap or has hard-to-replace data | Massive (~$29), EODHD ($19.99–99), Financial Datasets (PAYG ~$30), **IBKR paid streaming add-on (~$4.50)** | Admit when the gap is real; gate spend via `metered_spend` / paid toggles |
 | **3 — Expensive / Specialist** | Pricey but unique: deep options flow, institutional fundamentals, alt-data, international markets, fixed-income / commodity / crypto | *(none connected yet)* | **Do NOT pre-connect** — pulled only by an explicit feature requirement |
 | **Reject / Defer** | High overlap with existing data, unstable API, licensing friction, free quota too low to use, un-cacheable, or high Settings complexity for low analytic gain | — | Document the reason; revisit only if conditions change |
 
@@ -82,7 +82,7 @@ admitted separately as task capabilities, not presumed data foundations.
 | Provider | Status | Asset classes | Streaming (charting?) | History depth (key) | Cost posture | Best for | verified_at |
 |----------|--------|--------------|----------------------|---------------------|--------------|----------|-------------|
 | **IBKR** (IB Gateway) | live | US equities, options, futures, FX | `realtime_bars` ✅ **charting-grade (only one)** | 1-min bars ~6mo; news ~1mo | free snapshot-only; RT add-on ≈$4.50/mo | real-time charting; live quotes; options chains+Greeks | 2025-12 |
-| **Polygon** (Massive) | live (free) / optional-live (paid) | US equities, options | `none` free (15-min delayed); `realtime_quote` paid | **news 3+ yr w/ AI sentiment**; prices 2yr free / 10-15yr paid | free 5 calls/min; paid ≈$29/mo | best free **news archive** + AI sentiment | 2025-12 |
+| **Massive** | live (free) / optional-live (paid) | US equities, options | `none` free (15-min delayed); `realtime_quote` paid | **news 3+ yr w/ AI sentiment**; prices 2yr free / 10-15yr paid | free 5 calls/min; paid ≈$29/mo | best free **news archive** + AI sentiment | 2025-12 |
 | **Finnhub** | live | US equities | `realtime_quote` (no bars) | **news ~7 days** (claims 1yr) | free; paid Fundamental tiers | earnings/IPO/economic **calendar** | 2025-12 |
 | **Alpha Vantage** | live | equities, FX, commodities | `none` (delayed) | EOD; intraday ~7 days | free **25 req/day** | **commodity series** → IBKR futures | 2025-12 |
 | **EODHD** | optional-live (paid) | global equities, fundamentals | `none` (EOD) | long global EOD | paid $19.99–$99 | global EOD + fundamentals breadth | 2025-12 |
@@ -124,11 +124,11 @@ admitted separately as task capabilities, not presumed data foundations.
 
 > Same schema as the IBKR exemplar. Pricing/limits carry `verified_at` and are **last-known (source-doc dated), not live-verified** (§0.2).
 
-### 3.1 Massive (legacy Polygon source IDs)
+### 3.1 Massive (legacy `polygon` source IDs)
 
 | Field | Value |
 |-------|-------|
-| **provider** | Polygon.io — **renamed Massive.com** (docs use both names). |
+| **provider** | Massive.com (formerly Polygon.io). |
 | **implementation_status** | **live** (free tier) / **optional-live** (paid). |
 | **connected_via** | `data_sources/polygon_source.py` (REST). |
 | **asset_classes** | US equities, options. |
@@ -139,11 +139,11 @@ admitted separately as task capabilities, not presumed data foundations.
 | **cost** | Free tier (delayed, rate-limited). Paid ≈ **$29/mo** (real-time options quotes + Greeks + news sentiment + technicals). |
 | **auth/config** | `massive.api_key` in profile DB; `MASSIVE_API_KEY` is the sole process bridge. `config/.env` and `POLYGON_API_KEY` are not runtime/import authority. REST. Historical source preferences still use `polygon`. |
 | **limits** | Free ≈ **5 calls/min**; paid 300+ calls/min. |
-| **known_quirks** | Free-tier delay makes it historical-only; name split (Polygon/Massive). |
+| **known_quirks** | Free-tier delay makes it historical-only; durable source IDs still use `polygon`. |
 | **best_for** | **Best free news archive** (3+ yr) with AI sentiment; historical price backtests; cheap real-time options ($29). |
 | **not_good_for** | Real-time charting on free tier (15-min delay). |
 | **verified_at** | 2025-12. |
-| **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Polygon, `docs/data/US_STOCKS_OPTIONS_DATA_SUBSCRIPTIONS.md`, `data_sources/API_SPECIFICATIONS.md` §Polygon. |
+| **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §4, `docs/data/US_STOCKS_OPTIONS_DATA_SUBSCRIPTIONS.md`, `data_sources/API_SPECIFICATIONS.md` §Massive. |
 | **app_settings_fields** | `polygon.enabled` (historical source toggle), `massive.api_key` (secret), `polygon.tier` (free/paid source info). |
 
 ### 3.2 Finnhub
@@ -161,7 +161,7 @@ admitted separately as task capabilities, not presumed data foundations.
 | **cost** | Free tier (news + calendar + quote). Paid **Fundamental** tiers for deeper financials. |
 | **auth/config** | `FINNHUB_API_KEY`. REST. Wired as free news source in `data_preferences`. |
 | **limits** | Free ≈ **60 calls/min**. |
-| **known_quirks** | ⚠️ **Biggest spec-vs-reality gap in the stack**: free news history is ~7 days, not 1 year — use Polygon for news archive. |
+| **known_quirks** | ⚠️ **Biggest spec-vs-reality gap in the stack**: free news history is ~7 days, not 1 year — use Massive for news archive. |
 | **best_for** | **Earnings / IPO / economic calendar** (free, well-structured); quick real-time quotes. |
 | **not_good_for** | News backtesting / history (~7 days only). |
 | **verified_at** | 2025-12. |
@@ -218,7 +218,7 @@ dated evaluations and git history are context, not runnable integration assets.
 | **cost** | Paid **$19.99–$99/mo** by tier. |
 | **auth/config** | `EODHD_API_KEY`. REST. |
 | **limits** | Per-tier request caps. |
-| **known_quirks** | Value is **breadth** (global markets) rather than US-depth; overlaps Polygon and other US EOD sources. |
+| **known_quirks** | Value is **breadth** (global markets) rather than US-depth; overlaps Massive and other US EOD sources. |
 | **best_for** | Global EOD + fundamentals breadth; dividend/split calendar. |
 | **not_good_for** | Real-time; US-only users may not need it (free options cover US EOD). |
 | **verified_at** | 2025-12. |
@@ -345,7 +345,7 @@ rest fill specific gaps:
 
 - **Prices**: real-time = **IBKR**; historical and qualified completed-session bars = local `market_data.db` through the DAL.
 - **Fundamentals**: local IBKR snapshot → SEC EDGAR (free) → Financial Datasets (paid, cached).
-- **News**: **IBKR** (real-time, shallow) + Polygon (deep archive + AI sentiment) + Finnhub (quick, ~7d) — different depth/latency trade-offs.
+- **News**: **IBKR** (real-time, shallow) + Massive (deep archive + AI sentiment) + Finnhub (quick, ~7d) — different depth/latency trade-offs.
 - **Macro/calendar**: FRED (series) + Finnhub (events).
 - **Curated**: **Seeking Alpha** (Alpha Picks + community signal) — unique, not API-replaceable.
 - **World context**: future provider-neutral hosted search may supply optional

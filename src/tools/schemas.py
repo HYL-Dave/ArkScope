@@ -48,7 +48,7 @@ class NewsArticle(BaseModel):
     date: str = Field(description="Publication date (YYYY-MM-DD)")
     ticker: str
     title: str
-    source: str = Field(description="News source (ibkr, polygon, etc.)")
+    source: str = Field(description="News source (IBKR, Massive, etc.)")
     url: Optional[str] = None
     publisher: Optional[str] = None
     description: Optional[str] = None

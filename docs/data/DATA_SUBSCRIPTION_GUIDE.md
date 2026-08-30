@@ -782,15 +782,15 @@ IBIS Research Platform 包含 "Live Event Calendars"，但這是 GUI only：
 
 **結論**: IBKR 新聞品質更高，Finnhub 作為備用或補充。
 
-### Q: 為什麼不用 Polygon.io 替代全部？
+### Q: 為什麼不用 Massive 替代全部？
 
-| Polygon.io 優點 | Polygon.io 缺點 |
+| Massive 優點 | Massive 缺點 |
 |-----------------|-----------------|
 | 整合報價 + 新聞 + Options | $199/月 (完整版) |
 | < 20ms 延遲 | 很多功能與 IBKR 重疊 |
 | 2003 年起歷史數據 | 無國會交易、政府合約 |
 
-**結論**: 如果已有 IBKR，Polygon.io 的 CP 值不高。
+**結論**: 如果已有 IBKR，Massive 的 CP 值不高。
 
 ### Q: 什麼時候應該升級到 Benzinga？
 

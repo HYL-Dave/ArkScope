@@ -129,7 +129,7 @@ class FileBackend:
         Args:
             ticker: Filter by ticker symbol.
             days: Number of days to look back.
-            source: Data source filter ('ibkr', 'polygon', 'auto').
+            source: Data source filter (IBKR, Massive, auto; Massive uses legacy ID 'polygon').
         """
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         combined = self._load_raw_news(days=days)

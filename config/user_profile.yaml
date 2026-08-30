@@ -173,7 +173,7 @@ data_preferences:
       priority: 2
     - source: "finnhub"     # Finnhub 免費
       priority: 3
-    - source: "polygon"     # Polygon (歷史)
+    - source: "polygon"     # Massive（歷史 durable source ID）
       priority: 4
 
   # 價格數據來源

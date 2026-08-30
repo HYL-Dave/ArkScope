@@ -89,7 +89,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 - `detect_news_volume_anomaly` uses raw count windows.
 - `detect_event_chains` preserves deterministic event order and returns typed
   unavailable impact rather than manufacturing direction or a numeric score.
-- Provider-native analyst labels, Polygon source sentiment, SA community data,
+- Provider-native analyst labels, Massive source sentiment, SA community data,
   and investor risk preferences remain source-labelled distinct contracts.
 - Option pricing accepts the caller's rate. Provider-backed estimates are a
   separate future capability, not a hidden network fallback.

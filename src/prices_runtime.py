@@ -19,11 +19,24 @@ _SAFE_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9 ._-]{0,11}$")
 _SAFE_ERROR_CODES = frozenset({"ibkr_gateway_unavailable"})
 
 
+def _provider_arg(value: str) -> str:
+    if value == "ibkr":
+        return value
+    if value in {"massive", "polygon"}:
+        return "polygon"
+    raise argparse.ArgumentTypeError("provider must be ibkr or massive")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ArkScope direct-local prices worker")
     parser.add_argument("--tickers", required=True)
     parser.add_argument("--lookback-days", type=int, default=5)
-    parser.add_argument("--provider", choices=("ibkr", "polygon"), default="ibkr")
+    parser.add_argument(
+        "--provider",
+        type=_provider_arg,
+        default="ibkr",
+        metavar="{ibkr,massive}",
+    )
     parser.add_argument("--gateway-lock-held", action="store_true")
     return parser.parse_args(argv)
 

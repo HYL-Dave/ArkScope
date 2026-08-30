@@ -39,7 +39,7 @@ def get_ticker_news(
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol
         days: Lookback period in days
-        source: Data source (ibkr, polygon, auto)
+        source: Data source (IBKR, Massive, auto; Massive uses the legacy polygon wire value)
         limit: Maximum number of articles to return (default 20, max 500)
 
     Returns:

@@ -1,6 +1,6 @@
 """Direct provider-to-local market-data collection.
 
-This module writes the local ``prices`` table from IBKR or Polygon and records
+This module writes the local ``prices`` table from IBKR or Massive and records
 provider-sync telemetry.
 
 Slice #2 COMPLETE — #2a (hermetic core) + #2b·1 (write lock) + #2b·2 (provider fetch +
@@ -21,7 +21,7 @@ write path) + #2c (completed-days-only gap rule). The scheduler ``price_backfill
                                 bar-count completeness claim, see the naming note below);
 - ``provider_sync_runs`` / ``provider_sync_meta`` tables + helpers;
 - ``_ibkr_bars_to_rows`` / ``_polygon_results_to_rows`` + ``backfill_prices_direct``
-  (2b·2): IBKR-primary / Polygon-fallback fetch → canonicalize-before-insert →
+  (2b·2): IBKR-primary / Massive-fallback fetch → canonicalize-before-insert →
   INSERT OR IGNORE → provider_sync telemetry, under ``market_write_lock``.
 
 Coverage v2 session truth and operator diagnostics live in ``src.market_coverage``.
@@ -93,7 +93,7 @@ def _normalize_utc(dt: datetime, exchange_tz: str = _EXCHANGE_TZ) -> str:
 
     A NAIVE datetime is assumed exchange-local (IBKR ``formatDate=1`` bars) and
     localized via ZoneInfo (DST-correct per instant — NOT a fixed offset). An
-    aware datetime is converted as-is. Polygon callers must pass an ALREADY-UTC-aware
+    aware datetime is converted as-is. Massive callers must pass an ALREADY-UTC-aware
     datetime (``datetime.fromtimestamp(t/1000, timezone.utc)`` from the RAW epoch — do
     NOT reuse polygon_source's local-naive ``item['datetime']``)."""
     if dt.tzinfo is None:
@@ -433,7 +433,7 @@ def _ibkr_bars_to_rows(canon: str, bars, interval: str) -> List[tuple]:
 
 
 def _polygon_results_to_rows(canon: str, results, interval: str) -> List[tuple]:
-    """Polygon raw agg results → prices rows. Uses the RAW epoch-ms ``t`` (UTC) → an
+    """Massive raw agg results → prices rows. Uses the RAW epoch-ms ``t`` (UTC) → an
     aware-UTC datetime — NOT polygon_source's mutated ``item['datetime']`` (LOCAL-naive,
     which would mis-stamp the PK). ``o/h/l/c/v`` are the agg keys."""
     db_interval = _INTERVAL_DB.get(interval, interval)
@@ -473,18 +473,18 @@ def _fetch_rows_for_gaps(canon, fetch_days, interval, provider, ibkr_src, polygo
     every complete trading day to cover, not just zero-bar gaps). IBKR primary fetches the
     CONTIGUOUS [min,max] span in one request (auto-chunked; INSERT OR IGNORE dedupes).
 
-    Polygon fallback (per day) engages whenever a successful IBKR request returns NO bars for
+    Massive fallback (per day) engages whenever a successful IBKR request returns NO bars for
     the span. Connection, contract-resolution, and historical-request failures propagate as
-    typed issues and are recorded per ticker; they never masquerade as a successful Polygon
+    typed issues and are recorded per ticker; they never masquerade as a successful Massive
     substitution. A genuinely empty response remains ambiguous (halt, delisting, or temporary
-    provider absence), so it may use Polygon and is never treated as proof of delisting."""
+    provider absence), so it may use Massive and is never treated as proof of delisting."""
     start, end = min(fetch_days), max(fetch_days)
     rows: List[tuple] = []
     if provider == "ibkr" and ibkr_src is not None:
         by_ticker = ibkr_src.fetch_historical_intraday([canon], start, end, interval="15 mins")
         bars = by_ticker.get(canon, []) if isinstance(by_ticker, dict) else []
         rows = _ibkr_bars_to_rows(canon, bars, interval)
-    if not rows and polygon_src is not None:  # IBKR reachable-but-empty → Polygon (NOT on a raise)
+    if not rows and polygon_src is not None:  # IBKR reachable-but-empty → Massive (NOT on a raise)
         for day in fetch_days:
             results = polygon_src.fetch_intraday_prices(canon, day, multiplier=15, timespan="minute")
             rows.extend(_polygon_results_to_rows(canon, results or [], interval))
@@ -549,7 +549,7 @@ def backfill_prices_direct(
     acquire_gateway_lock: bool = True,
 ) -> dict:
     """Direct provider→SQLite price backfill (FULL-WINDOW TOP-UP, 2d) — heal sparse/partial
-    days in the local ``prices`` table from IBKR or Polygon.
+    days in the local ``prices`` table from IBKR or Massive.
 
     TOP-UP not zero-bar-gap (the canary finding): a day with 1 of 26 bars is day-presence
     "present" yet actually broken (IBKR has the full day). So this fetches EVERY COMPLETE
@@ -579,13 +579,13 @@ def backfill_prices_direct(
         if ibkr_src is None:
             ibkr_src = _default_ibkr_src()
         if polygon_src is None:
-            # IBKR primary + Polygon FALLBACK (the documented design) — also on the live
+            # IBKR primary + Massive FALLBACK (the documented design) — also on the live
             # path, not just when a test injects polygon_src. Best-effort: a missing
             # A missing Massive key (construction raises) must not break IBKR-only backfill.
             try:
                 polygon_src = _default_polygon_src()
             except Exception:  # noqa: BLE001
-                logger.info("Polygon fallback unavailable (e.g. no API key); IBKR-only backfill")
+                logger.info("Massive fallback unavailable (e.g. no API key); IBKR-only backfill")
                 polygon_src = None
     elif provider == "polygon" and polygon_src is None:
         polygon_src = _default_polygon_src()

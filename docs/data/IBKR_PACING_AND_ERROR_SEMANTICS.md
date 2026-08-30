@@ -51,7 +51,7 @@ that IBKR imposes the same rule.
    complete the synchronous request with an empty result instead of raising.
 6. **OBSERVED-IN-REPO:** ArkScope's price adapter catches per-chunk exceptions,
    logs them, and continues. Its caller cannot distinguish a request failure
-   from a genuine empty result and may then try Polygon.
+   from a genuine empty result and may then try Massive.
 7. **OBSERVED-IN-REPO:** The shipped price-truth reconciliation prevents that
    ambiguity from becoming a false success. It reports the local fact
    `price_day_unresolved_after_fetch` when a zero-bar target remains empty.
@@ -256,7 +256,7 @@ can still return an empty collection.
 1. `IBKRDataSource.fetch_historical_intraday` calls `reqHistoricalData`.
 2. A per-chunk exception is caught, logged, and not returned to the caller.
 3. The method returns a ticker key whose bar list may be empty.
-4. `_fetch_rows_for_gaps` sees no IBKR rows and may invoke Polygon fallback.
+4. `_fetch_rows_for_gaps` sees no IBKR rows and may invoke Massive fallback.
 5. If the final local target date is still empty, post-write reconciliation
    reports `price_day_unresolved_after_fetch`.
 
@@ -266,7 +266,7 @@ The reconciliation proves a local before/after fact. It does not prove any of:
 - IBKR returned no data;
 - IBKR rejected or paced the request;
 - the account lacked entitlement;
-- Polygon was unavailable; or
+- Massive was unavailable; or
 - either provider supplied a stored row.
 
 ### 5.4 Existing strict-news precedent
@@ -392,7 +392,7 @@ Only measure these when they serve a product decision:
 1. Which code/message classes occur on ArkScope's 15-minute requests in
    production?
 2. For each class, does IBKR return no rows, partial rows, or raise?
-3. How often does Polygon fallback run, and which stored rows came from it?
+3. How often does Massive fallback run, and which stored rows came from it?
 4. What are the observed lock wait/hold distributions by IBKR domain?
 5. Does a calendar-aware cadence reduce requests without delaying completed-day
    availability?

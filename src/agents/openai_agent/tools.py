@@ -136,7 +136,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Args:
             ticker: Stock ticker symbol (e.g. NVDA, AMD)
             days: Lookback period in days (default: 30)
-            source: Data source - auto, ibkr, or polygon (default: auto)
+            source: Data source - auto, ibkr, or Massive (legacy wire value: polygon; default: auto)
             limit: Max articles to return, 1-500 (default: 20)
         """
         result = get_ticker_news(dal, ticker, days=days, source=source, limit=limit)

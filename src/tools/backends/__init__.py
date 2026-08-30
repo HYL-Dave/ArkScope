@@ -30,7 +30,7 @@ class DataBackend(Protocol):
         Args:
             ticker: Filter by ticker (None = all tickers)
             days: Lookback period in days
-            source: Data source (ibkr, polygon, auto)
+            source: Data source (IBKR, Massive, auto; Massive uses the legacy polygon wire value)
         Returns:
             DataFrame with columns:
                 date, ticker, title, source, url, publisher, description

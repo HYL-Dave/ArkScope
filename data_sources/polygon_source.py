@@ -1,7 +1,7 @@
 """
-Polygon.io (Massive.com) Data Source Implementation.
+Massive Data Source Implementation (legacy module identity retained).
 
-Polygon provides:
+Massive provides:
 - Stock Prices: Real-time and historical (tick, minute, daily)
 - News API: Financial news with sentiment
 - Reference Data: Tickers, exchanges, markets
@@ -12,7 +12,7 @@ Free Tier Limits:
 - EOD data included
 - 15-minute delayed quotes
 
-Documentation: https://polygon.io/docs/stocks
+Documentation: https://massive.com/docs/rest/stocks
 """
 
 import os
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 class PolygonDataSource(BaseDataSource):
     """
-    Polygon.io data source implementation.
+    Massive data source implementation with a legacy class name.
 
     Usage:
         # With explicit API key
@@ -53,7 +53,7 @@ class PolygonDataSource(BaseDataSource):
         prices = polygon.fetch_intraday_prices('AAPL', date(2024, 1, 15))
     """
 
-    BASE_URL = "https://api.polygon.io"
+    BASE_URL = "https://api.massive.com"
 
     # Rate limiting: 5 calls/minute for free tier
     REQUESTS_PER_MINUTE = 5
@@ -61,7 +61,7 @@ class PolygonDataSource(BaseDataSource):
 
     def __init__(self, api_key: Optional[str] = None, is_paid: bool = False):
         """
-        Initialize Polygon data source.
+        Initialize the Massive data source.
 
         Args:
             api_key: API key. If None, reads the Massive process bridge.
@@ -91,11 +91,11 @@ class PolygonDataSource(BaseDataSource):
 
     @property
     def source_name(self) -> str:
-        return "Polygon.io"
+        return "Massive"
 
     @property
     def source_type(self) -> DataSourceType:
-        return DataSourceType.FINANCIAL_DATASETS  # Reuse enum, or add POLYGON
+        return DataSourceType.FINANCIAL_DATASETS  # Reuse enum, or add a dedicated source enum
 
     @property
     def supports_news(self) -> bool:
@@ -151,7 +151,7 @@ class PolygonDataSource(BaseDataSource):
             JSON response or None on error.
         """
         if not self.api_key:
-            raise ValueError("Polygon API key is required")
+            raise ValueError("Massive API key is required")
 
         self._rate_limit_wait()
 
@@ -212,7 +212,7 @@ class PolygonDataSource(BaseDataSource):
         limit: Optional[int] = None,
     ) -> List[NewsArticle]:
         """
-        Fetch news articles from Polygon.
+        Fetch news articles from Massive.
 
         Args:
             tickers: List of stock symbols (e.g., ['AAPL', 'MSFT']).
@@ -233,7 +233,7 @@ class PolygonDataSource(BaseDataSource):
         all_articles = []
         seen_ids = set()
 
-        # Polygon allows multiple tickers in one request
+        # Massive allows multiple tickers in one request
         ticker_str = ','.join(tickers)
 
         params = {
@@ -264,7 +264,7 @@ class PolygonDataSource(BaseDataSource):
         return all_articles
 
     def _parse_news_item(self, item: Dict[str, Any]) -> Optional[NewsArticle]:
-        """Parse a single news item from Polygon response."""
+        """Parse a single news item from a Massive response."""
         try:
             # Parse published date
             pub_date_str = item.get('published_utc', '')
@@ -291,7 +291,7 @@ class PolygonDataSource(BaseDataSource):
                 ticker=primary_ticker,
                 title=item.get('title', ''),
                 published_date=pub_date,
-                source=item.get('publisher', {}).get('name', 'Polygon'),
+                source=item.get('publisher', {}).get('name', 'Massive'),
                 description=item.get('description', ''),
                 content=item.get('description', ''),
                 url=item.get('article_url', ''),
@@ -314,7 +314,7 @@ class PolygonDataSource(BaseDataSource):
         frequency: str = 'daily',
     ) -> List[StockPrice]:
         """
-        Fetch historical stock prices from Polygon.
+        Fetch historical stock prices from Massive.
 
         Args:
             tickers: List of stock symbols.
@@ -330,7 +330,7 @@ class PolygonDataSource(BaseDataSource):
 
         all_prices = []
 
-        # Map frequency to Polygon timespan
+        # Map frequency to the Massive timespan vocabulary
         timespan_map = {
             'daily': 'day',
             'weekly': 'week',
@@ -367,7 +367,7 @@ class PolygonDataSource(BaseDataSource):
         return all_prices
 
     def _parse_price_item(self, ticker: str, item: Dict[str, Any]) -> Optional[StockPrice]:
-        """Parse a single price item from Polygon response."""
+        """Parse a single price item from a Massive response."""
         try:
             # Parse timestamp (milliseconds since epoch)
             timestamp = item.get('t', 0) / 1000
@@ -381,7 +381,7 @@ class PolygonDataSource(BaseDataSource):
                 low=item.get('l', 0),
                 close=item.get('c', 0),
                 volume=int(item.get('v', 0)),
-                adj_close=item.get('c'),  # Polygon returns adjusted by default
+                adj_close=item.get('c'),  # Massive returns adjusted by default
                 data_source='polygon',
             )
         except Exception as e:

@@ -39,7 +39,7 @@ recording an attempt when the writer is already occupied.
 
 | Source | Default mode | Cadence / control | Target |
 |---|---|---|---|
-| Polygon news | Scheduled, manual available | Per-source setting | `market_data.db` |
+| Massive news | Scheduled, manual available | Per-source setting | `market_data.db` |
 | Finnhub news | Scheduled, manual available | Per-source setting and rate limits | `market_data.db` |
 | IBKR news | Scheduled, manual available | Gateway-gated | `market_data.db` |
 | IBKR prices | Scheduled delta, manual backfill | Gateway-gated | `market_data.db` |

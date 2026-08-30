@@ -369,6 +369,24 @@ afterEach(() => {
 });
 
 describe("News content availability", () => {
+  it("presents the durable polygon source as Massive without changing the wire value", async () => {
+    await mount();
+
+    const provider = sourceSelect();
+    expect(provider.querySelector('option[value="polygon"]')?.textContent).toBe("Massive");
+    expect(host!.querySelector(".news-stats")?.textContent).toContain("Massive 1");
+    expect(host!.querySelector(".news-stats")?.textContent).not.toContain("polygon");
+    const unknownRow = Array.from(host!.querySelectorAll(".news-item"))
+      .find((row) => row.textContent?.includes("Unknown body state"));
+    expect(unknownRow?.querySelector(".news-meta")?.textContent).toContain("Massive");
+    expect(unknownRow?.querySelector(".news-meta")?.textContent).not.toContain("polygon");
+
+    await change(provider, "polygon");
+    expect(apiMocks.getNewsFeed).toHaveBeenLastCalledWith(expect.objectContaining({
+      source: "polygon",
+    }));
+  });
+
   it("shows content facet counts and only honest non-full row labels", async () => {
     await mount();
 

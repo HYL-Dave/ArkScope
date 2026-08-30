@@ -11,7 +11,7 @@ to the local UTC format ``'YYYY-MM-DDTHH:MM:SS+0000'``.
 ``news_fts`` (external-content FTS5, ``content_rowid='id'``) is kept in sync by AFTER
 INSERT/UPDATE/DELETE triggers through ``_ensure_news_fts_triggers`` — no manual fts write
 here, so the writer can't double-index. The incremental cursor is the newest local
-``published_at`` for THIS source (source-scoped, optionally ticker-scoped) so Polygon/Finnhub
+``published_at`` for THIS source (source-scoped, optionally ticker-scoped) so Massive/Finnhub
 don't clobber each other's frontier.
 
 NO scheduler routing yet (use_local_news = 2c). Schema (UNIQUE article_hash + fts triggers) is

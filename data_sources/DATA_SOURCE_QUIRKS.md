@@ -27,7 +27,7 @@ doc。
 - **聲稱**: 1 年（見 [API_SPECIFICATIONS.md](./API_SPECIFICATIONS.md)
   Finnhub 新聞 API §呼叫限制歷史紀錄）
 - **實測 (2025-12-14)**: ~7 天
-- **Workaround**: 歷史新聞改用 Polygon Free Tier（3+ 年 + AI 情緒標籤）
+- **Workaround**: 歷史新聞改用 Massive Free Tier（3+ 年 + AI 情緒標籤）
 - **Detailed sources**:
   - [DATA_SOURCES_EVALUATION.md](./DATA_SOURCES_EVALUATION.md) §1
     — 完整測試紀錄（5 股票 × 多時段、跨源對比）
