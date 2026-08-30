@@ -1387,6 +1387,127 @@ def test_alias_closure_overflow_is_a_per_case_ibkr_ambiguity(tmp_path):
     }
 
 
+def test_alias_edge_row_overflow_is_a_per_case_ibkr_ambiguity(tmp_path):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+    component = ("DENSE", *(f"D{index:02d}" for index in range(23)))
+    edges = tuple(
+        (alias, canonical)
+        for alias in component
+        for canonical in component
+        if alias != canonical
+    )
+    assert len(component) == 24
+    assert len(edges) == 552
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+        conn.executemany("INSERT INTO ticker_aliases VALUES (?,?)", edges)
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+
+    hints = scheduler._load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=("DENSE", "GOOD"),
+    )
+
+    assert hints["DENSE"] == {
+        "ticker_aliases": ("DENSE",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
+    }
+    assert hints["GOOD"] == {
+        "ticker_aliases": ("GOOD",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": (),
+    }
+
+
+def test_ibkr_position_row_overflow_is_a_per_case_ambiguity(tmp_path):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO portfolio_positions VALUES (?,?,?)",
+            (("ibkr", "101", "ROWS"),) * 513
+            + (("ibkr", "202", "GOOD"),),
+        )
+
+    hints = scheduler._load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=("ROWS", "GOOD"),
+    )
+
+    assert hints["ROWS"] == {
+        "ticker_aliases": ("ROWS",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
+    }
+    assert hints["GOOD"] == {
+        "ticker_aliases": ("GOOD",),
+        "ibkr_conids": (202,),
+        "ibkr_identity_blockers": (),
+    }
+
+
+def test_duplicate_local_conid_rows_deduplicate_but_distinct_conids_are_ambiguous(
+    tmp_path,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+        conn.execute("INSERT INTO ticker_aliases VALUES (?,?)", ("DUP.A", "DUP"))
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO portfolio_positions VALUES (?,?,?)",
+            (
+                ("ibkr", "101", "DUP"),
+                ("ibkr", "101", "DUP"),
+                ("ibkr", "101", "DUP.A"),
+                ("ibkr", "202", "MULTI"),
+                ("ibkr", "303", "MULTI"),
+            ),
+        )
+
+    hints = scheduler._load_local_identity_hints(
+        market_path=market_path,
+        profile_path=profile_path,
+        tickers=("DUP", "MULTI"),
+    )
+
+    assert hints["DUP"] == {
+        "ticker_aliases": ("DUP", "DUP.A"),
+        "ibkr_conids": (101,),
+        "ibkr_identity_blockers": (),
+    }
+    assert hints["MULTI"] == {
+        "ticker_aliases": ("MULTI",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": ("ibkr_contract_ambiguous",),
+    }
+
+
 def test_multiple_local_conids_do_not_poison_a_later_case(tmp_path):
     from src.service import security_lifecycle_automation_scheduler as scheduler
 
@@ -1624,6 +1745,214 @@ def test_ibkr_identity_ambiguity_blocks_one_case_and_the_later_case_runs(tmp_pat
         second["case_id"]: "blocked",
     }
     conn.close()
+
+
+def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
+    tmp_path,
+    monkeypatch,
+):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
+    from src.security_lifecycle_fact_kernel import AutomationEvidence, AutomationFact
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+        case_id_for,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    market_path = tmp_path / "market.db"
+    profile_path = tmp_path / "profile.db"
+
+    def case(index, ticker):
+        source_ref = f"000000000{index}-26-00000{index}"
+        observation = {
+            "ticker": ticker,
+            "cik": f"{index:010d}",
+            "issuer_name": f"Identity seam issuer {index}",
+            "filing_date": "2026-08-20",
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "evidence_url": (
+                f"https://www.sec.gov/Archives/identity-seam/{index}.htm"
+            ),
+            "description": "Identity planning seam fixture.",
+            "kinds": [{"event_type": "listing_status_review"}],
+        }
+        return {
+            "case_id": case_id_for("sec_edgar", source_ref, ticker),
+            "source": "sec_edgar",
+            "source_ref": source_ref,
+            "ticker": ticker,
+            "source_presence": "present",
+            "observation": observation,
+        }
+
+    first, later = sorted(
+        (case(1, "CASEA"), case(2, "CASEB")),
+        key=lambda row: row["case_id"],
+    )
+    component = (first["ticker"], *(f"X{index:02d}" for index in range(23)))
+    edges = tuple(
+        (alias, canonical)
+        for alias in component
+        for canonical in component
+        if alias != canonical
+    )
+    with sqlite3.connect(market_path) as conn:
+        conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
+        conn.executemany("INSERT INTO ticker_aliases VALUES (?,?)", edges)
+    with sqlite3.connect(profile_path) as conn:
+        SecurityLifecycleInvestigationStore(conn)
+        conn.execute(
+            "CREATE TABLE portfolio_positions("
+            "broker TEXT,broker_con_id TEXT,symbol TEXT)"
+        )
+
+    monkeypatch.setattr(scheduler, "_market_path", lambda: market_path)
+    monkeypatch.setattr(scheduler, "_profile_path", lambda: profile_path)
+    monkeypatch.setattr(
+        scheduler,
+        "compose_security_lifecycle",
+        lambda _market, _profile: {"cases": (first, later)},
+    )
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    def collect_sec_evidence(*, context, retrieved_at, **_kwargs):
+        successor = f"{context.current_ticker}N"
+        excerpt = json.dumps(
+            {"successor_ticker": successor},
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        cited = json.dumps(successor).encode("utf-8")
+        encoded = excerpt.encode("utf-8")
+        start = encoded.index(cited)
+        evidence = AutomationEvidence(
+            evidence_id=f"sec-{context.case_id[-32:]}",
+            source_family="regulator",
+            adapter="sec_edgar",
+            kind="regulator_excerpt",
+            source_url=(
+                f"https://www.sec.gov/Archives/{context.accession}.htm"
+            ),
+            title="SEC identity seam evidence",
+            publisher="SEC EDGAR",
+            domain="sec.gov",
+            source_published_at=context.filing_date,
+            retrieved_at=retrieved_at,
+            excerpt=excerpt,
+            content_sha256=hashlib.sha256(encoded).hexdigest(),
+            source_document_sha256="d" * 64,
+            source_locator={"filing_chain_complete": True},
+            evidence_dedupe_key=f"sec:{context.case_id}",
+        )
+        fact = AutomationFact(
+            evidence_id=evidence.evidence_id,
+            fact_type="successor_ticker",
+            normalized_value=successor,
+            source_span_start=start,
+            source_span_end=start + len(cited),
+            cited_text_sha256=hashlib.sha256(cited).hexdigest(),
+            extractor_rule_id="fixture.successor_ticker",
+            extractor_rule_version="1",
+        )
+        return SimpleNamespace(
+            evidence=(evidence,),
+            facts=(fact,),
+            blockers=(),
+            source_deadlines=(),
+        )
+
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        collect_sec_evidence,
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(),
+            facts=(),
+            blockers=(),
+            diagnostics={},
+        )
+    )
+    ibkr_calls = []
+
+    def ibkr_evidence(context, **_kwargs):
+        ibkr_calls.append(context.current_ticker)
+        return (
+            SimpleNamespace(
+                evidence=(),
+                blockers=("ibkr_contract_missing",),
+                requests_made=1,
+            ),
+            (),
+        )
+
+    monkeypatch.setattr(scheduler, "_ibkr_evidence", ibkr_evidence)
+
+    @contextmanager
+    def profile_connection():
+        conn = sqlite3.connect(profile_path, check_same_thread=False)
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    worker = LifecycleAutomationWorker(
+        case_loader=scheduler._load_cases,
+        profile_connection=profile_connection,
+        evidence_loader=lambda current, *, mode, at: scheduler._load_evidence(
+            current,
+            mode=mode,
+            at=at,
+            listing_session=listing_session,
+        ),
+        source_loader=lambda: {
+            first["ticker"]: (),
+            later["ticker"]: (),
+        },
+        transition_preview=lambda **_kwargs: pytest.fail(
+            "blocked cases must not preview transitions"
+        ),
+        transition_approver=lambda **_kwargs: pytest.fail(
+            "blocked cases must not approve transitions"
+        ),
+        clock=lambda: "2026-08-25T13:00:00Z",
+        execution_owner_id="identity-real-seam-owner",
+    )
+
+    result = worker.run(limit=2)
+
+    assert result["case_ids"] == [first["case_id"], later["case_id"]]
+    assert result["processed"] == 2
+    assert result["blocked"] == 2
+    assert result["case_outcomes"] == {
+        first["case_id"]: "blocked",
+        later["case_id"]: "blocked",
+    }
+    assert ibkr_calls == [later["ticker"]]
+    with sqlite3.connect(profile_path) as conn:
+        store = SecurityLifecycleInvestigationStore(conn)
+        first_run = store.list_automation_runs(first["case_id"])[0]
+        later_run = store.list_automation_runs(later["case_id"])[0]
+    assert {row["blocker_code"] for row in first_run["blockers"]} >= {
+        "ibkr_contract_ambiguous",
+    }
+    assert "ibkr_contract_ambiguous" not in {
+        row["blocker_code"] for row in later_run["blockers"]
+    }
 
 
 def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatch):
