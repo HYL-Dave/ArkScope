@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,9 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _BARE_POLYGON = re.compile(r"\b(?:Polygon(?:\.io)?|POLYGON(?:\.IO)?)\b")
+_LOWERCASE_POLYGON_COPY = re.compile(
+    r"(?<![A-Za-z0-9_])polygon(?:\.io)?(?=\s+[A-Za-z\u3400-\u9fff])"
+)
 
 
 @dataclass(frozen=True, order=True)
@@ -36,6 +40,16 @@ _ALLOWLIST = {
         "src/tools/schemas.py",
         'POLYGON = "polygon"',
     ): "This is a durable wire enum member, not provider-facing copy.",
+}
+_LOWERCASE_COPY_ALLOWLIST = {
+    Occurrence(
+        "src/daily_update.py",
+        "Get Massive news data status from the durable polygon source path.",
+    ): "This explains the existing durable storage path.",
+    Occurrence(
+        "src/tools/backends/__init__.py",
+        "source: Data source (IBKR, Massive, auto; Massive uses the legacy polygon wire value)",
+    ): "This explains the hidden durable filter value.",
 }
 
 _CODE_ROOTS = (
@@ -92,6 +106,27 @@ def _occurrences() -> set[Occurrence]:
     return found
 
 
+def _lowercase_copy_occurrences() -> set[Occurrence]:
+    found: set[Occurrence] = set()
+    for path in _source_files():
+        relative = path.relative_to(_REPO_ROOT).as_posix()
+        source = path.read_text(encoding="utf-8")
+        if path.suffix == ".py":
+            tree = ast.parse(source)
+            strings = (
+                node.value
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            )
+            lines = (line for value in strings for line in value.splitlines())
+        else:
+            lines = iter(source.splitlines())
+        for line in lines:
+            if _LOWERCASE_POLYGON_COPY.search(line):
+                found.add(Occurrence(relative, line.strip()))
+    return found
+
+
 def test_product_and_current_document_surfaces_have_only_reviewed_polygon_mentions():
     actual = _occurrences()
     expected = set(_ALLOWLIST)
@@ -101,6 +136,17 @@ def test_product_and_current_document_surfaces_have_only_reviewed_polygon_mentio
         "stale_allowlist": sorted(expected - actual),
     }
     assert all(reason.strip() for reason in _ALLOWLIST.values())
+
+
+def test_lowercase_polygon_copy_has_only_reviewed_durable_explanations():
+    actual = _lowercase_copy_occurrences()
+    expected = set(_LOWERCASE_COPY_ALLOWLIST)
+
+    assert actual == expected, {
+        "unreviewed": sorted(actual - expected),
+        "stale_allowlist": sorted(expected - actual),
+    }
+    assert all(reason.strip() for reason in _LOWERCASE_COPY_ALLOWLIST.values())
 
 
 def test_scheduler_exposes_the_current_massive_news_label():
