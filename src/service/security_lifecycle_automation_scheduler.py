@@ -874,6 +874,74 @@ def _required_listing_codes(
     )
 
 
+def _ordered_retained_regulator_evidence(
+    rows: list[Mapping[str, object]],
+) -> tuple[Mapping[str, object], ...] | None:
+    if len(rows) < 2:
+        return tuple(rows)
+
+    ordered: list[
+        tuple[str, str, tuple[tuple[int, int], ...] | None, Mapping[str, object]]
+    ] = []
+    document_counts: dict[tuple[str, str], int] = {}
+    for row in rows:
+        published = row.get("source_published_at")
+        locator = row.get("source_locator")
+        if type(published) is not str or not isinstance(locator, Mapping):
+            return None
+        try:
+            if date.fromisoformat(published).isoformat() != published:
+                return None
+        except ValueError:
+            return None
+        accession = locator.get("accession")
+        if type(accession) is not str or not accession:
+            return None
+
+        raw_ranges = locator.get("rendered_text_ranges")
+        ranges: tuple[tuple[int, int], ...] | None = None
+        if raw_ranges is not None:
+            if not isinstance(raw_ranges, list) or not raw_ranges:
+                return None
+            parsed_ranges: list[tuple[int, int]] = []
+            for raw_range in raw_ranges:
+                if not isinstance(raw_range, list) or len(raw_range) != 2:
+                    return None
+                start, end = raw_range
+                if (
+                    type(start) is not int
+                    or type(end) is not int
+                    or start < 0
+                    or end <= start
+                ):
+                    return None
+                parsed_ranges.append((start, end))
+            ranges = tuple(parsed_ranges)
+
+        document = (published, accession)
+        document_counts[document] = document_counts.get(document, 0) + 1
+        ordered.append((published, accession, ranges, row))
+
+    if any(
+        document_counts[(published, accession)] > 1 and ranges is None
+        for published, accession, ranges, _row in ordered
+    ):
+        return None
+    order_keys = {
+        (published, accession, ranges or ())
+        for published, accession, ranges, _row in ordered
+    }
+    if len(order_keys) != len(ordered):
+        return None
+    return tuple(
+        row
+        for _published, _accession, _ranges, row in sorted(
+            ordered,
+            key=lambda item: (item[0], item[1], item[2] or ()),
+        )
+    )
+
+
 def _reusable_regulator_material(
     case: Mapping[str, object],
     *,
@@ -922,6 +990,10 @@ def _reusable_regulator_material(
             evidence.append({**dict(raw), "source_locator": dict(locator)})
         if not evidence:
             return None
+        ordered_evidence = _ordered_retained_regulator_evidence(evidence)
+        if ordered_evidence is None:
+            return None
+        evidence = list(ordered_evidence)
 
         evidence_ids = {str(row["evidence_id"]) for row in evidence}
         facts: list[Mapping[str, object]] = []

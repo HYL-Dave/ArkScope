@@ -2367,6 +2367,101 @@ def test_closed_sec_reuse_reconstructs_deadline_supersession_and_refreshes_marke
     ]
 
 
+def test_retained_deadline_reconstruction_uses_filing_order_not_evidence_id(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    case = _closed_chain_case(
+        kinds=({"event_type": "merger_agreement", "effective_date": None},)
+    )
+    original_sentence = (
+        "The merger agreement may be terminated if the merger is not "
+        "consummated by May 28, 2026."
+    )
+    extension_sentence = (
+        "The outside date was extended from May 28, 2026 to May 30, 2026."
+    )
+    prior = _retained_sec_prior(
+        case,
+        excerpt=original_sentence,
+        include_fact=False,
+    )
+    original = {
+        **dict(prior.evidence[0]),
+        "evidence_id": "sle_z_original",
+        "evidence_dedupe_key": "automation:slar_retained:sec:original",
+        "source_published_at": "2026-01-01",
+        "source_locator_json": json.dumps(
+            {
+                "accession": "0000000001-26-000001",
+                "filing_chain_complete": True,
+                "rendered_text_ranges": [[0, len(original_sentence)]],
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+    }
+    extension = {
+        **dict(prior.evidence[0]),
+        "evidence_id": "sle_a_extension",
+        "evidence_dedupe_key": "automation:slar_retained:sec:extension",
+        "source_published_at": "2026-01-02",
+        "excerpt": extension_sentence,
+        "content_sha256": hashlib.sha256(extension_sentence.encode()).hexdigest(),
+        "source_document_sha256": "e" * 64,
+        "source_locator_json": json.dumps(
+            {
+                "accession": "0000000001-26-000002",
+                "filing_chain_complete": True,
+                "rendered_text_ranges": [[0, len(extension_sentence)]],
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+    }
+    prior = replace(prior, evidence=(extension, original))
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(evidence=(), blockers=(), requests_made=1),
+            (),
+        ),
+    )
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == []
+    assert len(bundle.retained_evidence) == 2
+    assert len(bundle.blockers) == 1
+    assert bundle.blockers[0].context["source_deadline"] == "2026-05-30"
+    assert bundle.blockers[0].context["source_deadline_evidence_id"] == (
+        "sle_a_extension"
+    )
+
+
+def test_retained_same_filing_excerpts_without_positions_force_sec_refresh(
+    monkeypatch,
+):
+    case = _closed_chain_case()
+    prior = _retained_sec_prior(case)
+    second_excerpt = "Issuer CIK 0000000001 remains unchanged."
+    second = {
+        **dict(prior.evidence[0]),
+        "evidence_id": "sle_retained_second_excerpt",
+        "evidence_dedupe_key": "automation:slar_retained:sec:second",
+        "excerpt": second_excerpt,
+        "content_sha256": hashlib.sha256(second_excerpt.encode()).hexdigest(),
+    }
+    prior = replace(prior, evidence=(*prior.evidence, second))
+
+    sec_calls, bundle = _probe_sec_reuse(monkeypatch, case, prior)
+
+    assert sec_calls == ["2026-06-02T12:00:00Z"]
+    assert bundle.retained_evidence == ()
+
+
 @pytest.mark.parametrize(
     ("include_successor", "expected_ibkr_calls"),
     ((True, 1), (False, 0)),
