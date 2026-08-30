@@ -187,9 +187,19 @@ class TickerIdentityService:
                 options=options,
             )
 
-    def list_due_transitions(self, *, on_date: str, limit: int) -> list[dict]:
+    def list_due_transitions(
+        self,
+        *,
+        on_date: str,
+        limit: int,
+        allow_automation_approved: bool = True,
+    ) -> list[dict]:
         with self._profile_connection(write=False) as conn:
-            return self._store(conn).list_due(on_date=on_date, limit=limit)
+            return self._store(conn).list_due(
+                on_date=on_date,
+                limit=limit,
+                allow_automation_approved=allow_automation_approved,
+            )
 
     def list_transition_activity(
         self,

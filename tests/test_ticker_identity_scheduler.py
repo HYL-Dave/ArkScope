@@ -155,6 +155,43 @@ def _scheduler_result(
     }
 
 
+def test_service_threads_authority_selection_to_due_store(tmp_path, monkeypatch):
+    service, _profile_path, _transition_id = _build_due_context(tmp_path)
+
+    class StoreProbe:
+        def __init__(self):
+            self.calls = []
+
+        def list_due(
+            self,
+            *,
+            on_date,
+            limit,
+            allow_automation_approved,
+        ):
+            self.calls.append((on_date, limit, allow_automation_approved))
+            return []
+
+    store = StoreProbe()
+    monkeypatch.setattr(service, "_store", lambda _conn: store)
+
+    assert service.list_due_transitions(
+        on_date="2026-08-25",
+        limit=1,
+        allow_automation_approved=False,
+    ) == []
+    assert store.calls == [("2026-08-25", 1, False)]
+
+
+def test_due_runner_requires_explicit_authority_selection():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    with pytest.raises(TypeError, match="allow_automation_approved"):
+        scheduler.run_due_ticker_identity_transitions(
+            now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+        )
+
+
 def test_due_execution_records_needs_review_when_recomputed_preview_changed(tmp_path):
     service, profile_path, transition_id = _build_due_context(tmp_path)
     digest = _approved_preview_sha256(service, transition_id)
@@ -382,8 +419,14 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
             self.list_call = None
             self.executed = []
 
-        def list_due_transitions(self, *, on_date, limit):
-            self.list_call = (on_date, limit)
+        def list_due_transitions(
+            self,
+            *,
+            on_date,
+            limit,
+            allow_automation_approved,
+        ):
+            self.list_call = (on_date, limit, allow_automation_approved)
             return [
                 {
                     "transition_id": f"slt_{index}",
@@ -421,11 +464,12 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
     )
 
     result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
         limit=10,
         now=datetime(2026, 8, 24, 3, 30, tzinfo=timezone.utc),
     )
 
-    assert service.list_call == ("2026-08-23", 10)
+    assert service.list_call == ("2026-08-23", 10, True)
     assert len(service.executed) == 10
     assert all(row[2] == "scheduler" for row in service.executed)
     assert result == {
@@ -439,6 +483,73 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
         "failed_transition_ids": ["slt_2"],
     }
     assert len(permission_calls) == 8
+
+
+@pytest.mark.parametrize(
+    ("allow_automation_approved", "transition_id"),
+    [
+        (False, "slt_attended"),
+        (True, "slt_automation"),
+    ],
+)
+def test_due_runner_forwards_authority_selection_and_executes_returned_transition(
+    allow_automation_approved,
+    transition_id,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    class FakeService:
+        def __init__(self):
+            self.list_calls = []
+            self.executed = []
+
+        def list_due_transitions(
+            self,
+            *,
+            on_date,
+            limit,
+            allow_automation_approved,
+        ):
+            self.list_calls.append(
+                (on_date, limit, allow_automation_approved)
+            )
+            selected = (
+                "slt_automation"
+                if allow_automation_approved
+                else "slt_attended"
+            )
+            return [
+                {
+                    "transition_id": selected,
+                    "approved_preview_sha256": "a" * 64,
+                }
+            ]
+
+        def execute_transition(self, selected_id, **_kwargs):
+            self.executed.append(selected_id)
+            return {"status": "applied"}
+
+    service = FakeService()
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=allow_automation_approved,
+        limit=1,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert service.list_calls == [
+        ("2026-08-25", 1, allow_automation_approved)
+    ]
+    assert service.executed == [transition_id]
+    assert result["transition_ids"] == [transition_id]
+    assert result["applied"] == 1
 
 
 @pytest.mark.parametrize(
@@ -459,8 +570,14 @@ def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
         def __init__(self):
             self.executed = []
 
-        def list_due_transitions(self, *, on_date, limit):
-            del on_date, limit
+        def list_due_transitions(
+            self,
+            *,
+            on_date,
+            limit,
+            allow_automation_approved,
+        ):
+            del on_date, limit, allow_automation_approved
             return [
                 {
                     "transition_id": "slt_bad",
@@ -482,6 +599,7 @@ def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
     monkeypatch.setattr(scheduler, "_service", lambda: service)
 
     result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 
@@ -508,8 +626,17 @@ def test_due_runner_is_provider_free_and_concurrent_ticks_apply_once(
     barrier = threading.Barrier(2)
     original_list_due = service.list_due_transitions
 
-    def synchronized_list_due(*, on_date, limit):
-        rows = original_list_due(on_date=on_date, limit=limit)
+    def synchronized_list_due(
+        *,
+        on_date,
+        limit,
+        allow_automation_approved,
+    ):
+        rows = original_list_due(
+            on_date=on_date,
+            limit=limit,
+            allow_automation_approved=allow_automation_approved,
+        )
         barrier.wait(timeout=5)
         return rows
 
@@ -533,6 +660,7 @@ def test_due_runner_is_provider_free_and_concurrent_ticks_apply_once(
         results = list(
             executor.map(
                 lambda _index: scheduler.run_due_ticker_identity_transitions(
+                    allow_automation_approved=True,
                     now=now
                 ),
                 range(2),
@@ -563,6 +691,7 @@ def test_due_runner_with_no_identity_component_creates_nothing(tmp_path, monkeyp
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
 
     result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 
@@ -599,6 +728,7 @@ def test_due_runner_reports_existing_profile_without_identity_schema_as_not_inst
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
 
     result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 
@@ -636,6 +766,7 @@ def test_due_runner_reports_malformed_identity_schema_as_unavailable(
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_path))
 
     result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
     )
 

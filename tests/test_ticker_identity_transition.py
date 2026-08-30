@@ -146,6 +146,54 @@ def _id_factory():
     return generate
 
 
+def _insert_due_transition(
+    conn: sqlite3.Connection,
+    *,
+    transition_id: str,
+    approval_authority: str,
+    approved_at: str,
+) -> None:
+    automation = approval_authority == "automation_policy"
+    conn.execute(
+        "INSERT INTO ticker_identity_transitions "
+        "(transition_id,case_id,assessment_id,proposal_ids_json,"
+        "transition_dedupe_key,kind,status,source_ticker,successor_ticker,"
+        "execute_on,priority_resolution,unhide_successor,"
+        "approved_observation_fingerprint_sha256,"
+        "approved_assessment_fingerprint_sha256,approved_preview_sha256,"
+        "approved_preview_json,before_snapshot_json,after_snapshot_sha256,"
+        "approved_at,updated_at,applied_at,cancelled_at,reversed_at,"
+        "approval_authority,automation_policy_version,rule_id,rule_version,"
+        "decision_provenance_sha256) "
+        "VALUES (?,?,?,?,?,?,'approved',?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,"
+        "NULL,NULL,NULL,?,?,?,?,?)",
+        (
+            transition_id,
+            "slc_1",
+            "sla_1",
+            '["slp_1"]',
+            f"due:{transition_id}",
+            "symbol_continuation",
+            "OLD",
+            "NEW",
+            "2026-08-25",
+            None,
+            0,
+            "a" * 64,
+            "b" * 64,
+            "c" * 64,
+            "{}",
+            approved_at,
+            approved_at,
+            approval_authority,
+            "trusted-lifecycle-automation-v3" if automation else None,
+            "lifecycle.simple_symbol_continuation" if automation else None,
+            "1" if automation else None,
+            "d" * 64,
+        ),
+    )
+
+
 def _seed_transferable_state(conn: sqlite3.Connection) -> None:
     conn.execute(
         "INSERT INTO universe_source_memberships "
@@ -639,6 +687,53 @@ def test_transition_approval_is_digest_bound_idempotent_and_due_on_its_date(tmp_
         assert conn.execute(
             "SELECT COUNT(*) FROM ticker_identity_transitions"
         ).fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
+def test_list_due_filters_automation_authority_before_ordering_and_limit(tmp_path):
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    conn = _transition_connection(tmp_path)
+    try:
+        _insert_due_transition(
+            conn,
+            transition_id="tit_automation_oldest",
+            approval_authority="automation_policy",
+            approved_at="2026-08-23T00:00:00Z",
+        )
+        _insert_due_transition(
+            conn,
+            transition_id="tit_automation_older",
+            approval_authority="automation_policy",
+            approved_at="2026-08-23T01:00:00Z",
+        )
+        _insert_due_transition(
+            conn,
+            transition_id="tit_attended",
+            approval_authority="attended_user",
+            approved_at="2026-08-23T02:00:00Z",
+        )
+        conn.commit()
+        store = TickerIdentityTransitionStore(conn)
+
+        attended_only = store.list_due(
+            on_date="2026-08-25",
+            limit=1,
+            allow_automation_approved=False,
+        )
+        all_authorities = store.list_due(
+            on_date="2026-08-25",
+            limit=1,
+            allow_automation_approved=True,
+        )
+
+        assert [row["transition_id"] for row in attended_only] == [
+            "tit_attended"
+        ]
+        assert [row["transition_id"] for row in all_authorities] == [
+            "tit_automation_oldest"
+        ]
     finally:
         conn.close()
 

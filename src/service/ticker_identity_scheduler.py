@@ -328,18 +328,25 @@ def record_ticker_identity_scheduler_result(
 
 def run_due_ticker_identity_transitions(
     *,
+    allow_automation_approved: bool,
     limit: int = _DEFAULT_LIMIT,
     now: datetime | None = None,
 ) -> dict:
     """Run a bounded due batch without importing or calling data providers."""
 
+    if not isinstance(allow_automation_approved, bool):
+        raise ValueError("allow_automation_approved")
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10:
         raise ValueError("limit")
     instant = now or datetime.now(timezone.utc)
     on_date = _new_york_date(instant)
     service = _service()
     try:
-        due = service.list_due_transitions(on_date=on_date, limit=limit)
+        due = service.list_due_transitions(
+            on_date=on_date,
+            limit=limit,
+            allow_automation_approved=allow_automation_approved,
+        )
     except TickerIdentityStoreUnavailable as exc:
         status = (
             "not_installed"

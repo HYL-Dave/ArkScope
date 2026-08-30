@@ -1650,7 +1650,13 @@ class TickerIdentityTransitionStore:
             automation=True,
         )
 
-    def list_due(self, *, on_date: str, limit: int) -> list[dict]:
+    def list_due(
+        self,
+        *,
+        on_date: str,
+        limit: int,
+        allow_automation_approved: bool = True,
+    ) -> list[dict]:
         try:
             if date.fromisoformat(on_date).isoformat() != on_date:
                 raise ValueError
@@ -1658,9 +1664,18 @@ class TickerIdentityTransitionStore:
             raise ValueError("on_date") from exc
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
             raise ValueError("limit")
+        if not isinstance(allow_automation_approved, bool):
+            raise ValueError("allow_automation_approved")
+        authority_predicate = (
+            ""
+            if allow_automation_approved
+            else " AND approval_authority='attended_user'"
+        )
         cursor = self.conn.execute(
             "SELECT transition_id FROM ticker_identity_transitions "
             "WHERE status='approved' AND execute_on<=? "
+            + authority_predicate
+            + " "
             "ORDER BY execute_on,approved_at,transition_id LIMIT ?",
             (on_date, limit),
         )
