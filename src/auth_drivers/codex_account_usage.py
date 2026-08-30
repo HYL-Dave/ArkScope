@@ -30,8 +30,10 @@ from src.auth_drivers.oauth_status import (
 )
 
 
-ALLOWED_CODEX_APP_SERVER_VERSION = "0.147.0"
-_VERSION_OUTPUT = f"codex-cli {ALLOWED_CODEX_APP_SERVER_VERSION}"
+ALLOWED_CODEX_APP_SERVER_VERSIONS = frozenset({"0.147.0", "0.151.0"})
+_VERSION_OUTPUTS = frozenset(
+    f"codex-cli {version}" for version in ALLOWED_CODEX_APP_SERVER_VERSIONS
+)
 _MAX_STDOUT_BYTES = 256 * 1024
 _MAX_STDERR_BYTES = 64 * 1024
 _MAX_RATE_LIMIT_BUCKETS = 16
@@ -479,16 +481,27 @@ class _JsonlSession:
         return None
 
 
+def _default_codex_executable() -> str | Path:
+    try:
+        from codex_cli_bin import bundled_codex_path
+
+        return bundled_codex_path()
+    except (ImportError, FileNotFoundError, OSError):
+        return "codex"
+
+
 class CodexAccountUsageAdapter:
     """Read one account snapshot without starting a model thread or turn."""
 
     def __init__(
         self,
         *,
-        executable: str | Path = "codex",
+        executable: str | Path | None = None,
         timeout_seconds: float = 8.0,
     ):
-        self.executable = executable
+        self.executable = (
+            executable if executable is not None else _default_codex_executable()
+        )
         try:
             timeout = float(timeout_seconds)
         except (TypeError, ValueError):
@@ -572,7 +585,7 @@ class CodexAccountUsageAdapter:
         text = stdout.decode("utf-8", errors="replace").strip()
         if not re.fullmatch(r"codex-cli [0-9]+\.[0-9]+\.[0-9]+", text):
             raise _fail("protocol_incompatible")
-        if text != _VERSION_OUTPUT:
+        if text not in _VERSION_OUTPUTS:
             raise _fail("version_incompatible")
 
     def read_account_usage(

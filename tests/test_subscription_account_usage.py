@@ -481,6 +481,124 @@ def test_account_sync_requires_allowlisted_codex_version_and_cleans_child(tmp_pa
     _wait_for_process_exit(int(hang_pid.read_text()))
 
 
+def test_default_account_usage_launcher_uses_bundled_openai_codex_runtime():
+    from codex_cli_bin import bundled_codex_path
+
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    launcher, target = CodexAccountUsageAdapter()._resolve_launcher_and_target()
+
+    assert launcher == bundled_codex_path()
+    assert target == bundled_codex_path().resolve()
+
+
+def test_explicit_account_usage_launcher_overrides_bundled_runtime(tmp_path):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    executable, _, _ = _write_codex_fixture(tmp_path)
+
+    launcher, target = CodexAccountUsageAdapter(
+        executable=executable
+    )._resolve_launcher_and_target()
+
+    assert launcher == executable
+    assert target == executable.resolve()
+
+
+def test_default_account_usage_launcher_falls_back_to_path_without_bundle(
+    tmp_path, monkeypatch
+):
+    executable, _, _ = _write_codex_fixture(tmp_path)
+    path_launcher = tmp_path / "codex"
+    path_launcher.symlink_to(executable)
+    monkeypatch.setitem(sys.modules, "codex_cli_bin", None)
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    launcher, target = CodexAccountUsageAdapter()._resolve_launcher_and_target()
+
+    assert launcher == path_launcher
+    assert target == executable.resolve()
+
+
+def test_reviewed_codex_0151_version_is_allowlisted(tmp_path):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    executable, _, pid_path = _write_codex_fixture(tmp_path, version="0.151.0")
+
+    CodexAccountUsageAdapter(
+        executable=executable, timeout_seconds=2.0
+    ).read_account_usage(
+        credential_id="local:1",
+        record=_token_record(),
+        observed_at=_OBSERVED_AT,
+    )
+
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
+def test_reviewed_codex_0151_schema_projection_matches_the_adapter_contract():
+    from src.auth_drivers import codex_account_usage
+
+    artifact = json.loads(
+        (
+            Path(__file__).parent
+            / "fixtures"
+            / "codex_account_usage"
+            / "codex-app-server-0.151.0-contract.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert artifact["codex_cli_version"] in (
+        codex_account_usage.ALLOWED_CODEX_APP_SERVER_VERSIONS
+    )
+    assert set(artifact["requests"]) == {
+        "initialize",
+        "account/login/start",
+        "account/read",
+        "account/rateLimits/read",
+        "account/usage/read",
+    }
+    assert set(artifact["notifications"]) == (
+        codex_account_usage._ALLOWED_SERVER_NOTIFICATIONS
+    )
+    assert artifact["responses"]["account/read"] == {
+        "chatgpt_account_properties": ["email", "planType", "type"],
+        "properties": ["account", "requiresOpenaiAuth"],
+        "required": ["requiresOpenaiAuth"],
+    }
+    assert artifact["responses"]["account/rateLimits/read"]["required"] == [
+        "rateLimits"
+    ]
+    assert set(
+        artifact["responses"]["account/rateLimits/read"]["structures"][
+            "RateLimitSnapshot"
+        ]
+    ) == {
+        "credits",
+        "individualLimit",
+        "limitId",
+        "limitName",
+        "planType",
+        "primary",
+        "rateLimitReachedType",
+        "secondary",
+        "spendControlReached",
+    }
+    assert artifact["responses"]["account/usage/read"]["summary_properties"] == [
+        "currentStreakDays",
+        "lifetimeTokens",
+        "longestRunningTurnSec",
+        "longestStreakDays",
+        "peakDailyTokens",
+    ]
+    assert all(
+        len(digest) == 64 and set(digest) <= set("0123456789abcdef")
+        for digest in artifact["source_sha256"].values()
+    )
+
+
 def test_cached_account_status_is_credential_bound_and_missing_is_unknown(tmp_path):
     from src.auth_drivers.oauth_status import OAuthObservationStore, cached_account_usage
 

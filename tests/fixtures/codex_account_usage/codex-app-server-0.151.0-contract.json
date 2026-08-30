@@ -1,0 +1,131 @@
+{
+  "artifact_kind": "reviewed_codex_app_server_protocol_projection",
+  "codex_cli_version": "0.151.0",
+  "generated_on": "2026-08-29",
+  "generator_command": "codex app-server generate-json-schema --experimental --out <temporary-directory>",
+  "source_sha256": {
+    "ClientRequest.json": "22d8039094586f0c957ab1b17825c9233942c1b18abcd9d3c9e9e97c47a35d9e",
+    "ServerNotification.json": "6c0dbcf9da4ad2561a77adf69000390f5c1319896db329d16ac544025f716cb1",
+    "codex_app_server_protocol.schemas.json": "31ae67beb2c94cc9509f6a71968600062dc8c6d7fe45437ed3a9129838f4d2d9",
+    "v2/GetAccountRateLimitsResponse.json": "c102f41b28ee782008b0fc98adb2cefe172bfe6c347770a0896453f23e3d812a",
+    "v2/GetAccountResponse.json": "08a7dd8c570c905b0bb6998d43ed133e72e2445f08125f86dfc96887e288701a",
+    "v2/GetAccountTokenUsageResponse.json": "a58e58c852c888e5de925d99a66688d55ebb2fff038e795aadf04f8a8426dff8"
+  },
+  "requests": {
+    "account/login/start": {
+      "params_required": true
+    },
+    "account/rateLimits/read": {
+      "params_required": false
+    },
+    "account/read": {
+      "params_required": true
+    },
+    "account/usage/read": {
+      "params_required": false
+    },
+    "initialize": {
+      "params_required": true
+    }
+  },
+  "notifications": [
+    "account/login/completed",
+    "account/rateLimits/updated",
+    "account/updated",
+    "remoteControl/status/changed"
+  ],
+  "responses": {
+    "account/rateLimits/read": {
+      "properties": [
+        "rateLimitResetCredits",
+        "rateLimits",
+        "rateLimitsByLimitId"
+      ],
+      "required": [
+        "rateLimits"
+      ],
+      "structures": {
+        "CreditsSnapshot": [
+          "balance",
+          "hasCredits",
+          "unlimited"
+        ],
+        "RateLimitResetCreditsSummary": [
+          "availableCount",
+          "credits"
+        ],
+        "RateLimitSnapshot": [
+          "credits",
+          "individualLimit",
+          "limitId",
+          "limitName",
+          "planType",
+          "primary",
+          "rateLimitReachedType",
+          "secondary",
+          "spendControlReached"
+        ],
+        "RateLimitWindow": [
+          "resetsAt",
+          "usedPercent",
+          "windowDurationMins"
+        ],
+        "SpendControlLimitSnapshot": [
+          "limit",
+          "remainingPercent",
+          "resetsAt",
+          "used"
+        ]
+      }
+    },
+    "account/read": {
+      "chatgpt_account_properties": [
+        "email",
+        "planType",
+        "type"
+      ],
+      "properties": [
+        "account",
+        "requiresOpenaiAuth"
+      ],
+      "required": [
+        "requiresOpenaiAuth"
+      ]
+    },
+    "account/usage/read": {
+      "daily_bucket_properties": [
+        "startDate",
+        "tokens"
+      ],
+      "properties": [
+        "dailyUsageBuckets",
+        "summary",
+        "threadUsage"
+      ],
+      "required": [
+        "summary"
+      ],
+      "summary_properties": [
+        "currentStreakDays",
+        "lifetimeTokens",
+        "longestRunningTurnSec",
+        "longestStreakDays",
+        "peakDailyTokens"
+      ]
+    },
+    "initialize": {
+      "properties": [
+        "codexHome",
+        "platformFamily",
+        "platformOs",
+        "userAgent"
+      ],
+      "required": [
+        "codexHome",
+        "platformFamily",
+        "platformOs",
+        "userAgent"
+      ]
+    }
+  }
+}
