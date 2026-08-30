@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import sys
+import threading
 from typing import Iterator
 
 from src.data_provider_config import MASSIVE_CONFIG_PROVIDER, provider_field_env_value
@@ -1286,14 +1288,13 @@ def _record_automation_result(result: Mapping[str, object], *, now: datetime) ->
         )
 
 
-def _run_security_lifecycle_automation(
-    limit: int = _DEFAULT_LIMIT,
-    now: datetime | None = None,
+def _automation_request(
     *,
-    record_result: bool,
-    target_case_id: str | None = None,
-    allow_new_attempt: bool = False,
-) -> dict:
+    limit: int,
+    now: datetime | None,
+    target_case_id: str | None,
+    allow_new_attempt: bool,
+) -> tuple[datetime, str]:
     if type(limit) is not int or not 1 <= limit <= _MAX_CASES:
         raise ValueError("limit")
     if type(allow_new_attempt) is not bool:
@@ -1308,44 +1309,81 @@ def _run_security_lifecycle_automation(
     if allow_new_attempt and target_case_id is None:
         raise ValueError("target_case_id")
     instant = _aware_instant(now)
-    at = _timestamp(instant)
+    return instant, _timestamp(instant)
+
+
+def _run_owned_and_maybe_record(
+    *,
+    limit: int,
+    instant: datetime,
+    at: str,
+    execution_owner_id: str,
+    record_result: bool,
+    target_case_id: str | None,
+    allow_new_attempt: bool,
+) -> dict:
+    try:
+        startup_reconciled = False
+        active_failure = False
+        try:
+            _reconcile_running_rows(at=at)
+            startup_reconciled = True
+            result = _run_owned_automation_batch(
+                limit=limit,
+                at=at,
+                execution_owner_id=execution_owner_id,
+                target_case_id=target_case_id,
+                allow_new_attempt=allow_new_attempt,
+            )
+        except BaseException:
+            active_failure = True
+            raise
+        finally:
+            if startup_reconciled:
+                try:
+                    _reconcile_running_rows(
+                        at=at,
+                        execution_owner_id=execution_owner_id,
+                    )
+                except Exception as exc:
+                    if not active_failure:
+                        raise
+                    logger.warning(
+                        "security lifecycle owner cleanup failed code=%s",
+                        type(exc).__name__,
+                    )
+    except Exception as exc:
+        result = _automation_exception_result(exc)
+    if record_result:
+        _record_automation_result(result, now=instant)
+    return result
+
+
+def _run_security_lifecycle_automation(
+    limit: int = _DEFAULT_LIMIT,
+    now: datetime | None = None,
+    *,
+    record_result: bool,
+    target_case_id: str | None = None,
+    allow_new_attempt: bool = False,
+) -> dict:
+    instant, at = _automation_request(
+        limit=limit,
+        now=now,
+        target_case_id=target_case_id,
+        allow_new_attempt=allow_new_attempt,
+    )
     try:
         with lifecycle_automation_execution_lock() as execution:
-            try:
-                startup_reconciled = False
-                active_failure = False
-                try:
-                    _reconcile_running_rows(at=at)
-                    startup_reconciled = True
-                    result = _run_owned_automation_batch(
-                        limit=limit,
-                        at=at,
-                        execution_owner_id=execution.execution_owner_id,
-                        target_case_id=target_case_id,
-                        allow_new_attempt=allow_new_attempt,
-                    )
-                except BaseException:
-                    active_failure = True
-                    raise
-                finally:
-                    if startup_reconciled:
-                        try:
-                            _reconcile_running_rows(
-                                at=at,
-                                execution_owner_id=execution.execution_owner_id,
-                            )
-                        except Exception as exc:
-                            if not active_failure:
-                                raise
-                            logger.warning(
-                                "security lifecycle owner cleanup failed code=%s",
-                                type(exc).__name__,
-                            )
-            except Exception as exc:
-                result = _automation_exception_result(exc)
-            if record_result:
-                _record_automation_result(result, now=instant)
-            return result
+            return _run_owned_and_maybe_record(
+                limit=limit,
+                instant=instant,
+                at=at,
+                execution_owner_id=execution.execution_owner_id,
+                record_result=record_result,
+                target_case_id=target_case_id,
+                allow_new_attempt=allow_new_attempt,
+            )
     except LifecycleAutomationAlreadyRunning:
         result = _empty_summary(status="skipped", reason="already_running")
     except LifecycleAutomationExecutionUnavailable:
@@ -1357,6 +1395,89 @@ def _run_security_lifecycle_automation(
     if record_result:
         _record_automation_result(result, now=instant)
     return result
+
+
+def _run_dispatched_owned_automation(
+    *,
+    lock_context,
+    execution_owner_id: str,
+    limit: int,
+    instant: datetime,
+    at: str,
+    target_case_id: str | None,
+    allow_new_attempt: bool,
+) -> None:
+    exit_args = (None, None, None)
+    try:
+        _run_owned_and_maybe_record(
+            limit=limit,
+            instant=instant,
+            at=at,
+            execution_owner_id=execution_owner_id,
+            record_result=True,
+            target_case_id=target_case_id,
+            allow_new_attempt=allow_new_attempt,
+        )
+    except BaseException:
+        exit_args = sys.exc_info()
+        raise
+    finally:
+        lock_context.__exit__(*exit_args)
+
+
+def dispatch_and_record_security_lifecycle_automation(
+    limit: int = _DEFAULT_LIMIT,
+    now: datetime | None = None,
+    *,
+    target_case_id: str | None = None,
+    allow_new_attempt: bool = False,
+) -> dict[str, str]:
+    """Acquire ownership now and transfer that exact lease to one thread."""
+
+    instant, at = _automation_request(
+        limit=limit,
+        now=now,
+        target_case_id=target_case_id,
+        allow_new_attempt=allow_new_attempt,
+    )
+    lock_context = lifecycle_automation_execution_lock()
+    try:
+        execution = lock_context.__enter__()
+    except LifecycleAutomationAlreadyRunning:
+        result = _empty_summary(status="skipped", reason="already_running")
+        _record_automation_result(result, now=instant)
+        return {"status": "skipped", "reason": "already_running"}
+    except LifecycleAutomationExecutionUnavailable:
+        result = security_lifecycle_automation_failure(
+            "execution_lock_unavailable"
+        )
+        _record_automation_result(result, now=instant)
+        return {"status": "unavailable", "reason": "execution_lock_unavailable"}
+    except Exception as exc:
+        result = _automation_exception_result(exc)
+        _record_automation_result(result, now=instant)
+        return {"status": str(result["status"]), "reason": str(result["reason"])}
+
+    try:
+        thread = threading.Thread(
+            target=_run_dispatched_owned_automation,
+            kwargs={
+                "lock_context": lock_context,
+                "execution_owner_id": execution.execution_owner_id,
+                "limit": limit,
+                "instant": instant,
+                "at": at,
+                "target_case_id": target_case_id,
+                "allow_new_attempt": allow_new_attempt,
+            },
+            name="security-lifecycle-automation-run",
+            daemon=True,
+        )
+        thread.start()
+    except BaseException:
+        lock_context.__exit__(*sys.exc_info())
+        raise
+    return {"status": "started"}
 
 
 def run_security_lifecycle_automation(
@@ -1880,6 +2001,7 @@ def record_security_lifecycle_automation_result(
 
 
 __all__ = [
+    "dispatch_and_record_security_lifecycle_automation",
     "LifecycleAutomationNotInstalled",
     "record_security_lifecycle_automation_result",
     "run_and_record_security_lifecycle_automation",

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import re
-import threading
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -39,7 +38,7 @@ from src.security_lifecycle_translation import (
     translate_evidence,
 )
 from src.service.security_lifecycle_automation_scheduler import (
-    run_and_record_security_lifecycle_automation,
+    dispatch_and_record_security_lifecycle_automation,
 )
 from src.tools.security_lifecycle_tools import (
     SecurityLifecycleReadService,
@@ -48,7 +47,6 @@ from src.tools.security_lifecycle_tools import (
 
 
 router = APIRouter(prefix="/security-lifecycle", tags=["security-lifecycle"])
-_AUTOMATION_DISPATCH_LOCK = threading.Lock()
 
 
 def _utc_now() -> str:
@@ -329,27 +327,11 @@ def _case_fingerprint(case: dict) -> str:
     return observation_fingerprint(observation)
 
 
-def _run_dispatched_automation(*, run_kwargs: dict[str, object]) -> None:
-    try:
-        run_and_record_security_lifecycle_automation(**run_kwargs)
-    finally:
-        _AUTOMATION_DISPATCH_LOCK.release()
-
-
 def _dispatch_automation(
     *,
     scope: Literal["due", "case"],
     case_id: str | None = None,
 ) -> dict[str, object]:
-    if not _AUTOMATION_DISPATCH_LOCK.acquire(blocking=False):
-        result: dict[str, object] = {
-            "scope": scope,
-            "status": "skipped",
-            "reason": "already_running",
-        }
-        if case_id is not None:
-            result["case_id"] = case_id
-        return result
     run_kwargs: dict[str, object] = {}
     if case_id is not None:
         run_kwargs = {
@@ -357,17 +339,14 @@ def _dispatch_automation(
             "limit": 1,
             "target_case_id": case_id,
         }
-    try:
-        threading.Thread(
-            target=_run_dispatched_automation,
-            kwargs={"run_kwargs": run_kwargs},
-            name=f"security-lifecycle-{scope}-run",
-            daemon=True,
-        ).start()
-    except BaseException:
-        _AUTOMATION_DISPATCH_LOCK.release()
-        raise
-    result = {"scope": scope, "status": "started"}
+    dispatched = dispatch_and_record_security_lifecycle_automation(**run_kwargs)
+    result: dict[str, object] = {
+        "scope": scope,
+        "status": dispatched["status"],
+    }
+    reason = dispatched.get("reason")
+    if reason is not None:
+        result["reason"] = reason
     if case_id is not None:
         result["case_id"] = case_id
     return result
@@ -385,9 +364,6 @@ def run_case_automation(
     service: SecurityLifecycleReadService = Depends(
         get_security_lifecycle_read_service
     ),
-    store: SecurityLifecycleInvestigationStore = Depends(
-        get_security_lifecycle_store
-    ),
 ):
     try:
         service.get_case(case_id)
@@ -395,17 +371,13 @@ def run_case_automation(
             "security_lifecycle_run_automation",
             {"case_id": case_id, "scope": "case"},
         )
-        latest_run = store.conn.execute(
-            "SELECT status FROM security_lifecycle_automation_runs "
-            "WHERE case_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
-            (case_id,),
-        ).fetchone()
-        if latest_run is not None and latest_run["status"] == "running":
+        result = _dispatch_automation(scope="case", case_id=case_id)
+        if result.get("reason") == "already_running":
             raise HTTPException(
                 status_code=409,
                 detail={"case_id": case_id, "code": "automation_case_running"},
             )
-        return _dispatch_automation(scope="case", case_id=case_id)
+        return result
     except HTTPException:
         raise
     except LifecycleStoreUnavailable as exc:

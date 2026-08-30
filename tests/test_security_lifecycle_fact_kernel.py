@@ -1425,6 +1425,181 @@ def test_legacy_failed_predecessor_field_remains_chain_readable():
     )["predecessor_run_id"] == second.run_id
 
 
+def _two_failed_attended_attempts(kernel, case_id):
+    first = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=first.run_id,
+        failure_code="extractor_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:00:00Z",
+    )
+    second = _reserve(
+        kernel,
+        case_id,
+        allow_new_attempt=True,
+        at="2026-08-25T03:00:00Z",
+    )
+    kernel.fail_run(
+        run_id=second.run_id,
+        failure_code="extractor_failed",
+        diagnostics={"failures": 1},
+        at="2026-08-25T04:00:00Z",
+    )
+    return first, second
+
+
+def test_predecessor_chain_rejects_a_different_input_evidence_snapshot():
+    from src.security_lifecycle_fact_kernel import automation_run_key
+
+    _conn, store, kernel, case_id = _context()
+    first, _second = _two_failed_attended_attempts(kernel, case_id)
+    context = json.loads(
+        store.get_automation_run(first.run_id)["query_context_json"]
+    )
+    context["input_evidence_set_sha256"] = "b" * 64
+    context["semantic_run_key"] = automation_run_key(
+        case_id=case_id,
+        observation_fingerprint_sha256=_FINGERPRINT,
+        policy_version="trusted-lifecycle-v1",
+        mode="historical",
+        input_evidence_set_sha256="b" * 64,
+    )
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), first.run_id),
+    )
+    store.conn.commit()
+
+    with pytest.raises(ValueError, match="automation_predecessor_semantic_identity"):
+        _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at="2026-08-25T05:00:00Z",
+        )
+
+
+def test_predecessor_chain_rejects_a_noncanonical_semantic_run_key():
+    _conn, store, kernel, case_id = _context()
+    first, _second = _two_failed_attended_attempts(kernel, case_id)
+    context = json.loads(
+        store.get_automation_run(first.run_id)["query_context_json"]
+    )
+    context["semantic_run_key"] = "lifecycle-automation-v1:" + "f" * 64
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), first.run_id),
+    )
+    store.conn.commit()
+
+    with pytest.raises(ValueError, match="automation_predecessor_semantic_run_key"):
+        _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at="2026-08-25T05:00:00Z",
+        )
+
+
+def test_legacy_predecessor_missing_semantic_metadata_fails_closed():
+    _conn, store, kernel, case_id = _context()
+    first, second = _two_failed_attended_attempts(kernel, case_id)
+    first_context = json.loads(
+        store.get_automation_run(first.run_id)["query_context_json"]
+    )
+    first_context.pop("input_evidence_set_sha256")
+    second_context = json.loads(
+        store.get_automation_run(second.run_id)["query_context_json"]
+    )
+    second_context["predecessor_failed_run_id"] = second_context.pop(
+        "predecessor_run_id"
+    )
+    store.conn.executemany(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (
+            (
+                json.dumps(first_context, separators=(",", ":"), sort_keys=True),
+                first.run_id,
+            ),
+            (
+                json.dumps(second_context, separators=(",", ":"), sort_keys=True),
+                second.run_id,
+            ),
+        ),
+    )
+    store.conn.commit()
+
+    with pytest.raises(
+        ValueError,
+        match="automation_predecessor_input_evidence_set_sha256",
+    ):
+        _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at="2026-08-25T05:00:00Z",
+        )
+
+
+def test_malformed_legacy_predecessor_field_fails_closed():
+    _conn, store, kernel, case_id = _context()
+    _first, second = _two_failed_attended_attempts(kernel, case_id)
+    context = json.loads(
+        store.get_automation_run(second.run_id)["query_context_json"]
+    )
+    context.pop("predecessor_run_id")
+    context["predecessor_failed_run_id"] = {"run_id": "slar_malformed"}
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), second.run_id),
+    )
+    store.conn.commit()
+
+    with pytest.raises(ValueError, match="automation_predecessor_chain"):
+        _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at="2026-08-25T05:00:00Z",
+        )
+
+
+def test_predecessor_chain_enforces_the_hard_traversal_limit():
+    _conn, _store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    for ordinal in range(32):
+        kernel.fail_run(
+            run_id=claim.run_id,
+            failure_code="extractor_failed",
+            diagnostics={"ordinal": ordinal},
+            at=f"2026-08-25T02:{ordinal:02d}:00Z",
+        )
+        claim = _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at=f"2026-08-25T02:{ordinal:02d}:30Z",
+        )
+    kernel.fail_run(
+        run_id=claim.run_id,
+        failure_code="extractor_failed",
+        diagnostics={"ordinal": 32},
+        at="2026-08-25T02:32:00Z",
+    )
+
+    with pytest.raises(ValueError, match="automation_predecessor_chain_limit"):
+        _reserve(
+            kernel,
+            case_id,
+            allow_new_attempt=True,
+            at="2026-08-25T02:32:30Z",
+        )
+
+
 def test_predecessor_cycle_fails_closed_before_creating_attended_attempt():
     _conn, store, kernel, case_id = _context()
     failed = _reserve(kernel, case_id)

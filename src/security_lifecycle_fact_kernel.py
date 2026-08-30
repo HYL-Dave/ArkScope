@@ -607,7 +607,7 @@ def _attempt_chain(
     rows: list[sqlite3.Row] = []
     visited: set[str] = set()
     current_id: str | None = run_id
-    identity: tuple[str, str, str, str] | None = None
+    identity: tuple[str, str, str, str, str, str] | None = None
     while current_id is not None:
         if current_id in visited:
             raise ValueError("automation_predecessor_cycle")
@@ -622,18 +622,39 @@ def _attempt_chain(
         ).fetchone()
         if row is None:
             raise ValueError("automation_predecessor_chain")
+        context = _query_context_value(row["query_context_json"])
+        input_evidence_digest = _sha256(
+            "automation_predecessor_input_evidence_set_sha256",
+            context.get("input_evidence_set_sha256"),
+        )
+        canonical_semantic_run_key = automation_run_key(
+            case_id=str(row["case_id"]),
+            observation_fingerprint_sha256=str(
+                row["observation_fingerprint_sha256"]
+            ),
+            policy_version=str(row["policy_version"]),
+            mode=str(row["mode"]),
+            input_evidence_set_sha256=input_evidence_digest,
+        )
+        stored_semantic_run_key = context.get("semantic_run_key")
+        if (
+            type(stored_semantic_run_key) is not str
+            or stored_semantic_run_key != canonical_semantic_run_key
+        ):
+            raise ValueError("automation_predecessor_semantic_run_key")
         row_identity = (
             str(row["case_id"]),
             str(row["observation_fingerprint_sha256"]),
             str(row["policy_version"]),
             str(row["mode"]),
+            input_evidence_digest,
+            canonical_semantic_run_key,
         )
         if identity is None:
             identity = row_identity
         elif row_identity != identity:
-            raise ValueError("automation_predecessor_chain")
+            raise ValueError("automation_predecessor_semantic_identity")
         rows.append(row)
-        context = _query_context_value(row["query_context_json"])
         current_id = _predecessor_run_id(context)
     return tuple(rows)
 

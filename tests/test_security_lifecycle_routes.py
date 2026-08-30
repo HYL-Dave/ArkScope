@@ -7,6 +7,7 @@ import sqlite3
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import pytest
 
 
 _AT = "2026-08-20T00:00:00Z"
@@ -434,22 +435,13 @@ def test_global_automation_run_dispatches_the_recorded_due_boundary(
 
     context = _build_context(tmp_path)
     permission_calls = []
-    run_calls = []
-
-    class ImmediateThread:
-        def __init__(self, *, target, kwargs, **_ignored):
-            self.target = target
-            self.kwargs = kwargs
-
-        def start(self):
-            self.target(**self.kwargs)
+    dispatch_calls = []
 
     try:
-        monkeypatch.setattr(routes.threading, "Thread", ImmediateThread)
         monkeypatch.setattr(
             routes,
-            "run_and_record_security_lifecycle_automation",
-            lambda **kwargs: run_calls.append(kwargs),
+            "dispatch_and_record_security_lifecycle_automation",
+            lambda **kwargs: dispatch_calls.append(kwargs) or {"status": "started"},
         )
         client = _client(
             context,
@@ -463,7 +455,7 @@ def test_global_automation_run_dispatches_the_recorded_due_boundary(
 
         assert response.status_code == 200
         assert response.json() == {"scope": "due", "status": "started"}
-        assert run_calls == [{}]
+        assert dispatch_calls == [{}]
         assert permission_calls == [
             ("security_lifecycle_run_automation", {"scope": "due"})
         ]
@@ -478,22 +470,13 @@ def test_case_automation_run_dispatches_exact_attended_authority(
     from src.api.routes import security_lifecycle as routes
 
     context = _build_context(tmp_path)
-    run_calls = []
-
-    class ImmediateThread:
-        def __init__(self, *, target, kwargs, **_ignored):
-            self.target = target
-            self.kwargs = kwargs
-
-        def start(self):
-            self.target(**self.kwargs)
+    dispatch_calls = []
 
     try:
-        monkeypatch.setattr(routes.threading, "Thread", ImmediateThread)
         monkeypatch.setattr(
             routes,
-            "run_and_record_security_lifecycle_automation",
-            lambda **kwargs: run_calls.append(kwargs),
+            "dispatch_and_record_security_lifecycle_automation",
+            lambda **kwargs: dispatch_calls.append(kwargs) or {"status": "started"},
         )
         client = _client(context, monkeypatch, permissions=lambda *_args: None)
 
@@ -507,7 +490,7 @@ def test_case_automation_run_dispatches_exact_attended_authority(
             "scope": "case",
             "status": "started",
         }
-        assert run_calls == [
+        assert dispatch_calls == [
             {
                 "allow_new_attempt": True,
                 "limit": 1,
@@ -526,20 +509,11 @@ def test_case_automation_run_materializes_a_source_only_case_in_the_worker(
 
     context = _build_context(tmp_path, materialize_profile_case=False)
 
-    class ImmediateThread:
-        def __init__(self, *, target, kwargs, **_ignored):
-            self.target = target
-            self.kwargs = kwargs
-
-        def start(self):
-            self.target(**self.kwargs)
-
     try:
-        monkeypatch.setattr(routes.threading, "Thread", ImmediateThread)
         monkeypatch.setattr(
             routes,
-            "run_and_record_security_lifecycle_automation",
-            lambda **_kwargs: None,
+            "dispatch_and_record_security_lifecycle_automation",
+            lambda **_kwargs: {"status": "started"},
         )
         client = _client(context, monkeypatch, permissions=lambda *_args: None)
 
@@ -556,75 +530,154 @@ def test_case_automation_run_materializes_a_source_only_case_in_the_worker(
         context["profile_conn"].close()
 
 
-def test_automation_run_returns_typed_skip_while_local_dispatch_is_active(
+def test_global_automation_run_returns_typed_skip_on_real_flock_collision(
     tmp_path,
     monkeypatch,
 ):
-    import threading
-
     from src.api.routes import security_lifecycle as routes
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.security_lifecycle_automation_runtime import (
+        lifecycle_automation_execution_lock,
+    )
 
     context = _build_context(tmp_path)
-    pending = []
-
-    class DeferredThread:
-        def __init__(self, *, target, kwargs, **_ignored):
-            pending.append((target, kwargs))
-
-        def start(self):
-            pass
-
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(context["profile_path"]))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     try:
-        monkeypatch.setattr(routes, "_AUTOMATION_DISPATCH_LOCK", threading.Lock())
-        monkeypatch.setattr(routes.threading, "Thread", DeferredThread)
+        monkeypatch.setattr(
+            scheduler.threading,
+            "Thread",
+            lambda **_kwargs: pytest.fail("collision must not start a thread"),
+        )
         client = _client(context, monkeypatch, permissions=lambda *_args: None)
 
-        started = client.post("/security-lifecycle/automation/run")
-        skipped = client.post("/security-lifecycle/automation/run")
+        with lifecycle_automation_execution_lock():
+            skipped = client.post("/security-lifecycle/automation/run")
 
-        assert started.json() == {"scope": "due", "status": "started"}
+        assert skipped.status_code == 200
         assert skipped.json() == {
             "reason": "already_running",
             "scope": "due",
             "status": "skipped",
         }
-        assert len(pending) == 1
     finally:
-        if routes._AUTOMATION_DISPATCH_LOCK.locked():
-            routes._AUTOMATION_DISPATCH_LOCK.release()
         context["profile_conn"].close()
 
 
-def test_case_automation_run_rejects_a_current_running_attempt(
+def test_case_automation_run_returns_409_on_real_flock_collision(
     tmp_path,
     monkeypatch,
 ):
-    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.security_lifecycle_automation_runtime import (
+        lifecycle_automation_execution_lock,
+    )
 
     context = _build_context(tmp_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(context["profile_path"]))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     try:
-        SecurityLifecycleFactKernel(context["store"]).reserve_run(
-            case_id=context["case_id"],
-            observation_fingerprint_sha256=context["fingerprint"],
-            policy_version="trusted-lifecycle-automation-v4",
-            mode="live",
-            execution_revision="trusted-lifecycle-execution-r1",
-            execution_owner_id="route-running-owner",
-            query_context={"case_id": context["case_id"], "ticker": "EA"},
-            diagnostics={},
-            at=_AT,
+        monkeypatch.setattr(
+            scheduler.threading,
+            "Thread",
+            lambda **_kwargs: pytest.fail("collision must not start a thread"),
         )
         client = _client(context, monkeypatch, permissions=lambda *_args: None)
 
-        response = client.post(
-            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
-        )
+        with lifecycle_automation_execution_lock():
+            response = client.post(
+                f"/security-lifecycle/cases/{context['case_id']}/automation/run"
+            )
 
         assert response.status_code == 409
         assert response.json()["detail"] == {
             "case_id": context["case_id"],
             "code": "automation_case_running",
         }
+    finally:
+        context["profile_conn"].close()
+
+
+def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisition(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    context = _build_context(tmp_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(context["profile_path"]))
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    running = SecurityLifecycleFactKernel(context["store"]).reserve_run(
+        case_id=context["case_id"],
+        observation_fingerprint_sha256=context["fingerprint"],
+        policy_version="trusted-lifecycle-automation-v4",
+        mode="live",
+        execution_revision="trusted-lifecycle-execution-r1",
+        execution_owner_id="route-running-owner",
+        query_context={"case_id": context["case_id"], "ticker": "EA"},
+        diagnostics={},
+        at=_AT,
+    )
+
+    class ImmediateThread:
+        def __init__(self, *, target, kwargs, **_ignored):
+            self.target = target
+            self.kwargs = kwargs
+
+        def start(self):
+            self.target(**self.kwargs)
+
+    worker_calls = []
+
+    def run_batch(**kwargs):
+        row = context["store"].get_automation_run(running.run_id)
+        assert row["status"] == "failed"
+        assert row["failure_code"] == "internal_error"
+        worker_calls.append(kwargs)
+        return {
+            "result_version": 2,
+            "case_outcomes": {},
+            "status": "succeeded",
+            "reason": None,
+            "selected": 0,
+            "processed": 0,
+            "accepted": 0,
+            "drafted": 0,
+            "blocked": 0,
+            "failed": 0,
+            "skipped_current": 0,
+            "case_ids": [],
+        }
+
+    try:
+        monkeypatch.setattr(scheduler.threading, "Thread", ImmediateThread)
+        monkeypatch.setattr(scheduler, "_run_owned_automation_batch", run_batch)
+        client = _client(context, monkeypatch, permissions=lambda *_args: None)
+
+        response = client.post(
+            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "case_id": context["case_id"],
+            "scope": "case",
+            "status": "started",
+        }
+        assert len(worker_calls) == 1
+        assert worker_calls == [
+            {
+                "limit": 1,
+                "at": worker_calls[0]["at"],
+                "execution_owner_id": worker_calls[0]["execution_owner_id"],
+                "target_case_id": context["case_id"],
+                "allow_new_attempt": True,
+            }
+        ]
+        assert context["store"].get_automation_run(running.run_id)["status"] == (
+            "failed"
+        )
     finally:
         context["profile_conn"].close()
 

@@ -196,7 +196,11 @@ def test_recorded_runner_persists_result_before_releasing_execution_lock(
             lock_held = False
 
     result = _v2_summary()
-    monkeypatch.setattr(scheduler, "lifecycle_automation_execution_lock", execution_lock)
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_execution_lock",
+        execution_lock,
+    )
     monkeypatch.setattr(scheduler, "_reconcile_running_rows", lambda **_kwargs: ())
     monkeypatch.setattr(
         scheduler,
@@ -222,6 +226,140 @@ def test_recorded_runner_persists_result_before_releasing_execution_lock(
         now=_NOW,
     ) == result
     assert events == ["lock_acquired", "worker", "record", "lock_released"]
+
+
+def test_dispatch_acquires_ownership_before_return_and_transfers_exact_lease(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+    pending = []
+    lock_held = False
+
+    @contextmanager
+    def execution_lock():
+        nonlocal lock_held
+        lock_held = True
+        lease = SimpleNamespace(execution_owner_id="dispatch-owner")
+        events.append(("lock_acquired", lease))
+        try:
+            yield lease
+        finally:
+            events.append(("lock_released", lease))
+            lock_held = False
+
+    class DeferredThread:
+        def __init__(self, *, target, kwargs, **_ignored):
+            pending.append((target, kwargs))
+
+        def start(self):
+            events.append(("thread_started", None))
+
+    result = _v2_summary()
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_execution_lock",
+        execution_lock,
+    )
+    monkeypatch.setattr(scheduler.threading, "Thread", DeferredThread)
+    monkeypatch.setattr(
+        scheduler,
+        "_reconcile_running_rows",
+        lambda **kwargs: events.append(("reconcile", kwargs)),
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "_run_owned_automation_batch",
+        lambda **kwargs: events.append(("worker", kwargs)) or result,
+    )
+
+    def record(value, *, now):
+        assert lock_held is True
+        assert value == result
+        assert now == _NOW
+        events.append(("record", value))
+
+    monkeypatch.setattr(
+        scheduler,
+        "record_security_lifecycle_automation_result",
+        record,
+    )
+
+    dispatched = scheduler.dispatch_and_record_security_lifecycle_automation(
+        limit=1,
+        now=_NOW,
+        target_case_id="slc_attended",
+        allow_new_attempt=True,
+    )
+
+    assert dispatched == {"status": "started"}
+    assert lock_held is True
+    assert [event[0] for event in events] == ["lock_acquired", "thread_started"]
+    assert len(pending) == 1
+
+    target, kwargs = pending.pop()
+    target(**kwargs)
+
+    assert lock_held is False
+    assert [event[0] for event in events] == [
+        "lock_acquired",
+        "thread_started",
+        "reconcile",
+        "worker",
+        "reconcile",
+        "record",
+        "lock_released",
+    ]
+    worker_kwargs = next(value for name, value in events if name == "worker")
+    assert worker_kwargs == {
+        "limit": 1,
+        "at": "2026-08-25T13:00:00Z",
+        "execution_owner_id": "dispatch-owner",
+        "target_case_id": "slc_attended",
+        "allow_new_attempt": True,
+    }
+
+
+def test_dispatch_thread_start_failure_releases_transferred_ownership(
+    monkeypatch,
+):
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    events = []
+    retained_contexts = []
+
+    @contextmanager
+    def execution_lock():
+        events.append("lock_acquired")
+        try:
+            yield SimpleNamespace(execution_owner_id="start-failure-owner")
+        finally:
+            events.append("lock_released")
+
+    class FailingThread:
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            raise RuntimeError("thread start failed")
+
+    def retained_execution_lock():
+        context = execution_lock()
+        retained_contexts.append(context)
+        return context
+
+    monkeypatch.setattr(
+        scheduler,
+        "lifecycle_automation_execution_lock",
+        retained_execution_lock,
+    )
+    monkeypatch.setattr(scheduler.threading, "Thread", FailingThread)
+
+    with pytest.raises(RuntimeError, match="thread start failed"):
+        scheduler.dispatch_and_record_security_lifecycle_automation(now=_NOW)
+
+    assert events == ["lock_acquired", "lock_released"]
 
 
 def test_scheduled_runner_grants_only_due_failed_retry_authority(monkeypatch):
