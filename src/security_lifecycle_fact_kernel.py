@@ -113,6 +113,18 @@ _AUTOMATIC_RETRY_DELAYS = {
 _MAX_PREDECESSOR_CHAIN = 32
 
 
+class _AttemptChainDataError(ValueError):
+    pass
+
+
+class _AttemptChainLimitError(ValueError):
+    pass
+
+
+class _ReconciliationRowClassificationError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class AutomationEvidence:
     evidence_id: str
@@ -643,9 +655,7 @@ def _attempt_chain(
     identity: tuple[str, str, str, str, str, str] | None = None
     while current_id is not None:
         if current_id in visited:
-            raise ValueError("automation_predecessor_cycle")
-        if len(rows) >= _MAX_PREDECESSOR_CHAIN:
-            raise ValueError("automation_predecessor_chain_limit")
+            raise _AttemptChainDataError("automation_predecessor_cycle")
         visited.add(current_id)
         row = conn.execute(
             "SELECT run_id,case_id,observation_fingerprint_sha256,policy_version,"
@@ -654,41 +664,55 @@ def _attempt_chain(
             (current_id,),
         ).fetchone()
         if row is None:
-            raise ValueError("automation_predecessor_chain")
-        context = _query_context_value(row["query_context_json"])
-        input_evidence_digest = _sha256(
-            "automation_predecessor_input_evidence_set_sha256",
-            context.get("input_evidence_set_sha256"),
-        )
-        canonical_semantic_run_key = automation_run_key(
-            case_id=str(row["case_id"]),
-            observation_fingerprint_sha256=str(
-                row["observation_fingerprint_sha256"]
-            ),
-            policy_version=str(row["policy_version"]),
-            mode=str(row["mode"]),
-            input_evidence_set_sha256=input_evidence_digest,
-        )
-        stored_semantic_run_key = context.get("semantic_run_key")
-        if (
-            type(stored_semantic_run_key) is not str
-            or stored_semantic_run_key != canonical_semantic_run_key
-        ):
-            raise ValueError("automation_predecessor_semantic_run_key")
-        row_identity = (
-            str(row["case_id"]),
-            str(row["observation_fingerprint_sha256"]),
-            str(row["policy_version"]),
-            str(row["mode"]),
-            input_evidence_digest,
-            canonical_semantic_run_key,
-        )
-        if identity is None:
-            identity = row_identity
-        elif row_identity != identity:
-            raise ValueError("automation_predecessor_semantic_identity")
+            raise _AttemptChainDataError("automation_predecessor_chain")
+        try:
+            context = _query_context_value(row["query_context_json"])
+            input_evidence_digest = _sha256(
+                "automation_predecessor_input_evidence_set_sha256",
+                context.get("input_evidence_set_sha256"),
+            )
+            canonical_semantic_run_key = automation_run_key(
+                case_id=str(row["case_id"]),
+                observation_fingerprint_sha256=str(
+                    row["observation_fingerprint_sha256"]
+                ),
+                policy_version=str(row["policy_version"]),
+                mode=str(row["mode"]),
+                input_evidence_set_sha256=input_evidence_digest,
+            )
+            stored_semantic_run_key = context.get("semantic_run_key")
+            if (
+                type(stored_semantic_run_key) is not str
+                or stored_semantic_run_key != canonical_semantic_run_key
+            ):
+                raise _AttemptChainDataError(
+                    "automation_predecessor_semantic_run_key"
+                )
+            row_identity = (
+                str(row["case_id"]),
+                str(row["observation_fingerprint_sha256"]),
+                str(row["policy_version"]),
+                str(row["mode"]),
+                input_evidence_digest,
+                canonical_semantic_run_key,
+            )
+            if identity is None:
+                identity = row_identity
+            elif row_identity != identity:
+                raise _AttemptChainDataError(
+                    "automation_predecessor_semantic_identity"
+                )
+            predecessor_run_id = _predecessor_run_id(context)
+        except _AttemptChainDataError:
+            raise
+        except ValueError as exc:
+            raise _AttemptChainDataError(*exc.args) from exc
+        if predecessor_run_id is not None and predecessor_run_id in visited:
+            raise _AttemptChainDataError("automation_predecessor_cycle")
+        if len(rows) >= _MAX_PREDECESSOR_CHAIN:
+            raise _AttemptChainLimitError("automation_predecessor_chain_limit")
         rows.append(row)
-        current_id = _predecessor_run_id(context)
+        current_id = predecessor_run_id
     return tuple(rows)
 
 
@@ -704,9 +728,7 @@ def _automatic_retry_for_failure(
         return None
     try:
         chain = _attempt_chain(conn, run_id)
-    except ValueError as exc:
-        if exc.args != ("automation_predecessor_chain_limit",):
-            raise
+    except _AttemptChainLimitError:
         return {
             "class": failure_code,
             "retry_not_before": None,
@@ -725,6 +747,44 @@ def _automatic_retry_for_failure(
         "class": failure_code,
         "retry_not_before": retry_not_before,
     }
+
+
+def _reconciliation_retry_context(
+    conn: sqlite3.Connection,
+    *,
+    query_context_json: object,
+    requested_owner: str | None,
+    run_id: str,
+    failed_at: str,
+) -> str | None:
+    try:
+        context = _query_context_value(query_context_json)
+        persisted_owner = context.get(_EXECUTION_OWNER_KEY)
+        if persisted_owner is None:
+            if requested_owner is not None:
+                return None
+        else:
+            normalized_owner = _execution_owner_id(persisted_owner)
+            if requested_owner is not None and normalized_owner != requested_owner:
+                return None
+    except ValueError as exc:
+        raise _ReconciliationRowClassificationError from exc
+
+    try:
+        automatic_retry = _automatic_retry_for_failure(
+            conn,
+            run_id=run_id,
+            failure_code="internal_error",
+            failed_at=failed_at,
+        )
+    except _AttemptChainDataError as exc:
+        raise _ReconciliationRowClassificationError from exc
+    assert automatic_retry is not None
+    context[_AUTOMATIC_RETRY_KEY] = automatic_retry
+    try:
+        return _query_context_json(context)
+    except ValueError as exc:
+        raise _ReconciliationRowClassificationError from exc
 
 
 def _input_evidence_set_sha256(
@@ -1663,23 +1723,25 @@ class SecurityLifecycleFactKernel:
                             context.get(_AUTOMATIC_RETRY_KEY)
                         )
                         if retry is not None:
-                            chain = _attempt_chain(self.conn, existing_id)
                             retry_class = str(retry["class"])
-                            retry_count = sum(
-                                1
-                                for item in chain
-                                if item["status"] == "failed"
-                                and item["failure_code"] == retry_class
-                            )
                             retry_not_before = retry["retry_not_before"]
-                            due_failed_retry = (
+                            if (
                                 row["failure_code"] == retry_class
-                                and retry_count
-                                <= len(_AUTOMATIC_RETRY_DELAYS[retry_class])
                                 and retry_not_before is not None
-                                and _instant(timestamp)
-                                >= _instant(str(retry_not_before))
-                            )
+                            ):
+                                chain = _attempt_chain(self.conn, existing_id)
+                                retry_count = sum(
+                                    1
+                                    for item in chain
+                                    if item["status"] == "failed"
+                                    and item["failure_code"] == retry_class
+                                )
+                                due_failed_retry = (
+                                    retry_count
+                                    <= len(_AUTOMATIC_RETRY_DELAYS[retry_class])
+                                    and _instant(timestamp)
+                                    >= _instant(str(retry_not_before))
+                                )
                     if due_failed_retry or existing_revision != execution:
                         _attempt_chain(self.conn, existing_id)
                         predecessor_run_id = existing_id
@@ -2560,28 +2622,14 @@ class SecurityLifecycleFactKernel:
             for row in rows:
                 run_id = str(row["run_id"])
                 try:
-                    context = _query_context_value(row["query_context_json"])
-                    persisted_owner = context.get(_EXECUTION_OWNER_KEY)
-                    if persisted_owner is None:
-                        if requested_owner is not None:
-                            continue
-                    else:
-                        normalized_owner = _execution_owner_id(persisted_owner)
-                        if (
-                            requested_owner is not None
-                            and normalized_owner != requested_owner
-                        ):
-                            continue
-                    automatic_retry = _automatic_retry_for_failure(
+                    query_context_json = _reconciliation_retry_context(
                         self.conn,
+                        query_context_json=row["query_context_json"],
+                        requested_owner=requested_owner,
                         run_id=run_id,
-                        failure_code="internal_error",
                         failed_at=timestamp,
                     )
-                    assert automatic_retry is not None
-                    context[_AUTOMATIC_RETRY_KEY] = automatic_retry
-                    query_context_json = _query_context_json(context)
-                except ValueError:
+                except _ReconciliationRowClassificationError:
                     cursor = self.conn.execute(
                         "UPDATE security_lifecycle_automation_runs SET "
                         "status='failed',decision_tier=NULL,action_readiness=NULL,"
@@ -2597,6 +2645,8 @@ class SecurityLifecycleFactKernel:
                     )
                     if cursor.rowcount != 1:
                         raise RuntimeError("automation_run_reconciliation_lost")
+                    continue
+                if query_context_json is None:
                     continue
                 cursor = self.conn.execute(
                     "UPDATE security_lifecycle_automation_runs SET "

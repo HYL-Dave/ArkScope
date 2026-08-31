@@ -1476,6 +1476,50 @@ def test_reconcile_records_the_unclassifiable_row_rather_than_skipping_silently(
     assert "automatic_retry" not in context
 
 
+def test_reconcile_propagates_unrelated_value_error_and_rolls_back(monkeypatch):
+    from src import security_lifecycle_fact_kernel as fact_kernel
+
+    _conn, store, kernel, first_case_id = _context()
+    second_case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0001409970-26-000132",
+        ticker="HAPN",
+        at=_AT,
+    )
+    first = _reserve(kernel, first_case_id)
+    second = _reserve(
+        kernel,
+        second_case_id,
+        observation_fingerprint_sha256="b" * 64,
+    )
+    real_retry_for_failure = fact_kernel._automatic_retry_for_failure
+
+    def retry_for_failure(conn, *, run_id, failure_code, failed_at):
+        if run_id == second.run_id:
+            raise ValueError("injected_reconciliation_programming_error")
+        return real_retry_for_failure(
+            conn,
+            run_id=run_id,
+            failure_code=failure_code,
+            failed_at=failed_at,
+        )
+
+    monkeypatch.setattr(
+        fact_kernel,
+        "_automatic_retry_for_failure",
+        retry_for_failure,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="injected_reconciliation_programming_error",
+    ):
+        kernel.reconcile_running_runs(at=_LATER)
+
+    assert store.get_automation_run(first.run_id)["status"] == "running"
+    assert store.get_automation_run(second.run_id)["status"] == "running"
+
+
 def test_legacy_failed_predecessor_field_remains_chain_readable():
     _conn, store, kernel, case_id = _context()
     first = _reserve(kernel, case_id, execution_revision="execution-r0")
@@ -1666,6 +1710,7 @@ def test_malformed_legacy_predecessor_field_fails_closed():
 
 def _over_long_running_attempt(kernel, case_id):
     claim = _reserve(kernel, case_id)
+    boundary_run_id = claim.run_id
     for ordinal in range(32):
         kernel.fail_run(
             run_id=claim.run_id,
@@ -1679,12 +1724,12 @@ def _over_long_running_attempt(kernel, case_id):
             allow_new_attempt=True,
             at=f"2026-08-25T02:{ordinal:02d}:30Z",
         )
-    return claim
+    return claim, boundary_run_id
 
 
 def test_over_long_predecessor_chain_exhausts_retries_without_raising():
     _conn, store, kernel, case_id = _context()
-    claim = _over_long_running_attempt(kernel, case_id)
+    claim, _boundary_run_id = _over_long_running_attempt(kernel, case_id)
 
     failed = kernel.fail_run(
         run_id=claim.run_id,
@@ -1703,9 +1748,32 @@ def test_over_long_predecessor_chain_exhausts_retries_without_raising():
     assert store.get_automation_run(claim.run_id)["status"] != "running"
 
 
+def test_unattended_admission_parks_an_exhausted_over_long_failure():
+    _conn, store, kernel, case_id = _context()
+    claim, _boundary_run_id = _over_long_running_attempt(kernel, case_id)
+    failed = kernel.fail_run(
+        run_id=claim.run_id,
+        failure_code="internal_error",
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:32:00Z",
+    )
+
+    parked = _reserve(
+        kernel,
+        case_id,
+        allow_due_failed_retry=True,
+        at="2099-08-25T02:32:00Z",
+    )
+
+    assert parked.should_execute is False
+    assert parked.run_id == failed["run_id"]
+    assert parked.status == "failed"
+    assert len(store.list_automation_runs(case_id)) == 33
+
+
 def test_per_case_run_button_cannot_grow_an_unbounded_predecessor_chain():
     _conn, store, kernel, case_id = _context()
-    claim = _over_long_running_attempt(kernel, case_id)
+    claim, _boundary_run_id = _over_long_running_attempt(kernel, case_id)
     kernel.fail_run(
         run_id=claim.run_id,
         failure_code="extractor_failed",
@@ -1721,6 +1789,87 @@ def test_per_case_run_button_cannot_grow_an_unbounded_predecessor_chain():
             at="2026-08-25T02:32:30Z",
         )
     assert len(store.list_automation_runs(case_id)) == 33
+
+
+def _corrupt_attempt_chain_boundary(
+    store,
+    *,
+    boundary_run_id,
+    case_id,
+    corruption,
+):
+    from src.security_lifecycle_fact_kernel import automation_run_key
+
+    if corruption == "missing_row":
+        store.conn.execute(
+            "DELETE FROM security_lifecycle_automation_runs WHERE run_id=?",
+            (boundary_run_id,),
+        )
+        store.conn.commit()
+        return
+
+    context = json.loads(
+        store.get_automation_run(boundary_run_id)["query_context_json"]
+    )
+    if corruption == "malformed_field":
+        context["predecessor_run_id"] = {"run_id": "slar_malformed"}
+    elif corruption == "cycle":
+        context["predecessor_run_id"] = boundary_run_id
+    elif corruption == "semantic_run_key":
+        context["semantic_run_key"] = "lifecycle-automation-v1:" + "f" * 64
+    elif corruption == "semantic_identity":
+        context["input_evidence_set_sha256"] = "b" * 64
+        context["semantic_run_key"] = automation_run_key(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            policy_version="trusted-lifecycle-v1",
+            mode="historical",
+            input_evidence_set_sha256="b" * 64,
+        )
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (
+            json.dumps(context, separators=(",", ":"), sort_keys=True),
+            boundary_run_id,
+        ),
+    )
+    store.conn.commit()
+
+
+@pytest.mark.parametrize(
+    ("corruption", "error"),
+    (
+        ("missing_row", "automation_predecessor_chain"),
+        ("malformed_field", "automation_predecessor_chain"),
+        ("cycle", "automation_predecessor_cycle"),
+        ("semantic_run_key", "automation_predecessor_semantic_run_key"),
+        ("semantic_identity", "automation_predecessor_semantic_identity"),
+    ),
+)
+def test_over_long_chain_validates_boundary_corruption_before_exhaustion(
+    corruption,
+    error,
+):
+    _conn, store, kernel, case_id = _context()
+    running, boundary_run_id = _over_long_running_attempt(kernel, case_id)
+    _corrupt_attempt_chain_boundary(
+        store,
+        boundary_run_id=boundary_run_id,
+        case_id=case_id,
+        corruption=corruption,
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        kernel.fail_run(
+            run_id=running.run_id,
+            failure_code="internal_error",
+            diagnostics={"failures": 1},
+            at="2026-08-25T02:32:00Z",
+        )
+
+    assert exc_info.value.args == (error,)
+    assert store.get_automation_run(running.run_id)["status"] == "running"
 
 
 @pytest.mark.parametrize(
