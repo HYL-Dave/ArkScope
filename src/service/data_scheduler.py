@@ -1506,7 +1506,8 @@ def reconcile_interrupted_runtime_state(
                     error=(
                         "sidecar restarted before lifecycle automation reached "
                         "a terminal outcome"
-                    )
+                    ),
+                    excluded_sources=("security_lifecycle.automation",),
                 )
             except Exception:  # noqa: BLE001 — no remaining safe startup repair
                 pass

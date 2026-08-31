@@ -2647,6 +2647,106 @@ def test_durable_status_reader_validates_envelope_and_returns_latest_failed_case
     assert "private_count" not in rendered
 
 
+def test_typed_write_recovers_a_lifecycle_state_row_poisoned_by_a_foreign_blob(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "foreign-state-profile.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    state_store = SchedulerStateStore(profile_path)
+    state_store.record_attempt("security_lifecycle.automation", _NOW)
+    assert state_store.reconcile_interrupted_running(
+        error="generic scheduler interruption"
+    ) == ["security_lifecycle.automation"]
+    assert state_store.get("security_lifecycle.automation")["last_result"] == {
+        "source": "security_lifecycle.automation",
+        "status": "failed",
+        "error": "generic scheduler interruption",
+        "last_attempt": "2026-08-25T13:00:00+0000",
+    }
+
+    result = _v2_summary()
+    assert scheduler.record_security_lifecycle_automation_result(
+        result,
+        now=_NOW,
+    )
+
+    state = state_store.get("security_lifecycle.automation")
+    assert state["last_status"] == "succeeded"
+    assert state["last_error"] is None
+    assert state["last_result"] == {
+        "state_version": 1,
+        "latest_result": result,
+        "active_incident": None,
+    }
+    durable = scheduler.read_security_lifecycle_automation_durable_status(
+        profile_path
+    )
+    assert durable["telemetry_status"] == "valid"
+    assert durable["latest_result"] == result
+    assert durable["active_incident"] is None
+
+
+def test_malformed_lifecycle_envelope_is_still_rejected(tmp_path, monkeypatch):
+    from src.scheduler_state import SchedulerStateStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    malformed_values = (
+        ("malformed-json", "{"),
+        (
+            "missing-field",
+            json.dumps(
+                {
+                    "state_version": 1,
+                    "latest_result": _v2_summary(),
+                }
+            ),
+        ),
+        (
+            "wrong-version",
+            json.dumps(
+                {
+                    "state_version": 2,
+                    "latest_result": _v2_summary(),
+                    "active_incident": None,
+                }
+            ),
+        ),
+    )
+
+    for label, malformed in malformed_values:
+        profile_path = tmp_path / f"{label}.db"
+        JobRunsLocalStore(profile_path)
+        monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+        state_store = SchedulerStateStore(profile_path)
+        state_store.record_attempt("security_lifecycle.automation", _NOW)
+        with sqlite3.connect(profile_path) as conn:
+            conn.execute(
+                "UPDATE scheduler_state SET last_result=? WHERE source=?",
+                (malformed, "security_lifecycle.automation"),
+            )
+
+        with pytest.raises(ValueError, match="automation_scheduler_state"):
+            scheduler._state_envelope(malformed)
+        assert not scheduler.record_security_lifecycle_automation_result(
+            _v2_summary(),
+            now=_NOW,
+        )
+        with sqlite3.connect(profile_path) as conn:
+            row = conn.execute(
+                "SELECT last_status,last_result FROM scheduler_state "
+                "WHERE source=?",
+                ("security_lifecycle.automation",),
+            ).fetchone()
+        assert row == ("running", malformed)
+
+
 def test_startup_reconciliation_terminalizes_orphan_under_lifecycle_lock(
     tmp_path,
     monkeypatch,

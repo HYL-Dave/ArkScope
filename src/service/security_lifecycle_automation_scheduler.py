@@ -2726,6 +2726,26 @@ def _reconcile_active_incident(
     )
 
 
+def _is_generic_scheduler_result(raw: object) -> bool:
+    if not isinstance(raw, str):
+        return False
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return False
+    return (
+        isinstance(value, Mapping)
+        and set(value) == {"source", "status", "error", "last_attempt"}
+        and value.get("source") == _JOB_NAME
+        and value.get("status") == "failed"
+        and isinstance(value.get("error"), str)
+        and (
+            value.get("last_attempt") is None
+            or isinstance(value.get("last_attempt"), str)
+        )
+    )
+
+
 def _load_active_incident(
     conn: sqlite3.Connection,
     latest_witness: sqlite3.Row | None,
@@ -2735,7 +2755,10 @@ def _load_active_incident(
         (_JOB_NAME,),
     ).fetchone()
     if state_row is not None:
-        envelope = _state_envelope(state_row["last_result"])
+        raw_state = state_row["last_result"]
+        if _is_generic_scheduler_result(raw_state):
+            return None
+        envelope = _state_envelope(raw_state)
         if envelope is not None:
             return envelope["active_incident"]
     if latest_witness is None or latest_witness["status"] != "failed":

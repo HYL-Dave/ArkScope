@@ -2840,7 +2840,7 @@ def test_lifecycle_startup_reconciliation_failure_replaces_running_telemetry(
     }
 
 
-def test_lifecycle_startup_reconciliation_uses_terminal_fallback_when_typed_write_fails(
+def test_startup_fallback_never_writes_a_foreign_blob_to_the_lifecycle_source(
     tmp_path,
     monkeypatch,
 ):
@@ -2848,14 +2848,24 @@ def test_lifecycle_startup_reconciliation_uses_terminal_fallback_when_typed_writ
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "missing-market.db"))
     monkeypatch.setattr(ds, "_SCHED_STATE", None)
-    ds._state_store().record_attempt(
+    state_store = ds._state_store()
+    state_store.record_attempt(
         "security_lifecycle.automation",
         datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc),
     )
+
+    def unavailable(*, now):
+        assert now == datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+        state_store.record_attempt(
+            "polygon_news",
+            datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc),
+        )
+        raise RuntimeError("private repair")
+
     monkeypatch.setattr(
         ds,
         "reconcile_interrupted_security_lifecycle_automation",
-        lambda *, now: (_ for _ in ()).throw(RuntimeError("private repair")),
+        unavailable,
     )
     monkeypatch.setattr(
         ds,
@@ -2867,11 +2877,21 @@ def test_lifecycle_startup_reconciliation_uses_terminal_fallback_when_typed_writ
         now=datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
     )
 
-    assert (
-        ds._state_store()
-        .get("security_lifecycle.automation")["last_status"]
-        == "failed"
-    )
+    lifecycle = state_store.get("security_lifecycle.automation")
+    assert lifecycle["last_status"] == "running"
+    assert lifecycle["last_result"] is None
+
+    fallback = state_store.get("polygon_news")
+    assert fallback["last_status"] == "failed"
+    assert fallback["last_result"] == {
+        "source": "polygon_news",
+        "status": "failed",
+        "error": (
+            "sidecar restarted before lifecycle automation reached "
+            "a terminal outcome"
+        ),
+        "last_attempt": "2026-06-24T10:00:00+0000",
+    }
 
 
 def test_v14a_status_snapshot_no_create_on_fresh_db(tmp_path, monkeypatch):
