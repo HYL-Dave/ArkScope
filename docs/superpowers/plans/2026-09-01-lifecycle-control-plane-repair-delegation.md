@@ -46,7 +46,7 @@ misreports recovery 30 seconds later.
 
 ---
 
-## T0 — Ship `enabled=False` as the automation default
+## Task 0 (T0) — Ship `enabled=False` as the automation default
 
 Independent of everything else, and it removes the sequencing hazard immediately,
 so it goes first.
@@ -75,7 +75,7 @@ enabled, and they are already owner-tested.
 
 ---
 
-## T1 — F1: get the chain walk off the recovery path, and fault-isolate reclamation — **BLOCKER**
+## Task 1 (T1) — F1: get the chain walk off the recovery path, and fault-isolate reclamation — **BLOCKER**
 
 The only defect with cross-case blast radius. It disables the exact orphan
 reclamation this branch was built to add.
@@ -131,7 +131,7 @@ reaching the poisoned row.
 
 ---
 
-## T2 — F2: stop the startup fallback poisoning the lifecycle state row — **BLOCKER**
+## Task 2 (T2) — F2: stop the startup fallback poisoning the lifecycle state row — **BLOCKER**
 
 **Defect**: `data_scheduler.py` calls `reconcile_interrupted_running` twice —
 line 1486 passes `excluded_sources=("security_lifecycle.automation",)`, **line
@@ -169,7 +169,7 @@ malformed lifecycle envelope too.
 
 ---
 
-## T3 — F3: separate "never asked" from "asked, answer not unique" — and surface the reason — **BLOCKER**
+## Task 3 (T3) — F3: separate "never asked" from "asked, answer not unique" — and surface the reason — **BLOCKER**
 
 **Defect**: the same blocker code is emitted from two sites that mean opposite
 things — `ibkr_evidence.py:481` (plan refused before any gateway call,
@@ -268,7 +268,7 @@ are byte-identical to `master` after this task.
 
 ---
 
-## T4 — F4: derive incident recovery from run state, not from a persisted record — **BLOCKER**
+## Task 4 (T4) — F4: derive incident recovery from run state, not from a persisted record — **BLOCKER**
 
 Promoted to blocker in round 3 on your argument: same permanence class as F2,
 higher reachability (F2 needs a nested double failure; F4 needs one swallowed
@@ -301,7 +301,7 @@ an incident whose case has not actually recovered.
 
 ---
 
-## T5 — F7: close the disposition vocabulary, and add the parity test
+## Task 5 (T5) — F7: close the disposition vocabulary, and add the parity test
 
 **Defect**: the branch adds a 21st backend reason,
 `automation_finalization_failure`, with no consumer. Frontend union = 20, label
@@ -332,7 +332,7 @@ if they fail, something else changed and stop.
 
 ---
 
-## T6 — F5: no backwards stage on the finalization-only path
+## Task 6 (T6) — F5: no backwards stage on the finalization-only path
 
 **Defect**: `_begin_progress(finalization_only=True)` seeds the registry at
 `finalize` (index 7); the shared tail at `worker.py:665-668` then emits
@@ -358,7 +358,7 @@ because that ordering guard is doing real work elsewhere.
 
 ---
 
-## T7 — F6: split the policy stop from the transient failure — including the test
+## Task 7 (T7) — F6: split the policy stop from the transient failure — including the test
 
 **This is a pinned contract, not an unowned regression** — you are right, and
 review verified it: `tests/test_ticker_identity_scheduler.py:637` asserts
@@ -532,7 +532,7 @@ recovery witness; break old-summary readback.
 
 ---
 
-## T8 — Own the two confirmed-unowned guards, and triage the rest
+## Task 8 (T8) — Own the two confirmed-unowned guards, and triage the rest
 
 The 32-mutation ledger is a **sample** of ~4,000 new product lines, not a census.
 Review's bounded census: of 63 new `raise` string constants, **22 have no mention
