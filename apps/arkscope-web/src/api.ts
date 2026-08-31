@@ -3192,6 +3192,9 @@ export interface SecurityLifecycleAutomationDispatchResponse {
 const AUTOMATION_STAGES: readonly SecurityLifecycleAutomationStage[] = [
   "preparing", "sec", "listing", "ibkr", "evaluate", "persist", "approve", "finalize",
 ];
+const AUTOMATION_TRIGGERS: readonly SecurityLifecycleAutomationTrigger[] = [
+  "scheduler", "manual_due", "manual_case",
+];
 const AUTOMATION_REASONS: readonly SecurityLifecycleAutomationFailureReason[] = [
   "already_running",
   "automation_schema_absent",
@@ -3379,7 +3382,7 @@ function parseAutomationStatus(value: unknown): SecurityLifecycleAutomationStatu
     current_progress: progress.map((item) => {
       const detail = automationRecord(item);
       return {
-        trigger: automationEnum(detail.trigger, ["scheduler", "manual_due", "manual_case"] as const),
+        trigger: automationEnum(detail.trigger, AUTOMATION_TRIGGERS),
         request_id: automationString(detail.request_id),
         case_id: automationString(detail.case_id),
         started_at: automationString(detail.started_at),

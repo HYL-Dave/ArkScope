@@ -36,6 +36,93 @@ class _UnsupportedVocabularyExpression(ValueError):
     pass
 
 
+def _python_root_name(node: ast.AST) -> str | None:
+    while isinstance(node, (ast.Attribute, ast.Subscript)):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+class _PythonAuthorityWriteVisitor(ast.NodeVisitor):
+    def __init__(self, name: str) -> None:
+        self._name = name
+        self.line: int | None = None
+
+    def _record(self, node: ast.AST) -> None:
+        if self.line is None:
+            self.line = getattr(node, "lineno", 0)
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if node.id == self._name and isinstance(node.ctx, (ast.Store, ast.Del)):
+            self._record(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if (
+            isinstance(node.ctx, (ast.Store, ast.Del))
+            and _python_root_name(node) == self._name
+        ):
+            self._record(node)
+        self.generic_visit(node)
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        if (
+            isinstance(node.ctx, (ast.Store, ast.Del))
+            and _python_root_name(node) == self._name
+        ):
+            self._record(node)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if (
+            isinstance(node.func, ast.Attribute)
+            and _python_root_name(node.func.value) == self._name
+        ):
+            self._record(node)
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if node.name == self._name:
+            self._record(node)
+        for value in (
+            *node.decorator_list,
+            *node.args.defaults,
+            *(default for default in node.args.kw_defaults if default is not None),
+        ):
+            self.visit(value)
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        if node.name == self._name:
+            self._record(node)
+        for value in (*node.decorator_list, *node.bases, *node.keywords):
+            self.visit(value)
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            if (alias.asname or alias.name.split(".", 1)[0]) == self._name:
+                self._record(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        for alias in node.names:
+            if (alias.asname or alias.name) == self._name:
+                self._record(node)
+
+    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+        if node.name == self._name:
+            self._record(node)
+        self.generic_visit(node)
+
+
+def _reject_python_authority_write(node: ast.AST, name: str) -> None:
+    visitor = _PythonAuthorityWriteVisitor(name)
+    visitor.visit(node)
+    if visitor.line is not None:
+        raise AssertionError(
+            f"unsupported Python vocabulary authority write: {name} "
+            f"at line {visitor.line}"
+        )
+
+
 def _python_string_members(
     node: ast.AST,
     known: dict[str, frozenset[str]],
@@ -81,17 +168,78 @@ def _python_string_authority(path: Path, name: str) -> frozenset[str]:
         if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
             target = statement.targets[0]
             value = statement.value
-        elif isinstance(statement, ast.AnnAssign):
+        elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
             target = statement.target
             value = statement.value
-        if not isinstance(target, ast.Name) or value is None:
+        supported_assignment = isinstance(target, ast.Name) and value is not None
+        if not supported_assignment or target.id != name:
+            _reject_python_authority_write(statement, name)
+        else:
+            _reject_python_authority_write(value, name)
+        if not supported_assignment:
             continue
         try:
             known[target.id] = _python_string_members(value, known)
-        except _UnsupportedVocabularyExpression:
+        except _UnsupportedVocabularyExpression as exc:
+            if target.id == name:
+                raise AssertionError(
+                    f"unsupported Python vocabulary authority write: {name} "
+                    f"at line {statement.lineno}"
+                ) from exc
             known.pop(target.id, None)
     assert name in known, f"closed Python vocabulary not found: {path}:{name}"
     return known[name]
+
+
+@pytest.mark.parametrize(
+    "unsupported_write",
+    (
+        pytest.param('VOCAB |= {"backend_only"}\n', id="augmented_assignment"),
+        pytest.param(
+            'VOCAB = ALIAS = frozenset({"shared", "backend_only"})\n',
+            id="chained_assignment",
+        ),
+        pytest.param(
+            'if True:\n    VOCAB = frozenset({"shared", "backend_only"})\n',
+            id="conditional_assignment",
+        ),
+        pytest.param('VOCAB.add("backend_only")\n', id="mutating_add"),
+        pytest.param(
+            'VOCAB.update({"backend_only"})\n', id="mutating_update"
+        ),
+    ),
+)
+def test_python_authority_parser_rejects_unsupported_module_level_writes(
+    tmp_path: Path,
+    unsupported_write: str,
+) -> None:
+    source_path = tmp_path / "authority.py"
+    source_path.write_text(
+        'VOCAB = set({"shared"})\n' + unsupported_write,
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match=r"unsupported Python vocabulary authority write: VOCAB",
+    ):
+        _python_string_authority(source_path, "VOCAB")
+
+
+def test_python_authority_parser_preserves_supported_source_order(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "authority.py"
+    source_path.write_text(
+        'VOCAB = frozenset({"historical"})\n'
+        "SNAPSHOT = VOCAB\n"
+        'VOCAB = SNAPSHOT | {"current"}\n',
+        encoding="utf-8",
+    )
+
+    assert _python_string_authority(source_path, "VOCAB") == frozenset(
+        {"historical", "current"}
+    )
 
 
 def _typescript_literal_members(body: str, *, separator: str) -> frozenset[str]:
@@ -104,10 +252,87 @@ def _typescript_literal_members(body: str, *, separator: str) -> frozenset[str]:
     return frozenset(json.loads(literal) for literal in literals)
 
 
+def _typescript_code_mask(source: str) -> str:
+    masked = list(source)
+    length = len(source)
+    index = 0
+
+    def mask(start: int, end: int) -> None:
+        for position in range(start, end):
+            if source[position] not in "\r\n":
+                masked[position] = " "
+
+    while index < length:
+        if source.startswith("//", index):
+            start = index
+            newline = source.find("\n", index + 2)
+            index = length if newline < 0 else newline
+            mask(start, index)
+            continue
+        if source.startswith("/*", index):
+            start = index
+            end = source.find("*/", index + 2)
+            assert end >= 0, "unterminated TypeScript block comment"
+            index = end + 2
+            mask(start, index)
+            continue
+        if source[index] in ('"', "'", "`"):
+            start = index
+            delimiter = source[index]
+            index += 1
+            while index < length:
+                if source[index] == "\\":
+                    assert index + 1 < length, (
+                        "unterminated TypeScript string or template literal"
+                    )
+                    if (
+                        source[index + 1] == "\r"
+                        and index + 2 < length
+                        and source[index + 2] == "\n"
+                    ):
+                        index += 3
+                    else:
+                        index += 2
+                    continue
+                if source[index] == delimiter:
+                    index += 1
+                    break
+                assert delimiter == "`" or source[index] not in "\r\n", (
+                    "unterminated TypeScript string literal"
+                )
+                index += 1
+            else:
+                raise AssertionError(
+                    "unterminated TypeScript string or template literal"
+                )
+            mask(start, index)
+            continue
+        index += 1
+
+    return "".join(masked)
+
+
+def _typescript_declaration(
+    source: str,
+    name: str,
+    pattern: str,
+) -> tuple[str, re.Match[str]]:
+    code = _typescript_code_mask(source)
+    declarations = list(re.finditer(pattern, code))
+    assert len(declarations) == 1, (
+        f"expected exactly one syntactic TypeScript declaration: {name}; "
+        f"found {len(declarations)}"
+    )
+    return code, declarations[0]
+
+
 def _typescript_string_union(source: str, name: str) -> frozenset[str]:
-    declaration = re.search(rf"\bexport\s+type\s+{re.escape(name)}\s*=", source)
-    assert declaration is not None, f"closed TypeScript union not found: {name}"
-    end = source.find(";", declaration.end())
+    code, declaration = _typescript_declaration(
+        source,
+        name,
+        rf"\bexport\s+type\s+{re.escape(name)}\s*=",
+    )
+    end = code.find(";", declaration.end())
     assert end >= 0, f"unterminated TypeScript union: {name}"
     return _typescript_literal_members(
         source[declaration.end() : end], separator="|"
@@ -115,15 +340,113 @@ def _typescript_string_union(source: str, name: str) -> frozenset[str]:
 
 
 def _typescript_string_array(source: str, name: str) -> frozenset[str]:
-    declaration = re.search(
-        rf"\bconst\s+{re.escape(name)}\b[^=]*=\s*\[", source
+    code, declaration = _typescript_declaration(
+        source,
+        name,
+        rf"\bconst\s+{re.escape(name)}\b[^=;]*=\s*\[",
     )
-    assert declaration is not None, f"closed TypeScript array not found: {name}"
-    end = source.find("];", declaration.end())
+    end = code.find("]", declaration.end())
     assert end >= 0, f"unterminated TypeScript array: {name}"
+    semicolon = end + 1
+    while semicolon < len(code) and code[semicolon].isspace():
+        semicolon += 1
+    assert semicolon < len(code) and code[semicolon] == ";", (
+        f"unterminated TypeScript array: {name}"
+    )
     return _typescript_literal_members(
         source[declaration.end() : end], separator=","
     )
+
+
+@pytest.mark.parametrize(
+    "decoy",
+    (
+        pytest.param(
+            '// export type Example = "comment_only";\n',
+            id="line_comment",
+        ),
+        pytest.param(
+            '/* export type Example = "comment_only"; */\n',
+            id="block_comment",
+        ),
+        pytest.param(
+            "const decoy = 'export type Example = \\\"string_only\\\";';\n",
+            id="single_quoted_string",
+        ),
+        pytest.param(
+            'const decoy = "export type Example = \'string_only\';";\n',
+            id="double_quoted_string",
+        ),
+        pytest.param(
+            'const decoy = `export type Example = "template_only";`;\n',
+            id="template_literal",
+        ),
+    ),
+)
+def test_typescript_union_parser_ignores_non_code_declaration_decoys(
+    tmp_path: Path,
+    decoy: str,
+) -> None:
+    source_path = tmp_path / "authority.ts"
+    source_path.write_text(
+        decoy + 'export type Example = "shared" | "frontend_only";\n',
+        encoding="utf-8",
+    )
+
+    assert _typescript_string_union(
+        source_path.read_text(encoding="utf-8"), "Example"
+    ) == frozenset({"shared", "frontend_only"})
+
+
+def test_typescript_array_parser_ignores_non_code_declaration_decoys(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "authority.ts"
+    source_path.write_text(
+        '/* const EXAMPLE = ["comment_only"]; */\n'
+        "const single = 'const EXAMPLE = [\\\"string_only\\\"];';\n"
+        'const template = `const EXAMPLE = ["template_only"];`;\n'
+        'const EXAMPLE = ["shared", "frontend_only"];\n',
+        encoding="utf-8",
+    )
+
+    assert _typescript_string_array(
+        source_path.read_text(encoding="utf-8"), "EXAMPLE"
+    ) == frozenset({"shared", "frontend_only"})
+
+
+@pytest.mark.parametrize(
+    ("source", "parser", "name"),
+    (
+        pytest.param(
+            'export type Example = "first";\n'
+            'export type Example = "second";\n',
+            _typescript_string_union,
+            "Example",
+            id="union",
+        ),
+        pytest.param(
+            'const EXAMPLE = ["first"];\nconst EXAMPLE = ["second"];\n',
+            _typescript_string_array,
+            "EXAMPLE",
+            id="array",
+        ),
+    ),
+)
+def test_typescript_authority_parser_rejects_duplicate_declarations(
+    tmp_path: Path,
+    source: str,
+    parser,
+    name: str,
+) -> None:
+    source_path = tmp_path / "authority.ts"
+    source_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(
+        AssertionError,
+        match=rf"exactly one syntactic TypeScript declaration: {name}",
+    ):
+        parser(source_path.read_text(encoding="utf-8"), name)
 
 
 def _vocabulary_mismatches(
@@ -208,6 +531,9 @@ def test_backend_and_frontend_lifecycle_vocabularies_have_exact_parity():
     )
     assert backend["automation_triggers"] == _python_string_authority(
         _AUTOMATION_RUNTIME_SOURCE, "_LIFECYCLE_AUTOMATION_TRIGGERS"
+    )
+    assert frontend["automation_triggers"] == _typescript_string_array(
+        frontend_source, "AUTOMATION_TRIGGERS"
     )
     assert backend == frontend, _vocabulary_mismatches(backend, frontend)
 
