@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
-import re
+import subprocess
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -17,436 +17,135 @@ from src.security_lifecycle_disposition import (
     next_lifecycle_recheck_at,
     project_lifecycle_disposition,
 )
+from src.security_lifecycle_schema import AUTOMATION_BLOCKER_CODES
+from src.service.security_lifecycle_automation_runtime import (
+    LIFECYCLE_AUTOMATION_STAGE_ORDER,
+    LifecycleAutomationStage,
+    LifecycleAutomationTrigger,
+    _LIFECYCLE_AUTOMATION_TRIGGERS,
+)
+from src.service.security_lifecycle_automation_scheduler import (
+    _REASONS as LIFECYCLE_AUTOMATION_FAILURE_REASONS,
+)
 
 
 _ROOT = Path(__file__).resolve().parents[1]
-_DISPOSITION_SOURCE = _ROOT / "src/security_lifecycle_disposition.py"
-_SCHEMA_SOURCE = _ROOT / "src/security_lifecycle_schema.py"
-_AUTOMATION_RUNTIME_SOURCE = (
-    _ROOT / "src/service/security_lifecycle_automation_runtime.py"
-)
-_AUTOMATION_SCHEDULER_SOURCE = (
-    _ROOT / "src/service/security_lifecycle_automation_scheduler.py"
-)
 _FRONTEND_API_SOURCE = _ROOT / "apps/arkscope-web/src/api.ts"
-_TYPESCRIPT_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
+_TYPESCRIPT_AUTHORITY_CLI = _ROOT / "tests/typescript_vocabulary_authority.cjs"
 
 
-class _UnsupportedVocabularyExpression(ValueError):
-    pass
-
-
-def _python_root_name(node: ast.AST) -> str | None:
-    while isinstance(node, (ast.Attribute, ast.Subscript)):
-        node = node.value
-    return node.id if isinstance(node, ast.Name) else None
-
-
-class _PythonAuthorityWriteVisitor(ast.NodeVisitor):
-    def __init__(self, name: str) -> None:
-        self._name = name
-        self.line: int | None = None
-
-    def _record(self, node: ast.AST) -> None:
-        if self.line is None:
-            self.line = getattr(node, "lineno", 0)
-
-    def visit_Name(self, node: ast.Name) -> None:
-        if node.id == self._name and isinstance(node.ctx, (ast.Store, ast.Del)):
-            self._record(node)
-
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        if (
-            isinstance(node.ctx, (ast.Store, ast.Del))
-            and _python_root_name(node) == self._name
-        ):
-            self._record(node)
-        self.generic_visit(node)
-
-    def visit_Subscript(self, node: ast.Subscript) -> None:
-        if (
-            isinstance(node.ctx, (ast.Store, ast.Del))
-            and _python_root_name(node) == self._name
-        ):
-            self._record(node)
-        self.generic_visit(node)
-
-    def visit_Call(self, node: ast.Call) -> None:
-        if (
-            isinstance(node.func, ast.Attribute)
-            and _python_root_name(node.func.value) == self._name
-        ):
-            self._record(node)
-        self.generic_visit(node)
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        if node.name == self._name:
-            self._record(node)
-        for value in (
-            *node.decorator_list,
-            *node.args.defaults,
-            *(default for default in node.args.kw_defaults if default is not None),
-        ):
-            self.visit(value)
-
-    visit_AsyncFunctionDef = visit_FunctionDef
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        if node.name == self._name:
-            self._record(node)
-        for value in (*node.decorator_list, *node.bases, *node.keywords):
-            self.visit(value)
-
-    def visit_Import(self, node: ast.Import) -> None:
-        for alias in node.names:
-            if (alias.asname or alias.name.split(".", 1)[0]) == self._name:
-                self._record(node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        for alias in node.names:
-            if (alias.asname or alias.name) == self._name:
-                self._record(node)
-
-    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
-        if node.name == self._name:
-            self._record(node)
-        self.generic_visit(node)
-
-
-def _reject_python_authority_write(node: ast.AST, name: str) -> None:
-    visitor = _PythonAuthorityWriteVisitor(name)
-    visitor.visit(node)
-    if visitor.line is not None:
-        raise AssertionError(
-            f"unsupported Python vocabulary authority write: {name} "
-            f"at line {visitor.line}"
-        )
-
-
-def _python_string_members(
-    node: ast.AST,
-    known: dict[str, frozenset[str]],
-) -> frozenset[str]:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return frozenset({node.value})
-    if isinstance(node, (ast.List, ast.Set, ast.Tuple)):
-        members: set[str] = set()
-        for item in node.elts:
-            members.update(_python_string_members(item, known))
-        return frozenset(members)
-    if isinstance(node, ast.Name):
-        if node.id not in known:
-            raise _UnsupportedVocabularyExpression(node.id)
-        return known[node.id]
-    if (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id in {"frozenset", "set", "tuple"}
-        and len(node.args) == 1
-        and not node.keywords
-    ):
-        return _python_string_members(node.args[0], known)
-    if (
-        isinstance(node, ast.Subscript)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "Literal"
-    ):
-        return _python_string_members(node.slice, known)
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _python_string_members(node.left, known) | _python_string_members(
-            node.right, known
-        )
-    raise _UnsupportedVocabularyExpression(ast.dump(node, include_attributes=False))
-
-
-def _python_string_authority(path: Path, name: str) -> frozenset[str]:
-    known: dict[str, frozenset[str]] = {}
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    for statement in tree.body:
-        target: ast.AST | None = None
-        value: ast.AST | None = None
-        if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
-            target = statement.targets[0]
-            value = statement.value
-        elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
-            target = statement.target
-            value = statement.value
-        supported_assignment = isinstance(target, ast.Name) and value is not None
-        if not supported_assignment or target.id != name:
-            _reject_python_authority_write(statement, name)
-        else:
-            _reject_python_authority_write(value, name)
-        if not supported_assignment:
-            continue
-        try:
-            known[target.id] = _python_string_members(value, known)
-        except _UnsupportedVocabularyExpression as exc:
-            if target.id == name:
-                raise AssertionError(
-                    f"unsupported Python vocabulary authority write: {name} "
-                    f"at line {statement.lineno}"
-                ) from exc
-            known.pop(target.id, None)
-    assert name in known, f"closed Python vocabulary not found: {path}:{name}"
-    return known[name]
-
-
-@pytest.mark.parametrize(
-    "unsupported_write",
-    (
-        pytest.param('VOCAB |= {"backend_only"}\n', id="augmented_assignment"),
-        pytest.param(
-            'VOCAB = ALIAS = frozenset({"shared", "backend_only"})\n',
-            id="chained_assignment",
-        ),
-        pytest.param(
-            'if True:\n    VOCAB = frozenset({"shared", "backend_only"})\n',
-            id="conditional_assignment",
-        ),
-        pytest.param('VOCAB.add("backend_only")\n', id="mutating_add"),
-        pytest.param(
-            'VOCAB.update({"backend_only"})\n', id="mutating_update"
-        ),
-    ),
-)
-def test_python_authority_parser_rejects_unsupported_module_level_writes(
-    tmp_path: Path,
-    unsupported_write: str,
-) -> None:
-    source_path = tmp_path / "authority.py"
-    source_path.write_text(
-        'VOCAB = set({"shared"})\n' + unsupported_write,
-        encoding="utf-8",
+def _typescript_compiler_authorities(
+    source_path: Path,
+    requests: dict[str, dict[str, str]],
+) -> dict[str, frozenset[str]]:
+    completed = subprocess.run(
+        [
+            "node",
+            str(_TYPESCRIPT_AUTHORITY_CLI),
+            str(source_path),
+            json.dumps(requests),
+        ],
+        cwd=_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
     )
-
-    with pytest.raises(
-        AssertionError,
-        match=r"unsupported Python vocabulary authority write: VOCAB",
-    ):
-        _python_string_authority(source_path, "VOCAB")
-
-
-def test_python_authority_parser_preserves_supported_source_order(
-    tmp_path: Path,
-) -> None:
-    source_path = tmp_path / "authority.py"
-    source_path.write_text(
-        'VOCAB = frozenset({"historical"})\n'
-        "SNAPSHOT = VOCAB\n"
-        'VOCAB = SNAPSHOT | {"current"}\n',
-        encoding="utf-8",
+    assert completed.returncode == 0, completed.stderr
+    decoded = json.loads(completed.stdout)
+    assert set(decoded) == set(requests)
+    assert all(
+        isinstance(members, list)
+        and members
+        and all(isinstance(member, str) for member in members)
+        for members in decoded.values()
     )
-
-    assert _python_string_authority(source_path, "VOCAB") == frozenset(
-        {"historical", "current"}
-    )
+    return {name: frozenset(members) for name, members in decoded.items()}
 
 
-def _typescript_literal_members(body: str, *, separator: str) -> frozenset[str]:
-    literals = _TYPESCRIPT_STRING.findall(body)
-    remainder = _TYPESCRIPT_STRING.sub("", body)
-    assert literals, "closed TypeScript vocabulary has no string literals"
-    assert re.fullmatch(rf"[\s{re.escape(separator)}]*", remainder), (
-        f"unsupported TypeScript vocabulary expression: {body.strip()}"
-    )
-    return frozenset(json.loads(literal) for literal in literals)
-
-
-def _typescript_code_mask(source: str) -> str:
-    masked = list(source)
-    length = len(source)
-    index = 0
-
-    def mask(start: int, end: int) -> None:
-        for position in range(start, end):
-            if source[position] not in "\r\n":
-                masked[position] = " "
-
-    while index < length:
-        if source.startswith("//", index):
-            start = index
-            newline = source.find("\n", index + 2)
-            index = length if newline < 0 else newline
-            mask(start, index)
-            continue
-        if source.startswith("/*", index):
-            start = index
-            end = source.find("*/", index + 2)
-            assert end >= 0, "unterminated TypeScript block comment"
-            index = end + 2
-            mask(start, index)
-            continue
-        if source[index] in ('"', "'", "`"):
-            start = index
-            delimiter = source[index]
-            index += 1
-            while index < length:
-                if source[index] == "\\":
-                    assert index + 1 < length, (
-                        "unterminated TypeScript string or template literal"
-                    )
-                    if (
-                        source[index + 1] == "\r"
-                        and index + 2 < length
-                        and source[index + 2] == "\n"
-                    ):
-                        index += 3
-                    else:
-                        index += 2
-                    continue
-                if source[index] == delimiter:
-                    index += 1
-                    break
-                assert delimiter == "`" or source[index] not in "\r\n", (
-                    "unterminated TypeScript string literal"
-                )
-                index += 1
-            else:
-                raise AssertionError(
-                    "unterminated TypeScript string or template literal"
-                )
-            mask(start, index)
-            continue
-        index += 1
-
-    return "".join(masked)
-
-
-def _typescript_declaration(
-    source: str,
-    name: str,
-    pattern: str,
-) -> tuple[str, re.Match[str]]:
-    code = _typescript_code_mask(source)
-    declarations = list(re.finditer(pattern, code))
-    assert len(declarations) == 1, (
-        f"expected exactly one syntactic TypeScript declaration: {name}; "
-        f"found {len(declarations)}"
-    )
-    return code, declarations[0]
-
-
-def _typescript_string_union(source: str, name: str) -> frozenset[str]:
-    code, declaration = _typescript_declaration(
-        source,
-        name,
-        rf"\bexport\s+type\s+{re.escape(name)}\s*=",
-    )
-    end = code.find(";", declaration.end())
-    assert end >= 0, f"unterminated TypeScript union: {name}"
-    return _typescript_literal_members(
-        source[declaration.end() : end], separator="|"
-    )
-
-
-def _typescript_string_array(source: str, name: str) -> frozenset[str]:
-    code, declaration = _typescript_declaration(
-        source,
-        name,
-        rf"\bconst\s+{re.escape(name)}\b[^=;]*=\s*\[",
-    )
-    end = code.find("]", declaration.end())
-    assert end >= 0, f"unterminated TypeScript array: {name}"
-    semicolon = end + 1
-    while semicolon < len(code) and code[semicolon].isspace():
-        semicolon += 1
-    assert semicolon < len(code) and code[semicolon] == ";", (
-        f"unterminated TypeScript array: {name}"
-    )
-    return _typescript_literal_members(
-        source[declaration.end() : end], separator=","
-    )
-
-
-@pytest.mark.parametrize(
-    "decoy",
-    (
-        pytest.param(
-            '// export type Example = "comment_only";\n',
-            id="line_comment",
-        ),
-        pytest.param(
-            '/* export type Example = "comment_only"; */\n',
-            id="block_comment",
-        ),
-        pytest.param(
-            "const decoy = 'export type Example = \\\"string_only\\\";';\n",
-            id="single_quoted_string",
-        ),
-        pytest.param(
-            'const decoy = "export type Example = \'string_only\';";\n',
-            id="double_quoted_string",
-        ),
-        pytest.param(
-            'const decoy = `export type Example = "template_only";`;\n',
-            id="template_literal",
-        ),
-    ),
-)
-def test_typescript_union_parser_ignores_non_code_declaration_decoys(
-    tmp_path: Path,
-    decoy: str,
-) -> None:
-    source_path = tmp_path / "authority.ts"
-    source_path.write_text(
-        decoy + 'export type Example = "shared" | "frontend_only";\n',
-        encoding="utf-8",
-    )
-
-    assert _typescript_string_union(
-        source_path.read_text(encoding="utf-8"), "Example"
-    ) == frozenset({"shared", "frontend_only"})
-
-
-def test_typescript_array_parser_ignores_non_code_declaration_decoys(
+def test_typescript_compiler_uses_real_union_around_regex_template_decoy(
     tmp_path: Path,
 ) -> None:
     source_path = tmp_path / "authority.ts"
     source_path.write_text(
-        '/* const EXAMPLE = ["comment_only"]; */\n'
-        "const single = 'const EXAMPLE = [\\\"string_only\\\"];';\n"
-        'const template = `const EXAMPLE = ["template_only"];`;\n'
-        'const EXAMPLE = ["shared", "frontend_only"];\n',
+        "const before = /`/;\n"
+        'export type Example = "shared" | "frontend_only";\n'
+        'const decoy = `export type Example = "shared";`;\n'
+        "const after = /`/;\n",
         encoding="utf-8",
     )
 
-    assert _typescript_string_array(
-        source_path.read_text(encoding="utf-8"), "EXAMPLE"
-    ) == frozenset({"shared", "frontend_only"})
+    assert _typescript_compiler_authorities(
+        source_path,
+        {"example": {"kind": "type", "name": "Example"}},
+    ) == {"example": frozenset({"shared", "frontend_only"})}
 
 
 @pytest.mark.parametrize(
-    ("source", "parser", "name"),
+    ("source", "authority_request", "expected_error"),
     (
         pytest.param(
             'export type Example = "first";\n'
             'export type Example = "second";\n',
-            _typescript_string_union,
-            "Example",
-            id="union",
+            {"kind": "type", "name": "Example"},
+            "expected exactly one exported type alias named Example; found 2",
+            id="type_alias",
         ),
         pytest.param(
             'const EXAMPLE = ["first"];\nconst EXAMPLE = ["second"];\n',
-            _typescript_string_array,
-            "EXAMPLE",
-            id="array",
+            {"kind": "array", "name": "EXAMPLE"},
+            "expected exactly one const array declaration named EXAMPLE; found 2",
+            id="const_array",
         ),
     ),
 )
-def test_typescript_authority_parser_rejects_duplicate_declarations(
+def test_typescript_compiler_rejects_duplicate_authority_declarations(
     tmp_path: Path,
     source: str,
-    parser,
-    name: str,
+    authority_request: dict[str, str],
+    expected_error: str,
 ) -> None:
     source_path = tmp_path / "authority.ts"
     source_path.write_text(source, encoding="utf-8")
 
-    with pytest.raises(
-        AssertionError,
-        match=rf"exactly one syntactic TypeScript declaration: {name}",
-    ):
-        parser(source_path.read_text(encoding="utf-8"), name)
+    with pytest.raises(AssertionError) as error:
+        _typescript_compiler_authorities(
+            source_path, {"example": authority_request}
+        )
+    assert expected_error in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("source", "authority_request", "expected_error"),
+    (
+        pytest.param(
+            'type External = "other";\n'
+            'export type Example = "shared" | External;\n',
+            {"kind": "type", "name": "Example"},
+            "must be a closed string-literal union",
+            id="type_reference",
+        ),
+        pytest.param(
+            'const external = "other";\n'
+            'const EXAMPLE = ["shared", external];\n',
+            {"kind": "array", "name": "EXAMPLE"},
+            "must be a closed string-literal array",
+            id="array_reference",
+        ),
+    ),
+)
+def test_typescript_compiler_rejects_nonliteral_authorities(
+    tmp_path: Path,
+    source: str,
+    authority_request: dict[str, str],
+    expected_error: str,
+) -> None:
+    source_path = tmp_path / "authority.ts"
+    source_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(AssertionError, match=expected_error):
+        _typescript_compiler_authorities(
+            source_path, {"example": authority_request}
+        )
 
 
 def _vocabulary_mismatches(
@@ -464,76 +163,86 @@ def _vocabulary_mismatches(
 
 
 def test_backend_and_frontend_lifecycle_vocabularies_have_exact_parity():
-    frontend_source = _FRONTEND_API_SOURCE.read_text(encoding="utf-8")
     backend = {
-        "automation_stages": _python_string_authority(
-            _AUTOMATION_RUNTIME_SOURCE, "LifecycleAutomationStage"
-        ),
-        "failure_reasons": _python_string_authority(
-            _AUTOMATION_SCHEDULER_SOURCE, "_REASONS"
-        ),
-        "disposition_reasons": _python_string_authority(
-            _DISPOSITION_SOURCE, "LIFECYCLE_DISPOSITION_REASONS"
-        ),
-        "disposition_values": _python_string_authority(
-            _DISPOSITION_SOURCE, "LIFECYCLE_DISPOSITIONS"
-        ),
-        "queue_buckets": _python_string_authority(
-            _DISPOSITION_SOURCE, "LIFECYCLE_QUEUE_BUCKETS"
-        ),
-        "blocker_codes": _python_string_authority(
-            _SCHEMA_SOURCE, "AUTOMATION_BLOCKER_CODES"
-        ),
-        "automation_triggers": _python_string_authority(
-            _AUTOMATION_RUNTIME_SOURCE, "LifecycleAutomationTrigger"
-        ),
-        "source_family_states": _python_string_authority(
-            _DISPOSITION_SOURCE, "SOURCE_FAMILY_STATES"
-        ),
+        "automation_stages": frozenset(get_args(LifecycleAutomationStage)),
+        "failure_reasons": frozenset(LIFECYCLE_AUTOMATION_FAILURE_REASONS),
+        "disposition_reasons": frozenset(LIFECYCLE_DISPOSITION_REASONS),
+        "disposition_values": frozenset(LIFECYCLE_DISPOSITIONS),
+        "queue_buckets": frozenset(LIFECYCLE_QUEUE_BUCKETS),
+        "blocker_codes": frozenset(AUTOMATION_BLOCKER_CODES),
+        "automation_triggers": frozenset(get_args(LifecycleAutomationTrigger)),
+        "source_family_states": frozenset(SOURCE_FAMILY_STATES),
     }
-    frontend = {
-        "automation_stages": _typescript_string_union(
-            frontend_source, "SecurityLifecycleAutomationStage"
-        ),
-        "failure_reasons": _typescript_string_union(
-            frontend_source, "SecurityLifecycleAutomationFailureReason"
-        ),
-        "disposition_reasons": _typescript_string_union(
-            frontend_source, "SecurityLifecycleDispositionReason"
-        ),
-        "disposition_values": _typescript_string_union(
-            frontend_source, "SecurityLifecycleDisposition"
-        ),
-        "queue_buckets": _typescript_string_union(
-            frontend_source, "SecurityLifecycleQueueBucket"
-        ),
-        "blocker_codes": _typescript_string_union(
-            frontend_source, "SecurityLifecycleAutomationBlockerCode"
-        ),
-        "automation_triggers": _typescript_string_union(
-            frontend_source, "SecurityLifecycleAutomationTrigger"
-        ),
-        "source_family_states": _typescript_string_union(
-            frontend_source, "SecurityLifecycleSourceFamilyState"
-        ),
-    }
+    frontend_authorities = _typescript_compiler_authorities(
+        _FRONTEND_API_SOURCE,
+        {
+            "automation_stages": {
+                "kind": "type",
+                "name": "SecurityLifecycleAutomationStage",
+            },
+            "failure_reasons": {
+                "kind": "type",
+                "name": "SecurityLifecycleAutomationFailureReason",
+            },
+            "disposition_reasons": {
+                "kind": "type",
+                "name": "SecurityLifecycleDispositionReason",
+            },
+            "disposition_values": {
+                "kind": "type",
+                "name": "SecurityLifecycleDisposition",
+            },
+            "queue_buckets": {
+                "kind": "type",
+                "name": "SecurityLifecycleQueueBucket",
+            },
+            "blocker_codes": {
+                "kind": "type",
+                "name": "SecurityLifecycleAutomationBlockerCode",
+            },
+            "automation_triggers": {
+                "kind": "type",
+                "name": "SecurityLifecycleAutomationTrigger",
+            },
+            "source_family_states": {
+                "kind": "type",
+                "name": "SecurityLifecycleSourceFamilyState",
+            },
+            "automation_stages_runtime": {
+                "kind": "array",
+                "name": "AUTOMATION_STAGES",
+            },
+            "failure_reasons_runtime": {
+                "kind": "array",
+                "name": "AUTOMATION_REASONS",
+            },
+            "automation_triggers_runtime": {
+                "kind": "array",
+                "name": "AUTOMATION_TRIGGERS",
+            },
+        },
+    )
+    frontend = {name: frontend_authorities[name] for name in backend}
 
-    assert backend["automation_stages"] == _python_string_authority(
-        _AUTOMATION_RUNTIME_SOURCE, "LIFECYCLE_AUTOMATION_STAGE_ORDER"
+    assert backend["automation_stages"] == frozenset(
+        LIFECYCLE_AUTOMATION_STAGE_ORDER
     )
     assert backend["automation_stages"] == frontend["automation_stages"]
-    assert frontend["automation_stages"] == _typescript_string_array(
-        frontend_source, "AUTOMATION_STAGES"
+    assert (
+        frontend["automation_stages"]
+        == frontend_authorities["automation_stages_runtime"]
     )
     assert backend["failure_reasons"] == frontend["failure_reasons"]
-    assert frontend["failure_reasons"] == _typescript_string_array(
-        frontend_source, "AUTOMATION_REASONS"
+    assert (
+        frontend["failure_reasons"]
+        == frontend_authorities["failure_reasons_runtime"]
     )
-    assert backend["automation_triggers"] == _python_string_authority(
-        _AUTOMATION_RUNTIME_SOURCE, "_LIFECYCLE_AUTOMATION_TRIGGERS"
+    assert backend["automation_triggers"] == frozenset(
+        _LIFECYCLE_AUTOMATION_TRIGGERS
     )
-    assert frontend["automation_triggers"] == _typescript_string_array(
-        frontend_source, "AUTOMATION_TRIGGERS"
+    assert (
+        frontend["automation_triggers"]
+        == frontend_authorities["automation_triggers_runtime"]
     )
     assert backend == frontend, _vocabulary_mismatches(backend, frontend)
 
