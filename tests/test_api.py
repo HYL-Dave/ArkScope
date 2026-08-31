@@ -166,7 +166,17 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 187
+    assert len(observed["routes"]) == 191
+    assert {
+        "GET\t/security-lifecycle/automation\t"
+        "src.api.routes.security_lifecycle\tget_automation_config",
+        "PUT\t/security-lifecycle/automation\t"
+        "src.api.routes.security_lifecycle\tput_automation_config",
+        "POST\t/security-lifecycle/automation/run\t"
+        "src.api.routes.security_lifecycle\trun_due_automation",
+        "POST\t/security-lifecycle/cases/{case_id}/automation/run\t"
+        "src.api.routes.security_lifecycle\trun_case_automation",
+    }.issubset(observed["routes"])
     assert observed["active_owners"] == {
         "data-scheduler",
         "portfolio-capture-scheduler",

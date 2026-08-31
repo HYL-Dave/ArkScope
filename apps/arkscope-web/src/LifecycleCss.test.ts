@@ -38,4 +38,16 @@ describe("lifecycle queue CSS contract", () => {
       /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
     );
   });
+
+  it("keeps closed manual evidence commands out of layout", () => {
+    expect(
+      rule(".lifecycle-manual-supplement:not([open]) > .lifecycle-commands"),
+    ).toMatch(/display:\s*none/);
+  });
+
+  it("keeps closed evidence bodies out of layout", () => {
+    expect(
+      rule(".lifecycle-evidence-item:not([open]) > .lifecycle-evidence-body"),
+    ).toMatch(/display:\s*none/);
+  });
 });

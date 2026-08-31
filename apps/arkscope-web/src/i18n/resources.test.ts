@@ -94,7 +94,7 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 410,
+      lifecycle: 422,
       news: 45,
       tickerDetail: 89,
       aiCard: 67,
@@ -264,7 +264,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(798);
+      expect(flattened.size, `${locale}.explore`).toBe(810);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -726,9 +726,9 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 61,
       shell: 37,
-      settings: 800,
+      settings: 840,
       research: 207,
-      explore: 798,
+      explore: 810,
       portfolio: 374,
       system: 24,
     } as const;
@@ -797,7 +797,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2301);
+      expect(total, `${locale}.total`).toBe(2353);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1218,6 +1218,46 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.openWorkflow",
       "dataStorage.lifecycle.summary.activeCases",
       "dataStorage.lifecycle.summary.sourceMissing",
+      "dataStorage.lifecycle.automation.title",
+      "dataStorage.lifecycle.automation.backgroundEnabled",
+      "dataStorage.lifecycle.automation.interval",
+      "dataStorage.lifecycle.automation.intervalMinutes",
+      "dataStorage.lifecycle.automation.batchSize",
+      "dataStorage.lifecycle.automation.batchOption",
+      "dataStorage.lifecycle.automation.applyTransitions",
+      "dataStorage.lifecycle.automation.runDue",
+      "dataStorage.lifecycle.automation.runningCommand",
+      "dataStorage.lifecycle.automation.invalidConfig",
+      "dataStorage.lifecycle.automation.state",
+      "dataStorage.lifecycle.automation.currentStage",
+      "dataStorage.lifecycle.automation.lastResult",
+      "dataStorage.lifecycle.automation.lastAttempt",
+      "dataStorage.lifecycle.automation.nextScheduled",
+      "dataStorage.lifecycle.automation.notScheduled",
+      "dataStorage.lifecycle.automation.providers",
+      "dataStorage.lifecycle.automation.providerSummary",
+      "dataStorage.lifecycle.automation.noResult",
+      "dataStorage.lifecycle.automation.resultSummary",
+      "dataStorage.lifecycle.automation.incidentCases_one",
+      "dataStorage.lifecycle.automation.incidentCases_other",
+      "dataStorage.lifecycle.automation.incidentScheduler",
+      "dataStorage.lifecycle.automation.stateLabels.running",
+      "dataStorage.lifecycle.automation.stateLabels.failed",
+      "dataStorage.lifecycle.automation.stateLabels.succeeded",
+      "dataStorage.lifecycle.automation.stateLabels.partial",
+      "dataStorage.lifecycle.automation.stateLabels.unavailable",
+      "dataStorage.lifecycle.automation.stateLabels.not_installed",
+      "dataStorage.lifecycle.automation.stateLabels.skipped",
+      "dataStorage.lifecycle.automation.stateLabels.absent",
+      "dataStorage.lifecycle.automation.stateLabels.invalid",
+      "dataStorage.lifecycle.automation.stages.preparing",
+      "dataStorage.lifecycle.automation.stages.sec",
+      "dataStorage.lifecycle.automation.stages.listing",
+      "dataStorage.lifecycle.automation.stages.ibkr",
+      "dataStorage.lifecycle.automation.stages.evaluate",
+      "dataStorage.lifecycle.automation.stages.persist",
+      "dataStorage.lifecycle.automation.stages.approve",
+      "dataStorage.lifecycle.automation.stages.finalize",
     ] as const;
     const currentOwnerSettingsPaths = new Set([
       "workspace.routes.effortRequired",

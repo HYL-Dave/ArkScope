@@ -2264,6 +2264,9 @@ table.lifecycle-table tbody tr:last-child td {
   padding: 0 10px 10px;
   border-top: 1px solid var(--border);
 }
+.lifecycle-evidence-item:not([open]) > .lifecycle-evidence-body {
+  display: none;
+}
 .lifecycle-evidence-mode-switch {
   display: inline-flex;
   margin: 9px 0 4px;
@@ -2344,6 +2347,9 @@ table.lifecycle-table tbody tr:last-child td {
   margin-top: 14px;
   padding-top: 10px;
   border-top: 1px dashed var(--border);
+}
+.lifecycle-manual-supplement:not([open]) > .lifecycle-commands {
+  display: none;
 }
 
 .universe-hint {

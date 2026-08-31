@@ -16,6 +16,7 @@ _PROJECT_PROFILE_DB = (_PROJECT_ROOT / "data" / "profile_state.db").resolve()
 _SESSION_PROFILE_DIR = tempfile.TemporaryDirectory(prefix="arkscope-pytest-profile-")
 _SESSION_PROFILE_DB = Path(_SESSION_PROFILE_DIR.name) / "profile_state.db"
 os.environ["ARKSCOPE_PROFILE_DB"] = str(_SESSION_PROFILE_DB)
+os.environ["ARKSCOPE_DISABLE_SCHEDULER"] = "1"
 
 _REAL_SQLITE_CONNECT = sqlite3.connect
 
