@@ -165,6 +165,34 @@ def test_progress_registry_rejects_stage_jumps_and_nonconditional_skips_without_
     )
 
 
+def test_progress_registry_still_rejects_a_backwards_stage():
+    from src.service.security_lifecycle_automation_runtime import (
+        LifecycleAutomationProgressRegistry,
+    )
+
+    registry = LifecycleAutomationProgressRegistry()
+    registry.begin(
+        trigger="scheduler",
+        request_id="request-backwards-stage",
+        case_id="case-backwards-stage",
+        started_at=datetime(2026, 8, 31, tzinfo=timezone.utc),
+        initial_stage="finalize",
+    )
+
+    with pytest.raises(ValueError, match="automation_progress_stage_order"):
+        registry.advance(
+            request_id="request-backwards-stage",
+            case_id="case-backwards-stage",
+            stage="approve",
+        )
+
+    remaining = registry.snapshot(
+        request_id="request-backwards-stage",
+        case_id="case-backwards-stage",
+    )
+    assert [row.current_stage for row in remaining] == ["finalize"]
+
+
 def test_progress_registry_keys_snapshots_and_clear_by_request_and_case():
     from src.service.security_lifecycle_automation_runtime import (
         LifecycleAutomationProgressRegistry,

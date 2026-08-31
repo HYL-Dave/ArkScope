@@ -1308,6 +1308,54 @@ def test_transition_approval_rereads_mutation_authority_at_boundary(tmp_path):
         harness.conn.close()
 
 
+def test_finalization_only_recovery_keeps_its_progress_row(tmp_path, monkeypatch):
+    import src.security_lifecycle_automation_worker as worker_module
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+    progress = _RecordingProgressRegistry()
+    request_id = "request-finalization-only-recovery"
+    original = worker_module.create_automation_assessment
+    interrupted = False
+    rows_during_recovery = []
+
+    def interrupt_then_observe(*args, **kwargs):
+        nonlocal interrupted
+        assessment_id = original(*args, **kwargs)
+        if not interrupted:
+            interrupted = True
+            raise _InjectedFinalizationCrash("assessment")
+        rows_during_recovery.extend(
+            progress.snapshot(request_id=request_id, case_id=case["case_id"])
+        )
+        return assessment_id
+
+    monkeypatch.setattr(
+        worker_module,
+        "create_automation_assessment",
+        interrupt_then_observe,
+    )
+    try:
+        with pytest.raises(_InjectedFinalizationCrash, match="assessment"):
+            harness.worker_with_transition_approver().run()
+
+        recovered = harness.worker_with_transition_approver(
+            progress_registry=progress,
+            request_id=request_id,
+            trigger="manual_case",
+        ).run()
+
+        assert recovered["accepted"] == 1
+        assert recovered["failed"] == 0
+        assert [
+            (row.request_id, row.case_id, row.current_stage)
+            for row in rows_during_recovery
+        ] == [(request_id, case["case_id"], "finalize")]
+        assert progress.snapshot() == ()
+    finally:
+        harness.conn.close()
+
+
 @pytest.mark.parametrize(
     "boundary",
     ("assessment", "acceptance", "proposal", "approval"),

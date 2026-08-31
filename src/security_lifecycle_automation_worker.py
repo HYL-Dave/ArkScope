@@ -970,7 +970,9 @@ class LifecycleAutomationWorker:
                         ),
                         finalization_only=finalization_only,
                         progress_callback=(
-                            progress.advance if progress is not None else None
+                            progress.advance
+                            if progress is not None and not finalization_only
+                            else None
                         ),
                     )
                     if progress is not None:
