@@ -54,22 +54,22 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_fact_kernel.py`
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 
-- [ ] Write a real-worker RED: inject a `BaseException` during evidence
+- [x] Write a real-worker RED: inject a `BaseException` during evidence
   acquisition, restore a healthy loader, and prove the next invocation still
   skips a persisted `running` row.
-- [ ] Write a second RED with two independent SQLite connections: one process
+- [x] Write a second RED with two independent SQLite connections: one process
   lock owner may reserve, a second returns `already_running`, and releasing the
   first lock enables reconciliation.
-- [ ] Add a dedicated cross-process lock and a bounded runtime owner ID.
-- [ ] Add `execution_owner_id` to reserved query context without changing run
+- [x] Add a dedicated cross-process lock and a bounded runtime owner ID.
+- [x] Add `execution_owner_id` to reserved query context without changing run
   identity or provenance.
-- [ ] Add a kernel reconciliation entry point that may fail only `running`
+- [x] Add a kernel reconciliation entry point that may fail only `running`
   rows, validates owner/context shape, and uses the existing `internal_error`
   failure code.
-- [ ] Wrap the whole invocation in `finally` so `BaseException` terminalizes
+- [x] Wrap the whole invocation in `finally` so `BaseException` terminalizes
   rows owned by that invocation before the lock is released.
-- [ ] Reconcile pre-existing running rows only after exclusive lock ownership.
-- [ ] Add reverse mutations for removal of the lock, owner predicate, startup
+- [x] Reconcile pre-existing running rows only after exclusive lock ownership.
+- [x] Add reverse mutations for removal of the lock, owner predicate, startup
   reconciliation, and `BaseException` cleanup.
 
 ## Task 2: Complete Human-Accepted Finalization Truthfully
@@ -84,23 +84,23 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_disposition.py`
 - Test: `tests/test_security_lifecycle_tools.py`
 
-- [ ] Write the exact RED: crash after assessment creation, accept that
+- [x] Write the exact RED: crash after assessment creation, accept that
   automation assessment with `acceptance_authority="human"`, run again, and
   assert finalization completes without changing the acceptance authority.
-- [ ] Add a RED showing that routing the state through `fail_run` raises
+- [x] Add a RED showing that routing the state through `fail_run` raises
   `automation_run_has_current_assessment`; retain this as a regression owner.
-- [ ] Admit both valid accepted authorities for an automation-authored
+- [x] Admit both valid accepted authorities for an automation-authored
   assessment and preserve proposal idempotency.
-- [ ] Add a closed kernel method for
+- [x] Add a closed kernel method for
   `terminal_finalization_failure` metadata in query context. Bound code,
   timestamps, count, and total JSON size.
-- [ ] Make finalization retries reuse the succeeded run, apply bounded backoff,
+- [x] Make finalization retries reuse the succeeded run, apply bounded backoff,
   and stop hot-looping every scheduler tick. The closed schedule is 15 minutes,
   1 hour, and 6 hours; after the fourth recorded failure, automatic retries
   stop until an attended Run again.
-- [ ] Project unresolved finalization failure to Attention with a closed reason
+- [x] Project unresolved finalization failure to Attention with a closed reason
   code; never call it completed or running.
-- [ ] Add mutations for the human-authority branch, metadata validator,
+- [x] Add mutations for the human-authority branch, metadata validator,
   backoff gate, and projection priority.
 
 ## Task 3: Version Per-Case Outcomes and Repair Recovery Witnesses
@@ -113,23 +113,23 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_scheduler_state.py`
 
-- [ ] Replace the existing synthetic witness RED with the real sequence:
+- [x] Replace the existing synthetic witness RED with the real sequence:
   failed case, next tick skipped, persisted run still failed. Assert no recovery
   witness is written.
-- [ ] Add the same owner for a blocked case and assert a blocker is not an
+- [x] Add the same owner for a blocked case and assert a blocker is not an
   operational failure witness.
-- [ ] Add `result_version=2` and exact `case_outcomes`; prove counters and map
+- [x] Add `result_version=2` and exact `case_outcomes`; prove counters and map
   cannot disagree.
-- [ ] Keep version-1 blob parsing. Add fixtures for a v1 case failure, v1
+- [x] Keep version-1 blob parsing. Add fixtures for a v1 case failure, v1
   scheduler failure with no case IDs, and malformed legacy blobs.
-- [ ] Determine case recovery from latest per-case run/finalization rows. An
+- [x] Determine case recovery from latest per-case run/finalization rows. An
   empty batch may not recover a case incident.
-- [ ] Store latest aggregate outcome and active incident under a dedicated
+- [x] Store latest aggregate outcome and active incident under a dedicated
   scheduler-state key; do not use `continuation` as a retry queue.
-- [ ] Keep result persistence inside execution ownership for every production
+- [x] Keep result persistence inside execution ownership for every production
   caller so a newer invocation cannot replace the per-case row being recorded.
-- [ ] Deduplicate identical active incidents without periodic restatement.
-- [ ] Add mutations for dropping case outcomes, treating blocked as failed,
+- [x] Deduplicate identical active incidents without periodic restatement.
+- [x] Add mutations for dropping case outcomes, treating blocked as failed,
   trusting an empty batch, and accepting counter/map drift.
 
 ## Task 4: Add Predecessor-Linked Retry and Attended Run Authority
@@ -146,21 +146,21 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_security_lifecycle_routes.py`
 
-- [ ] Preserve the three existing no-auto-replay tests as baseline owners.
-- [ ] Add REDs for explicit new attempts from failed, nonretryable blocked, and
+- [x] Preserve the three existing no-auto-replay tests as baseline owners.
+- [x] Add REDs for explicit new attempts from failed, nonretryable blocked, and
   completed runs; all prior rows must remain byte-identical.
-- [ ] Generalize execution attempt identity to `predecessor_run_id` while
+- [x] Generalize execution attempt identity to `predecessor_run_id` while
   reading existing `predecessor_failed_run_id` rows unchanged.
-- [ ] Add cycle-safe predecessor traversal and derive attempt counts from the
+- [x] Add cycle-safe predecessor traversal and derive attempt counts from the
   chain. Prove a new caller context cannot reset the count.
-- [ ] Add `allow_due_failed_retry` and `allow_new_attempt`, both default false.
-- [ ] Persist closed automatic retry metadata on the failed row without using
+- [x] Add `allow_due_failed_retry` and `allow_new_attempt`, both default false.
+- [x] Persist closed automatic retry metadata on the failed row without using
   the schema `retry_at` column.
-- [ ] Implement the retry matrix: persistence 3 attempts; source-payload 1;
+- [x] Implement the retry matrix: persistence 3 attempts; source-payload 1;
   internal 1; extractor/schema manual only.
-- [ ] Add global due-run and exact-case run endpoints. Return 409 for a current
+- [x] Add global due-run and exact-case run endpoints. Return 409 for a current
   running owner and a typed started/skipped response otherwise.
-- [ ] Add mutations for each default-false authority, chain count, cycle guard,
+- [x] Add mutations for each default-false authority, chain count, cycle guard,
   and policy-version isolation.
 
 ## Task 5: Align IBKR Identity Planning Without False Absence
@@ -172,18 +172,18 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_security_lifecycle_grounded_shadow.py`
 
-- [ ] Add the direct RED where six aliases fit and seven aliases raise.
-- [ ] Add REDs for multiple exact conIds and for a 65-alias closure that
+- [x] Add the direct RED where six aliases fit and seven aliases raise.
+- [x] Add REDs for multiple exact conIds and for a 65-alias closure that
   currently fails the entire scheduler batch.
-- [ ] Build a deterministic candidate plan: one exact conId, current ticker,
+- [x] Build a deterministic candidate plan: one exact conId, current ticker,
   SEC successor, stable remaining aliases.
-- [ ] If complete coverage cannot fit, emit `ibkr_contract_ambiguous` before
+- [x] If complete coverage cannot fit, emit `ibkr_contract_ambiguous` before
   provider access and emit no `contract_missing` evidence.
-- [ ] Convert alias/conId over-limit conditions into per-case ambiguity while
+- [x] Convert alias/conId over-limit conditions into per-case ambiguity while
   allowing later cases in the same batch to run.
-- [ ] Prove a genuine complete bounded lookup can still emit missing and that
+- [x] Prove a genuine complete bounded lookup can still emit missing and that
   missing remains excluded from automatic decision material.
-- [ ] Add mutations for candidate priority, overflow admission, per-case
+- [x] Add mutations for candidate priority, overflow admission, per-case
   containment, and false-missing prevention.
 
 ## Task 6: Preserve Resolvable SEC Deadline Supersession
@@ -195,16 +195,16 @@ transitions default off.
 - Test: `tests/test_security_lifecycle_automation_scheduler.py`
 - Test: `tests/test_security_lifecycle_automation_worker.py`
 
-- [ ] Add a producer-to-scheduler RED for a termination-by date followed by an
+- [x] Add a producer-to-scheduler RED for a termination-by date followed by an
   explicit `extended from OLD to NEW` sentence. It must retain NEW, trigger the
   due IBKR check, and carry NEW's exact citation.
-- [ ] Add fail-closed REDs for two extension targets, contradictory current
+- [x] Add fail-closed REDs for two extension targets, contradictory current
   dates, extension without a provable predecessor, and reversed chronology.
-- [ ] Add transient `kind` and `supersedes_date` metadata to
+- [x] Add transient `kind` and `supersedes_date` metadata to
   `SecSourceDeadline`; do not add a fact or schema field.
-- [ ] Resolve only one provable active deadline and retain its original citation
+- [x] Resolve only one provable active deadline and retain its original citation
   fields unchanged.
-- [ ] Keep defensive scheduler multi-date checks and add a mutation showing the
+- [x] Keep defensive scheduler multi-date checks and add a mutation showing the
   public producer owner, not a scheduler stub, kills a broken collapse.
 
 ## Task 7: Reuse Closed SEC Chains and Classify Operator Blockers
@@ -385,17 +385,17 @@ transitions default off.
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md` only in the isolated branch and
   only after product gates are green
 
-- [ ] Run every focused owner after its RED and again after the fix.
-- [ ] Run reverse mutations one at a time, record the named failing node, and
+- [x] Run every focused owner after its RED and again after the fix.
+- [x] Run reverse mutations one at a time, record the named failing node, and
   restore every product file byte-identically.
-- [ ] Run the full backend suite twice and compare complete node manifests.
-- [ ] Run frontend tests twice, TypeScript, production build, and i18n scanner.
-- [ ] Run Playwright desktop/mobile checks for Settings and lifecycle drawer;
+- [x] Run the full backend suite twice and compare complete node manifests.
+- [x] Run frontend tests twice, TypeScript, production build, and i18n scanner.
+- [x] Run Playwright desktop/mobile checks for Settings and lifecycle drawer;
   include rapid selection and in-flight command refresh cases.
-- [ ] Capture schema hashes proving no DDL drift.
-- [ ] Build a secret-safe packet with measured and declared values explicitly
+- [x] Capture schema hashes proving no DDL drift.
+- [x] Build a secret-safe packet with measured and declared values explicitly
   separated, then verify manifest/disk equality and all hashes.
-- [ ] Add a dated GREEN/RED decision entry without altering prior history.
+- [x] Add a dated GREEN/RED decision entry without altering prior history.
 
 ## Task 13: Separately Authorized Production Validation
 
