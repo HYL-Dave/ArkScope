@@ -2717,6 +2717,12 @@ export interface SecurityLifecycleAutomationRun {
   finished_at?: string | null;
   created_at: string;
   updated_at?: string;
+  terminal_finalization_failure?: {
+    attempt_count: number;
+    code: "finalization_failed";
+    failed_at: string;
+    retry_not_before: string | null;
+  };
 }
 
 export interface SecurityLifecycleAutomationFact {

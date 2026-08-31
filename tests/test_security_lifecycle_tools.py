@@ -1053,43 +1053,90 @@ def test_tool_reads_never_write_or_generate_action_proposals(tmp_path, monkeypat
         profile.close()
 
 
-def test_provider_neutral_case_exposes_only_closed_finalization_failure_fields():
-    from src.tools.security_lifecycle_tools import _provider_neutral_case
-
-    rendered = _provider_neutral_case(
-        {
-            "automation_runs": [
-                {
-                    "run_id": "slar_pending",
-                    "created_at": "2026-08-25T12:00:00Z",
-                    "status": "succeeded",
-                    "query_context": {
-                        "case_id": "private-case-context",
-                        "terminal_finalization_failure": {
-                            "attempt_count": 1,
-                            "code": "finalization_failed",
-                            "failed_at": "2026-08-25T12:00:00Z",
-                            "retry_not_before": "2026-08-25T12:15:00Z",
-                        },
-                    },
-                    "diagnostics": {"private": 1},
-                    "blockers": [],
-                }
-            ],
-            "source_family_status": {},
-        }
+def test_shared_public_automation_run_projection_is_closed_and_preserves_failure():
+    from src.tools.security_lifecycle_tools import (
+        _provider_neutral_case,
+        project_active_security_lifecycle_case,
     )
 
-    run = rendered["automation_runs"][0]
-    assert run["terminal_finalization_failure"] == {
+    failure = {
         "attempt_count": 1,
         "code": "finalization_failed",
         "failed_at": "2026-08-25T12:00:00Z",
         "retry_not_before": "2026-08-25T12:15:00Z",
     }
-    assert "query_context" not in run
-    assert "diagnostics" not in run
-    assert "private-case-context" not in json.dumps(rendered)
+    source = {
+        "automation_runs": [
+            {
+                "run_id": "slar_pending",
+                "case_id": "slc_public_case",
+                "mode": "historical",
+                "status": "succeeded",
+                "policy_version": "trusted-lifecycle-v1",
+                "decision_tier": "review_suggested",
+                "action_readiness": "action_blocked",
+                "failure_code": None,
+                "blockers": [],
+                "retry_at": None,
+                "started_at": "2026-08-25T11:59:00Z",
+                "finished_at": "2026-08-25T12:00:00Z",
+                "created_at": "2026-08-25T11:59:00Z",
+                "updated_at": "2026-08-25T12:00:00Z",
+                "observation_fingerprint_sha256": "a" * 64,
+                "run_key": "private-run-key-sentinel",
+                "query_context": {
+                    "terminal_finalization_failure": failure,
+                    "execution_owner_id": "private-owner-sentinel",
+                    "internal_hash": "private-hash-sentinel",
+                    "internal_id": "private-id-sentinel",
+                    "query_future": "private-query-future-sentinel",
+                },
+                "diagnostics": {"private-diagnostics-sentinel": 1},
+                "execution_owner_id": "private-top-owner-sentinel",
+                "internal_hash": "private-top-hash-sentinel",
+                "internal_id": "private-top-id-sentinel",
+                "future_run_field": "private-run-future-sentinel",
+            }
+        ],
+        "source_family_status": {},
+    }
+    expected = {
+        "run_id": "slar_pending",
+        "case_id": "slc_public_case",
+        "mode": "historical",
+        "status": "succeeded",
+        "policy_version": "trusted-lifecycle-v1",
+        "decision_tier": "review_suggested",
+        "action_readiness": "action_blocked",
+        "failure_code": None,
+        "blockers": [],
+        "retry_at": None,
+        "started_at": "2026-08-25T11:59:00Z",
+        "finished_at": "2026-08-25T12:00:00Z",
+        "created_at": "2026-08-25T11:59:00Z",
+        "updated_at": "2026-08-25T12:00:00Z",
+        "terminal_finalization_failure": failure,
+    }
+
+    shared = project_active_security_lifecycle_case(source)
+    ai = _provider_neutral_case(source)
+
+    assert shared["automation_runs"] == [expected]
+    assert ai["automation_runs"] == [expected]
+    for sentinel in (
+        "private-run-key-sentinel",
+        "private-owner-sentinel",
+        "private-hash-sentinel",
+        "private-id-sentinel",
+        "private-query-future-sentinel",
+        "private-diagnostics-sentinel",
+        "private-top-owner-sentinel",
+        "private-top-hash-sentinel",
+        "private-top-id-sentinel",
+        "private-run-future-sentinel",
+    ):
+        assert sentinel not in json.dumps(shared, sort_keys=True)
+        assert sentinel not in json.dumps(ai, sort_keys=True)
 
 
 def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_path, monkeypatch):

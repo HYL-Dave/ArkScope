@@ -84,6 +84,26 @@ _HISTORY_ORDER_FIELDS = {
     "acknowledgement_history": ("acknowledged_at", "acknowledgement_id"),
     "proposals": ("created_at", "proposal_id"),
 }
+_PUBLIC_AUTOMATION_RUN_FIELDS = (
+    "run_id",
+    "case_id",
+    "mode",
+    "status",
+    "policy_version",
+    "decision_tier",
+    "action_readiness",
+    "failure_code",
+    "retry_at",
+    "started_at",
+    "finished_at",
+    "created_at",
+    "updated_at",
+    "blockers",
+    "terminal_finalization_failure",
+)
+_PROJECTED_AUTOMATION_RUN_FIELDS = frozenset(
+    {"blockers", "terminal_finalization_failure"}
+)
 
 
 def _nullable_listing_text(value: object, pattern: re.Pattern[str]) -> bool:
@@ -174,20 +194,45 @@ def _compact_listing(source_locator_json: object) -> dict:
     }
 
 
+def _project_automation_run(raw_run: Mapping[str, object]) -> dict[str, object]:
+    query_context = raw_run.get("query_context")
+    if query_context is not None and not isinstance(query_context, Mapping):
+        raise ValueError("automation_query_context")
+
+    failure_value = raw_run.get("terminal_finalization_failure")
+    if (
+        isinstance(query_context, Mapping)
+        and "terminal_finalization_failure" in query_context
+    ):
+        failure_value = query_context.get("terminal_finalization_failure")
+    from src.security_lifecycle_fact_kernel import (
+        normalize_terminal_finalization_failure,
+    )
+
+    finalization_failure = normalize_terminal_finalization_failure(failure_value)
+    projected = {
+        field: raw_run[field]
+        for field in _PUBLIC_AUTOMATION_RUN_FIELDS
+        if field in raw_run and field not in _PROJECTED_AUTOMATION_RUN_FIELDS
+    }
+    blockers = []
+    for blocker in raw_run.get("blockers", []):
+        if not isinstance(blocker, Mapping):
+            raise ValueError("automation_blocker")
+        blockers.append(project_automation_blocker(blocker))
+    projected["blockers"] = blockers
+    if finalization_failure is not None:
+        projected["terminal_finalization_failure"] = finalization_failure
+    return projected
+
+
 def project_active_security_lifecycle_case(case: Mapping[str, object]) -> dict:
     item = dict(case)
     automation_runs = []
     for raw_run in item.get("automation_runs", []):
         if not isinstance(raw_run, Mapping):
             raise ValueError("automation_run")
-        run = dict(raw_run)
-        blockers = []
-        for blocker in run.get("blockers", []):
-            if not isinstance(blocker, Mapping):
-                raise ValueError("automation_blocker")
-            blockers.append(project_automation_blocker(blocker))
-        run["blockers"] = blockers
-        automation_runs.append(run)
+        automation_runs.append(_project_automation_run(raw_run))
     item["automation_runs"] = automation_runs
     evidence = []
     for raw in item.get("evidence", []):
@@ -389,39 +434,6 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
                     for key, field in value.items()
                     if key not in {"adapter", "query_plan_json", "usage_json"}
                 }
-            elif name == "automation_runs":
-                query_context = value.get("query_context")
-                if query_context is not None and not isinstance(
-                    query_context,
-                    Mapping,
-                ):
-                    raise ValueError("automation_query_context")
-                if isinstance(query_context, Mapping):
-                    from src.security_lifecycle_fact_kernel import (
-                        normalize_terminal_finalization_failure,
-                    )
-
-                    finalization_failure = normalize_terminal_finalization_failure(
-                        query_context.get("terminal_finalization_failure")
-                    )
-                    if finalization_failure is not None:
-                        value["terminal_finalization_failure"] = (
-                            finalization_failure
-                        )
-                for key in (
-                    "run_key",
-                    "query_context",
-                    "query_context_json",
-                    "diagnostics",
-                    "diagnostics_json",
-                ):
-                    value.pop(key, None)
-                projected_blockers = []
-                for blocker in value.get("blockers", []):
-                    if not isinstance(blocker, Mapping):
-                        raise ValueError("automation_blocker")
-                    projected_blockers.append(project_automation_blocker(blocker))
-                value["blockers"] = projected_blockers
             elif name == "automation_facts":
                 value = {
                     key: value.get(key)
