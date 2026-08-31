@@ -463,15 +463,15 @@ def test_automation_config_get_defaults_and_put_replaces_all_four_keys(
         assert initial.status_code == 200
         assert initial.json()["config_status"] == "valid"
         assert initial.json()["config"] == {
-            "enabled": True,
+            "enabled": False,
             "interval_minutes": 5,
             "batch_limit": 2,
             "apply_profile_transitions": False,
         }
         assert initial.json()["schedule"] == {
-            "status": "due",
+            "status": "disabled",
             "last_attempt_at": None,
-            "next_scheduled_at": "2026-08-31T05:00:00Z",
+            "next_scheduled_at": None,
         }
         assert initial.json()["current_progress"] == []
         assert initial.json()["telemetry_status"] == "absent"
@@ -515,8 +515,10 @@ def test_automation_status_combines_shared_schedule_durable_truth_and_live_progr
     from src.service.security_lifecycle_automation_runtime import (
         LifecycleAutomationProgressRegistry,
     )
+    from src.service.security_lifecycle_automation_config import ENABLED_KEY
 
     context = _build_context(tmp_path)
+    context["settings_store"].set_setting(ENABLED_KEY, "true")
     registry = LifecycleAutomationProgressRegistry()
     registry.begin(
         trigger="manual_case",

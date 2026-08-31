@@ -18,6 +18,7 @@ import src.service.data_scheduler as ds
 from src.active_universe import ActiveUniverseUnavailable
 from src.profile_state import ProfileStateStore
 from src.service.job_runs_store import JobRunsLocalStore as _REAL_JOB_RUNS_LOCAL_STORE
+from src.service.security_lifecycle_automation_config import ENABLED_KEY
 
 _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
 _REAL_RESOLVE_PRICE_SCOPE = ds._resolve_price_scope
@@ -227,7 +228,23 @@ def test_tick_fires_only_enabled_and_due():
     assert out == fired == ["finnhub_news"]
 
 
+def test_empty_profile_settings_snapshot_never_makes_lifecycle_automation_due():
+    assert ds._store().get_settings_snapshot(
+        ds.SECURITY_LIFECYCLE_AUTOMATION_SETTING_KEYS
+    ) == {}
+    state = ds._security_lifecycle_automation_config_state()
+
+    assert state.valid is True
+    assert state.config is not None
+    for now in (
+        datetime(1970, 1, 1, tzinfo=timezone.utc),
+        datetime(2099, 12, 31, 23, 59, tzinfo=timezone.utc),
+    ):
+        assert ds._security_lifecycle_automation_is_due(state, now=now) is False
+
+
 def test_tick_uses_the_lock_owned_lifecycle_run_and_record_boundary(monkeypatch):
+    ds._store().set_setting(ENABLED_KEY, "true")
     events = []
     monkeypatch.setattr(
         ds,
@@ -268,6 +285,7 @@ def test_tick_uses_the_lock_owned_lifecycle_run_and_record_boundary(monkeypatch)
 
 
 def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
+    ds._store().set_setting(ENABLED_KEY, "true")
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
     automation_result = {
@@ -333,6 +351,7 @@ def test_tick_runs_due_ticker_transitions_before_provider_dispatch(monkeypatch):
 def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch(
     monkeypatch,
 ):
+    ds._store().set_setting(ENABLED_KEY, "true")
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
     monkeypatch.setattr(
@@ -395,6 +414,7 @@ def test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch
 def test_lifecycle_automation_uses_durable_five_minute_clock_and_batch_limit(
     monkeypatch,
 ):
+    ds._store().set_setting(ENABLED_KEY, "true")
     calls = []
     monkeypatch.setattr(
         ds,
@@ -520,7 +540,12 @@ def test_tick_rereads_mutation_authority_after_lifecycle_analysis(monkeypatch):
         APPLY_PROFILE_TRANSITIONS_KEY,
     )
 
-    ds._store().set_setting(APPLY_PROFILE_TRANSITIONS_KEY, "true")
+    ds._store().update_settings(
+        {
+            ENABLED_KEY: "true",
+            APPLY_PROFILE_TRANSITIONS_KEY: "true",
+        }
+    )
     boundary_reads = []
     transition_calls = []
 
@@ -561,6 +586,7 @@ def test_tick_rereads_mutation_authority_after_lifecycle_analysis(monkeypatch):
 
 
 def test_tick_records_lifecycle_automation_failure_and_continues(monkeypatch):
+    ds._store().set_setting(ENABLED_KEY, "true")
     events = []
     ds.set_source_config("finnhub_news", enabled=True, interval_minutes=60)
     failure = {

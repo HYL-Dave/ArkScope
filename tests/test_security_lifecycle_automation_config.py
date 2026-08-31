@@ -23,7 +23,7 @@ NOW = datetime(2026, 8, 31, 4, 0, tzinfo=timezone.utc)
 @pytest.mark.parametrize(
     ("missing_key", "expected_field", "expected_value"),
     [
-        (ENABLED_KEY, "enabled", True),
+        (ENABLED_KEY, "enabled", False),
         (INTERVAL_MINUTES_KEY, "interval_minutes", 5),
         (BATCH_LIMIT_KEY, "batch_limit", 2),
         (APPLY_PROFILE_TRANSITIONS_KEY, "apply_profile_transitions", False),
@@ -52,12 +52,13 @@ def test_absent_settings_resolve_to_the_complete_safe_default():
     state = parse_security_lifecycle_automation_config({})
 
     assert state.config == SecurityLifecycleAutomationConfig(
-        enabled=True,
+        enabled=False,
         interval_minutes=5,
         batch_limit=2,
         apply_profile_transitions=False,
     )
-    assert state.effective_background_enabled is True
+    assert state.config.enabled is False
+    assert state.effective_background_enabled is False
     assert state.effective_apply_profile_transitions is False
 
 

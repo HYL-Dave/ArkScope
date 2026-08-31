@@ -51,7 +51,7 @@ class SecurityLifecycleAutomationConfig:
 
 
 DEFAULT_SECURITY_LIFECYCLE_AUTOMATION_CONFIG = SecurityLifecycleAutomationConfig(
-    enabled=True,
+    enabled=False,
     interval_minutes=5,
     batch_limit=2,
     apply_profile_transitions=False,
