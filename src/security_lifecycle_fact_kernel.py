@@ -397,6 +397,17 @@ def _terminal_finalization_pending(context: Mapping[str, object]) -> bool:
     )
 
 
+def _terminal_finalization_completed(context: Mapping[str, object]) -> bool:
+    decision = context.get(_TERMINAL_DECISION_KEY)
+    provenance = context.get(_TERMINAL_PROVENANCE_KEY)
+    return (
+        isinstance(decision, Mapping)
+        and isinstance(provenance, str)
+        and _SHA256.fullmatch(provenance) is not None
+        and context.get(_TERMINAL_FINALIZED_KEY) == provenance
+    )
+
+
 def normalize_terminal_finalization_failure(
     value: object,
 ) -> dict[str, object] | None:

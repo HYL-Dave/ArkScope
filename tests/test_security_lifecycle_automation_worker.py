@@ -1697,20 +1697,31 @@ def test_recovery_marker_still_clears_when_a_failure_record_exists(
         harness.conn.close()
 
 
-def test_incident_stays_active_while_the_case_has_genuinely_not_recovered(
+def test_legacy_pending_finalization_merges_and_stays_active_until_completion(
     tmp_path,
     monkeypatch,
 ):
+    from src.scheduler_state import SchedulerStateStore
     from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
     from src.security_lifecycle_investigation import (
         SecurityLifecycleInvestigationStore,
     )
     from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
 
-    pending_case = _case(1)
-    harness = _Harness(tmp_path, [pending_case])
+    v2_case = _case(1)
+    legacy_case = _case(2)
+    finalized_case = _case(3)
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = JobRunsLocalStore(profile_path)
+    scheduler_state = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    harness = _Harness(tmp_path, [v2_case, legacy_case, finalized_case])
     original_proposals = (
         SecurityLifecycleInvestigationStore.generate_action_proposals
+    )
+    original_failure_recorder = (
+        SecurityLifecycleFactKernel.record_terminal_finalization_failure
     )
 
     def fail_proposals(*_args, **_kwargs):
@@ -1730,88 +1741,280 @@ def test_incident_stays_active_while_the_case_has_genuinely_not_recovered(
         fail_failure_record,
     )
     try:
-        pending_result = harness.worker_with_transition_approver().run()
+        v2_failure = harness.worker_with_transition_approver(
+            target_case_id=v2_case["case_id"],
+        ).run(limit=1)
+        legacy_failure = harness.worker_with_transition_approver(
+            target_case_id=legacy_case["case_id"],
+        ).run(limit=1)
         store = _store(harness)
-        pending_run = store.list_automation_runs(pending_case["case_id"])[0]
-        pending_context = json.loads(pending_run["query_context_json"])
-        assert pending_result["failed"] == 1
-        assert pending_run["status"] == "succeeded"
-        assert "terminal_finalization_failure" not in pending_context
-
-        kernel = SecurityLifecycleFactKernel(store)
-        claims = {}
-        for label, ticker in (("failed", "FAIL"), ("running", "RUN")):
-            case_id = store.ensure_case(
-                source="sec_edgar",
-                source_ref=f"real-{label}-case",
-                ticker=ticker,
-                at=_AT,
-            )
-            claims[label] = kernel.reserve_run(
-                case_id=case_id,
-                observation_fingerprint_sha256=("b" if label == "failed" else "c")
-                * 64,
-                policy_version="trusted-lifecycle-v1",
-                mode="live",
-                execution_revision="trusted-lifecycle-execution-r1",
-                execution_owner_id=f"{label}-owner",
-                query_context={"case_id": case_id, "ticker": ticker},
-                diagnostics={},
-                at=_AT,
-            )
-        kernel.fail_run(
-            run_id=claims["failed"].run_id,
-            failure_code="internal_error",
-            diagnostics={"failures": 1},
-            at=_AT,
-        )
-
-        incident = {
-            "case_failures": {
-                store.get_automation_run(claims["failed"].run_id)["case_id"]: {
-                    "run_id": claims["failed"].run_id,
-                    "recovery": "new_attempt",
-                },
-                store.get_automation_run(claims["running"].run_id)["case_id"]: {
-                    "run_id": claims["running"].run_id,
-                    "recovery": "new_attempt",
-                },
-                pending_case["case_id"]: {
-                    "run_id": pending_run["run_id"],
-                    "recovery": "finalization",
-                },
-            },
-            "scheduler_failure": None,
+        pending_runs = {
+            case["case_id"]: store.list_automation_runs(case["case_id"])[0]
+            for case in (v2_case, legacy_case)
         }
+        assert v2_failure["failed"] == 1
+        assert legacy_failure["failed"] == 1
+        for run in pending_runs.values():
+            context = json.loads(run["query_context_json"])
+            assert run["status"] == "succeeded"
+            assert "terminal_finalized_decision_provenance_sha256" not in context
+            assert "terminal_finalization_failure" not in context
 
-        active = scheduler._reconcile_active_incident(
-            harness.conn,
-            incident,
-            scheduler_succeeded=True,
-        )
-
-        assert active == incident
-
-        pending_replacement_incident = {
-            "case_failures": {
-                pending_case["case_id"]: {
-                    "run_id": None,
-                    "recovery": "new_attempt",
-                }
-            },
-            "scheduler_failure": None,
-        }
-        assert scheduler._reconcile_active_incident(
-            harness.conn,
-            pending_replacement_incident,
-            scheduler_succeeded=True,
-        ) == pending_replacement_incident
-    finally:
         monkeypatch.setattr(
             SecurityLifecycleInvestigationStore,
             "generate_action_proposals",
             original_proposals,
         )
+        monkeypatch.setattr(
+            SecurityLifecycleFactKernel,
+            "record_terminal_finalization_failure",
+            original_failure_recorder,
+        )
+        finalized = harness.worker_with_transition_approver(
+            target_case_id=finalized_case["case_id"],
+        ).run(limit=1)
+        finalized_run = store.list_automation_runs(finalized_case["case_id"])[0]
+        finalized_context = json.loads(finalized_run["query_context_json"])
+        assert finalized["accepted"] == 1
+        assert (
+            finalized_context["terminal_finalized_decision_provenance_sha256"]
+            == finalized_context["terminal_decision_provenance_sha256"]
+        )
+
+        assert scheduler.record_security_lifecycle_automation_result(
+            v2_failure,
+            now=datetime.fromisoformat("2026-08-25T12:00:00+00:00"),
+        )
+        expected_v2_marker = {
+            "run_id": pending_runs[v2_case["case_id"]]["run_id"],
+            "recovery": "finalization",
+        }
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_result"]["active_incident"] == {
+            "case_failures": {v2_case["case_id"]: expected_v2_marker},
+            "scheduler_failure": None,
+        }
+
+        legacy_mixed = {
+            "status": "partial",
+            "reason": "case_processing_failed",
+            "selected": 2,
+            "processed": 2,
+            "accepted": 1,
+            "drafted": 0,
+            "blocked": 0,
+            "failed": 1,
+            "skipped_current": 0,
+            "case_ids": [legacy_case["case_id"], finalized_case["case_id"]],
+        }
+        assert scheduler.record_security_lifecycle_automation_result(
+            legacy_mixed,
+            now=datetime.fromisoformat("2026-08-25T12:01:00+00:00"),
+        )
+        expected_incident = {
+            "case_failures": {
+                v2_case["case_id"]: expected_v2_marker,
+                legacy_case["case_id"]: {
+                    "run_id": pending_runs[legacy_case["case_id"]]["run_id"],
+                    "recovery": "finalization",
+                },
+            },
+            "scheduler_failure": None,
+        }
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        active_incident = state["last_result"]["active_incident"]
+        assert active_incident == expected_incident
+        assert finalized_case["case_id"] not in active_incident["case_failures"]
+
+        scheduler_success = {
+            "result_version": 2,
+            "status": "succeeded",
+            "reason": None,
+            "selected": 0,
+            "processed": 0,
+            "accepted": 0,
+            "drafted": 0,
+            "blocked": 0,
+            "failed": 0,
+            "skipped_current": 0,
+            "case_ids": [],
+            "case_outcomes": {},
+        }
+        assert scheduler.record_security_lifecycle_automation_result(
+            scheduler_success,
+            now=datetime.fromisoformat("2026-08-25T12:02:00+00:00"),
+        )
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_status"] == "failed"
+        assert state["last_result"]["latest_result"] == scheduler_success
+        assert state["last_result"]["active_incident"] == expected_incident
+        runs = telemetry.list_runs(
+            job_name="security_lifecycle.automation",
+            limit=10,
+        )
+        assert [(row["status"], row["message"]) for row in runs] == [
+            ("failed", "security_lifecycle_automation_failure"),
+            ("failed", "security_lifecycle_automation_failure"),
+        ]
+        assert [row["result"].get("result_version") for row in runs] == [None, 2]
+        assert [row["result"]["case_ids"] for row in runs] == [
+            [legacy_case["case_id"], finalized_case["case_id"]],
+            [v2_case["case_id"]],
+        ]
+
+        recovered_legacy = harness.worker_with_transition_approver(
+            target_case_id=legacy_case["case_id"],
+        ).run(limit=1)
+        assert scheduler.record_security_lifecycle_automation_result(
+            recovered_legacy,
+            now=datetime.fromisoformat("2026-08-25T12:03:00+00:00"),
+        )
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_result"]["active_incident"] == {
+            "case_failures": {v2_case["case_id"]: expected_v2_marker},
+            "scheduler_failure": None,
+        }
+
+        recovered_v2 = harness.worker_with_transition_approver(
+            target_case_id=v2_case["case_id"],
+        ).run(limit=1)
+        assert scheduler.record_security_lifecycle_automation_result(
+            recovered_v2,
+            now=datetime.fromisoformat("2026-08-25T12:04:00+00:00"),
+        )
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_result"]["active_incident"] is None
+        runs = telemetry.list_runs(
+            job_name="security_lifecycle.automation",
+            limit=10,
+        )
+        assert [(row["status"], row["message"]) for row in runs] == [
+            ("succeeded", "security_lifecycle_automation_recovered"),
+            ("failed", "security_lifecycle_automation_failure"),
+            ("failed", "security_lifecycle_automation_failure"),
+        ]
+        assert [row["result"].get("result_version") for row in runs] == [
+            2,
+            None,
+            2,
+        ]
+        assert [row["result"]["case_ids"] for row in runs] == [
+            [v2_case["case_id"]],
+            [legacy_case["case_id"], finalized_case["case_id"]],
+            [v2_case["case_id"]],
+        ]
+    finally:
+        harness.conn.close()
+
+
+@pytest.mark.parametrize(
+    "completion_corruption",
+    ("missing_decision", "malformed_decision", "malformed_provenance"),
+)
+def test_same_run_recovery_requires_an_explicit_valid_completion_witness(
+    tmp_path,
+    monkeypatch,
+    completion_corruption,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    case = _case(1)
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = JobRunsLocalStore(profile_path)
+    scheduler_state = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    harness = _Harness(tmp_path, [case])
+
+    def fail_proposals(*_args, **_kwargs):
+        raise ValueError("private fixture detail")
+
+    def fail_failure_record(*_args, **_kwargs):
+        raise sqlite3.OperationalError("failure record unavailable")
+
+    monkeypatch.setattr(
+        SecurityLifecycleInvestigationStore,
+        "generate_action_proposals",
+        fail_proposals,
+    )
+    monkeypatch.setattr(
+        SecurityLifecycleFactKernel,
+        "record_terminal_finalization_failure",
+        fail_failure_record,
+    )
+    try:
+        failed = harness.worker_with_transition_approver().run(limit=1)
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        assert scheduler.record_security_lifecycle_automation_result(
+            failed,
+            now=datetime.fromisoformat("2026-08-25T12:00:00+00:00"),
+        )
+
+        context = json.loads(run["query_context_json"])
+        provenance = context["terminal_decision_provenance_sha256"]
+        if completion_corruption == "missing_decision":
+            context.pop("terminal_decision")
+        elif completion_corruption == "malformed_decision":
+            context["terminal_decision"] = []
+            context["terminal_finalized_decision_provenance_sha256"] = provenance
+        else:
+            context["terminal_decision_provenance_sha256"] = "invalid"
+            context["terminal_finalized_decision_provenance_sha256"] = "invalid"
+        harness.conn.execute(
+            "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+            "WHERE run_id=?",
+            (json.dumps(context, sort_keys=True, separators=(",", ":")), run["run_id"]),
+        )
+        harness.conn.commit()
+
+        scheduler_success = {
+            "result_version": 2,
+            "status": "succeeded",
+            "reason": None,
+            "selected": 0,
+            "processed": 0,
+            "accepted": 0,
+            "drafted": 0,
+            "blocked": 0,
+            "failed": 0,
+            "skipped_current": 0,
+            "case_ids": [],
+            "case_outcomes": {},
+        }
+        assert scheduler.record_security_lifecycle_automation_result(
+            scheduler_success,
+            now=datetime.fromisoformat("2026-08-25T12:01:00+00:00"),
+        )
+
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_status"] == "failed"
+        assert state["last_result"]["latest_result"] == scheduler_success
+        assert state["last_result"]["active_incident"] == {
+            "case_failures": {
+                case["case_id"]: {
+                    "run_id": run["run_id"],
+                    "recovery": "finalization",
+                }
+            },
+            "scheduler_failure": None,
+        }
+        assert [(row["status"], row["message"]) for row in telemetry.list_runs(
+            job_name="security_lifecycle.automation",
+            limit=10,
+        )] == [("failed", "security_lifecycle_automation_failure")]
+    finally:
         harness.conn.close()
 
 
