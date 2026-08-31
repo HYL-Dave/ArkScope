@@ -1526,7 +1526,104 @@ def test_terminal_finalization_failure_uses_bounded_backoff_without_hot_loop(
         harness.conn.close()
 
 
-def test_due_terminal_finalization_retry_clears_failure_after_success(
+def test_recovery_marker_is_derived_from_run_state_without_a_failure_record(
+    tmp_path,
+    monkeypatch,
+):
+    from src.scheduler_state import SchedulerStateStore
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    case = _case(1)
+    profile_path = tmp_path / "profile_state.db"
+    telemetry = JobRunsLocalStore(profile_path)
+    scheduler_state = SchedulerStateStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    harness = _Harness(tmp_path, [case])
+    original_proposals = (
+        SecurityLifecycleInvestigationStore.generate_action_proposals
+    )
+    original_failure_recorder = (
+        SecurityLifecycleFactKernel.record_terminal_finalization_failure
+    )
+
+    def fail_proposals(*_args, **_kwargs):
+        raise ValueError("private fixture detail")
+
+    def fail_failure_record(*_args, **_kwargs):
+        raise sqlite3.OperationalError("failure record unavailable")
+
+    monkeypatch.setattr(
+        SecurityLifecycleInvestigationStore,
+        "generate_action_proposals",
+        fail_proposals,
+    )
+    monkeypatch.setattr(
+        SecurityLifecycleFactKernel,
+        "record_terminal_finalization_failure",
+        fail_failure_record,
+    )
+    try:
+        failed = harness.worker_with_transition_approver().run()
+        run = _store(harness).list_automation_runs(case["case_id"])[0]
+        pending_context = json.loads(run["query_context_json"])
+
+        assert failed["failed"] == 1
+        assert run["status"] == "succeeded"
+        assert "terminal_decision" in pending_context
+        assert "terminal_decision_provenance_sha256" in pending_context
+        assert "terminal_finalized_decision_provenance_sha256" not in pending_context
+        assert "terminal_finalization_failure" not in pending_context
+        assert scheduler.record_security_lifecycle_automation_result(
+            failed,
+            now=datetime.fromisoformat("2026-08-25T12:00:00+00:00"),
+        )
+
+        monkeypatch.setattr(
+            SecurityLifecycleInvestigationStore,
+            "generate_action_proposals",
+            original_proposals,
+        )
+        monkeypatch.setattr(
+            SecurityLifecycleFactKernel,
+            "record_terminal_finalization_failure",
+            original_failure_recorder,
+        )
+        recovered = harness.worker_with_transition_approver().run()
+        settled = _store(harness).list_automation_runs(case["case_id"])[0]
+        settled_context = json.loads(settled["query_context_json"])
+
+        assert recovered["accepted"] == 1
+        assert recovered["failed"] == 0
+        assert settled["run_id"] == run["run_id"]
+        assert (
+            settled_context["terminal_finalized_decision_provenance_sha256"]
+            == settled_context["terminal_decision_provenance_sha256"]
+        )
+        assert scheduler.record_security_lifecycle_automation_result(
+            recovered,
+            now=datetime.fromisoformat("2026-08-25T12:01:00+00:00"),
+        )
+
+        state = scheduler_state.get("security_lifecycle.automation")
+        assert state is not None
+        assert state["last_result"]["active_incident"] is None
+        assert [(row["status"], row["message"]) for row in telemetry.list_runs(
+            job_name="security_lifecycle.automation",
+            limit=10,
+        )] == [
+            ("succeeded", "security_lifecycle_automation_recovered"),
+            ("failed", "security_lifecycle_automation_failure"),
+        ]
+    finally:
+        harness.conn.close()
+
+
+def test_recovery_marker_still_clears_when_a_failure_record_exists(
     tmp_path,
     monkeypatch,
 ):
@@ -1597,6 +1694,124 @@ def test_due_terminal_finalization_retry_clears_failure_after_success(
         assert state is not None
         assert state["last_result"]["active_incident"] is None
     finally:
+        harness.conn.close()
+
+
+def test_incident_stays_active_while_the_case_has_genuinely_not_recovered(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_fact_kernel import SecurityLifecycleFactKernel
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    pending_case = _case(1)
+    harness = _Harness(tmp_path, [pending_case])
+    original_proposals = (
+        SecurityLifecycleInvestigationStore.generate_action_proposals
+    )
+
+    def fail_proposals(*_args, **_kwargs):
+        raise ValueError("private fixture detail")
+
+    def fail_failure_record(*_args, **_kwargs):
+        raise sqlite3.OperationalError("failure record unavailable")
+
+    monkeypatch.setattr(
+        SecurityLifecycleInvestigationStore,
+        "generate_action_proposals",
+        fail_proposals,
+    )
+    monkeypatch.setattr(
+        SecurityLifecycleFactKernel,
+        "record_terminal_finalization_failure",
+        fail_failure_record,
+    )
+    try:
+        pending_result = harness.worker_with_transition_approver().run()
+        store = _store(harness)
+        pending_run = store.list_automation_runs(pending_case["case_id"])[0]
+        pending_context = json.loads(pending_run["query_context_json"])
+        assert pending_result["failed"] == 1
+        assert pending_run["status"] == "succeeded"
+        assert "terminal_finalization_failure" not in pending_context
+
+        kernel = SecurityLifecycleFactKernel(store)
+        claims = {}
+        for label, ticker in (("failed", "FAIL"), ("running", "RUN")):
+            case_id = store.ensure_case(
+                source="sec_edgar",
+                source_ref=f"real-{label}-case",
+                ticker=ticker,
+                at=_AT,
+            )
+            claims[label] = kernel.reserve_run(
+                case_id=case_id,
+                observation_fingerprint_sha256=("b" if label == "failed" else "c")
+                * 64,
+                policy_version="trusted-lifecycle-v1",
+                mode="live",
+                execution_revision="trusted-lifecycle-execution-r1",
+                execution_owner_id=f"{label}-owner",
+                query_context={"case_id": case_id, "ticker": ticker},
+                diagnostics={},
+                at=_AT,
+            )
+        kernel.fail_run(
+            run_id=claims["failed"].run_id,
+            failure_code="internal_error",
+            diagnostics={"failures": 1},
+            at=_AT,
+        )
+
+        incident = {
+            "case_failures": {
+                store.get_automation_run(claims["failed"].run_id)["case_id"]: {
+                    "run_id": claims["failed"].run_id,
+                    "recovery": "new_attempt",
+                },
+                store.get_automation_run(claims["running"].run_id)["case_id"]: {
+                    "run_id": claims["running"].run_id,
+                    "recovery": "new_attempt",
+                },
+                pending_case["case_id"]: {
+                    "run_id": pending_run["run_id"],
+                    "recovery": "finalization",
+                },
+            },
+            "scheduler_failure": None,
+        }
+
+        active = scheduler._reconcile_active_incident(
+            harness.conn,
+            incident,
+            scheduler_succeeded=True,
+        )
+
+        assert active == incident
+
+        pending_replacement_incident = {
+            "case_failures": {
+                pending_case["case_id"]: {
+                    "run_id": None,
+                    "recovery": "new_attempt",
+                }
+            },
+            "scheduler_failure": None,
+        }
+        assert scheduler._reconcile_active_incident(
+            harness.conn,
+            pending_replacement_incident,
+            scheduler_succeeded=True,
+        ) == pending_replacement_incident
+    finally:
+        monkeypatch.setattr(
+            SecurityLifecycleInvestigationStore,
+            "generate_action_proposals",
+            original_proposals,
+        )
         harness.conn.close()
 
 

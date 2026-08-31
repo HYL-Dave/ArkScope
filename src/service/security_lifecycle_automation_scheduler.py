@@ -27,6 +27,7 @@ from src.security_lifecycle_decision_policy import (
     listing_authority_required_components,
 )
 from src.security_lifecycle_fact_kernel import (
+    _terminal_finalization_pending,
     AutomationBlocker,
     AutomationPriorMaterial,
     SecurityLifecycleFactKernel,
@@ -2265,7 +2266,7 @@ def _failed_case_ids(
         if str(row["status"]) in {"failed", "running"}:
             failed.append(case_id)
             continue
-        if _run_finalization_failure(row) is not None:
+        if _run_finalization_state(row)[1] is not None:
             failed.append(case_id)
     return tuple(failed)
 
@@ -2282,7 +2283,9 @@ def _latest_case_run(
     ).fetchone()
 
 
-def _run_finalization_failure(row: sqlite3.Row) -> dict[str, object] | None:
+def _run_finalization_state(
+    row: sqlite3.Row,
+) -> tuple[bool, dict[str, object] | None]:
     raw_context = row["query_context_json"]
     if not isinstance(raw_context, str):
         raise ValueError("automation_query_context")
@@ -2292,8 +2295,11 @@ def _run_finalization_failure(row: sqlite3.Row) -> dict[str, object] | None:
         raise ValueError("automation_query_context") from exc
     if not isinstance(context, Mapping):
         raise ValueError("automation_query_context")
-    return normalize_terminal_finalization_failure(
-        context.get("terminal_finalization_failure")
+    return (
+        _terminal_finalization_pending(context),
+        normalize_terminal_finalization_failure(
+            context.get("terminal_finalization_failure")
+        ),
     )
 
 
@@ -2304,10 +2310,11 @@ def _case_failure_marker(
     row = _latest_case_run(conn, case_id)
     if row is None:
         return {"run_id": None, "recovery": "new_attempt"}
+    finalization_pending, _ = _run_finalization_state(row)
     recovery = (
         "finalization"
         if str(row["status"]) == "succeeded"
-        and _run_finalization_failure(row) is not None
+        and finalization_pending
         else "new_attempt"
     )
     return {"run_id": str(row["run_id"]), "recovery": recovery}
@@ -2705,12 +2712,21 @@ def _case_failure_is_active(
     baseline_run_id = marker.get("run_id")
     latest_run_id = str(latest["run_id"])
     latest_status = str(latest["status"])
-    finalization_failure = _run_finalization_failure(latest)
+    finalization_pending, finalization_failure = _run_finalization_state(latest)
+    finalization_pending = latest_status == "succeeded" and finalization_pending
     if marker.get("recovery") == "finalization" and latest_run_id == baseline_run_id:
-        return latest_status != "succeeded" or finalization_failure is not None
+        return (
+            latest_status != "succeeded"
+            or finalization_pending
+            or finalization_failure is not None
+        )
     if latest_run_id == baseline_run_id:
         return True
-    return latest_status in {"failed", "running"} or finalization_failure is not None
+    return (
+        latest_status in {"failed", "running"}
+        or finalization_pending
+        or finalization_failure is not None
+    )
 
 
 def _reconcile_active_incident(
