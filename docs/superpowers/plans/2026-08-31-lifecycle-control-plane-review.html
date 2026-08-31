@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control-Plane Defect Register</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    color-scheme:light dark;
+    --paper:#F1F3F1; --surface:#FCFCFB; --surface-2:#E8EBE8;
+    --ink:#1B1F1E; --ink-2:#3D4442; --muted:#616866; --hairline:#D3D8D4;
+    --accent:#2F5D50; --accent-soft:#E2ECE7;
+    --blocking:#9A3B2A; --blocking-bg:#F7E7E3;
+    --major:#8A6516;   --major-bg:#F6EEDC;
+    --minor:#5A6270;   --minor-bg:#E9ECEF;
+    --ok:#2F5D50;
+    --code-bg:#EDEFEC; --code-ink:#22292A;
+    --measure:5px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#14181A; --surface:#1B2022; --surface-2:#232A2C;
+      --ink:#E7EBE8; --ink-2:#C2CAC6; --muted:#8E9894; --hairline:#2E3639;
+      --accent:#7FBCA8; --accent-soft:#1E2C29;
+      --blocking:#E68A73; --blocking-bg:#33201C;
+      --major:#D6AC5C;   --major-bg:#2C2519;
+      --minor:#96A0AE;   --minor-bg:#232A30;
+      --ok:#7FBCA8;
+      --code-bg:#101416; --code-ink:#CBD4D1;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14181A; --surface:#1B2022; --surface-2:#232A2C;
+    --ink:#E7EBE8; --ink-2:#C2CAC6; --muted:#8E9894; --hairline:#2E3639;
+    --accent:#7FBCA8; --accent-soft:#1E2C29;
+    --blocking:#E68A73; --blocking-bg:#33201C;
+    --major:#D6AC5C;   --major-bg:#2C2519;
+    --minor:#96A0AE;   --minor-bg:#232A30;
+    --ok:#7FBCA8;
+    --code-bg:#101416; --code-ink:#CBD4D1;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  img{max-width:100%}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif;
+    font-size:15.5px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1000px; margin:0 auto; padding:clamp(24px,5vw,64px) clamp(18px,4vw,40px) 96px}
+
+  .mast{display:flex; flex-direction:column; gap:18px; padding-bottom:26px; border-bottom:2px solid var(--ink)}
+  .eyebrow{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11px; font-weight:700;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--accent);
+  }
+  h1{
+    font-family:Newsreader,Georgia,serif; font-weight:600;
+    font-size:clamp(30px,5vw,46px); line-height:1.1; margin:0;
+    text-wrap:balance; letter-spacing:-.015em;
+  }
+  .subject{
+    display:flex; flex-wrap:wrap; gap:6px 22px;
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:12.5px; color:var(--muted);
+  }
+  .subject b{color:var(--ink-2); font-weight:700}
+  .localnote{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11px;
+    letter-spacing:.06em; color:var(--muted);
+  }
+
+  .verdict{
+    margin:26px 0 0; padding:20px 22px; background:var(--surface);
+    border:1px solid var(--hairline); border-left:var(--measure) solid var(--blocking);
+    border-radius:3px;
+  }
+  .verdict p{margin:0}
+  .verdict p + p{margin-top:10px}
+  .verdict .lead{font-family:Newsreader,Georgia,serif; font-size:19px; line-height:1.45}
+
+  .caveat{
+    margin-top:14px; padding:14px 18px; border-radius:3px;
+    background:var(--surface-2); border:1px dashed var(--hairline);
+    font-size:14px; color:var(--ink-2);
+  }
+  .caveat strong{color:var(--ink)}
+
+  section{margin-top:52px}
+  h2{
+    font-family:Newsreader,Georgia,serif; font-weight:600; font-size:clamp(21px,3vw,27px);
+    margin:0 0 6px; letter-spacing:-.01em; text-wrap:balance;
+  }
+  .snum{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11.5px; font-weight:700;
+    letter-spacing:.1em; color:var(--accent); display:block; margin-bottom:7px;
+  }
+  .lede{color:var(--muted); max-width:66ch; margin:0 0 22px}
+
+  .tw{overflow-x:auto; border:1px solid var(--hairline); border-radius:3px; background:var(--surface)}
+  table{width:100%; border-collapse:collapse; font-size:14px; min-width:560px}
+  th,td{padding:10px 14px; text-align:left; vertical-align:top; border-bottom:1px solid var(--hairline)}
+  thead th{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10.5px; font-weight:700;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    background:var(--surface-2); white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:none}
+  td code{font-size:12.5px}
+  .yes{color:var(--ok); font-weight:600}
+  .no{color:var(--blocking); font-weight:600}
+  .num{font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; white-space:nowrap}
+
+  .entry{
+    background:var(--surface); border:1px solid var(--hairline);
+    border-left:var(--measure) solid var(--minor); border-radius:3px;
+    padding:20px 22px; margin-bottom:22px;
+  }
+  .entry.blocking{border-left-color:var(--blocking)}
+  .entry.major{border-left-color:var(--major)}
+  .ehead{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 12px; margin-bottom:4px}
+  .eid{font-family:"JetBrains Mono",ui-monospace,monospace; font-weight:700; font-size:15px; color:var(--ink)}
+  .loc{font-family:"JetBrains Mono",ui-monospace,monospace; color:var(--muted); font-size:12.5px}
+  .chip{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10px; font-weight:700;
+    letter-spacing:.09em; text-transform:uppercase; padding:3px 8px; border-radius:2px; white-space:nowrap;
+  }
+  .chip.blocking{background:var(--blocking-bg); color:var(--blocking)}
+  .chip.major{background:var(--major-bg); color:var(--major)}
+  .chip.minor{background:var(--minor-bg); color:var(--minor)}
+  .chip.conf{background:var(--accent-soft); color:var(--accent)}
+  .etitle{
+    font-family:Newsreader,Georgia,serif; font-size:20px; line-height:1.32; font-weight:600;
+    margin:6px 0 12px; text-wrap:balance;
+  }
+  .entry p{margin:0 0 11px; max-width:74ch}
+  .entry p:last-child{margin-bottom:0}
+  .entry ol,.entry ul{margin:0 0 11px; padding-left:22px; max-width:74ch}
+  .entry li{margin-bottom:7px}
+  .fix{margin-top:14px; padding:12px 16px; background:var(--accent-soft); border-radius:2px; font-size:14.5px}
+  .fix b{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10.5px; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--accent); display:block; margin-bottom:5px;
+  }
+
+  pre{
+    margin:0 0 13px; padding:14px 16px; background:var(--code-bg); color:var(--code-ink);
+    border-radius:3px; overflow-x:auto; font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:12.5px; line-height:1.66; border:1px solid var(--hairline);
+  }
+  pre .hit{color:var(--blocking); font-weight:700}
+  pre .good{color:var(--ok); font-weight:700}
+  pre .dim{color:var(--muted)}
+  .caption{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 6px;
+  }
+  code{
+    font-family:"JetBrains Mono",ui-monospace,monospace; font-size:13px;
+    background:var(--code-bg); padding:1px 5px; border-radius:2px; color:var(--code-ink);
+  }
+
+  .correction{
+    margin:14px 0; padding:14px 18px; border-radius:3px;
+    background:var(--major-bg); border-left:3px solid var(--major); font-size:14.5px;
+  }
+  .correction b{color:var(--major)}
+
+  .order{list-style:none; padding:0; margin:0; counter-reset:o}
+  .order li{
+    counter-increment:o; display:grid; grid-template-columns:34px 1fr; gap:14px;
+    padding:14px 0; border-bottom:1px solid var(--hairline);
+  }
+  .order li:last-child{border-bottom:none}
+  .order li::before{
+    content:counter(o); font-family:"JetBrains Mono",ui-monospace,monospace; font-weight:700;
+    font-size:13px; color:var(--accent); background:var(--accent-soft);
+    width:30px; height:30px; display:grid; place-items:center; border-radius:2px;
+  }
+  .order .what{font-weight:600; display:block; margin-bottom:2px}
+  .order .why{color:var(--muted); font-size:14px}
+
+  footer{margin-top:60px; padding-top:22px; border-top:1px solid var(--hairline); font-size:13.5px; color:var(--muted)}
+  footer ul{padding-left:20px; margin:8px 0 0}
+  footer li{margin-bottom:5px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <span class="eyebrow">Independent review · round 2</span>
+    <h1>Control-Plane Defect Register</h1>
+    <div class="subject">
+      <span>branch <b>lifecycle-automation-control-plane</b></span>
+      <span>authority <b>daa3a408</b></span>
+      <span>seal <b>b7cf3c0b</b></span>
+      <span>base <b>947a51fc</b></span>
+      <span>2026-08-31</span>
+    </div>
+    <span class="localnote">local file · not published · open directly in a browser</span>
+  </header>
+
+  <div class="verdict">
+    <p class="lead">Every mechanical claim in the implementer's report is true — I re-derived all of them rather than reading the summary. <strong>But the branch installs one blocking dead-end and six further defects, all reproduced by running code.</strong></p>
+    <p>The nine round-1 repair items and all six §7 corrections landed, and landed in the <em>corrected</em> form. Merge is nevertheless not recommended until <strong>F1–F4</strong> are repaired: F1 disables the very orphan reclamation this branch exists to add, and does so for every case at once. <em>Round 3 (2026-09-01): the implementer reproduced all seven independently and corrected two conclusions below — both accepted.</em></p>
+  </div>
+
+  <div class="caveat">
+    <strong>Provenance of these findings.</strong> Three review lanes were commissioned. Two finished; the third — an unowned-guard census — plus all nine adversarial verify agents died on a session limit. <strong>No finding here survived an adversarial refutation pass, because that pass never ran.</strong> Each was instead re-verified directly, by execution, and §3 is a bounded substitute for the dead lane.
+  </div>
+
+  <section>
+    <span class="snum">§ 1</span>
+    <h2>Attestation: what was re-derived independently</h2>
+    <p class="lede">Nothing in this column came from the implementer's summary. Independent means own command, own hash, own test run.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Claim</th><th>Independent check</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Manifest digest <code>8e6b7e7f…</code></td><td>own <code>sha256sum SHA256SUMS</code></td><td class="yes">identical</td></tr>
+          <tr><td>Packet 34/34 hashes</td><td>own <code>sha256sum -c</code> + directory-vs-manifest set difference</td><td class="yes">34/34, zero unsealed files</td></tr>
+          <tr><td>Backend A/B <span class="num">5223P / 12S</span></td><td>both raw gate logs</td><td class="yes">matches</td></tr>
+          <tr><td>Focused <span class="num">931</span></td><td><b>own re-run</b></td><td class="yes">931 passed in 46.20s</td></tr>
+          <tr><td>Frontend A/B <span class="num">108 files / 1324</span></td><td>both raw logs</td><td class="yes">matches</td></tr>
+          <tr><td>Node manifests byte-identical</td><td>own hashes of both files</td><td class="yes">both <code>22363e5d…</code>, 5235 nodes</td></tr>
+          <tr><td>Schema authorities untouched</td><td>own hash of both files vs <code>master</code></td><td class="yes">identical</td></tr>
+          <tr><td>Unmerged, unpushed</td><td><code>master == origin/master == 947a51fc</code>, zero merge commits</td><td class="yes">confirmed</td></tr>
+          <tr><td>Mutation method is real</td><td><b>own reverse mutations</b> on the three load-bearing fixes</td><td class="yes">3/3 RED, restored byte-identically</td></tr>
+          <tr><td>Browser zero-findings are earned</td><td>read <code>calibrate_geometry()</code> source</td><td class="yes">computed, not hardcoded</td></tr>
+          <tr><td>Automation has never self-approved</td><td>—</td><td class="no">still unverified</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lede" style="margin-top:14px">The last row is the round-1 claim asserted without checking. It needs the production read-only inventory. No conclusion below depends on it.</p>
+  </section>
+
+  <section>
+    <span class="snum">§ 2</span>
+    <h2>The defect register</h2>
+    <p class="lede">Severity is by consequence, not novelty. Every entry is <em>confirmed</em>: reproduced by running code, with the decisive output shown.</p>
+
+    <article class="entry blocking">
+      <div class="ehead">
+        <span class="eid">F1</span><span class="chip blocking">Blocking</span><span class="chip conf">Confirmed</span>
+        <span class="loc">fact_kernel.py:648</span>
+      </div>
+      <p class="etitle">A 33-link predecessor chain wedges the run forever — and blocks orphan reclamation for every other case</p>
+      <p><code>_MAX_PREDECESSOR_CHAIN = 32</code>. <code>_attempt_chain</code> raises on the 33rd link, and <strong>both</strong> paths that can rescue a <code>running</code> row route through it unconditionally — <code>fail_run</code> (:2624) and <code>reconcile_running_runs</code> (:2559), each via <code>_automatic_retry_for_failure</code>. The worker swallows both raises.</p>
+      <p class="caption">reproduced</p>
+<pre><span class="hit">*** fail_run RAISED at chain depth 33: ValueError(automation_predecessor_chain_limit)</span>
+rows left status='running' = 1
+<span class="hit">*** reconcile_running_runs RAISED: ValueError(automation_predecessor_chain_limit)</span>
+<span class="dim">--- CROSS-CASE blast radius: a second, healthy case</span>
+healthy case2 row: before=running after=running  <span class="hit">-&gt; STILL STUCK (collateral damage)</span></pre>
+      <p>Two aggravating facts found while verifying:</p>
+      <ol>
+        <li><strong>Cross-case blast radius.</strong> The reconcile loop is not per-row guarded and runs in one <code>_immediate_transaction</code>. With <code>execution_owner_id=None</code> — the startup and per-tick call — the owner <code>continue</code> never fires, so the chain walk runs for <em>every</em> running row. One poisoned row withholds reclamation from all of them.</li>
+        <li><strong>Reachability is worse than a failure loop.</strong> A link is appended whenever the previous attempt is terminal — <code>{failed, blocked, succeeded}</code> — so fully <em>successful</em> runs chain too (verified to depth 33 using only succeeded rows). <code>allow_new_attempt=True</code> is set unconditionally for the per-case Run button, and nothing anywhere prunes the chain. About 32 clicks on one case with an unchanged fingerprint suffices.</li>
+      </ol>
+      <div class="fix"><b>Fix direction</b>Get the chain walk off the recovery path — bound the derivation and treat an over-long chain as “retries exhausted”, or catch the two chain errors at the <code>fail_run</code>/<code>reconcile</code> boundary and degrade to a typed terminal state. Independently, <code>reconcile_running_runs</code> must be per-row fault-isolated so one row can never starve the rest.</div>
+    </article>
+
+    <article class="entry major">
+      <div class="ehead">
+        <span class="eid">F2</span><span class="chip major">Major</span><span class="chip conf">Confirmed</span>
+        <span class="loc">data_scheduler.py:1505</span>
+      </div>
+      <p class="etitle">A startup fallback poisons the lifecycle telemetry row permanently</p>
+      <p>There are two calls to <code>reconcile_interrupted_running</code>. Line 1486 passes <code>excluded_sources=("security_lifecycle.automation",)</code>; <strong>line 1505 does not.</strong> That exclusion exists precisely because the lifecycle source's <code>last_result</code> carries a different blob shape.</p>
+      <p class="caption">reproduced</p>
+<pre>_state_envelope(foreign blob)               <span class="hit">*** RAISED ValueError(automation_scheduler_state)</span>
+_state_envelope(well-formed lifecycle blob) <span class="good">OK</span></pre>
+      <p>The consequence is permanent, and the ordering is what makes it so: <code>_load_active_incident</code> runs at :2892, <strong>before</strong> <code>_write_automation_state</code> at :2945, and its raise is caught at :2953 with a <strong>rollback</strong>. So the write that would repair the row never executes, and every later record call returns <code>False</code>. The <code>not_installed</code> early return writes only <code>last_status</code>, so it does not clear <code>last_result</code> either. Nothing in-product recovers it.</p>
+      <p>Reachability is gated — line 1505 needs both the lifecycle reconcile <em>and</em> its failure telemetry to raise. Low probability, permanent consequence, two-line fix.</p>
+      <div class="fix"><b>Fix direction</b>Pass the same <code>excluded_sources</code> at line 1505. Separately, let <code>_load_active_incident</code> treat a foreign blob as “no prior incident” rather than raising, so a poisoned row self-heals on the next write.</div>
+    </article>
+
+    <article class="entry major">
+      <div class="ehead">
+        <span class="eid">F3</span><span class="chip major">Major</span><span class="chip conf">Confirmed</span>
+        <span class="loc">ibkr_evidence.py:269 · 481 · 523</span>
+      </div>
+      <p class="etitle">One blocker code, two opposite meanings — and a 9..64 band that asserts a conflict never observed</p>
+      <p>This is <strong>instance #9</strong> of the producer/validator asymmetry family, in its purest form: the same code is emitted from two sites that mean opposite things.</p>
+<pre>:481  plan refused, BEFORE any gateway call   requests_made=0   <span class="dim">"I never asked"</span>
+:523  several contracts found AFTER querying  requests_made=N   <span class="dim">"I asked; the answer isn't unique"</span></pre>
+      <p class="caption">measured with the real functions</p>
+<pre>producer bound (_MAX_ALIASES_PER_TICKER)   = 64
+consumer bound (_DEFAULT_IBKR_MAX_QUERIES) = 8   <span class="hit">→ dead band 9..64  (canary: 4..64)</span>
+  8 distinct tickers -&gt; 8 contracts        <span class="good">(fine)</span>
+  9 distinct tickers -&gt; None (plan refused)
+
+refusal: blockers=('ibkr_contract_ambiguous',) requests_made=0 status='ambiguous'
+_provider_state(…, 'market_infrastructure') = <span class="hit">'conflict'</span>
+retryable? <span class="hit">False</span>        <span class="dim">(compare ibkr_contract_missing: True)</span></pre>
+      <p>So a case in the dead band is told <strong>“IBKR contract data conflicts”</strong> with zero IBKR contact, and because the code is not retryable, <code>retry_at</code> is <code>NULL</code> and it never retries. The same run writes <code>ibkr_requests=0</code> and <code>ibkr_conflict=1</code> simultaneously.</p>
+      <div class="correction"><b>Correction to round 1.</b> The §7.2 note sized this as “degrades toward <code>review_suggested</code>; manufactures human work, does not authorise an unsafe change”. That note described a <code>contract_missing</code> outcome. The implemented fix emits <code>ambiguous</code>, which maps to <code>conflict</code> and is non-retryable — the note does not apply and the severity is higher than stated. The fix <em>direction</em> in §7.2 was right; the sizing was wrong.</div>
+      <div class="correction"><b>Fix direction corrected in round 3.</b> The first draft said “give plan-overflow its own code”. That <strong>violates zero-migration</strong>: <code>schema.py:489</code> bakes the allowed set into the table — <code>blocker_code TEXT NOT NULL CHECK (blocker_code IN (…))</code> — and SQLite cannot <code>ALTER</code> a <code>CHECK</code>. The implementer caught this; the correction is his.</div><div class="fix"><b>Approved fix</b>Use the existing-but-unused <code>market_confirmation_missing</code> for plan-overflow — retryable, absent from <code>_PROVIDER_CONFLICT_CODES</code>, carrying a <code>candidate_budget_exceeded</code> context; keep <code>ibkr_contract_ambiguous</code> only for multiplicity observed after querying. Slot verified: only it and <code>impact_context_requested</code> have zero references outside <code>schema.py</code>, and it <strong>already carries both locale labels</strong> (<code>marketConfirmationMissing</code>, mapped at <code>lifecyclePresentation.ts:414</code>) — a label-less code would have reproduced F7 on the spot.<br><br><strong>Condition added by review:</strong> the blocker projection is <code>{blocker_code, retryable}</code> only (<code>api.ts:2703</code>), so <code>candidate_budget_exceeded</code> would be persisted and never seen — the operator reads only “Market confirmation is missing”, true but uninformative, trading a false conflict for a vague truth. Widen the projection to carry context (no migration: <code>context_json</code> already exists), or file the gap explicitly.</div>
+    </article>
+
+    <article class="entry major">
+      <div class="ehead">
+        <span class="eid">F4</span><span class="chip major">Major</span><span class="chip conf">Confirmed</span><span class="chip blocking">Merge blocker</span>
+        <span class="loc">automation_scheduler.py:2295</span>
+      </div>
+      <p class="etitle">A genuinely recovered case stays pinned as an active incident forever</p>
+      <p><code>_case_failure_marker</code> classifies recovery as <code>"finalization"</code> only when a finalization-failure <em>record</em> exists; otherwise <code>"new_attempt"</code>. But recovery for a <code>succeeded</code> + pending run is finalization <strong>in place, on the same run_id</strong>. When the record could not be written — the worker swallows exactly that at :770-777 — the two disagree.</p>
+      <p class="caption">reproduced, with positive control</p>
+<pre><span class="dim">A: failure record WAS persisted</span>
+   marker = {'run_id':'slar_R', 'recovery':'finalization'}
+   after a GENUINE in-place recovery -&gt; still_active = <span class="good">False   (clears correctly)</span>
+
+<span class="dim">B: failure record could NOT be written</span>
+   marker = {'run_id':'slar_R', 'recovery':'new_attempt'}
+   after a GENUINE in-place recovery -&gt; still_active = <span class="hit">True    &lt;== PINNED FOREVER</span></pre>
+      <p>Two independent review lanes landed on this same line.</p>
+      <div class="fix"><b>Fix direction</b>Derive <code>recovery</code> from the run's <em>state</em> — succeeded plus terminal finalization pending implies in-place finalization — not from whether a failure record happened to persist.</div><div class="correction"><b>Promoted to merge blocker in round 3.</b> The first draft listed F1–F3 as blocking and put F4 fourth — inconsistent on this review's own reasoning. F4 is the same class as F2 (permanent, non-self-healing false state on the status surface) with <strong>higher reachability</strong>: F2 needs a nested double failure, F4 needs one swallowed write. The implementer raised this; accepted.</div>
+    </article>
+
+    <article class="entry">
+      <div class="ehead">
+        <span class="eid">F5</span><span class="chip minor">Minor</span><span class="chip conf">Confirmed</span>
+        <span class="loc">worker.py:666</span>
+      </div>
+      <p class="etitle">The finalization-recovery path destroys its own progress row</p>
+      <p><code>_begin_progress(finalization_only=True)</code> seeds the registry at <code>finalize</code> (index 7). The shared tail then emits <code>progress_callback("approve")</code> (index 6) whenever the terminal decision is <code>verified_automatic</code> + <code>transition_requested</code> and mutation is allowed. The registry requires strictly increasing stages.</p>
+      <p class="caption">reproduced through the real worker wrapper, with control</p>
+<pre>rows before = 1
+security lifecycle progress observer disabled operation=advance
+rows after  = 0  <span class="hit">-&gt; PROGRESS ROW DESTROYED</span>
+control: legitimate forward advance -&gt; rows = 1 <span class="good">(kept)</span></pre>
+      <p><code>_CaseProgress.advance</code> catches the <code>automation_progress_stage_order</code> raise and <code>_disable("advance")</code> clears the entry. <code>GET /automation</code> loses the case for the rest of a run that is still executing — on the branch whose stated goal is truthful progress.</p>
+      <div class="fix"><b>Fix direction</b>Do not emit <code>approve</code> after seeding at <code>finalize</code>; or seed the finalization-only path at <code>approve</code> when an approval stage will actually run.</div>
+    </article>
+
+    <article class="entry">
+      <div class="ehead">
+        <span class="eid">F6</span><span class="chip minor">Minor</span><span class="chip conf">Confirmed</span>
+        <span class="loc">ticker_identity_scheduler.py:391</span>
+      </div>
+      <p class="etitle">A deliberate policy stop is reported as an execution failure</p>
+      <p><code>AutomationTransitionMutationDisabled</code> is raised inside <code>before_write</code>. <code>execute_transition</code> calls <code>before_write()</code> bare (<code>ticker_identity_service.py:385</code>), so it propagates to the loop's generic <code>except Exception</code> at :417, lands in <code>failed_transition_ids</code>, and the tick reports <code>status="partial"</code>, <code>reason="transition_execution_failed"</code>.</p>
+      <p>Two ways in: the operator turns off <em>apply profile transitions</em> after the batch was listed, or <code>_mutation_allowed</code> swallows a transient profile-store read error into <code>False</code>. Either way an intentional, correct refusal is recorded as a failure.</p>
+      <div class="fix"><b>Fix direction</b>Catch <code>AutomationTransitionMutationDisabled</code> ahead of the generic handler and count it as a deferral with its own reason.</div><div class="correction"><b>Refined in round 3 — a pinned contract, not an unowned regression.</b> The current semantics is deliberately fixed by <code>tests/test_ticker_identity_scheduler.py:637</code>, so repairing it changes an intentional contract. <strong>And the pinning test is itself the source of the dishonesty:</strong> <code>@pytest.mark.parametrize("authority_state", ("disabled", "unavailable"))</code> binds a deliberate policy stop and a transient read failure to the same outcome — two orthogonal axes in one state. The repair must split them, and the parametrized test must split with them.</div>
+    </article>
+
+    <article class="entry">
+      <div class="ehead">
+        <span class="eid">F7</span><span class="chip minor">Minor</span><span class="chip conf">Confirmed</span>
+        <span class="loc">disposition.py:642</span>
+      </div>
+      <p class="etitle">The new attention state renders as “Unrecognized value” in both locales</p>
+      <p>The branch adds a 21st backend disposition reason and no consumer for it.</p>
+      <p class="caption">measured</p>
+<pre>backend reasons        = 21
+frontend type union    = 20
+frontend label map     = 20
+missing from both      = <span class="hit">['automation_finalization_failure']</span>
+i18n en      : automationFinalizationFailure? <span class="hit">False</span>   (automationFailure? <span class="good">True</span>)
+i18n zh-Hant : automationFinalizationFailure? <span class="hit">False</span>   (automationFailure? <span class="good">True</span>)</pre>
+      <p><code>disposition_reason</code> has no runtime validator, so the row parses fine; <code>lifecycleDispositionReasonLabel</code> falls through <code>closedLifecycleLabel</code> to <code>states.unknownValue</code>. The bucket and disposition are correct — the case does reach <code>exception_required</code> / attention — but the reason column reads “Unrecognized value” / 「未識別的值」, byte-identical to what a garbage string prints, exactly when the operator needs the reason.</p>
+      <p><strong>Why no gate caught it:</strong> TypeScript passes because nothing in the frontend <em>produces</em> the value; the backend test only asserts <code>reason_code in LIFECYCLE_DISPOSITION_REASONS</code>, which is self-referential; no mutation targeted the reason vocabulary. There is no backend↔frontend vocabulary parity test in the repository.</p>
+      <p>Verified clean by the same method: the stage vocabulary matches 8=8=8 across backend <code>Literal</code>, frontend type and frontend runtime validator, and the failure-reason vocabulary has no backend-only members.</p>
+      <div class="fix"><b>Fix direction</b>Add the union member, the label entry and both locale strings — and add the parity test, which is the deliverable that stops the next recurrence.</div>
+    </article>
+  </section>
+
+  <section>
+    <span class="snum">§ 3</span>
+    <h2>Test-coverage gap on new guards</h2>
+    <p class="lede">The 32-mutation ledger is a sample, not a census, of roughly 4,000 new product lines. This is the bounded substitute for the lane that died: every new raise-string constant the branch introduces, checked against any mention in <code>tests/</code>.</p>
+<pre>new raise-string constants : 63
+  mentioned in tests/      : 41
+  NOT mentioned in tests/  : <span class="hit">22</span></pre>
+    <p class="lede">Three of the 22 were then mutation-tested against the <strong>full 931-test focused set</strong>, not a single file.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Guard</th><th>Mutation applied</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>automation_scheduler_state</code></td><td>accept a foreign state blob</td><td class="yes">OWNED — 129 failed</td></tr>
+          <tr><td><code>transition_approval_authority</code></td><td>admit any approval authority</td><td class="no">UNOWNED — 931 passed</td></tr>
+          <tr><td><code>terminal_finalization_not_pending</code></td><td>record a failure on a non-pending run</td><td class="no">UNOWNED — 931 passed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lede" style="margin-top:16px">Both unowned guards are defence-in-depth rather than live defects — no current caller reaches them with a bad value. The problem is that a future refactor can delete them silently, and <code>transition_approval_authority</code> is an <em>authority</em> guard, which makes it the one worth owning first. The other 19 candidates were not mutation-tested; a no-test-mention result is a signal, not proof.</p>
+  </section>
+
+  <section>
+    <span class="snum">§ 4</span>
+    <h2>Recommended repair order</h2>
+    <p class="lede">Same principle as round 1: earlier items make later items observable. RED-first throughout — write the failing test before the fix, and prove each new guard is owned by reverse mutation with a named test, restoring byte-identically.</p>
+    <ol class="order">
+      <li><span><span class="what">F1 <em>(blocker)</em> — chain walk off the recovery path, plus per-row fault isolation in <code>reconcile_running_runs</code></span><span class="why">The only defect with cross-case blast radius; it disables the very orphan reclamation this branch added</span></span></li>
+      <li><span><span class="what">F2 <em>(blocker)</em> — <code>excluded_sources</code> at line 1505; make <code>_load_active_incident</code> tolerant</span><span class="why">Two lines; unrecoverable in-product otherwise</span></span></li>
+      <li><span><span class="what">F3 <em>(blocker)</em> — <code>market_confirmation_missing</code> for plan-overflow, retryable and non-conflict, <strong>plus surface the blocker context</strong></span><span class="why">Asserts an unobserved conflict on exactly the high-alias cases</span></span></li>
+      <li><span><span class="what">F4 — derive <code>recovery</code> from run state, not from a persisted record <em>(merge blocker)</em></span><span class="why">Incidents that never clear undermine every later signal</span></span></li>
+      <li><span><span class="what">F7 — union, label, both locales, and the backend↔frontend parity test</span><span class="why">The parity test is the real deliverable</span></span></li>
+      <li><span><span class="what">F5 — no backwards stage on the finalization-only path</span><span class="why">Progress row loss on the recovery path</span></span></li>
+      <li><span><span class="what">F6 — split policy stop from transient failure, <strong>including the parametrized test</strong></span><span class="why">Truthfulness of the tick summary</span></span></li>
+      <li><span><span class="what">Own the two unowned guards; triage the other 19 candidates</span><span class="why">Stops silent deletion later</span></span></li>
+    </ol>
+  </section>
+
+  <section>
+    <span class="snum">§ 5</span>
+    <h2>Sequencing: the arming step is the migration, not the canary</h2>
+    <p class="lede">Merging on its own is safe, and the reason was traced.</p>
+    <p>The automation tables are <strong>not</strong> in the general profile bootstrap — <code>profile_state.py</code> contains no <code>security_lifecycle_automation_runs</code> — and the migration module has <strong>zero callers anywhere outside <code>tests/</code></strong>. So on a production profile the tick hits <code>LifecycleAutomationNotInstalled</code>, records <code>automation_schema_absent</code>, and contacts no provider. A partial schema fails closed with <code>LifecycleSchemaMismatch</code> rather than self-completing.</p>
+    <p>But the shipped default is:</p>
+<pre>DEFAULT_SECURITY_LIFECYCLE_AUTOMATION_CONFIG = SecurityLifecycleAutomationConfig(
+    enabled=<span class="hit">True</span>, interval_minutes=5, batch_limit=2, apply_profile_transitions=<span class="good">False</span>,
+)</pre>
+    <p>and the parser falls back to those defaults for any <em>absent</em> key, while the tick is already wired into the periodic loop. So the moment the tables exist, unattended lifecycle automation begins on a five-minute cadence — <strong>before</strong> the single-case canary that is supposed to precede it. <code>apply_profile_transitions=False</code> means no profile mutation, so this is a provider-traffic and sequencing question, not a data-safety one.</p>
+    <div class="fix"><b>Recommended order for Task 13</b>Read-only inventory → authorize the migration <strong>and in the same session write <code>security_lifecycle.automation.enabled = false</code></strong> (or change the shipped default to <code>False</code> with a named owner test) → single-case canary → then enable deliberately.</div>
+  </section>
+
+  <footer>
+    <strong>Constraints observed during this review.</strong>
+    <ul>
+      <li>Read-only throughout. No merge, push, provider call, production database operation, or App restart.</li>
+      <li>Every mutation was applied to the branch worktree and restored byte-identically; <code>git diff --exit-code</code> verified clean after each batch.</li>
+      <li><code>PROJECT_PRIORITY_MAP.md</code> was not modified. Reproduction scripts live outside the repository, in the session scratchpad.</li>
+      <li>Markdown source of this register: <code>docs/superpowers/plans/2026-08-31-lifecycle-control-plane-review.md</code>.</li>
+      <li>This page is a local file and was not uploaded anywhere.</li>
+    </ul>
+  </footer>
+
+</div>
+</body>
+</html>
