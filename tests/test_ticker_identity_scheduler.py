@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+import json
 import socket
 import sqlite3
 import threading
@@ -144,9 +145,11 @@ def _scheduler_result(
     already_applied: int = 0,
     transition_ids: list[str] | None = None,
     failed_transition_ids: list[str] | None = None,
+    deferred_transition_ids: list[str] | None = None,
 ) -> dict:
     ids = list(transition_ids or [])
     failed_ids = list(failed_transition_ids or [])
+    deferred_ids = list(deferred_transition_ids or [])
     return {
         "status": status,
         "reason": reason,
@@ -156,6 +159,7 @@ def _scheduler_result(
         "already_applied": already_applied,
         "transition_ids": ids,
         "failed_transition_ids": failed_ids,
+        "deferred_transition_ids": deferred_ids,
     }
 
 
@@ -503,6 +507,7 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
         "already_applied": 0,
         "transition_ids": [f"slt_{index}" for index in range(10)],
         "failed_transition_ids": ["slt_2"],
+        "deferred_transition_ids": [],
     }
     assert len(permission_calls) == 8
 
@@ -581,11 +586,7 @@ def test_due_runner_forwards_authority_selection_and_executes_returned_transitio
     assert result["applied"] == 1
 
 
-@pytest.mark.parametrize("authority_state", ("disabled", "unavailable"))
-def test_due_runner_rereads_automation_authority_at_each_write_boundary(
-    monkeypatch,
-    authority_state,
-):
+def _run_automation_write_boundary(monkeypatch, mutation_allowed):
     from src.service import ticker_identity_scheduler as scheduler
 
     writes = []
@@ -620,11 +621,6 @@ def test_due_runner_rereads_automation_authority_at_each_write_boundary(
         lambda *_args, **_kwargs: None,
     )
 
-    def mutation_allowed():
-        if authority_state == "unavailable":
-            raise sqlite3.OperationalError("private config failure")
-        return False
-
     result = scheduler.run_due_ticker_identity_transitions(
         allow_automation_approved=True,
         transition_mutation_allowed=mutation_allowed,
@@ -632,9 +628,101 @@ def test_due_runner_rereads_automation_authority_at_each_write_boundary(
         now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
     )
 
+    return writes, result
+
+
+def test_due_runner_defers_when_automation_mutation_is_disabled_at_write_boundary(
+    monkeypatch,
+):
+    writes, result = _run_automation_write_boundary(monkeypatch, lambda: False)
+
     assert writes == []
-    assert result["applied"] == 0
-    assert result["failed_transition_ids"] == ["slt_automation"]
+    assert result == {
+        "status": "deferred",
+        "reason": "transition_mutation_disabled",
+        "due": 1,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": ["slt_automation"],
+        "failed_transition_ids": [],
+        "deferred_transition_ids": ["slt_automation"],
+    }
+
+
+def test_due_runner_reports_transient_mutation_authority_failure_separately(
+    monkeypatch,
+):
+    def unavailable():
+        raise sqlite3.OperationalError("private config failure")
+
+    writes, result = _run_automation_write_boundary(monkeypatch, unavailable)
+
+    assert writes == []
+    assert result == {
+        "status": "partial",
+        "reason": "transition_mutation_authority_unavailable",
+        "due": 1,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": ["slt_automation"],
+        "failed_transition_ids": ["slt_automation"],
+        "deferred_transition_ids": [],
+    }
+
+
+def test_attended_user_transition_ignores_automation_mutation_authority(
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    authority_reads = []
+
+    class FakeService:
+        def list_due_transitions(self, **_kwargs):
+            return [
+                {
+                    "transition_id": "slt_attended",
+                    "approved_preview_sha256": "a" * 64,
+                    "approval_authority": "attended_user",
+                }
+            ]
+
+        def execute_transition(self, transition_id, *, before_write, **_kwargs):
+            before_write()
+            return {"status": "applied", "transition_id": transition_id}
+
+    def unavailable():
+        authority_reads.append("read")
+        raise sqlite3.OperationalError("private config failure")
+
+    monkeypatch.setattr(scheduler, "_service", FakeService)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=unavailable,
+        limit=1,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert authority_reads == []
+    assert result == {
+        "status": "succeeded",
+        "reason": None,
+        "due": 1,
+        "applied": 1,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": ["slt_attended"],
+        "failed_transition_ids": [],
+        "deferred_transition_ids": [],
+    }
 
 
 @pytest.mark.parametrize(
@@ -701,6 +789,7 @@ def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
         "already_applied": 0,
         "transition_ids": ["slt_bad", "slt_later"],
         "failed_transition_ids": ["slt_bad"],
+        "deferred_transition_ids": [],
     }
 
 
@@ -771,6 +860,75 @@ def test_due_runner_is_provider_free_and_concurrent_ticks_apply_once(
         ).fetchall() == [("already_applied", 1), ("applied", 1)]
 
 
+def test_deferred_transition_is_reapplied_after_policy_is_re_enabled(
+    tmp_path,
+    monkeypatch,
+):
+    from src.security_lifecycle_decision_policy import (
+        AUTOMATION_POLICY_VERSION,
+        RULE_VERSIONS,
+    )
+    from src.service import ticker_identity_scheduler as scheduler
+
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    rule_id = "lifecycle.simple_symbol_continuation"
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "UPDATE ticker_identity_transitions SET approval_authority=?,"
+            "automation_policy_version=?,rule_id=?,rule_version=? "
+            "WHERE transition_id=?",
+            (
+                "automation_policy",
+                AUTOMATION_POLICY_VERSION,
+                rule_id,
+                RULE_VERSIONS[rule_id],
+                transition_id,
+            ),
+        )
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+
+    deferred = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+
+    assert deferred["status"] == "deferred"
+    assert deferred["deferred_transition_ids"] == [transition_id]
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status FROM ticker_identity_transitions WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == ("approved",)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts "
+            "WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == (0,)
+
+    applied = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
+        now=now,
+    )
+
+    assert applied["status"] == "succeeded"
+    assert applied["applied"] == 1
+    assert applied["failed_transition_ids"] == []
+    assert applied["deferred_transition_ids"] == []
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status FROM ticker_identity_transitions WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == ("applied",)
+
+
 def test_due_runner_with_no_identity_component_creates_nothing(tmp_path, monkeypatch):
     from src.service import ticker_identity_scheduler as scheduler
 
@@ -794,6 +952,7 @@ def test_due_runner_with_no_identity_component_creates_nothing(tmp_path, monkeyp
         "already_applied": 0,
         "transition_ids": [],
         "failed_transition_ids": [],
+        "deferred_transition_ids": [],
     }
     assert not profile_path.exists()
     assert not market_path.exists()
@@ -832,6 +991,7 @@ def test_due_runner_reports_existing_profile_without_identity_schema_as_not_inst
         "already_applied": 0,
         "transition_ids": [],
         "failed_transition_ids": [],
+        "deferred_transition_ids": [],
     }
     assert profile_path.is_file()
     assert not market_path.exists()
@@ -871,8 +1031,150 @@ def test_due_runner_reports_malformed_identity_schema_as_unavailable(
         "already_applied": 0,
         "transition_ids": [],
         "failed_transition_ids": [],
+        "deferred_transition_ids": [],
     }
     assert not market_path.exists()
+
+
+def test_bounded_result_accepts_disjoint_failure_and_deferral_accounting():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    result = _scheduler_result(
+        status="partial",
+        reason="transition_mutation_authority_unavailable",
+        applied=1,
+        transition_ids=["slt_applied", "slt_failed", "slt_deferred"],
+        failed_transition_ids=["slt_failed"],
+        deferred_transition_ids=["slt_deferred"],
+    )
+
+    assert scheduler._bounded_result(result) == result
+
+
+def test_bounded_result_accepts_successes_alongside_only_deferrals():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    result = _scheduler_result(
+        status="deferred",
+        reason="transition_mutation_disabled",
+        applied=1,
+        transition_ids=["slt_applied", "slt_deferred"],
+        deferred_transition_ids=["slt_deferred"],
+    )
+
+    assert scheduler._bounded_result(result) == result
+
+
+@pytest.mark.parametrize(
+    ("result", "field"),
+    [
+        (
+            _scheduler_result(
+                status="partial",
+                reason="transition_execution_failed",
+                transition_ids=["slt_shared"],
+                failed_transition_ids=["slt_shared"],
+                deferred_transition_ids=["slt_shared"],
+            ),
+            "deferred_transition_ids",
+        ),
+        (
+            _scheduler_result(
+                status="deferred",
+                reason="transition_mutation_disabled",
+                transition_ids=["slt_due"],
+                deferred_transition_ids=["slt_not_due"],
+            ),
+            "deferred_transition_ids",
+        ),
+        (
+            _scheduler_result(
+                status="partial",
+                reason="transition_execution_failed",
+            ),
+            "failed_transition_ids",
+        ),
+        (
+            _scheduler_result(
+                status="succeeded",
+                reason=None,
+                transition_ids=["slt_failed"],
+                failed_transition_ids=["slt_failed"],
+            ),
+            "failed_transition_ids",
+        ),
+        (
+            _scheduler_result(
+                status="deferred",
+                reason="transition_mutation_disabled",
+            ),
+            "deferred_transition_ids",
+        ),
+        (
+            _scheduler_result(
+                status="succeeded",
+                reason=None,
+                transition_ids=["slt_deferred"],
+                deferred_transition_ids=["slt_deferred"],
+            ),
+            "deferred_transition_ids",
+        ),
+        (
+            _scheduler_result(
+                status="deferred",
+                reason="transition_execution_failed",
+                transition_ids=["slt_deferred"],
+                deferred_transition_ids=["slt_deferred"],
+            ),
+            "reason",
+        ),
+    ],
+)
+def test_bounded_result_rejects_invalid_failure_and_deferral_states(result, field):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    with pytest.raises(ValueError, match=field):
+        scheduler._bounded_result(result)
+
+
+def test_stored_result_reads_legacy_summary_without_deferred_field():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    current = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=["slt_failed"],
+        failed_transition_ids=["slt_failed"],
+    )
+    legacy = dict(current)
+    legacy.pop("deferred_transition_ids")
+
+    assert scheduler._stored_result(json.dumps(legacy)) == current
+
+
+def test_stored_result_degrades_unknown_result_version_without_rejecting():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    current = _scheduler_result(
+        status="partial",
+        reason="transition_mutation_authority_unavailable",
+        transition_ids=["slt_failed"],
+        failed_transition_ids=["slt_failed"],
+    )
+    future = {**current, "result_version": 999}
+
+    assert scheduler._stored_result(json.dumps(future)) == current
+
+
+def test_present_malformed_deferred_field_is_rejected():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    malformed = _scheduler_result(status="succeeded", reason=None)
+    malformed["deferred_transition_ids"] = "slt_not_a_list"
+
+    with pytest.raises(ValueError, match="deferred_transition_ids"):
+        scheduler._bounded_result(malformed)
+    assert scheduler._stored_result(json.dumps(malformed)) is None
 
 
 def test_scheduler_failure_witness_does_not_create_missing_profile_database(
@@ -1083,6 +1385,95 @@ def test_scheduler_concurrent_healthy_ticks_record_one_recovery(
         ]
 
 
+def test_policy_deferral_after_a_real_failure_never_records_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=["slt_failed"],
+        failed_transition_ids=["slt_failed"],
+    )
+    deferred = _scheduler_result(
+        status="deferred",
+        reason="transition_mutation_disabled",
+        transition_ids=["slt_deferred"],
+        deferred_transition_ids=["slt_deferred"],
+    )
+
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+    assert scheduler.record_ticker_identity_scheduler_result(deferred, now=now)
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "ticker_identity_scheduler_failure",
+                "transition_execution_failed",
+            )
+        ]
+
+    healthy = _scheduler_result(status="succeeded", reason=None)
+    assert scheduler.record_ticker_identity_scheduler_result(healthy, now=now)
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "ticker_identity_scheduler_failure",
+                "transition_execution_failed",
+            ),
+            (
+                "succeeded",
+                "ticker_identity_scheduler_recovered",
+                None,
+            ),
+        ]
+
+
+def test_repeated_deferral_across_ticks_writes_no_witness_each_time(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    deferred = _scheduler_result(
+        status="deferred",
+        reason="transition_mutation_disabled",
+        transition_ids=["slt_deferred"],
+        deferred_transition_ids=["slt_deferred"],
+    )
+
+    for offset in range(2):
+        assert scheduler.record_ticker_identity_scheduler_result(
+            deferred,
+            now=datetime(2026, 8, 25, 13, 0, offset, tzinfo=timezone.utc),
+        )
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM job_runs WHERE job_name=?",
+            ("ticker_identity.transitions",),
+        ).fetchone() == (0,)
+
+
 def test_scheduler_witness_write_failure_never_logs_raw_database_text(
     tmp_path,
     monkeypatch,
@@ -1151,6 +1542,42 @@ def test_scheduler_failure_incident_ignores_successful_companion_churn(
             "SELECT COUNT(*) FROM job_runs WHERE job_name=?",
             ("ticker_identity.transitions",),
         ).fetchone() == (1,)
+
+
+def test_scheduler_failure_incident_ignores_deferred_companion_churn(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    base = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+
+    for index in range(2):
+        assert scheduler.record_ticker_identity_scheduler_result(
+            _scheduler_result(
+                status="partial",
+                reason="transition_execution_failed",
+                applied=1,
+                transition_ids=[
+                    f"slt_ok_{index}",
+                    "slt_stuck",
+                    f"slt_deferred_{index}",
+                ],
+                failed_transition_ids=["slt_stuck"],
+                deferred_transition_ids=[f"slt_deferred_{index}"],
+            ),
+            now=base,
+        )
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [("failed", "transition_execution_failed")]
 
 
 def test_scheduler_malformed_summary_records_failure_instead_of_recovery(

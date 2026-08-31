@@ -61,6 +61,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from src.service.ticker_identity_scheduler import (
+    AutomationTransitionMutationAuthorityUnavailable,
     record_ticker_identity_scheduler_result,
     run_due_ticker_identity_transitions,
     ticker_identity_scheduler_failure,
@@ -395,8 +396,10 @@ def _security_lifecycle_profile_mutation_allowed() -> bool:
             _security_lifecycle_automation_config_state()
             .effective_apply_profile_transitions
         )
-    except Exception:
-        return False
+    except AutomationTransitionMutationAuthorityUnavailable:
+        raise
+    except Exception as exc:
+        raise AutomationTransitionMutationAuthorityUnavailable() from exc
 
 
 def _security_lifecycle_automation_is_due(
@@ -1648,6 +1651,10 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
             now=now,
             allow_automation_approved=transition_mutation_allowed(),
             transition_mutation_allowed=transition_mutation_allowed,
+        )
+    except AutomationTransitionMutationAuthorityUnavailable:
+        transition_result = ticker_identity_scheduler_failure(
+            "transition_mutation_authority_unavailable"
         )
     except Exception as exc:  # lifecycle work must not stop provider scheduling
         logger.warning(

@@ -535,6 +535,94 @@ def test_malformed_lifecycle_config_disables_analysis_and_mutation(monkeypatch):
     assert transition_calls == [{"now": _NOW, "allow_automation_approved": False}]
 
 
+def test_profile_mutation_authority_distinguishes_disabled_from_unavailable(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        ds,
+        "_security_lifecycle_automation_config_state",
+        lambda: SimpleNamespace(effective_apply_profile_transitions=False),
+    )
+    assert ds._security_lifecycle_profile_mutation_allowed() is False
+
+    def unavailable():
+        raise sqlite3.OperationalError("private config failure")
+
+    monkeypatch.setattr(
+        ds,
+        "_security_lifecycle_automation_config_state",
+        unavailable,
+    )
+    with pytest.raises(RuntimeError) as caught:
+        ds._security_lifecycle_profile_mutation_allowed()
+    assert type(caught.value).__name__ == (
+        "AutomationTransitionMutationAuthorityUnavailable"
+    )
+
+
+def test_tick_records_typed_transition_failure_when_authority_read_is_unavailable(
+    monkeypatch,
+):
+    initial_state = ds._security_lifecycle_automation_config_state()
+    state_reads = []
+
+    def read_state():
+        state_reads.append("read")
+        if len(state_reads) == 1:
+            return initial_state
+        raise sqlite3.OperationalError("private config failure")
+
+    transition_calls = []
+    healthy = {
+        "status": "succeeded",
+        "reason": None,
+        "due": 0,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [],
+        "failed_transition_ids": [],
+        "deferred_transition_ids": [],
+    }
+    monkeypatch.setattr(
+        ds,
+        "_security_lifecycle_automation_config_state",
+        read_state,
+    )
+    monkeypatch.setattr(
+        ds,
+        "run_due_ticker_identity_transitions",
+        lambda **kwargs: transition_calls.append(kwargs) or healthy,
+    )
+    recorded = []
+    monkeypatch.setattr(
+        ds,
+        "record_ticker_identity_scheduler_result",
+        lambda result, *, now: recorded.append((result, now)) or True,
+    )
+
+    ds.tick_once(_NOW, fire=lambda _source: None)
+
+    assert state_reads == ["read", "read"]
+    assert transition_calls == []
+    assert recorded == [
+        (
+            {
+                "status": "unavailable",
+                "reason": "transition_mutation_authority_unavailable",
+                "due": 0,
+                "applied": 0,
+                "needs_review": 0,
+                "already_applied": 0,
+                "transition_ids": [],
+                "failed_transition_ids": [],
+                "deferred_transition_ids": [],
+            },
+            _NOW,
+        )
+    ]
+
+
 def test_tick_rereads_mutation_authority_after_lifecycle_analysis(monkeypatch):
     from src.service.security_lifecycle_automation_config import (
         APPLY_PROFILE_TRANSITIONS_KEY,
@@ -674,6 +762,7 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
         "already_applied": 0,
         "transition_ids": ["slt_ok", "slt_failed"],
         "failed_transition_ids": ["slt_failed"],
+        "deferred_transition_ids": [],
     }
     recovered = {
         "status": "succeeded",
@@ -684,6 +773,7 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
         "already_applied": 0,
         "transition_ids": [],
         "failed_transition_ids": [],
+        "deferred_transition_ids": [],
     }
     results = iter((failure, failure, recovered, recovered))
     monkeypatch.setattr(
@@ -736,6 +826,7 @@ def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
         "already_applied": 0,
         "transition_ids": [],
         "failed_transition_ids": [],
+        "deferred_transition_ids": [],
     }
     assert "private detail" not in json.dumps(runs[0], sort_keys=True)
 

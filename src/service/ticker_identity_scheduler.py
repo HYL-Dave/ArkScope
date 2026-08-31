@@ -22,22 +22,37 @@ logger = logging.getLogger(__name__)
 _DEFAULT_LIMIT = 10
 _JOB_NAME = "ticker_identity.transitions"
 _RUNNER_STATUSES = frozenset(
-    {"succeeded", "partial", "unavailable", "not_installed"}
+    {"succeeded", "partial", "deferred", "unavailable", "not_installed"}
 )
 _RUNNER_REASONS = TICKER_IDENTITY_STORE_UNAVAILABLE_REASONS | frozenset(
-    {"ticker_identity_scheduler_failed", "transition_execution_failed"}
+    {
+        "ticker_identity_scheduler_failed",
+        "transition_execution_failed",
+        "transition_mutation_authority_unavailable",
+        "transition_mutation_disabled",
+    }
 )
+_FAILURE_STATUSES = frozenset({"partial", "unavailable"})
 
 
 class AutomationTransitionMutationDisabled(RuntimeError):
     """The operator disabled automation after this row was selected."""
 
 
+class AutomationTransitionMutationAuthorityUnavailable(RuntimeError):
+    """The automation mutation authority could not be read."""
+
+
 def _mutation_allowed(callback: Callable[[], bool]) -> bool:
     try:
-        return callback() is True
-    except Exception:
-        return False
+        allowed = callback()
+    except AutomationTransitionMutationAuthorityUnavailable:
+        raise
+    except Exception as exc:
+        raise AutomationTransitionMutationAuthorityUnavailable() from exc
+    if not isinstance(allowed, bool):
+        raise AutomationTransitionMutationAuthorityUnavailable()
+    return allowed
 
 
 def _service() -> TickerIdentityService:
@@ -68,6 +83,7 @@ def _empty_summary(
         "already_applied": 0,
         "transition_ids": [],
         "failed_transition_ids": [],
+        "deferred_transition_ids": [],
     }
 
 
@@ -110,10 +126,14 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
         raise ValueError("status")
     raw_reason = result.get("reason")
     reason = None if raw_reason is None else str(raw_reason)
-    if status in {"partial", "unavailable", "not_installed"}:
+    if status in {"partial", "deferred", "unavailable", "not_installed"}:
         if reason not in _RUNNER_REASONS:
             raise ValueError("reason")
     elif reason is not None:
+        raise ValueError("reason")
+    if status == "deferred" and reason != "transition_mutation_disabled":
+        raise ValueError("reason")
+    if status == "partial" and reason == "transition_mutation_disabled":
         raise ValueError("reason")
 
     bounded: dict[str, object] = {"status": status, "reason": reason}
@@ -122,8 +142,16 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 10:
             raise ValueError(key)
         bounded[key] = value
-    for key in ("transition_ids", "failed_transition_ids"):
-        raw_ids = result.get(key)
+    for key in (
+        "transition_ids",
+        "failed_transition_ids",
+        "deferred_transition_ids",
+    ):
+        raw_ids = (
+            []
+            if key == "deferred_transition_ids" and key not in result
+            else result.get(key)
+        )
         if not isinstance(raw_ids, list) or len(raw_ids) > 10:
             raise ValueError(key)
         ids: list[str] = []
@@ -138,13 +166,22 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
             raise ValueError(key)
         bounded[key] = ids
     failed_ids = set(bounded["failed_transition_ids"])
+    deferred_ids = set(bounded["deferred_transition_ids"])
     transition_ids = set(bounded["transition_ids"])
     if not failed_ids.issubset(transition_ids):
         raise ValueError("failed_transition_ids")
+    if not deferred_ids.issubset(transition_ids):
+        raise ValueError("deferred_transition_ids")
+    if failed_ids & deferred_ids:
+        raise ValueError("deferred_transition_ids")
     if status == "partial" and not failed_ids:
         raise ValueError("failed_transition_ids")
     if status != "partial" and failed_ids:
         raise ValueError("failed_transition_ids")
+    if status == "deferred" and not deferred_ids:
+        raise ValueError("deferred_transition_ids")
+    if status not in {"partial", "deferred"} and deferred_ids:
+        raise ValueError("deferred_transition_ids")
     if status in {"unavailable", "not_installed"} and (
         bounded["due"] != 0 or transition_ids
     ):
@@ -156,13 +193,16 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
         + bounded["needs_review"]
         + bounded["already_applied"]
         + len(failed_ids)
+        + len(deferred_ids)
     )
     if bounded["due"] != terminal_count:
         raise ValueError("due")
     return bounded
 
 
-def _failure_incident_key(result: Mapping[str, object]) -> tuple:
+def _failure_incident_key(result: Mapping[str, object]) -> tuple | None:
+    if result["status"] not in _FAILURE_STATUSES:
+        return None
     return (
         result["status"],
         result["reason"],
@@ -213,7 +253,7 @@ def _insert_witness(
     now: datetime,
     not_before: object,
 ) -> None:
-    failed = bounded["status"] in {"partial", "unavailable"}
+    failed = bounded["status"] in _FAILURE_STATUSES
     at = _witness_started_at(now, not_before)
     conn.execute(
         """
@@ -268,7 +308,7 @@ def record_ticker_identity_scheduler_result(
             "ticker_identity_scheduler_failed"
         )
     status = str(bounded["status"])
-    if status == "not_installed":
+    if status in {"deferred", "not_installed"}:
         return True
 
     conn = _job_runs_connection()
@@ -283,7 +323,7 @@ def record_ticker_identity_scheduler_result(
         ).fetchone()
         if present is None:
             conn.rollback()
-            if status in {"partial", "unavailable"}:
+            if status in _FAILURE_STATUSES:
                 _log_witness_unavailable(bounded)
                 return False
             return True
@@ -292,8 +332,8 @@ def record_ticker_identity_scheduler_result(
             "ORDER BY id DESC LIMIT 1",
             (_JOB_NAME,),
         ).fetchone()
-        failed = status in {"partial", "unavailable"}
-        if failed:
+        incident_key = _failure_incident_key(bounded)
+        if incident_key is not None:
             latest_result = (
                 _stored_result(latest["result"])
                 if latest is not None and latest["status"] == "failed"
@@ -302,7 +342,7 @@ def record_ticker_identity_scheduler_result(
             if (
                 latest_result is not None
                 and _failure_incident_key(latest_result)
-                == _failure_incident_key(bounded)
+                == incident_key
             ):
                 conn.commit()
                 return True
@@ -315,7 +355,7 @@ def record_ticker_identity_scheduler_result(
             conn.commit()
             return True
 
-        if latest is None or latest["status"] != "failed":
+        if status != "succeeded" or latest is None or latest["status"] != "failed":
             conn.commit()
             return True
         _insert_witness(
@@ -372,6 +412,7 @@ def run_due_ticker_identity_transitions(
     summary = _empty_summary()
     summary["due"] = len(due)
     summary["transition_ids"] = [str(row["transition_id"]) for row in due]
+    authority_unavailable = False
     for transition in due:
         transition_id = str(transition["transition_id"])
         try:
@@ -414,6 +455,18 @@ def run_due_ticker_identity_transitions(
                 summary["needs_review"] += 1
             else:
                 raise ValueError("unsupported_transition_result")
+        except AutomationTransitionMutationDisabled:
+            summary["deferred_transition_ids"].append(transition_id)
+            continue
+        except AutomationTransitionMutationAuthorityUnavailable as exc:
+            authority_unavailable = True
+            logger.warning(
+                "ticker transition execution failed transition_id=%s code=%s",
+                transition_id,
+                type(exc).__name__,
+            )
+            summary["failed_transition_ids"].append(transition_id)
+            continue
         except Exception as exc:  # one plan must never stop later plans
             logger.warning(
                 "ticker transition execution failed transition_id=%s code=%s",
@@ -424,11 +477,20 @@ def run_due_ticker_identity_transitions(
             continue
     if summary["failed_transition_ids"]:
         summary["status"] = "partial"
-        summary["reason"] = "transition_execution_failed"
+        summary["reason"] = (
+            "transition_mutation_authority_unavailable"
+            if authority_unavailable
+            else "transition_execution_failed"
+        )
+    elif summary["deferred_transition_ids"]:
+        summary["status"] = "deferred"
+        summary["reason"] = "transition_mutation_disabled"
     return summary
 
 
 __all__ = [
+    "AutomationTransitionMutationAuthorityUnavailable",
+    "AutomationTransitionMutationDisabled",
     "record_ticker_identity_scheduler_result",
     "run_due_ticker_identity_transitions",
     "ticker_identity_scheduler_failure",
