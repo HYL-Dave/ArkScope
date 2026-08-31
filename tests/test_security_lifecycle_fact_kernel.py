@@ -1425,6 +1425,57 @@ def test_reconciled_internal_error_receives_one_hour_retry_authority():
     assert failed["retry_at"] is None
 
 
+def _poison_run_with_predecessor_cycle(store, run_id):
+    context = json.loads(store.get_automation_run(run_id)["query_context_json"])
+    context["predecessor_run_id"] = run_id
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (json.dumps(context, separators=(",", ":"), sort_keys=True), run_id),
+    )
+    store.conn.commit()
+
+
+def test_reconcile_reclaims_healthy_rows_despite_one_unclassifiable_row():
+    _conn, store, kernel, poisoned_case_id = _context()
+    healthy_case_id = store.ensure_case(
+        source="sec_edgar",
+        source_ref="0001409970-26-000132",
+        ticker="HAPN",
+        at=_AT,
+    )
+    poisoned = _reserve(kernel, poisoned_case_id)
+    healthy = _reserve(
+        kernel,
+        healthy_case_id,
+        observation_fingerprint_sha256="b" * 64,
+    )
+    _poison_run_with_predecessor_cycle(store, poisoned.run_id)
+
+    reconciled = kernel.reconcile_running_runs(at=_LATER)
+
+    assert reconciled == (healthy.run_id,)
+    assert store.get_automation_run(healthy.run_id)["status"] == "failed"
+
+
+def test_reconcile_records_the_unclassifiable_row_rather_than_skipping_silently():
+    _conn, store, kernel, case_id = _context()
+    poisoned = _reserve(kernel, case_id)
+    _poison_run_with_predecessor_cycle(store, poisoned.run_id)
+
+    assert kernel.reconcile_running_runs(at=_LATER) == ()
+
+    recorded = store.get_automation_run(poisoned.run_id)
+    context = json.loads(recorded["query_context_json"])
+    assert recorded["status"] == "failed"
+    assert recorded["failure_code"] == "internal_error"
+    assert json.loads(recorded["diagnostics_json"]) == {
+        "interrupted_execution": 1,
+        "reconciliation_unclassifiable": 1,
+    }
+    assert "automatic_retry" not in context
+
+
 def test_legacy_failed_predecessor_field_remains_chain_readable():
     _conn, store, kernel, case_id = _context()
     first = _reserve(kernel, case_id, execution_revision="execution-r0")
@@ -1613,8 +1664,7 @@ def test_malformed_legacy_predecessor_field_fails_closed():
         )
 
 
-def test_predecessor_chain_enforces_the_hard_traversal_limit():
-    _conn, _store, kernel, case_id = _context()
+def _over_long_running_attempt(kernel, case_id):
     claim = _reserve(kernel, case_id)
     for ordinal in range(32):
         kernel.fail_run(
@@ -1629,6 +1679,33 @@ def test_predecessor_chain_enforces_the_hard_traversal_limit():
             allow_new_attempt=True,
             at=f"2026-08-25T02:{ordinal:02d}:30Z",
         )
+    return claim
+
+
+def test_over_long_predecessor_chain_exhausts_retries_without_raising():
+    _conn, store, kernel, case_id = _context()
+    claim = _over_long_running_attempt(kernel, case_id)
+
+    failed = kernel.fail_run(
+        run_id=claim.run_id,
+        failure_code="internal_error",
+        diagnostics={"failures": 1},
+        at="2026-08-25T02:32:00Z",
+    )
+
+    context = json.loads(failed["query_context_json"])
+    assert failed["status"] == "failed"
+    assert failed["failure_code"] == "internal_error"
+    assert context["automatic_retry"] == {
+        "class": "internal_error",
+        "retry_not_before": None,
+    }
+    assert store.get_automation_run(claim.run_id)["status"] != "running"
+
+
+def test_per_case_run_button_cannot_grow_an_unbounded_predecessor_chain():
+    _conn, store, kernel, case_id = _context()
+    claim = _over_long_running_attempt(kernel, case_id)
     kernel.fail_run(
         run_id=claim.run_id,
         failure_code="extractor_failed",
@@ -1643,6 +1720,108 @@ def test_predecessor_chain_enforces_the_hard_traversal_limit():
             allow_new_attempt=True,
             at="2026-08-25T02:32:30Z",
         )
+    assert len(store.list_automation_runs(case_id)) == 33
+
+
+@pytest.mark.parametrize(
+    ("corruption", "error"),
+    (
+        ("cycle", "automation_predecessor_cycle"),
+        ("missing_row", "automation_predecessor_chain"),
+        ("malformed_field", "automation_predecessor_chain"),
+        ("malformed_context", "query_context"),
+        ("semantic_run_key", "automation_predecessor_semantic_run_key"),
+    ),
+)
+def test_failure_recovery_preserves_fail_closed_predecessor_validation(
+    corruption,
+    error,
+):
+    _conn, store, kernel, case_id = _context()
+    running = _reserve(kernel, case_id)
+    context = json.loads(
+        store.get_automation_run(running.run_id)["query_context_json"]
+    )
+    if corruption == "cycle":
+        context["predecessor_run_id"] = running.run_id
+    elif corruption == "missing_row":
+        context["predecessor_run_id"] = "slar_missing"
+    elif corruption == "malformed_field":
+        context["predecessor_run_id"] = {"run_id": "slar_malformed"}
+    elif corruption == "semantic_run_key":
+        context["semantic_run_key"] = "lifecycle-automation-v1:" + "f" * 64
+    query_context_json = (
+        "[]"
+        if corruption == "malformed_context"
+        else json.dumps(context, separators=(",", ":"), sort_keys=True)
+    )
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (query_context_json, running.run_id),
+    )
+    store.conn.commit()
+
+    with pytest.raises(ValueError, match=error):
+        kernel.fail_run(
+            run_id=running.run_id,
+            failure_code="internal_error",
+            diagnostics={"failures": 1},
+            at=_LATER,
+        )
+    assert store.get_automation_run(running.run_id)["status"] == "running"
+
+
+def test_failure_recovery_preserves_fail_closed_semantic_identity_validation():
+    from src.security_lifecycle_fact_kernel import automation_run_key
+
+    _conn, store, kernel, case_id = _context()
+    predecessor = _reserve(kernel, case_id)
+    kernel.fail_run(
+        run_id=predecessor.run_id,
+        failure_code="extractor_failed",
+        diagnostics={"failures": 1},
+        at=_LATER,
+    )
+    running = _reserve(
+        kernel,
+        case_id,
+        allow_new_attempt=True,
+        at="2026-08-25T03:00:00Z",
+    )
+    predecessor_context = json.loads(
+        store.get_automation_run(predecessor.run_id)["query_context_json"]
+    )
+    predecessor_context["input_evidence_set_sha256"] = "b" * 64
+    predecessor_context["semantic_run_key"] = automation_run_key(
+        case_id=case_id,
+        observation_fingerprint_sha256=_FINGERPRINT,
+        policy_version="trusted-lifecycle-v1",
+        mode="historical",
+        input_evidence_set_sha256="b" * 64,
+    )
+    store.conn.execute(
+        "UPDATE security_lifecycle_automation_runs SET query_context_json=? "
+        "WHERE run_id=?",
+        (
+            json.dumps(
+                predecessor_context,
+                separators=(",", ":"),
+                sort_keys=True,
+            ),
+            predecessor.run_id,
+        ),
+    )
+    store.conn.commit()
+
+    with pytest.raises(ValueError, match="automation_predecessor_semantic_identity"):
+        kernel.fail_run(
+            run_id=running.run_id,
+            failure_code="internal_error",
+            diagnostics={"failures": 1},
+            at="2026-08-25T04:00:00Z",
+        )
+    assert store.get_automation_run(running.run_id)["status"] == "running"
 
 
 def test_predecessor_cycle_fails_closed_before_creating_attended_attempt():

@@ -702,9 +702,18 @@ def _automatic_retry_for_failure(
     delays = _AUTOMATIC_RETRY_DELAYS.get(failure_code)
     if delays is None:
         return None
+    try:
+        chain = _attempt_chain(conn, run_id)
+    except ValueError as exc:
+        if exc.args != ("automation_predecessor_chain_limit",):
+            raise
+        return {
+            "class": failure_code,
+            "retry_not_before": None,
+        }
     prior_failures = sum(
         1
-        for row in _attempt_chain(conn, run_id)[1:]
+        for row in chain[1:]
         if row["status"] == "failed" and row["failure_code"] == failure_code
     )
     retry_not_before = None
@@ -2535,6 +2544,12 @@ class SecurityLifecycleFactKernel:
         )
         timestamp = _timestamp("at", at)
         diagnostics_json = _diagnostics({"interrupted_execution": 1})
+        unclassifiable_diagnostics_json = _diagnostics(
+            {
+                "interrupted_execution": 1,
+                "reconciliation_unclassifiable": 1,
+            }
+        )
         reconciled: list[str] = []
         with _immediate_transaction(self.conn):
             rows = self.conn.execute(
@@ -2543,27 +2558,46 @@ class SecurityLifecycleFactKernel:
                 "ORDER BY created_at,rowid"
             ).fetchall()
             for row in rows:
-                context = _query_context_value(row["query_context_json"])
-                persisted_owner = context.get(_EXECUTION_OWNER_KEY)
-                if persisted_owner is None:
-                    if requested_owner is not None:
-                        continue
-                else:
-                    normalized_owner = _execution_owner_id(persisted_owner)
-                    if (
-                        requested_owner is not None
-                        and normalized_owner != requested_owner
-                    ):
-                        continue
                 run_id = str(row["run_id"])
-                automatic_retry = _automatic_retry_for_failure(
-                    self.conn,
-                    run_id=run_id,
-                    failure_code="internal_error",
-                    failed_at=timestamp,
-                )
-                assert automatic_retry is not None
-                context[_AUTOMATIC_RETRY_KEY] = automatic_retry
+                try:
+                    context = _query_context_value(row["query_context_json"])
+                    persisted_owner = context.get(_EXECUTION_OWNER_KEY)
+                    if persisted_owner is None:
+                        if requested_owner is not None:
+                            continue
+                    else:
+                        normalized_owner = _execution_owner_id(persisted_owner)
+                        if (
+                            requested_owner is not None
+                            and normalized_owner != requested_owner
+                        ):
+                            continue
+                    automatic_retry = _automatic_retry_for_failure(
+                        self.conn,
+                        run_id=run_id,
+                        failure_code="internal_error",
+                        failed_at=timestamp,
+                    )
+                    assert automatic_retry is not None
+                    context[_AUTOMATIC_RETRY_KEY] = automatic_retry
+                    query_context_json = _query_context_json(context)
+                except ValueError:
+                    cursor = self.conn.execute(
+                        "UPDATE security_lifecycle_automation_runs SET "
+                        "status='failed',decision_tier=NULL,action_readiness=NULL,"
+                        "diagnostics_json=?,retry_at=NULL,"
+                        "failure_code='internal_error',finished_at=?,updated_at=? "
+                        "WHERE run_id=? AND status='running'",
+                        (
+                            unclassifiable_diagnostics_json,
+                            timestamp,
+                            timestamp,
+                            run_id,
+                        ),
+                    )
+                    if cursor.rowcount != 1:
+                        raise RuntimeError("automation_run_reconciliation_lost")
+                    continue
                 cursor = self.conn.execute(
                     "UPDATE security_lifecycle_automation_runs SET "
                     "status='failed',decision_tier=NULL,action_readiness=NULL,"
@@ -2572,7 +2606,7 @@ class SecurityLifecycleFactKernel:
                     "WHERE run_id=? AND status='running'",
                     (
                         diagnostics_json,
-                        _query_context_json(context),
+                        query_context_json,
                         timestamp,
                         timestamp,
                         run_id,
