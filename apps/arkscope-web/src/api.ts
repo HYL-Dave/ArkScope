@@ -2540,6 +2540,7 @@ export type SecurityLifecycleDispositionReason =
   | "ambiguous_event"
   | "nonretryable_provider_failure"
   | "automation_failure"
+  | "automation_finalization_failure"
   | "resolved_no_change"
   | "resolved_assessment"
   | "transition_applied"

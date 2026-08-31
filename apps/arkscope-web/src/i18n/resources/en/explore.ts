@@ -250,6 +250,7 @@ const explore = {
       ambiguousEvent: "The event outcome remains ambiguous",
       nonretryableProviderFailure: "A source failed and cannot be retried automatically",
       automationFailure: "Automatic checking failed",
+      automationFinalizationFailure: "Automatic check finalization failed",
       resolvedNoChange: "No tracked-security change was confirmed",
       resolvedAssessment: "A current assessment is complete",
       transitionApplied: "The tracking transition was applied",

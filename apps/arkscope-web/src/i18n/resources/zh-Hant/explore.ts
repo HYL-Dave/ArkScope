@@ -250,6 +250,7 @@ const explore = {
       ambiguousEvent: "事件結果仍有歧義",
       nonretryableProviderFailure: "資料來源失敗且無法自動重試",
       automationFailure: "自動查核失敗",
+      automationFinalizationFailure: "自動查核最終處理失敗",
       resolvedNoChange: "已確認追蹤標的沒有變更",
       resolvedAssessment: "已有有效判定",
       transitionApplied: "已套用追蹤轉移",

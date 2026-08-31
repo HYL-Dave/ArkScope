@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -14,6 +17,199 @@ from src.security_lifecycle_disposition import (
     next_lifecycle_recheck_at,
     project_lifecycle_disposition,
 )
+
+
+_ROOT = Path(__file__).resolve().parents[1]
+_DISPOSITION_SOURCE = _ROOT / "src/security_lifecycle_disposition.py"
+_SCHEMA_SOURCE = _ROOT / "src/security_lifecycle_schema.py"
+_AUTOMATION_RUNTIME_SOURCE = (
+    _ROOT / "src/service/security_lifecycle_automation_runtime.py"
+)
+_AUTOMATION_SCHEDULER_SOURCE = (
+    _ROOT / "src/service/security_lifecycle_automation_scheduler.py"
+)
+_FRONTEND_API_SOURCE = _ROOT / "apps/arkscope-web/src/api.ts"
+_TYPESCRIPT_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
+
+
+class _UnsupportedVocabularyExpression(ValueError):
+    pass
+
+
+def _python_string_members(
+    node: ast.AST,
+    known: dict[str, frozenset[str]],
+) -> frozenset[str]:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return frozenset({node.value})
+    if isinstance(node, (ast.List, ast.Set, ast.Tuple)):
+        members: set[str] = set()
+        for item in node.elts:
+            members.update(_python_string_members(item, known))
+        return frozenset(members)
+    if isinstance(node, ast.Name):
+        if node.id not in known:
+            raise _UnsupportedVocabularyExpression(node.id)
+        return known[node.id]
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in {"frozenset", "set", "tuple"}
+        and len(node.args) == 1
+        and not node.keywords
+    ):
+        return _python_string_members(node.args[0], known)
+    if (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "Literal"
+    ):
+        return _python_string_members(node.slice, known)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        return _python_string_members(node.left, known) | _python_string_members(
+            node.right, known
+        )
+    raise _UnsupportedVocabularyExpression(ast.dump(node, include_attributes=False))
+
+
+def _python_string_authority(path: Path, name: str) -> frozenset[str]:
+    known: dict[str, frozenset[str]] = {}
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for statement in tree.body:
+        target: ast.AST | None = None
+        value: ast.AST | None = None
+        if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+            target = statement.targets[0]
+            value = statement.value
+        elif isinstance(statement, ast.AnnAssign):
+            target = statement.target
+            value = statement.value
+        if not isinstance(target, ast.Name) or value is None:
+            continue
+        try:
+            known[target.id] = _python_string_members(value, known)
+        except _UnsupportedVocabularyExpression:
+            known.pop(target.id, None)
+    assert name in known, f"closed Python vocabulary not found: {path}:{name}"
+    return known[name]
+
+
+def _typescript_literal_members(body: str, *, separator: str) -> frozenset[str]:
+    literals = _TYPESCRIPT_STRING.findall(body)
+    remainder = _TYPESCRIPT_STRING.sub("", body)
+    assert literals, "closed TypeScript vocabulary has no string literals"
+    assert re.fullmatch(rf"[\s{re.escape(separator)}]*", remainder), (
+        f"unsupported TypeScript vocabulary expression: {body.strip()}"
+    )
+    return frozenset(json.loads(literal) for literal in literals)
+
+
+def _typescript_string_union(source: str, name: str) -> frozenset[str]:
+    declaration = re.search(rf"\bexport\s+type\s+{re.escape(name)}\s*=", source)
+    assert declaration is not None, f"closed TypeScript union not found: {name}"
+    end = source.find(";", declaration.end())
+    assert end >= 0, f"unterminated TypeScript union: {name}"
+    return _typescript_literal_members(
+        source[declaration.end() : end], separator="|"
+    )
+
+
+def _typescript_string_array(source: str, name: str) -> frozenset[str]:
+    declaration = re.search(
+        rf"\bconst\s+{re.escape(name)}\b[^=]*=\s*\[", source
+    )
+    assert declaration is not None, f"closed TypeScript array not found: {name}"
+    end = source.find("];", declaration.end())
+    assert end >= 0, f"unterminated TypeScript array: {name}"
+    return _typescript_literal_members(
+        source[declaration.end() : end], separator=","
+    )
+
+
+def _vocabulary_mismatches(
+    backend: dict[str, frozenset[str]],
+    frontend: dict[str, frozenset[str]],
+) -> dict[str, dict[str, list[str]]]:
+    return {
+        name: {
+            "backend_only": sorted(backend[name] - frontend[name]),
+            "frontend_only": sorted(frontend[name] - backend[name]),
+        }
+        for name in backend
+        if backend[name] != frontend[name]
+    }
+
+
+def test_backend_and_frontend_lifecycle_vocabularies_have_exact_parity():
+    frontend_source = _FRONTEND_API_SOURCE.read_text(encoding="utf-8")
+    backend = {
+        "automation_stages": _python_string_authority(
+            _AUTOMATION_RUNTIME_SOURCE, "LifecycleAutomationStage"
+        ),
+        "failure_reasons": _python_string_authority(
+            _AUTOMATION_SCHEDULER_SOURCE, "_REASONS"
+        ),
+        "disposition_reasons": _python_string_authority(
+            _DISPOSITION_SOURCE, "LIFECYCLE_DISPOSITION_REASONS"
+        ),
+        "disposition_values": _python_string_authority(
+            _DISPOSITION_SOURCE, "LIFECYCLE_DISPOSITIONS"
+        ),
+        "queue_buckets": _python_string_authority(
+            _DISPOSITION_SOURCE, "LIFECYCLE_QUEUE_BUCKETS"
+        ),
+        "blocker_codes": _python_string_authority(
+            _SCHEMA_SOURCE, "AUTOMATION_BLOCKER_CODES"
+        ),
+        "automation_triggers": _python_string_authority(
+            _AUTOMATION_RUNTIME_SOURCE, "LifecycleAutomationTrigger"
+        ),
+        "source_family_states": _python_string_authority(
+            _DISPOSITION_SOURCE, "SOURCE_FAMILY_STATES"
+        ),
+    }
+    frontend = {
+        "automation_stages": _typescript_string_union(
+            frontend_source, "SecurityLifecycleAutomationStage"
+        ),
+        "failure_reasons": _typescript_string_union(
+            frontend_source, "SecurityLifecycleAutomationFailureReason"
+        ),
+        "disposition_reasons": _typescript_string_union(
+            frontend_source, "SecurityLifecycleDispositionReason"
+        ),
+        "disposition_values": _typescript_string_union(
+            frontend_source, "SecurityLifecycleDisposition"
+        ),
+        "queue_buckets": _typescript_string_union(
+            frontend_source, "SecurityLifecycleQueueBucket"
+        ),
+        "blocker_codes": _typescript_string_union(
+            frontend_source, "SecurityLifecycleAutomationBlockerCode"
+        ),
+        "automation_triggers": _typescript_string_union(
+            frontend_source, "SecurityLifecycleAutomationTrigger"
+        ),
+        "source_family_states": _typescript_string_union(
+            frontend_source, "SecurityLifecycleSourceFamilyState"
+        ),
+    }
+
+    assert backend["automation_stages"] == _python_string_authority(
+        _AUTOMATION_RUNTIME_SOURCE, "LIFECYCLE_AUTOMATION_STAGE_ORDER"
+    )
+    assert backend["automation_stages"] == frontend["automation_stages"]
+    assert frontend["automation_stages"] == _typescript_string_array(
+        frontend_source, "AUTOMATION_STAGES"
+    )
+    assert backend["failure_reasons"] == frontend["failure_reasons"]
+    assert frontend["failure_reasons"] == _typescript_string_array(
+        frontend_source, "AUTOMATION_REASONS"
+    )
+    assert backend["automation_triggers"] == _python_string_authority(
+        _AUTOMATION_RUNTIME_SOURCE, "_LIFECYCLE_AUTOMATION_TRIGGERS"
+    )
+    assert backend == frontend, _vocabulary_mismatches(backend, frontend)
 
 
 def _blocker(code: str, *, retryable: bool, context: dict | None = None) -> dict:

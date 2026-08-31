@@ -104,6 +104,7 @@ export function lifecycleDispositionReasonLabel(
     ambiguous_event: copy.ambiguousEvent,
     nonretryable_provider_failure: copy.nonretryableProviderFailure,
     automation_failure: copy.automationFailure,
+    automation_finalization_failure: copy.automationFinalizationFailure,
     resolved_no_change: copy.resolvedNoChange,
     resolved_assessment: copy.resolvedAssessment,
     transition_applied: copy.transitionApplied,

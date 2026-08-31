@@ -49,6 +49,10 @@ describe("Lifecycle presentation", () => {
       .toBe("截止最近一次完整查核仍未確認");
     expect(lifecycleDispositionReasonLabel("retryable_source_unavailable", "en"))
       .toBe("A source is temporarily unavailable; another check is scheduled");
+    expect(lifecycleDispositionReasonLabel("automation_finalization_failure", "en"))
+      .toBe("Automatic check finalization failed");
+    expect(lifecycleDispositionReasonLabel("automation_finalization_failure", "zh-Hant"))
+      .toBe("自動查核最終處理失敗");
     expect(lifecycleDispositionReasonLabel("event_completion_not_confirmed", "en"))
       .not.toBe(lifecycleDispositionReasonLabel("retryable_source_unavailable", "en"));
     expect(lifecycleSourceFamilyStateLabel("confirmed", "zh-Hant"))
