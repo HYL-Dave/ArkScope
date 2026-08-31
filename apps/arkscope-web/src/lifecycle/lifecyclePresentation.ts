@@ -6,6 +6,7 @@ import type {
   SecurityLifecycleAssessmentAuthor,
   SecurityLifecycleAutomationBlockerCode,
   SecurityLifecycleAutomationMethod,
+  SecurityLifecycleAutomationOperatorDetail,
   SecurityLifecycleConfidence,
   SecurityLifecycleEventType,
   SecurityLifecycleEvidenceSourceFamily,
@@ -426,6 +427,34 @@ export function lifecycleAutomationBlockerLabel(
     transition_approval_changed: copy.transitionApprovalChanged,
     transition_approval_unavailable: copy.transitionApprovalUnavailable,
   }, locale);
+}
+
+export function lifecycleAutomationOperatorDetailLabel(
+  value: unknown,
+  locale: LifecycleLocale,
+): string | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const detail = value as Partial<SecurityLifecycleAutomationOperatorDetail>;
+  if (
+    detail.code !== "candidate_budget_exceeded"
+    || !Number.isInteger(detail.candidate_count)
+    || !Number.isInteger(detail.query_limit)
+    || Number(detail.query_limit) < 1
+    || Number(detail.query_limit) > 16
+    || Number(detail.candidate_count) <= Number(detail.query_limit)
+    || detail.provider_contacted !== false
+  ) {
+    return null;
+  }
+  return narrativeTemplate(
+    lifecycleCopy(locale).automationOperatorDetails.candidateBudgetExceeded,
+    {
+      candidateCount: String(detail.candidate_count),
+      queryLimit: String(detail.query_limit),
+    },
+  );
 }
 
 export function lifecycleWorkflowLabel(

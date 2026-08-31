@@ -113,6 +113,7 @@ _RETRYABLE_BLOCKERS = frozenset(
         "sec_evidence_insufficient",
         "ibkr_gateway_unavailable",
         "ibkr_contract_missing",
+        "market_confirmation_missing",
         "listing_directory_unavailable",
         "listing_directory_stale",
         "listing_directory_schema_mismatch",
@@ -1475,15 +1476,26 @@ def _load_evidence(
             fresh_evidence.extend(ibkr_evidence)
             fresh_facts.extend(ibkr_fact_rows)
             mark_refreshed("market_infrastructure")
-        codes.extend(
-            code
-            for code in ibkr_codes
-            if code not in {
+        for code in ibkr_codes:
+            if code in {
                 "ibkr_contract_missing",
                 "ibkr_entitlement_denied",
                 "ibkr_gateway_unavailable",
-            }
-        )
+            }:
+                continue
+            if code == "market_confirmation_missing":
+                raw_context = getattr(ibkr, "blocker_context", None)
+                if not isinstance(raw_context, Mapping):
+                    raise ValueError("ibkr_blocker_context")
+                codes.append(
+                    AutomationBlocker(
+                        code=code,
+                        retryable=code in _RETRYABLE_BLOCKERS,
+                        context=dict(raw_context),
+                    )
+                )
+            else:
+                codes.append(code)
     else:
         diagnostics["ibkr_requests"] = 0
         if has_existing_material and sec_failed:

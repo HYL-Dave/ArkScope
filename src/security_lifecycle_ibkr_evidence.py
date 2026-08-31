@@ -69,6 +69,7 @@ class IbkrContractEvidenceResult:
     corroboration_family_count: int
     requests_made: int
     contract_status: str
+    blocker_context: Mapping[str, object] | None = None
 
 
 def _timestamp(value: str) -> str:
@@ -246,7 +247,6 @@ def _queries(
     context: IdentityContext,
     *,
     candidate_tickers: Iterable[str],
-    max_queries: int,
 ) -> tuple[Contract, ...] | None:
     if len(context.ibkr_conids) > 1:
         return None
@@ -265,16 +265,20 @@ def _queries(
     queries: tuple[Contract, ...] = tuple(
         Contract(conId=con_id, exchange="SMART") for con_id in context.ibkr_conids
     ) + tuple(Stock(alias, "SMART", "USD") for alias in aliases)
-    if len(queries) > max_queries:
-        return None
     return queries
 
 
-def _blocked(code: str, *, requests_made: int) -> IbkrContractEvidenceResult:
+def _blocked(
+    code: str,
+    *,
+    requests_made: int,
+    context: Mapping[str, object] | None = None,
+) -> IbkrContractEvidenceResult:
     statuses = {
         "ibkr_gateway_unavailable": "unavailable",
         "ibkr_contract_ambiguous": "ambiguous",
         "ibkr_entitlement_denied": "entitlement_denied",
+        "market_confirmation_missing": "unqueried",
     }
     return IbkrContractEvidenceResult(
         (),
@@ -283,6 +287,7 @@ def _blocked(code: str, *, requests_made: int) -> IbkrContractEvidenceResult:
         0,
         requests_made,
         statuses[code],
+        context,
     )
 
 
@@ -475,10 +480,19 @@ def read_ibkr_contract_evidence(
     queries = _queries(
         context,
         candidate_tickers=candidate_tickers,
-        max_queries=max_queries,
     )
     if queries is None:
         return _blocked("ibkr_contract_ambiguous", requests_made=0)
+    if len(queries) > max_queries:
+        return _blocked(
+            "market_confirmation_missing",
+            requests_made=0,
+            context={
+                "code": "candidate_budget_exceeded",
+                "candidate_count": len(queries),
+                "query_limit": max_queries,
+            },
+        )
     requests_made = 0
     detail_rows: list[object] = []
     snapshot: dict[str, Any] | None = None

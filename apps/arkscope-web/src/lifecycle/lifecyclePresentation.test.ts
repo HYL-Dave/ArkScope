@@ -274,6 +274,31 @@ describe("Lifecycle presentation", () => {
     }
   });
 
+  it("keeps operator detail vocabulary closed in both locales", async () => {
+    const presentation = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    ) as Record<string, unknown>;
+    const label = presentation.lifecycleAutomationOperatorDetailLabel;
+
+    expect(label).toBeTypeOf("function");
+    if (typeof label !== "function") return;
+
+    const detail = {
+      code: "candidate_budget_exceeded",
+      candidate_count: 9,
+      query_limit: 8,
+      provider_contacted: false,
+    };
+    expect(label(detail, "en")).toBe(
+      "9 candidates exceed the IBKR query limit of 8. IBKR was not contacted.",
+    );
+    expect(label(detail, "zh-Hant")).toBe(
+      "9 個候選標的超過 IBKR 查詢上限 8；未聯絡 IBKR。",
+    );
+    expect(label({ ...detail, code: "future_operator_detail" }, "en")).toBeNull();
+    expect(label({ ...detail, provider_contacted: true }, "en")).toBeNull();
+  });
+
   it("rejects unsafe evidence links before rendering an external action", async () => {
     const { safeEvidenceUrl } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
 

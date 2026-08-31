@@ -1772,6 +1772,47 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).not.toContain("symbol_and_venue_change");
   });
 
+  it("renders the candidate-budget operator diagnostic in en and zh-Hant", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      automation_runs: [{
+        run_id: "automation-run-budget",
+        case_id: CASE_ID,
+        mode: "historical",
+        status: "blocked",
+        policy_version: "lifecycle-automation-v1",
+        decision_tier: null,
+        action_readiness: null,
+        failure_code: null,
+        blockers: [{
+          blocker_code: "market_confirmation_missing",
+          retryable: true,
+          operator_detail: {
+            code: "candidate_budget_exceeded",
+            candidate_count: 9,
+            query_limit: 8,
+            provider_contacted: false,
+          },
+          context_json: '{"internal_hash":"ui-raw-context-sentinel"}',
+        }],
+        created_at: "2026-08-25T10:00:00Z",
+      }],
+      automation_facts: [],
+    }));
+
+    await mountLifecycle();
+    expect(document.body.textContent).toContain(
+      "9 candidates exceed the IBKR query limit of 8. IBKR was not contacted.",
+    );
+    expect(document.body.textContent).not.toContain("ui-raw-context-sentinel");
+
+    await act(async () => { await i18n.changeLanguage("zh-Hant"); });
+    await flush();
+    expect(document.body.textContent).toContain(
+      "9 個候選標的超過 IBKR 查詢上限 8；未聯絡 IBKR。",
+    );
+    expect(document.body.textContent).not.toContain("ui-raw-context-sentinel");
+  });
+
   it("prefills the newest automation suggestion without rewriting its authorship", async () => {
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
       current_assessment: LEGACY_ASSESSMENT,

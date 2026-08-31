@@ -19,6 +19,7 @@ from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     compose_security_lifecycle,
     observation_fingerprint,
+    project_automation_blocker,
 )
 from src.security_lifecycle_schema import (
     ASSESSMENT_RELEVANCE,
@@ -175,6 +176,19 @@ def _compact_listing(source_locator_json: object) -> dict:
 
 def project_active_security_lifecycle_case(case: Mapping[str, object]) -> dict:
     item = dict(case)
+    automation_runs = []
+    for raw_run in item.get("automation_runs", []):
+        if not isinstance(raw_run, Mapping):
+            raise ValueError("automation_run")
+        run = dict(raw_run)
+        blockers = []
+        for blocker in run.get("blockers", []):
+            if not isinstance(blocker, Mapping):
+                raise ValueError("automation_blocker")
+            blockers.append(project_automation_blocker(blocker))
+        run["blockers"] = blockers
+        automation_runs.append(run)
+    item["automation_runs"] = automation_runs
     evidence = []
     for raw in item.get("evidence", []):
         if not isinstance(raw, Mapping):
@@ -402,13 +416,12 @@ def _provider_neutral_case(case: Mapping[str, object]) -> dict:
                     "diagnostics_json",
                 ):
                     value.pop(key, None)
-                value["blockers"] = [
-                    {
-                        "blocker_code": blocker.get("blocker_code"),
-                        "retryable": bool(blocker.get("retryable")),
-                    }
-                    for blocker in value.get("blockers", [])
-                ]
+                projected_blockers = []
+                for blocker in value.get("blockers", []):
+                    if not isinstance(blocker, Mapping):
+                        raise ValueError("automation_blocker")
+                    projected_blockers.append(project_automation_blocker(blocker))
+                value["blockers"] = projected_blockers
             elif name == "automation_facts":
                 value = {
                     key: value.get(key)

@@ -2608,6 +2608,14 @@ export type SecurityLifecycleAutomationBlockerCode =
   | "impact_context_requested"
   | "transition_approval_changed"
   | "transition_approval_unavailable";
+export interface SecurityLifecycleCandidateBudgetExceededOperatorDetail {
+  code: "candidate_budget_exceeded";
+  candidate_count: number;
+  query_limit: number;
+  provider_contacted: false;
+}
+export type SecurityLifecycleAutomationOperatorDetail =
+  SecurityLifecycleCandidateBudgetExceededOperatorDetail;
 export type SecurityLifecycleFactType =
   | "source_ticker"
   | "successor_ticker"
@@ -2702,6 +2710,7 @@ export interface SecurityLifecycleAutomationRun {
   blockers: Array<{
     blocker_code: SecurityLifecycleAutomationBlockerCode;
     retryable: boolean;
+    operator_detail?: SecurityLifecycleAutomationOperatorDetail;
   }>;
   retry_at?: string | null;
   started_at?: string | null;

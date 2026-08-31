@@ -311,6 +311,31 @@ def _create_automation_draft(context):
     )
 
 
+def _insert_automation_blocker(context, detail):
+    run_id = str(
+        context["profile_conn"]
+        .execute(
+            "SELECT run_id FROM security_lifecycle_automation_runs "
+            "ORDER BY created_at DESC,rowid DESC LIMIT 1"
+        )
+        .fetchone()[0]
+    )
+    context["profile_conn"].execute(
+        "INSERT INTO security_lifecycle_automation_run_blockers "
+        "(automation_run_id,blocker_code,retryable,context_json,created_at) "
+        "VALUES (?,?,?,?,?)",
+        (
+            run_id,
+            "market_confirmation_missing",
+            1,
+            json.dumps(detail, separators=(",", ":"), sort_keys=True),
+            _AT,
+        ),
+    )
+    context["profile_conn"].commit()
+    return run_id
+
+
 def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, monkeypatch):
     context = _build_context(tmp_path)
     try:
@@ -1150,6 +1175,101 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
         assert context["store"].get_automation_run(running.run_id)["status"] == (
             "failed"
         )
+    finally:
+        context["profile_conn"].close()
+
+
+def test_operator_detail_reaches_http_ai_tool_and_ui_identically(
+    tmp_path,
+    monkeypatch,
+):
+    from src.tools import security_lifecycle_tools
+
+    context = _build_context(tmp_path)
+    try:
+        _create_automation_draft(context)
+        _insert_automation_blocker(
+            context,
+            {
+                "code": "candidate_budget_exceeded",
+                "candidate_count": 9,
+                "query_limit": 8,
+                "provider_contacted": False,
+            },
+        )
+        client = _client(context, monkeypatch)
+        http_case = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}"
+        ).json()
+
+        monkeypatch.setattr(
+            security_lifecycle_tools,
+            "SecurityLifecycleReadService",
+            lambda **_kwargs: context["service"],
+        )
+        ai_case = security_lifecycle_tools.get_security_lifecycle_case(
+            context["case_id"]
+        )["case"]
+
+        expected = {
+            "blocker_code": "market_confirmation_missing",
+            "retryable": True,
+            "operator_detail": {
+                "code": "candidate_budget_exceeded",
+                "candidate_count": 9,
+                "query_limit": 8,
+                "provider_contacted": False,
+            },
+        }
+        assert http_case["automation_runs"][0]["blockers"] == [expected]
+        assert ai_case["automation_runs"][0]["blockers"] == [expected]
+    finally:
+        context["profile_conn"].close()
+
+
+def test_raw_context_json_is_never_exposed_on_any_surface(tmp_path, monkeypatch):
+    from src.tools import security_lifecycle_tools
+
+    context = _build_context(tmp_path)
+    try:
+        _create_automation_draft(context)
+        _insert_automation_blocker(
+            context,
+            {
+                "code": "future_operator_detail",
+                "candidate_count": 999,
+                "query_limit": 1,
+                "provider_contacted": True,
+                "internal_candidate_hash": "raw-context-sentinel",
+                "internal_case_id": context["case_id"],
+                "arbitrary_unknown_key": {"secret": "must-not-escape"},
+            },
+        )
+        client = _client(context, monkeypatch)
+        http_case = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}"
+        ).json()
+
+        monkeypatch.setattr(
+            security_lifecycle_tools,
+            "SecurityLifecycleReadService",
+            lambda **_kwargs: context["service"],
+        )
+        ai_case = security_lifecycle_tools.get_security_lifecycle_case(
+            context["case_id"]
+        )["case"]
+
+        for payload in (http_case, ai_case):
+            blocker = payload["automation_runs"][0]["blockers"][0]
+            assert blocker == {
+                "blocker_code": "market_confirmation_missing",
+                "retryable": True,
+            }
+            encoded = json.dumps(payload, sort_keys=True)
+            assert "context_json" not in encoded
+            assert "raw-context-sentinel" not in encoded
+            assert context["case_id"] not in json.dumps(blocker, sort_keys=True)
+            assert "must-not-escape" not in encoded
     finally:
         context["profile_conn"].close()
 

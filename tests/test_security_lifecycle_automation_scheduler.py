@@ -1775,6 +1775,246 @@ def test_scheduler_ibkr_seam_forwards_an_injected_query_cap(monkeypatch):
     assert captured[0]["max_queries"] == 3
 
 
+def test_candidate_budget_overflow_is_retryable_and_not_a_market_conflict():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+    from src.security_lifecycle_sec_evidence import build_identity_context
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    def provider_access_forbidden(*_args, **_kwargs):
+        pytest.fail("candidate overflow contacted IBKR")
+
+    gateway = SimpleNamespace(
+        isConnected=provider_access_forbidden,
+        reqContractDetails=provider_access_forbidden,
+        reqMktData=provider_access_forbidden,
+        sleep=provider_access_forbidden,
+    )
+
+    @contextmanager
+    def lock(_timeout):
+        pytest.fail("candidate overflow entered the gateway lock")
+        yield
+
+    context = build_identity_context(
+        case_id="slc_candidate_budget",
+        observation={
+            "ticker": "CUR",
+            "cik": "0000000001",
+            "issuer_name": "Candidate Budget Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000001",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "event_kinds": ["listing_status_review"],
+        },
+        ticker_aliases=tuple(f"A{index}" for index in range(7)),
+        ibkr_conids=(),
+    )
+
+    result = read_ibkr_contract_evidence(
+        gateway=gateway,
+        gateway_lock=lock,
+        context=context,
+        candidate_tickers=("NEXT",),
+        retrieved_at="2026-08-26T00:00:00Z",
+        max_queries=8,
+    )
+    blockers, retry_at = scheduler._blockers(
+        list(result.blockers),
+        at="2026-08-26T00:00:00Z",
+    )
+
+    assert tuple(row.code for row in blockers) == ("market_confirmation_missing",)
+    assert blockers[0].retryable is True
+    assert retry_at == "2026-08-27T00:00:00Z"
+    assert scheduler._provider_state(
+        result.blockers,
+        family="market_infrastructure",
+    ) == "available"
+    assert scheduler._provider_state(
+        ("ibkr_contract_ambiguous",),
+        family="market_infrastructure",
+    ) == "conflict"
+
+
+def test_candidate_budget_context_reaches_scheduler_blocker(monkeypatch):
+    from data_sources import sec_transport
+    from src import security_lifecycle_sec_evidence
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    class Transport:
+        def diagnostics(self, _budget):
+            return {"attempt_count": 1}
+
+        def close(self):
+            pass
+
+    sec_evidence = SimpleNamespace(
+        evidence_id="sec-candidate-budget",
+        source_family="regulator",
+        source_locator={},
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+    successor = SimpleNamespace(
+        evidence_id=sec_evidence.evidence_id,
+        fact_type="successor_ticker",
+        value="NEXT",
+    )
+    monkeypatch.setattr(sec_transport, "SecTransport", Transport)
+    monkeypatch.setattr(
+        security_lifecycle_sec_evidence,
+        "collect_sec_evidence",
+        lambda **_kwargs: SimpleNamespace(
+            evidence=(sec_evidence,),
+            facts=(successor,),
+            blockers=(),
+            source_deadlines=(),
+        ),
+    )
+    listing_session = SimpleNamespace(
+        lookup=lambda **_kwargs: SimpleNamespace(
+            evidence=(), facts=(), blockers=(), diagnostics={}
+        )
+    )
+    detail = {
+        "code": "candidate_budget_exceeded",
+        "candidate_count": 9,
+        "query_limit": 8,
+    }
+    monkeypatch.setattr(
+        scheduler,
+        "_ibkr_evidence",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(
+                evidence=(),
+                blockers=("market_confirmation_missing",),
+                blocker_context=detail,
+                requests_made=0,
+            ),
+            (),
+        ),
+    )
+    case = {
+        "case_id": "slc_candidate_budget",
+        "ticker": "OLD",
+        "ticker_aliases": ("OLD",),
+        "ibkr_conids": (),
+        "ibkr_identity_blockers": (),
+        "observation": {
+            "ticker": "OLD",
+            "cik": "0000000001",
+            "issuer_name": "Candidate Budget Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000003",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "kinds": [{"event_type": "acquisition_completed", "effective_date": None}],
+        },
+    }
+
+    bundle = scheduler._load_evidence(
+        case,
+        mode="live",
+        at="2026-08-26T00:00:00Z",
+        listing_session=listing_session,
+    )
+
+    blocker = next(
+        row for row in bundle.blockers if row.code == "market_confirmation_missing"
+    )
+    assert blocker.retryable is True
+    assert blocker.context == detail
+    assert bundle.retry_at == "2026-08-27T00:00:00Z"
+    assert bundle.diagnostics["ibkr_requests"] == 0
+    assert bundle.diagnostics["ibkr_conflict"] == 0
+
+
+def test_observed_multiplicity_remains_a_non_retryable_ambiguity():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+    from src.security_lifecycle_sec_evidence import build_identity_context
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    details = (
+        SimpleNamespace(
+            contract=SimpleNamespace(
+                symbol="CUR",
+                localSymbol="CUR",
+                conId=101,
+                secType="STK",
+                primaryExchange="NYSE",
+                currency="USD",
+            ),
+            validExchanges="SMART,NYSE",
+        ),
+        SimpleNamespace(
+            contract=SimpleNamespace(
+                symbol="CUR",
+                localSymbol="CUR",
+                conId=202,
+                secType="STK",
+                primaryExchange="NASDAQ",
+                currency="USD",
+            ),
+            validExchanges="SMART,NASDAQ",
+        ),
+    )
+    requests = []
+
+    def request(contract):
+        requests.append(contract)
+        return details
+
+    gateway = SimpleNamespace(
+        isConnected=lambda: True,
+        reqContractDetails=request,
+        reqMktData=lambda *_args, **_kwargs: pytest.fail(
+            "ambiguous contracts requested market data"
+        ),
+        sleep=lambda *_args, **_kwargs: None,
+    )
+
+    @contextmanager
+    def lock(_timeout):
+        yield
+
+    context = build_identity_context(
+        case_id="slc_observed_ambiguity",
+        observation={
+            "ticker": "CUR",
+            "cik": "0000000001",
+            "issuer_name": "Observed Ambiguity Issuer",
+            "filing_date": "2026-08-20",
+            "source_ref": "0000000001-26-000002",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "event_kinds": ["listing_status_review"],
+        },
+        ticker_aliases=(),
+        ibkr_conids=(),
+    )
+
+    result = read_ibkr_contract_evidence(
+        gateway=gateway,
+        gateway_lock=lock,
+        context=context,
+        retrieved_at="2026-08-26T00:00:00Z",
+    )
+    blockers, retry_at = scheduler._blockers(
+        list(result.blockers),
+        at="2026-08-26T00:00:00Z",
+    )
+
+    assert len(requests) == 1
+    assert result.requests_made == 1
+    assert tuple(row.code for row in blockers) == ("ibkr_contract_ambiguous",)
+    assert blockers[0].retryable is False
+    assert retry_at is None
+    assert scheduler._provider_state(
+        result.blockers,
+        family="market_infrastructure",
+    ) == "conflict"
+
+
 def test_precomputed_ibkr_ambiguity_never_reaches_the_gateway(monkeypatch):
     from data_sources import sec_transport
     from src import security_lifecycle_sec_evidence

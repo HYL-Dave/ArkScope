@@ -398,7 +398,7 @@ def test_ibkr_candidate_plan_prioritizes_exact_current_successor_then_aliases():
     assert result.requests_made == 5
 
 
-def test_ibkr_candidate_budget_distinguishes_complete_missing_from_ambiguity():
+def test_eight_candidate_query_boundary_still_reports_missing():
     from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
 
     six_aliases = tuple(f"A{index}" for index in range(6))
@@ -418,6 +418,10 @@ def test_ibkr_candidate_budget_distinguishes_complete_missing_from_ambiguity():
     assert complete.requests_made == 8
     assert len(complete_gateway.requests) == 8
 
+
+def test_budget_overflow_records_candidate_budget_exceeded_context():
+    from src.security_lifecycle_ibkr_evidence import read_ibkr_contract_evidence
+
     seven_aliases = tuple(f"A{index}" for index in range(7))
     state, lock = _lock_recorder()
     overflow_gateway = _Gateway(lock_state=state)
@@ -430,8 +434,13 @@ def test_ibkr_candidate_budget_distinguishes_complete_missing_from_ambiguity():
         max_queries=8,
     )
 
-    assert overflow.contract_status == "ambiguous"
-    assert overflow.blockers == ("ibkr_contract_ambiguous",)
+    assert overflow.contract_status == "unqueried"
+    assert overflow.blockers == ("market_confirmation_missing",)
+    assert overflow.blocker_context == {
+        "code": "candidate_budget_exceeded",
+        "candidate_count": 9,
+        "query_limit": 8,
+    }
     assert overflow.evidence == ()
     assert overflow.requests_made == 0
     assert overflow_gateway.requests == []
@@ -485,7 +494,7 @@ def test_ibkr_adapter_reports_gateway_unavailable_and_contract_missing_separatel
     assert unavailable.evidence == ()
 
 
-def test_ibkr_adapter_reports_ambiguous_contract_without_guessing():
+def test_observed_multiplicity_remains_ambiguous_after_real_queries():
     state, lock = _lock_recorder()
     old = _details(symbol="LC", local_symbol="LC", con_id=100, primary_exchange="NYSE")
     current = _details(symbol="HAPN", con_id=200)

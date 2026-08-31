@@ -77,6 +77,7 @@ import {
   lifecycleActionReadinessLabel,
   lifecycleAssessmentAuthorLabel,
   lifecycleAutomationBlockerLabel,
+  lifecycleAutomationOperatorDetailLabel,
   lifecycleAutomationNarrative,
   lifecycleAutomationMethodLabel,
   lifecycleConfidenceLabel,
@@ -688,11 +689,23 @@ function AutomationTruth({
               <dd className="mono">{run.policy_version}</dd>
             </div>
           </dl>
-          {blockers.map((blocker) => (
-            <p className="lifecycle-blocker" key={blocker.blocker_code}>
-              {lifecycleAutomationBlockerLabel(blocker.blocker_code, locale)}
-            </p>
-          ))}
+          {blockers.map((blocker) => {
+            const blockerLabel = lifecycleAutomationBlockerLabel(
+              blocker.blocker_code,
+              locale,
+            );
+            const operatorDetail = lifecycleAutomationOperatorDetailLabel(
+              blocker.operator_detail,
+              locale,
+            );
+            return (
+              <p className="lifecycle-blocker" key={blocker.blocker_code}>
+                {operatorDetail
+                  ? [blockerLabel, operatorDetail].join(": ")
+                  : blockerLabel}
+              </p>
+            );
+          })}
         </>
       ) : null}
       {facts.length > 0 ? (

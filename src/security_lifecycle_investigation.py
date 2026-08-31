@@ -8,7 +8,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import sqlite3
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Any, Callable, Iterable, Literal, Mapping, Optional, TypedDict
 import uuid
 
 from src.security_lifecycle import read_market_observations
@@ -1721,6 +1721,13 @@ def create_automation_assessment(
 _AUTOMATION_DETAIL_LIMIT = 100
 
 
+class CandidateBudgetExceededOperatorDetail(TypedDict):
+    code: Literal["candidate_budget_exceeded"]
+    candidate_count: int
+    query_limit: int
+    provider_contacted: Literal[False]
+
+
 def _decoded_json(value: object, *, mapping: bool = False) -> object:
     try:
         decoded = json.loads(str(value))
@@ -1729,6 +1736,53 @@ def _decoded_json(value: object, *, mapping: bool = False) -> object:
     if mapping and not isinstance(decoded, dict):
         raise LifecycleSchemaMismatch("invalid lifecycle automation object")
     return decoded
+
+
+def _candidate_budget_operator_detail(
+    value: object,
+) -> CandidateBudgetExceededOperatorDetail | None:
+    if not isinstance(value, Mapping):
+        return None
+    if value.get("code") != "candidate_budget_exceeded":
+        return None
+    candidate_count = value.get("candidate_count")
+    query_limit = value.get("query_limit")
+    if (
+        type(candidate_count) is not int
+        or type(query_limit) is not int
+        or query_limit < 1
+        or query_limit > 16
+        or candidate_count <= query_limit
+        or value.get("provider_contacted", False) is not False
+    ):
+        return None
+    return {
+        "code": "candidate_budget_exceeded",
+        "candidate_count": candidate_count,
+        "query_limit": query_limit,
+        "provider_contacted": False,
+    }
+
+
+def project_automation_blocker(blocker: Mapping[str, object]) -> dict[str, object]:
+    """Project one internal blocker into the closed operator-facing shape."""
+
+    projected: dict[str, object] = {
+        "blocker_code": blocker.get("blocker_code"),
+        "retryable": bool(blocker.get("retryable")),
+    }
+    if "context_json" in blocker:
+        context = _decoded_json(blocker.get("context_json"), mapping=True)
+    elif "context" in blocker:
+        context = blocker.get("context")
+    else:
+        context = blocker.get("operator_detail")
+    if projected["blocker_code"] != "market_confirmation_missing":
+        return projected
+    detail = _candidate_budget_operator_detail(context)
+    if detail is not None:
+        projected["operator_detail"] = detail
+    return projected
 
 
 def _automation_history(

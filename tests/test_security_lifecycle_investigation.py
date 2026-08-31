@@ -1157,6 +1157,150 @@ def test_stale_assessment_blocks_existing_and_new_proposals(tmp_path):
         conn.close()
 
 
+def test_operator_detail_is_a_closed_dto_and_rejects_unknown_codes(tmp_path):
+    from src.security_lifecycle_fact_kernel import (
+        AutomationBlocker,
+        SecurityLifecycleFactKernel,
+    )
+    from src.security_lifecycle_investigation import (
+        compose_security_lifecycle,
+        project_automation_blocker,
+    )
+    from src.tools.security_lifecycle_tools import (
+        project_active_security_lifecycle_case,
+    )
+
+    conn, store, case_id, market_path, profile_path, fingerprint = (
+        _composed_context(tmp_path)
+    )
+    try:
+        kernel = SecurityLifecycleFactKernel(store)
+        claim = kernel.reserve_run(
+            case_id=case_id,
+            observation_fingerprint_sha256=fingerprint,
+            policy_version="trusted-lifecycle-v1",
+            mode="historical",
+            execution_revision="trusted-lifecycle-execution-r1",
+            execution_owner_id="test-operator-detail-owner",
+            query_context={"case_id": case_id, "ticker": "EA"},
+            diagnostics={"ibkr_requests": 0},
+            at=_AT,
+        )
+        context = {
+            "code": "candidate_budget_exceeded",
+            "candidate_count": 9,
+            "query_limit": 8,
+            "internal_candidate_hash": "a" * 64,
+            "internal_case_id": case_id,
+            "future_key": {"must": "not escape"},
+        }
+        assert project_automation_blocker(
+            {
+                "blocker_code": "sec_rate_limited",
+                "retryable": True,
+                "context": context,
+            }
+        ) == {
+            "blocker_code": "sec_rate_limited",
+            "retryable": True,
+        }
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(),
+            facts=(),
+            blockers=(
+                AutomationBlocker(
+                    code="market_confirmation_missing",
+                    retryable=True,
+                    context=context,
+                ),
+            ),
+            decision_tier=None,
+            action_readiness=None,
+            retry_at="2026-08-21T00:00:00Z",
+            diagnostics={"ibkr_requests": 0},
+            at=_LATER,
+        )
+
+        internal_case = compose_security_lifecycle(
+            str(market_path),
+            str(profile_path),
+        )["cases"][0]
+        assert internal_case["automation_runs"][0]["blockers"][0]["context"] == (
+            context
+        )
+        blocker = project_active_security_lifecycle_case(internal_case)[
+            "automation_runs"
+        ][0]["blockers"][0]
+        assert blocker == {
+            "blocker_code": "market_confirmation_missing",
+            "retryable": True,
+            "operator_detail": {
+                "code": "candidate_budget_exceeded",
+                "candidate_count": 9,
+                "query_limit": 8,
+                "provider_contacted": False,
+            },
+        }
+
+        conn.execute(
+            "UPDATE security_lifecycle_automation_run_blockers "
+            "SET context_json=? WHERE automation_run_id=?",
+            (
+                json.dumps(
+                    {
+                        **context,
+                        "code": "future_operator_detail",
+                    },
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+                claim.run_id,
+            ),
+        )
+        conn.commit()
+
+        rejected = project_active_security_lifecycle_case(
+            compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
+        )["automation_runs"][0]["blockers"][0]
+        assert rejected == {
+            "blocker_code": "market_confirmation_missing",
+            "retryable": True,
+        }
+
+        invalid_details = (
+            {**context, "provider_contacted": True},
+            {**context, "candidate_count": "9"},
+            {**context, "query_limit": "8"},
+        )
+        for invalid_detail in invalid_details:
+            conn.execute(
+                "UPDATE security_lifecycle_automation_run_blockers "
+                "SET context_json=? WHERE automation_run_id=?",
+                (
+                    json.dumps(
+                        invalid_detail,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                    claim.run_id,
+                ),
+            )
+            conn.commit()
+            rejected = project_active_security_lifecycle_case(
+                compose_security_lifecycle(
+                    str(market_path),
+                    str(profile_path),
+                )["cases"][0]
+            )["automation_runs"][0]["blockers"][0]
+            assert rejected == {
+                "blocker_code": "market_confirmation_missing",
+                "retryable": True,
+            }
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize(
     "outcomes",
     [

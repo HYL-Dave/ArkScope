@@ -621,6 +621,9 @@ const explore = {
       transitionApprovalChanged: "追蹤轉移核准輸入已變更；已排程重新驗證",
       transitionApprovalUnavailable: "追蹤轉移核准暫時無法完成；已排程重新驗證",
     },
+    automationOperatorDetails: {
+      candidateBudgetExceeded: "{{candidateCount}} 個候選標的超過 IBKR 查詢上限 {{queryLimit}}；未聯絡 IBKR。",
+    },
     citationKinds: {
       observation: "觀察引用",
       evidence: "證據引用",

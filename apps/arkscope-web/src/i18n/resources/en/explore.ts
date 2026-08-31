@@ -621,6 +621,9 @@ const explore = {
       transitionApprovalChanged: "Transition approval inputs changed; revalidation is scheduled",
       transitionApprovalUnavailable: "Transition approval is temporarily unavailable; revalidation is scheduled",
     },
+    automationOperatorDetails: {
+      candidateBudgetExceeded: "{{candidateCount}} candidates exceed the IBKR query limit of {{queryLimit}}. IBKR was not contacted.",
+    },
     citationKinds: {
       observation: "Observation citation",
       evidence: "Evidence citation",

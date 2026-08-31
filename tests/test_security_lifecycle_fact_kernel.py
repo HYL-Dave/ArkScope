@@ -2757,6 +2757,41 @@ def test_explicit_source_conflict_survives_persistence_without_derived_fact_conf
     }
 
 
+def test_candidate_budget_context_persists_in_existing_context_json():
+    from src.security_lifecycle_fact_kernel import AutomationBlocker
+
+    _conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    detail = {
+        "code": "candidate_budget_exceeded",
+        "candidate_count": 9,
+        "query_limit": 8,
+    }
+
+    kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(),
+        facts=(),
+        blockers=(
+            AutomationBlocker(
+                code="market_confirmation_missing",
+                retryable=True,
+                context=detail,
+            ),
+        ),
+        decision_tier=None,
+        action_readiness=None,
+        retry_at="2026-08-26T02:00:00Z",
+        diagnostics={"ibkr_requests": 0},
+        at=_LATER,
+    )
+
+    blocker = store.get_automation_run(claim.run_id)["blockers"][0]
+    assert blocker["blocker_code"] == "market_confirmation_missing"
+    assert blocker["retryable"] == 1
+    assert json.loads(blocker["context_json"]) == detail
+
+
 @pytest.mark.parametrize(
     "blocker_code",
     ("transition_approval_changed", "transition_approval_unavailable"),
