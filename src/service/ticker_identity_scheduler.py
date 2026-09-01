@@ -303,7 +303,7 @@ def _unresolved_transition_failure_ids(
         "AND name='ticker_identity_transitions'"
     ).fetchone()
     if present is None:
-        return () if result["recovery_eligible"] is True else tuple(sorted(failed_ids))
+        return tuple(sorted(failed_ids))
     statuses: dict[str, str] = {}
     ordered_ids = sorted(failed_ids)
     for offset in range(0, len(ordered_ids), 500):

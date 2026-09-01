@@ -1607,7 +1607,7 @@ def test_scheduler_concurrent_healthy_ticks_record_one_recovery(
         ]
 
 
-def test_policy_deferral_after_a_real_failure_never_records_recovery(
+def test_policy_deferral_and_schema_absence_never_clear_named_failure(
     tmp_path,
     monkeypatch,
 ):
@@ -1643,7 +1643,7 @@ def test_policy_deferral_after_a_real_failure_never_records_recovery(
                 "failed",
                 "ticker_identity_scheduler_failure",
                 "transition_execution_failed",
-            )
+            ),
         ]
 
     healthy = _scheduler_result(status="succeeded", reason=None)
@@ -1657,12 +1657,7 @@ def test_policy_deferral_after_a_real_failure_never_records_recovery(
                 "failed",
                 "ticker_identity_scheduler_failure",
                 "transition_execution_failed",
-            ),
-            (
-                "succeeded",
-                "ticker_identity_scheduler_recovered",
-                None,
-            ),
+            )
         ]
 
 

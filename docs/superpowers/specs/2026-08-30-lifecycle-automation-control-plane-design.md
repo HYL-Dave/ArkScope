@@ -355,10 +355,12 @@ security_lifecycle.automation.batch_limit
 security_lifecycle.automation.apply_profile_transitions
 ```
 
-Deterministic background automation remains enabled by default to preserve the
-current decision and monitoring behavior. The configurable interval prevents a
-full case composition every 30 seconds; its default is five minutes. Batch
-limit remains bounded to 1 or 2 and defaults to 2.
+Deterministic background automation defaults to disabled. Attended runs remain
+available, but background dispatch begins only after the operator enables it;
+this preserves the reviewed canary-before-automation boundary. Once enabled,
+the configurable interval prevents a full case composition every 30 seconds;
+its default is five minutes. Batch limit remains bounded to 1 or 2 and defaults
+to 2.
 
 Persisted booleans use only the canonical strings `true` and `false`.
 `interval_minutes` accepts integers from 5 through 10,080; `batch_limit`
