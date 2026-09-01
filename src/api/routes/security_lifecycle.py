@@ -29,6 +29,7 @@ from src.card_synthesis import translate_text, translation_harness
 from src.content_translation_failures import classify_content_translation_failure
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.security_lifecycle_disposition import LIFECYCLE_QUEUE_BUCKETS
+from src.security_lifecycle_sec_admission import SEC_ADMISSION_STATES
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
     LifecycleWritesUnavailable,
@@ -666,6 +667,30 @@ def list_cases(
             proposal_type=proposal_type,
             queue_bucket=queue_bucket,
             source_presence=source_presence,
+            limit=limit,
+        )
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except ValueError as exc:
+        raise _invalid(exc) from None
+
+
+@router.get("/candidates")
+def list_sec_candidates(
+    admission_state: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=200),
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+):
+    try:
+        if (
+            admission_state is not None
+            and admission_state not in SEC_ADMISSION_STATES
+        ):
+            raise ValueError("admission_state")
+        return service.list_sec_candidates(
+            admission_state=admission_state,
             limit=limit,
         )
     except LifecycleStoreUnavailable as exc:

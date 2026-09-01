@@ -4737,6 +4737,11 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
             evidence=(),
             facts=(),
             blockers=("sec_evidence_insufficient",),
+            diagnostics={
+                "candidate_document_count": 3,
+                "completed_document_count": 3,
+                "effective_date_ambiguity_count": 0,
+            },
         ),
     )
     listing_session = SimpleNamespace(
@@ -4773,7 +4778,9 @@ def test_sec_transport_byte_diagnostic_is_safe_for_kernel_persistence(monkeypatc
     assert _diagnostics(bundle.diagnostics) == (
         '{"ibkr_conflict":0,"ibkr_missing":0,"ibkr_requests":0,'
         '"ibkr_unavailable":0,"sec_attempt_count":2,'
-        '"sec_document_count":1,"sec_governor_wait_ms":25,'
+        '"sec_candidate_document_count":3,"sec_completed_document_count":3,'
+        '"sec_document_count":1,"sec_effective_date_ambiguity_count":0,'
+        '"sec_governor_wait_ms":25,'
         '"sec_payload_bytes":4096,"sec_rate_limit_retries":0}'
     )
 

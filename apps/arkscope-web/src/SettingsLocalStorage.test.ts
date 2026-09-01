@@ -123,6 +123,7 @@ const lifecycle = {
   cases: [],
   count: 33,
   queue_counts: { attention: 2, monitoring: 31, history: 0 },
+  admission_counts: { admitted: 8, needs_review: 2, pending: 23, screened_out: 4 },
   data_integrity: { source_missing_count: 2 },
 } satisfies SecurityLifecycleCaseListResponse;
 

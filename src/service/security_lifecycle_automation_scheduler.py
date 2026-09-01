@@ -1321,6 +1321,19 @@ def _load_evidence(
                 f"sec_{'payload_bytes' if key == 'body_bytes' else key}": value
                 for key, value in transport.diagnostics(budget).items()
             }
+            sec_diagnostics = getattr(sec, "diagnostics", {})
+            if isinstance(sec_diagnostics, Mapping):
+                diagnostics.update(
+                    {
+                        f"sec_{key}": int(sec_diagnostics[key])
+                        for key in (
+                            "candidate_document_count",
+                            "completed_document_count",
+                            "effective_date_ambiguity_count",
+                        )
+                        if key in sec_diagnostics
+                    }
+                )
         finally:
             transport.close()
         sec_codes = tuple(
@@ -1346,7 +1359,20 @@ def _load_evidence(
         sec_facts = retained_facts
         sec_codes = ()
         sec_failed = False
-        diagnostics = {"sec_attempt_count": 0, "sec_reused": 1}
+        retained_accessions = {
+            str(row.get("source_locator", {}).get("accession") or "")
+            for row in retained_evidence
+            if isinstance(row, Mapping)
+            and isinstance(row.get("source_locator"), Mapping)
+            and row.get("source_locator", {}).get("accession")
+        }
+        diagnostics = {
+            "sec_attempt_count": 0,
+            "sec_reused": 1,
+            "sec_candidate_document_count": len(retained_accessions),
+            "sec_completed_document_count": len(retained_accessions),
+            "sec_effective_date_ambiguity_count": 0,
+        }
 
     codes: list[str | AutomationBlocker] = list(sec_codes)
     if not sec_facts and not sec_codes:

@@ -2479,6 +2479,20 @@ export type SecurityLifecycleTrackingSource =
   | "portfolio_open"
   | "sa_alpha_picks_current"
   | "legacy_config_seed";
+export type SecurityLifecycleSecAdmissionState =
+  | "pending"
+  | "admitted"
+  | "screened_out"
+  | "needs_review";
+export type SecurityLifecycleSecAdmissionReason =
+  | "awaiting_regulator_screening"
+  | "direct_listing_item"
+  | "direct_identity_filing"
+  | "material_tracked_security_fact"
+  | "no_material_tracked_security_fact"
+  | "identity_binding_missing"
+  | "regulator_screening_incomplete"
+  | "unknown_form";
 export type SecurityLifecycleProposalStatus = "proposed" | "dismissed";
 export type SecurityLifecycleProposalBlockReason =
   | "portfolio_position_open"
@@ -2805,6 +2819,29 @@ export interface SecurityLifecycleActionProposal {
   replacement_ticker: string | null;
 }
 
+export interface SecurityLifecycleSecAdmission {
+  state: SecurityLifecycleSecAdmissionState;
+  reason: SecurityLifecycleSecAdmissionReason;
+}
+
+export interface SecurityLifecycleSecCandidate {
+  case_id: string;
+  ticker: string;
+  issuer_name: string;
+  filing_form: string;
+  filing_items: string[];
+  filing_date: string;
+  evidence_url: string;
+  admission_state: SecurityLifecycleSecAdmissionState;
+  admission_reason: SecurityLifecycleSecAdmissionReason;
+}
+
+export interface SecurityLifecycleSecCandidateResponse {
+  candidates: SecurityLifecycleSecCandidate[];
+  count: number;
+  state_counts: Record<SecurityLifecycleSecAdmissionState, number>;
+}
+
 export type TickerIdentityTransitionKind =
   | "symbol_continuation"
   | "terminal_delisting";
@@ -3030,6 +3067,7 @@ export interface SecurityLifecycleCaseSummary {
   assessment_count: number;
   acknowledgement_count: number;
   proposal_count: number;
+  sec_admission?: SecurityLifecycleSecAdmission | null;
 }
 
 export interface SecurityLifecycleCaseDetail extends SecurityLifecycleCaseSummary {
@@ -3050,6 +3088,7 @@ export interface SecurityLifecycleCaseListResponse {
   cases: SecurityLifecycleCaseSummary[];
   count: number;
   queue_counts: Record<SecurityLifecycleQueueBucket, number>;
+  admission_counts: Record<SecurityLifecycleSecAdmissionState, number>;
   data_integrity: { source_missing_count: number };
 }
 
@@ -3436,6 +3475,24 @@ const LIFECYCLE_TRACKING_SOURCES: readonly SecurityLifecycleTrackingSource[] = [
   "sa_alpha_picks_current",
   "legacy_config_seed",
 ];
+const LIFECYCLE_SEC_ADMISSION_STATES:
+readonly SecurityLifecycleSecAdmissionState[] = [
+  "pending",
+  "admitted",
+  "screened_out",
+  "needs_review",
+];
+const LIFECYCLE_SEC_ADMISSION_REASONS:
+readonly SecurityLifecycleSecAdmissionReason[] = [
+  "awaiting_regulator_screening",
+  "direct_listing_item",
+  "direct_identity_filing",
+  "material_tracked_security_fact",
+  "no_material_tracked_security_fact",
+  "identity_binding_missing",
+  "regulator_screening_incomplete",
+  "unknown_form",
+];
 
 function lifecycleCaseContractError(): never {
   throw new Error("security_lifecycle_case_contract");
@@ -3458,6 +3515,13 @@ function lifecycleCaseString(value: unknown): string {
     return lifecycleCaseContractError();
   }
   return value;
+}
+
+function lifecycleCaseCount(value: unknown): number {
+  if (!Number.isInteger(value) || (value as number) < 0) {
+    return lifecycleCaseContractError();
+  }
+  return value as number;
 }
 
 function lifecycleCaseEnum<Value extends string>(
@@ -3485,6 +3549,44 @@ function parseLifecycleProposal(value: unknown): SecurityLifecycleActionProposal
     replacement_ticker: row.replacement_ticker === null
       ? null
       : lifecycleCaseString(row.replacement_ticker),
+  };
+}
+
+function parseLifecycleSecCandidate(value: unknown): SecurityLifecycleSecCandidate {
+  const row = lifecycleCaseRecord(value);
+  return {
+    case_id: lifecycleCaseString(row.case_id),
+    ticker: lifecycleCaseString(row.ticker),
+    issuer_name: lifecycleCaseString(row.issuer_name),
+    filing_form: lifecycleCaseString(row.filing_form),
+    filing_items: lifecycleCaseArray(row.filing_items).map(lifecycleCaseString),
+    filing_date: lifecycleCaseString(row.filing_date),
+    evidence_url: lifecycleCaseString(row.evidence_url),
+    admission_state: lifecycleCaseEnum(
+      row.admission_state,
+      LIFECYCLE_SEC_ADMISSION_STATES,
+    ),
+    admission_reason: lifecycleCaseEnum(
+      row.admission_reason,
+      LIFECYCLE_SEC_ADMISSION_REASONS,
+    ),
+  };
+}
+
+function parseLifecycleSecCandidateResponse(
+  value: unknown,
+): SecurityLifecycleSecCandidateResponse {
+  const row = lifecycleCaseRecord(value);
+  const counts = lifecycleCaseRecord(row.state_counts);
+  return {
+    candidates: lifecycleCaseArray(row.candidates).map(parseLifecycleSecCandidate),
+    count: lifecycleCaseCount(row.count),
+    state_counts: {
+      pending: lifecycleCaseCount(counts.pending),
+      admitted: lifecycleCaseCount(counts.admitted),
+      screened_out: lifecycleCaseCount(counts.screened_out),
+      needs_review: lifecycleCaseCount(counts.needs_review),
+    },
   };
 }
 
@@ -3547,7 +3649,7 @@ export interface SecurityLifecycleCaseFilters {
   limit?: number;
 }
 
-function lifecycleQuery(filters: SecurityLifecycleCaseFilters): string {
+function lifecycleQuery(filters: object): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "") params.set(key, String(value));
@@ -3561,6 +3663,19 @@ export function listSecurityLifecycleCases(
 ): Promise<SecurityLifecycleCaseListResponse> {
   return getJSON<SecurityLifecycleCaseListResponse>(
     `/security-lifecycle/cases${lifecycleQuery(filters)}`,
+  );
+}
+
+export async function listSecurityLifecycleSecCandidates(
+  filters: {
+    admission_state?: SecurityLifecycleSecAdmissionState;
+    limit?: number;
+  } = {},
+): Promise<SecurityLifecycleSecCandidateResponse> {
+  return parseLifecycleSecCandidateResponse(
+    await getJSON<unknown>(
+      `/security-lifecycle/candidates${lifecycleQuery(filters)}`,
+    ),
   );
 }
 

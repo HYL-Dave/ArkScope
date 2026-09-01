@@ -551,6 +551,32 @@ def _store(harness):
     return SecurityLifecycleInvestigationStore(harness.conn)
 
 
+def test_scheduled_worker_skips_screened_candidate_but_attended_target_can_rescreen(
+    tmp_path,
+):
+    case = _case()
+    case["sec_admission"] = {
+        "state": "screened_out",
+        "reason": "no_material_tracked_security_fact",
+    }
+    harness = _Harness(tmp_path, [case])
+    try:
+        scheduled = harness.worker().run(limit=1)
+        attended = harness.worker(
+            execution_owner_id="attended-worker",
+            target_case_id=case["case_id"],
+            allow_new_attempt=True,
+        ).run(limit=1)
+
+        assert scheduled["selected"] == 0
+        assert scheduled["case_ids"] == []
+        assert attended["selected"] == 1
+        assert attended["case_ids"] == [case["case_id"]]
+        assert harness.evidence_calls == [(case["case_id"], "live", _AT)]
+    finally:
+        harness.conn.close()
+
+
 class _RecordingProgressRegistry:
     def __init__(self):
         from src.service.security_lifecycle_automation_runtime import (

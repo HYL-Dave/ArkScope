@@ -435,6 +435,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("GET", "/security-lifecycle/automation"),
         ("PUT", "/security-lifecycle/automation"),
         ("GET", "/security-lifecycle/cases"),
+        ("GET", "/security-lifecycle/candidates"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
         ("POST", "/security-lifecycle/automation/run"),
         ("POST", "/security-lifecycle/cases/{case_id}/automation/run"),
@@ -461,7 +462,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 191
+    assert len(rows) == 192
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",
@@ -2208,6 +2209,62 @@ def test_case_list_route_admits_only_closed_queue_buckets():
     invalid = client.get("/security-lifecycle/cases?queue_bucket=unknown")
     assert invalid.status_code == 422
     assert invalid.json() == {"detail": {"code": "queue_bucket"}}
+    assert len(calls) == 1
+
+
+def test_sec_candidate_audit_route_forwards_only_closed_state_filter():
+    from src.api import dependencies
+    from src.api.routes import security_lifecycle as routes
+
+    calls = []
+
+    class Service:
+        def list_sec_candidates(self, **filters):
+            calls.append(filters)
+            return {
+                "candidates": [
+                    {
+                        "case_id": "case-screened",
+                        "ticker": "QUIET",
+                        "issuer_name": "Quiet Issuer",
+                        "filing_form": "8-K",
+                        "filing_items": ["2.01"],
+                        "filing_date": "2026-08-20",
+                        "evidence_url": "https://www.sec.gov/Archives/quiet.htm",
+                        "admission_state": "screened_out",
+                        "admission_reason": "no_material_tracked_security_fact",
+                    }
+                ],
+                "count": 1,
+                "state_counts": {
+                    "admitted": 0,
+                    "needs_review": 0,
+                    "pending": 0,
+                    "screened_out": 1,
+                },
+            }
+
+    app = FastAPI()
+    app.include_router(routes.router)
+    app.dependency_overrides[dependencies.get_security_lifecycle_read_service] = (
+        Service
+    )
+    client = TestClient(app)
+
+    response = client.get(
+        "/security-lifecycle/candidates?admission_state=screened_out&limit=20"
+    )
+    assert response.status_code == 200
+    assert response.json()["candidates"][0]["admission_reason"] == (
+        "no_material_tracked_security_fact"
+    )
+    assert calls == [{"admission_state": "screened_out", "limit": 20}]
+
+    invalid = client.get(
+        "/security-lifecycle/candidates?admission_state=not-a-state"
+    )
+    assert invalid.status_code == 422
+    assert invalid.json() == {"detail": {"code": "admission_state"}}
     assert len(calls) == 1
 
 

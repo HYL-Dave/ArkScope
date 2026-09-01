@@ -562,7 +562,7 @@ def test_draft_accept_and_supersede_preserve_version_history(tmp_path):
             "human",
             "human",
         ]
-        projected = store.project_proposals(
+        projected = store.project_public_proposals(
             case_id,
             observation_fingerprint_sha256=_FINGERPRINT,
         )
@@ -590,7 +590,7 @@ def test_proposal_projection_is_a_closed_public_dto(tmp_path):
             at=_LATER,
         )
 
-        projected = store.project_proposals(
+        projected = store.project_public_proposals(
             case_id,
             observation_fingerprint_sha256=_FINGERPRINT,
         )

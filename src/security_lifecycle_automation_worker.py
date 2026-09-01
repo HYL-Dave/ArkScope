@@ -817,6 +817,13 @@ class LifecycleAutomationWorker:
                 if isinstance(case, Mapping)
                 and case.get("source_presence") == "present"
                 and (
+                    self._target_case_id is not None
+                    or not (
+                        isinstance(case.get("sec_admission"), Mapping)
+                        and case["sec_admission"].get("state") == "screened_out"
+                    )
+                )
+                and (
                     self._target_case_id is None
                     or case.get("case_id") == self._target_case_id
                 )

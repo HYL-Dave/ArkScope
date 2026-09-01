@@ -1,7 +1,10 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getSecurityLifecycleCase } from "./api";
+import {
+  getSecurityLifecycleCase,
+  listSecurityLifecycleSecCandidates,
+} from "./api";
 
 const CASE_DETAIL = {
   case_id: "slc_blbd",
@@ -104,6 +107,94 @@ describe("security lifecycle case API", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(body)));
 
     await expect(getSecurityLifecycleCase("slc_blbd")).rejects.toThrow(
+      "security_lifecycle_case_contract",
+    );
+  });
+
+  it("projects SEC candidates through the closed browser DTO", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+      candidates: [{
+        case_id: "slc_cde",
+        ticker: "CDE",
+        issuer_name: "Coeur Mining, Inc.",
+        filing_form: "DEFA14A",
+        filing_items: [],
+        filing_date: "2026-08-29",
+        evidence_url: "https://www.sec.gov/Archives/example/cde.htm",
+        admission_state: "screened_out",
+        admission_reason: "no_material_tracked_security_fact",
+        assessment_fingerprint_sha256: "must-not-cross-the-client-boundary",
+      }],
+      count: 1,
+      state_counts: {
+        admitted: 0,
+        needs_review: 0,
+        pending: 0,
+        screened_out: 1,
+      },
+    })));
+
+    const result = await listSecurityLifecycleSecCandidates();
+
+    expect(result.candidates).toEqual([{
+      case_id: "slc_cde",
+      ticker: "CDE",
+      issuer_name: "Coeur Mining, Inc.",
+      filing_form: "DEFA14A",
+      filing_items: [],
+      filing_date: "2026-08-29",
+      evidence_url: "https://www.sec.gov/Archives/example/cde.htm",
+      admission_state: "screened_out",
+      admission_reason: "no_material_tracked_security_fact",
+    }]);
+  });
+
+  it.each([
+    ["candidate collection", { candidates: {}, count: 0, state_counts: {} }],
+    ["admission state", {
+      candidates: [{
+        case_id: "slc_cde",
+        ticker: "CDE",
+        issuer_name: "Coeur Mining, Inc.",
+        filing_form: "DEFA14A",
+        filing_items: [],
+        filing_date: "2026-08-29",
+        evidence_url: "https://www.sec.gov/Archives/example/cde.htm",
+        admission_state: "quietly_ignored",
+        admission_reason: "no_material_tracked_security_fact",
+      }],
+      count: 1,
+      state_counts: {
+        admitted: 0,
+        needs_review: 0,
+        pending: 0,
+        screened_out: 1,
+      },
+    }],
+    ["admission reason", {
+      candidates: [{
+        case_id: "slc_cde",
+        ticker: "CDE",
+        issuer_name: "Coeur Mining, Inc.",
+        filing_form: "DEFA14A",
+        filing_items: [],
+        filing_date: "2026-08-29",
+        evidence_url: "https://www.sec.gov/Archives/example/cde.htm",
+        admission_state: "screened_out",
+        admission_reason: "silently_discarded",
+      }],
+      count: 1,
+      state_counts: {
+        admitted: 0,
+        needs_review: 0,
+        pending: 0,
+        screened_out: 1,
+      },
+    }],
+  ])("rejects malformed SEC %s before React receives it", async (_field, body) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(body)));
+
+    await expect(listSecurityLifecycleSecCandidates()).rejects.toThrow(
       "security_lifecycle_case_contract",
     );
   });
