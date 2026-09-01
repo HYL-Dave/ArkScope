@@ -332,10 +332,10 @@ function SecurityLifecyclePanel({
     : 0;
   const schedulerIncident = Boolean(automation?.active_incident?.scheduler_failure);
   const stateKey: SecurityLifecycleAutomationSchedulerStatus | "absent" | "invalid" = (
-    automation?.telemetry_status === "invalid"
-      ? "invalid"
-      : currentProgress
-        ? "running"
+    currentProgress || automation?.last_status === "running"
+      ? "running"
+      : automation?.telemetry_status === "invalid"
+        ? "invalid"
         : automation?.last_status ?? "absent"
   );
   const stateLabel = schedulerIncident

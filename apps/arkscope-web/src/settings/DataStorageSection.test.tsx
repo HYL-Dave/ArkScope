@@ -363,6 +363,21 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(button("立即檢查到期案件").disabled).toBe(false);
   });
 
+  it("shows durable running ahead of stale invalid telemetry", async () => {
+    controls.automationStatus = status({
+      telemetry_status: "invalid",
+      last_status: "running",
+      current_progress: [],
+    });
+
+    await renderSection("en");
+
+    expect(host!.querySelector('[data-automation-state="running"]')?.textContent)
+      .toBe("Running");
+    expect(host!.querySelector('[data-automation-state="invalid"]')).toBeNull();
+    expect(button("Run due cases now").disabled).toBe(true);
+  });
+
   it("disables all write controls when stored automation config is invalid", async () => {
     controls.automationStatus = {
       ...status(),
