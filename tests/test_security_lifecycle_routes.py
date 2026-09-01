@@ -354,6 +354,17 @@ def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, m
             "notify",
         }
         assert all(item["status"] == "proposed" for item in payload["proposals"])
+        assert {frozenset(item) for item in payload["proposals"]} == {
+            frozenset(
+                {
+                    "proposal_id",
+                    "action_type",
+                    "status",
+                    "projected_block_reason",
+                    "replacement_ticker",
+                }
+            )
+        }
         assert not hasattr(context["store"], "apply_action_proposal")
     finally:
         context["profile_conn"].close()
@@ -1999,6 +2010,13 @@ def test_dismiss_proposal_route_does_not_apply_any_profile_action(tmp_path, monk
         )
         assert response.status_code == 200
         assert response.json()["status"] == "dismissed"
+        assert set(response.json()) == {
+            "proposal_id",
+            "action_type",
+            "status",
+            "projected_block_reason",
+            "replacement_ticker",
+        }
         assert [
             tuple(row)
             for row in context["profile_conn"].execute(

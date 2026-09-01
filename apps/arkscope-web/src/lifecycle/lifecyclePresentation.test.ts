@@ -319,7 +319,7 @@ describe("Lifecycle presentation", () => {
     expect(actionProposalPresentation({
       action_type: "archive_manual_memberships",
       status: "proposed",
-      block_reason: null,
+      projected_block_reason: null,
     }, "en")).toEqual(expect.objectContaining({
       label: "Review removing manual tracking",
       state: "Recommendation only; not applied",
@@ -329,7 +329,7 @@ describe("Lifecycle presentation", () => {
     expect(actionProposalPresentation({
       action_type: "hide_from_active_universe",
       status: "dismissed",
-      block_reason: null,
+      projected_block_reason: null,
     }, "en")).toEqual(expect.objectContaining({
       label: "Recommend hiding from the active universe",
       state: "Recommendation dismissed; not applied",

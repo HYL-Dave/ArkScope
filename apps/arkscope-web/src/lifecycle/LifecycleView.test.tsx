@@ -361,16 +361,14 @@ function detail(overrides: object = {}) {
       proposal_id: "proposal-review",
       action_type: "review_portfolio_position",
       status: "proposed",
-      block_reason: "portfolio_position_open",
-      source_snapshot: ["manual_lists", "portfolio_open"],
-      created_at: "2026-08-20T00:00:00Z",
+      projected_block_reason: "portfolio_position_open",
+      replacement_ticker: null,
     }, {
       proposal_id: "proposal-hide",
       action_type: "hide_from_active_universe",
       status: "dismissed",
-      block_reason: null,
-      source_snapshot: ["sa_alpha_picks_current", "legacy_config_seed"],
-      created_at: "2026-08-20T00:00:00Z",
+      projected_block_reason: null,
+      replacement_ticker: null,
     }],
     truncation: {},
     ...overrides,
@@ -840,6 +838,23 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).toContain("Open portfolio position requires review");
     expect(document.body.textContent).toContain("Recommendation only");
     expect(document.body.textContent).not.toMatch(/Apply|Execute/);
+  });
+
+  it("renders the closed proposal DTO without a historical source snapshot", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      proposals: [{
+        proposal_id: "proposal-blbd",
+        action_type: "keep_tracking",
+        status: "proposed",
+        projected_block_reason: null,
+        replacement_ticker: null,
+      }],
+    }));
+
+    await mountLifecycle();
+
+    expect(document.body.textContent).toContain("Keep tracking");
+    expect(document.body.textContent).toContain("Recommendation only");
   });
 
   it("filters cases by workflow relevance event kind and proposal type", async () => {
@@ -1685,25 +1700,27 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).not.toContain(assessment.impact_summary);
   });
 
-  it("renders source-aware proposals as unapplied explanations", async () => {
+  it("renders closed proposals as unapplied explanations", async () => {
     await mountLifecycle();
-    expect(document.body.textContent).toContain("Manual lists");
-    expect(document.body.textContent).toContain("Open portfolio position");
-    expect(document.body.textContent).toContain("Seeking Alpha picks");
-    expect(document.body.textContent).toContain("Imported legacy settings");
     expect(document.body.textContent).toContain("Recommend hiding from the active universe");
     expect(document.body.textContent).toContain("Recommendation dismissed; not applied");
-    expect(document.body.textContent).not.toMatch(
-      /manual_lists|portfolio_open|sa_alpha_picks_current|legacy_config_seed/,
-    );
     expect(document.body.textContent).toContain("Recommendation only; not applied");
+    const proposalText = Array.from(
+      document.body.querySelectorAll<HTMLElement>(".lifecycle-proposal"),
+    ).map((item) => item.textContent ?? "").join(" ");
+    expect(proposalText).not.toMatch(
+      /Manual lists|Seeking Alpha picks|Imported legacy settings/,
+    );
     await click("Dismiss recommendation");
     expect(apiMocks.dismissSecurityLifecycleProposal).toHaveBeenCalledWith("proposal-review");
     await act(async () => { await i18n.changeLanguage("zh-Hant"); });
     await flush();
-    for (const label of ["手動清單", "未平倉投資部位", "Seeking Alpha 選股", "舊設定匯入"]) {
-      expect(document.body.textContent).toContain(label);
-    }
+    const translatedProposalText = Array.from(
+      document.body.querySelectorAll<HTMLElement>(".lifecycle-proposal"),
+    ).map((item) => item.textContent ?? "").join(" ");
+    expect(translatedProposalText).not.toMatch(
+      /手動清單|Seeking Alpha 選股|舊設定匯入/,
+    );
   });
 
   it("renders unresolved investigating evidence ready inconclusive and resolved as distinct states", async () => {

@@ -35,6 +35,7 @@ from src.security_lifecycle_investigation import (
     SecurityLifecycleInvestigationStore,
     canonical_assessment_decimal,
     observation_fingerprint,
+    project_action_proposal,
 )
 from src.security_lifecycle_manual_evidence import (
     add_manual_evidence,
@@ -840,7 +841,17 @@ def accept_assessment(
             sources_by_ticker=service.sources_by_ticker(),
             at=at,
         )
-        return {"assessment": assessment, **proposal_result}
+        return {
+            "assessment": assessment,
+            "proposals": [
+                project_action_proposal(
+                    proposal,
+                    projected_block_reason=proposal["block_reason"],
+                )
+                for proposal in proposal_result["proposals"]
+            ],
+            "block_reason": proposal_result["block_reason"],
+        }
     except LifecycleStoreUnavailable as exc:
         raise _store_error(exc) from None
     except KeyError as exc:
@@ -914,7 +925,11 @@ def dismiss_proposal(
         require_db_write(
             "security_lifecycle_dismiss_proposal", {"proposal_id": proposal_id}
         )
-        return store.dismiss_proposal(proposal_id, at=_utc_now())
+        proposal = store.dismiss_proposal(proposal_id, at=_utc_now())
+        return project_action_proposal(
+            proposal,
+            projected_block_reason=proposal["block_reason"],
+        )
     except KeyError as exc:
         raise _not_found(exc) from None
     except (LifecycleWritesUnavailable, ValueError) as exc:

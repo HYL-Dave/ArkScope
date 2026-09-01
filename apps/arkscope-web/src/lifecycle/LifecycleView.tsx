@@ -2457,8 +2457,6 @@ export function LifecycleView({
                   <article className="lifecycle-proposal" key={proposal.proposal_id}>
                     <strong>{presentation.label}</strong>
                     <p>{presentation.state}</p>
-                    <p className="tiny">{proposal.source_snapshot
-                      .map((source) => lifecycleTrackingSourceLabel(source, locale)).join(", ")}</p>
                     {proposal.replacement_ticker ? (
                       <p>{t(($) => $.lifecycle.fields.successorTicker)}: {
                         proposal.replacement_ticker

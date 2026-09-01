@@ -633,7 +633,7 @@ export function lifecycleProposalBlockReasonLabel(
 export function actionProposalPresentation(
   proposal: Pick<
     SecurityLifecycleActionProposal,
-    "action_type" | "status" | "block_reason" | "projected_block_reason"
+    "action_type" | "status" | "projected_block_reason"
   >,
   locale: LifecycleLocale,
 ): { label: string; state: string; canApply: false; blockReason: string | null } {
@@ -646,7 +646,7 @@ export function actionProposalPresentation(
     state: states[proposal.status] ?? lifecycleCopy(locale).states.unknownValue,
     canApply: false,
     blockReason: lifecycleProposalBlockReasonLabel(
-      proposal.projected_block_reason ?? proposal.block_reason,
+      proposal.projected_block_reason,
       locale,
     ),
   };
