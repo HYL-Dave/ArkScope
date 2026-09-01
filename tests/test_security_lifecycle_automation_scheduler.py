@@ -553,6 +553,72 @@ def test_scheduled_runner_grants_only_due_failed_retry_authority(monkeypatch):
     assert worker_kwargs["transition_mutation_allowed"]() is False
 
 
+def test_owned_batch_progress_is_visible_through_public_status(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.service.security_lifecycle_automation_config import (
+        DEFAULT_SECURITY_LIFECYCLE_AUTOMATION_CONFIG,
+        SecurityLifecycleAutomationConfigState,
+    )
+
+    request_id = "progress-registry-owner"
+    case_id = "slc_progress_registry_owner"
+    observed = []
+
+    class Worker:
+        def __init__(self, progress_registry):
+            self.progress_registry = progress_registry
+
+        def run(self, limit, mode):
+            assert (limit, mode) == (1, "live")
+            self.progress_registry.begin(
+                trigger="scheduler",
+                request_id=request_id,
+                case_id=case_id,
+                started_at=_NOW,
+            )
+            try:
+                status = routes._automation_status_envelope(
+                    SecurityLifecycleAutomationConfigState(
+                        DEFAULT_SECURITY_LIFECYCLE_AUTOMATION_CONFIG
+                    ),
+                    profile_path=str(tmp_path / "installed-profile-state.db"),
+                )
+                observed.extend(status["current_progress"])
+            finally:
+                self.progress_registry.clear(
+                    request_id=request_id,
+                    case_id=case_id,
+                )
+            return _v2_summary()
+
+    @contextmanager
+    def listing_session(*, at):
+        assert at == "2026-08-25T13:00:00Z"
+        yield object()
+
+    def worker(**kwargs):
+        return Worker(kwargs["progress_registry"])
+
+    monkeypatch.setattr(scheduler, "_listing_authority_session", listing_session)
+    monkeypatch.setattr(scheduler, "_worker", worker)
+
+    assert scheduler._run_owned_automation_batch(
+        limit=1,
+        at="2026-08-25T13:00:00Z",
+        execution_owner_id="progress-registry-owner",
+        transition_mutation_allowed=lambda: False,
+    ) == _v2_summary()
+    assert [
+        (row["request_id"], row["case_id"], row["current_stage"])
+        for row in observed
+        if row["request_id"] == request_id
+    ] == [(request_id, case_id, "preparing")]
+
+
 def test_recorded_attended_runner_targets_one_case_and_grants_new_attempt_only(
     monkeypatch,
 ):
