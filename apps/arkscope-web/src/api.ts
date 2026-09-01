@@ -305,6 +305,10 @@ export interface DiscoveredModel {
   provider: ModelProvider;
   label: string;
   source: "provider_api" | "seed";
+  effort_options?: string[] | null;
+  default_effort?: string | null;
+  input_modalities?: Array<"text" | "image" | "audio"> | null;
+  task_route_tasks?: ModelTask[] | null;
 }
 
 export interface ModelDiscoveryResult {

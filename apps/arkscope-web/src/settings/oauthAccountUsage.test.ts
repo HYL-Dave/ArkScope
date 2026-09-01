@@ -314,6 +314,33 @@ describe("OAuth account usage reducer", () => {
 });
 
 describe("useOAuthAccountUsage ownership", () => {
+  it("rejects a malformed provider-reported rate-limit bucket before caching it", async () => {
+    const cache = createSettingsReadCache();
+    const malformed = snapshot(18);
+    malformed.payload.rate_limits_by_limit_id = {
+      codex_bengalfox: {
+        ...malformed.payload.rate_limits,
+        limit_id: "codex_bengalfox",
+        limit_name: "GPT-5.3-Codex-Spark",
+        primary: {
+          used_percent: 101,
+          window_duration_minutes: 300,
+          resets_at: 1_786_190_400,
+        },
+      },
+    };
+    const harness = await renderUsageHook({
+      cache,
+      readAccountView: vi.fn(async () => view(malformed)),
+    });
+    await settle();
+
+    expect(harness.current().states[CREDENTIAL_ID].cachedRead.status).toBe("failed");
+    expect(harness.current().states[CREDENTIAL_ID].snapshot).toBeNull();
+    expect(cache.inspect(oauthAccountUsageKey(CREDENTIAL_ID))).toEqual({ status: "missing" });
+    harness.unmount();
+  });
+
   it("credential change invalidates the cache entry and focus cannot resurrect it", async () => {
     const cache = createSettingsReadCache();
     cache.replace(oauthAccountUsageKey(CREDENTIAL_ID), snapshot(18));

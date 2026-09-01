@@ -3,18 +3,17 @@
 This driver makes an openai ``chatgpt_oauth`` credential report ITS OWN available
 models — the ChatGPT/Codex backend's list, NOT the api-key seed catalog — so the
 plan's "availability is PER (provider, auth_mode), NEVER shared" lock becomes real
-on the wire. Discovery uses the P2c shape (plain ``models.list`` may 400; the codex
-backend needs a Codex-style ``client_version`` via ``extra_query``), reusing the
-probe's model-id extraction.
+on the wire. Discovery uses the reviewed Codex app-server ``model/list`` contract,
+including provider-ordered reasoning efforts and input modalities.
 
 Discovery is live (ChatGPT-backend model list). Execution uses the raw Responses
 API against the ChatGPT/Codex backend — NOT the normal OpenAI API-key Agents SDK
 path. Load-bearing request differences: no ``max_output_tokens``, forced
 ``stream=True`` + ``store=False``, no ``previous_response_id``.
 
-The OpenAI client is built behind ``_discovery_client`` (a monkeypatchable seam),
-and the token is loaded from the token-store ONLY (never ``credential.secret``).
-Any surfaced error is redacted — the token can never leak into a result.
+The catalog adapter and execution client are monkeypatchable seams, and the token is
+loaded from the token-store ONLY (never ``credential.secret``). Any surfaced error
+is redacted — the token can never leak into a result.
 """
 
 from __future__ import annotations
@@ -23,7 +22,6 @@ import asyncio
 import concurrent.futures
 import json
 import logging
-import re
 from typing import Any, AsyncIterator, Optional
 
 from src.agents.shared.compressor.reducers import get_reducer
@@ -35,7 +33,7 @@ from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTe
 from .chatgpt_oauth_login import ChatGPTOAuthLoginError
 from .chatgpt_oauth_login import provider_error_requires_reauth
 from .chatgpt_oauth_login import refresh_if_needed as _refresh_login
-from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PROBE_MODEL, _model_ids, _to_dict
+from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _PROBE_MODEL, _to_dict
 from .probe_harness import redact
 
 _PER_TOOL_TIMEOUT_S = 45.0
@@ -66,27 +64,24 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
     }
 )
 
-# A well-formed model id: starts alphanumeric, then [A-Za-z0-9._:-], ≤80 chars. Real
-# model ids — gpt-5.4-mini, gpt-3.5-turbo, claude-opus-4-8, ft:gpt-..., dated ids —
-# all satisfy it; it rejects spaces / @ / / + = (email + base64/JWT padding). Because
-# a SHORT JWT (eyJ....eyJ....sig) uses only [A-Za-z0-9.], the regex alone can't catch
-# it (version dots like 5.4 are legitimate), so an id is kept ONLY if it ALSO survives
-# the fail-closed redact() unchanged (which catches JWT/base64/high-entropy shapes).
-# Defense-in-depth: a hostile/odd backend can't reflect a token-shaped string into the
-# picker; non-matching discovered ids are DROPPED, not shown.
-_VALID_MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\-]{0,79}$")
+def _subscription_catalog_adapter():
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    return CodexAccountUsageAdapter()
 
 
-def _well_formed_ids(ids: list[str]) -> list[str]:
-    return [mid for mid in ids if _VALID_MODEL_ID.fullmatch(mid) and redact(mid) == mid]
+def _task_route_tasks(model: str) -> list[str]:
+    from src.model_capabilities import capability_for
+    from src.model_effective import task_auth_executable
 
-
-def _discovery_client(token: str) -> Any:  # seam for tests
-    """A sync OpenAI client pointed at the ChatGPT/Codex backend, with a short
-    timeout (discovery must not hang the request thread)."""
-    from openai import OpenAI
-
-    return OpenAI(api_key=token, base_url=CHATGPT_BACKEND_BASE_URL, timeout=15)
+    capability = capability_for(model)
+    if capability is None or capability.task_route_status != "current":
+        return []
+    return [
+        task
+        for task in ("card_synthesis", "card_translation", "ai_research")
+        if task_auth_executable(task, "openai", "chatgpt_oauth", capability)
+    ]
 
 
 def _execution_client(token: str) -> Any:  # seam for tests
@@ -377,27 +372,36 @@ class OpenAIChatGPTOAuthDriver:
                 error_code="reauth_required",
             )
         try:
-            client = _discovery_client(token)
-            try:
-                page = client.models.list()  # may 400 if the backend requires client_version
-            except Exception:  # noqa: BLE001 — fall through to the Codex-style extra_query
-                page = client.models.list(extra_query={"client_version": _CLIENT_VERSION})
-            ids = _well_formed_ids(_model_ids(page))  # drop token/PII-shaped ids (defense-in-depth)
+            catalog = _subscription_catalog_adapter().read_model_catalog(record=rec)
         except Exception as exc:  # noqa: BLE001 — never raise discovery; degrade to seed
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
                 status="error", models=_seed_models("openai"), error=_err(exc),
             )
-        if not ids:
+        if not catalog:
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
                 status="error", models=_seed_models("openai"),
-                error="the ChatGPT backend returned no model ids",
+                error="the Codex app-server returned no subscription models",
             )
-        models = [DiscoveredModel(id=mid, provider="openai", label=mid, source="provider_api") for mid in ids]
+        models = [
+            DiscoveredModel(
+                id=row.model,
+                provider="openai",
+                label=row.display_name,
+                source="provider_api",
+                effort_options=list(row.supported_reasoning_efforts),
+                default_effort=row.default_reasoning_effort,
+                input_modalities=list(row.input_modalities),
+                task_route_tasks=_task_route_tasks(row.model),
+            )
+            for row in catalog
+        ]
         return ModelDiscoveryResult(
             provider="openai", credential_id=self._credential_id,
-            status="ok", models=models, source_url=CHATGPT_BACKEND_BASE_URL,
+            status="ok",
+            models=models,
+            source_url="https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md#models",
         )
 
     async def test(self) -> ModelTestResult:

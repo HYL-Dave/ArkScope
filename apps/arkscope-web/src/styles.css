@@ -1411,6 +1411,16 @@ table.wl tbody tr.archived td {
   color: var(--muted);
   font-size: 11.5px;
 }
+.account-usage-limit-group {
+  display: grid;
+  gap: 2px;
+  padding-top: 4px;
+}
+.account-usage-limit-group + .account-usage-limit-group {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
 .credential-actions {
   grid-column: 1 / -1;
   display: grid;
@@ -1502,7 +1512,7 @@ table.wl tbody tr.archived td {
 }
 .model-discovery-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
   border: 1px solid var(--border);
@@ -1512,14 +1522,41 @@ table.wl tbody tr.archived td {
   padding: 6px;
   font-size: 11.5px;
 }
-.model-discovery-row > span {
+.model-discovery-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.model-discovery-id {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.model-discovery-efforts,
+.model-discovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.model-discovery-actions {
+  justify-content: flex-end;
+}
+.model-discovery-efforts > span {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+}
+.model-discovery-efforts > .is-default {
+  border-color: var(--accent);
+  color: var(--fg);
+}
 @media (max-width: 900px) {
   .model-discovery-row {
     grid-template-columns: 1fr;
+  }
+  .model-discovery-actions {
+    justify-content: flex-start;
   }
 }
 .test-status {
