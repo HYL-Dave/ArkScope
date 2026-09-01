@@ -676,6 +676,61 @@ def test_due_runner_forwards_authority_selection_and_executes_returned_transitio
     assert result["applied"] == 1
 
 
+def test_due_runner_never_executes_transition_with_unknown_approval_authority(
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    class FakeService:
+        def __init__(self):
+            self.executed = []
+
+        def list_due_transitions(self, **_kwargs):
+            return [
+                {
+                    "transition_id": "slt_unknown_authority",
+                    "approved_preview_sha256": "a" * 64,
+                    "approval_authority": "foreign_authority",
+                }
+            ]
+
+        def execute_transition(self, transition_id, *, before_write, **_kwargs):
+            before_write()
+            self.executed.append(transition_id)
+            return {"status": "applied"}
+
+    service = FakeService()
+    permission_calls = []
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *args, **kwargs: permission_calls.append((args, kwargs)),
+    )
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
+        limit=1,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    assert service.executed == []
+    assert permission_calls == []
+    assert result == {
+        "status": "partial",
+        "reason": "transition_execution_failed",
+        "recovery_eligible": True,
+        "due": 1,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": ["slt_unknown_authority"],
+        "failed_transition_ids": ["slt_unknown_authority"],
+        "deferred_transition_ids": [],
+    }
+
+
 def _run_automation_write_boundary(monkeypatch, mutation_allowed):
     from src.service import ticker_identity_scheduler as scheduler
 

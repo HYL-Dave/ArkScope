@@ -2970,6 +2970,73 @@ def test_terminal_finalization_rejects_changed_persisted_provenance():
     assert "terminal_finalized_decision_provenance_sha256" not in final_context
 
 
+def test_finalized_run_never_acquires_terminal_failure_retry_state():
+    conn, store, kernel, case_id = _context()
+    claim = _reserve(kernel, case_id)
+    evidence = _evidence()
+    result = kernel.complete_run(
+        run_id=claim.run_id,
+        evidence=(evidence,),
+        facts=(_fact(evidence),),
+        blockers=(),
+        decision_tier="verified_automatic",
+        action_readiness="not_applicable",
+        retry_at=None,
+        diagnostics={"sec_attempts": 1},
+        at=_LATER,
+        terminal_decision={
+            "decision_tier": "verified_automatic",
+            "action_readiness": "not_applicable",
+        },
+    )
+    persisted_evidence_id = store.list_evidence(case_id)[0]["evidence_id"]
+    store.create_assessment(
+        case_id=case_id,
+        relevance="direct_tracked_security",
+        confidence="high",
+        author="automation",
+        conclusion="The deterministic evidence confirms a symbol change.",
+        impact_summary="The tracked symbol requires review.",
+        outcomes=("symbol_changed",),
+        citations=(
+            {
+                "reference_kind": "observation",
+                "cited_content_sha256": _FINGERPRINT,
+            },
+            {
+                "reference_kind": "evidence",
+                "evidence_id": persisted_evidence_id,
+            },
+        ),
+        observation_fingerprint_sha256=_FINGERPRINT,
+        automation_method="deterministic_rule",
+        automation_run_id=claim.run_id,
+        rule_id="lifecycle.simple_symbol_continuation",
+        rule_version="1",
+        decision_provenance_sha256=result.decision_provenance_sha256,
+        at=_LATER,
+    )
+    kernel.complete_terminal_finalization(
+        run_id=claim.run_id,
+        decision_provenance_sha256=result.decision_provenance_sha256,
+    )
+    finalized_context = json.loads(
+        store.get_automation_run(claim.run_id)["query_context_json"]
+    )
+
+    with pytest.raises(ValueError):
+        kernel.record_terminal_finalization_failure(
+            run_id=claim.run_id,
+            code="finalization_failed",
+            at="2026-08-25T03:00:00Z",
+        )
+
+    assert json.loads(
+        store.get_automation_run(claim.run_id)["query_context_json"]
+    ) == finalized_context
+    assert "terminal_finalization_failure" not in finalized_context
+
+
 def test_fail_run_rejects_succeeded_run_with_current_automation_assessment():
     conn, store, kernel, case_id = _context()
     claim = _reserve(kernel, case_id)
