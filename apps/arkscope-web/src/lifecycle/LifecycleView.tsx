@@ -24,6 +24,7 @@ import {
   createSecurityLifecycleAssessment,
   dismissSecurityLifecycleProposal,
   getSecurityLifecycleCase,
+  getSecurityLifecycleCaseAudit,
   getSecurityLifecycleAutomationStatus,
   getTickerIdentityTransitionPreview,
   listTickerIdentityTransitionActivity,
@@ -36,6 +37,7 @@ import {
   translateSecurityLifecycleEvidence,
   type RuntimeConfig,
   type SecurityLifecycleCaseDetail,
+  type SecurityLifecycleCaseAudit,
   type SecurityLifecycleCaseFilters,
   type SecurityLifecycleCaseSummary,
   type SecurityLifecycleDispositionReason,
@@ -135,6 +137,12 @@ const ACTIVE_SOURCE_FAMILIES: SecurityLifecycleEvidenceSourceFamily[] = [
   "market_infrastructure",
   "manual",
 ];
+const CORROBORATION_PROVIDER_LABELS = {
+  regulator: "SEC",
+  nasdaq_trader: "Nasdaq Trader",
+  massive: "Massive",
+  ibkr: "IBKR",
+} as const;
 const RELEVANCE: SecurityLifecycleRelevance[] = [
   "undetermined",
   "direct_tracked_security",
@@ -698,17 +706,17 @@ function factValue(value: unknown): string {
 }
 
 function AutomationTruth({
-  detail,
+  audit,
   locale,
   t,
 }: {
-  detail: SecurityLifecycleCaseDetail;
+  audit: SecurityLifecycleCaseAudit;
   locale: LifecycleLocale;
   t: TFunction<"explore">;
 }) {
-  const run = detail.automation_runs?.[0];
+  const run = audit.automation_runs?.[0];
   const blockers = run?.blockers ?? [];
-  const facts = detail.automation_facts ?? [];
+  const facts = audit.automation_facts ?? [];
   if (!run && facts.length === 0) return null;
   const grouped = facts.reduce<Map<string, SecurityLifecycleAutomationFact[]>>(
     (result, fact) => {
@@ -1318,6 +1326,11 @@ export function LifecycleView({
   const [activityBusy, setActivityBusy] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(initialCaseId);
   const [detail, setDetail] = useState<SecurityLifecycleCaseDetail | null>(null);
+  const [audit, setAudit] = useState<SecurityLifecycleCaseAudit | null>(null);
+  const [auditBusy, setAuditBusy] = useState(false);
+  const [auditError, setAuditError] = useState<ReturnType<
+    typeof lifecycleErrorPresentation
+  > | null>(null);
   const [listError, setListError] = useState<ReturnType<typeof lifecycleErrorPresentation> | null>(null);
   const [commandError, setCommandError] = useState<ReturnType<typeof lifecycleErrorPresentation> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -1380,6 +1393,7 @@ export function LifecycleView({
   const transitionPreviewRequestRef = useRef(0);
   const caseRequestRef = useRef(0);
   const detailRequestRef = useRef(0);
+  const auditRequestRef = useRef(0);
   const secAuditRequestRef = useRef(0);
   const automationStatusRequestRef = useRef(0);
   const automationRunRequestRef = useRef(0);
@@ -1499,6 +1513,28 @@ export function LifecycleView({
     }
   }, [locale]);
 
+  const loadAudit = useCallback(async (caseId: string) => {
+    const requestId = ++auditRequestRef.current;
+    setAuditBusy(true);
+    try {
+      const response = await getSecurityLifecycleCaseAudit(caseId);
+      if (
+        requestId !== auditRequestRef.current
+        || selectedCaseIdRef.current !== caseId
+      ) return;
+      setAudit(response);
+      setAuditError(null);
+    } catch (error) {
+      if (
+        requestId !== auditRequestRef.current
+        || selectedCaseIdRef.current !== caseId
+      ) return;
+      setAuditError(lifecycleErrorPresentation(error, locale));
+    } finally {
+      if (requestId === auditRequestRef.current) setAuditBusy(false);
+    }
+  }, [locale]);
+
   const loadAutomationStatus = useCallback(async () => {
     const sequence = ++automationStatusRequestRef.current;
     try {
@@ -1572,6 +1608,7 @@ export function LifecycleView({
     automationStatusRequestRef.current += 1;
     automationRunRequestRef.current += 1;
     secAuditRequestRef.current += 1;
+    auditRequestRef.current += 1;
   }, []);
   useEffect(() => {
     if (selectedCaseId) void loadDetail(selectedCaseId);
@@ -1621,10 +1658,14 @@ export function LifecycleView({
     setTransitionPriority(null);
     setTransitionUnhideSuccessor(false);
     setTransitionDialog(null);
+    auditRequestRef.current += 1;
+    setAudit(null);
+    setAuditBusy(false);
+    setAuditError(null);
   }, [selectedCaseId]);
-  const automationSuggestion = useMemo(() => detail?.assessment_history.find(
+  const automationSuggestion = useMemo(() => audit?.assessment_history.find(
     (assessment) => assessment.author === "automation" && assessment.status === "draft",
-  ) ?? null, [detail]);
+  ) ?? null, [audit]);
   useEffect(() => {
     if (!automationSuggestion) return;
     const editableOutcomes = automationSuggestion.outcomes.filter(
@@ -1669,6 +1710,13 @@ export function LifecycleView({
     value: SecurityLifecycleCaseFilters[Key],
   ) => setFilters((current) => ({ ...current, [key]: value }));
 
+  const refreshCase = useCallback(async (caseId: string) => {
+    await Promise.all([
+      loadDetail(caseId),
+      audit ? loadAudit(caseId) : Promise.resolve(),
+    ]);
+  }, [audit, loadAudit, loadDetail]);
+
   const runCommand = async (name: string, command: () => Promise<unknown>): Promise<boolean> => {
     if (!selectedCaseId || busy) return false;
     setBusy(name);
@@ -1678,7 +1726,7 @@ export function LifecycleView({
       const currentCaseId = selectedCaseIdRef.current;
       await Promise.all([
         loadCases(),
-        currentCaseId ? loadDetail(currentCaseId) : Promise.resolve(),
+        currentCaseId ? refreshCase(currentCaseId) : Promise.resolve(),
       ]);
       return true;
     } catch (error) {
@@ -1714,7 +1762,7 @@ export function LifecycleView({
       await Promise.all([
         loadAutomationStatus(),
         loadCases(),
-        currentCaseId ? loadDetail(currentCaseId) : Promise.resolve(),
+        currentCaseId ? refreshCase(currentCaseId) : Promise.resolve(),
       ]);
     } catch (error) {
       if (runSequence !== automationRunRequestRef.current) return;
@@ -1743,11 +1791,11 @@ export function LifecycleView({
       const currentCaseId = selectedCaseIdRef.current;
       await Promise.all([
         loadCases(),
-        currentCaseId ? loadDetail(currentCaseId) : Promise.resolve(),
+        currentCaseId ? refreshCase(currentCaseId) : Promise.resolve(),
       ]);
       if (runSequence !== automationRunRequestRef.current) return;
     })();
-  }, [automationStatusSnapshot, loadCases, loadDetail, pendingAutomationRun]);
+  }, [automationStatusSnapshot, loadCases, pendingAutomationRun, refreshCase]);
 
   const runActivityCommand = async (
     name: string,
@@ -1762,7 +1810,7 @@ export function LifecycleView({
         loadActivity(),
         loadCases(),
         selectedCaseIdRef.current
-          ? loadDetail(selectedCaseIdRef.current)
+          ? refreshCase(selectedCaseIdRef.current)
           : Promise.resolve(),
       ]);
     } catch (error) {
@@ -1783,7 +1831,7 @@ export function LifecycleView({
     try {
       await translateSecurityLifecycleEvidence(evidenceId, locale, runtime);
       const currentCaseId = selectedCaseIdRef.current;
-      if (currentCaseId) await loadDetail(currentCaseId);
+      if (currentCaseId) await refreshCase(currentCaseId);
     } catch (error) {
       setTranslationErrors((current) => ({
         ...current,
@@ -1795,11 +1843,11 @@ export function LifecycleView({
   };
 
   const currentEvidence = useMemo(
-    () => (detail?.evidence ?? []).filter(
+    () => (audit?.evidence ?? []).filter(
       (item) => ACTIVE_SOURCE_FAMILIES.includes(item.source_family)
         && (item.source_family !== "listing_authority" || Boolean(item.listing)),
     ),
-    [detail?.evidence],
+    [audit?.evidence],
   );
   const evidenceGroups = useMemo(() => ACTIVE_SOURCE_FAMILIES.flatMap((family) => {
     const items = currentEvidence.filter((item) => item.source_family === family);
@@ -2120,7 +2168,7 @@ export function LifecycleView({
 
       <LifecycleCaseDrawer
         open={Boolean(selectedCaseId && detail)}
-        title={detail ? [detail.ticker, detail.issuer_name ?? detail.source_ref].join(" · ") : ""}
+        title={detail ? [detail.ticker, detail.issuer_name].filter(Boolean).join(" · ") : ""}
         onClose={() => setSelectedCaseId(null)}
         returnFocusRef={returnFocusRef}
       >
@@ -2129,7 +2177,7 @@ export function LifecycleView({
             {commandError ? (
               <p className="errorbox" data-error-code={commandError.code}>{commandError.message}</p>
             ) : null}
-            <LifecycleCaseSection title={t(($) => $.lifecycle.sections.status)}>
+            <LifecycleCaseSection title={t(($) => $.lifecycle.sections.currentSummary)}>
               <div
                 className="lifecycle-case-automation"
                 data-automation-state={caseAutomationProgress ? "running" : "idle"}
@@ -2167,86 +2215,142 @@ export function LifecycleView({
                   </ol>
                 ) : null}
               </div>
-              {detail.current_assessment && currentDecisionNarrative ? (
+              <dl
+                className="lifecycle-primary-summary"
+                data-testid="lifecycle-primary-summary"
+              >
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.whatHappened)}</dt>
+                  <dd>{(
+                    currentDecisionNarrative?.conclusion
+                    ?? detail.kinds.map((kind) => (
+                      lifecycleEventLabel(kind.event_type, locale)
+                    )).join(" · ")
+                  ) || t(($) => $.lifecycle.states.revalidation)}</dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.trackedSecurityEffect)}</dt>
+                  <dd>{currentDecisionNarrative?.impact ?? <>
+                    {lifecycleDispositionLabel(detail.disposition, locale)}
+                    <span aria-hidden="true"> · </span>
+                    <LifecycleDispositionReasonText
+                      reason={detail.disposition_reason}
+                      dispositionAsOf={detail.disposition_as_of}
+                      locale={locale}
+                    />
+                  </>}</dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.effectiveDate)}</dt>
+                  <dd>{detail.current_assessment?.effective_date
+                    ?? detail.kinds.find((kind) => kind.effective_date)?.effective_date
+                    ?? t(($) => $.lifecycle.states.notAvailable)}</dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.successorOrDestination)}</dt>
+                  <dd>{[
+                    detail.current_assessment?.successor_ticker,
+                    detail.current_assessment?.destination_venue,
+                  ].filter(Boolean).join(" · ") || t(($) => $.lifecycle.states.notAvailable)}</dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.secFiling)}</dt>
+                  <dd>{detail.observation ? <>
+                    <span>{[
+                      detail.observation.filing_form,
+                      detail.observation.filing_date,
+                      detail.observation.filing_items.join(", "),
+                    ].filter(Boolean).join(" · ")}</span>
+                    {safeEvidenceUrl(detail.observation.evidence_url) ? <>
+                      <span aria-hidden="true"> · </span>
+                      <a
+                        className="lifecycle-evidence-link"
+                        href={safeEvidenceUrl(detail.observation.evidence_url)!}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink size={13} /> {t(($) => $.lifecycle.actions.openEvidence)}
+                      </a>
+                    </> : null}
+                  </> : detail.source_presence === "source_missing"
+                    ? t(($) => $.lifecycle.states.sourceMissing)
+                    : t(($) => $.lifecycle.states.notAvailable)}</dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.corroboration)}</dt>
+                  <dd className="lifecycle-corroboration-list">
+                    <span>{CORROBORATION_PROVIDER_LABELS.regulator} · {detail.corroboration.regulator
+                      ? lifecycleSourceFamilyStateLabel(detail.corroboration.regulator, locale)
+                      : t(($) => $.lifecycle.states.notChecked)}</span>
+                    <span>{CORROBORATION_PROVIDER_LABELS.nasdaq_trader} · {detail.corroboration.nasdaq_trader
+                      ? lifecycleListingStatusLabel(
+                        detail.corroboration.nasdaq_trader.listing_status,
+                        locale,
+                      )
+                      : t(($) => $.lifecycle.states.notChecked)}</span>
+                    <span>{CORROBORATION_PROVIDER_LABELS.massive} · {detail.corroboration.massive
+                      ? lifecycleListingStatusLabel(
+                        detail.corroboration.massive.listing_status,
+                        locale,
+                      )
+                      : t(($) => $.lifecycle.states.notChecked)}</span>
+                    <span>{CORROBORATION_PROVIDER_LABELS.ibkr} · {detail.corroboration.ibkr
+                      ? lifecycleSourceFamilyStateLabel(detail.corroboration.ibkr, locale)
+                      : t(($) => $.lifecycle.states.notChecked)}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t(($) => $.lifecycle.primary.missingAndNextCheck)}</dt>
+                  <dd>
+                    <LifecycleDispositionReasonText
+                      reason={detail.disposition_reason}
+                      dispositionAsOf={detail.disposition_as_of}
+                      locale={locale}
+                    />
+                    <span aria-hidden="true"> · </span>
+                    {detail.next_check_at ? (
+                      <time dateTime={detail.next_check_at}>{detail.next_check_at}</time>
+                    ) : t(($) => $.lifecycle.states.notScheduled)}
+                  </dd>
+                </div>
+              </dl>
+              {detail.current_assessment ? (
                 <div
-                  className="lifecycle-decision-summary"
+                  className="lifecycle-provenance-row"
                   data-testid="lifecycle-decision-summary"
                 >
-                  <strong>{currentDecisionNarrative.conclusion}</strong>
-                  <p>{currentDecisionNarrative.impact}</p>
-                  <div className="lifecycle-provenance-row">
-                    <span className="lifecycle-state">{lifecycleAssessmentAuthorLabel(
-                      detail.current_assessment.author,
+                  <span className="lifecycle-state">{lifecycleAssessmentAuthorLabel(
+                    detail.current_assessment.author,
+                    locale,
+                  )}</span>
+                  {detail.current_assessment.automation_method ? (
+                    <span className="lifecycle-state">{lifecycleAutomationMethodLabel(
+                      detail.current_assessment.automation_method,
                       locale,
                     )}</span>
-                    {detail.current_assessment.automation_method ? (
-                      <span className="lifecycle-state">{lifecycleAutomationMethodLabel(
-                        detail.current_assessment.automation_method,
-                        locale,
-                      )}</span>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-              <dl className="lifecycle-assessment-facts lifecycle-disposition-summary">
-                <div>
-                  <dt>{t(($) => $.lifecycle.table.disposition)}</dt>
-                  <dd>{lifecycleDispositionLabel(detail.disposition, locale)}</dd>
-                </div>
-                <div>
-                  <dt>{t(($) => $.lifecycle.fields.actionReadiness)}</dt>
-                  <dd><LifecycleDispositionReasonText
-                    reason={detail.disposition_reason}
-                    dispositionAsOf={detail.disposition_as_of}
-                    locale={locale}
-                  /></dd>
-                </div>
-                {detail.last_checked_at ? (
-                  <div>
-                    <dt>{t(($) => $.lifecycle.table.lastChecked)}</dt>
-                    <dd><time dateTime={detail.last_checked_at}>{detail.last_checked_at}</time></dd>
-                  </div>
-                ) : null}
-                {detail.next_check_at ? (
-                  <div>
-                    <dt>{t(($) => $.lifecycle.table.nextCheck)}</dt>
-                    <dd><time dateTime={detail.next_check_at}>{detail.next_check_at}</time></dd>
-                  </div>
-                ) : null}
-                {ACTIVE_SOURCE_FAMILIES.map((family) => {
-                  const state = detail.source_family_status[family];
-                  return state ? (
-                    <div key={family}>
-                      <dt>{lifecycleEvidenceSourceFamilyLabel(family, locale)}</dt>
-                      <dd>{lifecycleSourceFamilyStateLabel(state, locale)}</dd>
-                    </div>
-                  ) : null;
-                })}
-              </dl>
-            </LifecycleCaseSection>
-            <LifecycleCaseSection title={t(($) => $.lifecycle.sections.source)}>
-              <p><strong>{lifecycleSourcePresenceLabel(detail.source_presence, locale)}</strong></p>
-              {detail.source_context === "unavailable" ? (
-                <p>{t(($) => $.lifecycle.states.sourceContextUnavailable)}</p>
-              ) : null}
-              {detail.observation ? (
-                <>
-                  <p>{detail.observation.filing_form} · {detail.observation.filing_date}</p>
-                  <p className="lifecycle-provider-evidence">{detail.observation.description}</p>
-                  {safeEvidenceUrl(detail.observation.evidence_url) ? (
-                    <a
-                      className="lifecycle-evidence-link"
-                      href={safeEvidenceUrl(detail.observation.evidence_url)!}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink size={14} /> {t(($) => $.lifecycle.actions.openEvidence)}
-                    </a>
                   ) : null}
-                </>
-              ) : <p>{t(($) => $.lifecycle.states.revalidation)}</p>}
+                </div>
+              ) : null}
             </LifecycleCaseSection>
 
+            <details
+              className="lifecycle-audit-details"
+              onToggle={(event) => {
+                if (event.currentTarget.open && !audit && !auditBusy) {
+                  void loadAudit(detail.case_id);
+                }
+              }}
+            >
+              <summary>{t(($) => $.lifecycle.sections.auditDetails)}</summary>
+              {auditError ? (
+                <p className="errorbox" data-error-code={auditError.code}>
+                  {auditError.message}
+                </p>
+              ) : null}
+              {auditBusy && !audit ? (
+                <p className="muted">{t(($) => $.lifecycle.states.loadingAudit)}</p>
+              ) : null}
+              {audit ? <>
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.evidence)}>
               {evidenceGroups.map(([family, items]) => (
                 <section className="lifecycle-evidence-group" key={family}>
@@ -2265,10 +2369,10 @@ export function LifecycleView({
                   ))}
                 </section>
               ))}
-              {detail.investigation_runs.length > 0 ? (
+              {audit.investigation_runs.length > 0 ? (
                 <details className="lifecycle-secondary-details">
                   <summary>{t(($) => $.lifecycle.sections.runs)}</summary>
-                  {detail.investigation_runs.map((run) => (
+                  {audit.investigation_runs.map((run) => (
                     <p key={run.run_id}>
                       {run.status === "succeeded" && run.result_count === 0
                         ? t(($) => $.lifecycle.states.zeroResults)
@@ -2336,13 +2440,10 @@ export function LifecycleView({
               ) : null}
             </LifecycleCaseSection>
 
-            <details className="lifecycle-audit-details">
-              <summary>{t(($) => $.lifecycle.sections.auditDetails)}</summary>
-              <AutomationTruth detail={detail} locale={locale} t={t} />
-            </details>
+            <AutomationTruth audit={audit} locale={locale} t={t} />
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.acknowledgement)}>
-              {detail.acknowledgement_history.map((item) => (
+              {audit.acknowledgement_history.map((item) => (
                 <p key={item.acknowledgement_id}>
                   {t(($) => $.lifecycle.acknowledgementReasons.evidenceInsufficient)}
                   {item.stale ? <>
@@ -2384,7 +2485,7 @@ export function LifecycleView({
             </LifecycleCaseSection>
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.assessment)}>
-              {detail.assessment_history.map((assessment) => (
+              {audit.assessment_history.map((assessment) => (
                 <AssessmentHistory
                   assessment={assessment}
                   ticker={detail.ticker}
@@ -2576,7 +2677,7 @@ export function LifecycleView({
                     icon={<Check size={15} />}
                     disabled={!conclusion.trim() || !impact.trim()}
                     onClick={() => {
-                      const observationFingerprint = detail.observation_fingerprint_sha256;
+                      const observationFingerprint = audit.observation_fingerprint_sha256;
                       if (!citeObservation || !observationFingerprint) {
                         setCitationError(true);
                         return;
@@ -2628,6 +2729,8 @@ export function LifecycleView({
                 </div>
               ) : null}
             </LifecycleCaseSection>
+              </> : null}
+            </details>
 
             <LifecycleCaseSection title={t(($) => $.lifecycle.sections.proposals)}>
               {detail.proposals.map((proposal) => {

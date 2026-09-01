@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   getUniverse: vi.fn(),
   importUniverse: vi.fn(),
   getSecurityLifecycleCase: vi.fn(),
+  getSecurityLifecycleCaseAudit: vi.fn(),
   listSecurityLifecycleCases: vi.fn(),
   setTickerHidden: vi.fn(),
   translateSecurityLifecycleEvidence: vi.fn(),
@@ -355,6 +356,7 @@ beforeEach(async () => {
     disposition: "not_confirmed_yet",
     queue_bucket: "monitoring",
     disposition_reason: "awaiting_initial_automation",
+    disposition_as_of: null,
     last_checked_at: null,
     next_check_at: null,
     source_family_status: { regulator: "present" },
@@ -362,14 +364,27 @@ beforeEach(async () => {
     assessment_count: 0,
     acknowledgement_count: 0,
     proposal_count: 0,
+    sec_admission: null,
     observation: {
+      ticker: "QBTS",
       issuer_name: "D-Wave Quantum Inc.",
       filing_date: "2026-07-24",
       filing_form: "25-NSE",
+      filing_items: [],
       evidence_url: "https://www.sec.gov/Archives/example/qbts.htm",
-      description: "Common stock",
       kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
     },
+    corroboration: {
+      regulator: "present",
+      nasdaq_trader: null,
+      massive: null,
+      ibkr: null,
+    },
+    proposals: [],
+    ticker_transition: null,
+  });
+  apiMocks.getSecurityLifecycleCaseAudit.mockReset().mockResolvedValue({
+    case_id: "slc-qbts",
     observation_fingerprint_sha256: "a".repeat(64),
     investigation_runs: [],
     automation_runs: [],
@@ -377,8 +392,7 @@ beforeEach(async () => {
     evidence: [],
     assessment_history: [],
     acknowledgement_history: [],
-    proposals: [],
-    ticker_transition: null,
+    truncation: {},
   });
   apiMocks.importUniverse.mockReset().mockResolvedValue(IMPORT_RESULT);
   apiMocks.setTickerHidden.mockReset().mockResolvedValue({ ticker: SOURCE_TICKER, hidden: true });
@@ -724,8 +738,8 @@ describe("Universe localization", () => {
 
   it("forwards the exact Models Settings target from lifecycle translation recovery", async () => {
     const onNavigateTarget = vi.fn();
-    apiMocks.getSecurityLifecycleCase.mockResolvedValueOnce({
-      ...(await apiMocks.getSecurityLifecycleCase()),
+    apiMocks.getSecurityLifecycleCaseAudit.mockResolvedValueOnce({
+      ...(await apiMocks.getSecurityLifecycleCaseAudit()),
       evidence: [{
         evidence_id: "evidence-sec",
         source_family: "regulator",
@@ -744,6 +758,11 @@ describe("Universe localization", () => {
     await click(buttonByText("標的事件調查", host!.querySelector('[role="tablist"]')!));
     await waitForText("QBTS");
     await click(buttonByText("QBTS"));
+    const auditDisclosure = document.body.querySelector<HTMLDetailsElement>(
+      "details.lifecycle-audit-details",
+    );
+    if (!auditDisclosure) throw new Error("missing lifecycle audit disclosure");
+    await click(auditDisclosure.querySelector("summary")!);
     await waitForBodyText("Issuer notice");
     await click(buttonByText("翻譯證據", document.body));
     const recovery = document.body.querySelector<HTMLButtonElement>(

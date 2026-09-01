@@ -702,6 +702,195 @@ def test_active_case_projection_omits_each_malformed_listing_row_independently()
         assert "malformed-listing" not in json.dumps(projected)
 
 
+def test_primary_detail_and_lazy_audit_are_disjoint_closed_projections(
+    tmp_path,
+):
+    from src.security_lifecycle_investigation import observation_fingerprint
+    from src.tools.security_lifecycle_tools import (
+        SecurityLifecycleReadService,
+        project_security_lifecycle_case_audit,
+        project_security_lifecycle_case_detail,
+    )
+
+    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    try:
+        service = SecurityLifecycleReadService(
+            market_db_path=str(market_path),
+            profile_db_path=str(profile_path),
+            source_loader=lambda: {"EA": ("manual_lists",)},
+        )
+        initial = service.get_case(case_id)
+        _seed_all_evidence_families(
+            store,
+            case_id,
+            observation_fingerprint(initial["observation"]),
+        )
+        source = service.get_case(case_id)
+        source["future_case_field"] = "future-case-sentinel"
+        source["automation_runs"][0]["future_run_field"] = "future-run-sentinel"
+        source["evidence"][0]["future_evidence_field"] = "future-evidence-sentinel"
+        source["current_assessment"] = {
+            "assessment_id": "assessment-automation",
+            "status": "accepted",
+            "author": "automation",
+            "automation_method": "deterministic_rule",
+            "acceptance_authority": "automation_policy",
+            "rule_id": "lifecycle.ma_review",
+            "rule_version": "2",
+            "decision_provenance_sha256": "d" * 64,
+            "relevance": "direct_tracked_security",
+            "confidence": "high",
+            "conclusion": "Stored automation prose.",
+            "impact_summary": "Stored automation impact.",
+            "outcomes": ["acquisition_pending"],
+            "stale": False,
+            "created_at": "2026-08-28T01:00:00Z",
+        }
+
+        primary = project_security_lifecycle_case_detail(source)
+        audit = project_security_lifecycle_case_audit(source)
+
+        assert set(audit) == {
+            "case_id",
+            "observation_fingerprint_sha256",
+            "investigation_runs",
+            "automation_runs",
+            "automation_facts",
+            "evidence",
+            "assessment_history",
+            "acknowledgement_history",
+            "truncation",
+        }
+        for history_field in (
+            "investigation_runs",
+            "automation_runs",
+            "automation_facts",
+            "evidence",
+            "assessment_history",
+            "acknowledgement_history",
+            "truncation",
+            "observation_fingerprint_sha256",
+        ):
+            assert history_field not in primary
+        assert primary["case_id"] == case_id
+        assert primary["observation"]["evidence_url"] == initial["observation"][
+            "evidence_url"
+        ]
+        assert "source_ref" not in primary["observation"]
+        assert primary["current_assessment"]["automation_narrative"] == (
+            "maReview"
+        )
+        assert "rule_id" not in primary["current_assessment"]
+        assert "decision_provenance_sha256" not in primary[
+            "current_assessment"
+        ]
+        assert primary["corroboration"] == {
+            "regulator": "present",
+            "nasdaq_trader": None,
+            "massive": {
+                "listing_status": "active",
+                "source_as_of": "2026-08-28",
+                "provider_last_updated_utc": None,
+            },
+            "ibkr": "present",
+        }
+        encoded = json.dumps({"primary": primary, "audit": audit}, sort_keys=True)
+        for sentinel in (
+            "future-case-sentinel",
+            "future-run-sentinel",
+            "future-evidence-sentinel",
+            "canonical-only",
+        ):
+            assert sentinel not in encoded
+    finally:
+        profile.close()
+
+
+def test_primary_detail_distinguishes_nasdaq_and_massive_corroboration():
+    from src.tools.security_lifecycle_tools import (
+        project_security_lifecycle_case_detail,
+    )
+
+    source = {
+        "case_id": "slc_authorities",
+        "source": "sec_edgar",
+        "source_ref": "0000000001-26-000001",
+        "ticker": "EA",
+        "source_presence": "present",
+        "workflow_state": "evidence_ready",
+        "observation": {
+            "ticker": "EA",
+            "issuer_name": "Issuer",
+            "filing_date": "2026-08-28",
+            "filing_form": "8-K",
+            "filing_items": ["3.01"],
+            "evidence_url": "https://www.sec.gov/Archives/example/ea.htm",
+            "kinds": [],
+        },
+        "current_assessment": None,
+        "current_acknowledgement": None,
+        "active_sources": ["manual_lists"],
+        "source_context": "available",
+        "components": {},
+        "investigation_runs": [],
+        "automation_runs": [],
+        "automation_facts": [],
+        "assessment_history": [],
+        "acknowledgement_history": [],
+        "proposals": [],
+        "ticker_transition": None,
+        "disposition": "not_confirmed_yet",
+        "queue_bucket": "monitoring",
+        "disposition_reason": "event_completion_not_confirmed",
+        "disposition_as_of": None,
+        "last_checked_at": None,
+        "next_check_at": "2026-09-04T00:00:00Z",
+        "source_family_status": {
+            "regulator": "confirmed",
+            "listing_authority": "confirmed",
+            "market_infrastructure": "present",
+        },
+        "sec_admission": {
+            "state": "admitted",
+            "reason": "direct_listing_item",
+        },
+        "evidence": [
+            {
+                "evidence_id": "nasdaq",
+                "source_family": "listing_authority",
+                "kind": "listing_directory_snapshot",
+                "source_url": "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.txt",
+                "created_at": "2026-08-28T00:00:00Z",
+                "source_locator_json": json.dumps(_listing_locator(
+                    adapter="nasdaq_symbol_directory",
+                    authority="nasdaq_trader",
+                    directory="nasdaq_listed",
+                    listing_status="inactive",
+                    source_as_of="2026-08-27",
+                )),
+            },
+            {
+                "evidence_id": "massive",
+                "source_family": "listing_authority",
+                "kind": "listing_directory_snapshot",
+                "source_url": "https://api.massive.com/v3/reference/tickers/EA",
+                "created_at": "2026-08-28T01:00:00Z",
+                "source_locator_json": json.dumps(_listing_locator()),
+            },
+        ],
+    }
+
+    primary = project_security_lifecycle_case_detail(source)
+
+    assert primary["corroboration"]["nasdaq_trader"] == {
+        "listing_status": "inactive",
+        "source_as_of": "2026-08-27",
+        "provider_last_updated_utc": None,
+    }
+    assert primary["corroboration"]["massive"]["listing_status"] == "active"
+    assert "source_locator_json" not in json.dumps(primary)
+
+
 def test_malformed_stored_listing_isolated_across_list_direct_and_provider_detail(
     tmp_path,
     monkeypatch,

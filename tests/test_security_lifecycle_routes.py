@@ -437,6 +437,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("GET", "/security-lifecycle/cases"),
         ("GET", "/security-lifecycle/candidates"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
+        ("GET", "/security-lifecycle/cases/{case_id}/audit"),
         ("POST", "/security-lifecycle/automation/run"),
         ("POST", "/security-lifecycle/cases/{case_id}/automation/run"),
         ("GET", "/security-lifecycle/investigations/{run_id}"),
@@ -462,7 +463,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 192
+    assert len(rows) == 193
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",
@@ -1255,7 +1256,7 @@ def test_operator_detail_reaches_http_ai_tool_and_ui_identically(
         )
         client = _client(context, monkeypatch)
         http_case = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}"
+            f"/security-lifecycle/cases/{context['case_id']}/audit"
         ).json()
 
         monkeypatch.setattr(
@@ -1351,7 +1352,7 @@ def test_http_and_ai_share_one_exact_closed_automation_run_projection(
         context["service"] = SimpleNamespace(get_case=get_case_with_future_field)
         client = _client(context, monkeypatch)
         http_case = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}"
+            f"/security-lifecycle/cases/{context['case_id']}/audit"
         ).json()
 
         monkeypatch.setattr(
@@ -1441,19 +1442,32 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         assert client.post(
             f"/security-lifecycle/assessments/{assessment_id}/accept"
         ).status_code == 200
-        payload = client.get(
+        primary = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
         ).json()
-        assert payload["observation"]["source_ref"] == _SOURCE_REF
-        assert payload["observation_fingerprint_sha256"] == context["fingerprint"]
-        assert payload["active_sources"] == ["manual_lists"]
-        assert len(payload["evidence"]) == 2
-        assert {row["source_family"] for row in payload["evidence"]} == {
+        audit = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}/audit"
+        ).json()
+        assert "source_ref" not in primary["observation"]
+        assert primary["observation"]["filing_form"] == "8-K"
+        assert "observation_fingerprint_sha256" not in primary
+        assert primary["active_sources"] == ["manual_lists"]
+        for historical in (
+            "evidence",
+            "automation_runs",
+            "automation_facts",
+            "assessment_history",
+            "acknowledgement_history",
+        ):
+            assert historical not in primary
+        assert audit["observation_fingerprint_sha256"] == context["fingerprint"]
+        assert len(audit["evidence"]) == 2
+        assert {row["source_family"] for row in audit["evidence"]} == {
             "manual",
             "regulator",
         }
         translated = next(
-            row for row in payload["evidence"] if row["evidence_id"] == evidence_id
+            row for row in audit["evidence"] if row["evidence_id"] == evidence_id
         )
         assert translated["excerpt"] == "Official issuer evidence."
         assert translated["translations"] == [
@@ -1468,20 +1482,20 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
                 "translated_at": _AT,
             }
         ]
-        assert payload["current_assessment"]["assessment_id"] == assessment_id
-        assert payload["acknowledgement_history"] == []
-        assert payload["proposals"]
-        assert len(payload["automation_runs"]) == 1
-        assert payload["automation_runs"][0]["status"] == "succeeded"
-        assert payload["automation_runs"][0]["decision_tier"] == "review_suggested"
-        assert payload["automation_runs"][0]["action_readiness"] == "action_blocked"
-        assert payload["automation_runs"][0]["blockers"] == []
-        assert len(payload["automation_facts"]) == 1
-        assert payload["automation_facts"][0]["fact_type"] == "successor_ticker"
-        assert payload["automation_facts"][0]["normalized_value"] == "EA2"
-        assert payload["automation_facts"][0]["source_family"] == "regulator"
+        assert primary["current_assessment"]["assessment_id"] == assessment_id
+        assert audit["acknowledgement_history"] == []
+        assert primary["proposals"]
+        assert len(audit["automation_runs"]) == 1
+        assert audit["automation_runs"][0]["status"] == "succeeded"
+        assert audit["automation_runs"][0]["decision_tier"] == "review_suggested"
+        assert audit["automation_runs"][0]["action_readiness"] == "action_blocked"
+        assert audit["automation_runs"][0]["blockers"] == []
+        assert len(audit["automation_facts"]) == 1
+        assert audit["automation_facts"][0]["fact_type"] == "successor_ticker"
+        assert audit["automation_facts"][0]["normalized_value"] == "EA2"
+        assert audit["automation_facts"][0]["source_family"] == "regulator"
         assert automation_assessment_id in {
-            row["assessment_id"] for row in payload["assessment_history"]
+            row["assessment_id"] for row in audit["assessment_history"]
         }
     finally:
         context["profile_conn"].close()
@@ -1532,8 +1546,11 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
         client = _client(context, monkeypatch)
         _add_manual(client, context["case_id"])
 
-        detail_response = client.get(
+        primary = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
+        ).json()
+        detail_response = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}/audit"
         )
         assert detail_response.status_code == 200
         detail = detail_response.json()
@@ -1543,13 +1560,7 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
             "market_infrastructure",
             "manual",
         }
-        assert detail["evidence_count"] == 4
-        assert set(detail["source_family_status"]) <= {
-            "regulator",
-            "listing_authority",
-            "market_infrastructure",
-            "manual",
-        }
+        assert primary["corroboration"]["massive"]["listing_status"] == "active"
         listing = next(
             row
             for row in detail["evidence"]
@@ -1628,8 +1639,11 @@ def test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evid
         client = _client(context, monkeypatch)
         _add_manual(client, context["case_id"])
 
-        detail_response = client.get(
+        primary = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
+        ).json()
+        detail_response = client.get(
+            f"/security-lifecycle/cases/{context['case_id']}/audit"
         )
         assert detail_response.status_code == 200
         detail = detail_response.json()
@@ -1638,7 +1652,7 @@ def test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evid
             "market_infrastructure",
             "manual",
         }
-        assert detail["evidence_count"] == 3
+        assert primary["corroboration"]["massive"] is None
         assert "canonical-only" not in detail_response.text
         assert client.get("/security-lifecycle/cases").json()["cases"][0][
             "evidence_count"

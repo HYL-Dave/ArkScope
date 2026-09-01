@@ -2176,6 +2176,31 @@ table.lifecycle-table tbody tr:last-child td {
   margin: 2px 0 0;
   overflow-wrap: anywhere;
 }
+.lifecycle-primary-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  margin: 10px 0 0;
+}
+.lifecycle-primary-summary > div {
+  min-width: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.lifecycle-primary-summary dt {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.lifecycle-primary-summary dd {
+  margin: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.lifecycle-corroboration-list {
+  display: grid;
+  gap: 3px;
+}
 .lifecycle-commands,
 .lifecycle-assessment-form {
   display: grid;
@@ -2483,7 +2508,8 @@ table.lifecycle-table tbody tr:last-child td {
   }
   .lifecycle-filters,
   .lifecycle-commands,
-  .lifecycle-assessment-form {
+  .lifecycle-assessment-form,
+  .lifecycle-primary-summary {
     grid-template-columns: minmax(0, 1fr);
   }
   .lifecycle-commands > *,

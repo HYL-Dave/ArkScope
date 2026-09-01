@@ -113,6 +113,143 @@ _PUBLIC_AUTOMATION_RUN_FIELDS = (
 _PROJECTED_AUTOMATION_RUN_FIELDS = frozenset(
     {"blockers", "terminal_finalization_failure"}
 )
+_PUBLIC_INVESTIGATION_RUN_FIELDS = (
+    "run_id",
+    "status",
+    "result_count",
+    "failure_code",
+    "created_at",
+)
+_PUBLIC_AUTOMATION_FACT_FIELDS = (
+    "fact_id",
+    "automation_run_id",
+    "evidence_id",
+    "source_family",
+    "fact_type",
+    "normalized_value",
+    "source_span_start",
+    "source_span_end",
+    "cited_text_sha256",
+    "extractor_rule_id",
+    "extractor_rule_version",
+    "created_at",
+)
+_PUBLIC_ASSESSMENT_FIELDS = (
+    "assessment_id",
+    "status",
+    "author",
+    "automation_method",
+    "acceptance_authority",
+    "automation_run_id",
+    "rule_id",
+    "rule_version",
+    "decision_provenance_sha256",
+    "relevance",
+    "confidence",
+    "conclusion",
+    "impact_summary",
+    "outcomes",
+    "stale",
+    "created_at",
+    "consideration_currency",
+    "cash_per_security_decimal",
+    "exchange_ratio_decimal",
+    "successor_ticker",
+    "destination_venue",
+    "counterparty_name",
+    "counterparty_ticker",
+    "counterparty_cik",
+    "effective_date",
+)
+_PRIMARY_ASSESSMENT_FIELDS = tuple(
+    field
+    for field in _PUBLIC_ASSESSMENT_FIELDS
+    if field
+    not in {
+        "automation_run_id",
+        "rule_id",
+        "rule_version",
+        "decision_provenance_sha256",
+        "counterparty_cik",
+    }
+)
+_AUTOMATION_NARRATIVE_KEYS = {
+    "lifecycle.terminal_delisting": "terminalDelisting",
+    "lifecycle.no_identity_change": "noIdentityChange",
+    "lifecycle.simple_symbol_continuation": "simpleSymbolContinuation",
+    "lifecycle.venue_transfer": "venueTransfer",
+    "lifecycle.ma_review": "maReview",
+    "lifecycle.source_conflict": "sourceConflict",
+    "lifecycle.insufficient_identity_facts": "insufficientIdentityFacts",
+}
+_PUBLIC_ACKNOWLEDGEMENT_FIELDS = (
+    "acknowledgement_id",
+    "reason",
+    "note",
+    "stale",
+    "acknowledged_at",
+    "reopened_at",
+)
+_PUBLIC_PROPOSAL_FIELDS = (
+    "proposal_id",
+    "action_type",
+    "status",
+    "projected_block_reason",
+    "replacement_ticker",
+)
+_PRIMARY_OBSERVATION_FIELDS = (
+    "ticker",
+    "issuer_name",
+    "filing_date",
+    "filing_form",
+    "filing_items",
+    "evidence_url",
+    "kinds",
+)
+_PRIMARY_CASE_FIELDS = (
+    "case_id",
+    "ticker",
+    "source_presence",
+    "workflow_state",
+    "issuer_name",
+    "filing_date",
+    "kinds",
+    "current_assessment",
+    "current_acknowledgement",
+    "active_sources",
+    "source_context",
+    "automation_tier",
+    "action_readiness",
+    "disposition",
+    "queue_bucket",
+    "disposition_reason",
+    "disposition_as_of",
+    "last_checked_at",
+    "next_check_at",
+    "source_family_status",
+    "sec_admission",
+)
+_PUBLIC_TRANSITION_FIELDS = (
+    "transition_id",
+    "kind",
+    "status",
+    "source_ticker",
+    "successor_ticker",
+    "execute_on",
+    "approved_preview_sha256",
+    "approved_preview",
+    "approval_authority",
+    "automation_policy_version",
+    "rule_id",
+    "rule_version",
+    "decision_provenance_sha256",
+    "updated_at",
+    "latest_attempt",
+    "reverse_readiness",
+    "activity_history",
+    "activity_count",
+    "unacknowledged_activity_count",
+)
 
 
 def _nullable_listing_text(value: object, pattern: re.Pattern[str]) -> bool:
@@ -285,6 +422,254 @@ def project_active_security_lifecycle_case(case: Mapping[str, object]) -> dict:
     if "evidence_count" in item:
         item["evidence_count"] = len(evidence)
     return item
+
+
+def _closed_fields(
+    row: Mapping[str, object], fields: Iterable[str]
+) -> dict[str, object]:
+    return {field: row[field] for field in fields if field in row}
+
+
+def _project_assessment(
+    row: Mapping[str, object], *, audit: bool
+) -> dict[str, object]:
+    fields = _PUBLIC_ASSESSMENT_FIELDS if audit else _PRIMARY_ASSESSMENT_FIELDS
+    projected = _closed_fields(row, fields)
+    if audit:
+        citations = []
+        for raw in row.get("citations", []):
+            if not isinstance(raw, Mapping):
+                raise ValueError("assessment_citation")
+            citations.append(
+                _closed_fields(
+                    raw,
+                    (
+                        "reference_kind",
+                        "evidence_id",
+                        "cited_content_sha256",
+                    ),
+                )
+            )
+        projected["citations"] = citations
+    elif row.get("author") == "automation":
+        projected["automation_narrative"] = _AUTOMATION_NARRATIVE_KEYS.get(
+            str(row.get("rule_id") or ""), "unknownRule"
+        )
+    return projected
+
+
+def _project_acknowledgement(row: Mapping[str, object]) -> dict[str, object]:
+    return _closed_fields(row, _PUBLIC_ACKNOWLEDGEMENT_FIELDS)
+
+
+def _project_proposal(row: Mapping[str, object]) -> dict[str, object]:
+    return _closed_fields(row, _PUBLIC_PROPOSAL_FIELDS)
+
+
+def _project_transition(value: object) -> dict[str, object] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("ticker_transition")
+    return _closed_fields(value, _PUBLIC_TRANSITION_FIELDS)
+
+
+def _project_audit_evidence(row: Mapping[str, object]) -> dict[str, object]:
+    if row.get("source_family") == "listing_authority":
+        return _closed_fields(
+            row,
+            (
+                "evidence_id",
+                "source_family",
+                "kind",
+                "source_url",
+                "created_at",
+                "listing",
+            ),
+        )
+    projected = _closed_fields(
+        row,
+        (
+            "evidence_id",
+            "source_family",
+            "kind",
+            "excerpt",
+            "content_sha256",
+            "source_url",
+            "title",
+            "publisher",
+            "source_published_at",
+            "source_document_sha256",
+            "created_at",
+        ),
+    )
+    projected["excerpt"] = str(projected.get("excerpt") or "")[
+        :_DETAIL_EXCERPT_LIMIT
+    ]
+    translations = []
+    for raw in row.get("translations", []):
+        if not isinstance(raw, Mapping):
+            raise ValueError("evidence_translation")
+        translations.append(
+            _closed_fields(
+                raw,
+                (
+                    "evidence_id",
+                    "evidence_content_sha256",
+                    "locale",
+                    "translated_text",
+                    "provider",
+                    "model",
+                    "harness",
+                    "translated_at",
+                    "cached",
+                ),
+            )
+        )
+    projected["translations"] = translations
+    return projected
+
+
+def _bounded_rows(
+    rows: Iterable[Mapping[str, object]],
+    *,
+    timestamp_field: str,
+    id_field: str,
+) -> tuple[list[Mapping[str, object]], int]:
+    values = list(rows)
+    ordered = sorted(
+        values,
+        key=lambda row: (
+            str(row.get(timestamp_field) or ""),
+            str(row.get(id_field) or ""),
+        ),
+    )
+    return ordered[-_DETAIL_HISTORY_LIMIT:], len(values)
+
+
+def _listing_corroboration(
+    evidence: Iterable[Mapping[str, object]],
+) -> dict[str, object | None]:
+    snapshots: dict[str, Mapping[str, object]] = {}
+    for row in evidence:
+        if row.get("source_family") != "listing_authority":
+            continue
+        listing = row.get("listing")
+        if not isinstance(listing, Mapping):
+            continue
+        authority = str(listing.get("authority") or "")
+        if authority in {"nasdaq_trader", "massive"}:
+            snapshots[authority] = listing
+
+    def compact(authority: str) -> dict[str, object] | None:
+        listing = snapshots.get(authority)
+        if listing is None:
+            return None
+        return _closed_fields(
+            listing,
+            (
+                "listing_status",
+                "source_as_of",
+                "provider_last_updated_utc",
+            ),
+        )
+
+    return {
+        "nasdaq_trader": compact("nasdaq_trader"),
+        "massive": compact("massive"),
+    }
+
+
+def project_security_lifecycle_case_detail(
+    case: Mapping[str, object],
+) -> dict[str, object]:
+    """Return the closed current-state DTO used by the browser drawer."""
+    active = project_active_security_lifecycle_case(case)
+    summary = _case_summary(active)
+    primary = _closed_fields(summary, _PRIMARY_CASE_FIELDS)
+    current_assessment = summary.get("current_assessment")
+    primary["current_assessment"] = (
+        _project_assessment(current_assessment, audit=False)
+        if isinstance(current_assessment, Mapping)
+        else None
+    )
+    current_acknowledgement = summary.get("current_acknowledgement")
+    primary["current_acknowledgement"] = (
+        _project_acknowledgement(current_acknowledgement)
+        if isinstance(current_acknowledgement, Mapping)
+        else None
+    )
+    observation = active.get("observation")
+    primary["observation"] = (
+        _closed_fields(observation, _PRIMARY_OBSERVATION_FIELDS)
+        if isinstance(observation, Mapping)
+        else None
+    )
+    proposals = []
+    for raw in active.get("proposals", []):
+        if not isinstance(raw, Mapping):
+            raise ValueError("proposal")
+        proposals.append(_project_proposal(raw))
+    primary["proposals"] = proposals
+    primary["ticker_transition"] = _project_transition(
+        active.get("ticker_transition")
+    )
+    statuses = primary.get("source_family_status")
+    if not isinstance(statuses, Mapping):
+        raise ValueError("source_family_status")
+    primary["corroboration"] = {
+        "regulator": statuses.get("regulator"),
+        **_listing_corroboration(active.get("evidence", [])),
+        "ibkr": statuses.get("market_infrastructure"),
+    }
+    return primary
+
+
+def project_security_lifecycle_case_audit(
+    case: Mapping[str, object],
+) -> dict[str, object]:
+    """Return bounded, closed provenance arrays for on-demand browser reads."""
+    active = project_active_security_lifecycle_case(case)
+    projectors = {
+        "investigation_runs": lambda row: _closed_fields(
+            row, _PUBLIC_INVESTIGATION_RUN_FIELDS
+        ),
+        "automation_runs": _project_automation_run,
+        "automation_facts": lambda row: _closed_fields(
+            row, _PUBLIC_AUTOMATION_FACT_FIELDS
+        ),
+        "evidence": _project_audit_evidence,
+        "assessment_history": lambda row: _project_assessment(row, audit=True),
+        "acknowledgement_history": _project_acknowledgement,
+    }
+    audit: dict[str, object] = {
+        "case_id": str(active["case_id"]),
+        "observation_fingerprint_sha256": active.get(
+            "observation_fingerprint_sha256"
+        ),
+    }
+    truncation = {}
+    for name, projector in projectors.items():
+        raw_rows = active.get(name, [])
+        if not isinstance(raw_rows, Iterable) or isinstance(
+            raw_rows, (str, bytes, Mapping)
+        ):
+            raise ValueError(name)
+        rows = []
+        for raw in raw_rows:
+            if not isinstance(raw, Mapping):
+                raise ValueError(name)
+            rows.append(raw)
+        timestamp_field, id_field = _HISTORY_ORDER_FIELDS[name]
+        selected, total = _bounded_rows(
+            rows,
+            timestamp_field=timestamp_field,
+            id_field=id_field,
+        )
+        audit[name] = [projector(row) for row in selected]
+        truncation[name] = {"total": total, "returned": len(selected)}
+    audit["truncation"] = truncation
+    return audit
 
 
 def _profile_db_path() -> str:
@@ -762,6 +1147,12 @@ class SecurityLifecycleReadService:
                 return {**case, **_case_summary(case)}
         raise KeyError("case_not_found")
 
+    def get_case_detail(self, case_id: str) -> dict[str, object]:
+        return project_security_lifecycle_case_detail(self.get_case(case_id))
+
+    def get_case_audit(self, case_id: str) -> dict[str, object]:
+        return project_security_lifecycle_case_audit(self.get_case(case_id))
+
 
 def _typed_unavailable(exc: LifecycleStoreUnavailable) -> dict:
     return {
@@ -828,4 +1219,6 @@ __all__ = [
     "get_security_lifecycle_case",
     "list_security_lifecycle_cases",
     "project_active_security_lifecycle_case",
+    "project_security_lifecycle_case_audit",
+    "project_security_lifecycle_case_detail",
 ]

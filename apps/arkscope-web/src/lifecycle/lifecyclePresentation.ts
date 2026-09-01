@@ -145,7 +145,8 @@ type AutomationNarrativeKey =
   | "venueTransfer"
   | "maReview"
   | "sourceConflict"
-  | "insufficientIdentityFacts";
+  | "insufficientIdentityFacts"
+  | "unknownRule";
 
 const AUTOMATION_NARRATIVE_KEYS: Record<KnownAutomationRuleId, AutomationNarrativeKey> = {
   "lifecycle.terminal_delisting": "terminalDelisting",
@@ -179,12 +180,11 @@ export function lifecycleAutomationNarrative(
   }
   const copy = lifecycleCopy(locale);
   const ruleId = assessment.rule_id ?? copy.states.unknownValue;
-  const key = Object.prototype.hasOwnProperty.call(AUTOMATION_NARRATIVE_KEYS, ruleId)
-    ? AUTOMATION_NARRATIVE_KEYS[ruleId as KnownAutomationRuleId]
-    : null;
-  const template = key
-    ? copy.automationNarratives[key]
-    : copy.automationNarratives.unknownRule;
+  const key = assessment.automation_narrative
+    ?? (Object.prototype.hasOwnProperty.call(AUTOMATION_NARRATIVE_KEYS, ruleId)
+      ? AUTOMATION_NARRATIVE_KEYS[ruleId as KnownAutomationRuleId]
+      : "unknownRule");
+  const template = copy.automationNarratives[key];
   const values = {
     ticker,
     successor: assessment.successor_ticker ?? copy.states.unknownValue,
