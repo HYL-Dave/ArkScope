@@ -2801,12 +2801,8 @@ export interface SecurityLifecycleActionProposal {
   proposal_id: string;
   action_type: SecurityLifecycleProposalType;
   status: SecurityLifecycleProposalStatus;
-  block_reason: SecurityLifecycleProposalBlockReason | null;
-  projected_block_reason?: SecurityLifecycleProposalBlockReason | null;
-  source_snapshot: SecurityLifecycleTrackingSource[];
-  source_ticker?: string;
-  replacement_ticker?: string | null;
-  created_at: string;
+  projected_block_reason: SecurityLifecycleProposalBlockReason | null;
+  replacement_ticker: string | null;
 }
 
 export type TickerIdentityTransitionKind =
@@ -3413,6 +3409,133 @@ function parseAutomationDispatch(
   return result;
 }
 
+const LIFECYCLE_PROPOSAL_TYPES: readonly SecurityLifecycleProposalType[] = [
+  "archive_manual_memberships",
+  "hide_from_active_universe",
+  "keep_tracking",
+  "no_action",
+  "notify",
+  "remap_symbol",
+  "review_portfolio_position",
+];
+const LIFECYCLE_PROPOSAL_STATUSES: readonly SecurityLifecycleProposalStatus[] = [
+  "proposed",
+  "dismissed",
+];
+const LIFECYCLE_PROPOSAL_BLOCK_REASONS:
+readonly SecurityLifecycleProposalBlockReason[] = [
+  "portfolio_position_open",
+  "successor_evidence_missing",
+  "source_context_unavailable",
+  "stale_assessment",
+  "action_executor_not_available",
+];
+const LIFECYCLE_TRACKING_SOURCES: readonly SecurityLifecycleTrackingSource[] = [
+  "manual_lists",
+  "portfolio_open",
+  "sa_alpha_picks_current",
+  "legacy_config_seed",
+];
+
+function lifecycleCaseContractError(): never {
+  throw new Error("security_lifecycle_case_contract");
+}
+
+function lifecycleCaseRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return lifecycleCaseContractError();
+  }
+  return value as Record<string, unknown>;
+}
+
+function lifecycleCaseArray(value: unknown): unknown[] {
+  if (!Array.isArray(value)) return lifecycleCaseContractError();
+  return value;
+}
+
+function lifecycleCaseString(value: unknown): string {
+  if (typeof value !== "string" || !value || value.includes("\0")) {
+    return lifecycleCaseContractError();
+  }
+  return value;
+}
+
+function lifecycleCaseEnum<Value extends string>(
+  value: unknown,
+  allowed: readonly Value[],
+): Value {
+  if (typeof value !== "string" || !allowed.includes(value as Value)) {
+    return lifecycleCaseContractError();
+  }
+  return value as Value;
+}
+
+function parseLifecycleProposal(value: unknown): SecurityLifecycleActionProposal {
+  const row = lifecycleCaseRecord(value);
+  return {
+    proposal_id: lifecycleCaseString(row.proposal_id),
+    action_type: lifecycleCaseEnum(row.action_type, LIFECYCLE_PROPOSAL_TYPES),
+    status: lifecycleCaseEnum(row.status, LIFECYCLE_PROPOSAL_STATUSES),
+    projected_block_reason: row.projected_block_reason === null
+      ? null
+      : lifecycleCaseEnum(
+        row.projected_block_reason,
+        LIFECYCLE_PROPOSAL_BLOCK_REASONS,
+      ),
+    replacement_ticker: row.replacement_ticker === null
+      ? null
+      : lifecycleCaseString(row.replacement_ticker),
+  };
+}
+
+function parseLifecycleCaseDetail(value: unknown): SecurityLifecycleCaseDetail {
+  const row = lifecycleCaseRecord(value);
+  const activeSources = lifecycleCaseArray(row.active_sources).map((item) => (
+    lifecycleCaseEnum(item, LIFECYCLE_TRACKING_SOURCES)
+  ));
+  const arrayFields = [
+    "kinds",
+    "investigation_runs",
+    "automation_runs",
+    "automation_facts",
+    "evidence",
+    "assessment_history",
+    "acknowledgement_history",
+  ] as const;
+  for (const field of arrayFields) lifecycleCaseArray(row[field]);
+
+  for (const run of row.automation_runs as unknown[]) {
+    lifecycleCaseArray(lifecycleCaseRecord(run).blockers);
+  }
+  for (const evidence of row.evidence as unknown[]) {
+    const item = lifecycleCaseRecord(evidence);
+    if (item.source_family === "listing_authority") {
+      lifecycleCaseRecord(item.listing);
+    } else {
+      lifecycleCaseArray(item.translations);
+    }
+  }
+  for (const assessment of row.assessment_history as unknown[]) {
+    const citations = lifecycleCaseRecord(assessment).citations;
+    if (citations !== undefined) lifecycleCaseArray(citations);
+  }
+  if (row.current_assessment !== null) {
+    const citations = lifecycleCaseRecord(row.current_assessment).citations;
+    if (citations !== undefined) lifecycleCaseArray(citations);
+  }
+  if (row.observation !== null) {
+    const observation = lifecycleCaseRecord(row.observation);
+    lifecycleCaseArray(observation.filing_items);
+    lifecycleCaseArray(observation.kinds);
+  }
+
+  return {
+    ...row,
+    active_sources: activeSources,
+    proposals: lifecycleCaseArray(row.proposals).map(parseLifecycleProposal),
+  } as unknown as SecurityLifecycleCaseDetail;
+}
+
 export interface SecurityLifecycleCaseFilters {
   ticker?: string;
   workflow_state?: SecurityLifecycleWorkflowState | "";
@@ -3475,11 +3598,13 @@ export async function runSecurityLifecycleCaseAutomation(
   ));
 }
 
-export function getSecurityLifecycleCase(
+export async function getSecurityLifecycleCase(
   caseId: string,
 ): Promise<SecurityLifecycleCaseDetail> {
-  return getJSON<SecurityLifecycleCaseDetail>(
-    `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,
+  return parseLifecycleCaseDetail(
+    await getJSON<unknown>(
+      `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,
+    ),
   );
 }
 

@@ -129,6 +129,20 @@ def _canonical_json(value: object, *, max_bytes: int, name: str) -> str:
     return encoded
 
 
+def project_action_proposal(
+    proposal: Mapping[str, Any],
+    *,
+    projected_block_reason: object,
+) -> dict[str, object]:
+    return {
+        "proposal_id": proposal["proposal_id"],
+        "action_type": proposal["action_type"],
+        "status": proposal["status"],
+        "projected_block_reason": projected_block_reason,
+        "replacement_ticker": proposal["replacement_ticker"],
+    }
+
+
 def canonical_assessment_decimal(value: object, *, name: str) -> str | None:
     if value is None:
         return None
@@ -1508,12 +1522,12 @@ class SecurityLifecycleInvestigationStore:
                 != assessment_fingerprint(assessment)
             )
             rendered.append(
-                {
-                    **proposal,
-                    "projected_block_reason": (
+                project_action_proposal(
+                    proposal,
+                    projected_block_reason=(
                         "stale_assessment" if stale else proposal["block_reason"]
                     ),
-                }
+                )
             )
         return rendered
 
@@ -1979,4 +1993,5 @@ __all__ = [
     "case_id_for",
     "compose_security_lifecycle",
     "observation_fingerprint",
+    "project_action_proposal",
 ]

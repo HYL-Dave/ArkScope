@@ -573,6 +573,52 @@ def test_draft_accept_and_supersede_preserve_version_history(tmp_path):
         conn.close()
 
 
+def test_proposal_projection_is_a_closed_public_dto(tmp_path):
+    conn, store, case_id = _context(tmp_path)
+    try:
+        assessment_id = _draft(
+            store,
+            case_id,
+            outcomes=("symbol_changed",),
+            successor_ticker="EA2",
+        )
+        _accept(store, assessment_id)
+        store.generate_action_proposals(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            sources_by_ticker={"EA": ("manual_lists",)},
+            at=_LATER,
+        )
+
+        projected = store.project_proposals(
+            case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+        )
+
+        assert projected
+        assert {frozenset(item) for item in projected} == {
+            frozenset(
+                {
+                    "proposal_id",
+                    "action_type",
+                    "status",
+                    "projected_block_reason",
+                    "replacement_ticker",
+                }
+            )
+        }
+        remap = next(item for item in projected if item["action_type"] == "remap_symbol")
+        assert remap == {
+            "proposal_id": remap["proposal_id"],
+            "action_type": "remap_symbol",
+            "status": "proposed",
+            "projected_block_reason": None,
+            "replacement_ticker": "EA2",
+        }
+    finally:
+        conn.close()
+
+
 def test_automation_policy_acceptance_requires_verified_current_run_and_matching_provenance(
     tmp_path,
 ):
