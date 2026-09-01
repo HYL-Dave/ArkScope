@@ -1214,6 +1214,8 @@ describe("Lifecycle workflow", () => {
 
   it("keeps an attended run pending while durable status is running without progress", async () => {
     await mountLifecycle();
+    const initialListCalls = apiMocks.listSecurityLifecycleCases.mock.calls.length;
+    const initialDetailCalls = apiMocks.getSecurityLifecycleCase.mock.calls.length;
     apiMocks.getSecurityLifecycleAutomationStatus.mockReset()
       .mockResolvedValueOnce(automationStatus({
         last_status: "running",
@@ -1234,13 +1236,19 @@ describe("Lifecycle workflow", () => {
 
     expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledOnce();
     expect(buttonIn(document.body, "Run this case").disabled).toBe(true);
+    expect(apiMocks.listSecurityLifecycleCases).toHaveBeenCalledTimes(initialListCalls);
+    expect(apiMocks.getSecurityLifecycleCase).toHaveBeenCalledTimes(initialDetailCalls);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
     expect(buttonIn(document.body, "Run this case").disabled).toBe(false);
+    expect(apiMocks.listSecurityLifecycleCases).toHaveBeenCalledTimes(initialListCalls + 1);
+    expect(apiMocks.getSecurityLifecycleCase).toHaveBeenCalledTimes(initialDetailCalls + 1);
   });
 
   it("polls and exposes a durable run before in-memory progress arrives", async () => {
