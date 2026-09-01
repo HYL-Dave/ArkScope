@@ -1820,6 +1820,339 @@ def test_filtered_automation_with_attended_failure_still_records_failure(
         ).fetchall() == [("failed", "transition_execution_failed")]
 
 
+def test_scheduler_wide_recovery_is_independent_of_automation_policy_filter(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="unavailable",
+        reason="profile_store_unavailable",
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+    service = _PolicyFilteringDueService(include_attended=False)
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+
+    recovered = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert recovered["status"] == "succeeded"
+    assert recovered["recovery_eligible"] is False
+    assert scheduler.record_ticker_identity_scheduler_result(recovered, now=now)
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "ticker_identity_scheduler_failure",
+                "profile_store_unavailable",
+            ),
+            ("succeeded", "ticker_identity_scheduler_recovered", None),
+        ]
+
+
+def test_manual_transition_settlement_recovers_the_scheduler_incident(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+    preview_sha256 = _approved_preview_sha256(service, transition_id)
+    real_execute = service.execute_transition
+
+    def fail_execution(*_args, **_kwargs):
+        raise RuntimeError("private execution failure")
+
+    monkeypatch.setattr(service, "execute_transition", fail_execution)
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert failure["failed_transition_ids"] == [transition_id]
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+
+    monkeypatch.setattr(service, "execute_transition", real_execute)
+    manual_result = real_execute(
+        transition_id,
+        preview_sha256=preview_sha256,
+        before_write=lambda: None,
+    )
+    assert manual_result["status"] == "applied"
+    recovered = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert recovered["status"] == "succeeded"
+    assert recovered["due"] == 0
+    assert recovered["recovery_eligible"] is False
+    assert scheduler.record_ticker_identity_scheduler_result(recovered, now=now)
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "ticker_identity_scheduler_failure",
+                "transition_execution_failed",
+            ),
+            ("succeeded", "ticker_identity_scheduler_recovered", None),
+        ]
+
+
+def test_recovery_tracks_all_unresolved_transition_ids_across_failure_churn(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    service, profile_path, automation_transition_id = _build_due_context(tmp_path)
+    attended_transition_id = "slt_attended_second"
+    with sqlite3.connect(profile_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = dict(
+            conn.execute(
+                "SELECT * FROM ticker_identity_transitions WHERE transition_id=?",
+                (automation_transition_id,),
+            ).fetchone()
+        )
+        row["transition_id"] = attended_transition_id
+        row["transition_dedupe_key"] = (
+            str(row["transition_dedupe_key"]) + ":attended-second"
+        )
+        columns = tuple(row)
+        conn.execute(
+            "INSERT INTO ticker_identity_transitions ("
+            + ",".join(columns)
+            + ") VALUES ("
+            + ",".join("?" for _ in columns)
+            + ")",
+            tuple(row[column] for column in columns),
+        )
+        conn.execute(
+            "UPDATE ticker_identity_transitions SET approval_authority='automation_policy',"
+            "automation_policy_version='test-policy',rule_id='test-rule',"
+            "rule_version='1' WHERE transition_id=?",
+            (automation_transition_id,),
+        )
+        conn.commit()
+
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    assert scheduler.record_ticker_identity_scheduler_result(
+        _scheduler_result(
+            status="partial",
+            reason="transition_execution_failed",
+            transition_ids=[automation_transition_id, attended_transition_id],
+            failed_transition_ids=[
+                automation_transition_id,
+                attended_transition_id,
+            ],
+        ),
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(
+        _scheduler_result(
+            status="partial",
+            reason="transition_execution_failed",
+            transition_ids=[attended_transition_id],
+            failed_transition_ids=[attended_transition_id],
+        ),
+        now=now,
+    )
+    service.cancel_transition(
+        attended_transition_id,
+        before_write=lambda: None,
+    )
+
+    filtered = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert filtered["status"] == "succeeded"
+    assert filtered["due"] == 0
+    assert scheduler.record_ticker_identity_scheduler_result(filtered, now=now)
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            ("failed", "ticker_identity_scheduler_failure"),
+            ("failed", "ticker_identity_scheduler_failure"),
+            ("failed", "ticker_identity_scheduler_failure"),
+        ]
+
+    service.cancel_transition(
+        automation_transition_id,
+        before_write=lambda: None,
+    )
+    recovered = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(recovered, now=now)
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            ("failed", "ticker_identity_scheduler_failure"),
+            ("failed", "ticker_identity_scheduler_failure"),
+            ("failed", "ticker_identity_scheduler_failure"),
+            ("succeeded", "ticker_identity_scheduler_recovered"),
+        ]
+
+
+def test_legacy_recovery_is_revalidated_before_becoming_an_incident_boundary(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=[transition_id],
+        failed_transition_ids=[transition_id],
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "UPDATE ticker_identity_transitions SET approval_authority='automation_policy',"
+            "automation_policy_version='test-policy',rule_id='test-rule',"
+            "rule_version='1' WHERE transition_id=?",
+            (transition_id,),
+        )
+        legacy_recovery = _scheduler_result(status="succeeded", reason=None)
+        at = now.isoformat(timespec="seconds")
+        conn.execute(
+            "INSERT INTO job_runs ("
+            "job_name,status,trigger_source,payload,result,message,error,"
+            "started_at,finished_at,duration_ms,created_at,updated_at"
+            ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                "ticker_identity.transitions",
+                "succeeded",
+                "scheduler",
+                "{}",
+                json.dumps(legacy_recovery, sort_keys=True, separators=(",", ":")),
+                "ticker_identity_scheduler_recovered",
+                None,
+                at,
+                at,
+                None,
+                at,
+                at,
+            ),
+        )
+        conn.commit()
+
+    filtered = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert filtered["status"] == "succeeded"
+    assert filtered["due"] == 0
+    assert scheduler.record_ticker_identity_scheduler_result(filtered, now=now)
+
+    with sqlite3.connect(profile_path) as conn:
+        rows = conn.execute(
+            "SELECT status,message,result FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall()
+    assert [(row[0], row[1]) for row in rows] == [
+        ("failed", "ticker_identity_scheduler_failure"),
+        ("succeeded", "ticker_identity_scheduler_recovered"),
+        ("failed", "ticker_identity_scheduler_failure"),
+    ]
+    assert json.loads(rows[-1][2])["failed_transition_ids"] == [transition_id]
+
+
+def test_missing_failed_transition_row_never_proves_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=[transition_id],
+        failed_transition_ids=[transition_id],
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+    with sqlite3.connect(profile_path) as conn:
+        conn.execute(
+            "DELETE FROM ticker_identity_transitions WHERE transition_id=?",
+            (transition_id,),
+        )
+        conn.commit()
+
+    healthy = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert healthy["status"] == "succeeded"
+    assert healthy["due"] == 0
+    assert scheduler.record_ticker_identity_scheduler_result(healthy, now=now)
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [("failed", "ticker_identity_scheduler_failure")]
+
+
 def test_re_enabled_eligible_success_recovers_filtered_automation_incident(
     tmp_path,
     monkeypatch,

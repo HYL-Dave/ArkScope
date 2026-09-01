@@ -16,6 +16,7 @@ from src.ticker_identity_service import (
     TickerIdentityService,
     TickerIdentityStoreUnavailable,
 )
+from src.ticker_identity_schema import TRANSITION_STATUSES
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ _RUNNER_REASONS = TICKER_IDENTITY_STORE_UNAVAILABLE_REASONS | frozenset(
     }
 )
 _FAILURE_STATUSES = frozenset({"partial", "unavailable"})
+_INCIDENT_RECONCILIATION_VERSION = 1
 
 
 class AutomationTransitionMutationDisabled(RuntimeError):
@@ -237,6 +239,118 @@ def _stored_result(raw: object) -> dict | None:
         return None
 
 
+def _stored_incident_reconciliation_version(raw: object) -> int | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    version = parsed.get("incident_reconciliation_version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        return None
+    return version
+
+
+def _trusted_recovery_id(conn: sqlite3.Connection) -> int:
+    rows = conn.execute(
+        "SELECT id,result FROM job_runs WHERE job_name=? AND status='succeeded' "
+        "AND message='ticker_identity_scheduler_recovered' ORDER BY id DESC",
+        (_JOB_NAME,),
+    ).fetchall()
+    for row in rows:
+        if (
+            _stored_incident_reconciliation_version(row["result"])
+            == _INCIDENT_RECONCILIATION_VERSION
+        ):
+            return int(row["id"])
+    return 0
+
+
+def _active_failure_results(conn: sqlite3.Connection) -> tuple[dict, ...]:
+    recovery_id = _trusted_recovery_id(conn)
+    rows = conn.execute(
+        "SELECT result FROM job_runs WHERE job_name=? AND status='failed' "
+        "AND id>? ORDER BY id",
+        (_JOB_NAME, recovery_id),
+    ).fetchall()
+    results: list[dict] = []
+    for row in rows:
+        result = _stored_result(row["result"])
+        if result is None or _failure_incident_key(result) is None:
+            raise ValueError("ticker_identity_scheduler_incident")
+        results.append(result)
+    return tuple(results)
+
+
+def _unresolved_transition_failure_ids(
+    conn: sqlite3.Connection,
+    incidents: tuple[Mapping[str, object], ...],
+    result: Mapping[str, object],
+) -> tuple[str, ...]:
+    failed_ids = {
+        str(transition_id)
+        for incident in incidents
+        for transition_id in incident["failed_transition_ids"]
+    }
+    failed_ids.difference_update(str(value) for value in result["transition_ids"])
+    if not failed_ids:
+        return ()
+    present = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' "
+        "AND name='ticker_identity_transitions'"
+    ).fetchone()
+    if present is None:
+        return () if result["recovery_eligible"] is True else tuple(sorted(failed_ids))
+    statuses: dict[str, str] = {}
+    ordered_ids = sorted(failed_ids)
+    for offset in range(0, len(ordered_ids), 500):
+        chunk = ordered_ids[offset : offset + 500]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = conn.execute(
+            "SELECT transition_id,status FROM ticker_identity_transitions "
+            f"WHERE transition_id IN ({placeholders})",
+            tuple(chunk),
+        ).fetchall()
+        for row in rows:
+            status = str(row["status"])
+            if status not in TRANSITION_STATUSES:
+                raise ValueError("ticker_identity_transition_status")
+            statuses[str(row["transition_id"])] = status
+    return tuple(
+        transition_id
+        for transition_id in ordered_ids
+        if statuses.get(transition_id) in {None, "approved"}
+    )
+
+
+def _restated_failure_result(
+    incidents: tuple[Mapping[str, object], ...],
+    unresolved_ids: tuple[str, ...],
+) -> dict:
+    unresolved = set(unresolved_ids)
+    for incident in reversed(incidents):
+        active_ids = [
+            str(transition_id)
+            for transition_id in incident["failed_transition_ids"]
+            if str(transition_id) in unresolved
+        ]
+        if not active_ids:
+            continue
+        result = _empty_summary(
+            status=str(incident["status"]),
+            reason=str(incident["reason"]),
+            recovery_eligible=bool(incident["recovery_eligible"]),
+        )
+        result["due"] = len(active_ids)
+        result["transition_ids"] = active_ids
+        result["failed_transition_ids"] = active_ids
+        return _bounded_result(result)
+    raise ValueError("ticker_identity_scheduler_incident")
+
+
 def _iso_at(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
@@ -269,6 +383,11 @@ def _insert_witness(
     not_before: object,
 ) -> None:
     failed = bounded["status"] in _FAILURE_STATUSES
+    stored = dict(bounded)
+    if not failed:
+        stored["incident_reconciliation_version"] = (
+            _INCIDENT_RECONCILIATION_VERSION
+        )
     at = _witness_started_at(now, not_before)
     conn.execute(
         """
@@ -282,7 +401,7 @@ def _insert_witness(
             "failed" if failed else "succeeded",
             "scheduler",
             "{}",
-            json.dumps(bounded, sort_keys=True, separators=(",", ":")),
+            json.dumps(stored, sort_keys=True, separators=(",", ":")),
             (
                 "ticker_identity_scheduler_failure"
                 if failed
@@ -370,12 +489,39 @@ def record_ticker_identity_scheduler_result(
             conn.commit()
             return True
 
-        if (
-            status != "succeeded"
-            or not bounded["recovery_eligible"]
-            or latest is None
-            or latest["status"] != "failed"
-        ):
+        if status != "succeeded":
+            conn.commit()
+            return True
+        active_failures = _active_failure_results(conn)
+        unresolved_ids = _unresolved_transition_failure_ids(
+            conn,
+            active_failures,
+            bounded,
+        )
+        if unresolved_ids:
+            latest_result = (
+                _stored_result(latest["result"])
+                if latest is not None and latest["status"] == "failed"
+                else None
+            )
+            latest_failed_ids = (
+                set(latest_result["failed_transition_ids"])
+                if latest_result is not None
+                else set()
+            )
+            if latest_failed_ids.isdisjoint(unresolved_ids):
+                _insert_witness(
+                    conn,
+                    bounded=_restated_failure_result(
+                        active_failures,
+                        unresolved_ids,
+                    ),
+                    now=now,
+                    not_before=latest["started_at"] if latest is not None else None,
+                )
+            conn.commit()
+            return True
+        if not active_failures:
             conn.commit()
             return True
         _insert_witness(

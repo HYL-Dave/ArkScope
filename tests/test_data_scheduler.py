@@ -794,7 +794,10 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
         ("failed", "transition_execution_failed"),
     ]
     assert runs[1]["result"] == failure
-    assert runs[0]["result"] == recovered
+    assert runs[0]["result"] == {
+        **recovered,
+        "incident_reconciliation_version": 1,
+    }
 
 
 def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
