@@ -13,6 +13,7 @@ import {
   syncCredentialAccountUsage,
   type OAuthAccountSnapshot,
   type OAuthAccountSyncView,
+  type OAuthRateLimitSnapshot,
   type ProviderCredential,
 } from "../api";
 import {
@@ -80,6 +81,78 @@ function isRateLimitStatus(value: unknown): boolean {
     || value === "rejected";
 }
 
+function isNullableString(value: unknown, maximum: number): boolean {
+  return value === null
+    || (typeof value === "string" && value.length > 0 && value.length <= maximum);
+}
+
+function isNullableBoolean(value: unknown): boolean {
+  return value === null || typeof value === "boolean";
+}
+
+function isNullableNonNegativeInteger(value: unknown): boolean {
+  return value === null
+    || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
+}
+
+function isCreditsSnapshot(value: unknown): boolean {
+  if (value === null) return true;
+  return isRecord(value)
+    && isNullableString(value.balance, 80)
+    && typeof value.has_credits === "boolean"
+    && typeof value.unlimited === "boolean";
+}
+
+function isSpendControlLimit(value: unknown): boolean {
+  if (value === null) return true;
+  return isRecord(value)
+    && typeof value.limit === "string"
+    && value.limit.length > 0
+    && value.limit.length <= 80
+    && typeof value.used === "string"
+    && value.used.length > 0
+    && value.used.length <= 80
+    && typeof value.remaining_percent === "number"
+    && Number.isInteger(value.remaining_percent)
+    && value.remaining_percent >= 0
+    && value.remaining_percent <= 100
+    && typeof value.resets_at === "number"
+    && Number.isFinite(value.resets_at)
+    && value.resets_at >= 0;
+}
+
+function isRateLimitSnapshot(value: unknown): value is OAuthRateLimitSnapshot {
+  if (!isRecord(value)) return false;
+  return isNullableString(value.limit_id, 160)
+    && isNullableString(value.limit_name, 160)
+    && isNullableString(value.plan_type, 160)
+    && isRateLimitWindow(value.primary)
+    && isRateLimitWindow(value.secondary)
+    && isNullableString(value.rate_limit_reached_type, 160)
+    && isCreditsSnapshot(value.credits)
+    && isSpendControlLimit(value.individual_limit)
+    && isNullableBoolean(value.spend_control_reached)
+    && isRateLimitStatus(value.status)
+    && isRateLimitStatus(value.overage_status)
+    && (value.overage_resets_at === null
+      || (typeof value.overage_resets_at === "number"
+        && Number.isFinite(value.overage_resets_at)
+        && value.overage_resets_at >= 0))
+    && (value.overage_disabled_reason === null
+      || (typeof value.overage_disabled_reason === "string"
+        && /^[a-z0-9_]{1,64}$/.test(value.overage_disabled_reason)));
+}
+
+function isRateLimitsById(value: unknown): boolean {
+  if (!isRecord(value) || Object.keys(value).length > 16) return false;
+  return Object.entries(value).every(([key, bucket]) => (
+    key.length > 0
+    && key.length <= 80
+    && isRateLimitSnapshot(bucket)
+    && (bucket.limit_id === null || bucket.limit_id === key)
+  ));
+}
+
 function requireCredentialBoundSnapshot(
   credentialId: string,
   value: unknown,
@@ -106,7 +179,9 @@ function requireCredentialBoundSnapshot(
     || typeof value.updated_at !== "string"
     || !Number.isFinite(Date.parse(value.updated_at))
     || !isRecord(value.payload)
-    || !isRecord(value.payload.rate_limits)
+    || !isRateLimitSnapshot(value.payload.rate_limits)
+    || !isRateLimitsById(value.payload.rate_limits_by_limit_id)
+    || !isNullableNonNegativeInteger(value.payload.reset_credits_available)
   ) {
     throw new Error("invalid credential-bound OAuth account snapshot");
   }

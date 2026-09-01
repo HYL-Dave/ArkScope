@@ -6,7 +6,8 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderSection } from "./Settings";
-import type { ModelCatalog, ProviderCredential } from "./api";
+import type { ModelCatalog, ModelDiscoveryResult, ProviderCredential } from "./api";
+import { DiscoveryResultView } from "./settings/ProviderSection";
 import {
   createSettingsReadCache,
   oauthAccountUsageKey,
@@ -186,6 +187,22 @@ function renderSection(extra: Record<string, unknown> = {}) {
   act(() => {
     root!.render(React.createElement(ProviderSection, currentRenderProps));
   });
+}
+
+function renderDiscovery(result: ModelDiscoveryResult, onUse = vi.fn()) {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  act(() => {
+    root!.render(React.createElement(DiscoveryResultView, {
+      result,
+      authMode: "chatgpt_oauth",
+      credentialLabel: "ChatGPT subscription Pro",
+      onClose: vi.fn(),
+      onUse,
+    }));
+  });
+  return onUse;
 }
 
 function rerenderSection(extra: Record<string, unknown> = {}) {
@@ -568,6 +585,67 @@ describe("ProviderSection Settings navigation guard", () => {
 });
 
 describe("ProviderSection OAuth lifecycle and account usage truth", () => {
+  it("shows subscription model efforts without offering unsupported task-route actions", () => {
+    const onUse = vi.fn();
+    renderDiscovery({
+      provider: "openai",
+      credential_id: "local:7",
+      status: "ok",
+      error: null,
+      source_url: null,
+      models: [{
+        id: "gpt-5.3-codex-spark",
+        provider: "openai",
+        label: "GPT-5.3-Codex-Spark",
+        source: "provider_api",
+        effort_options: ["low", "medium", "high", "xhigh"],
+        default_effort: "medium",
+        input_modalities: ["text"],
+        task_route_tasks: [],
+      }],
+    } as ModelDiscoveryResult, onUse);
+
+    expect(host!.textContent).toContain("gpt-5.3-codex-spark");
+    for (const effort of ["low", "medium", "high", "xhigh"]) {
+      expect(host!.textContent).toContain(effort);
+    }
+    expect(host!.textContent).toContain("medium · 預設");
+    expect(host!.textContent).toContain("僅顯示訂閱能力");
+    expect(host!.textContent).not.toContain("用於生成");
+    expect(host!.textContent).not.toContain("用於翻譯");
+    expect(onUse).not.toHaveBeenCalled();
+  });
+
+  it("keeps explicit reviewed task-route actions available", () => {
+    const onUse = vi.fn();
+    renderDiscovery({
+      provider: "openai",
+      credential_id: "local:7",
+      status: "ok",
+      error: null,
+      source_url: null,
+      models: [{
+        id: "gpt-5.6-sol",
+        provider: "openai",
+        label: "GPT-5.6 Sol",
+        source: "provider_api",
+        effort_options: ["low", "medium", "high", "xhigh"],
+        default_effort: "high",
+        input_modalities: ["text", "image"],
+        task_route_tasks: ["card_synthesis", "card_translation", "ai_research"],
+      }],
+    } as ModelDiscoveryResult, onUse);
+
+    const synthesis = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "用於生成");
+    const translation = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "用於翻譯");
+    expect(synthesis).toBeDefined();
+    expect(translation).toBeDefined();
+    act(() => synthesis!.click());
+    expect(onUse).toHaveBeenCalledWith("gpt-5.6-sol", "card_synthesis");
+  });
+
   it("renders_retained_account_usage_immediately_and_revalidates_with_cached_GET_only", async () => {
     const now = Date.now();
     const cache = createSettingsReadCache({ clock: () => now });
@@ -755,6 +833,47 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
       `觀察時間：${formatSystemTimestamp(observedAt)}`,
     );
     expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+  });
+
+  it("renders each provider-reported rate-limit bucket without duplicating the legacy bucket", async () => {
+    const observedAt = new Date(Date.now() - 60_000).toISOString();
+    const value = catalog();
+    value.credentials.openai = [oauthCredential({ active: true })];
+    const snapshot = accountSnapshot({ observedAt, usedPercent: 18 });
+    snapshot.payload.rate_limits_by_limit_id = {
+      codex: {
+        ...snapshot.payload.rate_limits,
+        limit_name: "Codex",
+      },
+      codex_bengalfox: {
+        ...snapshot.payload.rate_limits,
+        limit_id: "codex_bengalfox",
+        limit_name: "GPT-5.3-Codex-Spark",
+        primary: {
+          used_percent: 27,
+          window_duration_minutes: 300,
+          resets_at: 1_786_190_400,
+        },
+        secondary: {
+          used_percent: 46,
+          window_duration_minutes: 10_080,
+          resets_at: 1_786_687_200,
+        },
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(accountView(snapshot))));
+
+    renderSection({ catalog: value });
+    await waitFor(() => (host!.textContent ?? "").includes("GPT-5.3-Codex-Spark"));
+
+    const row = credentialRow("ChatGPT subscription Plus");
+    expect(row.textContent).toContain("Codex");
+    expect(row.textContent).toContain("GPT-5.3-Codex-Spark");
+    expect(row.textContent).toContain("5 小時視窗");
+    expect(row.textContent).toContain("7 天視窗");
+    expect(row.textContent?.match(/已用：18%/g)).toHaveLength(1);
+    expect(row.textContent?.match(/已用：27%/g)).toHaveLength(1);
+    expect(row.textContent?.match(/已用：46%/g)).toHaveLength(1);
   });
 
   it("renders missing account fields as unknown instead of zero", async () => {

@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 from src.env_keys import ensure_env_loaded, unquote_env_value
 from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
-from src.model_routing import MODEL_CATALOG, Provider
+from src.model_routing import MODEL_CATALOG, Provider, TaskId
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +91,10 @@ class DiscoveredModel(BaseModel):
     provider: Provider
     label: str
     source: Literal["provider_api", "seed"]
+    effort_options: list[str] | None = None
+    default_effort: str | None = None
+    input_modalities: list[Literal["text", "image", "audio"]] | None = None
+    task_route_tasks: list[TaskId] | None = None
 
 
 class ModelDiscoveryResult(BaseModel):

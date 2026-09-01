@@ -14,9 +14,10 @@ import signal
 import subprocess
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from src.auth_drivers.oauth_status import (
     OAuthAccountObservation,
@@ -28,6 +29,7 @@ from src.auth_drivers.oauth_status import (
     OAuthSpendControlLimit,
     OAuthUsageSummary,
 )
+from src.auth_drivers.probe_harness import redact
 
 
 ALLOWED_CODEX_APP_SERVER_VERSIONS = frozenset({"0.147.0", "0.151.0"})
@@ -37,6 +39,8 @@ _VERSION_OUTPUTS = frozenset(
 _MAX_STDOUT_BYTES = 256 * 1024
 _MAX_STDERR_BYTES = 64 * 1024
 _MAX_RATE_LIMIT_BUCKETS = 16
+_MAX_MODEL_PAGES = 8
+_MAX_MODELS = 256
 _ALLOWED_SERVER_NOTIFICATIONS = frozenset(
     {
         "account/login/completed",
@@ -46,6 +50,24 @@ _ALLOWED_SERVER_NOTIFICATIONS = frozenset(
     }
 )
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_MODEL_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\-]{0,79}$")
+_EFFORT_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}$")
+_INPUT_MODALITIES = frozenset({"text", "image", "audio"})
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True)
+class CodexSubscriptionModel:
+    catalog_id: str
+    model: str
+    display_name: str
+    description: str
+    hidden: bool
+    default_reasoning_effort: str
+    supported_reasoning_efforts: tuple[str, ...]
+    input_modalities: tuple[str, ...]
+    supports_personality: bool
+    is_default: bool
 
 
 class CodexAccountUsageError(RuntimeError):
@@ -257,6 +279,93 @@ def _usage_payload(value: Any) -> tuple[OAuthUsageSummary, list[OAuthDailyUsageB
             )
         )
     return summary, daily
+
+
+def _model_identifier(value: Any) -> str:
+    model = _bounded_string(value, optional=False, maximum=80)
+    assert model is not None
+    if not _MODEL_ID_RE.fullmatch(model) or redact(model) != model:
+        raise _fail()
+    return model
+
+
+def _display_string(value: Any, *, maximum: int) -> str:
+    text = _bounded_string(value, optional=False, maximum=maximum)
+    assert text is not None
+    if any(ord(char) < 32 for char in text) or "@" in text:
+        raise _fail()
+    return text
+
+
+def _model_catalog_page(
+    value: Any,
+) -> tuple[list[CodexSubscriptionModel], str | None]:
+    result = _object(value)
+    assert result is not None
+    data = result.get("data")
+    if not isinstance(data, list) or len(data) > _MAX_MODELS:
+        raise _fail()
+    models: list[CodexSubscriptionModel] = []
+    for value_row in data:
+        row = _object(value_row)
+        assert row is not None
+        efforts_raw = row.get("supportedReasoningEfforts")
+        if not isinstance(efforts_raw, list) or len(efforts_raw) > 8:
+            raise _fail()
+        efforts: list[str] = []
+        for value_effort in efforts_raw:
+            effort_row = _object(value_effort)
+            assert effort_row is not None
+            effort = _bounded_string(
+                effort_row.get("reasoningEffort"), optional=False, maximum=32
+            )
+            assert effort is not None
+            if not _EFFORT_RE.fullmatch(effort) or effort in efforts:
+                raise _fail()
+            _display_string(effort_row.get("description"), maximum=240)
+            efforts.append(effort)
+
+        default_effort = _bounded_string(
+            row.get("defaultReasoningEffort"), optional=False, maximum=32
+        )
+        assert default_effort is not None
+        if not _EFFORT_RE.fullmatch(default_effort):
+            raise _fail()
+        if efforts and default_effort not in efforts:
+            raise _fail()
+
+        modalities_raw = row.get("inputModalities", ["text", "image"])
+        if not isinstance(modalities_raw, list) or len(modalities_raw) > 3:
+            raise _fail()
+        modalities: list[str] = []
+        for modality in modalities_raw:
+            if (
+                not isinstance(modality, str)
+                or modality not in _INPUT_MODALITIES
+                or modality in modalities
+            ):
+                raise _fail()
+            modalities.append(modality)
+
+        supports_personality = row.get("supportsPersonality", False)
+        if not isinstance(supports_personality, bool):
+            raise _fail()
+        models.append(
+            CodexSubscriptionModel(
+                catalog_id=_model_identifier(row.get("id")),
+                model=_model_identifier(row.get("model")),
+                display_name=_display_string(row.get("displayName"), maximum=160),
+                description=_display_string(row.get("description"), maximum=1000),
+                hidden=_boolean(row.get("hidden"), optional=False),
+                default_reasoning_effort=default_effort,
+                supported_reasoning_efforts=tuple(efforts),
+                input_modalities=tuple(modalities),
+                supports_personality=supports_personality,
+                is_default=_boolean(row.get("isDefault"), optional=False),
+            )
+        )
+    cursor = _bounded_string(result.get("nextCursor"), maximum=512)
+    return models, cursor
 
 
 def _observed_at(value: str | datetime | None) -> str:
@@ -491,7 +600,7 @@ def _default_codex_executable() -> str | Path:
 
 
 class CodexAccountUsageAdapter:
-    """Read one account snapshot without starting a model thread or turn."""
+    """Read bounded account or model-catalog data without starting a thread or turn."""
 
     def __init__(
         self,
@@ -588,13 +697,13 @@ class CodexAccountUsageAdapter:
         if text not in _VERSION_OUTPUTS:
             raise _fail("version_incompatible")
 
-    def read_account_usage(
+    def _run_authenticated(
         self,
         *,
-        credential_id: str,
         record,
-        observed_at: str | datetime | None = None,
-    ) -> OAuthAccountObservation:
+        operation: Callable[[_JsonlSession], _T],
+    ) -> tuple[str, _T]:
+        """Run one bounded read against an isolated, credential-bound app-server."""
         account_id = _validated_account_id(record)
         access_token = getattr(record, "access_token", None)
         if not isinstance(access_token, str) or not access_token:
@@ -659,14 +768,29 @@ class CodexAccountUsageAdapter:
                 if email is not None:
                     _bounded_string(email, maximum=320)
                 _boolean(account.get("requiresOpenaiAuth"), optional=False)
-                rate_limits_result = session.request(4, "account/rateLimits/read")
-                usage_result = session.request(5, "account/usage/read")
-                rate_limits, by_id, reset_count = _rate_limits_payload(rate_limits_result)
-                usage_summary, daily = _usage_payload(usage_result)
+                result = operation(session)
             finally:
                 if session is not None:
                     session.close()
                 _terminate_process_group(process)
+        return account_id, result
+
+    def read_account_usage(
+        self,
+        *,
+        credential_id: str,
+        record,
+        observed_at: str | datetime | None = None,
+    ) -> OAuthAccountObservation:
+        def read(session: _JsonlSession):
+            rate_limits_result = session.request(4, "account/rateLimits/read")
+            usage_result = session.request(5, "account/usage/read")
+            rate_limits, by_id, reset_count = _rate_limits_payload(rate_limits_result)
+            usage_summary, daily = _usage_payload(usage_result)
+            return rate_limits, by_id, reset_count, usage_summary, daily
+
+        account_id, values = self._run_authenticated(record=record, operation=read)
+        rate_limits, by_id, reset_count, usage_summary, daily = values
 
         return OAuthAccountObservation(
             account_fingerprint=_account_fingerprint(credential_id, account_id),
@@ -682,3 +806,37 @@ class CodexAccountUsageAdapter:
                 daily_usage_buckets=daily,
             ),
         )
+
+    def read_model_catalog(self, *, record) -> list[CodexSubscriptionModel]:
+        def read(session: _JsonlSession) -> list[CodexSubscriptionModel]:
+            cursor: str | None = None
+            seen_cursors: set[str] = set()
+            models: list[CodexSubscriptionModel] = []
+            seen_models: set[str] = set()
+            for page_index in range(_MAX_MODEL_PAGES):
+                result = session.request(
+                    4 + page_index,
+                    "model/list",
+                    {"cursor": cursor, "includeHidden": False, "limit": 100},
+                )
+                page, next_cursor = _model_catalog_page(result)
+                for model in page:
+                    if model.model in seen_models:
+                        raise _fail()
+                    seen_models.add(model.model)
+                    if not model.hidden:
+                        models.append(model)
+                if len(models) > _MAX_MODELS:
+                    raise _fail()
+                if next_cursor is None:
+                    return models
+                if next_cursor in seen_cursors:
+                    raise _fail()
+                seen_cursors.add(next_cursor)
+                cursor = next_cursor
+            raise _fail()
+
+        _, models = self._run_authenticated(record=record, operation=read)
+        if not models:
+            raise _fail()
+        return models

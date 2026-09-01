@@ -160,7 +160,7 @@ def test_probe_route_now_supports_openai_chatgpt_oauth(stores, monkeypatch):
 
 def test_model_discovery_dispatches_chatgpt_oauth_to_the_driver(stores, monkeypatch):
     # S3 step 1: an openai chatgpt_oauth credential discovers via its driver (the
-    # live ChatGPT-backend list), NOT the api_key seed catalog.
+    # credential-bound Codex app-server catalog), NOT the api_key seed catalog.
     cred, tok = stores
     from src.auth_drivers import StoredTokenRecord
     c = cred.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg")
@@ -169,17 +169,28 @@ def test_model_discovery_dispatches_chatgpt_oauth_to_the_driver(stores, monkeypa
              record=StoredTokenRecord(access_token="cg-FAKE-TOKEN"))
 
     import src.auth_drivers.chatgpt_oauth_driver as drv_mod
+    from src.auth_drivers.codex_account_usage import CodexSubscriptionModel
 
-    class _Page:
-        models = [{"id": "gpt-5.4-mini"}, {"id": "gpt-5.5"}]
+    class _CatalogAdapter:
+        def read_model_catalog(self, *, record):
+            assert record.access_token == "cg-FAKE-TOKEN"
+            return [
+                CodexSubscriptionModel(
+                    catalog_id=f"catalog-{model}",
+                    model=model,
+                    display_name=model,
+                    description="Subscription model fixture.",
+                    hidden=False,
+                    default_reasoning_effort="medium",
+                    supported_reasoning_efforts=("low", "medium", "high"),
+                    input_modalities=("text",),
+                    supports_personality=False,
+                    is_default=False,
+                )
+                for model in ("gpt-5.4-mini", "gpt-5.5")
+            ]
 
-    class _Client:
-        class models:  # noqa: N801
-            @staticmethod
-            def list(**kw):
-                return _Page()
-
-    monkeypatch.setattr(drv_mod, "_discovery_client", lambda token: _Client())
+    monkeypatch.setattr(drv_mod, "_subscription_catalog_adapter", _CatalogAdapter)
     out = cr.discover_provider_models(
         cr.ModelDiscoveryRequest(provider="openai", credential_id=cid), store=cred, token_store=tok,
     )

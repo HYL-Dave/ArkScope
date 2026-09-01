@@ -98,9 +98,27 @@ def _rate_limits_payload() -> dict:
         "spendControlReached": True,
         "rawAccountId": _ACCOUNT_ID,
     }
+    spark_bucket = {
+        **bucket,
+        "limitId": "codex_bengalfox",
+        "limitName": "GPT-5.3-Codex-Spark",
+        "primary": {
+            "usedPercent": 27,
+            "windowDurationMins": 300,
+            "resetsAt": 1786190400,
+        },
+        "secondary": {
+            "usedPercent": 46,
+            "windowDurationMins": 10080,
+            "resetsAt": 1786687200,
+        },
+    }
     return {
         "rateLimits": bucket,
-        "rateLimitsByLimitId": {"codex": bucket},
+        "rateLimitsByLimitId": {
+            "codex": bucket,
+            "codex_bengalfox": spark_bucket,
+        },
         "rateLimitResetCredits": {"availableCount": 0, "credits": []},
         "unknownTopLevel": _ID_TOKEN_SENTINEL,
     }
@@ -128,6 +146,31 @@ def _usage_payload() -> dict:
     }
 
 
+def _model_list_payload() -> dict:
+    return {
+        "data": [
+            {
+                "id": "catalog-entry-spark",
+                "model": "gpt-5.3-codex-spark",
+                "displayName": "GPT-5.3-Codex-Spark",
+                "description": "Ultra-fast coding model.",
+                "hidden": False,
+                "defaultReasoningEffort": "medium",
+                "supportedReasoningEfforts": [
+                    {"reasoningEffort": "low", "description": "Fast"},
+                    {"reasoningEffort": "medium", "description": "Balanced"},
+                    {"reasoningEffort": "high", "description": "Deeper"},
+                    {"reasoningEffort": "xhigh", "description": "Deepest"},
+                ],
+                "inputModalities": ["text"],
+                "supportsPersonality": False,
+                "isDefault": False,
+            },
+        ],
+        "nextCursor": None,
+    }
+
+
 def _write_codex_fixture(
     root: Path,
     *,
@@ -141,6 +184,7 @@ def _write_codex_fixture(
     pid_path = root / "app-server.pid"
     rate_limits = json.dumps(_rate_limits_payload(), separators=(",", ":"))
     usage = json.dumps(_usage_payload(), separators=(",", ":"))
+    models = json.dumps(_model_list_payload(), separators=(",", ":"))
     source = '''#!%s
 import json
 import os
@@ -152,6 +196,7 @@ TRANSCRIPT = %r
 PID_PATH = %r
 RATE_LIMITS = json.loads(%r)
 USAGE = json.loads(%r)
+MODELS = json.loads(%r)
 UNEXPECTED = %r
 STARTUP_NOTIFICATION = %r
 HANG = %r
@@ -193,6 +238,8 @@ for raw in sys.stdin:
         emit({"id": request_id, "result": RATE_LIMITS})
     elif method == "account/usage/read":
         emit({"id": request_id, "result": USAGE})
+    elif method == "model/list":
+        emit({"id": request_id, "result": MODELS})
     else:
         emit({"id": request_id, "error": {"code": -32601, "message": "unknown method"}})
 ''' % (
@@ -202,6 +249,7 @@ for raw in sys.stdin:
         str(pid_path),
         rate_limits,
         usage,
+        models,
         unexpected_method,
         startup_notification,
         hang_method,
@@ -306,6 +354,14 @@ def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_tu
     assert observation.payload.rate_limits.secondary.used_percent == 34
     assert observation.payload.rate_limits.credits.balance == "0"
     assert observation.payload.rate_limits.spend_control_reached is True
+    assert list(observation.payload.rate_limits_by_limit_id) == [
+        "codex",
+        "codex_bengalfox",
+    ]
+    spark = observation.payload.rate_limits_by_limit_id["codex_bengalfox"]
+    assert spark.limit_name == "GPT-5.3-Codex-Spark"
+    assert spark.primary.window_duration_minutes == 300
+    assert spark.secondary.window_duration_minutes == 10080
     assert observation.payload.usage_summary.lifetime_tokens == 14_243_654_879
     daily = observation.payload.daily_usage_buckets
     assert len(daily) == 246
@@ -348,6 +404,83 @@ def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_tu
     assert len(homes) == 1
     assert next(iter(homes)) != str(Path.home() / ".codex")
     _wait_for_process_exit(int(pid_path.read_text()))
+
+
+def test_codex_model_catalog_preserves_provider_model_and_effort_contract(tmp_path):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    executable, transcript, pid_path = _write_codex_fixture(tmp_path)
+    adapter = CodexAccountUsageAdapter(executable=executable, timeout_seconds=2.0)
+
+    models = adapter.read_model_catalog(record=_token_record())
+
+    assert [row.model for row in models] == ["gpt-5.3-codex-spark"]
+    spark = models[0]
+    assert spark.catalog_id == "catalog-entry-spark"
+    assert spark.display_name == "GPT-5.3-Codex-Spark"
+    assert spark.default_reasoning_effort == "medium"
+    assert spark.supported_reasoning_efforts == ("low", "medium", "high", "xhigh")
+    assert spark.input_modalities == ("text",)
+    methods = [json.loads(line)["method"] for line in transcript.read_text().splitlines()]
+    assert methods == [
+        "initialize",
+        "initialized",
+        "account/login/start",
+        "account/read",
+        "model/list",
+    ]
+    assert not any(method.startswith(("thread/", "turn/")) for method in methods)
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
+def test_codex_model_catalog_follows_cursors_and_omits_hidden_rows(monkeypatch):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+
+    hidden_page = _model_list_payload()
+    hidden_page["data"][0].update(
+        {
+            "id": "catalog-hidden",
+            "model": "gpt-hidden-fixture",
+            "displayName": "Hidden fixture",
+            "hidden": True,
+        }
+    )
+    hidden_page["nextCursor"] = "page-2"
+    spark_page = _model_list_payload()
+    calls = []
+
+    class Session:
+        def request(self, request_id, method, params):
+            calls.append((request_id, method, params))
+            return hidden_page if params["cursor"] is None else spark_page
+
+    adapter = CodexAccountUsageAdapter(executable="unused")
+    monkeypatch.setattr(
+        adapter,
+        "_run_authenticated",
+        lambda *, record, operation: ("account-fixture", operation(Session())),
+    )
+
+    models = adapter.read_model_catalog(record=_token_record())
+
+    assert [row.model for row in models] == ["gpt-5.3-codex-spark"]
+    assert [params["cursor"] for _, _, params in calls] == [None, "page-2"]
+    assert all(method == "model/list" for _, method, _ in calls)
+
+
+def test_codex_model_catalog_rejects_secret_shaped_model_identifiers():
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageError,
+        _model_catalog_page,
+    )
+
+    payload = _model_list_payload()
+    payload["data"][0]["model"] = (
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJsZWFrIn0.SIG"
+    )
+
+    with pytest.raises(CodexAccountUsageError, match="protocol_incompatible"):
+        _model_catalog_page(payload)
 
 
 def test_exhausted_account_fixture_preserves_usage_across_five_rate_limit_reads(tmp_path):
@@ -559,6 +692,7 @@ def test_reviewed_codex_0151_schema_projection_matches_the_adapter_contract():
         "account/read",
         "account/rateLimits/read",
         "account/usage/read",
+        "model/list",
     }
     assert set(artifact["notifications"]) == (
         codex_account_usage._ALLOWED_SERVER_NOTIFICATIONS
@@ -593,6 +727,29 @@ def test_reviewed_codex_0151_schema_projection_matches_the_adapter_contract():
         "longestStreakDays",
         "peakDailyTokens",
     ]
+    assert artifact["requests"]["model/list"] == {
+        "params_required": False,
+        "properties": ["cursor", "includeHidden", "limit"],
+    }
+    assert artifact["responses"]["model/list"] == {
+        "properties": ["data", "nextCursor"],
+        "required": ["data"],
+        "model_required": [
+            "defaultReasoningEffort",
+            "description",
+            "displayName",
+            "hidden",
+            "id",
+            "isDefault",
+            "model",
+            "supportedReasoningEfforts",
+        ],
+        "adapter_optional_model_properties": [
+            "inputModalities",
+            "supportsPersonality",
+        ],
+        "reasoning_effort_option_required": ["description", "reasoningEffort"],
+    }
     assert all(
         len(digest) == 64 and set(digest) <= set("0123456789abcdef")
         for digest in artifact["source_sha256"].values()

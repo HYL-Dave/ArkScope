@@ -1,17 +1,16 @@
 """S3 — OpenAIChatGPTOAuthDriver: per-auth-mode discovery + subscription stream.
 
-The driver surfaces the ChatGPT/Codex backend's actual model list (the P2c shape:
-plain models.list may 400, extra_query client_version returns ids) as a
-ModelDiscoveryResult — so an openai chatgpt_oauth credential shows ITS models, not
-the api_key seed catalog.
+The driver surfaces the Codex app-server's credential-bound ``model/list`` catalog
+as a ModelDiscoveryResult, so an openai chatgpt_oauth credential shows ITS models,
+efforts, and modalities rather than the api_key seed catalog.
 
 Execution is NOT the normal OpenAI API-key Agents SDK path: the ChatGPT backend
 rejects max_output_tokens and does not support the SDK's previous_response_id loop.
 The driver owns a raw Responses stream loop: stream=True, store=False, no
 max_output_tokens, explicit function_call_output items.
 
-Offline: the OpenAI client is built behind a monkeypatchable seam (_discovery_client)
-+ the token is loaded from an injected token-store, so no network/token is needed.
+Offline: the catalog adapter and execution client are monkeypatchable seams, and the
+token is loaded from an injected token-store, so no network/token is needed.
 """
 
 from __future__ import annotations
@@ -23,6 +22,7 @@ import pytest
 
 import src.auth_drivers.chatgpt_oauth_driver as mod
 from src.agents.shared.events import EventType
+from src.auth_drivers.codex_account_usage import CodexSubscriptionModel
 from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
 from src.auth_drivers.protocol import LLMRequest
@@ -37,24 +37,6 @@ class _ApiErr(Exception):
     def __init__(self, status_code, msg=""):
         super().__init__(msg or f"HTTP {status_code}")
         self.status_code = status_code
-
-
-class _FakePage:
-    def __init__(self, models):
-        self.models = models  # nonstandard `models` field (no `data`)
-
-
-class _Models:
-    def __init__(self, on_list):
-        self._on_list = on_list
-
-    def list(self, **kwargs):
-        return self._on_list(kwargs)
-
-
-class _FakeClient:
-    def __init__(self, on_list):
-        self.models = _Models(on_list)
 
 
 class _Responses:
@@ -96,6 +78,33 @@ class _TokStore:
 
 def _driver(token="cg-FAKE-TOKEN"):
     return OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(token))
+
+
+def _catalog_model(model: str, *, label: str | None = None) -> CodexSubscriptionModel:
+    return CodexSubscriptionModel(
+        catalog_id=f"catalog-{model}",
+        model=model,
+        display_name=label or model,
+        description="Subscription model fixture.",
+        hidden=False,
+        default_reasoning_effort="medium",
+        supported_reasoning_efforts=("low", "medium", "high"),
+        input_modalities=("text",),
+        supports_personality=False,
+        is_default=False,
+    )
+
+
+def _install_catalog(monkeypatch, *, models=(), error: Exception | None = None, seen=None):
+    class CatalogAdapter:
+        def read_model_catalog(self, *, record):
+            if seen is not None:
+                seen["token"] = record.access_token
+            if error is not None:
+                raise error
+            return list(models)
+
+    monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter)
 
 
 def _req(**kw):
@@ -186,14 +195,62 @@ def test_unauthenticated_without_token():
 
 
 # --- discover_models ---------------------------------------------------------
-def test_discover_returns_live_ids_as_provider_api(monkeypatch):
-    def on_list(kw):
-        eq = kw.get("extra_query") or {}
-        if "client_version" not in eq:
-            raise _ApiErr(400, "missing client_version")
-        return _FakePage([{"id": "gpt-5.4-mini"}, {"id": "gpt-5.5"}])
+def test_discover_uses_app_server_catalog_and_keeps_subscription_only_model_metadata(monkeypatch):
+    class CatalogAdapter:
+        def read_model_catalog(self, *, record):
+            assert record.access_token == "cg-FRESH"
+            return [
+                CodexSubscriptionModel(
+                    catalog_id="catalog-entry-spark",
+                    model="gpt-5.3-codex-spark",
+                    display_name="GPT-5.3-Codex-Spark",
+                    description="Ultra-fast coding model.",
+                    hidden=False,
+                    default_reasoning_effort="medium",
+                    supported_reasoning_efforts=("low", "medium", "high", "xhigh"),
+                    input_modalities=("text",),
+                    supports_personality=False,
+                    is_default=False,
+                )
+            ]
 
-    monkeypatch.setattr(mod, "_discovery_client", lambda token: _FakeClient(on_list))
+    monkeypatch.setattr(
+        mod,
+        "_refresh_login",
+        lambda **_: StoredTokenRecord(access_token="cg-FRESH"),
+    )
+    monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter, raising=False)
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "ok"
+    assert [model.id for model in result.models] == ["gpt-5.3-codex-spark"]
+    spark = result.models[0]
+    assert spark.label == "GPT-5.3-Codex-Spark"
+    assert spark.effort_options == ["low", "medium", "high", "xhigh"]
+    assert spark.default_effort == "medium"
+    assert spark.input_modalities == ["text"]
+    assert spark.task_route_tasks == []
+
+
+def test_discover_keeps_reviewed_current_models_available_to_existing_task_routes(monkeypatch):
+    _install_catalog(monkeypatch, models=(_catalog_model("gpt-5.6-sol"),))
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "ok"
+    assert result.models[0].task_route_tasks == [
+        "card_synthesis",
+        "card_translation",
+        "ai_research",
+    ]
+
+
+def test_discover_returns_live_ids_as_provider_api(monkeypatch):
+    _install_catalog(
+        monkeypatch,
+        models=(_catalog_model("gpt-5.4-mini"), _catalog_model("gpt-5.5")),
+    )
     res = _run(_driver().discover_models())
     assert res.status == "ok" and res.provider == "openai" and res.credential_id == "local:7"
     assert [m.id for m in res.models] == ["gpt-5.4-mini", "gpt-5.5"]
@@ -203,7 +260,11 @@ def test_discover_returns_live_ids_as_provider_api(monkeypatch):
 def test_discover_no_token_is_missing_credential_seed(monkeypatch):
     # never reach the network without a token; fall back to the seed candidate list.
     called = {"n": 0}
-    monkeypatch.setattr(mod, "_discovery_client", lambda token: called.__setitem__("n", called["n"] + 1))
+    monkeypatch.setattr(
+        mod,
+        "_subscription_catalog_adapter",
+        lambda: called.__setitem__("n", called["n"] + 1),
+    )
     res = _run(_driver(token="").discover_models())
     assert res.status == "missing_credential" and called["n"] == 0
     assert len(res.models) > 0 and all(m.source == "seed" for m in res.models)
@@ -211,53 +272,16 @@ def test_discover_no_token_is_missing_credential_seed(monkeypatch):
 
 def test_discover_backend_error_falls_back_to_seed_redacted(monkeypatch):
     tok = "cg-SECRET-TOKEN-abc123"
-
-    def on_list(kw):
-        raise _Boom(f"500 backend boom leaking {tok}")
-
-    monkeypatch.setattr(mod, "_discovery_client", lambda token: _FakeClient(on_list))
+    _install_catalog(monkeypatch, error=_Boom(f"500 backend boom leaking {tok}"))
     res = _run(OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(tok)).discover_models())
     assert res.status == "error" and all(m.source == "seed" for m in res.models)  # honest fallback
     assert res.error and tok not in res.error  # the token must never leak into the surfaced error
 
 
 def test_discover_empty_ids_is_error_with_seed(monkeypatch):
-    monkeypatch.setattr(mod, "_discovery_client", lambda token: _FakeClient(lambda kw: _FakePage([])))
+    _install_catalog(monkeypatch)
     res = _run(_driver().discover_models())
     assert res.status == "error" and all(m.source == "seed" for m in res.models)
-
-
-def test_discover_drops_token_or_pii_shaped_ids(monkeypatch):
-    # Defense-in-depth: a hostile/odd backend could reflect a token-/JWT-/email-shaped
-    # string as a "model id". Those must be DROPPED (never surfaced into a picker),
-    # keeping only well-formed model ids.
-    bad = [
-        {"id": "gpt-5.4-mini"},                                   # good
-        {"id": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJsZWFrIn0.SIG"},   # JWT-shaped
-        {"id": "user@example.com"},                               # email
-        {"id": "sk-proj-" + "A" * 90},                            # long token
-        {"id": "claude-opus-4-8"},                                # good (cross-provider id still well-formed)
-    ]
-    monkeypatch.setattr(mod, "_discovery_client", lambda token: _FakeClient(lambda kw: _FakePage(bad)))
-    res = _run(_driver().discover_models())
-    ids = [m.id for m in res.models]
-    assert ids == ["gpt-5.4-mini", "claude-opus-4-8"]  # bad shapes dropped, good kept
-    assert all(m.label == m.id for m in res.models)
-
-
-def test_discover_all_ids_garbage_is_error_seed(monkeypatch):
-    monkeypatch.setattr(mod, "_discovery_client",
-                        lambda token: _FakeClient(lambda kw: _FakePage([{"id": "a@b.com"}, {"id": "x" * 200}])))
-    res = _run(_driver().discover_models())
-    assert res.status == "error" and all(m.source == "seed" for m in res.models)  # nothing well-formed → seed
-
-
-def test_discover_plain_list_succeeds_without_extra_query(monkeypatch):
-    # if the backend serves a plain models.list (no 400), use it directly.
-    monkeypatch.setattr(mod, "_discovery_client",
-                        lambda token: _FakeClient(lambda kw: _FakePage([{"id": "gpt-5.5"}])))
-    res = _run(_driver().discover_models())
-    assert res.status == "ok" and [m.id for m in res.models] == ["gpt-5.5"]
 
 
 # --- Step 1.1: refresh-before-discovery (access tokens rotate) ----------------
@@ -268,11 +292,7 @@ def test_discover_uses_refreshed_token(monkeypatch):
                         lambda *, credential_id, token_store, **kw: StoredTokenRecord(access_token="cg-FRESH"))
     used = {}
 
-    def client(token):
-        used["token"] = token
-        return _FakeClient(lambda kw: _FakePage([{"id": "gpt-5.5"}]))
-
-    monkeypatch.setattr(mod, "_discovery_client", client)
+    _install_catalog(monkeypatch, models=(_catalog_model("gpt-5.5"),), seen=used)
     res = _run(_driver().discover_models())
     assert res.status == "ok" and used["token"] == "cg-FRESH"  # the refreshed token was used
 

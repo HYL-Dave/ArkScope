@@ -15,6 +15,7 @@ import {
   type ModelProvider,
   type ModelTask,
   type OAuthLifecycleState,
+  type OAuthRateLimitSnapshot,
   type OAuthRateLimitStatus,
   type OAuthRateLimitWindow,
   type ProbeResponse,
@@ -971,7 +972,6 @@ function AccountUsageView({
 }) {
   const { t } = useTranslation("settings");
   const snapshot = local?.snapshot ?? null;
-  const limits = snapshot?.payload.rate_limits ?? null;
   const unknown = t(($) => $.providers.accountUsage.unknown);
   const isProbeSource = snapshot?.source === "anthropic_oauth_probe";
   const backendSyncError = local?.backendSync.errorCode ?? null;
@@ -981,6 +981,38 @@ function AccountUsageView({
   const cachedReadFailed = local?.cachedRead.status === "failed";
   const syncing = local?.syncSend.status === "sending";
   const manualSyncDisabled = syncing || cooldownUntil > Date.now();
+
+  const buckets = (() => {
+    if (!snapshot) return [];
+    const rows = Object.entries(snapshot.payload.rate_limits_by_limit_id);
+    if (rows.length === 0) return [snapshot.payload.rate_limits];
+    const legacy = snapshot.payload.rate_limits;
+    const legacyRepresented = rows.some(([id, bucket]) => (
+      id === legacy.limit_id || (
+        legacy.limit_id !== null && bucket.limit_id === legacy.limit_id
+      )
+    ));
+    return legacyRepresented
+      ? rows.map(([, bucket]) => bucket)
+      : [legacy, ...rows.map(([, bucket]) => bucket)];
+  })();
+
+  function windowLabel(window: OAuthRateLimitWindow | null, primary: boolean) {
+    const duration = window?.window_duration_minutes ?? null;
+    if (duration === 300) return t(($) => $.providers.accountUsage.fiveHourWindow);
+    if (duration === 10_080) return t(($) => $.providers.accountUsage.sevenDayWindow);
+    if (duration !== null) {
+      return t(($) => $.providers.accountUsage.durationWindow, { minutes: duration });
+    }
+    if (isProbeSource) {
+      return primary
+        ? t(($) => $.providers.accountUsage.fiveHourWindow)
+        : t(($) => $.providers.accountUsage.sevenDayWindow);
+    }
+    return primary
+      ? t(($) => $.providers.accountUsage.primaryWindow)
+      : t(($) => $.providers.accountUsage.secondaryWindow);
+  }
 
   function renderWindow(label: string, window: OAuthRateLimitWindow | null) {
     const used = window?.used_percent ?? null;
@@ -995,6 +1027,34 @@ function AccountUsageView({
     );
   }
 
+  function renderBucket(bucket: OAuthRateLimitSnapshot, index: number) {
+    const heading = bucket.limit_name
+      ?? bucket.limit_id
+      ?? t(($) => $.providers.accountUsage.limitGroup, { index: index + 1 });
+    return (
+      <section className="account-usage-limit-group" key={bucket.limit_id ?? `${heading}-${index}`}>
+        {buckets.length > 1 ? <strong>{heading}</strong> : null}
+        {renderWindow(windowLabel(bucket.primary, true), bucket.primary)}
+        {bucket.secondary
+          ? renderWindow(windowLabel(bucket.secondary, false), bucket.secondary)
+          : null}
+        <p>
+          {t(($) => $.providers.accountUsage.rateStatus, {
+            value: rateLimitStatusLabel(bucket.status, t),
+          })}
+        </p>
+        <p>
+          {t(($) => $.providers.accountUsage.overage, {
+            value: rateLimitStatusLabel(bucket.overage_status, t),
+          })}
+        </p>
+        {bucket.overage_disabled_reason ? (
+          <p>{t(($) => $.providers.accountUsage.reason, { value: bucket.overage_disabled_reason })}</p>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <div
       data-account-usage={credential.id}
@@ -1003,33 +1063,7 @@ function AccountUsageView({
       <strong>{t(($) => $.providers.accountUsage.title)}</strong>
       {snapshot ? (
         <>
-          {renderWindow(
-            isProbeSource
-              ? t(($) => $.providers.accountUsage.fiveHourWindow)
-              : t(($) => $.providers.accountUsage.primaryWindow),
-            limits?.primary ?? null,
-          )}
-          {limits?.secondary
-            ? renderWindow(
-              isProbeSource
-                ? t(($) => $.providers.accountUsage.sevenDayWindow)
-                : t(($) => $.providers.accountUsage.secondaryWindow),
-              limits.secondary,
-            )
-            : null}
-          <p>
-            {t(($) => $.providers.accountUsage.rateStatus, {
-              value: rateLimitStatusLabel(limits?.status ?? null, t),
-            })}
-          </p>
-          <p>
-            {t(($) => $.providers.accountUsage.overage, {
-              value: rateLimitStatusLabel(limits?.overage_status ?? null, t),
-            })}
-          </p>
-          {limits?.overage_disabled_reason ? (
-            <p>{t(($) => $.providers.accountUsage.reason, { value: limits.overage_disabled_reason })}</p>
-          ) : null}
+          {buckets.map(renderBucket)}
           <p>{t(($) => $.providers.accountUsage.source, { value: snapshot.source })}</p>
           <p>
             {t(($) => $.providers.accountUsage.observedAt, {
@@ -1516,17 +1550,49 @@ export function DiscoveryResultView({
         />
       </label>
       <div className="discovery-models">
-        {models.map((model) => (
-          <div className="model-discovery-row" key={model.id}>
-            <span>{model.id}</span>
-            <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_synthesis")}>
-              {t(($) => $.providers.discovery.useForSynthesis)}
-            </button>
-            <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_translation")}>
-              {t(($) => $.providers.discovery.useForTranslation)}
-            </button>
-          </div>
-        ))}
+        {models.map((model) => {
+          const taskRouteTasks = model.task_route_tasks;
+          const canUseForSynthesis = taskRouteTasks?.includes("card_synthesis") ?? true;
+          const canUseForTranslation = taskRouteTasks?.includes("card_translation") ?? true;
+          return (
+            <div className="model-discovery-row" key={model.id}>
+              <div className="model-discovery-copy">
+                <span className="model-discovery-id">{model.id}</span>
+                {model.effort_options?.length ? (
+                  <span className="model-discovery-efforts">
+                    {model.effort_options.map((effort) => (
+                      <span
+                        className={effort === model.default_effort ? "is-default" : undefined}
+                        key={effort}
+                      >
+                        {effort === model.default_effort
+                          ? t(($) => $.providers.discovery.defaultEffort, { effort })
+                          : effort}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+                {Array.isArray(taskRouteTasks) && taskRouteTasks.length === 0 ? (
+                  <span className="muted tiny">
+                    {t(($) => $.providers.discovery.subscriptionCapabilityOnly)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="model-discovery-actions">
+                {canUseForSynthesis ? (
+                  <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_synthesis")}>
+                    {t(($) => $.providers.discovery.useForSynthesis)}
+                  </button>
+                ) : null}
+                {canUseForTranslation ? (
+                  <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_translation")}>
+                    {t(($) => $.providers.discovery.useForTranslation)}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
       </div>
       <p className="muted tiny">
         {t(($) => $.providers.discovery.modelCount, { count: models.length })}
