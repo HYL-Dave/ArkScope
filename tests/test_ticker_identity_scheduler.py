@@ -2038,9 +2038,15 @@ def test_recovery_tracks_all_unresolved_transition_ids_across_failure_churn(
         ]
 
 
+@pytest.mark.parametrize(
+    "legacy_version",
+    (None, 999),
+    ids=("absent-version", "unknown-version"),
+)
 def test_legacy_recovery_is_revalidated_before_becoming_an_incident_boundary(
     tmp_path,
     monkeypatch,
+    legacy_version,
 ):
     from src.service import ticker_identity_scheduler as scheduler
     from src.service.job_runs_store import JobRunsLocalStore
@@ -2066,6 +2072,8 @@ def test_legacy_recovery_is_revalidated_before_becoming_an_incident_boundary(
             (transition_id,),
         )
         legacy_recovery = _scheduler_result(status="succeeded", reason=None)
+        if legacy_version is not None:
+            legacy_recovery["incident_reconciliation_version"] = legacy_version
         at = now.isoformat(timespec="seconds")
         conn.execute(
             "INSERT INTO job_runs ("
