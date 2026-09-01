@@ -281,7 +281,8 @@ function SecurityLifecyclePanel({
   useEffect(() => {
     void loadAutomation();
   }, [loadAutomation]);
-  const automationRunning = Boolean(automation?.current_progress.length);
+  const automationRunning = automation?.last_status === "running"
+    || Boolean(automation?.current_progress.length);
   useEffect(() => {
     if (!automationRunning) return undefined;
     const timer = window.setTimeout(() => { void loadAutomation(); }, 1_000);
@@ -289,7 +290,7 @@ function SecurityLifecyclePanel({
   }, [automationRunning, automation, loadAutomation]);
 
   const saveAutomationConfig = async (next: SecurityLifecycleAutomationConfig) => {
-    if (automationBusy || automation?.config_status !== "valid") return;
+    if (automationBusy || automationRunning || automation?.config_status !== "valid") return;
     setAutomationBusy("config");
     setAutomationErr(null);
     try {
@@ -302,7 +303,7 @@ function SecurityLifecyclePanel({
     }
   };
   const runDueAutomation = async () => {
-    if (automationBusy || automation?.config_status !== "valid") return;
+    if (automationBusy || automationRunning || automation?.config_status !== "valid") return;
     setAutomationBusy("run");
     setAutomationErr(null);
     try {
@@ -319,7 +320,7 @@ function SecurityLifecyclePanel({
     ? settingsErrorPresentation(automationErr, t, commonT)
     : null;
   const config = automation?.config_status === "valid" ? automation.config : null;
-  const automationDisabled = !config || automationBusy !== null;
+  const automationDisabled = !config || automationBusy !== null || automationRunning;
   const currentProgress = automation?.current_progress[0] ?? null;
   const incidentCaseCount = automation
     ? Object.keys(automation.active_incident?.case_failures ?? {}).length

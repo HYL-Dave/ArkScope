@@ -1631,6 +1631,7 @@ export function LifecycleView({
       !pendingAutomationRun
       || !automationStatusSnapshot
       || automationStatusSnapshot.sequence < pendingAutomationRun.minimumStatusSequence
+      || automationStatusSnapshot.response.last_status === "running"
       || automationStatusSnapshot.response.current_progress.some(
         (row) => row.request_id === pendingAutomationRun.requestId,
       )

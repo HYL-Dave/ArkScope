@@ -145,6 +145,7 @@ vi.mock("../api", async (importOriginal) => {
 });
 
 import {
+  getSecurityLifecycleAutomationStatus,
   runDueSecurityLifecycleAutomation,
   updateSecurityLifecycleAutomationConfig,
 } from "../api";
@@ -206,16 +207,23 @@ afterEach(() => {
   host?.remove();
   host = null;
   document.body.replaceChildren();
+  vi.useRealTimers();
 });
 
 describe("DataStorageSection lifecycle automation controls", () => {
   it("shows real progress and sends complete config from each control shape", async () => {
+    vi.useFakeTimers();
     await renderSection();
 
     expect(host!.textContent).toContain("目前階段");
     expect(host!.textContent).toContain("上市名錄");
     expect(host!.textContent).toContain("SEC · Nasdaq / Massive · IBKR（必要時）");
     expect(host!.textContent).toContain("2026-08-31");
+
+    controls.automationStatus = status({ current_progress: [] });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
 
     await act(async () => checkbox("背景自動判定").click());
     await flush();
@@ -274,6 +282,44 @@ describe("DataStorageSection lifecycle automation controls", () => {
 
     expect(host!.textContent).toContain("1 件執行失敗尚未恢復");
     expect(host!.querySelector('[data-automation-state="success"]')).toBeNull();
+  });
+
+  it("keeps write controls disabled while a started run has durable running status", async () => {
+    controls.automationStatus = status({
+      last_status: "succeeded",
+      current_progress: [],
+    });
+    await renderSection();
+    vi.useFakeTimers();
+    controls.automationStatus = status({
+      last_status: "running",
+      current_progress: [],
+    });
+
+    await act(async () => button("立即檢查到期案件").click());
+    await flush();
+
+    expect(runDueSecurityLifecycleAutomation).toHaveBeenCalledOnce();
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+    const runningControls = host!.querySelectorAll<HTMLElement>(
+      '[data-testid="lifecycle-automation-controls"] input, '
+      + '[data-testid="lifecycle-automation-controls"] select, '
+      + '[data-testid="lifecycle-automation-controls"] button',
+    );
+    expect(Array.from(runningControls).every((control) => (
+      (control as HTMLInputElement | HTMLSelectElement | HTMLButtonElement).disabled
+    ))).toBe(true);
+
+    controls.automationStatus = status({
+      last_status: "succeeded",
+      current_progress: [],
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(3);
+    expect(button("立即檢查到期案件").disabled).toBe(false);
   });
 
   it("disables all write controls when stored automation config is invalid", async () => {

@@ -578,6 +578,7 @@ afterEach(() => {
   host?.remove();
   host = null;
   document.body.querySelectorAll(".ui-overlay-backdrop").forEach((node) => node.remove());
+  vi.useRealTimers();
 });
 
 describe("Lifecycle workflow", () => {
@@ -1209,6 +1210,37 @@ describe("Lifecycle workflow", () => {
     expect(document.body.querySelector(
       '[data-testid="lifecycle-automation-progress"]',
     )?.textContent).toContain("Evaluate");
+  });
+
+  it("keeps an attended run pending while durable status is running without progress", async () => {
+    await mountLifecycle();
+    apiMocks.getSecurityLifecycleAutomationStatus.mockReset()
+      .mockResolvedValueOnce(automationStatus({
+        last_status: "running",
+        current_progress: [],
+      }))
+      .mockResolvedValueOnce(automationStatus({
+        last_status: "succeeded",
+        current_progress: [],
+      }));
+    vi.useFakeTimers();
+
+    await act(async () => {
+      buttonIn(document.body, "Run this case").click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledOnce();
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(false);
   });
 
   it("refreshes only the latest selected case after an attended run completes", async () => {
