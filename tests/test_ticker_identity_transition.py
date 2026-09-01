@@ -1452,6 +1452,94 @@ def test_terminal_delisting_archives_and_suppresses_without_creating_successor(
         conn.close()
 
 
+def test_terminal_delisting_exits_shared_scheduled_price_and_news_scope(
+    tmp_path,
+    monkeypatch,
+):
+    from src import sa_capture_store
+    from src.active_universe import build_active_universe_snapshot
+    from src.portfolio_state import PortfolioStore
+    from src.service import data_scheduler
+    from src.ticker_identity_transition import TickerIdentityTransitionStore
+
+    profile_path = tmp_path / "profile_state.db"
+    sa_path = tmp_path / "sa_capture.db"
+    conn = _transition_connection(tmp_path)
+    try:
+        PortfolioStore(profile_path)
+        sa_conn = sa_capture_store.connect(str(sa_path))
+        sa_conn.execute(
+            "INSERT INTO sa_pick_lineages "
+            "(symbol_key,picked_date,created_at) VALUES ('OLD','2026-08-20',?)",
+            (_AT,),
+        )
+        lineage_id = sa_conn.execute(
+            "SELECT lineage_id FROM sa_pick_lineages "
+            "WHERE symbol_key='OLD' AND picked_date='2026-08-20'"
+        ).fetchone()[0]
+        sa_conn.execute(
+            "INSERT INTO sa_alpha_picks "
+            "(lineage_id,symbol,company,picked_date,portfolio_status,is_stale) "
+            "VALUES (?,?,?,'2026-08-20','current',0)",
+            (lineage_id, "OLD", "Old Corp"),
+        )
+        sa_conn.commit()
+        sa_conn.close()
+        _seed_transferable_state(conn)
+        conn.execute(
+            "INSERT INTO watchlist_memberships "
+            "(list_id,ticker,position,archived_at,created_at,updated_at) "
+            "VALUES (1,'CONTROL',4,NULL,?,?)",
+            (_AT, _AT),
+        )
+        conn.commit()
+
+        before = build_active_universe_snapshot(
+            profile_db=profile_path,
+            sa_db=sa_path,
+        )
+        assert before.tickers == ("CONTROL", "OLD")
+
+        preview = _build(
+            conn,
+            assessment=_assessment(outcomes=("listing_ended",), successor=None),
+            proposals=[_proposal(action_type="notify", replacement=None)],
+            sources=("manual_lists", "legacy_config_seed"),
+        )
+        store = TickerIdentityTransitionStore(
+            conn,
+            id_factory=_id_factory(),
+            clock=lambda: "2026-08-25T13:00:00Z",
+        )
+        transition = store.approve(
+            preview=preview,
+            approved_preview_sha256=preview["preview_sha256"],
+        )
+        assert store.apply(
+            transition["transition_id"],
+            current_preview=preview,
+            expected_preview_sha256=preview["preview_sha256"],
+            trigger="attended_user",
+        )["status"] == "applied"
+
+        after = build_active_universe_snapshot(
+            profile_db=profile_path,
+            sa_db=sa_path,
+        )
+        assert after.tickers == ("CONTROL",)
+        assert "OLD" not in after.sources_by_ticker
+
+        monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+        monkeypatch.setattr(
+            sa_capture_store,
+            "resolve_sa_db_path",
+            lambda: sa_path,
+        )
+        assert data_scheduler._resolve_price_scope() == ["CONTROL"]
+    finally:
+        conn.close()
+
+
 def test_reversal_restores_exact_owned_rows_and_keeps_reversed_lineage(tmp_path):
     from src.ticker_identity_transition import TickerIdentityTransitionStore
 
