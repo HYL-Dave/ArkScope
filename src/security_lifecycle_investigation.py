@@ -1961,7 +1961,7 @@ def _read_profile(
                     observation_fingerprint_sha256=fingerprint,
                 ),
             )
-            proposals = store.project_public_proposals(
+            proposals = store.project_proposals(
                 case_id,
                 observation_fingerprint_sha256=fingerprint,
             )

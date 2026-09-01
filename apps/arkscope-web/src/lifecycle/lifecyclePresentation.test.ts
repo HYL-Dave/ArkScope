@@ -128,6 +128,11 @@ describe("Lifecycle presentation", () => {
       "FB",
       "zh-Hant",
     ).conclusion).toContain("lifecycle.future_rule");
+    expect(lifecycleAutomationNarrative(
+      { ...base, automation_narrative: "maReview" },
+      "FB",
+      "en",
+    ).conclusion).toContain("The transaction involving FB still requires review.");
   });
 
   it("preserves human and legacy assessment prose", async () => {

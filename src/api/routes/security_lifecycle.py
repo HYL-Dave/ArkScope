@@ -70,7 +70,8 @@ from src.service.ticker_identity_scheduler import (
 )
 from src.tools.security_lifecycle_tools import (
     SecurityLifecycleReadService,
-    project_active_security_lifecycle_case,
+    project_security_lifecycle_case_audit,
+    project_security_lifecycle_case_detail,
 )
 
 
@@ -707,7 +708,24 @@ def get_case(
     ),
 ):
     try:
-        return project_active_security_lifecycle_case(service.get_case(case_id))
+        return project_security_lifecycle_case_detail(service.get_case(case_id))
+    except LifecycleStoreUnavailable as exc:
+        raise _store_error(exc) from None
+    except KeyError as exc:
+        raise _not_found(exc) from None
+    except ValueError as exc:
+        raise _invalid(exc) from None
+
+
+@router.get("/cases/{case_id}/audit")
+def get_case_audit(
+    case_id: str,
+    service: SecurityLifecycleReadService = Depends(
+        get_security_lifecycle_read_service
+    ),
+):
+    try:
+        return project_security_lifecycle_case_audit(service.get_case(case_id))
     except LifecycleStoreUnavailable as exc:
         raise _store_error(exc) from None
     except KeyError as exc:

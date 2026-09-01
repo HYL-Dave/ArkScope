@@ -590,11 +590,22 @@ def test_proposal_projection_is_a_closed_public_dto(tmp_path):
             at=_LATER,
         )
 
+        internal = store.project_proposals(
+            case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+        )
         projected = store.project_public_proposals(
             case_id,
             observation_fingerprint_sha256=_FINGERPRINT,
         )
 
+        internal_remap = next(
+            item for item in internal if item["action_type"] == "remap_symbol"
+        )
+        assert internal_remap["case_id"] == case_id
+        assert internal_remap["assessment_id"] == assessment_id
+        assert internal_remap["source_ticker"] == "EA"
+        assert internal_remap["assessment_fingerprint_sha256"]
         assert projected
         assert {frozenset(item) for item in projected} == {
             frozenset(

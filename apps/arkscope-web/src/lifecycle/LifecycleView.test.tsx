@@ -22,6 +22,7 @@ const apiMocks = vi.hoisted(() => ({
   createSecurityLifecycleAssessment: vi.fn(),
   dismissSecurityLifecycleProposal: vi.fn(),
   getSecurityLifecycleCase: vi.fn(),
+  getSecurityLifecycleCaseAudit: vi.fn(),
   getSecurityLifecycleAutomationStatus: vi.fn(),
   getSecurityLifecycleInvestigation: vi.fn(),
   getTickerIdentityTransitionPreview: vi.fn(),
@@ -286,6 +287,24 @@ function detail(overrides: object = {}) {
     ...SUMMARY,
     workflow_state: "resolved",
     current_assessment: LEGACY_ASSESSMENT,
+    sec_admission: {
+      state: "admitted",
+      reason: "direct_identity_filing",
+    },
+    corroboration: {
+      regulator: "confirmed",
+      nasdaq_trader: {
+        listing_status: "inactive",
+        source_as_of: "2026-08-28",
+        provider_last_updated_utc: null,
+      },
+      massive: {
+        listing_status: "inactive",
+        source_as_of: "2026-08-28",
+        provider_last_updated_utc: "2026-08-28T12:00:00Z",
+      },
+      ibkr: "present",
+    },
     observation_fingerprint_sha256: "f".repeat(64),
     observation: {
       ticker: "QBTS",
@@ -293,6 +312,7 @@ function detail(overrides: object = {}) {
       source: "sec_edgar",
       source_ref: "0001907982-26-000111",
       filing_form: "25-NSE",
+      filing_items: [],
       filing_date: "2026-07-24",
       effective_date: null,
       evidence_url: "https://www.sec.gov/Archives/example/qbts.htm",
@@ -374,6 +394,38 @@ function detail(overrides: object = {}) {
     truncation: {},
     ...overrides,
   };
+}
+
+function audit(overrides: object = {}) {
+  const source = detail();
+  return {
+    case_id: source.case_id,
+    observation_fingerprint_sha256: source.observation_fingerprint_sha256,
+    investigation_runs: source.investigation_runs,
+    automation_runs: source.automation_runs,
+    automation_facts: source.automation_facts,
+    evidence: source.evidence,
+    assessment_history: source.assessment_history,
+    acknowledgement_history: source.acknowledgement_history,
+    truncation: source.truncation,
+    ...overrides,
+  };
+}
+
+function mockLifecycleCase(overrides: object = {}) {
+  const value = detail(overrides);
+  apiMocks.getSecurityLifecycleCase.mockResolvedValue(value);
+  apiMocks.getSecurityLifecycleCaseAudit.mockResolvedValue(audit({
+    case_id: value.case_id,
+    observation_fingerprint_sha256: value.observation_fingerprint_sha256,
+    investigation_runs: value.investigation_runs,
+    automation_runs: value.automation_runs,
+    automation_facts: value.automation_facts,
+    evidence: value.evidence,
+    assessment_history: value.assessment_history,
+    acknowledgement_history: value.acknowledgement_history,
+    truncation: value.truncation,
+  }));
 }
 
 function automationStatus(
@@ -499,6 +551,23 @@ async function toggle(label: string) {
   await flush();
 }
 
+async function openAuditDetails() {
+  const disclosure = document.body.querySelector<HTMLDetailsElement>(
+    "details.lifecycle-audit-details",
+  );
+  if (!disclosure) throw new Error("missing lifecycle audit details");
+  await act(async () => disclosure.querySelector<HTMLElement>("summary")?.click());
+  await flush();
+}
+
+async function mountLifecycleWithAudit(
+  caseId: string | null = CASE_ID,
+  onNavigate = vi.fn(),
+) {
+  await mountLifecycle(caseId, onNavigate);
+  await openAuditDetails();
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage("en");
   vi.clearAllMocks();
@@ -514,7 +583,7 @@ beforeEach(async () => {
     count: 0,
     state_counts: { admitted: 2, needs_review: 1, pending: 2, screened_out: 1 },
   });
-  apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail());
+  mockLifecycleCase();
   apiMocks.getSecurityLifecycleAutomationStatus.mockResolvedValue(automationStatus());
   apiMocks.addSecurityLifecycleEvidence.mockResolvedValue({ evidence_id: "evidence-new" });
   apiMocks.createSecurityLifecycleAssessment.mockResolvedValue({
@@ -691,7 +760,7 @@ describe("Lifecycle workflow", () => {
       },
       regulator,
     ];
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       evidence,
       evidence_count: evidence.length,
       source_family_status: {
@@ -702,9 +771,9 @@ describe("Lifecycle workflow", () => {
         general_web: "present",
         market_infrastructure: "present",
       },
-    }));
+    });
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
 
     const familyLabels = Array.from(
       document.body.querySelectorAll(".lifecycle-evidence-group > h4"),
@@ -817,7 +886,7 @@ describe("Lifecycle workflow", () => {
         acknowledgement_history: [{ acknowledgement_id: "ack-current", stale: false }],
       }))
       .mockResolvedValueOnce(detail());
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     await click("Record insufficient evidence");
     expect(apiMocks.acknowledgeSecurityLifecycleCase).toHaveBeenCalledWith(CASE_ID, {
       reason: "evidence_insufficient",
@@ -829,7 +898,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("adds manual URL and text evidence without network access", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     await setField("Manual evidence text", "Issuer investor-relations statement.");
     await click("Add text evidence");
     await setField("Manual evidence URL", "https://example.com/issuer-notice");
@@ -1120,7 +1189,7 @@ describe("Lifecycle workflow", () => {
       }),
     );
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     await click("Record insufficient evidence");
     await click("Monitoring", host!);
     expect(host!.textContent).toContain("MONITORING");
@@ -1512,7 +1581,7 @@ describe("Lifecycle workflow", () => {
     });
     apiMocks.acknowledgeSecurityLifecycleCase.mockReturnValue(command.promise);
 
-    await mountLifecycle(currentCase.case_id);
+    await mountLifecycleWithAudit(currentCase.case_id);
     await click("Record insufficient evidence");
     const nextCaseTrigger = Array.from(
       host!.querySelectorAll<HTMLButtonElement>(".lifecycle-case-trigger"),
@@ -1634,7 +1703,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("keeps prior evidence and shows a typed safe historical run error", async () => {
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       investigation_runs: [{
         run_id: "run-failed",
         status: "failed",
@@ -1642,15 +1711,15 @@ describe("Lifecycle workflow", () => {
         failure_code: "usage_limit_reached",
         created_at: "2026-08-20T00:00:00Z",
       }],
-    }));
-    await mountLifecycle();
+    });
+    await mountLifecycleWithAudit();
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
     expect(document.body.textContent).toContain("Search usage limit reached");
     expect(document.body.textContent).not.toMatch(/token=private|\/home\/private|traceback/);
   });
 
   it("keeps source-missing history visible and marks changed source content for revalidation", async () => {
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       source_presence: "source_missing",
       observation: null,
       workflow_state: "evidence_ready",
@@ -1660,8 +1729,8 @@ describe("Lifecycle workflow", () => {
         stale: true,
         conclusion: "Prior accepted conclusion",
       }],
-    }));
-    await mountLifecycle();
+    });
+    await mountLifecycleWithAudit();
     expect(document.body.textContent).toContain("Source observation missing");
     expect(document.body.textContent).toContain("Prior accepted conclusion");
     expect(document.body.textContent).toContain("Revalidation required");
@@ -1671,7 +1740,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("omits the retired search command while manual evidence remains reachable", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     expect(document.body.textContent).not.toContain("Tavily");
     expect(document.body.textContent).toContain("Add text evidence");
     expect(document.body.textContent).toContain("Add URL evidence");
@@ -1687,7 +1756,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("opens a drawer with source evidence acknowledgement assessment and proposal sections", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     for (const label of [
       "Source observation",
       "Evidence and searches",
@@ -1699,7 +1768,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("records successful zero-result runs without claiming no impact", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     const history = Array.from(document.body.querySelectorAll("section")).find(
       (section) => section.querySelector("h3")?.textContent === "Evidence and searches",
     );
@@ -1708,7 +1777,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("renders bilingual workflow copy without translating provider evidence", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     expect(document.body.textContent).toContain("Security event investigation");
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
     await act(async () => { await i18n.changeLanguage("zh-Hant"); });
@@ -1786,7 +1855,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("requires cited evidence before accepting a conclusive assessment", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     expect(document.body.querySelector<HTMLSelectElement>(
       '[aria-label="Assessment relevance"]',
     )?.value).toBe("undetermined");
@@ -1832,7 +1901,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("preserves the accepted meaning of the real migrated legacy review in both locales", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     const legacy = Array.from(document.body.querySelectorAll(".lifecycle-history-row"))
       .find((item) => item.textContent?.includes("Legacy review"));
     expect(legacy?.textContent).toContain("Directly concerns the tracked security");
@@ -1856,7 +1925,7 @@ describe("Lifecycle workflow", () => {
       status: "accepted",
       acceptance_authority: "automation_policy",
     };
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       current_assessment: automated,
       assessment_history: [automated],
       automation_runs: [{
@@ -1922,9 +1991,9 @@ describe("Lifecycle workflow", () => {
         extractor_rule_version: "1",
         created_at: "2026-08-25T10:00:00Z",
       }],
-    }));
+    });
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     for (const value of [
       "Verified automatic",
       "Waiting to revalidate tracking transition",
@@ -1949,7 +2018,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("renders the candidate-budget operator diagnostic in en and zh-Hant", async () => {
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       automation_runs: [{
         run_id: "automation-run-budget",
         case_id: CASE_ID,
@@ -1973,9 +2042,9 @@ describe("Lifecycle workflow", () => {
         created_at: "2026-08-25T10:00:00Z",
       }],
       automation_facts: [],
-    }));
+    });
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     expect(document.body.textContent).toContain(
       "9 candidates exceed the IBKR query limit of 8. IBKR was not contacted.",
     );
@@ -1990,7 +2059,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("prefills the newest automation suggestion without rewriting its authorship", async () => {
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       current_assessment: LEGACY_ASSESSMENT,
       assessment_history: [AUTOMATION_DRAFT, LEGACY_ASSESSMENT],
       automation_runs: [{
@@ -2005,9 +2074,9 @@ describe("Lifecycle workflow", () => {
         blockers: [],
         created_at: "2026-08-25T10:00:00Z",
       }],
-    }));
+    });
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     expect(document.body.querySelector<HTMLInputElement>(
       '[aria-label="Successor ticker"]',
     )?.value).toBe("NEW");
@@ -2040,7 +2109,7 @@ describe("Lifecycle workflow", () => {
   it("keeps original evidence authoritative when machine translation fails", async () => {
     const { ApiError } = await import("../api");
     const secondExcerpt = "交易所公告原文必須保留";
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       evidence: [
         detail().evidence[0],
         {
@@ -2057,7 +2126,7 @@ describe("Lifecycle workflow", () => {
           created_at: "2026-08-25T10:00:00Z",
         },
       ],
-    }));
+    });
     apiMocks.translateSecurityLifecycleEvidence.mockRejectedValue(new ApiError(
       "private provider failure",
       "/security-lifecycle/evidence/evidence-market/translations",
@@ -2073,7 +2142,7 @@ describe("Lifecycle workflow", () => {
     ));
     const onNavigate = vi.fn();
 
-    await mountLifecycle(CASE_ID, onNavigate);
+    await mountLifecycleWithAudit(CASE_ID, onNavigate);
     expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
     expect(document.body.textContent).toContain("Machine translation");
     expect(document.body.textContent).toContain(secondExcerpt);
@@ -2104,7 +2173,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("collapses evidence and switches between source text and LLM translation", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
 
     const evidence = document.body.querySelector<HTMLDetailsElement>(
       "details.lifecycle-evidence-item",
@@ -2125,18 +2194,164 @@ describe("Lifecycle workflow", () => {
     expect(translated?.textContent).toContain("openai · gpt-5 · responses-api");
   });
 
-  it("summarizes the current decision and marks deterministic automation as non-LLM", async () => {
+  it("answers the seven primary questions before lazily loading audit history", async () => {
     apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
-      current_assessment: { ...AUTOMATION_DRAFT, rule_id: "lifecycle.ma_review" },
-      assessment_history: [{ ...AUTOMATION_DRAFT, rule_id: "lifecycle.ma_review" }],
+      current_assessment: {
+        ...AUTOMATION_DRAFT,
+        status: "accepted",
+        rule_id: "lifecycle.ma_review",
+        effective_date: "2026-09-30",
+        successor_ticker: "NEW",
+        destination_venue: "Nasdaq",
+      },
+      next_check_at: null,
     }));
 
     await mountLifecycle();
 
+    const primary = document.body.querySelector<HTMLElement>(
+      "[data-testid='lifecycle-primary-summary']",
+    );
+    expect(primary?.textContent).toContain("What happened");
+    expect(primary?.textContent).toContain("The transaction involving QBTS still requires review.");
+    expect(primary?.textContent).toContain("Tracked-security effect");
+    expect(primary?.textContent).toContain("Effective date");
+    expect(primary?.textContent).toContain("2026-09-30");
+    expect(primary?.textContent).toContain("Successor or destination");
+    expect(primary?.textContent).toContain("NEW · Nasdaq");
+    expect(primary?.textContent).toContain("SEC filing");
+    expect(primary?.textContent).toContain("25-NSE");
+    expect(primary?.textContent).toContain("Corroboration");
+    expect(primary?.textContent).toContain("Massive");
+    expect(primary?.textContent).toContain("IBKR");
+    expect(primary?.textContent).toContain("Missing / next check");
+    expect(primary?.textContent).toContain("Not scheduled");
+    expect(document.body.textContent).not.toContain(PROVIDER_EVIDENCE);
+    expect(document.body.textContent).not.toContain("sec-symbol");
+    expect(apiMocks.getSecurityLifecycleCaseAudit).not.toHaveBeenCalled();
+
+    await openAuditDetails();
+
+    expect(apiMocks.getSecurityLifecycleCaseAudit).toHaveBeenCalledWith(CASE_ID);
+    expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
+    expect(document.body.textContent).toContain("sec-symbol");
+  });
+
+  it("reuses a loaded audit when its disclosure is closed and reopened", async () => {
+    await mountLifecycle();
+
+    await openAuditDetails();
+    expect(apiMocks.getSecurityLifecycleCaseAudit).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
+
+    await openAuditDetails();
+    await openAuditDetails();
+
+    expect(apiMocks.getSecurityLifecycleCaseAudit).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain(PROVIDER_EVIDENCE);
+  });
+
+  it("discards an old audit response after switching cases", async () => {
+    const firstAudit = deferred<ReturnType<typeof audit>>();
+    const firstCase = { ...SUMMARY, case_id: "case-audit-first", ticker: "FIRST" };
+    const secondCase = { ...SUMMARY, case_id: "case-audit-second", ticker: "SECOND" };
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [firstCase, secondCase],
+      count: 2,
+      queue_counts: { attention: 2, monitoring: 0, history: 0 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.getSecurityLifecycleCase.mockImplementation((caseId: string) => Promise.resolve(
+      detail({
+        case_id: caseId,
+        ticker: caseId === firstCase.case_id ? "FIRST" : "SECOND",
+        issuer_name: caseId === firstCase.case_id ? "First issuer" : "Second issuer",
+      }),
+    ));
+    apiMocks.getSecurityLifecycleCaseAudit.mockImplementation((caseId: string) => (
+      caseId === firstCase.case_id
+        ? firstAudit.promise
+        : Promise.resolve(audit({
+          case_id: secondCase.case_id,
+          evidence: [{
+            ...detail().evidence[0],
+            evidence_id: "evidence-second-audit",
+            excerpt: "SECOND AUDIT EVIDENCE",
+          }],
+        }))
+    ));
+
+    await mountLifecycle(firstCase.case_id);
+    await openAuditDetails();
+    const secondTrigger = Array.from(
+      host!.querySelectorAll<HTMLButtonElement>(".lifecycle-case-trigger"),
+    ).find((button) => button.textContent?.includes("SECOND"));
+    if (!secondTrigger) throw new Error("missing second audit case");
+    await act(async () => secondTrigger.click());
+    await flush();
+
+    const disclosure = document.body.querySelector<HTMLDetailsElement>(
+      "details.lifecycle-audit-details",
+    );
+    expect(disclosure?.open).toBe(false);
+    await openAuditDetails();
+    expect(document.body.textContent).toContain("SECOND AUDIT EVIDENCE");
+
+    await act(async () => {
+      firstAudit.resolve(audit({
+        case_id: firstCase.case_id,
+        evidence: [{
+          ...detail().evidence[0],
+          evidence_id: "evidence-first-audit",
+          excerpt: "STALE FIRST AUDIT EVIDENCE",
+        }],
+      }));
+      await firstAudit.promise;
+    });
+    await flush();
+
+    expect(document.body.textContent).toContain("SECOND AUDIT EVIDENCE");
+    expect(document.body.textContent).not.toContain("STALE FIRST AUDIT EVIDENCE");
+  });
+
+  it("keeps the primary case usable when the audit endpoint fails", async () => {
+    const { ApiError } = await import("../api");
+    apiMocks.getSecurityLifecycleCaseAudit.mockRejectedValue(new ApiError(
+      "private audit failure",
+      `/security-lifecycle/cases/${CASE_ID}/audit`,
+      503,
+      "security_lifecycle_profile_store_unavailable",
+      null,
+    ));
+
+    await mountLifecycle();
+    await openAuditDetails();
+
+    expect(document.body.querySelector(
+      "[data-testid='lifecycle-primary-summary']",
+    )?.textContent).toContain("SEC filing");
+    expect(document.body.textContent).toContain("Action recommendations");
+    expect(document.body.querySelector(
+      "details.lifecycle-audit-details [data-error-code='security_lifecycle_profile_store_unavailable']",
+    )).not.toBeNull();
+    expect(document.body.textContent).not.toContain("private audit failure");
+  });
+
+  it("summarizes the current decision and marks deterministic automation as non-LLM", async () => {
+    mockLifecycleCase({
+      current_assessment: { ...AUTOMATION_DRAFT, rule_id: "lifecycle.ma_review" },
+      assessment_history: [{ ...AUTOMATION_DRAFT, rule_id: "lifecycle.ma_review" }],
+    });
+
+    await mountLifecycle();
+
+    const primary = document.body.querySelector<HTMLElement>(
+      "[data-testid='lifecycle-primary-summary']",
+    );
+    expect(primary?.textContent).toContain("The transaction involving QBTS still requires review.");
     const summary = document.body.querySelector<HTMLElement>(
       "[data-testid='lifecycle-decision-summary']",
     );
-    expect(summary?.textContent).toContain("The transaction involving QBTS still requires review.");
     expect(summary?.textContent).toContain("Deterministic rule (not LLM)");
     const audit = document.body.querySelector<HTMLDetailsElement>(
       "details.lifecycle-audit-details",
@@ -2148,12 +2363,12 @@ describe("Lifecycle workflow", () => {
 
   it("keeps retry available for a retryable translation failure", async () => {
     const { ApiError } = await import("../api");
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       evidence: [{
         ...detail().evidence[0],
         translations: [],
       }],
-    }));
+    });
     apiMocks.translateSecurityLifecycleEvidence.mockRejectedValue(new ApiError(
       "private provider failure",
       "/security-lifecycle/evidence/evidence-sec/translations",
@@ -2168,7 +2383,7 @@ describe("Lifecycle workflow", () => {
       },
     ));
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     await click("Translate evidence");
     expect(document.body.textContent).toContain("OpenAI · gpt-5.4-mini");
     expect(document.body.textContent).toContain("Translation timed out. Try again.");
@@ -2222,12 +2437,12 @@ describe("Lifecycle workflow", () => {
       cash_per_security_decimal: "10.5000",
       exchange_ratio_decimal: "0.2500",
     };
-    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+    mockLifecycleCase({
       current_assessment: assessment,
       assessment_history: [assessment],
-    }));
+    });
 
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     const history = Array.from(document.body.querySelectorAll(".lifecycle-history-row"))
       .find((item) => item.textContent?.includes("Acquirer Corp."));
     expect(history).toBeDefined();
@@ -2243,7 +2458,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("submits structured facts and multiple outcomes without moving them into prose", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     for (const label of [
       "Counterparty name", "Counterparty ticker", "Counterparty CIK", "Successor ticker",
       "Destination venue", "Effective date", "Consideration currency", "Cash per security",
@@ -2292,7 +2507,7 @@ describe("Lifecycle workflow", () => {
   });
 
   it("shows legacy reviews with limited provenance", async () => {
-    await mountLifecycle();
+    await mountLifecycleWithAudit();
     expect(document.body.textContent).toContain("Legacy review");
     expect(document.body.textContent).toContain(
       "The legacy label did not distinguish renaming from transfer",

@@ -185,6 +185,7 @@ def test_read_composition_keeps_profile_history_visible_when_source_is_missing(
             "workflow_state": "unresolved",
             "observation": None,
             "current_assessment": None,
+            "sec_admission": None,
         }
     ]
 
