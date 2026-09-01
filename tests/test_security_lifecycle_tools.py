@@ -227,6 +227,254 @@ def _configure(monkeypatch, market_path, profile_path, *, sources=None):
     return security_lifecycle_tools
 
 
+def _admission_case(
+    case_id,
+    ticker,
+    *,
+    form="8-K",
+    items=("2.01",),
+    run=None,
+    facts=(),
+):
+    from src.security_lifecycle_investigation import observation_fingerprint
+
+    observation = {
+        "ticker": ticker,
+        "cik": "0000712515",
+        "issuer_name": f"{ticker} Issuer",
+        "filing_date": "2026-08-20",
+        "source": "sec_edgar",
+        "source_ref": f"{case_id}-ref",
+        "filing_form": form,
+        "filing_items": list(items),
+        "evidence_url": f"https://www.sec.gov/Archives/{case_id}.htm",
+        "description": "Candidate filing.",
+        "last_observed_at": _AT,
+        "kinds": [{"event_type": "acquisition_completed", "effective_date": None}],
+    }
+    fingerprint = observation_fingerprint(observation)
+    automation_runs = []
+    if run is not None:
+        automation_runs = [
+            {
+                "run_id": f"{case_id}-run",
+                "observation_fingerprint_sha256": fingerprint,
+                "status": "blocked",
+                "decision_tier": "review_suggested",
+                "action_readiness": "exception_required",
+                "retry_at": "2026-08-21T00:00:00Z",
+                "created_at": _AT,
+                "updated_at": _AT,
+                "diagnostics": {
+                    "sec_candidate_document_count": 1,
+                    "sec_completed_document_count": 1,
+                },
+                "blockers": [
+                    {
+                        "blocker_code": "sec_evidence_insufficient",
+                        "retryable": True,
+                        "context": {},
+                    }
+                ],
+                **run,
+            }
+        ]
+    return {
+        "case_id": case_id,
+        "source": "sec_edgar",
+        "source_ref": observation["source_ref"],
+        "ticker": ticker,
+        "source_presence": "present",
+        "workflow_state": "unresolved",
+        "observation": observation,
+        "automation_runs": automation_runs,
+        "automation_facts": [
+            {
+                "automation_run_id": f"{case_id}-run",
+                "evidence_id": f"{case_id}-evidence",
+                "source_family": "regulator",
+                "fact_type": fact_type,
+                "normalized_value": value,
+                "created_at": _AT,
+                "fact_id": f"{case_id}-{fact_type}",
+            }
+            for fact_type, value in facts
+        ],
+        "evidence": [],
+        "assessment_history": [],
+        "acknowledgement_history": [],
+        "proposals": [],
+        "current_assessment": None,
+        "current_acknowledgement": None,
+    }
+
+
+def test_sec_admission_separates_operational_queue_from_closed_candidate_audit(
+    monkeypatch,
+):
+    from src.tools import security_lifecycle_tools
+
+    admitted = _admission_case(
+        "case-admitted",
+        "LIVE",
+        items=("3.01",),
+    )
+    screened = _admission_case(
+        "case-screened",
+        "QUIET",
+        run={},
+        facts=(("source_ticker", "QUIET"),),
+    )
+    unknown = _admission_case(
+        "case-unknown",
+        "ODD",
+        form="S-4",
+        items=(),
+    )
+    monkeypatch.setattr(security_lifecycle_tools, "_store_exists", lambda *_: None)
+    monkeypatch.setattr(
+        security_lifecycle_tools,
+        "_ticker_transitions_by_case",
+        lambda _: {},
+    )
+    monkeypatch.setattr(
+        security_lifecycle_tools,
+        "compose_security_lifecycle",
+        lambda *_: {"cases": [admitted, screened, unknown]},
+    )
+    service = security_lifecycle_tools.SecurityLifecycleReadService(
+        market_db_path="unused-market.db",
+        profile_db_path="unused-profile.db",
+        source_loader=lambda: {"LIVE": (), "QUIET": (), "ODD": ()},
+    )
+
+    operational = service.list_cases()
+    audit = service.list_sec_candidates()
+    screened_only = service.list_sec_candidates(admission_state="screened_out")
+
+    assert {row["case_id"] for row in operational["cases"]} == {
+        "case-admitted",
+        "case-unknown",
+    }
+    assert operational["count"] == 2
+    assert operational["admission_counts"] == {
+        "admitted": 1,
+        "needs_review": 1,
+        "pending": 0,
+        "screened_out": 1,
+    }
+    assert audit["count"] == 3
+    assert audit["state_counts"] == operational["admission_counts"]
+    assert [row["case_id"] for row in screened_only["candidates"]] == [
+        "case-screened"
+    ]
+    assert set(screened_only["candidates"][0]) == {
+        "case_id",
+        "ticker",
+        "issuer_name",
+        "filing_form",
+        "filing_items",
+        "filing_date",
+        "evidence_url",
+        "admission_state",
+        "admission_reason",
+    }
+
+
+def test_real_profile_run_diagnostics_drive_screening_without_truncated_fact_history(
+    tmp_path,
+):
+    from src.security_lifecycle_fact_kernel import (
+        AutomationBlocker,
+        AutomationEvidence,
+        AutomationFact,
+        SecurityLifecycleFactKernel,
+    )
+    from src.security_lifecycle_investigation import observation_fingerprint
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+
+    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    try:
+        service = SecurityLifecycleReadService(
+            market_db_path=str(market_path),
+            profile_db_path=str(profile_path),
+            source_loader=lambda: {"EA": ()},
+        )
+        observation = service.get_case(case_id)["observation"]
+        fingerprint = observation_fingerprint(observation)
+        kernel = SecurityLifecycleFactKernel(store)
+        claim = kernel.reserve_run(
+            case_id=case_id,
+            observation_fingerprint_sha256=fingerprint,
+            policy_version="sec-admission-test-v1",
+            mode="live",
+            execution_revision="sec-admission-test-r1",
+            execution_owner_id="sec-admission-test-owner",
+            query_context={"case_id": case_id, "ticker": "EA"},
+            diagnostics={},
+            at=_AT,
+        )
+        excerpt = "EA common stock filing contained no tracked-security change."
+        evidence = AutomationEvidence(
+            evidence_id="admission-regulator-evidence",
+            source_family="regulator",
+            adapter="sec_edgar",
+            kind="regulator_excerpt",
+            excerpt=excerpt,
+            content_sha256=hashlib.sha256(excerpt.encode()).hexdigest(),
+            source_url="https://www.sec.gov/Archives/example/ea.htm",
+            title="EA filing",
+            publisher="SEC EDGAR",
+            domain="sec.gov",
+            source_published_at="2026-08-04",
+            retrieved_at=_AT,
+            source_document_sha256="a" * 64,
+            source_locator={"accession": "0000712515-26-000042"},
+            evidence_dedupe_key="admission:ea",
+        )
+        kernel.complete_run(
+            run_id=claim.run_id,
+            evidence=(evidence,),
+            facts=(
+                AutomationFact(
+                    evidence_id=evidence.evidence_id,
+                    fact_type="source_ticker",
+                    normalized_value="EA",
+                    source_span_start=0,
+                    source_span_end=2,
+                    cited_text_sha256=hashlib.sha256(b"EA").hexdigest(),
+                    extractor_rule_id="sec.explicit_source_ticker",
+                    extractor_rule_version="1",
+                ),
+            ),
+            blockers=(
+                AutomationBlocker(
+                    code="sec_evidence_insufficient",
+                    retryable=True,
+                    context={},
+                ),
+            ),
+            decision_tier="review_suggested",
+            action_readiness="action_blocked",
+            retry_at="2026-08-21T00:00:00Z",
+            diagnostics={
+                "sec_candidate_document_count": 1,
+                "sec_completed_document_count": 1,
+                "sec_effective_date_ambiguity_count": 0,
+            },
+            at=_AT,
+        )
+
+        assert service.list_cases()["count"] == 0
+        candidate = service.list_sec_candidates()["candidates"][0]
+        assert (candidate["admission_state"], candidate["admission_reason"]) == (
+            "screened_out",
+            "no_material_tracked_security_fact",
+        )
+    finally:
+        profile.close()
+
+
 def test_catalog_registry_and_both_generic_bridges_expose_exact_lifecycle_schemas(tmp_path, monkeypatch):
     from src.agents.anthropic_agent.tools import get_anthropic_tools
     from src.agents.openai_agent.tools import create_openai_tools

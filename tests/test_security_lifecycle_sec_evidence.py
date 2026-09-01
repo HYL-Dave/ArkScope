@@ -335,12 +335,64 @@ def test_chain_admits_only_reviewed_identity_forms_and_same_cik():
         row("8-K12B", "d"),
         row("DEFM14A", "e"),
         row("8-K", "f", items="2.01"),
+        row("8-K", "j", items="1.01"),
+        row("8-K", "k", items="5.01"),
+        row("8-K", "l", items="9.01"),
         row("8-K", "g", items="5.02"),
         row("10-K", "h"),
         row("25", "i", cik="0009999999"),
     ]
     selected = select_filing_chain(context, _submissions(case, filings=rows))
-    assert {item.accession for item in selected.filings} == {"a", "b", "c", "d", "e", "f"}
+    assert {item.accession for item in selected.filings} == {
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "j",
+        "k",
+    }
+
+
+def test_unknown_observation_form_remains_an_auditable_candidate_only_for_itself():
+    from src.security_lifecycle_sec_evidence import (
+        build_identity_context,
+        select_filing_chain,
+    )
+
+    case = _case("BLBD")
+    unknown = {
+        **case["filing"],
+        "form": "S-4",
+        "accessionNumber": "0001589526-26-000999",
+        "primaryDocument": "unknown-candidate.htm",
+        "items": "",
+    }
+    unrelated_unknown = {
+        **unknown,
+        "accessionNumber": "0001589526-26-000998",
+        "primaryDocument": "unrelated-unknown.htm",
+    }
+    context = build_identity_context(
+        case_id="case-unknown",
+        observation={
+            **case["observation"],
+            "source_ref": unknown["accessionNumber"],
+            "filing_form": "S-4",
+            "filing_items": [],
+        },
+        ticker_aliases=("BLBD",),
+    )
+
+    selected = select_filing_chain(
+        context,
+        _submissions(case, filings=[unknown, unrelated_unknown]),
+    )
+
+    assert [row.accession for row in selected.filings] == [
+        unknown["accessionNumber"]
+    ]
 
 
 def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts():
@@ -356,6 +408,8 @@ def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts(
     assert evidence.source_locator["accession"] == case["filing"]["accessionNumber"]
     assert evidence.source_locator["rule_version"] == "3"
     assert transport.calls[0][1] is transport.calls[1][1]
+    assert result.diagnostics["candidate_document_count"] == 1
+    assert result.diagnostics["completed_document_count"] == 1
 
     for fact in result.facts:
         assert fact.evidence_id == evidence.evidence_id
@@ -380,6 +434,42 @@ def test_primary_documents_emit_bounded_verbatim_evidence_and_exact_cited_facts(
     assert all(len(item.excerpt.encode()) <= 4096 for item in delayed_result.evidence)
     assert all("Background material" not in item.excerpt for item in delayed_result.evidence)
 
+
+def test_cde_shaped_historical_effective_date_is_not_promoted_as_current_fact():
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("BLBD")
+    case["document"] = (
+        "<html><body><p>BLBD common stock remains listed, effective May 6, "
+        "2010.</p></body></html>"
+    )
+    result = collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+
+    assert _values(result, "effective_date") == set()
+    assert result.diagnostics["effective_date_ambiguity_count"] == 1
+    assert "sec_evidence_insufficient" in result.blockers
+
+
+def test_effective_date_requires_an_extracted_tracked_ticker_binding_in_the_excerpt():
+    from src.security_lifecycle_sec_evidence import collect_sec_evidence
+
+    case = _case("BLBD")
+    case["document"] = (
+        "<html><body><p>The common stock will transfer listing to Nasdaq, "
+        "effective July 20, 2026.</p></body></html>"
+    )
+    result = collect_sec_evidence(
+        context=_context("BLBD"),
+        transport=_FixtureTransport(case),
+        retrieved_at="2026-08-25T01:02:03.123456Z",
+    )
+
+    assert _values(result, "effective_date") == set()
+    assert result.diagnostics["effective_date_ambiguity_count"] == 1
 
 def test_sec_adapter_canonicalizes_boundary_excerpt_before_kernel_validation():
     from src.security_lifecycle_fact_kernel import _normalize_evidence

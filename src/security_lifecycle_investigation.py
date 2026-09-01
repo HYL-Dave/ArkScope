@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterable, Literal, Mapping, Optional, TypedDic
 import uuid
 
 from src.security_lifecycle import read_market_observations
+from src.security_lifecycle_sec_admission import classify_sec_admission
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
     LifecycleWritesUnavailable,
@@ -1522,14 +1523,31 @@ class SecurityLifecycleInvestigationStore:
                 != assessment_fingerprint(assessment)
             )
             rendered.append(
-                project_action_proposal(
-                    proposal,
-                    projected_block_reason=(
+                {
+                    **proposal,
+                    "projected_block_reason": (
                         "stale_assessment" if stale else proposal["block_reason"]
                     ),
-                )
+                }
             )
         return rendered
+
+    def project_public_proposals(
+        self,
+        case_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+    ) -> list[dict]:
+        return [
+            project_action_proposal(
+                proposal,
+                projected_block_reason=proposal["projected_block_reason"],
+            )
+            for proposal in self.project_proposals(
+                case_id,
+                observation_fingerprint_sha256=observation_fingerprint_sha256,
+            )
+        ]
 
 
 def _decision_value(decision: object, name: str) -> Any:
@@ -1864,10 +1882,42 @@ def _automation_history(
     return runs, facts, run_total, fact_total
 
 
+def _automation_admission_facts(
+    store: SecurityLifecycleInvestigationStore,
+    *,
+    case_id: str,
+    observation_fingerprint_sha256: str,
+) -> list[dict]:
+    run = store.conn.execute(
+        "SELECT run_id FROM security_lifecycle_automation_runs "
+        "WHERE case_id=? AND observation_fingerprint_sha256=? "
+        "ORDER BY created_at DESC,rowid DESC LIMIT 1",
+        (case_id, observation_fingerprint_sha256),
+    ).fetchone()
+    if run is None:
+        return []
+    facts = []
+    for row in store.conn.execute(
+        "SELECT f.automation_run_id,f.evidence_id,e.source_family,f.fact_type,"
+        "f.normalized_value_json FROM security_lifecycle_automation_facts f "
+        "JOIN security_lifecycle_evidence e ON e.evidence_id=f.evidence_id "
+        "WHERE f.automation_run_id=? AND e.source_family='regulator' "
+        "ORDER BY f.fact_id",
+        (str(run["run_id"]),),
+    ):
+        item = dict(row)
+        item["normalized_value"] = _decoded_json(
+            item.pop("normalized_value_json")
+        )
+        facts.append(item)
+    return facts
+
+
 def _read_profile(
     path: Path,
     *,
     observation_fingerprints: Mapping[str, str],
+    observations_by_case: Mapping[str, Mapping[str, object]],
 ) -> tuple[list[dict], dict[str, dict]]:
     if not path.is_file():
         return [], {}
@@ -1898,7 +1948,20 @@ def _read_profile(
             automation_runs, automation_facts, run_total, fact_total = (
                 _automation_history(store, case_id)
             )
-            proposals = store.project_proposals(
+            admission = classify_sec_admission(
+                observation=observations_by_case.get(
+                    case_id,
+                    {"ticker": case["ticker"], "filing_form": ""},
+                ),
+                observation_fingerprint_sha256=fingerprint,
+                automation_runs=automation_runs,
+                automation_facts=_automation_admission_facts(
+                    store,
+                    case_id=case_id,
+                    observation_fingerprint_sha256=fingerprint,
+                ),
+            )
+            proposals = store.project_public_proposals(
                 case_id,
                 observation_fingerprint_sha256=fingerprint,
             )
@@ -1922,6 +1985,10 @@ def _read_profile(
                     "automation_facts": automation_facts,
                     "automation_run_count": run_total,
                     "automation_fact_count": fact_total,
+                    "sec_admission": {
+                        "state": admission.state,
+                        "reason": admission.reason,
+                    },
                     "proposals": proposals,
                 }
         return cases, projections
@@ -1955,6 +2022,11 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
         profile_cases, profile_projections = _read_profile(
             Path(profile_db_path),
             observation_fingerprints=fingerprints,
+            observations_by_case={
+                case_id: case["observation"]
+                for case_id, case in by_case.items()
+                if isinstance(case.get("observation"), Mapping)
+            },
         )
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("profile") from None
@@ -1974,6 +2046,23 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
         if case_id not in by_case:
             continue
         by_case[case_id].update(projection)
+
+    for case_id, case in by_case.items():
+        observation = case.get("observation")
+        if not isinstance(observation, Mapping):
+            case["sec_admission"] = None
+            continue
+        if case.get("sec_admission") is None:
+            admission = classify_sec_admission(
+                observation=observation,
+                observation_fingerprint_sha256=fingerprints[case_id],
+                automation_runs=case.get("automation_runs", ()),
+                automation_facts=case.get("automation_facts", ()),
+            )
+            case["sec_admission"] = {
+                "state": admission.state,
+                "reason": admission.reason,
+            }
 
     cases = sorted(
         by_case.values(),

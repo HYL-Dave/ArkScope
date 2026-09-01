@@ -49,6 +49,7 @@ const CASES: SecurityLifecycleCaseListResponse = {
   cases: [],
   count: 9,
   queue_counts: { attention: 2, monitoring: 5, history: 2 },
+  admission_counts: { admitted: 2, needs_review: 1, pending: 6, screened_out: 3 },
   data_integrity: { source_missing_count: 1 },
 };
 

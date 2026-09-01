@@ -27,6 +27,7 @@ const apiMocks = vi.hoisted(() => ({
   getTickerIdentityTransitionPreview: vi.fn(),
   listTickerIdentityTransitionActivity: vi.fn(),
   listSecurityLifecycleCases: vi.fn(),
+  listSecurityLifecycleSecCandidates: vi.fn(),
   acknowledgeTickerIdentityTransitionActivity: vi.fn(),
   reopenSecurityLifecycleAcknowledgement: vi.fn(),
   retryTickerIdentityTransition: vi.fn(),
@@ -505,7 +506,13 @@ beforeEach(async () => {
     cases: [SUMMARY, ...CASES],
     count: 6,
     queue_counts: { attention: 2, monitoring: 2, history: 2 },
+    admission_counts: { admitted: 2, needs_review: 1, pending: 2, screened_out: 1 },
     data_integrity: { source_missing_count: 1 },
+  });
+  apiMocks.listSecurityLifecycleSecCandidates.mockResolvedValue({
+    candidates: [],
+    count: 0,
+    state_counts: { admitted: 2, needs_review: 1, pending: 2, screened_out: 1 },
   });
   apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail());
   apiMocks.getSecurityLifecycleAutomationStatus.mockResolvedValue(automationStatus());
@@ -981,6 +988,48 @@ describe("Lifecycle workflow", () => {
     expect(apiMocks.listSecurityLifecycleCases).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ queue_bucket: expect.anything() }),
     );
+  });
+
+  it("keeps screened SEC candidates out of the queue while exposing their audit reason", async () => {
+    apiMocks.listSecurityLifecycleCases.mockResolvedValue({
+      cases: [SUMMARY],
+      count: 1,
+      queue_counts: { attention: 1, monitoring: 0, history: 0 },
+      admission_counts: { admitted: 1, needs_review: 0, pending: 0, screened_out: 1 },
+      data_integrity: { source_missing_count: 0 },
+    });
+    apiMocks.listSecurityLifecycleSecCandidates.mockResolvedValue({
+      candidates: [{
+        case_id: "slc_cde",
+        ticker: "CDE",
+        issuer_name: "Coeur Mining, Inc.",
+        filing_form: "DEFA14A",
+        filing_items: [],
+        filing_date: "2026-08-29",
+        evidence_url: "https://www.sec.gov/Archives/example/cde.htm",
+        admission_state: "screened_out",
+        admission_reason: "no_material_tracked_security_fact",
+      }],
+      count: 1,
+      state_counts: { admitted: 1, needs_review: 0, pending: 0, screened_out: 1 },
+    });
+
+    await mountLifecycle(null);
+
+    expect(Array.from(
+      host!.querySelectorAll<HTMLElement>(".lifecycle-case-trigger .mono"),
+    ).map((node) => node.textContent)).toEqual(["QBTS"]);
+    expect(host!.textContent).not.toContain("Coeur Mining");
+
+    await click("SEC screening", host!);
+
+    expect(apiMocks.listSecurityLifecycleSecCandidates).toHaveBeenCalledWith({});
+    expect(host!.textContent).toContain("CDE");
+    expect(host!.textContent).toContain("Screened out");
+    expect(host!.textContent).toContain("No material tracked-security fact found");
+    expect(Array.from(
+      host!.querySelectorAll<HTMLElement>(".lifecycle-case-trigger .mono"),
+    ).map((node) => node.textContent)).toEqual(["QBTS"]);
   });
 
   it("commits only the newest queue response when requests resolve out of order", async () => {

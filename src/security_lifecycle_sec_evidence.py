@@ -22,6 +22,7 @@ _CIK = re.compile(r"^\d{10}$")
 _ACCESSION = re.compile(r"^[A-Za-z0-9.\-]{1,160}$")
 _IDENTITY_FORMS = frozenset({"25", "25-NSE", "8-A12B", "8-K12B"})
 _M_AND_A_FORMS = frozenset({"DEFM14A", "DEFA14A"})
+_CURRENT_REPORT_CANDIDATE_ITEMS = frozenset({"1.01", "2.01", "3.01", "5.01"})
 _MAX_EXCERPT_BYTES = 4096
 _RULE_VERSION = "3"
 _SOURCE_DEADLINE_RULE_ID = "sec.explicit_transaction_termination_date"
@@ -403,10 +404,12 @@ def _admitted(
     *,
     is_observation_filing: bool,
 ) -> bool:
+    if is_observation_filing:
+        return True
     if form in _IDENTITY_FORMS or form in _M_AND_A_FORMS:
         return True
-    return form in {"8-K", "8-K/A"} and (
-        is_observation_filing or bool({"2.01", "3.01"}.intersection(items))
+    return form in {"8-K", "8-K/A"} and bool(
+        _CURRENT_REPORT_CANDIDATE_ITEMS.intersection(items)
     )
 
 
@@ -839,7 +842,12 @@ def _venue_mentions(sentence: str) -> tuple[tuple[int, str], ...]:
     return tuple((start, value) for start, _end, value in sorted(found))
 
 
-def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[SecFact, ...]:
+def _extract_facts(
+    evidence: SecEvidence,
+    context: IdentityContext,
+    *,
+    diagnostics: dict[str, int] | None = None,
+) -> tuple[SecFact, ...]:
     facts: list[SecFact] = []
     support: dict[str, tuple[int, int]] = {}
 
@@ -959,6 +967,12 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
                 "trading",
             )
         )
+        terminal_ticker = terminal.group("ticker").upper() if terminal else None
+        tracked_date_context = (
+            "source_ticker" in support
+            or "successor_ticker" in support
+            or terminal_ticker in context.ticker_aliases
+        )
         date_value = None
         date_rule = None
         if trading_begin_date is not None:
@@ -976,6 +990,16 @@ def _extract_facts(evidence: SecEvidence, context: IdentityContext) -> tuple[Sec
                 "effective_date", effective_iso_date.group("date")
             )
             date_rule = "sec.explicit_effective_date"
+        if date_value is not None and (
+            not tracked_date_context
+            or not context.widened_start <= date_value <= context.widened_end
+        ):
+            if diagnostics is not None:
+                diagnostics["effective_date_ambiguity_count"] = (
+                    diagnostics.get("effective_date_ambiguity_count", 0) + 1
+                )
+            date_value = None
+            date_rule = None
         if (
             terminal is not None
             and str(evidence.source_locator.get("form") or "").upper() in {"25", "25-NSE"}
@@ -1219,7 +1243,12 @@ def _empty_result(
         blockers=tuple(dict.fromkeys(blockers)),
         symbol_transitions=(),
         source_deadlines=(),
-        diagnostics=budget.diagnostics(),
+        diagnostics={
+            **budget.diagnostics(),
+            "candidate_document_count": len(selection.filings),
+            "completed_document_count": 0,
+            "effective_date_ambiguity_count": 0,
+        },
     )
 
 
@@ -1319,11 +1348,18 @@ def collect_sec_evidence(
         )
         for evidence in evidence_rows
     ]
+    extraction_diagnostics = {"effective_date_ambiguity_count": 0}
     facts = [
         fact
         for evidence in evidence_rows
-        for fact in _extract_facts(evidence, context)
+        for fact in _extract_facts(
+            evidence,
+            context,
+            diagnostics=extraction_diagnostics,
+        )
     ]
+    if extraction_diagnostics["effective_date_ambiguity_count"]:
+        blockers.append("sec_evidence_insufficient")
     deadline_rows: list[SecSourceDeadline] = []
     deadline_ambiguous = False
     for evidence in evidence_rows:
@@ -1360,5 +1396,10 @@ def collect_sec_evidence(
         blockers=tuple(dict.fromkeys(blockers)),
         symbol_transitions=transitions,
         source_deadlines=resolved_deadlines,
-        diagnostics=shared_budget.diagnostics(),
+        diagnostics={
+            **shared_budget.diagnostics(),
+            "candidate_document_count": len(selection.filings),
+            "completed_document_count": completed_documents,
+            **extraction_diagnostics,
+        },
     )

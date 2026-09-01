@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
-from typing import Callable, Iterable, Mapping
+from typing import Callable, Iterable, Mapping, cast
 
 from src.market_data_admin import resolve_market_db_path
 from src.security_lifecycle_disposition import (
@@ -27,6 +27,15 @@ from src.security_lifecycle_schema import (
     OBSERVATION_KINDS,
     PROPOSAL_ACTIONS,
     SOURCE_PRESENCE_STATES,
+)
+from src.security_lifecycle_sec_admission import (
+    SEC_ADMISSION_REASONS,
+    SEC_ADMISSION_STATES,
+    SecAdmissionDecision,
+    SecAdmissionReason,
+    SecAdmissionState,
+    classify_sec_admission,
+    project_sec_candidate,
 )
 
 
@@ -511,6 +520,7 @@ def _case_summary(case: Mapping[str, object]) -> dict:
         "last_checked_at": case["last_checked_at"],
         "next_check_at": case["next_check_at"],
         "source_family_status": dict(case["source_family_status"]),
+        "sec_admission": case.get("sec_admission"),
         "evidence_count": len(case.get("evidence", [])),
         "assessment_count": len(case.get("assessment_history", [])),
         "acknowledgement_count": len(case.get("acknowledgement_history", [])),
@@ -550,6 +560,8 @@ class SecurityLifecycleReadService:
         for case in cases:
             item = dict(case)
             item.setdefault("investigation_runs", [])
+            item.setdefault("automation_runs", [])
+            item.setdefault("automation_facts", [])
             item.setdefault("evidence", [])
             item.setdefault("assessment_history", [])
             item.setdefault("acknowledgement_history", [])
@@ -579,6 +591,21 @@ class SecurityLifecycleReadService:
                 if isinstance(observation, Mapping)
                 else None
             )
+            if isinstance(observation, Mapping) and not isinstance(
+                item.get("sec_admission"), Mapping
+            ):
+                admission = classify_sec_admission(
+                    observation=observation,
+                    observation_fingerprint_sha256=str(
+                        item["observation_fingerprint_sha256"]
+                    ),
+                    automation_runs=item["automation_runs"],
+                    automation_facts=item["automation_facts"],
+                )
+                item["sec_admission"] = {
+                    "state": admission.state,
+                    "reason": admission.reason,
+                }
             projection = project_lifecycle_disposition(item)
             item.update(
                 {
@@ -628,6 +655,7 @@ class SecurityLifecycleReadService:
             case["source_presence"] == "source_missing" for case in all_cases
         )
         selected = []
+        candidate_pool = []
         for case in all_cases:
             if case["source_presence"] != source_presence:
                 continue
@@ -650,7 +678,20 @@ class SecurityLifecycleReadService:
                 row.get("action_type") for row in case.get("proposals", [])
             }:
                 continue
+            admission = case.get("sec_admission")
+            if isinstance(admission, Mapping):
+                candidate_pool.append(case)
+                if admission.get("state") == "screened_out":
+                    continue
             selected.append(case)
+        admission_counts = {state: 0 for state in sorted(SEC_ADMISSION_STATES)}
+        for case in candidate_pool:
+            admission = case.get("sec_admission")
+            assert isinstance(admission, Mapping)
+            state = str(admission.get("state") or "")
+            if state not in SEC_ADMISSION_STATES:
+                raise ValueError("sec_admission_state")
+            admission_counts[state] += 1
         queue_counts = {bucket: 0 for bucket in sorted(LIFECYCLE_QUEUE_BUCKETS)}
         for case in selected:
             queue_counts[str(case["queue_bucket"])] += 1
@@ -667,7 +708,52 @@ class SecurityLifecycleReadService:
             "cases": cases,
             "count": count,
             "queue_counts": queue_counts,
+            "admission_counts": admission_counts,
             "data_integrity": {"source_missing_count": source_missing_count},
+        }
+
+    def list_sec_candidates(
+        self,
+        *,
+        admission_state: str | None = None,
+        limit: int = 200,
+    ) -> dict:
+        if admission_state is not None and admission_state not in SEC_ADMISSION_STATES:
+            raise ValueError("admission_state")
+        bounded_limit = min(max(int(limit), 1), 200)
+        candidates = []
+        state_counts = {state: 0 for state in sorted(SEC_ADMISSION_STATES)}
+        for case in self._cases():
+            observation = case.get("observation")
+            admission = case.get("sec_admission")
+            if not isinstance(observation, Mapping) or not isinstance(
+                admission, Mapping
+            ):
+                continue
+            state = str(admission.get("state") or "")
+            reason = str(admission.get("reason") or "")
+            if state not in SEC_ADMISSION_STATES:
+                raise ValueError("sec_admission_state")
+            if reason not in SEC_ADMISSION_REASONS:
+                raise ValueError("sec_admission_reason")
+            decision = SecAdmissionDecision(
+                cast(SecAdmissionState, state),
+                cast(SecAdmissionReason, reason),
+            )
+            state_counts[state] += 1
+            if admission_state is not None and state != admission_state:
+                continue
+            candidates.append(
+                project_sec_candidate(
+                    case_id=str(case["case_id"]),
+                    observation=observation,
+                    decision=decision,
+                )
+            )
+        return {
+            "candidates": candidates[:bounded_limit],
+            "count": len(candidates),
+            "state_counts": state_counts,
         }
 
     def get_case(self, case_id: str) -> dict:

@@ -5,6 +5,7 @@ import {
   ArrowRightLeft,
   Check,
   ExternalLink,
+  ListFilter,
   Play,
   Plus,
   RefreshCw,
@@ -27,6 +28,7 @@ import {
   getTickerIdentityTransitionPreview,
   listTickerIdentityTransitionActivity,
   listSecurityLifecycleCases,
+  listSecurityLifecycleSecCandidates,
   reopenSecurityLifecycleAcknowledgement,
   retryTickerIdentityTransition,
   reverseTickerIdentityTransition,
@@ -52,6 +54,9 @@ import {
   type SecurityLifecycleProposalType,
   type SecurityLifecycleQueueBucket,
   type SecurityLifecycleRelevance,
+  type SecurityLifecycleSecAdmissionReason,
+  type SecurityLifecycleSecAdmissionState,
+  type SecurityLifecycleSecCandidateResponse,
   type SecurityLifecycleSourcePresence,
   type SecurityLifecycleWorkflowState,
   type TickerIdentityPriorityResolution,
@@ -166,6 +171,54 @@ const ASSESSMENT_OUTCOMES: SecurityLifecycleAssessmentOutcome[] = [
   "other",
   "not_applicable",
 ];
+const SEC_ADMISSION_STATES: SecurityLifecycleSecAdmissionState[] = [
+  "admitted",
+  "pending",
+  "needs_review",
+  "screened_out",
+];
+const EMPTY_SEC_ADMISSION_COUNTS: Record<SecurityLifecycleSecAdmissionState, number> = {
+  admitted: 0,
+  pending: 0,
+  needs_review: 0,
+  screened_out: 0,
+};
+
+function secAdmissionStateLabel(
+  state: SecurityLifecycleSecAdmissionState,
+  t: TFunction<"explore">,
+): string {
+  switch (state) {
+    case "admitted": return t(($) => $.lifecycle.secAdmission.states.admitted);
+    case "pending": return t(($) => $.lifecycle.secAdmission.states.pending);
+    case "needs_review": return t(($) => $.lifecycle.secAdmission.states.needsReview);
+    case "screened_out": return t(($) => $.lifecycle.secAdmission.states.screenedOut);
+  }
+}
+
+function secAdmissionReasonLabel(
+  reason: SecurityLifecycleSecAdmissionReason,
+  t: TFunction<"explore">,
+): string {
+  switch (reason) {
+    case "awaiting_regulator_screening":
+      return t(($) => $.lifecycle.secAdmission.reasons.awaitingRegulatorScreening);
+    case "direct_listing_item":
+      return t(($) => $.lifecycle.secAdmission.reasons.directListingItem);
+    case "direct_identity_filing":
+      return t(($) => $.lifecycle.secAdmission.reasons.directIdentityFiling);
+    case "material_tracked_security_fact":
+      return t(($) => $.lifecycle.secAdmission.reasons.materialTrackedSecurityFact);
+    case "no_material_tracked_security_fact":
+      return t(($) => $.lifecycle.secAdmission.reasons.noMaterialTrackedSecurityFact);
+    case "identity_binding_missing":
+      return t(($) => $.lifecycle.secAdmission.reasons.identityBindingMissing);
+    case "regulator_screening_incomplete":
+      return t(($) => $.lifecycle.secAdmission.reasons.regulatorScreeningIncomplete);
+    case "unknown_form":
+      return t(($) => $.lifecycle.secAdmission.reasons.unknownForm);
+  }
+}
 
 function lifecycleAutomationStageLabel(
   stage: SecurityLifecycleAutomationStage,
@@ -1246,6 +1299,15 @@ export function LifecycleView({
     monitoring: 0,
     history: 0,
   });
+  const [secAdmissionCounts, setSecAdmissionCounts] = useState<
+    Record<SecurityLifecycleSecAdmissionState, number>
+  >(EMPTY_SEC_ADMISSION_COUNTS);
+  const [secAuditOpen, setSecAuditOpen] = useState(false);
+  const [secAudit, setSecAudit] = useState<SecurityLifecycleSecCandidateResponse | null>(null);
+  const [secAuditBusy, setSecAuditBusy] = useState(false);
+  const [secAuditError, setSecAuditError] = useState<ReturnType<
+    typeof lifecycleErrorPresentation
+  > | null>(null);
   const [filters, setFilters] = useState<SecurityLifecycleCaseFilters>({ limit: 200 });
   const [cases, setCases] = useState<SecurityLifecycleCaseSummary[] | null>(null);
   const [sourceMissingCount, setSourceMissingCount] = useState(0);
@@ -1318,6 +1380,7 @@ export function LifecycleView({
   const transitionPreviewRequestRef = useRef(0);
   const caseRequestRef = useRef(0);
   const detailRequestRef = useRef(0);
+  const secAuditRequestRef = useRef(0);
   const automationStatusRequestRef = useRef(0);
   const automationRunRequestRef = useRef(0);
   const caseQueryRef = useRef(caseQuery);
@@ -1345,6 +1408,7 @@ export function LifecycleView({
       ) return;
       setCases(response.cases);
       setQueueCounts(response.queue_counts);
+      setSecAdmissionCounts(response.admission_counts ?? EMPTY_SEC_ADMISSION_COUNTS);
       setSourceMissingCount(response.data_integrity.source_missing_count);
       if (pendingQueueViewRef.current === requestQuery.queueView) {
         setSelectedCaseId((caseId) => (
@@ -1363,6 +1427,30 @@ export function LifecycleView({
       setListError(lifecycleErrorPresentation(error, locale));
     }
   }, [locale]);
+
+  const toggleSecAudit = useCallback(async () => {
+    if (secAuditOpen) {
+      secAuditRequestRef.current += 1;
+      setSecAuditOpen(false);
+      setSecAuditBusy(false);
+      return;
+    }
+    setSecAuditOpen(true);
+    const requestId = ++secAuditRequestRef.current;
+    setSecAuditBusy(true);
+    try {
+      const response = await listSecurityLifecycleSecCandidates({});
+      if (requestId !== secAuditRequestRef.current) return;
+      setSecAudit(response);
+      setSecAdmissionCounts(response.state_counts);
+      setSecAuditError(null);
+    } catch (error) {
+      if (requestId !== secAuditRequestRef.current) return;
+      setSecAuditError(lifecycleErrorPresentation(error, locale));
+    } finally {
+      if (requestId === secAuditRequestRef.current) setSecAuditBusy(false);
+    }
+  }, [locale, secAuditOpen]);
 
   const loadActivity = useCallback(async () => {
     try {
@@ -1483,6 +1571,7 @@ export function LifecycleView({
   useEffect(() => () => {
     automationStatusRequestRef.current += 1;
     automationRunRequestRef.current += 1;
+    secAuditRequestRef.current += 1;
   }, []);
   useEffect(() => {
     if (selectedCaseId) void loadDetail(selectedCaseId);
@@ -1759,6 +1848,10 @@ export function LifecycleView({
       ? queueCounts.attention + queueCounts.monitoring + queueCounts.history
       : queueCounts[view]
   );
+  const secCandidateCount = SEC_ADMISSION_STATES.reduce(
+    (total, state) => total + secAdmissionCounts[state],
+    0,
+  );
   const selectQueueView = (view: QueueView) => {
     if (view === queueView) return;
     pendingQueueViewRef.current = view;
@@ -1855,6 +1948,18 @@ export function LifecycleView({
         >
           {t(($) => $.lifecycle.views.dataIntegrity)} · {sourceMissingCount}
         </Button>
+        {sourcePresence === "present" ? (
+          <Button
+            size="compact"
+            tone={secAuditOpen ? "secondary" : "ghost"}
+            icon={<ListFilter size={15} />}
+            aria-expanded={secAuditOpen}
+            busy={secAuditBusy}
+            onClick={() => void toggleSecAudit()}
+          >
+            {t(($) => $.lifecycle.secAdmission.control)} · {secCandidateCount}
+          </Button>
+        ) : null}
       </div>
 
       {sourcePresence === "present" ? (
@@ -1879,6 +1984,80 @@ export function LifecycleView({
             </Button>
           ))}
         </div>
+      ) : null}
+
+      {sourcePresence === "present" && secAuditOpen ? (
+        <section
+          className="lifecycle-sec-audit"
+          aria-label={t(($) => $.lifecycle.secAdmission.auditAria)}
+          data-testid="lifecycle-sec-audit"
+        >
+          <div className="lifecycle-sec-audit-counts">
+            {SEC_ADMISSION_STATES.map((state) => (
+              <span className="lifecycle-state" data-admission-state={state} key={state}>
+                {secAdmissionStateLabel(state, t)} · {secAdmissionCounts[state]}
+              </span>
+            ))}
+          </div>
+          {secAuditError ? (
+            <p className="errorbox" data-error-code={secAuditError.code}>
+              {secAuditError.message}
+            </p>
+          ) : secAuditBusy || !secAudit ? (
+            <p className="muted">{t(($) => $.lifecycle.secAdmission.loading)}</p>
+          ) : secAudit.candidates.length === 0 ? (
+            <p className="muted">{t(($) => $.lifecycle.secAdmission.empty)}</p>
+          ) : (
+            <div className="lifecycle-sec-audit-table-wrap">
+              <table className="lifecycle-sec-audit-table">
+                <thead>
+                  <tr>
+                    <th>{t(($) => $.lifecycle.table.ticker)}</th>
+                    <th>{t(($) => $.lifecycle.secAdmission.form)}</th>
+                    <th>{t(($) => $.lifecycle.table.filing)}</th>
+                    <th>{t(($) => $.lifecycle.secAdmission.state)}</th>
+                    <th>{t(($) => $.lifecycle.secAdmission.reason)}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {secAudit.candidates.map((candidate) => (
+                    <tr key={candidate.case_id}>
+                      <td>
+                        <button
+                          className="lifecycle-candidate-trigger"
+                          type="button"
+                          onClick={(event) => {
+                            returnFocusRef.current = event.currentTarget;
+                            setDetail(null);
+                            setSelectedCaseId(candidate.case_id);
+                          }}
+                        >
+                          <span className="mono strong">{candidate.ticker}</span>
+                          <span className="muted tiny">{candidate.issuer_name}</span>
+                        </button>
+                      </td>
+                      <td>
+                        {safeEvidenceUrl(candidate.evidence_url) ? (
+                          <a
+                            className="lifecycle-evidence-link"
+                            href={safeEvidenceUrl(candidate.evidence_url)!}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {candidate.filing_form} <ExternalLink size={13} />
+                          </a>
+                        ) : candidate.filing_form}
+                      </td>
+                      <td>{candidate.filing_date}</td>
+                      <td>{secAdmissionStateLabel(candidate.admission_state, t)}</td>
+                      <td>{secAdmissionReasonLabel(candidate.admission_reason, t)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       ) : null}
 
       <div className="lifecycle-filters">
