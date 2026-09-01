@@ -1468,6 +1468,7 @@ export function LifecycleView({
     if (
       !pendingAutomationRun
       && !automationStatusSnapshot?.response.current_progress.length
+      && automationStatusSnapshot?.response.last_status !== "running"
     ) return undefined;
     const timeout = window.setTimeout(() => {
       void loadAutomationStatus();
@@ -1815,6 +1816,10 @@ export function LifecycleView({
             count: automationStatus.current_progress.length,
           })}</strong>
         </div>
+      ) : automationStatus?.last_status === "running" ? (
+        <div className="lifecycle-automation-band" data-automation-state="running">
+          <strong>{t(($) => $.lifecycle.dispositionReasons.automationRunning)}</strong>
+        </div>
       ) : null}
 
       {activityError ? (
@@ -1957,7 +1962,9 @@ export function LifecycleView({
                     tone="secondary"
                     icon={<Play size={14} />}
                     busy={busy === "automation-case"}
-                    disabled={Boolean(busy) || Boolean(caseAutomationProgress)}
+                    disabled={Boolean(busy)
+                      || automationStatus?.last_status === "running"
+                      || Boolean(caseAutomationProgress)}
                     onClick={() => void runCaseAutomation()}
                   >
                     {t(($) => $.lifecycle.automationControl.runCase)}

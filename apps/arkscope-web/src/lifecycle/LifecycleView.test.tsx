@@ -1243,6 +1243,42 @@ describe("Lifecycle workflow", () => {
     expect(buttonIn(document.body, "Run this case").disabled).toBe(false);
   });
 
+  it("polls and exposes a durable run before in-memory progress arrives", async () => {
+    const initialStatus = deferred<SecurityLifecycleAutomationStatusResponse>();
+    apiMocks.getSecurityLifecycleAutomationStatus.mockReset()
+      .mockReturnValueOnce(initialStatus.promise)
+      .mockResolvedValueOnce(automationStatus({
+        last_status: "succeeded",
+        current_progress: [],
+      }));
+    await mountLifecycle();
+    vi.useFakeTimers();
+
+    await act(async () => {
+      initialStatus.resolve(automationStatus({
+        last_status: "running",
+        current_progress: [],
+      }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.body.querySelector(
+      '.lifecycle-automation-band[data-automation-state="running"]',
+    )?.textContent).toContain("Automatic check in progress");
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+    expect(document.body.querySelector(
+      '.lifecycle-automation-band[data-automation-state="running"]',
+    )).toBeNull();
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(false);
+  });
+
   it("continues polling an attended run after one status request fails", async () => {
     await mountLifecycle();
     apiMocks.getSecurityLifecycleAutomationStatus.mockReset()
