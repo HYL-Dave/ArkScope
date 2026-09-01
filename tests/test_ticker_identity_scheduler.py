@@ -140,6 +140,7 @@ def _scheduler_result(
     *,
     status: str,
     reason: str | None,
+    recovery_eligible: bool = True,
     applied: int = 0,
     needs_review: int = 0,
     already_applied: int = 0,
@@ -153,6 +154,7 @@ def _scheduler_result(
     return {
         "status": status,
         "reason": reason,
+        "recovery_eligible": recovery_eligible,
         "due": len(ids),
         "applied": applied,
         "needs_review": needs_review,
@@ -161,6 +163,93 @@ def _scheduler_result(
         "failed_transition_ids": failed_ids,
         "deferred_transition_ids": deferred_ids,
     }
+
+
+class _PolicyFilteringDueService:
+    def __init__(self, *, include_attended: bool, fail_attended: bool = False):
+        self.include_attended = include_attended
+        self.fail_attended = fail_attended
+        self.executed: list[str] = []
+
+    def list_due_transitions(self, *, allow_automation_approved, **_kwargs):
+        rows = [
+            {
+                "transition_id": "slt_automation",
+                "approved_preview_sha256": "a" * 64,
+                "approval_authority": "automation_policy",
+            }
+        ]
+        if self.include_attended:
+            rows.append(
+                {
+                    "transition_id": "slt_attended",
+                    "approved_preview_sha256": "b" * 64,
+                    "approval_authority": "attended_user",
+                }
+            )
+        if allow_automation_approved:
+            return rows
+        return [row for row in rows if row["approval_authority"] == "attended_user"]
+
+    def execute_transition(self, transition_id, *, before_write, **_kwargs):
+        self.executed.append(transition_id)
+        if transition_id == "slt_attended" and self.fail_attended:
+            raise RuntimeError("private execution failure")
+        before_write()
+        return {"status": "applied"}
+
+
+class _MixedFailureDueService:
+    def __init__(self):
+        self.executed: list[str] = []
+
+    def list_due_transitions(self, **_kwargs):
+        return [
+            {
+                "transition_id": "slt_deferred",
+                "approved_preview_sha256": "a" * 64,
+                "approval_authority": "automation_policy",
+            },
+            {
+                "transition_id": "slt_authority",
+                "approved_preview_sha256": "b" * 64,
+                "approval_authority": "automation_policy",
+            },
+            {
+                "transition_id": "slt_execution",
+                "approved_preview_sha256": "c" * 64,
+                "approval_authority": "attended_user",
+            },
+        ]
+
+    def execute_transition(self, transition_id, *, before_write, **_kwargs):
+        self.executed.append(transition_id)
+        if transition_id == "slt_execution":
+            raise RuntimeError("private execution failure")
+        before_write()
+        return {"status": "applied"}
+
+
+def _run_mixed_failure_batch(monkeypatch):
+    from src.service import ticker_identity_scheduler as scheduler
+
+    service = _MixedFailureDueService()
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    authority_reads = 0
+
+    def mutation_allowed():
+        nonlocal authority_reads
+        authority_reads += 1
+        if authority_reads == 1:
+            return False
+        raise sqlite3.OperationalError("private config failure")
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
+        transition_mutation_allowed=mutation_allowed,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+    return service, result
 
 
 def test_service_threads_authority_selection_to_due_store(tmp_path, monkeypatch):
@@ -501,6 +590,7 @@ def test_due_runner_uses_new_york_date_is_bounded_and_isolates_failures(
     assert result == {
         "status": "partial",
         "reason": "transition_execution_failed",
+        "recovery_eligible": True,
         "due": 10,
         "applied": 8,
         "needs_review": 1,
@@ -640,6 +730,7 @@ def test_due_runner_defers_when_automation_mutation_is_disabled_at_write_boundar
     assert result == {
         "status": "deferred",
         "reason": "transition_mutation_disabled",
+        "recovery_eligible": True,
         "due": 1,
         "applied": 0,
         "needs_review": 0,
@@ -662,6 +753,7 @@ def test_due_runner_reports_transient_mutation_authority_failure_separately(
     assert result == {
         "status": "partial",
         "reason": "transition_mutation_authority_unavailable",
+        "recovery_eligible": True,
         "due": 1,
         "applied": 0,
         "needs_review": 0,
@@ -669,6 +761,34 @@ def test_due_runner_reports_transient_mutation_authority_failure_separately(
         "transition_ids": ["slt_automation"],
         "failed_transition_ids": ["slt_automation"],
         "deferred_transition_ids": [],
+    }
+
+
+def test_due_runner_uses_execution_reason_for_heterogeneous_failure_causes(
+    monkeypatch,
+):
+    service, result = _run_mixed_failure_batch(monkeypatch)
+
+    assert service.executed == [
+        "slt_deferred",
+        "slt_authority",
+        "slt_execution",
+    ]
+    assert result == {
+        "status": "partial",
+        "reason": "transition_execution_failed",
+        "recovery_eligible": True,
+        "due": 3,
+        "applied": 0,
+        "needs_review": 0,
+        "already_applied": 0,
+        "transition_ids": [
+            "slt_deferred",
+            "slt_authority",
+            "slt_execution",
+        ],
+        "failed_transition_ids": ["slt_authority", "slt_execution"],
+        "deferred_transition_ids": ["slt_deferred"],
     }
 
 
@@ -715,6 +835,7 @@ def test_attended_user_transition_ignores_automation_mutation_authority(
     assert result == {
         "status": "succeeded",
         "reason": None,
+        "recovery_eligible": False,
         "due": 1,
         "applied": 1,
         "needs_review": 0,
@@ -783,6 +904,7 @@ def test_due_runner_isolates_malformed_transition_results_and_retains_ids(
     assert result == {
         "status": "partial",
         "reason": "transition_execution_failed",
+        "recovery_eligible": True,
         "due": 2,
         "applied": 1,
         "needs_review": 0,
@@ -946,6 +1068,7 @@ def test_due_runner_with_no_identity_component_creates_nothing(tmp_path, monkeyp
     assert result == {
         "status": "unavailable",
         "reason": "profile_store_missing",
+        "recovery_eligible": True,
         "due": 0,
         "applied": 0,
         "needs_review": 0,
@@ -985,6 +1108,7 @@ def test_due_runner_reports_existing_profile_without_identity_schema_as_not_inst
     assert result == {
         "status": "not_installed",
         "reason": "identity_schema_absent",
+        "recovery_eligible": True,
         "due": 0,
         "applied": 0,
         "needs_review": 0,
@@ -1025,6 +1149,7 @@ def test_due_runner_reports_malformed_identity_schema_as_unavailable(
     assert result == {
         "status": "unavailable",
         "reason": "identity_schema_mismatch",
+        "recovery_eligible": True,
         "due": 0,
         "applied": 0,
         "needs_review": 0,
@@ -1063,6 +1188,15 @@ def test_bounded_result_accepts_successes_alongside_only_deferrals():
     )
 
     assert scheduler._bounded_result(result) == result
+
+
+def test_failure_helper_rejects_policy_only_disabled_reason():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    with pytest.raises(ValueError, match="reason"):
+        scheduler.ticker_identity_scheduler_failure(
+            "transition_mutation_disabled"
+        )
 
 
 @pytest.mark.parametrize(
@@ -1128,6 +1262,20 @@ def test_bounded_result_accepts_successes_alongside_only_deferrals():
             ),
             "reason",
         ),
+        (
+            _scheduler_result(
+                status="unavailable",
+                reason="transition_mutation_disabled",
+            ),
+            "reason",
+        ),
+        (
+            _scheduler_result(
+                status="not_installed",
+                reason="transition_mutation_disabled",
+            ),
+            "reason",
+        ),
     ],
 )
 def test_bounded_result_rejects_invalid_failure_and_deferral_states(result, field):
@@ -1150,6 +1298,25 @@ def test_stored_result_reads_legacy_summary_without_deferred_field():
     legacy.pop("deferred_transition_ids")
 
     assert scheduler._stored_result(json.dumps(legacy)) == current
+
+
+def test_bounded_result_defaults_missing_legacy_recovery_eligible_to_true():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    legacy = _scheduler_result(status="succeeded", reason=None)
+    legacy.pop("recovery_eligible", None)
+
+    assert scheduler._bounded_result(legacy)["recovery_eligible"] is True
+
+
+def test_present_non_boolean_recovery_eligible_is_rejected():
+    from src.service import ticker_identity_scheduler as scheduler
+
+    malformed = _scheduler_result(status="succeeded", reason=None)
+    malformed["recovery_eligible"] = 1
+
+    with pytest.raises(ValueError, match="recovery_eligible"):
+        scheduler._bounded_result(malformed)
 
 
 def test_stored_result_degrades_unknown_result_version_without_rejecting():
@@ -1442,6 +1609,215 @@ def test_policy_deferral_after_a_real_failure_never_records_recovery(
                 None,
             ),
         ]
+
+
+def test_heterogeneous_failure_batch_persists_execution_failure_incident(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    _service, result = _run_mixed_failure_batch(monkeypatch)
+
+    assert scheduler.record_ticker_identity_scheduler_result(
+        result,
+        now=datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc),
+    )
+
+    with sqlite3.connect(profile_path) as conn:
+        row = conn.execute(
+            "SELECT status,error,result FROM job_runs WHERE job_name=?",
+            ("ticker_identity.transitions",),
+        ).fetchone()
+    assert row[:2] == ("failed", "transition_execution_failed")
+    assert json.loads(row[2]) == result
+
+
+def test_filtered_automation_only_success_never_recovers_prior_incident(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=["slt_automation"],
+        failed_transition_ids=["slt_automation"],
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+    service = _PolicyFilteringDueService(include_attended=False)
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(result, now=now)
+
+    assert service.executed == []
+    assert result["status"] == "succeeded"
+    assert result["recovery_eligible"] is False
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "ticker_identity_scheduler_failure",
+                "transition_execution_failed",
+            )
+        ]
+
+
+def test_filtered_automation_with_attended_success_never_recovers_prior_incident(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=["slt_automation"],
+        failed_transition_ids=["slt_automation"],
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+    service = _PolicyFilteringDueService(include_attended=True)
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(result, now=now)
+
+    assert service.executed == ["slt_attended"]
+    assert result["status"] == "succeeded"
+    assert result["applied"] == 1
+    assert result["recovery_eligible"] is False
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,message,error FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [
+            (
+                "failed",
+                "ticker_identity_scheduler_failure",
+                "transition_execution_failed",
+            )
+        ]
+
+
+def test_filtered_automation_with_attended_failure_still_records_failure(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    service = _PolicyFilteringDueService(
+        include_attended=True,
+        fail_attended=True,
+    )
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+
+    result = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(result, now=now)
+
+    assert result["status"] == "partial"
+    assert result["reason"] == "transition_execution_failed"
+    assert result["recovery_eligible"] is False
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status,error FROM job_runs WHERE job_name=?",
+            ("ticker_identity.transitions",),
+        ).fetchall() == [("failed", "transition_execution_failed")]
+
+
+def test_re_enabled_eligible_success_recovers_filtered_automation_incident(
+    tmp_path,
+    monkeypatch,
+):
+    from src.service import ticker_identity_scheduler as scheduler
+    from src.service.job_runs_store import JobRunsLocalStore
+
+    profile_path = tmp_path / "profile_state.db"
+    JobRunsLocalStore(profile_path)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_path))
+    now = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    failure = _scheduler_result(
+        status="partial",
+        reason="transition_execution_failed",
+        transition_ids=["slt_automation"],
+        failed_transition_ids=["slt_automation"],
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(failure, now=now)
+    service = _PolicyFilteringDueService(include_attended=False)
+    monkeypatch.setattr(scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        scheduler,
+        "require_profile_state_write",
+        lambda *_args, **_kwargs: None,
+    )
+
+    filtered = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=False,
+        transition_mutation_allowed=lambda: False,
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(filtered, now=now)
+    eligible = scheduler.run_due_ticker_identity_transitions(
+        allow_automation_approved=True,
+        transition_mutation_allowed=lambda: True,
+        now=now,
+    )
+    assert scheduler.record_ticker_identity_scheduler_result(eligible, now=now)
+
+    assert filtered["recovery_eligible"] is False
+    assert eligible["recovery_eligible"] is True
+    assert service.executed == ["slt_automation"]
+    with sqlite3.connect(profile_path) as conn:
+        rows = conn.execute(
+            "SELECT status,message,result FROM job_runs WHERE job_name=? ORDER BY id",
+            ("ticker_identity.transitions",),
+        ).fetchall()
+    assert [(row[0], row[1]) for row in rows] == [
+        ("failed", "ticker_identity_scheduler_failure"),
+        ("succeeded", "ticker_identity_scheduler_recovered"),
+    ]
+    assert json.loads(rows[1][2])["transition_ids"] == ["slt_automation"]
+    assert json.loads(rows[1][2])["recovery_eligible"] is True
 
 
 def test_repeated_deferral_across_ticks_writes_no_witness_each_time(

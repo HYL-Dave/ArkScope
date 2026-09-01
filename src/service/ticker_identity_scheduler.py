@@ -72,11 +72,15 @@ def _new_york_date(now: datetime) -> str:
 
 
 def _empty_summary(
-    *, status: str = "succeeded", reason: str | None = None
+    *,
+    status: str = "succeeded",
+    reason: str | None = None,
+    recovery_eligible: bool = True,
 ) -> dict:
     return {
         "status": status,
         "reason": reason,
+        "recovery_eligible": recovery_eligible,
         "due": 0,
         "applied": 0,
         "needs_review": 0,
@@ -90,7 +94,10 @@ def _empty_summary(
 def ticker_identity_scheduler_failure(reason: str) -> dict:
     """Return the bounded unavailable shape used by the parent scheduler."""
 
-    if reason not in _RUNNER_REASONS:
+    if (
+        reason not in _RUNNER_REASONS
+        or reason == "transition_mutation_disabled"
+    ):
         raise ValueError("reason")
     return _empty_summary(status="unavailable", reason=reason)
 
@@ -131,12 +138,20 @@ def _bounded_result(result: Mapping[str, object]) -> dict:
             raise ValueError("reason")
     elif reason is not None:
         raise ValueError("reason")
-    if status == "deferred" and reason != "transition_mutation_disabled":
-        raise ValueError("reason")
-    if status == "partial" and reason == "transition_mutation_disabled":
+    if status == "deferred":
+        if reason != "transition_mutation_disabled":
+            raise ValueError("reason")
+    elif reason == "transition_mutation_disabled":
         raise ValueError("reason")
 
-    bounded: dict[str, object] = {"status": status, "reason": reason}
+    recovery_eligible = result.get("recovery_eligible", True)
+    if not isinstance(recovery_eligible, bool):
+        raise ValueError("recovery_eligible")
+    bounded: dict[str, object] = {
+        "status": status,
+        "reason": reason,
+        "recovery_eligible": recovery_eligible,
+    }
     for key in ("due", "applied", "needs_review", "already_applied"):
         value = result.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 10:
@@ -355,7 +370,12 @@ def record_ticker_identity_scheduler_result(
             conn.commit()
             return True
 
-        if status != "succeeded" or latest is None or latest["status"] != "failed":
+        if (
+            status != "succeeded"
+            or not bounded["recovery_eligible"]
+            or latest is None
+            or latest["status"] != "failed"
+        ):
             conn.commit()
             return True
         _insert_witness(
@@ -407,12 +427,17 @@ def run_due_ticker_identity_transitions(
             if exc.reason == "identity_schema_absent"
             else "unavailable"
         )
-        return _empty_summary(status=status, reason=exc.reason)
+        return _empty_summary(
+            status=status,
+            reason=exc.reason,
+            recovery_eligible=allow_automation_approved,
+        )
 
-    summary = _empty_summary()
+    summary = _empty_summary(recovery_eligible=allow_automation_approved)
     summary["due"] = len(due)
     summary["transition_ids"] = [str(row["transition_id"]) for row in due]
-    authority_unavailable = False
+    authority_failure_ids: list[str] = []
+    execution_failure_ids: list[str] = []
     for transition in due:
         transition_id = str(transition["transition_id"])
         try:
@@ -459,13 +484,13 @@ def run_due_ticker_identity_transitions(
             summary["deferred_transition_ids"].append(transition_id)
             continue
         except AutomationTransitionMutationAuthorityUnavailable as exc:
-            authority_unavailable = True
             logger.warning(
                 "ticker transition execution failed transition_id=%s code=%s",
                 transition_id,
                 type(exc).__name__,
             )
             summary["failed_transition_ids"].append(transition_id)
+            authority_failure_ids.append(transition_id)
             continue
         except Exception as exc:  # one plan must never stop later plans
             logger.warning(
@@ -474,14 +499,14 @@ def run_due_ticker_identity_transitions(
                 type(exc).__name__,
             )
             summary["failed_transition_ids"].append(transition_id)
+            execution_failure_ids.append(transition_id)
             continue
     if summary["failed_transition_ids"]:
         summary["status"] = "partial"
-        summary["reason"] = (
-            "transition_mutation_authority_unavailable"
-            if authority_unavailable
-            else "transition_execution_failed"
-        )
+        if execution_failure_ids:
+            summary["reason"] = "transition_execution_failed"
+        elif authority_failure_ids:
+            summary["reason"] = "transition_mutation_authority_unavailable"
     elif summary["deferred_transition_ids"]:
         summary["status"] = "deferred"
         summary["reason"] = "transition_mutation_disabled"

@@ -610,6 +610,7 @@ def test_tick_records_typed_transition_failure_when_authority_read_is_unavailabl
             {
                 "status": "unavailable",
                 "reason": "transition_mutation_authority_unavailable",
+                "recovery_eligible": True,
                 "due": 0,
                 "applied": 0,
                 "needs_review": 0,
@@ -756,6 +757,7 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
     failure = {
         "status": "partial",
         "reason": "transition_execution_failed",
+        "recovery_eligible": True,
         "due": 2,
         "applied": 1,
         "needs_review": 0,
@@ -767,6 +769,7 @@ def test_tick_deduplicates_ticker_transition_failure_and_records_recovery(
     recovered = {
         "status": "succeeded",
         "reason": None,
+        "recovery_eligible": True,
         "due": 0,
         "applied": 0,
         "needs_review": 0,
@@ -820,6 +823,7 @@ def test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues(
     assert runs[0]["result"] == {
         "status": "unavailable",
         "reason": "ticker_identity_scheduler_failed",
+        "recovery_eligible": True,
         "due": 0,
         "applied": 0,
         "needs_review": 0,
