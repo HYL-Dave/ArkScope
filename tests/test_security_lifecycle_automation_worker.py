@@ -1308,6 +1308,45 @@ def test_transition_approval_rereads_mutation_authority_at_boundary(tmp_path):
         harness.conn.close()
 
 
+def test_route_mutation_authority_failure_is_retryable_before_finalization(
+    tmp_path,
+):
+    from src.api.routes.security_lifecycle import (
+        _live_transition_mutation_authority,
+    )
+
+    case = _case(1)
+    harness = _Harness(tmp_path, [case])
+
+    def unavailable(_keys):
+        raise sqlite3.OperationalError("private profile path")
+
+    settings_store = SimpleNamespace(get_settings_snapshot=unavailable)
+    mutation_allowed = _live_transition_mutation_authority(settings_store)
+    try:
+        result = harness.worker_with_transition_approver(
+            transition_mutation_allowed=mutation_allowed,
+        ).run()
+
+        store = _store(harness)
+        run = store.list_automation_runs(case["case_id"])[0]
+        context = json.loads(run["query_context_json"])
+
+        assert result["failed"] == 1
+        assert result["accepted"] == 0
+        assert run["status"] == "failed"
+        assert run["failure_code"] == "internal_error"
+        assert context["automatic_retry"] == {
+            "class": "internal_error",
+            "retry_not_before": "2026-08-25T13:00:00Z",
+        }
+        assert store.list_assessments(case["case_id"]) == []
+        assert store.list_proposals(case["case_id"]) == []
+        assert harness.approval_calls == []
+    finally:
+        harness.conn.close()
+
+
 def test_finalization_only_recovery_keeps_its_progress_row(tmp_path, monkeypatch):
     import src.security_lifecycle_automation_worker as worker_module
 

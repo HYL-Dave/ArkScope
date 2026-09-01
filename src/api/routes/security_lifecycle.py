@@ -63,6 +63,9 @@ from src.service.security_lifecycle_automation_scheduler import (
     dispatch_and_record_security_lifecycle_automation,
     read_security_lifecycle_automation_durable_status,
 )
+from src.service.ticker_identity_scheduler import (
+    AutomationTransitionMutationAuthorityUnavailable,
+)
 from src.tools.security_lifecycle_tools import (
     SecurityLifecycleReadService,
     project_active_security_lifecycle_case,
@@ -499,8 +502,10 @@ def _live_transition_mutation_authority(
             return _automation_config_state(
                 store
             ).effective_apply_profile_transitions
-        except Exception:
-            return False
+        except AutomationTransitionMutationAuthorityUnavailable:
+            raise
+        except Exception as exc:
+            raise AutomationTransitionMutationAuthorityUnavailable() from exc
 
     return allowed
 

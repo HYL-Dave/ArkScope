@@ -907,6 +907,50 @@ def test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_
         context["profile_conn"].close()
 
 
+def test_manual_run_live_mutation_gate_raises_typed_store_unavailable(
+    tmp_path,
+    monkeypatch,
+):
+    from src.api.routes import security_lifecycle as routes
+    from src.service.ticker_identity_scheduler import (
+        AutomationTransitionMutationAuthorityUnavailable,
+    )
+
+    context = _build_context(tmp_path)
+    dispatch_calls = []
+    monkeypatch.setattr(
+        routes,
+        "dispatch_and_record_security_lifecycle_automation",
+        lambda **kwargs: dispatch_calls.append(kwargs) or {"status": "started"},
+    )
+    try:
+        response = _client(
+            context,
+            monkeypatch,
+            permissions=lambda *_args: None,
+        ).post("/security-lifecycle/automation/run")
+        mutation_allowed = dispatch_calls[0]["transition_mutation_allowed"]
+
+        def unavailable(_keys):
+            raise sqlite3.OperationalError("private path must not leak")
+
+        monkeypatch.setattr(
+            context["settings_store"],
+            "get_settings_snapshot",
+            unavailable,
+        )
+
+        assert response.status_code == 200
+        with pytest.raises(
+            AutomationTransitionMutationAuthorityUnavailable
+        ) as raised:
+            mutation_allowed()
+        assert isinstance(raised.value.__cause__, sqlite3.OperationalError)
+        assert "private path" not in str(raised.value)
+    finally:
+        context["profile_conn"].close()
+
+
 def test_global_automation_run_dispatches_the_recorded_due_boundary(
     tmp_path,
     monkeypatch,
