@@ -139,7 +139,9 @@ vi.mock("../api", async (importOriginal) => {
     updateSecurityLifecycleAutomationConfig: vi.fn(async (
       config: SecurityLifecycleAutomationConfig,
     ) => {
-      controls.automationStatus = status({ config });
+      controls.automationStatus = controls.automationStatus
+        ? { ...controls.automationStatus, config_status: "valid", config }
+        : status({ config });
       return { config_status: "valid" as const, config };
     }),
     runDueSecurityLifecycleAutomation: vi.fn(async () => ({
@@ -162,8 +164,9 @@ let host: HTMLDivElement | null = null;
 
 async function flush() {
   await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let pending = 0; pending < 6; pending += 1) {
+      await Promise.resolve();
+    }
   });
 }
 
@@ -218,6 +221,30 @@ afterEach(() => {
 });
 
 describe("DataStorageSection lifecycle automation controls", () => {
+  it("reloads the complete schedule after each config save", async () => {
+    controls.automationStatus = status({ current_progress: [] });
+    vi.mocked(updateSecurityLifecycleAutomationConfig).mockImplementationOnce(async (config) => {
+      controls.automationStatus = status({
+        config,
+        current_progress: [],
+        schedule: {
+          status: "disabled",
+          last_attempt_at: "2026-08-31T04:55:00Z",
+          next_scheduled_at: null,
+        },
+      });
+      return { config_status: "valid" as const, config };
+    });
+    await renderSection();
+
+    await act(async () => checkbox("背景自動判定").click());
+    await flush();
+
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledOnce();
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+    expect(host!.textContent).toContain("未排程");
+  });
+
   it("shows real progress and sends complete config from each control shape", async () => {
     vi.useFakeTimers();
     await renderSection();

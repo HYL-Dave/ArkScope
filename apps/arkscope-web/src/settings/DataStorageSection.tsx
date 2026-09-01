@@ -301,6 +301,7 @@ function SecurityLifecyclePanel({
     try {
       const response = await updateSecurityLifecycleAutomationConfig(next);
       setAutomation((current) => current ? { ...current, ...response } : current);
+      await loadAutomation();
     } catch (error) {
       setAutomationErr(error instanceof Error ? error : new Error(String(error)));
     } finally {
