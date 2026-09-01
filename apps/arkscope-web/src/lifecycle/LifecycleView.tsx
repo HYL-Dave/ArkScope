@@ -1303,6 +1303,7 @@ export function LifecycleView({
   const [automationStatusError, setAutomationStatusError] = useState<ReturnType<
     typeof lifecycleErrorPresentation
   > | null>(null);
+  const [automationStatusPollRevision, setAutomationStatusPollRevision] = useState(0);
   const [pendingAutomationRun, setPendingAutomationRun] = useState<{
     caseId: string;
     minimumStatusSequence: number;
@@ -1422,6 +1423,10 @@ export function LifecycleView({
       if (sequence !== automationStatusRequestRef.current) return null;
       setAutomationStatusError(lifecycleErrorPresentation(error, locale));
       return null;
+    } finally {
+      if (sequence === automationStatusRequestRef.current) {
+        setAutomationStatusPollRevision((current) => current + 1);
+      }
     }
   }, [locale]);
 
@@ -1468,7 +1473,12 @@ export function LifecycleView({
       void loadAutomationStatus();
     }, 1000);
     return () => window.clearTimeout(timeout);
-  }, [automationStatusSnapshot, loadAutomationStatus, pendingAutomationRun]);
+  }, [
+    automationStatusPollRevision,
+    automationStatusSnapshot,
+    loadAutomationStatus,
+    pendingAutomationRun,
+  ]);
   useEffect(() => () => {
     automationStatusRequestRef.current += 1;
     automationRunRequestRef.current += 1;

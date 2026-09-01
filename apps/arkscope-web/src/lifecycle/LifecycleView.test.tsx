@@ -1243,6 +1243,40 @@ describe("Lifecycle workflow", () => {
     expect(buttonIn(document.body, "Run this case").disabled).toBe(false);
   });
 
+  it("continues polling an attended run after one status request fails", async () => {
+    await mountLifecycle();
+    apiMocks.getSecurityLifecycleAutomationStatus.mockReset()
+      .mockResolvedValueOnce(automationStatus({
+        last_status: "running",
+        current_progress: [],
+      }))
+      .mockRejectedValueOnce(new Error("temporary status failure"))
+      .mockResolvedValueOnce(automationStatus({
+        last_status: "succeeded",
+        current_progress: [],
+      }));
+    vi.useFakeTimers();
+
+    await act(async () => {
+      buttonIn(document.body, "Run this case").click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(apiMocks.getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(3);
+    expect(buttonIn(document.body, "Run this case").disabled).toBe(false);
+  });
+
   it("refreshes only the latest selected case after an attended run completes", async () => {
     const dispatch = deferred<{
       scope: "case";

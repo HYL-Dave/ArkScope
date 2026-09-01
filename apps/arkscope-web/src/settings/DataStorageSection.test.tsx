@@ -19,6 +19,7 @@ import { createSettingsReadCache } from "./settingsReadCache";
 
 const controls = vi.hoisted(() => ({
   automationStatus: null as SecurityLifecycleAutomationStatusResponse | null,
+  automationStatusError: null as Error | null,
 }));
 
 const EMPTY_MARKET_STATUS: MarketDataStatus = {
@@ -127,6 +128,11 @@ vi.mock("../api", async (importOriginal) => {
     listSecurityLifecycleCases: vi.fn(async () => CASES),
     getTradingDayCoverage: vi.fn(async () => COVERAGE),
     getSecurityLifecycleAutomationStatus: vi.fn(async () => {
+      if (controls.automationStatusError) {
+        const error = controls.automationStatusError;
+        controls.automationStatusError = null;
+        throw error;
+      }
       if (!controls.automationStatus) throw new Error("missing automation fixture");
       return controls.automationStatus;
     }),
@@ -199,6 +205,7 @@ function button(label: string): HTMLButtonElement {
 beforeEach(() => {
   vi.clearAllMocks();
   controls.automationStatus = status();
+  controls.automationStatusError = null;
 });
 
 afterEach(() => {
@@ -319,6 +326,40 @@ describe("DataStorageSection lifecycle automation controls", () => {
     });
 
     expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(3);
+    expect(button("立即檢查到期案件").disabled).toBe(false);
+  });
+
+  it("continues polling a durable running status after one request fails", async () => {
+    controls.automationStatus = status({
+      last_status: "succeeded",
+      current_progress: [],
+    });
+    await renderSection();
+    vi.useFakeTimers();
+    controls.automationStatus = status({
+      last_status: "running",
+      current_progress: [],
+    });
+
+    await act(async () => button("立即檢查到期案件").click());
+    await flush();
+    controls.automationStatusError = new Error("temporary status failure");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(3);
+    expect(button("立即檢查到期案件").disabled).toBe(true);
+
+    controls.automationStatus = status({
+      last_status: "succeeded",
+      current_progress: [],
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(4);
     expect(button("立即檢查到期案件").disabled).toBe(false);
   });
 

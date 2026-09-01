@@ -241,6 +241,7 @@ function SecurityLifecyclePanel({
   const [automation, setAutomation] = useState<SecurityLifecycleAutomationStatusResponse | null>(null);
   const [automationErr, setAutomationErr] = useState<Error | null>(null);
   const [automationBusy, setAutomationBusy] = useState<"config" | "run" | null>(null);
+  const [automationPollRevision, setAutomationPollRevision] = useState(0);
   const automationRequestRef = useRef(0);
   const load = useCallback(async (force = false) => {
     setBusy(true);
@@ -276,6 +277,10 @@ function SecurityLifecyclePanel({
       if (request !== automationRequestRef.current) return null;
       setAutomationErr(error instanceof Error ? error : new Error(String(error)));
       return null;
+    } finally {
+      if (request === automationRequestRef.current) {
+        setAutomationPollRevision((current) => current + 1);
+      }
     }
   }, []);
   useEffect(() => {
@@ -287,7 +292,7 @@ function SecurityLifecyclePanel({
     if (!automationRunning) return undefined;
     const timer = window.setTimeout(() => { void loadAutomation(); }, 1_000);
     return () => window.clearTimeout(timer);
-  }, [automationRunning, automation, loadAutomation]);
+  }, [automationRunning, automation, automationPollRevision, loadAutomation]);
 
   const saveAutomationConfig = async (next: SecurityLifecycleAutomationConfig) => {
     if (automationBusy || automationRunning || automation?.config_status !== "valid") return;
