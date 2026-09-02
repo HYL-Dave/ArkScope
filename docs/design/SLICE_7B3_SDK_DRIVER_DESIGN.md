@@ -1,8 +1,15 @@
 # Slice 7B-3 — Formal Design: `AnthropicClaudeCodeSdkDriver` on the Claude Agent SDK
 
-**Status: DESIGNED — not built. This artifact is for human + gpt-5.5 review BEFORE any code is written. Revised to fold in three adversarial reviews (tool-surface escape; token/secret leakage + isolation; correctness + grounding).**
+**Status: SHIPPED HISTORICAL DESIGN. Current runtime admission moved to `CLAUDE_AGENT_SDK_RUNTIME_ADMISSION.md`; this artifact preserves the original 0.2.105 / CLI 2.1.183 design and probe record.**
 
 > **Provenance:** Produced 2026-06-19 by a 9-agent design workflow (4 grounded-research agents → synthesis → 3 adversarial reviewers → revision), then read and landed by the orchestrator; the load-bearing §8 blocker and the key file:line citations were independently spot-verified. **gpt-5.5-reviewed 2026-06-19: all 6 open questions DECIDED (§10), permission posture reordered to `dontAsk`-FIRST (§7). The §9 step-0 permission spike PASSED 2026-06-20, and 7B-4/7B-5/7B-6 are BUILT + LIVE-VALIDATED — see the §8 STATUS UPDATE.** Supersedes the experimental 7A `claude -p --bare` driver.
+
+> **Current-runtime update (2026-09-02):** ArkScope now pins SDK 0.2.151 and
+> bundled CLI 2.1.258, validates distribution/module/metadata/binary identity,
+> supplies the exact bundled path, and treats missing `apiKeySource` evidence as
+> failure. The current live gate and publication boundary are defined only in
+> `CLAUDE_AGENT_SDK_RUNTIME_ADMISSION.md`. References below to 0.2.105,
+> 2.1.183, and the conditional `PreToolUse` fallback are retained as history.
 
 This is the formal design for the SDK-based Claude-SUBSCRIPTION Research driver. It supersedes the experimental `claude -p --bare` driver (7A). Every decision is grounded in the four research artifacts (R1 tool inventory, R2 AgentEvent contract, R3 SDK API, R4 redaction/timeout/cap conventions) plus re-verified reads of the installed `claude_agent_sdk` 0.2.105 source and the ArkScope codebase. Claims the standalone probe (`/tmp/agent_sdk_probe.py`) did not exercise are tagged **[DESIGNED-not-proven]**.
 

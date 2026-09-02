@@ -24,6 +24,7 @@ import asyncio
 import hashlib
 import json
 import os
+from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, List, Optional
@@ -159,9 +160,19 @@ def _make_driver(
 # the options the driver built so config/token assertions can read them.
 # ---------------------------------------------------------------------------
 def _install_fake_query(monkeypatch, messages: List[Any], capture: dict):
+    if not any(
+        isinstance(message, SystemMessage) and message.subtype == "init"
+        for message in messages
+    ):
+        messages = [
+            SystemMessage(subtype="init", data={"apiKeySource": "none"}),
+            *messages,
+        ]
+
     async def fake_query(*, prompt, options):
         capture["prompt"] = prompt
         capture["options"] = options
+        capture["cwd_existed_during_query"] = Path(options.cwd).is_dir()
         for m in messages:
             await asyncio.sleep(0)
             yield m
@@ -377,6 +388,7 @@ def test_driver_default_max_turns_is_not_hidden_eight():
 def test_zero_timeout_disables_overall_timeout(monkeypatch):
     async def slow_but_finishes_query(*, prompt, options):
         await asyncio.sleep(0.01)
+        yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
         yield _result_msg()
 
     monkeypatch.setattr(mod, "query", slow_but_finishes_query)
@@ -437,6 +449,11 @@ def test_exactly_one_terminal_stops_after_done(monkeypatch):
 # 7. Config posture: dontAsk, tools=[], allowed_tools mcp__ark__, setting_sources=[]
 # ===========================================================================
 def test_options_config_posture(monkeypatch):
+    from src.auth_drivers.claude_agent_sdk_runtime import (
+        REVIEWED_DISALLOWED_TOOLS,
+        require_reviewed_claude_agent_runtime,
+    )
+
     capture: dict = {}
     _install_fake_query(monkeypatch, [_result_msg()], capture)
     asyncio.run(_collect(_make_driver(), _REQ))
@@ -444,18 +461,59 @@ def test_options_config_posture(monkeypatch):
     opts = capture["options"]
     assert opts.permission_mode == "dontAsk"
     assert opts.tools == []
+    assert opts.disallowed_tools == list(REVIEWED_DISALLOWED_TOOLS)
     assert opts.setting_sources == []
+    assert opts.strict_mcp_config is True
+    assert Path(opts.cli_path).resolve() == require_reviewed_claude_agent_runtime().cli_path
+    assert Path(opts.cwd).is_absolute()
+    assert capture["cwd_existed_during_query"] is True
+    assert Path(opts.cwd).exists() is False
     assert opts.model == "claude-sonnet-4-6"
     assert opts.system_prompt == "You are a terse research assistant."
     # allowed_tools are exactly the mcp__ark__ names for the allowlist
     assert set(opts.allowed_tools) == {"mcp__ark__" + n for n in _RESEARCH_READONLY_TOOLS}
     assert all(t.startswith("mcp__ark__") for t in opts.allowed_tools)
+    assert opts.fallback_model is None
+    assert opts.resume is None
+    assert opts.continue_conversation is False
+    assert opts.session_id is None
+    assert opts.fork_session is False
+    assert opts.session_store is None
+    assert opts.add_dirs == []
+    assert opts.settings is None
+    assert opts.extra_args == {}
+    assert opts.plugins == []
+    assert opts.agents is None
+    assert opts.skills is None
+    assert callable(opts.stderr)
+
+    from claude_agent_sdk._internal.transport.subprocess_cli import (
+        SubprocessCLITransport,
+    )
+
+    transport = SubprocessCLITransport(prompt="probe", options=opts)
+    command = transport._build_command()
+    assert command[0] == str(require_reviewed_claude_agent_runtime().cli_path)
+    assert command[command.index("--tools") + 1] == ""
+    assert command[command.index("--allowedTools") + 1] == ",".join(opts.allowed_tools)
+    assert command[command.index("--disallowedTools") + 1] == ",".join(
+        REVIEWED_DISALLOWED_TOOLS
+    )
+    assert command[command.index("--permission-mode") + 1] == "dontAsk"
+    assert "--strict-mcp-config" in command
+    assert "--setting-sources=" in command
 
 
 # ===========================================================================
 # 8. Token handling: env carries token + ANTHROPIC_API_KEY=="" ; never in events
 # ===========================================================================
 def test_token_in_env_not_in_events(monkeypatch):
+    from src.auth_drivers.claude_agent_sdk_runtime import (
+        CLAUDE_INHERITED_AUTH_ENV,
+    )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "unrelated-secret")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "unrelated-cloud-secret")
     capture: dict = {}
     # A tool result + answer that try to echo the token; it must never reach events.
     msgs = [
@@ -474,6 +532,9 @@ def test_token_in_env_not_in_events(monkeypatch):
     opts = capture["options"]
     assert opts.env["CLAUDE_CODE_OAUTH_TOKEN"] == TOKEN
     assert opts.env["ANTHROPIC_API_KEY"] == ""
+    assert all(opts.env[name] == "" for name in CLAUDE_INHERITED_AUTH_ENV)
+    assert opts.env["OPENAI_API_KEY"] == ""
+    assert opts.env["AWS_SECRET_ACCESS_KEY"] == ""
     assert "CLAUDE_CONFIG_DIR" in opts.env
 
     # the token must NOT appear in ANY yielded event (args echo redacted; result
@@ -519,6 +580,68 @@ def test_apikeysource_guard_aborts(monkeypatch):
     assert events[-1].type == EventType.error
     assert "subscription" in events[-1].data["error"].lower()
     assert sum(1 for e in events if e.type in (EventType.done, EventType.error)) == 1
+
+
+@pytest.mark.parametrize("data", ({}, {"apiKeySource": None}))
+def test_apikeysource_guard_rejects_missing_evidence(monkeypatch, data):
+    capture: dict = {}
+
+    async def fake_query(*, prompt, options):
+        capture["called"] = True
+        yield SystemMessage(subtype="init", data=data)
+        yield _result_msg()
+
+    monkeypatch.setattr(mod, "query", fake_query)
+    events = asyncio.run(_collect(_make_driver(), _REQ))
+
+    assert [event.type for event in events] == [EventType.error]
+    assert events[0].data["code"] == "provider_call_failed"
+    assert "auth source evidence" in events[0].data["error"]
+
+
+def test_result_without_init_auth_evidence_is_rejected(monkeypatch):
+    async def fake_query(*, prompt, options):
+        yield _result_msg()
+
+    monkeypatch.setattr(mod, "query", fake_query)
+    events = asyncio.run(_collect(_make_driver(), _REQ))
+
+    assert [event.type for event in events] == [EventType.error]
+    assert events[0].data["code"] == "provider_call_failed"
+    assert "auth source evidence" in events[0].data["error"]
+
+
+def test_runtime_drift_fails_before_token_load_or_sdk_start(monkeypatch):
+    from src.auth_drivers.claude_agent_sdk_runtime import (
+        ClaudeAgentSdkRuntimeIncompatible,
+    )
+
+    def incompatible_runtime():
+        raise ClaudeAgentSdkRuntimeIncompatible("runtime not reviewed")
+
+    query_called = False
+
+    async def fake_query(*, prompt, options):
+        nonlocal query_called
+        query_called = True
+        yield _result_msg()
+
+    store = _FakeTokenStore(TOKEN)
+    driver = AnthropicClaudeCodeSdkDriver(
+        credential=_FakeCredential(),
+        token_store=store,
+        registry=_full_fake_registry(),
+        dal=_FakeDAL(),
+    )
+    monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime", incompatible_runtime)
+    monkeypatch.setattr(mod, "query", fake_query)
+
+    events = asyncio.run(_collect(driver, _REQ))
+
+    assert [event.type for event in events] == [EventType.error]
+    assert events[0].data["code"] == "provider_call_failed"
+    assert store.loaded_with == []
+    assert query_called is False
 
 
 # ===========================================================================
@@ -891,6 +1014,7 @@ def test_no_rate_limit_event_means_unknown_without_probe(monkeypatch, tmp_path):
 
     async def fake_query(*, prompt, options):
         calls.append((prompt, options))
+        yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
         yield StreamEvent(
             uuid="stream-uuid", session_id="stream-session",
             event={"type": "content_block_delta"}, parent_tool_use_id=None,

@@ -273,7 +273,13 @@ class _FakeTokenStore:
 
 def test_claude_oauth_structured_output_uses_locked_agent_sdk_options(tmp_path, monkeypatch):
     from src.auth_drivers import subscription_structured_output as mod
+    from src.auth_drivers.claude_agent_sdk_runtime import (
+        REVIEWED_DISALLOWED_TOOLS,
+        require_reviewed_claude_agent_runtime,
+    )
 
+    monkeypatch.setenv("OPENAI_API_KEY", "unrelated-secret")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "unrelated-cloud-secret")
     captured = {"closed": False}
 
     async def fake_query(*, prompt, options, transport=None):
@@ -333,17 +339,35 @@ def test_claude_oauth_structured_output_uses_locked_agent_sdk_options(tmp_path, 
     assert options.system_prompt == "Return one structured result."
     assert options.output_format == {"type": "json_schema", "schema": _schema()}
     assert options.tools == []
+    assert options.disallowed_tools == list(REVIEWED_DISALLOWED_TOOLS)
     assert options.allowed_tools == []
     assert options.mcp_servers == {}
     assert options.setting_sources == []
     assert options.strict_mcp_config is True
     assert options.permission_mode == "dontAsk"
+    assert Path(options.cli_path).resolve() == require_reviewed_claude_agent_runtime().cli_path
+    assert options.cwd == str(config_dir)
+    assert options.fallback_model is None
+    assert options.resume is None
+    assert options.continue_conversation is False
+    assert options.session_id is None
+    assert options.fork_session is False
+    assert options.session_store is None
+    assert options.add_dirs == []
+    assert options.settings is None
+    assert options.extra_args == {}
+    assert options.plugins == []
+    assert options.agents is None
+    assert options.skills is None
+    assert callable(options.stderr)
     # StructuredOutput is an internal SDK tool call. One turn emits that call;
     # the second delivers the terminal ResultMessage with structured_output.
     assert options.max_turns == 2
     assert options.env["CLAUDE_CODE_OAUTH_TOKEN"] == "claude-setup-token"
     assert options.env["ANTHROPIC_API_KEY"] == ""
     assert all(options.env[name] == "" for name in mod._CLAUDE_INHERITED_BILLING_ENV)
+    assert options.env["OPENAI_API_KEY"] == ""
+    assert options.env["AWS_SECRET_ACCESS_KEY"] == ""
     assert options.env["CLAUDE_CONFIG_DIR"] == str(config_dir)
     assert captured["closed"] is True
     assert Path(config_dir).exists() is False
@@ -636,6 +660,94 @@ def test_claude_oauth_rejects_non_subscription_auth_source(tmp_path, monkeypatch
 
     assert caught.value.code == "provider_call_failed"
     assert "refusing to bill" in str(caught.value)
+
+
+@pytest.mark.parametrize("data", ({}, {"apiKeySource": None}))
+def test_claude_oauth_rejects_missing_auth_source_evidence(
+    monkeypatch, data
+):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    async def fake_query(*, prompt, options, transport=None):
+        yield SystemMessage(subtype="init", data=data)
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="missing-auth-source",
+            structured_output={"ok": True},
+        )
+
+    monkeypatch.setattr(mod, "_claude_query", fake_query)
+    store = _FakeTokenStore(StoredTokenRecord(access_token="claude-setup-token"))
+
+    with pytest.raises(mod.SubscriptionStructuredOutputError) as caught:
+        mod.run_subscription_structured_output(
+            provider="anthropic",
+            auth_mode="claude_code_oauth",
+            credential_id="local:2",
+            model="claude-sonnet-5",
+            system="sys",
+            user="user",
+            output_name="emit_check",
+            output_description="desc",
+            schema=_schema(),
+            token_store=store,
+            timeout_s=45.0,
+        )
+
+    assert caught.value.code == "provider_call_failed"
+    assert "auth source evidence" in str(caught.value)
+
+
+def test_claude_runtime_drift_fails_before_token_load_or_sdk_start(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+    from src.auth_drivers.claude_agent_sdk_runtime import (
+        ClaudeAgentSdkRuntimeIncompatible,
+    )
+
+    def incompatible_runtime():
+        raise ClaudeAgentSdkRuntimeIncompatible("runtime not reviewed")
+
+    called = False
+
+    async def fake_query(*, prompt, options, transport=None):
+        nonlocal called
+        called = True
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="must-not-start",
+            structured_output={"ok": True},
+        )
+
+    store = _FakeTokenStore(StoredTokenRecord(access_token="claude-setup-token"))
+    monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime", incompatible_runtime)
+    monkeypatch.setattr(mod, "_claude_query", fake_query)
+
+    with pytest.raises(mod.SubscriptionStructuredOutputError) as caught:
+        mod.run_subscription_structured_output(
+            provider="anthropic",
+            auth_mode="claude_code_oauth",
+            credential_id="local:2",
+            model="claude-sonnet-5",
+            system="sys",
+            user="user",
+            output_name="emit_check",
+            output_description="desc",
+            schema=_schema(),
+            token_store=store,
+            timeout_s=45.0,
+        )
+
+    assert caught.value.code == "provider_call_failed"
+    assert store.loads == []
+    assert called is False
 
 
 def test_claude_oauth_allows_only_internal_structured_output_tool(monkeypatch):

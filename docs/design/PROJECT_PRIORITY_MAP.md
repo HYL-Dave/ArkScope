@@ -53,6 +53,12 @@ Not re-litigated per slice:
    still undecided.
 4. Alerts, bots, and unattended flows are redesigned, not restored. Lessons may
    be read from history; the retired code holds no product status.
+5. Claude setup-token integration is operator-local self-use. It is not a
+   distributable third-party Claude.ai login or a way to intermediate another
+   user's subscription credentials. Publication requires a separate legal and
+   product review; API-key and supported cloud credentials remain the ordinary
+   distributable Anthropic paths. Current runtime authority is
+   `CLAUDE_AGENT_SDK_RUNTIME_ADMISSION.md`.
 
 Queued under these premises: private untracked inventory slice; private
 `config/.env` `DISCORD_*` cleanup (pending authorization, key names only,

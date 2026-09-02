@@ -27,7 +27,7 @@ httpx
 openai-agents>=0.22.0
 openai-codex==0.147.0  # Account-usage observer; bundled CLI protocol is reviewed and version-gated.
 anthropic>=1.2.0
-claude-agent-sdk==0.2.105  # Claude-subscription Research driver (Slice 7B); PINNED — the bundled CLI it ships is load-bearing (negative-test gates re-run on any bump)
+claude-agent-sdk==0.2.151  # Claude-subscription Research driver; PINNED with bundled CLI 2.1.258 admission and live negative gates on every bump
 
 
 # Web Search (Phase 10)
