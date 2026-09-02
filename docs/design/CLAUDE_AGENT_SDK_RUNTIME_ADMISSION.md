@@ -1,8 +1,9 @@
 # Claude Agent SDK Runtime Admission
 
-**Status:** ACTIVE current authority. Offline admission is implemented for
-`claude-agent-sdk==0.2.151` with bundled Claude Code CLI 2.1.258. The bounded
-live security gate in this document must pass before this version is merged.
+**Status:** ACTIVE current authority. Offline admission and the bounded live
+security gate are complete for `claude-agent-sdk==0.2.151` with bundled
+Claude Code CLI 2.1.258. Evidence is retained at
+`docs/superpowers/evidence/2026-09-02-claude-agent-sdk-runtime-admission/`.
 
 This document supersedes only the *current runtime* claims in
 `SLICE_7B3_SDK_DRIVER_DESIGN.md`. That document remains the historical design
