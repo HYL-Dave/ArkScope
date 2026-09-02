@@ -128,14 +128,15 @@ def test_probe_route_runs_p3_and_never_echoes_token(stores, monkeypatch):
     import src.auth_drivers.claude_oauth_probe as probe_mod
     captured = {}
 
-    def fake_probe(token, **kw):
-        captured["token"] = token  # the route must pass the stored token
+    def fake_probe(*, credential_id, token_store, **kw):
+        captured["credential_id"] = credential_id
+        captured["token_store"] = token_store
         return {"passed": True, "probes": [{"name": "P3a", "passed": True, "expected": "x", "observed": "ok", "error": None}]}
 
     monkeypatch.setattr(probe_mod, "run_claude_code_oauth_probe", fake_probe)
     out = cr.probe_oauth_credential(cid, store=cred, token_store=tok)
     assert out["passed"] is True and out["probes"][0]["name"] == "P3a"
-    assert captured["token"] == _TOKEN  # the real stored token reached the probe
+    assert captured == {"credential_id": cid, "token_store": tok}
     assert _TOKEN not in json.dumps(out)  # but never came back in the response
 
 

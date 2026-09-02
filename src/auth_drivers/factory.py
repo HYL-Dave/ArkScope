@@ -123,9 +123,9 @@ def build_driver(
     # gated placeholder. NOTE: registry+dal feed the in-process tool bridge; callers
     # without them (e.g. live_resolver, which only builds api_key drivers) never
     # reach this branch — the Research-stream consumer (7B-6) passes the real
-    # registry+dal. The superseded experimental `claude -p --bare` driver
-    # (claude_code_oauth_driver.py) stays importable for dev diagnostics but is NO
-    # LONGER returned here (`--bare` cannot read CLAUDE_CODE_OAUTH_TOKEN).
+    # registry+dal. The superseded experimental `claude -p --bare` driver was
+    # removed: it could not read CLAUDE_CODE_OAUTH_TOKEN and external PATH CLIs
+    # are not an admitted product transport.
     if provider == "anthropic" and auth_mode == "claude_code_oauth":
         from .claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
         from .oauth_status import default_oauth_observation_store

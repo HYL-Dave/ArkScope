@@ -638,7 +638,7 @@ def test_explicit_account_usage_launcher_overrides_bundled_runtime(tmp_path):
     assert target == executable.resolve()
 
 
-def test_default_account_usage_launcher_falls_back_to_path_without_bundle(
+def test_default_account_usage_launcher_rejects_path_without_bundle(
     tmp_path, monkeypatch
 ):
     executable, _, _ = _write_codex_fixture(tmp_path)
@@ -647,12 +647,16 @@ def test_default_account_usage_launcher_falls_back_to_path_without_bundle(
     monkeypatch.setitem(sys.modules, "codex_cli_bin", None)
     monkeypatch.setenv("PATH", str(tmp_path))
 
-    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+    from src.auth_drivers.codex_account_usage import (
+        CodexAccountUsageAdapter,
+        CodexAccountUsageError,
+    )
 
-    launcher, target = CodexAccountUsageAdapter()._resolve_launcher_and_target()
+    with pytest.raises(CodexAccountUsageError) as caught:
+        CodexAccountUsageAdapter()
 
-    assert launcher == path_launcher
-    assert target == executable.resolve()
+    assert caught.value.code == "adapter_unavailable"
+    assert path_launcher.exists()
 
 
 def test_reviewed_codex_0151_version_is_allowlisted(tmp_path):

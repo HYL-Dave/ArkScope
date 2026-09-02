@@ -1,100 +1,87 @@
-"""S4 Step 3: P3 probe — Claude setup-token (claude_code_oauth).
-
-P3 proves the C≠D distinction from the auth plan:
-  P3a: `claude -p` with CLAUDE_CODE_OAUTH_TOKEN set + ANTHROPIC_API_KEY unset → works.
-  P3b: the raw Anthropic SDK passing that token as x-api-key → REJECTED (it is NOT
-       an api.anthropic.com API key).
-Both side effects are dependency-injected, so these tests use a FAKE token and
-make NO real subprocess/network call. Results flow through the redacted harness.
-"""
+"""Closed Settings probe for the Claude setup-token subscription path."""
 
 from __future__ import annotations
 
 import json
-
-import pytest
-
-from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
-
-_TOK = "claude-setup-FAKEtok-AbCdEf0123456789ZyXwVu"
+from pathlib import Path
 
 
-def test_p3_pass_cli_works_and_raw_sdk_rejects():
-    res = run_claude_code_oauth_probe(
-        _TOK,
-        cli_fn=lambda: (True, "claude -p exited rc=0 with output"),
-        raw_sdk_fn=lambda: (True, "raw SDK rejected: authentication_error"),
+def test_probe_uses_one_reviewed_subscription_call_without_fallback():
+    from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+
+    token_store = object()
+    calls: list[dict] = []
+
+    def structured_output(**kwargs):
+        calls.append(kwargs)
+        return {"ok": True}
+
+    result = run_claude_code_oauth_probe(
+        credential_id="local:7",
+        token_store=token_store,
+        structured_output_fn=structured_output,
     )
-    assert res["passed"] is True
-    names = [p["name"] for p in res["probes"]]
-    assert any("P3a" in n for n in names) and any("P3b" in n for n in names)
-    assert all(p["passed"] for p in res["probes"])
-    assert _TOK not in json.dumps(res)  # token never in the result
+
+    assert result["passed"] is True
+    assert len(result["probes"]) == 1
+    assert len(calls) == 1
+    assert calls[0]["provider"] == "anthropic"
+    assert calls[0]["auth_mode"] == "claude_code_oauth"
+    assert calls[0]["credential_id"] == "local:7"
+    assert calls[0]["token_store"] is token_store
+    assert calls[0]["model"] == "claude-sonnet-5"
+    assert calls[0]["schema"] == {
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+        "required": ["ok"],
+        "additionalProperties": False,
+    }
 
 
-def test_p3a_fail_when_cli_errors():
-    res = run_claude_code_oauth_probe(
-        _TOK,
-        cli_fn=lambda: (_ for _ in ()).throw(RuntimeError(f"claude -p rc=1 with {_TOK}")),
-        raw_sdk_fn=lambda: (True, "rejected"),
+def test_probe_rejects_a_structurally_valid_but_false_result():
+    from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+
+    result = run_claude_code_oauth_probe(
+        credential_id="local:7",
+        token_store=object(),
+        structured_output_fn=lambda **_kwargs: {"ok": False},
     )
-    assert res["passed"] is False
-    p3a = next(p for p in res["probes"] if "P3a" in p["name"])
-    assert p3a["passed"] is False
-    assert _TOK not in json.dumps(res)  # token in the exception must be redacted
+
+    assert result["passed"] is False
+    assert result["probes"][0]["observed"] == "unexpected structured result"
 
 
-def test_p3b_fail_when_raw_sdk_unexpectedly_accepts():
-    # If the raw SDK ACCEPTS the token, the C≠D invariant is violated → P3b fails.
-    res = run_claude_code_oauth_probe(
-        _TOK,
-        cli_fn=lambda: (True, "ok"),
-        raw_sdk_fn=lambda: (False, "raw SDK ACCEPTED the token — invariant violated"),
+def test_probe_failure_is_redacted_and_never_retried():
+    from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+
+    calls = 0
+    sentinel = "claude-setup-FAKEtok-AbCdEf0123456789ZyXwVu"
+
+    def fail(**_kwargs):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError(f"provider rejected {sentinel}")
+
+    result = run_claude_code_oauth_probe(
+        credential_id="local:7",
+        token_store=object(),
+        structured_output_fn=fail,
     )
-    assert res["passed"] is False
-    p3b = next(p for p in res["probes"] if "P3b" in p["name"])
-    assert p3b["passed"] is False and "violated" in p3b["observed"]
+
+    assert result["passed"] is False
+    assert calls == 1
+    assert sentinel not in json.dumps(result)
 
 
-def test_probe_never_raises_even_if_both_fail():
-    res = run_claude_code_oauth_probe(
-        _TOK,
-        cli_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
-        raw_sdk_fn=lambda: (_ for _ in ()).throw(RuntimeError("kaboom")),
-    )
-    assert res["passed"] is False and len(res["probes"]) == 2
+def test_probe_module_has_no_external_cli_or_raw_sdk_fallback():
+    import src.auth_drivers.claude_oauth_probe as probe
+
+    source = Path(probe.__file__).read_text(encoding="utf-8")
+    assert "subprocess" not in source
+    assert "shutil.which" not in source
+    assert "_default_raw_sdk_reject_probe" not in source
 
 
-# --- the default raw-SDK reject probe: an auth error means PASS ---------------
-def test_default_raw_sdk_probe_treats_auth_error_as_pass(monkeypatch):
-    import src.auth_drivers.claude_oauth_probe as mod
-
-    class FakeAuthError(Exception):
-        pass
-
-    class FakeClient:
-        def __init__(self, *a, **k):
-            pass
-
-        class messages:  # noqa: N801
-            @staticmethod
-            def create(*a, **k):
-                raise FakeAuthError("401 authentication_error: invalid x-api-key")
-
-    monkeypatch.setattr(mod, "_anthropic_client", lambda token: FakeClient())
-    passed, observed = mod._default_raw_sdk_reject_probe(_TOK)
-    assert passed is True and "reject" in observed.lower()
-
-
-def test_default_raw_sdk_probe_fails_if_call_succeeds(monkeypatch):
-    import src.auth_drivers.claude_oauth_probe as mod
-
-    class FakeClient:
-        class messages:  # noqa: N801
-            @staticmethod
-            def create(*a, **k):
-                return object()  # unexpected success
-
-    monkeypatch.setattr(mod, "_anthropic_client", lambda token: FakeClient())
-    passed, observed = mod._default_raw_sdk_reject_probe(_TOK)
-    assert passed is False and "accept" in observed.lower()
+def test_superseded_external_claude_driver_is_absent():
+    root = Path(__file__).resolve().parents[1]
+    assert not (root / "src/auth_drivers/claude_code_oauth_driver.py").exists()
