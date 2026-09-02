@@ -1,5 +1,13 @@
 # LLM Auth Driver Plan
 
+> **Current-runtime supersession (2026-09-03):** The nested
+> `src/tools/code_generator.py` transport and its external Codex/Claude CLI
+> launchers were retired. Current subscription consumers use reviewed bundled
+> runtimes through `src/auth_drivers/`; direct API-key consumers use the normal
+> provider SDK paths. References below to `code_generator`, `codex exec`, or
+> `claude -p` describe the historical design baseline, not a supported current
+> execution route.
+>
 > **Status:** PARTIALLY BUILT — was DESIGN-ONLY; drafted + gpt-5.5-reviewed, all §13 decisions RESOLVED 2026-06-15. **Built + unit-tested: S0 contract · S1 factory + `CredentialStore` delta · S2 standard `api_key` drivers (A+D) · S4 Anthropic `claude_code_oauth` SDK subscription driver — plus the 7B AI-研究 Research-stream consumer, live-validated on the Claude subscription (real tool call, built-ins locked, no token leak; commits `5f0ea35`→`9131f7f`).** **NEXT = S3 (OpenAI `chatgpt_oauth`), probe-first (run P2 before any Settings row).** S5 (full agent-loop wire-in) stays a separate future slice. Built code lives in `src/auth_drivers/` (+ `src/api/routes/query.py` for the 7B consumer); the 7B SDK-driver design detail = [SLICE_7B3_SDK_DRIVER_DESIGN.md](SLICE_7B3_SDK_DRIVER_DESIGN.md). Grounded in Novelloom's auth subsystem (`/mnt/md0/PycharmProjects/novelloom/src/novelloom/shared/auth/`, `docs/14_llm_access_and_auth.md`, `docs/19_chatgpt_oauth_backend_compatibility.md`) and ArkScope's current auth surface (`src/model_credentials.py`, `src/tools/code_generator.py`, `src/api/routes/config_routes.py`, `src/agents/{anthropic,openai}_agent/agent.py`, `src/api/routes/query.py`). Authored via an Opus-4.8 workflow (4 grounded readers → synthesis) + a spot-check of the load-bearing Novelloom claims (base_url / token-as-api_key / Protocol shape verified against source).
 >
 > **One-line goal:** Introduce a provider-neutral `AuthDriver` abstraction (borrowed FORM from Novelloom) that becomes the single client/strategy factory for all LLM credentials — built and tested BEFORE any rewiring of the agent loops or C-2 persistence.

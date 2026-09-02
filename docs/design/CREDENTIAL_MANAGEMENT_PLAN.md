@@ -1,5 +1,12 @@
 # Credential Management Plan — file-vs-DB, manual switch, export/import
 
+> **Current-runtime supersession (2026-09-03):** The nested
+> `src/tools/code_generator.py` and its CLI/API fallback matrix were retired.
+> References below to that module are retained as historical implementation
+> evidence; they do not describe a current credential consumer. Provider API
+> clients and reviewed subscription adapters remain separate transports behind
+> the shared credential/auth contracts.
+
 **Status:** DESIGN (awaiting user approval before Slices 3–6). Slices 0–1 +
 Supabase hygiene already landed (see §9). Companion to
 `LLM_AUTH_DRIVER_PLAN.md` (the driver/auth-mode matrix); this doc covers *where

@@ -130,6 +130,20 @@ def test_current_tool_catalog_has_the_exact_direct_contract():
     assert "background?" not in row
 
 
+def test_product_spec_records_the_unimplemented_permission_and_sandbox_boundary():
+    root = Path(__file__).resolve().parents[1]
+    product_spec = (root / "docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md").read_text(
+        encoding="utf-8"
+    )
+    boundary = product_spec.split("**Implementation boundary (2026-09-03):**", 1)[1]
+    boundary = boundary.split("### 4.4", 1)[0]
+
+    assert "not an implemented" in boundary
+    assert "records intent only" in boundary
+    assert "not an OS sandbox" in boundary
+    assert "filesystem, network, process, or resource isolation" in boundary
+
+
 def test_execution_tool_remains_present_in_both_agent_bridges():
     from src.agents.anthropic_agent.tools import get_anthropic_tools
     from src.agents.openai_agent.tools import create_openai_tools

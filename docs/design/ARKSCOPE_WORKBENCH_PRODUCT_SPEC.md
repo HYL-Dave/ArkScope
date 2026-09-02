@@ -172,6 +172,16 @@ Rules (LOCK):
 - Money is real BYOK spend, so `metered_spend` is load-bearing — but scoped to that extra-cost tail.
 - (Pattern credited to the three-level approval model distilled from `AI_AGENT_ARCHITECTURE_PATTERNS.md`.)
 
+> **Implementation boundary (2026-09-03):** The ASK/once/session/always
+> permission engine above is still a product contract, not an implemented
+> enforcement layer; `src/api/permissions.py::require_permission` currently
+> records intent only. The Python analysis child now receives a closed
+> non-secret environment, but it is not an OS sandbox and does not provide
+> filesystem, network, process, or resource isolation. Agent admission of this
+> capability remains a release decision until those controls have an executable
+> owner; a closed environment alone must never be presented as satisfying the
+> `code_execution` permission contract.
+
 ### 4.4 Memory & context (capability stance)
 
 - **Memory**: the agent reads/writes its accumulated substrate in the Profile layer (SPEC layer 4); the `memory_strategy` knob governs *recall proactiveness*. Existing memory + compression subsystems are reused — not reinvented. **Memory recall is a free read; memory *writes* go through the `db_write` gate (§4.3).** Even under a proactive `memory_strategy`, the agent produces an *auto-write candidate* that needs user confirmation unless DB-write auto-approve is ON — `memory_strategy` sets how eagerly candidates are *proposed*, not whether they bypass the write gate.
