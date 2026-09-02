@@ -30,6 +30,12 @@ class TestCompactionConfig:
 
 
 class TestAnthropicCompaction:
+    def test_fable_51_supported(self):
+        assert _supports_compaction("claude-fable-5-1") is True
+
+    def test_unregistered_numeric_fable_successor_not_inherited(self):
+        assert _supports_compaction("claude-fable-5-2") is False
+
     def test_opus_46_supported(self):
         assert _supports_compaction("claude-opus-4-7") is True
 

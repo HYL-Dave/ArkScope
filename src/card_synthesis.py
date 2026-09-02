@@ -28,6 +28,11 @@ from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.evidence_packet import EvidencePacket
+from src.model_capabilities import (
+    capability_for,
+    model_auth_admission_detail,
+    model_execution_admission_detail,
+)
 from src.model_routing import task_route_admission_detail
 from src.result_card import (
     ClaimCitation,
@@ -42,6 +47,27 @@ logger = logging.getLogger(__name__)
 Provider = Literal["anthropic", "openai"]
 _TOOL_NAME = "emit_result_card"
 _MAX_TOKENS = 8192  # card JSON is small; well under the 21333 streaming threshold
+
+
+def _anthropic_fixed_task_tool(
+    *, model: str, name: str, description: str, schema: dict[str, Any]
+) -> dict[str, Any]:
+    tool = {
+        "name": name,
+        "description": description,
+        "input_schema": schema,
+    }
+    capability = capability_for(model)
+    if capability is not None and capability.id == "claude-fable-5-1":
+        tool["strict"] = True
+    return tool
+
+
+def _anthropic_fixed_task_tool_choice(model: str, name: str) -> dict[str, str]:
+    capability = capability_for(model)
+    if capability is not None and capability.id == "claude-fable-5-1":
+        return {"type": "auto"}
+    return {"type": "tool", "name": name}
 
 
 def _require_task_route(provider: Provider, model: str, effort: str) -> None:
@@ -201,6 +227,9 @@ def _subscription_structured_output_if_active(
     An OAuth-active call never reaches those clients, so it cannot silently bill
     a key after the user selected subscription auth.
     """
+    execution_detail = model_execution_admission_detail(model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
     from src.auth_drivers.live_resolver import resolve_live_auth
 
     resolution = resolve_live_auth(provider)
@@ -209,6 +238,9 @@ def _subscription_structured_output_if_active(
     if not resolution.credential_id:
         raise RuntimeError(f"{provider} subscription credential has no id")
     auth_mode = "chatgpt_oauth" if provider == "openai" else "claude_code_oauth"
+    detail = model_auth_admission_detail(model, auth_mode)
+    if detail is not None:
+        raise ValueError(detail)
     from src.auth_drivers.subscription_structured_output import (
         run_subscription_structured_output,
     )
@@ -306,13 +338,14 @@ def _synthesize_anthropic(
                 system=_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_message}],
                 tools=[
-                    {
-                        "name": _TOOL_NAME,
-                        "description": "Emit the structured §2 result card.",
-                        "input_schema": _CARD_TOOL_SCHEMA,
-                    }
+                    _anthropic_fixed_task_tool(
+                        model=model,
+                        name=_TOOL_NAME,
+                        description="Emit the structured §2 result card.",
+                        schema=_CARD_TOOL_SCHEMA,
+                    )
                 ],
-                tool_choice={"type": "tool", "name": _TOOL_NAME},
+                tool_choice=_anthropic_fixed_task_tool_choice(model, _TOOL_NAME),
                 **kwargs,
             )
         except AnthropicAPITimeoutError as exc:
@@ -829,13 +862,16 @@ def _translate_anthropic(
                 system=system,
                 messages=[{"role": "user", "content": user}],
                 tools=[
-                    {
-                        "name": "emit_translation",
-                        "description": f"Emit the {target} translation of the given fields.",
-                        "input_schema": schema,
-                    }
+                    _anthropic_fixed_task_tool(
+                        model=model,
+                        name="emit_translation",
+                        description=f"Emit the {target} translation of the given fields.",
+                        schema=schema,
+                    )
                 ],
-                tool_choice={"type": "tool", "name": "emit_translation"},
+                tool_choice=_anthropic_fixed_task_tool_choice(
+                    model, "emit_translation"
+                ),
                 **kwargs,
             )
         except AnthropicAPITimeoutError as exc:

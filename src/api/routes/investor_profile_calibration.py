@@ -22,10 +22,16 @@ from src.investor_profile_calibration import (
 from src.investor_profile_calibration_agent import (
     CalibrationResultParseError,
     live_calibration_responder as default_calibration_responder,
+    resolve_calibration_execution,
     unavailable_responder,
 )
 from src.investor_profile_calibration_policy import CALIBRATION_TOPIC_IDS, OPENING_PROMPTS
 from src.research_errors import sanitize_research_detail
+from src.model_capabilities import (
+    model_auth_admission_detail,
+    model_execution_admission_detail,
+)
+from src.model_credentials import CredentialStore
 
 router = APIRouter(prefix="/profile/investor/calibration", tags=["investor_profile"])
 _default_responder = default_calibration_responder
@@ -211,6 +217,43 @@ def _turn_input_error(exc: ValueError) -> HTTPException:
     return _bad(400, "invalid_calibration_turn", "Calibration turn input is invalid.")
 
 
+def _require_calibration_execution(
+    *,
+    provider: str | None,
+    model: str | None,
+    store: CalibrationStore,
+) -> tuple[str, str]:
+    """Reject an ineligible calibration route before any turn/message write."""
+    try:
+        chosen_provider, chosen_model = resolve_calibration_execution(provider, model)
+    except ValueError as exc:
+        raise _bad(
+            400,
+            "calibration_provider_invalid",
+            "Calibration provider is invalid.",
+        ) from exc
+
+    detail = model_execution_admission_detail(chosen_model)
+    if detail is not None:
+        raise HTTPException(status_code=422, detail=detail)
+
+    from src.auth_drivers.live_resolver import resolve_live_auth
+
+    resolution = resolve_live_auth(
+        chosen_provider,
+        store=CredentialStore(store.db_path),
+    )
+    auth_mode = (
+        ("chatgpt_oauth" if chosen_provider == "openai" else "claude_code_oauth")
+        if resolution.source == "oauth_driver_unwired"
+        else "api_key"
+    )
+    detail = model_auth_admission_detail(chosen_model, auth_mode)
+    if detail is not None:
+        raise HTTPException(status_code=422, detail=detail)
+    return chosen_provider, chosen_model
+
+
 def _completion_error(store: CalibrationStore, work: ProviderWork, exc: CalibrationOperationError):
     failed = store.get_turn(work.turn.id)
     diagnostic = failed.diagnostic if failed is not None else exc.diagnostic
@@ -348,6 +391,11 @@ async def send_calibration_message(
     session_id = body.session_id or (active.id if active else None)
     if not session_id:
         raise _bad(409, "calibration_session_required", "Start a calibration session first.")
+    _require_calibration_execution(
+        provider=body.provider,
+        model=body.model,
+        store=store,
+    )
     require_profile_state_write(
         "investor_profile_calibration_message",
         {"session_id": session_id, "turn_id": body.turn_id},
@@ -371,6 +419,22 @@ async def retry_calibration_turn(
     body: CalibrationRetryBody,
     store: CalibrationStore = Depends(get_investor_calibration_store),
 ):
+    turn = store.get_turn(turn_id)
+    if (
+        turn is not None
+        and turn.status in {"failed", "interrupted"}
+        and turn.error_code != "calibration_session_superseded"
+    ):
+        persisted_route = store.get_turn_execution_route(turn_id)
+        if persisted_route is not None:
+            persisted_provider, persisted_model = persisted_route
+            _require_calibration_execution(
+                provider=(
+                    body.provider if body.provider is not None else persisted_provider
+                ),
+                model=body.model if body.model is not None else persisted_model,
+                store=store,
+            )
     require_profile_state_write(
         "investor_profile_calibration_retry", {"turn_id": turn_id}
     )
@@ -390,6 +454,11 @@ async def request_calibration_proposal(
     session_id = body.session_id or (active.id if active else None)
     if not session_id:
         raise _bad(409, "calibration_session_required", "Start a calibration session first.")
+    _require_calibration_execution(
+        provider=body.provider,
+        model=body.model,
+        store=store,
+    )
     require_profile_state_write(
         "investor_profile_calibration_proposal_request",
         {"session_id": session_id, "turn_id": body.turn_id},

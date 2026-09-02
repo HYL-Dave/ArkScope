@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ApiStatus } from "./api";
+import type { ApiStatus, RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
@@ -28,7 +28,10 @@ const STATUS: StatusState = { kind: "ready", status: API_STATUS };
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-async function renderDashboard(locale: "zh-Hant" | "en") {
+async function renderDashboard(
+  locale: "zh-Hant" | "en",
+  runtime: RuntimeConfig | null = null,
+) {
   await act(async () => {
     await i18n.changeLanguage(locale);
   });
@@ -39,7 +42,7 @@ async function renderDashboard(locale: "zh-Hant" | "en") {
     root!.render(
       <DashboardView
         status={STATUS}
-        runtime={null}
+        runtime={runtime}
         onRetry={() => undefined}
         developerMode
         onDeveloperModeChange={() => undefined}
@@ -91,5 +94,44 @@ describe("Dashboard stored data-source presentation", () => {
     for (const raw of ["news_tickers", "price_tickers", "fundamentals_tickers"]) {
       expect(en.textContent).not.toContain(raw);
     }
+  });
+
+  it("uses the canonical Content translation label in Developer Mode", async () => {
+    const runtime = {
+      anthropic: {
+        model: "claude-opus-5", model_advanced: "claude-opus-4-8",
+        effort: "high", thinking: true, key_set: true, credentials: [],
+      },
+      openai: {
+        model: "gpt-5.6-luna", model_advanced: "gpt-5.6-sol",
+        reasoning_effort: "high", key_set: true, credentials: [],
+      },
+      card_synthesis: {
+        task: "card_synthesis", provider: "anthropic", model: "claude-opus-5",
+        effort: "high", source: "default", custom: false, warning: null,
+      },
+      card_translation: {
+        task: "card_translation", provider: "anthropic", model: "claude-sonnet-5",
+        effort: "medium", source: "default", custom: false, warning: null,
+      },
+      ai_research: {
+        task: "ai_research", provider: "openai", model: "gpt-5.6-luna",
+        effort: "xhigh", source: "default", custom: false, warning: null,
+      },
+      research_runtime: {
+        max_tool_calls: 10, session_timeout_s: 900, per_tool_timeout_s: 120,
+        source: "default", db_saved: false, warning: null,
+      },
+      data_keys: {},
+    } satisfies RuntimeConfig;
+
+    const zh = await renderDashboard("zh-Hant", runtime);
+    expect(zh.textContent).toContain("內容翻譯");
+    expect(zh.textContent).not.toContain("card translation");
+
+    await unmountDashboard();
+    const en = await renderDashboard("en", runtime);
+    expect(en.textContent).toContain("Content translation");
+    expect(en.textContent).not.toContain("card translation");
   });
 });

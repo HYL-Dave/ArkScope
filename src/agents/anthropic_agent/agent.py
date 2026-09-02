@@ -28,7 +28,11 @@ from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 from ..shared.token_tracker import TokenTracker
 
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
-from src.model_capabilities import all_models, capability_for
+from src.model_capabilities import (
+    all_models,
+    capability_for,
+    model_execution_admission_detail,
+)
 
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
 # The beta header is a wire constant; WHICH models support compaction is a
@@ -41,7 +45,12 @@ _COMPACTION_MODELS = frozenset(
 
 def _supports_compaction(model: str) -> bool:
     """Check if the model supports server-side compaction."""
-    return any(model.startswith(m) for m in _COMPACTION_MODELS)
+    capability = capability_for(model)
+    return bool(
+        capability is not None
+        and capability.provider == "anthropic"
+        and capability.supports_compaction
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -129,12 +138,22 @@ def _get_model_max_output(model: str) -> int:
 
 def _supports_adaptive_thinking(model: str) -> bool:
     """Adaptive-thinking-capable models per the registry (any adaptive mode)."""
-    return any(model.startswith(m) for m in _ADAPTIVE_THINKING_MODELS)
+    capability = capability_for(model)
+    return bool(
+        capability is not None
+        and capability.provider == "anthropic"
+        and capability.thinking_mode.startswith("adaptive")
+    )
 
 
 def _supports_effort(model: str) -> bool:
     """output_config.effort support per the registry."""
-    return any(model.startswith(m) for m in _EFFORT_MODELS)
+    capability = capability_for(model)
+    return bool(
+        capability is not None
+        and capability.provider == "anthropic"
+        and capability.effort_options
+    )
 
 
 def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
@@ -238,6 +257,18 @@ async def run_query_stream(
     # Get config
     config = get_agent_config()
     model_name = model or config.anthropic_model
+
+    execution_detail = model_execution_admission_detail(model_name)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
+
+    from src.model_capabilities import client_compaction_admission_detail
+
+    compaction_detail = client_compaction_admission_detail(
+        model_name, config.compaction_enabled
+    )
+    if compaction_detail is not None:
+        raise ValueError(compaction_detail)
 
     # Initialize client from the ACTIVE credential (api_key wire-in; OAuth-active
     # falls back to env ANTHROPIC_API_KEY with an explicit log — Slice 6).

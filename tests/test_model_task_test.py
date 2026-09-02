@@ -231,6 +231,24 @@ def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
     assert len(calls["api"]) == 1
 
 
+def test_fable_5_1_oauth_test_is_rejected_before_any_provider_call(
+    monkeypatch, tmp_path
+):
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active("claude_code_oauth", "anthropic"),
+        task="card_translation",
+        provider="anthropic",
+        model="claude-fable-5-1",
+        effort="low",
+    )
+
+    assert result.status == "unsupported"
+    assert result.error_code == "model_auth_unverified"
+    assert calls == {"api": [], "driver": [], "subscription": []}
+
+
 def test_dispatch_precedence_rejects_cross_provider_oauth_before_capability(monkeypatch, tmp_path):
     result, calls, _ = _run(
         monkeypatch, tmp_path,

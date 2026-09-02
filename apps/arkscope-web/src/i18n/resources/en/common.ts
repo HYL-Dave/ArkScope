@@ -48,6 +48,7 @@ const common = {
       missingActiveCredential: "No sign-in is configured for this provider",
       taskAuthModeUnsupported: "This sign-in method does not support the task",
       taskTestUnsupported: "This sign-in method does not yet support live testing",
+      modelAuthUnverified: "This model has not been live-verified for this sign-in. Use an API key or choose another model",
       taskCapabilityMissing: "Task capability is missing",
       modelNotVisible: "This model does not appear in the discovery list for this sign-in",
       modelNotInRegistry: "Custom or unknown model; capabilities are unverified",

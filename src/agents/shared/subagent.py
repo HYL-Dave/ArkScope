@@ -22,7 +22,11 @@ logger = logging.getLogger(__name__)
 # GA models need no beta header; legacy beta models still do. Membership is a
 # registry fact (context_mode in src/model_capabilities.py) — P2.7 convergence.
 # The header string itself is a wire constant and stays here.
-from src.model_capabilities import all_models as _all_capabilities
+from src.model_capabilities import (
+    all_models as _all_capabilities,
+    capability_for,
+    model_execution_admission_detail,
+)
 
 _1M_GA_MODELS = frozenset(
     c.id for c in _all_capabilities("anthropic") if c.context_mode == "ga_1m"
@@ -41,7 +45,12 @@ def _use_extended_context_beta(model: str, enabled: bool) -> bool:
     """
     if not enabled:
         return False
-    return any(model.startswith(m) for m in _1M_BETA_MODELS)
+    capability = capability_for(model)
+    return bool(
+        capability is not None
+        and capability.provider == "anthropic"
+        and capability.context_mode == "beta_1m"
+    )
 
 
 # ── Provider detection ─────────────────────────────────────────
@@ -393,6 +402,9 @@ def _run_anthropic_subagent(
     dal: Any,
 ) -> Dict[str, Any]:
     """Run a subagent using the Anthropic SDK (simplified messages loop)."""
+    execution_detail = model_execution_admission_detail(config.model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
     from anthropic import Anthropic
 
     from ..anthropic_agent.agent import (

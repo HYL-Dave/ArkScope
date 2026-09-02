@@ -79,6 +79,7 @@ describe("Models terminology", () => {
           "尚未設定此 provider 的登入",
           "此登入方式不支援這個任務",
           "此登入方式尚不支援實際測試",
+          "此登入尚未實際驗證此模型；請改用 API key 或選擇其他模型",
           "缺少任務能力",
           "此登入的探索清單未顯示此模型",
           "自訂／未知模型，尚未驗證能力",
@@ -102,6 +103,7 @@ describe("Models terminology", () => {
           "No sign-in is configured for this provider",
           "This sign-in method does not support the task",
           "This sign-in method does not yet support live testing",
+          "This model has not been live-verified for this sign-in. Use an API key or choose another model",
           "Task capability is missing",
           "This model does not appear in the discovery list for this sign-in",
           "Custom or unknown model; capabilities are unverified",
@@ -128,6 +130,7 @@ describe("Models terminology", () => {
       "missing_active_credential",
       "task_auth_mode_unsupported",
       "task_test_unsupported",
+      "model_auth_unverified",
       "task_capability_missing",
       "model_not_visible",
       "model_not_in_registry",
@@ -173,9 +176,9 @@ const route = (provider: "openai" | "anthropic", model: string): TaskRoute => ({
 const taskCatalog = {
   current_model_ids: [
     "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-    "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
   ],
-  retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+  retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
   effort_options: {
     openai: ["low", "medium", "high", "xhigh", "max"].map((id) => ({
       id, provider: "openai" as const, label: id, description: id, applies_to_card_tasks: true,
@@ -188,7 +191,7 @@ const taskCatalog = {
     ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
       id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
     })),
-    ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+    ...["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
       id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
     })),
   ],

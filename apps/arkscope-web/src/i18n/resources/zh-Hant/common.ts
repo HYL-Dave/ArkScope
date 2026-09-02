@@ -48,6 +48,7 @@ const common = {
       missingActiveCredential: "尚未設定此 provider 的登入",
       taskAuthModeUnsupported: "此登入方式不支援這個任務",
       taskTestUnsupported: "此登入方式尚不支援實際測試",
+      modelAuthUnverified: "此登入尚未實際驗證此模型；請改用 API key 或選擇其他模型",
       taskCapabilityMissing: "缺少任務能力",
       modelNotVisible: "此登入的探索清單未顯示此模型",
       modelNotInRegistry: "自訂／未知模型，尚未驗證能力",

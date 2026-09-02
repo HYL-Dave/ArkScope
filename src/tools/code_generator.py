@@ -121,6 +121,11 @@ def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
     Code generation 一律給模型最大 output 空間 — thinking 開啟時 budget 從中扣，
     關閉時也直接給 model max（code 長度不可預測，不限制自由度）。
     """
+    from src.model_capabilities import model_execution_admission_detail
+
+    execution_detail = model_execution_admission_detail(model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
     from ..agents.config import get_agent_config
     from ..agents.anthropic_agent.agent import (
         _get_model_max_output,
@@ -312,6 +317,11 @@ def _call_llm(messages: List[dict], model: str, system: str = "") -> str:
 
     CLI backends (codex/claude) auto-fallback to API on failure.
     """
+    from src.model_capabilities import model_execution_admission_detail
+
+    execution_detail = model_execution_admission_detail(model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
     from ..agents.config import get_agent_config
     backend = get_agent_config().code_backend
 

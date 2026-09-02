@@ -40,6 +40,17 @@ def test_task_auth_executable_matrix():
     assert task_auth_executable("card_synthesis", "openai", "api_key", opus) is False
 
 
+def test_fable_5_1_api_key_is_executable_but_oauth_is_not_live_verified():
+    fable = capability_for("claude-fable-5-1")
+
+    assert fable is not None
+    for task in ("card_synthesis", "card_translation", "ai_research"):
+        assert task_auth_executable(task, "anthropic", "api_key", fable) is True
+        assert task_auth_executable(
+            task, "anthropic", "claude_code_oauth", fable
+        ) is False
+
+
 def _routes_mixed() -> dict:
     # Round-3 MF1: the DEFAULT config shape — anthropic cards + openai research.
     return {
@@ -167,6 +178,49 @@ def test_effective_view_anthropic_oauth_research_is_executable_but_seed_only(tmp
     assert any(m["badge"] == "seed" for m in view["tasks"]["card_synthesis"]["advanced"])
 
 
+def test_effective_view_marks_fable_5_1_oauth_seed_ineligible(tmp_path):
+    routes = {
+        task: TaskRoute(
+            task=task,
+            provider="anthropic",
+            model="claude-fable-5-1",
+            effort="high",
+        )
+        for task in ("card_synthesis", "card_translation", "ai_research")
+    }
+    credentials = {
+        "anthropic": ActiveCredential(
+            provider="anthropic",
+            credential_id="ao",
+            auth_mode="claude_code_oauth",
+            secret_fingerprint="oauth",
+        ),
+        "openai": None,
+    }
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        credential_id="ao",
+        secret_fingerprint="oauth",
+        status="seed_only",
+        models=[],
+    )
+
+    view = effective_model_view_v2(
+        cache=cache,
+        routes=routes,
+        credentials=credentials,
+    )
+
+    for task in routes:
+        entries = view["tasks"][task]["providers"]["anthropic"]["models"]
+        fable = next(entry for entry in entries if entry["id"] == "claude-fable-5-1")
+        assert fable["status"] == "seed"
+        assert fable["eligible"] is False
+        assert fable["reason_code"] == "model_auth_unverified"
+
+
 def test_effective_view_missing_credential_fails_closed(tmp_path):
     view = effective_model_view(cache=ModelDiscoveryCache(tmp_path / "p.db"),
                                 routes=_routes_mixed(),
@@ -254,7 +308,7 @@ def test_dated_discovery_ids_resolve_to_registry_capability(tmp_path):
     cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
     cache.record_run(provider="anthropic", auth_mode="api_key", credential_id="a1",
                      secret_fingerprint=_fp("sk-ant"), status="ok",
-                     models=[{"id": "claude-fable-5-20261001", "label": "Fable 5",
+                     models=[{"id": "claude-fable-5-1-20260901", "label": "Fable 5.1",
                               "source": "provider_api"}])
     creds = {
         "anthropic": ActiveCredential(provider="anthropic", credential_id="a1",
@@ -265,9 +319,9 @@ def test_dated_discovery_ids_resolve_to_registry_capability(tmp_path):
     view = effective_model_view(cache=cache, routes=_routes_mixed(), credentials=creds)
     synth = view["tasks"]["card_synthesis"]
     verified_ids = [m["id"] for m in synth["verified"]]
-    assert "claude-fable-5-20261001" in verified_ids   # real executable id kept
+    assert "claude-fable-5-1-20260901" in verified_ids   # real executable id kept
     all_ids = verified_ids + [m["id"] for m in synth["advanced"]]
-    assert "claude-fable-5-20261001" in all_ids        # never vanishes
+    assert "claude-fable-5-1-20260901" in all_ids        # never vanishes
 
 
 def test_unknown_discovery_ids_do_not_flood_advanced(tmp_path):
@@ -393,7 +447,11 @@ def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
     assert anthropic_card["executable"] is True
     assert anthropic_card["reason_code"] is None
     assert anthropic_card["models"]
-    assert all(entry["eligible"] is True for entry in anthropic_card["models"])
+    sonnet = next(entry for entry in anthropic_card["models"] if entry["id"] == "claude-sonnet-5")
+    fable = next(entry for entry in anthropic_card["models"] if entry["id"] == "claude-fable-5-1")
+    assert sonnet["eligible"] is True
+    assert fable["eligible"] is False
+    assert fable["reason_code"] == "model_auth_unverified"
 
 
 def test_v2_route_pin_unknown_model_is_eligible_with_warning(tmp_path):
@@ -448,7 +506,7 @@ def test_v2_thinking_mode_carried_from_registry(tmp_path):
     entries = {}
     for block in view["tasks"]["ai_research"]["providers"].values():
         entries.update({entry["id"]: entry for entry in block["models"]})
-    assert entries["claude-fable-5"]["thinking_mode"] == "adaptive_always_on"
+    assert entries["claude-fable-5-1"]["thinking_mode"] == "adaptive_always_on"
     assert entries["claude-sonnet-5"]["thinking_mode"] == "adaptive_default_on"
     assert entries["claude-opus-5"]["thinking_mode"] == "adaptive_default_on"
     assert entries["gpt-5.6-luna"]["thinking_mode"] == "none"

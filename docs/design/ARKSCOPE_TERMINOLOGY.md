@@ -126,6 +126,7 @@ printed in the interface.
 | Model picker group | Advanced / unverified | 進階／未驗證 | Compatibility state remains explicit metadata. |
 | Model picker group | Current route | 目前路由 | The persisted route, even when absent from discovery. |
 | Model compatibility note | Legacy sidecar compatibility mode | 舊 sidecar 相容模式 | Compose from `baseLabel` plus explicit compatibility; never parse a decorated label. |
+| Fixed AI task | Content translation | 內容翻譯 | `card_translation` remains the durable identifier; former wording may remain only as an invisible search alias. |
 | Fixed-task runtime section | Fixed AI Task Runtime Limits | 固定 AI 任務執行限制 | Covers card synthesis and translation runtime bounds. |
 | Research runtime section | AI Research Runtime Limits | AI 研究執行限制 | Covers AI Research session and run bounds. |
 | Investor settings section | Investor Profile | 投資人設定 | Current profile, calibration, and personalization owner. |

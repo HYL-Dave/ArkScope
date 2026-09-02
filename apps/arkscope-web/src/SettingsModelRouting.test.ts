@@ -34,7 +34,7 @@ const controls = vi.hoisted(() => ({
 
 const CURRENT_MODEL_IDS = [
   "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-  "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+  "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
 ] as const;
 const TASK_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"];
 
@@ -97,13 +97,14 @@ const catalog: ModelCatalog = {
     anthropic: TASK_EFFORT_IDS.map((id) => ({ id, provider: "anthropic" as const, label: id, description: "", applies_to_card_tasks: true })),
   },
   current_model_ids: [...CURRENT_MODEL_IDS],
-  retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+  retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
   model_lifecycle: [
     { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
     { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
     { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
     { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
-    { id: "claude-fable-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+    { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
+    { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
     { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
     { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
     { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },

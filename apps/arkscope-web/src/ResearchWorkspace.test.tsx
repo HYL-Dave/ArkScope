@@ -72,15 +72,16 @@ function catalog(
     }],
     current_model_ids: [
       "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-      "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+      "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
     ],
-    retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
     model_lifecycle: [
       { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
       { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
-      { id: "claude-fable-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
       { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
@@ -89,7 +90,7 @@ function catalog(
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
         id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
       })),
-      ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+      ...["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
         id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
       })),
     ] as unknown as ModelCatalog["models"],
@@ -141,7 +142,7 @@ function catalog(
               executable: true, reason_code: null, cache_state: "seed_only",
               discovered_at: null,
               models: [
-                model("claude-fable-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
+                model("claude-fable-5-1", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
                 model("claude-opus-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
                 model("claude-sonnet-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
               ],
@@ -645,6 +646,27 @@ describe("Research workspace contracts", () => {
     } finally {
       i18n.addResource("en", "research", "workspace.effortSummary", originalEffortSummary);
     }
+  });
+
+  it("keeps retired Fable 5 provenance visible in historical messages", async () => {
+    await i18n.changeLanguage("en");
+    vi.stubGlobal("fetch", stubFetch({
+      threads: [thread("fable-history", "Historical Fable run")],
+      messages: {
+        "fable-history": [message("Historical answer", {
+          provider: "anthropic",
+          model: "claude-fable-5",
+          effort: "max",
+        })],
+      },
+    }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "fable-history");
+
+    await mountResearch();
+    await vi.waitFor(() => expect(host!.textContent).toContain("Historical answer"));
+
+    const provenance = host!.querySelector(".research-bubble.assistant .research-model")!;
+    expect(provenance.textContent).toBe("anthropic/claude-fable-5 · max");
   });
 
   it("renders late stream outcomes in the current locale without replaying the request", async () => {

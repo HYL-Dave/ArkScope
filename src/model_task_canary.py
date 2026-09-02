@@ -23,7 +23,7 @@ from src.auth_drivers.subscription_structured_output import (
     SubscriptionStructuredOutputError,
     run_subscription_structured_output_async,
 )
-from src.model_capabilities import capability_for
+from src.model_capabilities import capability_for, model_auth_admission_detail
 from src.model_credentials import resolve_active_credential, test_model
 from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_effective import task_capability_ok
@@ -334,6 +334,18 @@ async def dispatch_task_model_test(
         return _result(
             task=task, provider=provider, model=model, effort=effort,
             active=active, status="unsupported", error_code="task_capability_missing",
+        )
+
+    auth_detail = model_auth_admission_detail(model, active.auth_mode)
+    if auth_detail is not None:
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="unsupported",
+            error_code=auth_detail["code"],
         )
 
     try:
