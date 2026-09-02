@@ -103,4 +103,3 @@ prior runs, and storage provenance move to a lazy audit view. That endpoint
 also uses closed projections. Original SEC excerpts remain available for
 citation and on-demand translation; they are not repeated in the primary
 summary.
-

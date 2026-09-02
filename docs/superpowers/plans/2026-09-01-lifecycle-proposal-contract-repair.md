@@ -129,4 +129,3 @@ Run: `git diff --check`
 
 Confirm no schema, collector, SEC policy, or production-data file changed in
 this slice.
-
