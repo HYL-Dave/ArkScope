@@ -120,8 +120,8 @@ approach yourself, choose appropriate statistical methods, and implement them
 You can retrieve structured price and fundamental data with available ArkScope
 tools and then analyze it with execute_python_analysis.
 
-Use execute_python_analysis with the `task` parameter for auto code generation,
-or provide direct `code` for precise control.
+Write the Python yourself and call execute_python_analysis with `code`. Inspect
+explicit execution errors before correcting and retrying through your tool loop.
 
 Available packages: numpy, pandas, scipy, json, math, statistics, datetime.
 Always print results clearly to stdout. Handle edge cases (NaN, missing data,

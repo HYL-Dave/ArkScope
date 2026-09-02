@@ -5,7 +5,6 @@ Provides execute_python_code() which:
 1. Validates code via AST (blocked module check)
 2. Runs in a child process with a closed environment and timeout
 3. Supports data injection via stdin (data_json → `data` variable)
-4. Background mode for long-running tasks (Popen + temp file)
 
 This is not an OS sandbox. The AST check and closed environment reduce accidental
 capability and direct credential inheritance; filesystem, network, process, and
@@ -15,16 +14,12 @@ resource isolation require a separate platform sandbox.
 from __future__ import annotations
 
 import ast
-import logging
 import os
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from typing import FrozenSet, Mapping, Optional
-from uuid import uuid4
-
-logger = logging.getLogger(__name__)
 
 # ── Blocked modules ──────────────────────────────────────────
 # These modules are denied at AST level (before code runs).
@@ -89,12 +84,9 @@ def _python_child_environment(
 class CodeExecutionResult:
     """Result of code execution."""
     success: bool
-    output: str            # stdout (or "Background started..." message)
+    output: str            # stdout
     error: str             # stderr or exception message
-    execution_time: float  # seconds (0.0 for background mode)
-    output_file: str = ""  # background mode: temp file path
-    pid: int = 0           # background mode: process PID
-    generated_code: str = ""  # code gen mode: the generated code
+    execution_time: float  # seconds
 
 
 # ── AST validation ───────────────────────────────────────────
@@ -144,19 +136,13 @@ def validate_code(
 # ── Code execution ───────────────────────────────────────────
 
 def execute_python_code(
-    code: str = "",
-    task: str = "",
+    code: str,
     data_json: str = "",
     timeout: int = 120,
-    background: bool = False,
     blocked_modules: FrozenSet[str] = DEFAULT_BLOCKED_MODULES,
 ) -> CodeExecutionResult:
     """
     Execute Python code in an isolated subprocess.
-
-    Two modes:
-    - Direct: provide `code` to execute directly
-    - Code gen: provide `task` to auto-generate code using a coding model
 
     The code has access to:
     - `data` variable (injected from data_json via stdin)
@@ -164,24 +150,14 @@ def execute_python_code(
     - numpy, pandas, scipy, and other installed packages
 
     Args:
-        code: Python code to execute (direct mode)
-        task: Task description for auto code generation (code gen mode)
+        code: Python code to execute
         data_json: JSON string injected as `data` variable
         timeout: Max execution time in seconds (default: 120)
-        background: If True, run non-blocking with output to temp file
         blocked_modules: Set of module names to block
 
     Returns:
-        CodeExecutionResult with output, error, timing, and background info
+        CodeExecutionResult with output, error, and timing
     """
-    # Task mode: delegate to code_generator
-    if task and not code:
-        from .code_generator import generate_and_execute
-        return generate_and_execute(
-            task=task, data_json=data_json,
-            timeout=timeout, background=background,
-        )
-
     # Validate code first (AST check)
     validation_error = validate_code(code, blocked_modules)
     if validation_error is not None:
@@ -198,10 +174,7 @@ def execute_python_code(
     # Ensure data_json is a string (could be empty)
     stdin_data = data_json if data_json else ""
 
-    if background:
-        return _execute_background(full_code, stdin_data)
-    else:
-        return _execute_foreground(full_code, stdin_data, timeout)
+    return _execute_foreground(full_code, stdin_data, timeout)
 
 
 def _execute_foreground(
@@ -246,51 +219,4 @@ def _execute_foreground(
             output="",
             error=f"Execution failed: {e}",
             execution_time=round(elapsed, 3),
-        )
-
-
-def _execute_background(
-    full_code: str,
-    stdin_data: str,
-) -> CodeExecutionResult:
-    """Run code in background subprocess, output to temp file."""
-    output_path = f"/tmp/mindfulrl_exec_{uuid4().hex[:12]}.txt"
-
-    try:
-        # Open output file for subprocess stdout/stderr
-        out_file = open(output_path, "w")
-
-        proc = subprocess.Popen(
-            [sys.executable, "-c", full_code],
-            stdin=subprocess.PIPE,
-            stdout=out_file,
-            stderr=subprocess.STDOUT,
-            env=_python_child_environment(),
-        )
-
-        # Write stdin data and close
-        if stdin_data:
-            proc.stdin.write(stdin_data.encode())
-        proc.stdin.close()
-
-        # Close parent's copy of file descriptor (child has its own)
-        out_file.close()
-
-        logger.info(f"Background execution started: pid={proc.pid} output={output_path}")
-
-        return CodeExecutionResult(
-            success=True,
-            output=f"Background execution started. Output file: {output_path}",
-            error="",
-            execution_time=0.0,
-            output_file=output_path,
-            pid=proc.pid,
-        )
-
-    except Exception as e:
-        return CodeExecutionResult(
-            success=False,
-            output="",
-            error=f"Failed to start background execution: {e}",
-            execution_time=0.0,
         )

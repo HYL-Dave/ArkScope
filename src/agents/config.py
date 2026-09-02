@@ -93,12 +93,6 @@ class AgentConfig(BaseModel):
     # Characters to keep as preview in compacted results
     context_preview_chars: int = 200
 
-    # Code generation model (empty = auto, uses anthropic_model_advanced)
-    code_model: str = ""
-    code_max_retries: int = 3
-    # Code generation backend: api | codex | codex-apikey | claude | claude-apikey
-    code_backend: str = "api"
-
     # 1M extended context beta (Anthropic only, Opus 4.7 + Sonnet 4.5)
     extended_context: bool = False
 
@@ -311,14 +305,6 @@ def get_agent_config() -> AgentConfig:
     # Freshness in prompt
     if "freshness_in_prompt" in llm_prefs:
         config.freshness_in_prompt = llm_prefs["freshness_in_prompt"]
-
-    # Code generation overrides
-    if "code_model" in llm_prefs:
-        config.code_model = llm_prefs["code_model"]
-    if "code_max_retries" in llm_prefs:
-        config.code_max_retries = llm_prefs["code_max_retries"]
-    if "code_backend" in llm_prefs:
-        config.code_backend = llm_prefs["code_backend"]
 
     # 1M extended context beta
     if "extended_context" in llm_prefs:

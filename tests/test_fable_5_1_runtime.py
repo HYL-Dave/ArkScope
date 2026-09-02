@@ -69,32 +69,6 @@ def test_anthropic_agent_rejects_history_only_fable_before_client(monkeypatch):
     assert provider_calls == []
 
 
-def test_code_generator_rejects_history_only_model_before_any_backend(monkeypatch):
-    from src.tools import code_generator
-
-    calls = []
-    monkeypatch.setattr(
-        "src.agents.config.get_agent_config",
-        lambda: SimpleNamespace(code_backend="claude"),
-    )
-    monkeypatch.setattr(
-        code_generator,
-        "_call_claude_cli",
-        lambda *args, **kwargs: calls.append("cli"),
-    )
-    monkeypatch.setattr(
-        code_generator,
-        "_call_anthropic",
-        lambda *args, **kwargs: calls.append("api"),
-    )
-
-    with pytest.raises(ValueError) as exc:
-        code_generator._call_llm([], "claude-fable-5")
-
-    assert exc.value.args[0] == {"code": "model_retired", "field": "model"}
-    assert calls == []
-
-
 def test_anthropic_subagent_rejects_history_only_model_before_client(monkeypatch):
     from src.agents.shared import subagent
 

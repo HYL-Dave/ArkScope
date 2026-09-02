@@ -841,30 +841,22 @@ class ToolRegistry:
             name="execute_python_analysis",
             description=(
                 "Run Python for ANY numerical calculation or data analysis. "
-                "PREFERRED: pass `task` (natural language) — the system auto-generates "
-                "code and retries on errors. Only use `code` for precise hand-crafted "
-                "implementations. Do not calculate mentally; always use this tool. "
-                "Sandbox with numpy, pandas, scipy. Pass data via data_json."
+                "Write the Python code yourself, inspect explicit errors, and retry through "
+                "the normal tool loop when needed. Do not calculate mentally. Runs in a "
+                "restricted child process with numpy, pandas, and scipy; pass all input "
+                "through data_json."
             ),
             function=execute_python_code,
             category="execution",
             requires_dal=False,
             parameters=[
-                ToolParameter("code", "string", "Python code to execute (direct mode)",
-                              required=False, default=""),
-                ToolParameter("task", "string",
-                              "Natural language task description (PREFERRED over code). "
-                              "System auto-generates Python and retries on errors.",
-                              required=False, default=""),
+                ToolParameter("code", "string", "Python code to execute", required=True),
                 ToolParameter("data_json", "string",
                               "JSON string of data to inject (accessible as `data` variable)",
                               required=False, default=""),
                 ToolParameter("timeout", "integer",
                               "Execution timeout in seconds (default: 120)",
                               required=False, default=120),
-                ToolParameter("background", "boolean",
-                              "Run in background, write results to temp file (default: false)",
-                              required=False, default=False),
             ],
         ))
 
