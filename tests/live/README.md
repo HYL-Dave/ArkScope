@@ -10,7 +10,7 @@ must not contain files named `test_*.py`.
 
 | Script | What it proves | Requires |
 |---|---|---|
-| `sdk_driver_smoke.py` | The admitted SDK/CLI pair passes two bounded sessions: one positive in-process MCP control and one locked tool/config surface check. Output is a closed, non-secret evidence object. | Explicit provider-call authorization, profile DB path, stored Anthropic `claude_code_oauth` token, network, and provider entitlement. |
+| `sdk_driver_smoke.py` | The admitted SDK/CLI pair passes two bounded sessions: one positive in-process MCP control and one locked tool/config surface check. Hostile `.mcp.json`, `CLAUDE.md`, and settings fixtures emulate developer-local inputs that the App must not consume. Output is a closed, non-secret evidence object. | Explicit provider-call authorization, profile DB path, stored Anthropic `claude_code_oauth` token, network, and provider entitlement. |
 | `sdk_route_smoke.py` | The `/query/stream` Anthropic subscription helper drives the real driver through the route's exact path. | Same Anthropic requirements; one real subscription call. |
 | `smoke_fred.py` | FRED metadata, release dates, vintage reads, catalog loading, and an in-memory ingestion dry run work against the live API. | FRED API key, network, and provider availability. |
 
