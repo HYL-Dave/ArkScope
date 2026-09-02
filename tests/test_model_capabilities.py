@@ -93,18 +93,18 @@ def test_openai_models_record_model_specific_effort_sets():
 def test_routing_seed_flags_pin_exact_current_membership():
     routing = {c.id for c in all_models() if c.in_routing_seed}
     assert routing == {
-        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
 
 
 def test_picker_visibility_matches_the_ruling():
     vis = {c.id: c.picker_visibility for c in all_models()}
-    for current in ("claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    for current in ("claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
                     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
         assert vis[current] == "default", current
     for pinned in (set(vis) - {
-        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }):
         assert vis[pinned] == "pinned_only", pinned
@@ -115,8 +115,74 @@ def test_default_picker_models_helper():
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
     assert {c.id for c in default_picker_models("anthropic")} == {
-        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
     }
+
+
+def test_fable_5_1_is_current_while_fable_5_is_history_only():
+    current = capability_for("claude-fable-5-1")
+    retired = capability_for("claude-fable-5")
+
+    assert current is not None
+    assert current.task_route_status == "current"
+    assert current.picker_visibility == "default"
+    assert current.in_routing_seed is True
+    assert current.new_execution_allowed is True
+    assert current.unverified_auth_modes == ("claude_code_oauth",)
+
+    assert retired is not None
+    assert retired.task_route_status == "retired"
+    assert retired.picker_visibility == "pinned_only"
+    assert retired.in_routing_seed is False
+    assert retired.new_execution_allowed is False
+
+
+def test_fable_snapshot_prefixes_resolve_to_the_correct_generation():
+    assert capability_for("claude-fable-5-1-20260901").id == "claude-fable-5-1"
+    assert capability_for("claude-fable-5-20260710").id == "claude-fable-5"
+
+
+def test_fable_numeric_successors_are_not_swallowed_by_prefix_matching():
+    assert capability_for("claude-fable-5-2") is None
+    assert capability_for("claude-fable-5-10") is None
+    assert capability_for("claude-fable-5-\u0662") is None
+
+
+def test_fable_5_history_only_admission_is_separate_from_task_route_status():
+    from src.model_capabilities import model_execution_admission_detail
+
+    assert model_execution_admission_detail("claude-fable-5") == {
+        "code": "model_retired",
+        "field": "model",
+    }
+    assert model_execution_admission_detail("claude-fable-5-20260710") == {
+        "code": "model_retired",
+        "field": "model",
+    }
+    assert model_execution_admission_detail("claude-opus-4-8") is None
+    assert model_execution_admission_detail("claude-fable-5-1") is None
+
+
+def test_fable_5_1_client_compaction_is_separate_from_provider_compaction():
+    from src.model_capabilities import client_compaction_admission_detail
+
+    current = capability_for("claude-fable-5-1")
+    retired = capability_for("claude-fable-5")
+
+    assert current.supports_compaction is True
+    assert current.supports_client_compaction is False
+    detail = client_compaction_admission_detail(current.id, True)
+    assert detail == {
+        "code": "model_client_compaction_incompatible",
+        "field": "compaction.enabled",
+        "message": (
+            "Claude Fable 5.1 has not been validated with ArkScope client-side "
+            "compaction. Disable client-side compaction or choose another model."
+        ),
+        "actions": ["disable_client_compaction", "choose_another_model"],
+    }
+    assert client_compaction_admission_detail(current.id, False) is None
+    assert client_compaction_admission_detail(retired.id, True) is None
 
 
 def test_prefix_precedence_is_structural_not_list_order():
@@ -214,7 +280,7 @@ def test_routing_view_keeps_exact_membership_and_capability_facts():
     from src.model_routing import MODEL_CATALOG as ROUTING_VIEW, is_seed_model
 
     assert {m.id for m in ROUTING_VIEW} == {
-        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
     assert is_seed_model("openai", "gpt-5.6-luna")
@@ -245,7 +311,7 @@ def test_single_source_no_local_fact_tables():
 
 
 def test_new_generation_entries_present_with_task0_facts():
-    fable = capability_for("claude-fable-5")
+    fable = capability_for("claude-fable-5-1")
     assert fable is not None and fable.provider == "anthropic"
     assert fable.picker_visibility == "default"
     assert fable.thinking_mode == "adaptive_always_on"
@@ -274,7 +340,7 @@ def test_new_generation_entries_present_with_task0_facts():
 
 def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
     opus5 = capability_for("claude-opus-5")
-    assert len(all_models()) == 18
+    assert len(all_models()) == 19
     assert opus5.provider == "anthropic"
     assert opus5.context_limit == 1_000_000 and opus5.max_output == 128_000
     assert opus5.thinking_mode == "adaptive_default_on"
@@ -287,10 +353,10 @@ def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
 
 
 def test_known_retired_models_keep_capabilities_but_leave_new_task_routes():
-    current = {"claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    current = {"claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
                "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
     retired = {cap.id for cap in all_models()} - current
-    assert len(retired) == 12
+    assert len(retired) == 13
     for model_id in retired:
         capability = capability_for(model_id)
         assert capability is not None, model_id

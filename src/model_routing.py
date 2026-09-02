@@ -315,9 +315,15 @@ def task_route_admission_detail(
     effort: str,
 ) -> dict[str, str] | None:
     """Return the bounded reason an effective task route cannot execute."""
-    from src.model_capabilities import capability_for
+    from src.model_capabilities import (
+        capability_for,
+        model_execution_admission_detail,
+    )
 
     capability = capability_for(model)
+    execution_detail = model_execution_admission_detail(model)
+    if execution_detail is not None:
+        return execution_detail
     if capability is not None and capability.task_route_status == "retired":
         return {"code": "model_retired", "field": "model"}
     if not effort.strip() or effort in ("default", "none"):

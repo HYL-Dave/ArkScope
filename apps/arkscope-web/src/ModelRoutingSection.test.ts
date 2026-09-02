@@ -29,7 +29,7 @@ afterEach(() => {
 
 const CURRENT_MODEL_IDS = [
   "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-  "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+  "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
 ] as const;
 const TASK_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"];
 const MODELS: ModelOption[] = CURRENT_MODEL_IDS.map((id) => ({

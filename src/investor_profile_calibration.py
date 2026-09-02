@@ -507,6 +507,20 @@ class CalibrationStore:
             row = self._turn_row(conn, turn_id)
         return self._turn(row) if row else None
 
+    def get_turn_execution_route(
+        self, turn_id: str
+    ) -> Optional[tuple[Optional[str], Optional[str]]]:
+        """Read the persisted provider/model pair without exposing it in the DTO."""
+        with self._connect_read_only() as conn:
+            row = conn.execute(
+                "SELECT provider, model FROM investor_profile_calibration_turns "
+                "WHERE id=?",
+                (turn_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return row["provider"], row["model"]
+
     def list_turns(self, session_id: str) -> list[CalibrationTurn]:
         with self._connect_read_only() as conn:
             rows = conn.execute(

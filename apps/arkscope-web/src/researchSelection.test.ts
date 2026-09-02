@@ -62,7 +62,7 @@ function catalog(): ModelCatalog {
     reason_code: null,
     cache_state: "seed_only" as const,
     discovered_at: null,
-    models: ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => model(id, ["low", "medium", "high", "xhigh", "max"])),
+    models: ["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5"].map((id) => model(id, ["low", "medium", "high", "xhigh", "max"])),
   };
   return {
     providers: ["openai", "anthropic"],
@@ -75,15 +75,16 @@ function catalog(): ModelCatalog {
     }],
     current_model_ids: [
       "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-      "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+      "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
     ],
-    retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
     model_lifecycle: [
       { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
       { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
-      { id: "claude-fable-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
       { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
@@ -92,7 +93,7 @@ function catalog(): ModelCatalog {
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
         id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
       })),
-      ...["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+      ...["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
         id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
       })),
     ] as unknown as ModelCatalog["models"],

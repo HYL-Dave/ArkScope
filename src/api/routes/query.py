@@ -13,6 +13,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.personalization import resolve_personalization as _resolve_personalization
+from src.model_capabilities import (
+    client_compaction_admission_detail,
+    model_auth_admission_detail,
+)
 from src.model_routing import task_route_admission_detail
 from pydantic import BaseModel
 
@@ -207,6 +211,14 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
     wire_effort = normalized_effort
     from src.research_runtime_config import resolve_research_runtime
     runtime = resolve_research_runtime()
+    if provider == "anthropic":
+        from src.agents.config import get_agent_config
+
+        compaction_detail = client_compaction_admission_detail(
+            model, get_agent_config().compaction_enabled
+        )
+        if compaction_detail is not None:
+            raise ValueError(compaction_detail)
     from src.auth_drivers.live_resolver import resolve_live_auth
     # Track A: pass the personalization block ONLY when non-empty, so legacy
     # strict-signature fakes/drivers see an unchanged call shape when the
@@ -215,6 +227,10 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
 
     if provider == "openai":
         _auth = resolve_live_auth("openai")
+        _auth_mode = "chatgpt_oauth" if _auth.source == "oauth_driver_unwired" else "api_key"
+        _auth_detail = model_auth_admission_detail(model, _auth_mode)
+        if _auth_detail is not None:
+            raise ValueError(_auth_detail)
         if _auth.source == "oauth_driver_unwired":
             return _openai_subscription_stream(
                 credential_id=_auth.credential_id, question=question,
@@ -229,6 +245,10 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
 
     if provider == "anthropic":
         _auth = resolve_live_auth("anthropic")
+        _auth_mode = "claude_code_oauth" if _auth.source == "oauth_driver_unwired" else "api_key"
+        _auth_detail = model_auth_admission_detail(model, _auth_mode)
+        if _auth_detail is not None:
+            raise ValueError(_auth_detail)
         if _auth.source == "oauth_driver_unwired":
             return _anthropic_subscription_stream(
                 credential_id=_auth.credential_id, question=question,
@@ -350,6 +370,33 @@ def _resolve_query_task_route(
     return model, effort
 
 
+def _require_live_model_auth(provider: str, model: str) -> None:
+    from src.auth_drivers.live_resolver import resolve_live_auth
+
+    resolution = resolve_live_auth(provider)
+    if resolution.source == "oauth_driver_unwired":
+        auth_mode = (
+            "chatgpt_oauth" if provider == "openai" else "claude_code_oauth"
+        )
+    else:
+        auth_mode = "api_key"
+    detail = model_auth_admission_detail(model, auth_mode)
+    if detail is not None:
+        raise HTTPException(status_code=422, detail=detail)
+
+
+def _require_client_compaction_compatibility(provider: str, model: str) -> None:
+    if provider != "anthropic":
+        return
+    from src.agents.config import get_agent_config
+
+    detail = client_compaction_admission_detail(
+        model, get_agent_config().compaction_enabled
+    )
+    if detail is not None:
+        raise HTTPException(status_code=422, detail=detail)
+
+
 @router.post("/query", response_model=QueryResponse)
 async def query_agent(
     request: QueryRequest,
@@ -375,6 +422,8 @@ async def query_agent(
     """
     provider = request.provider.lower()
     model, effort = _resolve_query_task_route(request, provider)
+    _require_live_model_auth(provider, model)
+    _require_client_compaction_compatibility(provider, model)
     personalization_context, _ptrace = _resolve_personalization(request.assistant_stance)
     _pctx = {"personalization_context": personalization_context} if personalization_context else {}
 
@@ -441,6 +490,8 @@ async def query_agent_stream(
     """
     provider = request.provider.lower()
     res_model, res_effort = _resolve_query_task_route(request, provider)
+    _require_live_model_auth(provider, res_model)
+    _require_client_compaction_compatibility(provider, res_model)
     # Track A: validate the stance override + resolve profile context BEFORE the
     # stream starts, so an invalid value is a clean 400 (not a mid-stream error).
     personalization_context, personalization = _resolve_personalization(request.assistant_stance)

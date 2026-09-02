@@ -17,7 +17,8 @@ unruled divergence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass
 
 _ANTHROPIC_DOCS = "https://docs.anthropic.com/en/docs/about-claude/models/all-models"
 _OPENAI_DOCS = "https://developers.openai.com/api/docs/models"
@@ -48,6 +49,15 @@ class ModelCapability:
     supports_structured_output: bool = True
     supports_tool_calling: bool = True
     runtime_ready: bool = True
+    # False means the registry entry exists only to preserve/display historical
+    # provenance. It is stronger than task_route_status: every new execution
+    # seam must reject it, while older Advanced models may remain usable by
+    # non-task tools where those tools already permit custom model IDs.
+    new_execution_allowed: bool = True
+    supports_client_compaction: bool = True
+    # Auth modes that ArkScope has not live-verified for this exact model.
+    # This is an admission fact, not a provider-wide compatibility claim.
+    unverified_auth_modes: tuple[str, ...] = ()
     task_route_status: str = "retired"  # current | retired; independent of adapter readiness
     in_routing_seed: bool = False
     aliases: tuple[str, ...] = ()      # OFFICIAL aliases only (e.g. "gpt-5.6"→Sol)
@@ -63,19 +73,40 @@ class ModelCapability:
 _REGISTRY: tuple[ModelCapability, ...] = (
     # ── Anthropic ────────────────────────────────────────────────
     ModelCapability(
-        id="claude-fable-5", provider="anthropic", label="Claude Fable 5",
+        id="claude-fable-5-1", provider="anthropic", label="Claude Fable 5.1",
         picker_visibility="default", thinking_mode="adaptive_always_on",
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
+        supports_client_compaction=False,
+        unverified_auth_modes=("claude_code_oauth",),
         task_route_status="current",
         in_routing_seed=True,
         aliases=(),
         quality="frontier", speed="slow", cost_tier="high",
         recommended_for=(),
+        source_url="https://platform.claude.com/docs/en/models/fable-5-1/overview",
+        verified_at="2026-09-02",
+        notes="Adaptive thinking is always on; default effort is high. "
+              "Forced tool choice is unsupported, so direct fixed-task calls "
+              "use auto plus strict tools. $10/$50 per MTok.",
+    ),
+    ModelCapability(
+        id="claude-fable-5", provider="anthropic", label="Claude Fable 5",
+        picker_visibility="pinned_only", thinking_mode="adaptive_always_on",
+        effort_options=_OPUS_EFFORTS,
+        supports_compaction=True, context_mode="ga_1m",
+        context_limit=1_000_000, max_output=128_000,
+        new_execution_allowed=False,
+        task_route_status="retired",
+        in_routing_seed=False,
+        aliases=(),
+        quality="frontier", speed="slow", cost_tier="high",
+        recommended_for=(),
         source_url="https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5",
         verified_at="2026-07-10",
-        notes="Thinking always-on (disable rejected); refusals return HTTP 200 "
+        notes="Product-retired on 2026-09-02; retained for historical provenance. "
+              "Thinking always-on (disable rejected); refusals return HTTP 200 "
               "stop_reason=refusal — handled via src/anthropic_refusal.py. "
               "$10/$50 per MTok.",
     ),
@@ -292,8 +323,77 @@ def capability_for(model: str) -> ModelCapability | None:
         return exact
     lowered = query.lower()
     for cap in _BY_PREFIX:
-        if lowered.startswith(cap.id):
+        if _matches_reviewed_variant(cap.id, lowered):
             return cap
+    return None
+
+
+_VARIANT_CHARS = re.compile(r"-[a-z0-9][a-z0-9-]*$")
+_DATED_VARIANT = re.compile(
+    r"-[12][0-9]{3}(?:[0-9]{4}|(?:-[a-z0-9][a-z0-9-]*)?)$"
+)
+
+
+def _matches_reviewed_variant(canonical_id: str, query: str) -> bool:
+    """Match a canonical model's reviewed variant forms without sibling bleed.
+
+    Alphabetic suffixes retain the registry's legacy custom/snapshot behavior.
+    Numeric suffixes are accepted only in the established dated-snapshot shape;
+    this prevents an unknown Fable 5.2 or 5.10 from inheriting Fable 5/5.1 facts.
+    """
+    if not query.startswith(canonical_id):
+        return False
+    suffix = query[len(canonical_id):]
+    if not suffix:
+        return True
+    if not suffix.startswith("-"):
+        return False
+    if len(suffix) == 1:
+        return False
+    if _VARIANT_CHARS.fullmatch(suffix) is None:
+        return False
+    if "0" <= suffix[1] <= "9":
+        return _DATED_VARIANT.fullmatch(suffix) is not None
+    return True
+
+
+def model_execution_admission_detail(model: str) -> dict[str, str] | None:
+    """Return a typed block for history-only models at any new execution seam."""
+    capability = capability_for(model)
+    if capability is not None and not capability.new_execution_allowed:
+        return {"code": "model_retired", "field": "model"}
+    return None
+
+
+def model_auth_admission_detail(
+    model: str, auth_mode: str | None
+) -> dict[str, str] | None:
+    """Return a typed block for model/auth pairs ArkScope has not live-verified."""
+    capability = capability_for(model)
+    if (
+        capability is not None
+        and auth_mode is not None
+        and auth_mode in capability.unverified_auth_modes
+    ):
+        return {"code": "model_auth_unverified", "field": "model"}
+    return None
+
+
+def client_compaction_admission_detail(
+    model: str, enabled: bool
+) -> dict[str, object] | None:
+    """Block model/client-compaction pairs whose message rewriting is unverified."""
+    capability = capability_for(model)
+    if enabled and capability is not None and not capability.supports_client_compaction:
+        return {
+            "code": "model_client_compaction_incompatible",
+            "field": "compaction.enabled",
+            "message": (
+                "Claude Fable 5.1 has not been validated with ArkScope client-side "
+                "compaction. Disable client-side compaction or choose another model."
+            ),
+            "actions": ["disable_client_compaction", "choose_another_model"],
+        }
     return None
 
 

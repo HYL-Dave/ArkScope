@@ -104,6 +104,11 @@ class AnthropicSummaryCaller:
         user_prompt: str,
     ) -> Optional[str]:
         try:
+            from src.model_capabilities import model_execution_admission_detail
+
+            execution_detail = model_execution_admission_detail(self.model)
+            if execution_detail is not None:
+                raise ValueError(execution_detail)
             client = self._get_client()
             with client.messages.stream(
                 model=self.model,

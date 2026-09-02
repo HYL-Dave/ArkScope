@@ -14,7 +14,7 @@ const system = {
   runtime: {
     modelsInUse: "Models in use",
     cardSynthesis: "card synthesis",
-    cardTranslation: "card translation",
+    cardTranslation: "內容翻譯",
     anthropicDefaultAdvanced: "anthropic (default / advanced)",
     openAIDefaultAdvanced: "openai (default / advanced)",
     apiKeysPresent: "API keys present",

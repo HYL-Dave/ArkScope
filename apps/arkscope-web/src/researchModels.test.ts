@@ -60,9 +60,9 @@ describe("effortOptionsForModel", () => {
     effort_options: { openai: options("openai"), anthropic: options("anthropic") },
     current_model_ids: [
       "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-      "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+      "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
     ],
-    retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
+    retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
     model_lifecycle: [
       {
         id: "gpt-5.6-sol", provider: "openai", task_route_status: "current",
@@ -81,6 +81,14 @@ describe("effortOptionsForModel", () => {
         aliases: [],
       },
       {
+        id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current",
+        aliases: [],
+      },
+      {
+        id: "claude-fable-5", provider: "anthropic", task_route_status: "retired",
+        aliases: [],
+      },
+      {
         id: "claude-opus-5", provider: "anthropic", task_route_status: "current",
         aliases: [],
       },
@@ -89,7 +97,7 @@ describe("effortOptionsForModel", () => {
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
         id, provider: "openai" as const, effort_options: ["none", ...taskEfforts],
       })),
-      ...["claude-fable-5", "claude-sonnet-5"].map((id) => ({
+      ...["claude-fable-5-1", "claude-sonnet-5"].map((id) => ({
         id, provider: "anthropic" as const, effort_options: taskEfforts,
       })),
       {
@@ -157,6 +165,8 @@ describe("model lifecycle matching", () => {
       { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
       { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
     ],
     current_model_ids: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "claude-opus-5"],
     retired_model_ids: ["gpt-5.4-mini"],
@@ -178,6 +188,24 @@ describe("model lifecycle matching", () => {
     expect(taskRouteModelStatus(catalog, "openai", "gpt-7-custom")).toBe("unknown");
     expect(taskRouteModelStatus(catalog, "anthropic", "gpt-5.6-luna")).toBe("unknown");
   });
+
+  it.each([
+    ["claude-fable-5-1-20260901", "claude-fable-5-1", "current"],
+    ["claude-fable-5-20260710", "claude-fable-5", "retired"],
+  ])("keeps dated Fable snapshot %s on %s", (query, canonical, status) => {
+    expect(matchModelLifecycle(catalog, query)).toMatchObject({
+      id: canonical,
+      task_route_status: status,
+    });
+  });
+
+  it.each(["claude-fable-5-2", "claude-fable-5-10", "claude-fable-5-\u0662"])(
+    "does not inherit lifecycle facts for numeric successor %s",
+    (query) => {
+      expect(matchModelLifecycle(catalog, query)).toBeNull();
+      expect(taskRouteModelStatus(catalog, "anthropic", query)).toBe("unknown");
+    },
+  );
 });
 
 describe("isTaskRouteEffort", () => {

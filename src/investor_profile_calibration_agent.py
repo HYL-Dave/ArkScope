@@ -187,9 +187,19 @@ async def unavailable_responder(
 
 
 def _default_model(provider: str, model: str | None) -> str:
-    if model:
-        return model
+    if model and model.strip():
+        return model.strip()
     return "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5"
+
+
+def resolve_calibration_execution(
+    provider: str | None, model: str | None
+) -> tuple[str, str]:
+    """Resolve the exact provider/model pair used by a calibration call."""
+    chosen_provider = (provider or "openai").lower().strip()
+    if chosen_provider not in ("openai", "anthropic"):
+        raise ValueError(f"unsupported calibration provider: {chosen_provider}")
+    return chosen_provider, _default_model(chosen_provider, model)
 
 
 def _message_text_openai(resp) -> str:
@@ -215,9 +225,23 @@ async def _call_calibration_llm(
 ) -> str:
     """Provider call seam with no registry, DAL, or tools."""
     from src.auth_drivers.live_resolver import resolve_live_auth
+    from src.model_capabilities import (
+        model_auth_admission_detail,
+        model_execution_admission_detail,
+    )
+
+    execution_detail = model_execution_admission_detail(model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
 
     if provider == "openai":
         auth = resolve_live_auth("openai")
+        auth_mode = (
+            "chatgpt_oauth" if auth.source == "oauth_driver_unwired" else "api_key"
+        )
+        auth_detail = model_auth_admission_detail(model, auth_mode)
+        if auth_detail is not None:
+            raise ValueError(auth_detail)
         if auth.source == "env_fallback" and not os.environ.get(
             "OPENAI_API_KEY", ""
         ).strip():
@@ -275,6 +299,14 @@ async def _call_calibration_llm(
 
     if provider == "anthropic":
         auth = resolve_live_auth("anthropic")
+        auth_mode = (
+            "claude_code_oauth"
+            if auth.source == "oauth_driver_unwired"
+            else "api_key"
+        )
+        auth_detail = model_auth_admission_detail(model, auth_mode)
+        if auth_detail is not None:
+            raise ValueError(auth_detail)
         if auth.source == "oauth_driver_unwired":
             raise RuntimeError("claude_code_oauth calibration no-tool path is not wired")
         if auth.source == "env_fallback" and not os.environ.get(
@@ -312,10 +344,12 @@ async def live_calibration_responder(
     provider: str | None,
     model: str | None,
 ) -> CalibrationAgentResult:
-    chosen_provider = (provider or "openai").lower().strip()
-    if chosen_provider not in ("openai", "anthropic"):
-        raise ValueError(f"unsupported calibration provider: {chosen_provider}")
-    chosen_model = _default_model(chosen_provider, model)
+    from src.model_capabilities import model_execution_admission_detail
+
+    chosen_provider, chosen_model = resolve_calibration_execution(provider, model)
+    execution_detail = model_execution_admission_detail(chosen_model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
     raw = await _call_calibration_llm(
         provider=chosen_provider,
         model=chosen_model,

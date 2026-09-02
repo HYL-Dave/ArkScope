@@ -20,6 +20,7 @@ from src.investor_profile_calibration_policy import (
     OPENING_PROMPTS,
 )
 from src.investor_profile_calibration_schema import migrate_calibration_schema
+from src.model_credentials import CredentialStore
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,143 @@ def test_send_message_wraps_responder_runtime_failure(stores, monkeypatch):
 
     assert exc.value.status_code == 502
     assert exc.value.detail["code"] == "calibration_responder_failed"
+
+
+@pytest.mark.parametrize("operation", ("message", "proposal"))
+def test_calibration_rejects_history_only_model_before_persistence_or_dispatch(
+    stores, monkeypatch, operation
+):
+    cstore, _pstore = stores
+    _allow_writes(monkeypatch)
+    session = _start(cstore)
+    calls = []
+
+    async def forbidden_responder(**kwargs):
+        calls.append(kwargs)
+        raise AssertionError("history-only model must not reach the responder")
+
+    monkeypatch.setattr(routes, "_default_responder", forbidden_responder)
+    before_messages = cstore.list_messages(session["id"])
+    turn_id = "retired-message" if operation == "message" else "retired-proposal"
+
+    with pytest.raises(HTTPException) as exc:
+        if operation == "message":
+            asyncio.run(
+                routes.send_calibration_message(
+                    routes.CalibrationMessageBody(
+                        session_id=session["id"],
+                        turn_id=turn_id,
+                        content="Do not persist this answer.",
+                        provider="anthropic",
+                        model="claude-fable-5",
+                    ),
+                    store=cstore,
+                )
+            )
+        else:
+            asyncio.run(
+                routes.request_calibration_proposal(
+                    routes.CalibrationProposalRequestBody(
+                        session_id=session["id"],
+                        turn_id=turn_id,
+                        provider="anthropic",
+                        model="claude-fable-5",
+                    ),
+                    store=cstore,
+                )
+            )
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == {"code": "model_retired", "field": "model"}
+    assert cstore.list_messages(session["id"]) == before_messages
+    assert cstore.get_turn(turn_id) is None
+    assert calls == []
+
+
+def test_calibration_rejects_unverified_fable_oauth_before_persistence(
+    stores, monkeypatch
+):
+    cstore, _pstore = stores
+    _allow_writes(monkeypatch)
+    session = _start(cstore)
+    CredentialStore(cstore.db_path).add_oauth_credential(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        alias="test oauth",
+        make_active=True,
+    )
+    calls = []
+
+    async def forbidden_responder(**kwargs):
+        calls.append(kwargs)
+        raise AssertionError("unverified OAuth must not reach the responder")
+
+    monkeypatch.setattr(routes, "_default_responder", forbidden_responder)
+    before_messages = cstore.list_messages(session["id"])
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            routes.send_calibration_message(
+                routes.CalibrationMessageBody(
+                    session_id=session["id"],
+                    turn_id="oauth-fable-51",
+                    content="Do not persist this answer.",
+                    provider="anthropic",
+                    model="claude-fable-5-1",
+                ),
+                store=cstore,
+            )
+        )
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == {
+        "code": "model_auth_unverified",
+        "field": "model",
+    }
+    assert cstore.list_messages(session["id"]) == before_messages
+    assert cstore.get_turn("oauth-fable-51") is None
+    assert calls == []
+
+
+def test_calibration_retry_rejects_persisted_history_only_route_without_mutation(
+    stores, monkeypatch
+):
+    cstore, _pstore = stores
+    _allow_writes(monkeypatch)
+    session = _start(cstore)
+    cstore.begin_answer_turn(
+        session_id=session["id"],
+        turn_id="retired-retry",
+        answer="This historical answer remains stored.",
+        provider="anthropic",
+        model="claude-fable-5",
+    )
+    cstore.fail_turn(
+        "retired-retry",
+        error_code="calibration_responder_failed",
+        diagnostic="Historical failure.",
+    )
+    before_turn = cstore.get_turn("retired-retry")
+    before_messages = cstore.list_messages(session["id"])
+    calls = []
+    monkeypatch.setattr(
+        routes,
+        "_default_responder",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            routes.retry_calibration_turn(
+                "retired-retry", routes.CalibrationRetryBody(), store=cstore
+            )
+        )
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == {"code": "model_retired", "field": "model"}
+    assert cstore.get_turn("retired-retry") == before_turn
+    assert cstore.list_messages(session["id"]) == before_messages
+    assert calls == []
 
 
 def test_calibration_refusal_records_model_refusal_instead_of_generic_failure(
@@ -653,7 +791,8 @@ def test_missing_provider_configuration_uses_existing_typed_error_family(
 
     resolution = {"source": "env_fallback", "credential_id": None}
 
-    def fake_resolve(provider):
+    def fake_resolve(provider, **kwargs):
+        del kwargs
         return live_resolver.LiveAuthResolution(
             provider=provider,
             source=resolution["source"],

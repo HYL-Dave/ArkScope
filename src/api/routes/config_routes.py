@@ -972,10 +972,16 @@ def run_provider_model_test(
     store: CredentialStore = Depends(get_credential_store),
 ):
     """Run a tiny explicit model test call for provider/model/effort access."""
+    from src.model_capabilities import model_execution_admission_detail
+
     store = _credential_store(store)
+    model = body.model.strip()
+    detail = model_execution_admission_detail(model)
+    if detail is not None:
+        raise HTTPException(status_code=400, detail=detail)
     effort = body.effort.strip() or "default"
     warning = None
-    if not is_valid_effort(body.provider, effort, model=body.model.strip()):
+    if not is_valid_effort(body.provider, effort, model=model):
         warning = (
             f"Requested effort '{effort}' is not known for provider '{body.provider}'; "
             "testing with provider default."
@@ -983,7 +989,7 @@ def run_provider_model_test(
         effort = "default"
     result = test_model(
         body.provider,
-        body.model.strip(),
+        model,
         effort=effort,
         credential_id=body.credential_id,
         store=store,

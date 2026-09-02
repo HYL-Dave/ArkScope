@@ -231,7 +231,7 @@ def test_card_synthesis_raises_structured_refusal(monkeypatch):
     )
     with pytest.raises(AnthropicRefusalError):
         cs._synthesize_anthropic(
-            _packet(), "claude-fable-5", model_timeout_s=900
+            _packet(), "claude-fable-5-1", model_timeout_s=900
         )
 
 
@@ -249,7 +249,7 @@ def test_card_translation_raises_structured_refusal(monkeypatch):
     )
     with pytest.raises(AnthropicRefusalError):
         cs._translate_anthropic(
-            "claude-fable-5",
+            "claude-fable-5-1",
             "sys",
             "user",
             {},
@@ -276,14 +276,14 @@ def test_refusal_never_triggers_effort_fallback(monkeypatch):
     )
     with pytest.raises(AnthropicRefusalError):
         cs._synthesize_anthropic(
-            _packet(), "claude-fable-5", effort="xhigh", model_timeout_s=900
+            _packet(), "claude-fable-5-1", effort="xhigh", model_timeout_s=900
         )
     assert client.messages.create.call_count == 1
 
     client.messages.create.reset_mock()
     with pytest.raises(AnthropicRefusalError):
         cs._translate_anthropic(
-            "claude-fable-5",
+            "claude-fable-5-1",
             "sys",
             "user",
             {},
@@ -439,6 +439,47 @@ def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(mon
     assert "emit_translation tool" not in calls[0]["system"]
     assert "JSON" in calls[0]["system"]
     assert calls[0]["timeout_s"] == 324.0
+
+
+@pytest.mark.parametrize("seam", ["synthesis", "translation"])
+def test_fable_5_1_oauth_fixed_tasks_fail_before_subscription_dispatch(
+    monkeypatch, seam
+):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:51"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or {},
+    )
+
+    with pytest.raises(ValueError) as exc:
+        if seam == "synthesis":
+            cs._synthesize_anthropic(
+                _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
+            )
+        else:
+            cs._translate_anthropic(
+                "claude-fable-5-1",
+                "Use emit_translation exactly once.",
+                "translate",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"translated_text": {"type": "string"}},
+                    "required": ["translated_text"],
+                },
+                "zh-Hant",
+                effort="low",
+                model_timeout_s=45,
+            )
+
+    assert exc.value.args[0] == {"code": "model_auth_unverified", "field": "model"}
+    assert calls == []
 
 
 @pytest.mark.parametrize(
@@ -852,6 +893,118 @@ def test_anthropic_api_key_synthesis_keeps_existing_messages_shape(monkeypatch):
     assert kwargs["max_tokens"] == 8192
     assert kwargs["output_config"] == {"effort": "high"}
     assert kwargs["tool_choice"] == {"type": "tool", "name": "emit_result_card"}
+
+
+@pytest.mark.parametrize("seam", ["synthesis", "translation"])
+def test_fable_5_1_api_key_fixed_tasks_use_auto_with_one_strict_tool(
+    monkeypatch, seam
+):
+    from types import SimpleNamespace
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    name = "emit_result_card" if seam == "synthesis" else "emit_translation"
+    payload = _synth().model_dump() if seam == "synthesis" else {
+        "translated_text": "譯文"
+    }
+    response = SimpleNamespace(
+        stop_reason="tool_use",
+        content=[SimpleNamespace(type="tool_use", name=name, input=payload)],
+    )
+    bounded = MagicMock()
+    bounded.messages.create.return_value = response
+    client = MagicMock()
+    client.with_options.return_value = bounded
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "db_api_key", "local:51"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client", lambda: client
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("API-key route must not call the subscription adapter")
+        ),
+    )
+
+    if seam == "synthesis":
+        result, _meta = cs._synthesize_anthropic(
+            _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
+        )
+        assert result == _synth()
+    else:
+        result = cs._translate_anthropic(
+            "claude-fable-5-1",
+            "Call emit_translation exactly once.",
+            "translate",
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"translated_text": {"type": "string"}},
+                "required": ["translated_text"],
+            },
+            "zh-Hant",
+            effort="low",
+            model_timeout_s=45,
+        )
+        assert result == payload
+
+    assert bounded.messages.create.call_count == 1
+    kwargs = bounded.messages.create.call_args.kwargs
+    assert kwargs["tool_choice"] == {"type": "auto"}
+    assert len(kwargs["tools"]) == 1
+    assert kwargs["tools"][0]["name"] == name
+    assert kwargs["tools"][0]["strict"] is True
+
+
+@pytest.mark.parametrize("seam", ("synthesis", "translation"))
+def test_fable_5_1_text_only_response_is_an_explicit_failure(monkeypatch, seam):
+    from types import SimpleNamespace
+
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    bounded = MagicMock()
+    bounded.messages.create.return_value = SimpleNamespace(
+        stop_reason="end_turn",
+        content=[SimpleNamespace(type="text", text="plain text is not accepted")],
+    )
+    client = MagicMock()
+    client.with_options.return_value = bounded
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(provider, "db_api_key", "local:51"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client", lambda: client
+    )
+
+    expected_tool = "emit_result_card" if seam == "synthesis" else "emit_translation"
+    with pytest.raises(RuntimeError, match=f"did not return (?:the )?{expected_tool}"):
+        if seam == "synthesis":
+            cs._synthesize_anthropic(
+                _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
+            )
+        else:
+            cs._translate_anthropic(
+                "claude-fable-5-1",
+                "Call emit_translation exactly once.",
+                "translate",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"translated_text": {"type": "string"}},
+                    "required": ["translated_text"],
+                },
+                "zh-Hant",
+                effort="low",
+                model_timeout_s=45,
+            )
+
+    assert bounded.messages.create.call_count == 1
 
 
 def test_openai_api_timeout_uses_one_attempt(monkeypatch):

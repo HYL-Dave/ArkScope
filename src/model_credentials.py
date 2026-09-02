@@ -1178,6 +1178,18 @@ def test_model(
     store: CredentialStore | None = None,
 ) -> ModelTestResult:
     """Run a tiny paid provider call to verify credential/model/effort access."""
+    from src.model_capabilities import model_execution_admission_detail
+
+    detail = model_execution_admission_detail(model)
+    if detail is not None:
+        return ModelTestResult(
+            provider=provider,
+            credential_id=credential_id,
+            model=model,
+            effort=effort,
+            status="error",
+            error=detail["code"],
+        )
     cred = _resolve_api_credential(provider, credential_id, store)
     if not cred or not cred.secret:
         return ModelTestResult(

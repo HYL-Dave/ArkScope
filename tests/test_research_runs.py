@@ -530,6 +530,92 @@ def test_implicit_current_research_route_persists_explicit_effort(
     assert len(scheduled) == 1
 
 
+def test_fable_5_1_oauth_research_is_rejected_before_persistence_or_schedule(
+    stores, monkeypatch
+):
+    run_store, thread_store = stores
+    scheduled = []
+    monkeypatch.setattr(
+        r, "_resolve_auth_metadata", lambda _provider: ("claude_code_oauth", "local:51")
+    )
+    monkeypatch.setattr(
+        r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs)
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            r.create_research_run(
+                r.ResearchRunCreate(
+                    question="new research",
+                    provider="anthropic",
+                    model="claude-fable-5-1",
+                    effort="low",
+                ),
+                dal=object(),
+                thread_store=thread_store,
+                run_store=run_store,
+            )
+        )
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == {"code": "model_auth_unverified", "field": "model"}
+    assert thread_store.list_threads() == []
+    assert scheduled == []
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_fable_5_1_client_compaction_admission_precedes_research_persistence(
+    stores, monkeypatch, enabled
+):
+    from types import SimpleNamespace
+
+    run_store, thread_store = stores
+    scheduled = []
+    monkeypatch.setattr(
+        r, "_resolve_auth_metadata", lambda _provider: ("api_key", "local:51")
+    )
+    monkeypatch.setattr(
+        "src.agents.config.get_agent_config",
+        lambda: SimpleNamespace(compaction_enabled=enabled),
+    )
+    monkeypatch.setattr(
+        r, "schedule_research_run", lambda **kwargs: scheduled.append(kwargs)
+    )
+    request = r.ResearchRunCreate(
+        question="compaction boundary",
+        provider="anthropic",
+        model="claude-fable-5-1",
+        effort="low",
+    )
+
+    if enabled:
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(
+                r.create_research_run(
+                    request,
+                    dal=object(),
+                    thread_store=thread_store,
+                    run_store=run_store,
+                )
+            )
+        assert exc.value.status_code == 422
+        assert exc.value.detail["code"] == "model_client_compaction_incompatible"
+        assert "Disable client-side compaction" in exc.value.detail["message"]
+        assert thread_store.list_threads() == []
+        assert scheduled == []
+    else:
+        response = asyncio.run(
+            r.create_research_run(
+                request,
+                dal=object(),
+                thread_store=thread_store,
+                run_store=run_store,
+            )
+        )
+        assert response["run"]["model"] == "claude-fable-5-1"
+        assert len(scheduled) == 1
+
+
 @pytest.mark.parametrize("legacy_effort", ["default", "none"])
 def test_legacy_research_route_remains_readable_but_cannot_start_new_run(
     stores, monkeypatch, legacy_effort
@@ -555,6 +641,31 @@ def test_legacy_research_route_remains_readable_but_cannot_start_new_run(
 
     assert exc.value.status_code == 422
     assert run_store.get_run("legacy").effort == legacy_effort
+
+
+def test_retired_fable_5_run_remains_readable_with_exact_effort(stores):
+    run_store, thread_store = stores
+    thread_store.ensure_thread(id="fable-history", title="historical Fable run")
+    run_store.create_run(
+        id="fable-history-run",
+        thread_id="fable-history",
+        question="historical question",
+        ticker=None,
+        provider="anthropic",
+        model="claude-fable-5",
+        effort="max",
+        auth_mode="api_key",
+        credential_id="local:historical",
+    )
+
+    stored = run_store.get_run("fable-history-run")
+
+    assert stored is not None
+    assert (stored.provider, stored.model, stored.effort) == (
+        "anthropic",
+        "claude-fable-5",
+        "max",
+    )
 
 
 def test_real_legacy_route_resolution_rejects_until_the_stored_route_is_corrected(
@@ -765,6 +876,36 @@ def test_anthropic_explicit_effort_persists_and_reaches_wire(stores, monkeypatch
 
     assert subscription_result is subscription_sentinel
     assert subscription_captured["effort"] == "high"
+
+
+def test_shared_research_dispatch_rejects_fable_5_1_oauth_before_driver(
+    monkeypatch,
+):
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: LiveAuthResolution(
+            provider, "oauth_driver_unwired", "local:subscription"
+        ),
+    )
+    monkeypatch.setattr(
+        q,
+        "_anthropic_subscription_stream",
+        lambda **kwargs: calls.append(kwargs) or object(),
+    )
+
+    with pytest.raises(ValueError) as exc:
+        q._research_provider_stream(
+            provider="anthropic",
+            question="q",
+            model="claude-fable-5-1",
+            effort="low",
+            dal=object(),
+            history=[],
+        )
+
+    assert exc.value.args[0] == {"code": "model_auth_unverified", "field": "model"}
+    assert calls == []
 
 
 def test_explicit_error_code_survives_event_run_and_linked_message(stores):

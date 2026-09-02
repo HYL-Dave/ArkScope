@@ -29,6 +29,10 @@ from src.research_threads import (
     ResearchThreadActiveError,
     valid_thread_id,
 )
+from src.model_capabilities import (
+    client_compaction_admission_detail,
+    model_auth_admission_detail,
+)
 from src.model_routing import task_route_admission_detail
 
 from ..dependencies import (
@@ -377,6 +381,17 @@ async def create_research_run(
     if detail is not None:
         raise HTTPException(status_code=422, detail=detail)
     auth_mode, credential_id = _resolve_auth_metadata(provider)
+    auth_detail = model_auth_admission_detail(model, auth_mode)
+    if auth_detail is not None:
+        raise HTTPException(status_code=422, detail=auth_detail)
+    if provider == "anthropic":
+        from src.agents.config import get_agent_config
+
+        compaction_detail = client_compaction_admission_detail(
+            model, get_agent_config().compaction_enabled
+        )
+        if compaction_detail is not None:
+            raise HTTPException(status_code=422, detail=compaction_detail)
     agent_question = _compose_agent_question(question, request.ticker)
 
     try:

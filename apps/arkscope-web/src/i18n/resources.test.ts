@@ -724,7 +724,7 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 61,
+      common: 62,
       shell: 37,
       settings: 840,
       research: 207,
@@ -797,7 +797,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2386);
+      expect(total, `${locale}.total`).toBe(2387);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1035,6 +1035,7 @@ describe("bundled i18n resources", () => {
         },
         reasons: {
           missingActiveCredential: "尚未設定此 provider 的登入",
+          modelAuthUnverified: "此登入尚未實際驗證此模型；請改用 API key 或選擇其他模型",
           taskAuthModeUnsupported: "此登入方式不支援這個任務",
           taskTestUnsupported: "此登入方式尚不支援實際測試",
           taskCapabilityMissing: "缺少任務能力",
@@ -1071,6 +1072,7 @@ describe("bundled i18n resources", () => {
         },
         reasons: {
           missingActiveCredential: "No sign-in is configured for this provider",
+          modelAuthUnverified: "This model has not been live-verified for this sign-in. Use an API key or choose another model",
           taskAuthModeUnsupported: "This sign-in method does not support the task",
           taskTestUnsupported: "This sign-in method does not yet support live testing",
           taskCapabilityMissing: "Task capability is missing",
@@ -1128,7 +1130,7 @@ describe("bundled i18n resources", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toEqual(expectedModels[locale]);
-      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(24);
+      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(25);
       const settings = flattenResource(resources[locale].settings as ResourceTree);
       for (const path of removedSettingsPaths) {
         expect.soft(settings.has(path), `${locale}.settings.${path}`).toBe(false);
@@ -1314,8 +1316,8 @@ describe("bundled i18n resources", () => {
       if (!commonModels) continue;
       const movedModelCount = flattenResource(commonModels).size - 1;
       expect(physicalPreSliceCount).toBe(639);
-      expect(movedModelCount).toBe(23);
-      expect(physicalPreSliceCount + movedModelCount).toBe(662);
+      expect(movedModelCount).toBe(24);
+      expect(physicalPreSliceCount + movedModelCount).toBe(663);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

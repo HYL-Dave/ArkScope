@@ -1308,3 +1308,30 @@ def test_responder_uses_current_model_when_model_is_omitted(
     )
 
     assert captured == {"provider": provider, "model": expected_model}
+
+
+def test_direct_calibration_responder_rejects_history_only_model_before_call(
+    monkeypatch,
+):
+    calls = []
+
+    async def forbidden_call(**kwargs):
+        calls.append(kwargs)
+        raise AssertionError("history-only model must not reach provider seam")
+
+    monkeypatch.setattr(calibration_agent, "_call_calibration_llm", forbidden_call)
+
+    with pytest.raises(ValueError) as exc:
+        asyncio.run(
+            calibration_agent.live_calibration_responder(
+                messages=[{"role": "user", "content": "Continue."}],
+                current_topic_id="loss_response",
+                covered_topics=(),
+                request_proposal=False,
+                provider="anthropic",
+                model="claude-fable-5",
+            )
+        )
+
+    assert exc.value.args[0] == {"code": "model_retired", "field": "model"}
+    assert calls == []

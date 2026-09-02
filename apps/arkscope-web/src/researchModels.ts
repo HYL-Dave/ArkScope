@@ -57,6 +57,19 @@ function lifecycleFacts(catalog: ModelCatalog): ModelLifecycleFact[] {
   return [...facts.values()];
 }
 
+const DATED_MODEL_VARIANT = /^-[12][0-9]{3}(?:[0-9]{4}|(?:-[a-z0-9][a-z0-9-]*)?)$/;
+const MODEL_VARIANT_CHARS = /^-[a-z0-9][a-z0-9-]*$/;
+
+function matchesReviewedVariant(canonicalId: string, query: string): boolean {
+  if (!query.startsWith(canonicalId)) return false;
+  const suffix = query.slice(canonicalId.length);
+  if (!suffix) return true;
+  if (!suffix.startsWith("-") || suffix.length === 1) return false;
+  if (!MODEL_VARIANT_CHARS.test(suffix)) return false;
+  if (suffix[1] >= "0" && suffix[1] <= "9") return DATED_MODEL_VARIANT.test(suffix);
+  return true;
+}
+
 export function matchModelLifecycle(
   catalog: ModelCatalog,
   model: string,
@@ -71,7 +84,7 @@ export function matchModelLifecycle(
   if (exact) return exact;
   return [...facts]
     .sort((left, right) => right.id.length - left.id.length)
-    .find((fact) => query.startsWith(fact.id.toLowerCase())) ?? null;
+    .find((fact) => matchesReviewedVariant(fact.id.toLowerCase(), query)) ?? null;
 }
 
 export function activeCredential(creds: ProviderCredential[] | undefined): ProviderCredential | null {

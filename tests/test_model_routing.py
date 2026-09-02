@@ -64,15 +64,24 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     )
 
 
+def test_content_translation_is_the_canonical_visible_product_term():
+    from pathlib import Path
+
+    terminology = Path("docs/design/ARKSCOPE_TERMINOLOGY.md").read_text()
+
+    assert "| Fixed AI task | Content translation | 內容翻譯 |" in terminology
+
+
 def test_catalog_exposes_canonical_current_and_retired_model_policy():
     from src.model_routing import catalog
 
     policy = catalog()
     assert set(policy.current_model_ids) == {
-        "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
-    assert len(policy.retired_model_ids) == 12
+    assert len(policy.retired_model_ids) == 13
+    assert "claude-fable-5" in policy.retired_model_ids
     assert set(policy.current_model_ids).isdisjoint(policy.retired_model_ids)
     lifecycle = {fact.id: fact for fact in policy.model_lifecycle}
     assert lifecycle["gpt-5.6-sol"].task_route_status == "current"
@@ -92,7 +101,7 @@ def test_task_route_effort_order_is_canonical_and_provider_native_facts_remain()
 
 
 @pytest.mark.parametrize("model", [
-    "claude-fable-5", "claude-opus-5", "claude-sonnet-5",
+    "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 ])
 def test_current_models_expose_identical_explicit_task_efforts(model):
@@ -631,11 +640,58 @@ def test_model_test_missing_credential_returns_seed_error(tmp_path, monkeypatch)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEYS", raising=False)
     res = run_provider_model_test(
-        ModelTestRequest(provider="openai", model="gpt-5.5", effort="high"),
+        ModelTestRequest(provider="openai", model="gpt-5.6-sol", effort="high"),
         store=store,
     )
     assert res["status"] == "missing_credential"
     assert "No direct API-key credential" in res["error"]
+
+
+def test_generic_model_test_rejects_history_only_model_before_dispatch(
+    tmp_path, monkeypatch
+):
+    from src.api.routes import config_routes
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    calls = []
+    monkeypatch.setattr(
+        config_routes,
+        "test_model",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        config_routes.run_provider_model_test(
+            ModelTestRequest(
+                provider="anthropic", model="claude-fable-5", effort="low"
+            ),
+            store=store,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "model_retired", "field": "model"}
+    assert calls == []
+
+
+def test_low_level_model_test_rejects_history_only_model_before_credentials(
+    monkeypatch,
+):
+    from src import model_credentials
+
+    calls = []
+    monkeypatch.setattr(
+        model_credentials,
+        "_resolve_api_credential",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    result = model_credentials.test_model(
+        "anthropic", "claude-fable-5", effort="low"
+    )
+
+    assert result.status == "error"
+    assert result.error == "model_retired"
+    assert calls == []
 
 
 def test_local_credential_crud_and_active_selection(tmp_path, monkeypatch):
