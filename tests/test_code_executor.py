@@ -24,6 +24,26 @@ from src.tools.code_executor import (
 )
 
 
+def _environment_probe_code(*names: str) -> str:
+    encoded = json.dumps(list(names))
+    return (
+        "_env = __import__('os').environ\n"
+        "_json_module = __import__('json')\n"
+        f"print(_json_module.dumps({{name: _env.get(name) for name in {encoded}}}, sort_keys=True))"
+    )
+
+
+def _wait_for_file(path: str, *, timeout: float = 3.0) -> str:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if os.path.exists(path):
+            content = open(path, encoding="utf-8").read()
+            if content:
+                return content
+        time.sleep(0.02)
+    raise AssertionError(f"background output did not arrive: {path}")
+
+
 # ============================================================
 # AST Validation Tests
 # ============================================================
@@ -184,6 +204,65 @@ class TestExecutePythonCode:
         assert result.success is True
         assert "6" in result.output
 
+    def test_foreground_child_environment_excludes_parent_credentials(self, monkeypatch):
+        sentinels = {
+            "OPENAI_API_KEY": "inert-openai-parent-value",
+            "ANTHROPIC_API_KEY": "inert-anthropic-parent-value",
+            "AWS_SECRET_ACCESS_KEY": "inert-cloud-parent-value",
+            "ARKSCOPE_EXECUTOR_SENTINEL": "inert-arbitrary-parent-value",
+        }
+        for name, value in sentinels.items():
+            monkeypatch.setenv(name, value)
+
+        result = execute_python_code(_environment_probe_code(*sentinels))
+
+        assert result.success is True
+        assert json.loads(result.output) == {name: None for name in sentinels}
+
+    def test_child_environment_excludes_value_loaded_by_real_env_file_loader(
+        self, monkeypatch, tmp_path
+    ):
+        import src.env_keys as env_keys
+
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "ALPHA_VANTAGE_API_KEY=inert-file-provider-value\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+        monkeypatch.setattr(env_keys, "_loaded", False)
+        monkeypatch.setattr(env_keys, "_loaded_keys", set())
+        monkeypatch.delenv("ALPHA_VANTAGE_API_KEY", raising=False)
+        env_keys.ensure_env_loaded()
+        assert os.environ["ALPHA_VANTAGE_API_KEY"] == "inert-file-provider-value"
+
+        result = execute_python_code(
+            _environment_probe_code("ALPHA_VANTAGE_API_KEY")
+        )
+
+        assert result.success is True
+        assert json.loads(result.output) == {"ALPHA_VANTAGE_API_KEY": None}
+
+    def test_child_environment_excludes_value_applied_from_profile_store(
+        self, monkeypatch, tmp_path
+    ):
+        import src.data_provider_config as provider_config
+        import src.env_keys as env_keys
+
+        monkeypatch.setattr(env_keys, "_loaded", True)
+        monkeypatch.setattr(env_keys, "_loaded_keys", set())
+        monkeypatch.setattr(provider_config, "_APP_APPLIED", set())
+        monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+        store = provider_config.DataProviderConfigStore(tmp_path / "profile.db")
+        store.set_field("finnhub", "api_key", "inert-profile-provider-value")
+        provider_config.apply_env(store)
+        assert os.environ["FINNHUB_API_KEY"] == "inert-profile-provider-value"
+
+        result = execute_python_code(_environment_probe_code("FINNHUB_API_KEY"))
+
+        assert result.success is True
+        assert json.loads(result.output) == {"FINNHUB_API_KEY": None}
+
     def test_timeout_kills_process(self):
         """Infinite loop is killed by timeout."""
         result = execute_python_code("while True: pass", timeout=2)
@@ -252,6 +331,21 @@ print(f"Mean: {mean}")
 # ============================================================
 
 class TestBackgroundExecution:
+    def test_background_child_environment_excludes_parent_credentials(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "inert-background-parent-value")
+        result = execute_python_code(
+            _environment_probe_code("OPENAI_API_KEY"),
+            background=True,
+        )
+        try:
+            assert result.success is True
+            assert json.loads(_wait_for_file(result.output_file)) == {
+                "OPENAI_API_KEY": None
+            }
+        finally:
+            if result.output_file and os.path.exists(result.output_file):
+                os.unlink(result.output_file)
+
     def test_background_returns_immediately(self):
         """background=True returns quickly (no waiting for code)."""
         start = time.monotonic()
