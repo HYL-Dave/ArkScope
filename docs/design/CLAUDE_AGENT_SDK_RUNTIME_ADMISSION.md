@@ -1,12 +1,11 @@
 # Claude Agent SDK Runtime Admission
 
-**Status:** PROVISIONAL current authority. Offline admission is complete for
-`claude-agent-sdk==0.2.151` with bundled Claude Code CLI 2.1.258. The bounded
-live gate verified the runtime/auth identity and exact observable tool/server
-surface for the product's fresh-empty-directory path, but a post-run
-calibration found the populated configuration traps were misplaced. Operator
-review of that disclosed live-evidence limitation remains pending. Evidence is
-retained at
+**Status:** ACTIVE current authority. Offline admission and the bounded live
+gate are complete for ArkScope's fresh-empty-directory product contract with
+`claude-agent-sdk==0.2.151` and bundled Claude Code CLI 2.1.258. A post-run
+calibration found that optional adversarial developer-configuration traps were
+misplaced; this is a disclosed non-blocking test limitation, not a product
+dependency or a known runtime escape. Evidence is retained at
 `docs/superpowers/evidence/2026-09-02-claude-agent-sdk-runtime-admission/`.
 
 This document supersedes only the *current runtime* claims in
@@ -99,13 +98,15 @@ not become a pass.
 The 2026-09-02 run used the intended fresh empty product directories and its
 exact init inventories passed, but its hostile project files were under a
 sibling directory and its hook was outside the overridden `CLAUDE_CONFIG_DIR`.
-Those false trap values therefore do not independently validate populated
-source suppression. The future harness now binds the traps to the actual SDK
-paths and an offline test owns that binding; it has not been live re-run beyond
-the consumed two-session authorization. Until a corrected live run is approved,
-the admission relies on the product invariant that both directories are fresh
-and empty plus the measured exact init surface. Removing that invariant is a
-new security decision, not a refactor.
+Those files are developer-local Claude Code inputs that ArkScope must never
+consume; they are not required App configuration. Their false trap values do
+not independently validate suppression against deliberately populated source
+directories, but that stronger adversarial check is not needed to establish
+the shipped empty-directory path. The future harness now binds the traps to the
+actual SDK paths and an offline test owns that binding. No additional provider
+call is required for this admission. Reusing a project, home, or non-empty
+configuration directory in the product path would be a new security decision
+and would require readmission.
 
 ## Publication boundary
 

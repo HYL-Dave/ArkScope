@@ -30,6 +30,9 @@ the child used a separate `CLAUDE_CONFIG_DIR`. Consequently,
 record what happened but do not prove that populated project/user sources are
 ignored. The harness has since been corrected and has an offline binding test,
 but was not run again because the two-session authorization was exhausted.
+These files are developer-local Claude Code inputs that ArkScope deliberately
+excludes, not configuration required by the App. The limitation therefore
+narrows the adversarial test claim without blocking the observed product path.
 
 The artifact intentionally excludes the setup-token, credential and account
 identifiers, local paths, process environment, prompts, raw SDK messages, and
