@@ -52,6 +52,15 @@ from typing import Any, AsyncIterator, Callable, Optional
 from src.agents.shared.compressor.reducers import get_reducer  # default = truncate_with_marker
 from src.agents.shared.events import AgentEvent, EventType
 from src.auth_drivers.api_key_drivers import MissingCredentialError
+from src.auth_drivers.claude_agent_sdk_runtime import (
+    ClaudeAgentSdkRuntimeIncompatible,
+    ClaudeSubscriptionAuthSourceUnverified,
+    REVIEWED_DISALLOWED_TOOLS,
+    build_claude_child_environment,
+    discard_claude_sdk_stderr,
+    require_reviewed_claude_agent_runtime,
+    require_subscription_auth_source,
+)
 from src.auth_drivers.oauth_status import (
     OAuthAccountObservation,
     OAuthAccountPayload,
@@ -106,7 +115,7 @@ _STABLE_REASON_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 _MCP_SERVER_NAME = "ark"
 _MCP_PREFIX = "mcp__ark__"
 
-# §3 Tier-1 allowlist (13 read-only tools). Hardcoded frozenset — NOT derived
+# §3 Tier-1 allowlist (15 read-only tools). Hardcoded frozenset — NOT derived
 # from the registry `category` field (which is free-text, not a safety boundary).
 _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
     {
@@ -508,7 +517,15 @@ class AnthropicClaudeCodeSdkDriver:
         # do NOT await this; ``async for`` over it).
         return self._stream(request)
 
-    def _build_options(self, request: LLMRequest, token: str, server: Any, config_dir: str) -> ClaudeAgentOptions:
+    def _build_options(
+        self,
+        request: LLMRequest,
+        token: str,
+        server: Any,
+        config_dir: str,
+        *,
+        cli_path: str,
+    ) -> ClaudeAgentOptions:
         # §1/§2/§5/§7. The token + empty API key + isolated config dir go via
         # options.env (NEVER os.environ). dontAsk + tools=[] + allowed_tools +
         # setting_sources=[] is the validated locked posture.
@@ -521,21 +538,30 @@ class AnthropicClaudeCodeSdkDriver:
             mcp_servers={_MCP_SERVER_NAME: server},
             allowed_tools=allowed,
             tools=[],                       # disable ALL built-ins (--tools "")
+            disallowed_tools=list(REVIEWED_DISALLOWED_TOOLS),
             setting_sources=[],             # no user/project/local .claude
             strict_mcp_config=True,         # ignore any auto-loaded MCP config
             permission_mode="dontAsk",      # deny anything not pre-approved
+            stderr=discard_claude_sdk_stderr,
+            cli_path=cli_path,               # reviewed bundled binary; never PATH
+            cwd=config_dir,                  # neutral, per-call directory
             max_turns=max_turns,
-            env={
-                "CLAUDE_CODE_OAUTH_TOKEN": token,   # subscription auth (token-store)
-                "ANTHROPIC_API_KEY": "",            # never bill the API key (§5)
-                "CLAUDE_CONFIG_DIR": config_dir,    # fresh empty dir — isolation (§1)
-            },
+            env=build_claude_child_environment(
+                token=token,
+                config_dir=config_dir,
+            ),
         )
 
     async def _stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
         # Pre-flight failures may raise on first iteration (the only sanctioned
         # exceptions, mirroring 7A). Once query() begins, every failure becomes a
         # single in-band terminal `error`.
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except ClaudeAgentSdkRuntimeIncompatible as exc:
+            yield _err(request, str(exc), code="provider_call_failed")
+            return
+
         token = self._load_token()
         if not token:
             raise MissingCredentialError(
@@ -547,7 +573,13 @@ class AnthropicClaudeCodeSdkDriver:
             per_tool_timeout_s=self._per_tool_timeout_s,
         )
         config_dir = tempfile.mkdtemp(prefix="ark_claude_cfg_")
-        options = self._build_options(request, token, server, config_dir)
+        options = self._build_options(
+            request,
+            token,
+            server,
+            config_dir,
+            cli_path=str(runtime.cli_path),
+        )
         logger.info(
             "claude agent-sdk (subscription) model=%s max_turns=%s timeout_s=%s",
             request.model, self._max_turns, self._timeout_s,
@@ -556,6 +588,7 @@ class AnthropicClaudeCodeSdkDriver:
         prompt = _compose_input(request.input_messages)
         tool_names: dict[str, str] = {}  # tool_use_id -> name, to label tool_end
         terminal = False
+        subscription_auth_verified = False
         loop = asyncio.get_event_loop()
         deadline = None if self._timeout_s <= 0 else loop.time() + self._timeout_s
 
@@ -583,6 +616,25 @@ class AnthropicClaudeCodeSdkDriver:
                     terminal = True
                     return
 
+                if isinstance(msg, SystemMessage) and msg.subtype == "init":
+                    try:
+                        require_subscription_auth_source(msg.data)
+                    except ClaudeSubscriptionAuthSourceUnverified as exc:
+                        yield _err(request, str(exc), code="provider_call_failed")
+                        terminal = True
+                        return
+                    subscription_auth_verified = True
+                elif isinstance(msg, (AssistantMessage, UserMessage, ResultMessage)):
+                    if not subscription_auth_verified:
+                        yield _err(
+                            request,
+                            "Claude subscription auth source evidence is missing or "
+                            "malformed; refusing to continue the model call.",
+                            code="provider_call_failed",
+                        )
+                        terminal = True
+                        return
+
                 for ev in self._map(msg, request, token, tool_names):
                     if ev.type in (EventType.done, EventType.error):
                         terminal = True
@@ -592,7 +644,13 @@ class AnthropicClaudeCodeSdkDriver:
 
             # EOF without a terminal -> synthesize ONE error (never a silent done).
             if not terminal:
-                yield _err(request, "claude agent-sdk stream ended without a result")
+                message = (
+                    "claude agent-sdk stream ended without a result"
+                    if subscription_auth_verified
+                    else "Claude subscription auth source evidence is missing or "
+                    "malformed; refusing to continue the model call."
+                )
+                yield _err(request, message, code="provider_call_failed")
         finally:
             # cancel / GeneratorExit / any exit -> tear down the SDK session FIRST
             # (the subprocess uses CLAUDE_CONFIG_DIR), then remove the per-call temp
@@ -687,18 +745,8 @@ class AnthropicClaudeCodeSdkDriver:
             ]
 
         if isinstance(msg, SystemMessage):
-            # init/hook noise -> IGNORE, except read apiKeySource ONCE for the
-            # abort guard (§6 — advisory, env-side guarantee is primary).
-            if getattr(msg, "subtype", None) == "init":
-                src = (getattr(msg, "data", {}) or {}).get("apiKeySource")
-                if src not in (None, "none"):
-                    return [
-                        _err(
-                            request,
-                            "subscription auth not active (apiKeySource="
-                            f"{src!r}) — refusing to bill an API key",
-                        )
-                    ]
+            # The stream loop owns the auth-evidence state; other system frames
+            # remain non-terminal protocol noise.
             return out
 
         if isinstance(msg, RateLimitEvent):

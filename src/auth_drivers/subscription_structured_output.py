@@ -34,6 +34,15 @@ from claude_agent_sdk._internal.transport.subprocess_cli import (
 from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
 from src.auth_drivers.chatgpt_oauth_login import provider_error_requires_reauth
 from src.auth_drivers.chatgpt_oauth_login import refresh_if_needed
+from src.auth_drivers.claude_agent_sdk_runtime import (
+    CLAUDE_INHERITED_AUTH_ENV,
+    ClaudeAgentSdkRuntimeIncompatible,
+    REVIEWED_DISALLOWED_TOOLS,
+    build_claude_child_environment,
+    discard_claude_sdk_stderr,
+    require_reviewed_claude_agent_runtime,
+    require_subscription_auth_source,
+)
 from src.auth_drivers.chatgpt_oauth_probe import (
     CHATGPT_BACKEND_BASE_URL,
     _event_output_item,
@@ -52,32 +61,7 @@ class SubscriptionStructuredOutputError(RuntimeError):
         super().__init__(message)
 
 
-_CLAUDE_INHERITED_BILLING_ENV = (
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_FOUNDRY_API_KEY",
-    "ANTHROPIC_AWS_API_KEY",
-    "ANTHROPIC_BEDROCK_MANTLE_API_KEY",
-    "AWS_BEARER_TOKEN_BEDROCK",
-    "ANTHROPIC_AWS_AUTH",
-    "ANTHROPIC_IDENTITY_TOKEN",
-    "ANTHROPIC_IDENTITY_TOKEN_FILE",
-    "ANTHROPIC_PROFILE",
-    "ANTHROPIC_CUSTOM_HEADERS",
-    "ANTHROPIC_BASE_URL",
-    "ANTHROPIC_BEDROCK_BASE_URL",
-    "ANTHROPIC_VERTEX_BASE_URL",
-    "ANTHROPIC_FOUNDRY_BASE_URL",
-    "ANTHROPIC_AWS_BASE_URL",
-    "ANTHROPIC_BEDROCK_MANTLE_BASE_URL",
-    "ANTHROPIC_UNIX_SOCKET",
-    "CLAUDE_CODE_USE_BEDROCK",
-    "CLAUDE_CODE_USE_VERTEX",
-    "CLAUDE_CODE_USE_FOUNDRY",
-    "CLAUDE_CODE_USE_ANTHROPIC_AWS",
-    "CLAUDE_CODE_USE_MANTLE",
-    "CLAUDE_CODE_USE_GATEWAY",
-)
+_CLAUDE_INHERITED_BILLING_ENV = CLAUDE_INHERITED_AUTH_ENV
 # The SDK's own close path budgets 5s graceful + 5s SIGTERM before SIGKILL.
 # Leave enough outer margin for the final waitpid/reap instead of cancelling
 # cleanup after the child exits but before it is collected.
@@ -365,6 +349,12 @@ async def _claude_structured_output_async(
 ) -> dict[str, Any]:
     deadline = asyncio.get_running_loop().time() + max(float(timeout_s), 0.001)
     try:
+        runtime = require_reviewed_claude_agent_runtime()
+    except ClaudeAgentSdkRuntimeIncompatible as exc:
+        raise SubscriptionStructuredOutputError(
+            "provider_call_failed", str(exc)
+        ) from exc
+    try:
         record = await _run_sync_preflight(
             lambda: token_store.load(
                 provider="anthropic",
@@ -415,17 +405,20 @@ async def _claude_structured_output_async(
             mcp_servers={},
             allowed_tools=[],
             tools=[],
+            disallowed_tools=list(REVIEWED_DISALLOWED_TOOLS),
             setting_sources=[],
             strict_mcp_config=True,
             permission_mode="dontAsk",
+            stderr=discard_claude_sdk_stderr,
+            cli_path=str(runtime.cli_path),
+            cwd=config_dir,
             # The internal StructuredOutput tool call consumes the first turn;
             # the terminal ResultMessage with structured_output needs a second.
             max_turns=2,
-            env={
-                **{name: "" for name in _CLAUDE_INHERITED_BILLING_ENV},
-                "CLAUDE_CODE_OAUTH_TOKEN": token,
-                "CLAUDE_CONFIG_DIR": config_dir,
-            },
+            env=build_claude_child_environment(
+                token=token,
+                config_dir=config_dir,
+            ),
         )
         transport = _claude_transport(prompt=user, options=options)
         agen = _claude_query(prompt=user, options=options, transport=transport)
@@ -438,13 +431,7 @@ async def _claude_structured_output_async(
                 break
             if isinstance(message, SystemMessage):
                 if message.subtype == "init":
-                    source = (message.data or {}).get("apiKeySource")
-                    if source not in (None, "none"):
-                        raise SubscriptionStructuredOutputError(
-                            "provider_call_failed",
-                            "Claude subscription auth is not active "
-                            f"(apiKeySource={source!r}); refusing to bill another source.",
-                        )
+                    require_subscription_auth_source(message.data)
                     subscription_auth_verified = True
                 continue
             if isinstance(message, AssistantMessage):

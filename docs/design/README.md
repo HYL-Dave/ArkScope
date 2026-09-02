@@ -36,6 +36,7 @@ its row here in the same commit. Git history is the recovery record.
 | `ARKSCOPE_PROVIDER_CATALOG.md` | **Provider Catalog** | Per-provider data/latency/streaming/cost/auth/limits → drives Settings provider config. |
 | `ARKSCOPE_TOOL_CATALOG.md` | **Tool Catalog** | Live ToolRegistry inventory (~51 tools) with keep/adapt/retire verdicts. |
 | `CONFIG_AUTHORITY_PLAN.md` | **Config Authority Plan** | DB-first Settings authority, file/env fallback roles, and retirement gates for config migration. |
+| `CLAUDE_AGENT_SDK_RUNTIME_ADMISSION.md` | **Claude Agent SDK Admission** | Current exact SDK/CLI pair, fail-closed OAuth runtime posture, live upgrade gate, and publication boundary. |
 | `CURRENT_PROJECT_CONTEXT.md` | **Project Context** | Pointer index for an assistant arriving at the repo; canonical sources in read order. |
 | `PROJECT_PRIORITY_MAP.md` | **Priority Map** | Backlog total order + newest-first decision log. First stop for "what's next?". |
 | `REFACTOR_PROTECTION_SMOKE_GATES.md` | **Refactor-Protection Gates** | Guardrail protecting operational ingestion + extension runtime paths during refactors/migration. |
