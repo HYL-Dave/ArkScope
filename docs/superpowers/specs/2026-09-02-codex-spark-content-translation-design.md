@@ -1,7 +1,7 @@
 # Codex Spark Content Translation Design
 
-**Status:** Product direction approved 2026-09-02; implementation pending
-written-spec review
+**Status:** Product direction approved 2026-09-02; revised 2026-09-03 after
+input-bound and bundled-runtime rulings; written-spec review pending
 
 ## Goal
 
@@ -67,8 +67,10 @@ product decision and tests.
 
 The provider does not publish a general API maximum-output fact for this Spark
 surface. The registry must represent that fact as unknown rather than borrowing
-the limit of `gpt-5.3-codex` or inventing one. The fixed translation output
-schema and ArkScope input/output bounds remain the actual execution limits.
+the limit of `gpt-5.3-codex` or inventing one. ArkScope does not turn an unknown
+provider fact into a guessed character or token limit. The output schema remains
+the semantic result contract; separate process-protocol resource guards are not
+model capability claims.
 
 ## Admission Model
 
@@ -164,9 +166,11 @@ capabilities. Its `task_route_tasks` value becomes exactly
 
 ### One core, one adapter
 
-Content Translation keeps one input contract, one output JSON Schema, and the
-existing `translate_text` / `translate_card` validation. The Spark work adds a
-Codex app-server adapter behind the existing subscription structured-output
+Content Translation keeps one input contract and one output JSON Schema. The
+shared `translate_text` / `translate_card` validation remains authoritative for
+shape, locale, NUL rejection, and complete-output requirements while the legacy
+generic 16,000-character checks are removed. The Spark work adds a Codex
+app-server adapter behind the existing subscription structured-output
 dispatcher. It does not fork translation prompts, DTOs, persistence, or output
 validation.
 
@@ -189,14 +193,22 @@ translation share:
 - process-group termination and reap behavior;
 - JWT account-ID validation and `chatgptAuthTokens` login.
 
-Executable policy is intentionally different by operation. Existing bounded
-account observation may retain its current PATH fallback for compatibility, but
-Spark execution is bundled-only. It must resolve `codex_cli_bin`'s bundled
-binary, verify that the resolved target remains inside that installed bundle,
-and probe the exact allowlisted version. Missing/broken bundle imports or paths
-are typed adapter-unavailable failures; Spark execution never consults PATH.
-This matches the bundled-only admission standard used by the Claude execution
-runtime.
+Every ArkScope Codex operation is bundled-only. Account observation and Spark
+execution must both resolve `codex_cli_bin`'s bundled binary, verify that the
+resolved target remains inside that installed bundle, and probe the exact
+allowlisted version. Missing or broken bundle imports and paths are typed
+runtime-unavailable failures. No ArkScope path may discover or execute an
+external `codex` from `PATH`. This preserves packageability without requiring a
+separately installed Codex CLI and matches the bundled-only admission standard
+used by the Claude execution runtime.
+
+The existing `src/tools/code_generator.py` Codex backend is part of this
+repository-wide executable ruling even though it uses `codex exec` rather than
+the app-server protocol. Before Spark execution is admitted, its
+`shutil.which("codex")` and literal `"codex"` launch must move to the same
+bundled-path and reviewed-version authority. Its task behavior and credential
+policy do not otherwise change in this slice. Explicit executable injection may
+remain as a test seam; it is not an operator-facing PATH override.
 
 Account-usage response parsing remains separate from translation event parsing.
 The refactor must preserve all existing account-usage tests and behavior.
@@ -252,22 +264,38 @@ The final message must be a bare JSON object matching `outputSchema`. It is
 parsed and returned to the existing translation validator. Markdown fences,
 prose, additional keys, and malformed JSON are failures.
 
-### Input and wire bounds
+### Semantic limits and protocol safety
 
-Bounds are checked before process startup so an oversized request consumes no
-subscription quota:
+The shared Content Translation contract has no ArkScope-defined character or
+token ceiling. It never truncates source text or translated output. In
+particular, the existing 16,000-character checks in `translate_text` are not a
+provider capability fact and must not constrain the reusable translation core.
+An exact provider context rejection is surfaced as a typed, non-retryable
+context-limit failure; it is not converted into partial output or retried with a
+smaller prompt.
 
-- `translate_text` retains its existing 16,000-character source limit;
-- the canonical UTF-8 JSON user payload produced by `translate_card` is limited
-  to 65,536 bytes;
-- the complete serialized `turn/start` JSONL message is limited to 262,144
-  bytes, including instructions, schema, and protocol framing;
-- the accepted final `agentMessage` text is limited to 65,536 UTF-8 bytes.
+The current lifecycle evidence feature has separate 16,000-character API,
+excerpt, translation-cache, and SQLite constraints. Those remain lifecycle
+storage/admission rules until that feature is redesigned; they are enforced at
+the lifecycle boundary and must never be exposed as a Spark or Content
+Translation model limit. Changing those SQLite checks requires its own reviewed
+migration and is outside this slice.
 
-These are ArkScope execution limits, not claims about the provider's maximum
-output. Exceeding an input or wire bound raises a closed, non-retryable
-`translation_input_too_large` failure before provider dispatch. Output excess
-remains a non-retryable invalid-output failure.
+The app-server transport still needs bounded-memory protection against a broken
+or hostile child process. Request and response JSONL are streamed under a
+separately named protocol-resource budget that:
+
+- is large enough not to stand in for a model context or output limit;
+- counts encoded protocol bytes rather than characters or tokens;
+- terminates and reaps the process on exhaustion;
+- reports a typed adapter/protocol failure; and
+- never truncates, retries, changes model, or returns a partial translation.
+
+This internal resource guard is not a user-tunable model setting. Settings must
+show provider maximum input/output as unknown when it is unknown, rather than
+claiming that the guard is a model limit. The implementation plan must ground
+the exact byte budget against the reviewed app-server framing and at least the
+largest admitted Content Translation fixture before product code is written.
 
 ### Deadlines and cleanup
 
@@ -296,9 +324,10 @@ failures. Provider rate limits and temporary queueing remain retryable provider
 failures. Protocol drift, unexpected tools, malformed output, and model mismatch
 are typed adapter failures and never count as successful translation.
 
-`translation_input_too_large` is added to the existing closed translation
-failure vocabulary and both frontend locales. It is not collapsed into a
-provider error because no provider call was attempted.
+An exact provider context rejection gains a closed translation failure code and
+localized guidance. Protocol-resource exhaustion remains a distinct adapter
+failure because it describes the local harness, not the model. Neither path may
+include raw provider text in its public DTO.
 
 The lifecycle translation endpoint continues to expose the existing closed
 translation-failure DTO. Harness provenance becomes `codex_app_server` for a
@@ -358,12 +387,17 @@ Implementation starts with failing tests that own these boundaries:
    notification shape.
 7. Process tests inspect the bundled-only executable, exact launch arguments,
    clean environment, temporary paths, disabled features, no inherited secrets,
-   no PATH fallback, and process-group cleanup.
+   no PATH fallback, and process-group cleanup. Separate owners prove both the
+   account-usage default and the existing `codex exec` code-generator backend
+   use the same bundled authority and cannot fall back to an external binary.
 8. Protocol tests cover the exact request sequence and reject every command,
    file, tool, MCP, approval, fallback, malformed-message, wrong-ID, duplicate,
    timeout, and non-completed-turn case.
-9. Boundary tests prove text, card-payload, serialized-wire, and final-output
-   limits at the exact byte edges, with a positive no-provider-call ledger.
+9. Boundary tests prove that source and translated text are never silently
+   truncated, that the reusable translator does not reject the former 16,000
+   character boundary, that lifecycle-specific storage limits remain at the
+   lifecycle boundary, and that protocol-budget exhaustion terminates the child
+   without returning partial output. Positive controls must reach each guard.
 10. Translation integration tests prove Spark uses the Codex adapter and the
    existing schema/validators, while all other subscription models retain their
    current adapters.
@@ -403,7 +437,10 @@ behavior. It does not widen Spark to API keys, Plus, other tasks, or fallback.
 - Using Spark for card synthesis, AI Research, generic agents, code generation,
   calibration, compression, or tool orchestration.
 - Building a general multi-agent scheduler.
-- Adding image input or expanding the 16,000-character text-translation bound.
+- Adding image input.
+- Migrating or widening lifecycle evidence/excerpt/translation-cache storage.
+- Adding a user-facing character/token limit that pretends to describe a model
+  whose provider maximum is unknown.
 - Replacing the existing ChatGPT OAuth raw Responses research driver.
 - Calling the provider during offline tests.
 - Changing Fable 5.1, Claude OAuth, lifecycle automation, provider credentials,
