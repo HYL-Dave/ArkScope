@@ -1,80 +1,66 @@
-"""P3 probe — Claude setup-token (claude_code_oauth) — S4 Step 3.
+"""One-call Settings probe for Claude setup-token subscription credentials.
 
-Falsifiable proof of the C≠D distinction (LLM_AUTH_DRIVER_PLAN.md §9):
-  P3a: `claude -p` with CLAUDE_CODE_OAUTH_TOKEN set (ANTHROPIC_API_KEY unset)
-       completes → the subscription/Agent-SDK route works.
-  P3b: passing the SAME token as a raw Anthropic() x-api-key is REJECTED → the
-       setup-token is NOT an api.anthropic.com API key (so it must route via the
-       CLI/Agent SDK, never the raw Messages API).
-
-Both side effects are injectable (cli_fn / raw_sdk_fn) so the route + tests can
-run without a live token. Results flow through the redacted probe harness — a
-token can never leak into a ProbeResult, even from an exception. No persistence.
+The probe reuses the shipped structured-output adapter so runtime admission,
+bundled-CLI selection, child-environment isolation, and ``apiKeySource``
+verification cannot drift from the real fixed-task path.
 """
 
 from __future__ import annotations
 
-import os
-import shutil
-import subprocess
 from typing import Any, Callable
 
 from .probe_harness import run_probe
+from .subscription_structured_output import run_subscription_structured_output
 
-_CLI_NAME = "P3a: claude -p works with the setup-token"
-_SDK_NAME = "P3b: raw Anthropic SDK rejects the setup-token as x-api-key"
+_PROBE_NAME = "Claude subscription auth source and structured output"
+_PROBE_SCHEMA = {
+    "type": "object",
+    "properties": {"ok": {"type": "boolean"}},
+    "required": ["ok"],
+    "additionalProperties": False,
+}
 
 
-def _default_cli_probe(token: str) -> tuple[bool, str]:
-    """Run `claude -p` with the OAuth token in env (ANTHROPIC_API_KEY unset), like
-    code_generator._call_claude_cli(use_api_key=False). PASS = rc 0 with output.
-    Returns SHAPE only (never the model output — the harness redacts regardless)."""
-    if not shutil.which("claude"):
-        return False, "claude CLI not installed (npm i -g @anthropic-ai/claude-code)"
-    env = os.environ.copy()
-    env.pop("ANTHROPIC_API_KEY", None)  # force the subscription/OAuth path
-    env["CLAUDE_CODE_OAUTH_TOKEN"] = token
-    proc = subprocess.run(
-        ["claude", "-p", "--output-format", "text", "--max-turns", "1",
-         "Reply with exactly: OK. Do not use any tools."],
-        capture_output=True, text=True, env=env, timeout=120,
+def _run_subscription_probe(
+    *,
+    credential_id: str,
+    token_store: Any,
+    structured_output_fn: Callable[..., dict[str, Any]],
+) -> tuple[bool, str]:
+    payload = structured_output_fn(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        credential_id=credential_id,
+        model="claude-sonnet-5",
+        system="Return the requested structured credential-probe result only.",
+        user="Set ok to true. Do not use tools.",
+        output_name="claude_subscription_probe",
+        output_description="A bounded Claude subscription credential check.",
+        schema=_PROBE_SCHEMA,
+        effort="low",
+        token_store=token_store,
+        timeout_s=120.0,
     )
-    if proc.returncode == 0 and proc.stdout.strip():
-        return True, f"claude -p exited rc=0 with {len(proc.stdout.strip())} chars of output"
-    return False, f"claude -p exited rc={proc.returncode}; stderr: {proc.stderr}"
-
-
-def _anthropic_client(token: str) -> Any:  # seam for tests
-    from anthropic import Anthropic
-
-    return Anthropic(api_key=token)
-
-
-def _default_raw_sdk_reject_probe(token: str) -> tuple[bool, str]:
-    """Pass the setup-token to the raw Anthropic SDK as an api_key. PASS = the
-    call is REJECTED (proves the token is not an API key). If the call SUCCEEDS,
-    the C≠D invariant is violated → FAIL."""
-    try:
-        client = _anthropic_client(token)
-        client.messages.create(
-            model="claude-haiku-4-5", max_tokens=1,
-            messages=[{"role": "user", "content": "ping"}],
-        )
-    except Exception as exc:  # noqa: BLE001 — any rejection is the expected outcome
-        return True, f"raw SDK rejected the token ({type(exc).__name__})"
-    return False, "raw SDK ACCEPTED the setup-token as an API key — C≠D invariant violated"
+    if payload != {"ok": True}:
+        return False, "unexpected structured result"
+    return True, "verified subscription auth source and structured result"
 
 
 def run_claude_code_oauth_probe(
-    token: str,
     *,
-    cli_fn: Callable[[], Any] | None = None,
-    raw_sdk_fn: Callable[[], Any] | None = None,
-) -> dict:
-    """Run P3a + P3b through the redacted harness. Returns
-    {passed: bool, probes: [<ProbeResult dict>, ...]} — never the token."""
-    cli_fn = cli_fn or (lambda: _default_cli_probe(token))
-    raw_sdk_fn = raw_sdk_fn or (lambda: _default_raw_sdk_reject_probe(token))
-    p3a = run_probe(_CLI_NAME, expected="claude -p completes (rc 0, output)", fn=cli_fn)
-    p3b = run_probe(_SDK_NAME, expected="rejected — token is not an API key", fn=raw_sdk_fn)
-    return {"passed": bool(p3a.passed and p3b.passed), "probes": [p3a.model_dump(), p3b.model_dump()]}
+    credential_id: str,
+    token_store: Any,
+    structured_output_fn: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Run one bounded Claude subscription call; never retry or fall back."""
+    call = structured_output_fn or run_subscription_structured_output
+    result = run_probe(
+        _PROBE_NAME,
+        expected="subscription source verified and structured result returned",
+        fn=lambda: _run_subscription_probe(
+            credential_id=credential_id,
+            token_store=token_store,
+            structured_output_fn=call,
+        ),
+    )
+    return {"passed": bool(result.passed), "probes": [result.model_dump()]}

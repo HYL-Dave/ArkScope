@@ -596,7 +596,7 @@ def _default_codex_executable() -> str | Path:
 
         return bundled_codex_path()
     except (ImportError, FileNotFoundError, OSError):
-        return "codex"
+        raise _fail("adapter_unavailable") from None
 
 
 class CodexAccountUsageAdapter:

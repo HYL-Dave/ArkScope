@@ -249,8 +249,14 @@ def test_probe_route_still_supports_anthropic(stores, monkeypatch):
              record=StoredTokenRecord(access_token="claude-FAKE"))
 
     import src.auth_drivers.claude_oauth_probe as probe_mod
-    monkeypatch.setattr(probe_mod, "run_claude_code_oauth_probe",
-                        lambda token, **kw: {"passed": True, "probes": []})
+    monkeypatch.setattr(
+        probe_mod,
+        "run_claude_code_oauth_probe",
+        lambda *, credential_id, token_store, **kw: {
+            "passed": bool(credential_id == cid and token_store is tok),
+            "probes": [],
+        },
+    )
     out = cr.probe_oauth_credential(cid, store=cred, token_store=tok)
     assert out["passed"] is True
 

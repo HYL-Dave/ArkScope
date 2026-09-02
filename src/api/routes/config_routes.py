@@ -689,10 +689,11 @@ def probe_oauth_credential(
     store: CredentialStore = Depends(get_credential_store),
     token_store=Depends(get_oauth_token_store),
 ):
-    """Run the OAuth probe for a stored credential and return redacted ProbeResults
-    (the token is NEVER echoed):
-      - anthropic claude_code_oauth → P3 (claude -p works + raw SDK rejects the token);
-      - openai chatgpt_oauth → P1/P2 (api.openai.com rejects + ChatGPT-backend floor)."""
+    """Run the OAuth probe for a stored credential and return redacted results.
+
+    Anthropic uses the admitted bundled Agent-SDK runtime and verifies its
+    subscription auth-source frame. OpenAI uses the bounded P1/P2 probe.
+    """
     from src.model_credentials import valid_credential_id
 
     store = _credential_store(store)
@@ -708,7 +709,10 @@ def probe_oauth_credential(
     if cred.provider == "anthropic" and cred.auth_type == "claude_code_oauth":
         from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
 
-        return run_claude_code_oauth_probe(record.access_token)
+        return run_claude_code_oauth_probe(
+            credential_id=credential_id,
+            token_store=token_store,
+        )
     if cred.provider == "openai" and cred.auth_type == "chatgpt_oauth":
         from src.auth_drivers.chatgpt_oauth_probe import run_chatgpt_oauth_probe
 
