@@ -1,271 +1,143 @@
-"""
-Regression tests for agent tool-calling behaviour (Issue C).
+"""Contract tests for direct, caller-authored Python analysis."""
 
-Tests cover:
-1. System prompt contains mandatory calculation guidance
-2. Tool descriptions emphasise task mode and forbid mental math
-3. Tool vs subagent boundary is clearly delineated in prompt
-4. Deterministic mock: agent dispatch routes execute_python_analysis correctly
-5. OpenAI function schema advertises task as preferred parameter
-"""
+from __future__ import annotations
 
-import json
-
-import pytest
+import inspect
+from dataclasses import fields
+from pathlib import Path
+from unittest.mock import MagicMock
 
 from src.agents.shared.prompts import SYSTEM_PROMPT
 
-
-# ============================================================
-# Prompt Guidance — mandatory calculation rules
-# ============================================================
-
-class TestPromptCalculationGuidance:
-    """System prompt MUST contain explicit rules that forbid mental math."""
-
-    def test_mandatory_tool_usage_keyword(self):
-        """Prompt explicitly says ALWAYS use execute_python_analysis."""
-        assert "ALWAYS use execute_python_analysis" in SYSTEM_PROMPT
-
-    def test_forbids_mental_math(self):
-        """Prompt forbids estimating or calculating mentally."""
-        upper = SYSTEM_PROMPT.upper()
-        assert "DO NOT ESTIMATE" in upper or "DO NOT CALCULATE MENTALLY" in upper
-
-    def test_wrong_vs_right_example(self):
-        """Prompt has a WRONG/RIGHT contrast to anchor expected behaviour."""
-        assert "WRONG:" in SYSTEM_PROMPT
-        assert "RIGHT:" in SYSTEM_PROMPT
-        # The RIGHT example must reference the tool
-        right_idx = SYSTEM_PROMPT.index("RIGHT:")
-        right_line = SYSTEM_PROMPT[right_idx:right_idx + 200]
-        assert "execute_python_analysis" in right_line
-
-    def test_task_mode_emphasized(self):
-        """Prompt recommends task (natural language) over code."""
-        assert "task" in SYSTEM_PROMPT.lower()
-        # Must mention auto-retry
-        assert "retries" in SYSTEM_PROMPT.lower() or "retry" in SYSTEM_PROMPT.lower()
-
-    def test_section_header_present(self):
-        """Dedicated section header exists for code execution rules."""
-        assert "CODE EXECUTION" in SYSTEM_PROMPT
+_PUBLIC_PARAMETERS = {"code", "data_json", "timeout"}
 
 
-# ============================================================
-# Tool vs Subagent boundary in prompt
-# ============================================================
+def _openai_execution_tool():
+    from src.agents.openai_agent.tools import create_openai_tools
 
-class TestToolSubagentBoundary:
-    """Prompt must clearly distinguish execute_python_analysis from code_analyst."""
-
-    def test_subagent_section_exists(self):
-        """SUBAGENT DELEGATION section is present."""
-        assert "SUBAGENT DELEGATION" in SYSTEM_PROMPT
-
-    def test_tool_vs_subagent_guidance(self):
-        """Prompt has explicit TOOL vs SUBAGENT guidance."""
-        assert "TOOL vs SUBAGENT" in SYSTEM_PROMPT
-
-    def test_direct_tool_for_single_calculation(self):
-        """Prompt routes single calculations to the tool, not subagent."""
-        # Find the guidance section
-        idx = SYSTEM_PROMPT.find("TOOL vs SUBAGENT")
-        assert idx != -1
-        section = SYSTEM_PROMPT[idx:idx + 600]
-        # Should mention "direct" for single calculation
-        assert "direct" in section.lower()
-        # Should mention code_analyst only for multi-step
-        assert "code_analyst" in section
-
-    def test_rule_of_thumb_present(self):
-        """There's a clear rule of thumb for the decision."""
-        assert "rule of thumb" in SYSTEM_PROMPT.lower() or "Rule of thumb" in SYSTEM_PROMPT
+    return next(
+        tool
+        for tool in create_openai_tools(MagicMock())
+        if getattr(tool, "name", "").endswith("execute_python_analysis")
+    )
 
 
-# ============================================================
-# Tool description quality (all 3 surfaces)
-# ============================================================
+def _anthropic_execution_tool() -> dict:
+    from src.agents.anthropic_agent.tools import get_anthropic_tools
 
-class TestToolDescriptions:
-    """Tool descriptions across registry + both bridges must emphasise task mode."""
-
-    def test_registry_description_prefers_task(self):
-        """Registry tool description says PREFERRED for task param."""
-        from src.tools.registry import create_default_registry
-        reg = create_default_registry()
-        tool = reg.get("execute_python_analysis")
-        assert tool is not None
-        assert "PREFERRED" in tool.description
-
-    def test_registry_description_forbids_mental_math(self):
-        """Registry description says do not calculate mentally."""
-        from src.tools.registry import create_default_registry
-        reg = create_default_registry()
-        tool = reg.get("execute_python_analysis")
-        assert "mentally" in tool.description.lower()
-
-    def test_registry_task_param_preferred(self):
-        """Registry task parameter description mentions PREFERRED."""
-        from src.tools.registry import create_default_registry
-        reg = create_default_registry()
-        tool = reg.get("execute_python_analysis")
-        task_param = next(p for p in tool.parameters if p.name == "task")
-        assert "PREFERRED" in task_param.description
-
-    def test_anthropic_description_prefers_task(self):
-        """Anthropic bridge tool description says PREFERRED."""
-        from src.agents.anthropic_agent.tools import get_anthropic_tools
-        tools = get_anthropic_tools()
-        tool = next(t for t in tools if t["name"] == "execute_python_analysis")
-        assert "PREFERRED" in tool["description"]
-
-    def test_anthropic_task_param_preferred(self):
-        """Anthropic bridge task parameter says PREFERRED."""
-        from src.agents.anthropic_agent.tools import get_anthropic_tools
-        tools = get_anthropic_tools()
-        tool = next(t for t in tools if t["name"] == "execute_python_analysis")
-        task_desc = tool["input_schema"]["properties"]["task"]["description"]
-        assert "PREFERRED" in task_desc
-
-    def test_openai_tool_description_prefers_task(self):
-        """OpenAI tool description (from docstring) mentions PREFERRED."""
-        from unittest.mock import MagicMock
-        from src.agents.openai_agent.tools import create_openai_tools
-        dal = MagicMock()
-        tools = create_openai_tools(dal)
-        # Find the execute_python_analysis tool by name attribute
-        tool = next(
-            (t for t in tools if getattr(t, "name", "").endswith("execute_python_analysis")),
-            None,
-        )
-        assert tool is not None, "execute_python_analysis not found in OpenAI tools"
-        # The tool description is derived from the docstring
-        desc = getattr(tool, "description", "") or ""
-        assert "PREFERRED" in desc or "preferred" in desc.lower(), (
-            f"OpenAI tool description should mention PREFERRED: {desc[:200]}"
-        )
-
-    def test_openai_tool_description_forbids_mental_math(self):
-        """OpenAI tool description tells model not to calculate mentally."""
-        from unittest.mock import MagicMock
-        from src.agents.openai_agent.tools import create_openai_tools
-        dal = MagicMock()
-        tools = create_openai_tools(dal)
-        tool = next(
-            (t for t in tools if getattr(t, "name", "").endswith("execute_python_analysis")),
-            None,
-        )
-        assert tool is not None
-        desc = getattr(tool, "description", "") or ""
-        assert "mentally" in desc.lower(), (
-            f"OpenAI tool description should forbid mental math: {desc[:200]}"
-        )
+    return next(
+        tool
+        for tool in get_anthropic_tools()
+        if tool["name"] == "execute_python_analysis"
+    )
 
 
-# ============================================================
-# Deterministic dispatch: execute_python_analysis routing
-# ============================================================
-
-class TestExecutePythonAnalysisDispatch:
-    """Mock-based tests verifying tool dispatch works correctly."""
-
-    def test_task_mode_invokes_code_generator(self):
-        """When task is provided (no code), code generator is called."""
-        from unittest.mock import patch
-        from src.tools.code_executor import CodeExecutionResult
-
-        mock_result = CodeExecutionResult(
-            success=True,
-            output="Sharpe ratio: 1.42",
-            error="",
-            execution_time=0.5,
-            generated_code="import pandas as pd\n...",
-        )
-        with patch(
-            "src.tools.code_generator.generate_and_execute",
-            return_value=mock_result,
-        ) as mock_gen:
-            from src.tools.code_executor import execute_python_code
-            result = execute_python_code(
-                task="Calculate Sharpe ratio",
-                data_json='{"prices": [100, 101, 99]}',
-            )
-            mock_gen.assert_called_once()
-            assert result.success is True
-
-    def test_code_mode_skips_code_generator(self):
-        """When code is provided, code generator is NOT called."""
-        from unittest.mock import patch
-
-        with patch(
-            "src.tools.code_generator.generate_and_execute",
-        ) as mock_gen:
-            from src.tools.code_executor import execute_python_code
-            result = execute_python_code(code='print("hello")')
-            mock_gen.assert_not_called()
-            assert result.success is True
-            assert "hello" in result.output
-
-    def test_task_mode_passes_data_json(self):
-        """data_json is forwarded to the code generator."""
-        from unittest.mock import patch
-        from src.tools.code_executor import CodeExecutionResult
-
-        mock_result = CodeExecutionResult(
-            success=True, output="ok", error="", execution_time=0.1,
-        )
-        with patch(
-            "src.tools.code_generator.generate_and_execute",
-            return_value=mock_result,
-        ) as mock_gen:
-            from src.tools.code_executor import execute_python_code
-            execute_python_code(
-                task="Summarize data",
-                data_json='{"tickers": ["NVDA", "AAPL"]}',
-            )
-            call_kwargs = mock_gen.call_args
-            # data_json should be in the call
-            assert "tickers" in str(call_kwargs)
-
-    def test_empty_code_runs_as_noop(self):
-        """Empty code (no task) runs as a no-op — valid but empty output."""
-        from src.tools.code_executor import execute_python_code
-        result = execute_python_code(code="", task="")
-        # Empty Python script is valid — subprocess exits 0
-        assert result.success is True
-        assert result.output == ""
+def test_prompt_requires_auditable_calculation_and_caller_authored_code():
+    assert "ALWAYS use execute_python_analysis" in SYSTEM_PROMPT
+    assert "DO NOT CALCULATE MENTALLY" in SYSTEM_PROMPT.upper()
+    section = SYSTEM_PROMPT[SYSTEM_PROMPT.index("CODE EXECUTION") :]
+    assert "write" in section.lower() and "Python code" in section
+    assert "inspect" in section.lower() and "error" in section.lower()
+    assert "auto-generates" not in section
 
 
-# ============================================================
-# OpenAI function schema structure
-# ============================================================
+def test_prompt_preserves_the_tool_vs_subagent_boundary():
+    assert "SUBAGENT DELEGATION" in SYSTEM_PROMPT
+    assert "TOOL vs SUBAGENT" in SYSTEM_PROMPT
+    section = SYSTEM_PROMPT[SYSTEM_PROMPT.index("TOOL vs SUBAGENT") :][:700]
+    assert "execute_python_analysis" in section
+    assert "code_analyst" in section
 
-class TestOpenAIFunctionSchema:
-    """OpenAI function tool schema must list task before code."""
 
-    def test_tool_registered_in_openai_bridge(self):
-        """execute_python_analysis is available in OpenAI tools list."""
-        from unittest.mock import MagicMock
-        from src.agents.openai_agent.tools import create_openai_tools
-        tools = create_openai_tools(MagicMock())
-        names = [getattr(t, "name", "") for t in tools]
-        assert any("execute_python_analysis" in n for n in names)
+def test_registry_exposes_only_the_direct_code_contract():
+    from src.tools.registry import create_default_registry
 
-    def test_task_param_listed_before_code_in_description(self):
-        """In the OpenAI tool description, task is mentioned before code."""
-        from unittest.mock import MagicMock
-        from src.agents.openai_agent.tools import create_openai_tools
-        tools = create_openai_tools(MagicMock())
-        tool = next(
-            (t for t in tools if getattr(t, "name", "").endswith("execute_python_analysis")),
-            None,
-        )
-        assert tool is not None
-        desc = getattr(tool, "description", "") or ""
-        task_pos = desc.lower().find("task")
-        code_pos = desc.lower().find("code")
-        assert task_pos != -1 and code_pos != -1
-        assert task_pos < code_pos, (
-            f"task ({task_pos}) should appear before code ({code_pos}) in description"
-        )
+    tool = create_default_registry().get("execute_python_analysis")
+    assert tool is not None
+    assert {parameter.name for parameter in tool.parameters} == _PUBLIC_PARAMETERS
+    assert next(parameter for parameter in tool.parameters if parameter.name == "code").required
+    assert "mentally" in tool.description.lower()
+    assert "restricted" in tool.description.lower()
+    assert "sandbox" not in tool.description.lower()
+
+
+def test_anthropic_bridge_exposes_only_the_direct_code_contract():
+    tool = _anthropic_execution_tool()
+    assert set(tool["input_schema"]["properties"]) == _PUBLIC_PARAMETERS
+    assert tool["input_schema"]["required"] == ["code"]
+    assert "restricted" in tool["description"].lower()
+    assert "sandbox" not in tool["description"].lower()
+
+
+def test_openai_bridge_exposes_only_the_direct_code_contract():
+    tool = _openai_execution_tool()
+    assert set(tool.params_json_schema["properties"]) == _PUBLIC_PARAMETERS
+    assert "restricted" in tool.description.lower()
+    assert "sandbox" not in tool.description.lower()
+
+
+def test_direct_code_dispatch_executes_without_a_nested_model_call():
+    from src.tools.code_executor import execute_python_code
+
+    result = execute_python_code(
+        code='print(data["left"] + data["right"])',
+        data_json='{"left": 19, "right": 23}',
+    )
+
+    assert result.success is True
+    assert result.output.strip() == "42"
+
+
+def test_executor_and_result_contract_have_no_hidden_or_background_mode():
+    from src.tools.code_executor import CodeExecutionResult, execute_python_code
+
+    assert set(inspect.signature(execute_python_code).parameters) == {
+        "code",
+        "data_json",
+        "timeout",
+        "blocked_modules",
+    }
+    assert {field.name for field in fields(CodeExecutionResult)} == {
+        "success",
+        "output",
+        "error",
+        "execution_time",
+    }
+
+
+def test_nested_code_generator_and_its_config_are_retired():
+    from src.agents.config import AgentConfig
+
+    root = Path(__file__).resolve().parents[1]
+    assert not (root / "src/tools/code_generator.py").exists()
+    assert {"code_model", "code_max_retries", "code_backend"}.isdisjoint(
+        AgentConfig.model_fields
+    )
+
+
+def test_current_tool_catalog_has_the_exact_direct_contract():
+    root = Path(__file__).resolve().parents[1]
+    catalog = (root / "docs/design/ARKSCOPE_TOOL_CATALOG.md").read_text(
+        encoding="utf-8"
+    )
+    row = next(
+        line for line in catalog.splitlines() if "`execute_python_analysis`" in line
+    )
+    assert "code*" in row
+    assert "data_json?" in row
+    assert "timeout?" in row
+    assert "task?" not in row
+    assert "background?" not in row
+
+
+def test_execution_tool_remains_present_in_both_agent_bridges():
+    from src.agents.anthropic_agent.tools import get_anthropic_tools
+    from src.agents.openai_agent.tools import create_openai_tools
+
+    assert any(
+        tool["name"] == "execute_python_analysis" for tool in get_anthropic_tools()
+    )
+    assert any(
+        getattr(tool, "name", "").endswith("execute_python_analysis")
+        for tool in create_openai_tools(MagicMock())
+    )

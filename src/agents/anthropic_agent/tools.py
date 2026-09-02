@@ -601,24 +601,17 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "execute_python_analysis",
             "description": (
                 "Run Python for ANY numerical calculation or data analysis. "
-                "PREFERRED: pass `task` (natural language) — the system auto-generates "
-                "code and retries on errors. Only use `code` for precise hand-crafted "
-                "implementations. Do not calculate mentally; always use this tool. "
-                "Sandbox with numpy, pandas, scipy. Pass data via data_json."
+                "Write the Python code yourself, inspect explicit errors, and retry through "
+                "the normal tool loop when needed. Do not calculate mentally. Runs in a "
+                "restricted child process with numpy, pandas, and scipy; pass all input "
+                "through data_json."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Python code to execute (direct mode)"
-                    },
-                    "task": {
-                        "type": "string",
-                        "description": (
-                            "Natural language task description (PREFERRED over code). "
-                            "System auto-generates Python and retries on errors."
-                        )
+                        "description": "Python code to execute"
                     },
                     "data_json": {
                         "type": "string",
@@ -627,13 +620,9 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "timeout": {
                         "type": "integer",
                         "description": "Execution timeout in seconds (default: 120)"
-                    },
-                    "background": {
-                        "type": "boolean",
-                        "description": "Run in background, write results to temp file (default: false)"
                     }
                 },
-                "required": []
+                "required": ["code"]
             }
         },
         # Subagent Delegation
@@ -1449,11 +1438,9 @@ def execute_tool(
         "get_watchlist_overview": lambda: get_watchlist_overview(dal),
         "get_morning_brief": lambda: get_morning_brief(dal),
         "execute_python_analysis": lambda: execute_python_code(
-            code=tool_input.get("code", ""),
-            task=tool_input.get("task", ""),
+            code=tool_input["code"],
             data_json=tool_input.get("data_json", ""),
             timeout=tool_input.get("timeout", 120),
-            background=tool_input.get("background", False),
         ),
         "delegate_to_subagent": lambda: _dispatch_subagent(tool_input, dal),
         # Analyst tools (Phase 11b) — no DAL needed

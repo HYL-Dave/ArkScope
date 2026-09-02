@@ -172,13 +172,12 @@ class TestOptionChainReducer:
 
 class TestPythonOutputReducer:
     """Real shape from src/tools/code_executor.py CodeExecutionResult:
-    fields are output / error / generated_code (NOT stdout / stderr)."""
+    fields are success / output / error / execution_time."""
 
     def test_short_passes_through(self):
         payload = json.dumps({
             "success": True, "output": "small", "error": "",
-            "execution_time": 0.5, "output_file": "", "pid": 0,
-            "generated_code": "",
+            "execution_time": 0.5,
         })
         out, _meta = python_output_reducer(payload, budget=10_000)
         assert out == payload
@@ -205,18 +204,6 @@ class TestPythonOutputReducer:
         assert data["_compressed"]["error_dropped_chars"] > 0
         assert meta["output_keep_chars"] == 2000
         assert meta["error_keep_chars"] == 1000
-
-    def test_trims_large_generated_code(self):
-        """generated_code is the second-largest source of bloat after output."""
-        gen_code = "def f():\n    pass\n" * 1000  # ~17KB
-        payload = json.dumps({
-            "success": True, "output": "", "error": "",
-            "generated_code": gen_code,
-        })
-        out, _meta = python_output_reducer(payload, budget=4_000)
-        data = json.loads(out)
-        assert len(data["generated_code"]) <= 2000
-        assert data["_compressed"]["generated_code_dropped_chars"] > 0
 
     def test_falls_back_on_non_object_payload(self):
         payload = json.dumps([1, 2, 3]) + "p" * 10_000

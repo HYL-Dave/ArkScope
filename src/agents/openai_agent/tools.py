@@ -517,32 +517,25 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
 
     @function_tool
     def tool_execute_python_analysis(
-        code: str = "",
-        task: str = "",
+        code: str,
         data_json: str = "",
         timeout: int = 120,
-        background: bool = False,
     ) -> str:
         """Run Python for ANY numerical calculation or data analysis.
 
         IMPORTANT: Always use this tool instead of calculating mentally.
-        Results are reproducible, auditable, and auto-corrected on errors.
-
-        PREFERRED: Pass `task` (natural language description). The system
-        auto-generates Python code and retries up to 3 times on errors.
-        Only use `code` for precise, hand-crafted implementations.
+        Write the Python code yourself. The restricted child process returns
+        explicit errors so you can correct the code through the normal tool loop.
 
         Args:
-            task: Natural language task description (PREFERRED). Example:
-                "Calculate 30-day Sharpe ratio from the provided OHLCV data"
-            code: Python code to execute directly (alternative to task)
+            code: Python code to execute
             data_json: JSON data passed as `data` variable in code
             timeout: Execution timeout in seconds (default: 120)
-            background: Run in background for long tasks (default: False)
         """
         result = execute_python_code(
-            code=code, task=task, data_json=data_json,
-            timeout=timeout, background=background,
+            code=code,
+            data_json=data_json,
+            timeout=timeout,
         )
         return _serialize_result(result, "execute_python_analysis")
 

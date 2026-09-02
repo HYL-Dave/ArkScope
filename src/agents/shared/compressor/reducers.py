@@ -202,15 +202,11 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
     .. code-block:: text
 
         {"success": bool, "output": str, "error": str,
-         "execution_time": float, "output_file": str, "pid": int,
-         "generated_code": str}
+         "execution_time": float}
 
     Strategy:
       - Keep last 2KB of ``output`` (was named ``stdout`` upstream).
       - Keep last 1KB of ``error`` (was named ``stderr`` upstream).
-      - Tail-trim ``generated_code`` to 2KB if present (large generated
-        scripts are the second-largest source of bloat).
-
     Falls through to ``truncate_with_marker`` on shape mismatch.
     """
     if len(payload) <= budget:
@@ -226,28 +222,21 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 
     output_keep = 2000
     error_keep = 1000
-    code_keep = 2000
     output = str(data.get("output") or "")
     error = str(data.get("error") or "")
-    gen_code = str(data.get("generated_code") or "")
 
     output_trimmed = output[-output_keep:] if len(output) > output_keep else output
     error_trimmed = error[-error_keep:] if len(error) > error_keep else error
-    code_trimmed = gen_code[-code_keep:] if len(gen_code) > code_keep else gen_code
 
     out = dict(data)
     out["output"] = output_trimmed
     out["error"] = error_trimmed
-    if "generated_code" in data:
-        out["generated_code"] = code_trimmed
 
     compressed_meta: Dict[str, Any] = {}
     if len(output) > output_keep:
         compressed_meta["output_dropped_chars"] = len(output) - output_keep
     if len(error) > error_keep:
         compressed_meta["error_dropped_chars"] = len(error) - error_keep
-    if len(gen_code) > code_keep:
-        compressed_meta["generated_code_dropped_chars"] = len(gen_code) - code_keep
     if compressed_meta:
         out["_compressed"] = compressed_meta
 
@@ -270,7 +259,7 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 _DEFAULT_REGISTRY: Dict[str, ToolReducer] = {
     # Options
     "get_option_chain":        option_chain_reducer,
-    # Python analysis (CodeExecutionResult.output / .error / .generated_code)
+    # Python analysis (CodeExecutionResult.output / .error)
     "execute_python_analysis": python_output_reducer,
 }
 

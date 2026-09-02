@@ -11,7 +11,6 @@ Tests cover:
 import json
 import os
 import re
-import time
 from importlib.metadata import requires
 
 import pytest
@@ -31,17 +30,6 @@ def _environment_probe_code(*names: str) -> str:
         "_json_module = __import__('json')\n"
         f"print(_json_module.dumps({{name: _env.get(name) for name in {encoded}}}, sort_keys=True))"
     )
-
-
-def _wait_for_file(path: str, *, timeout: float = 3.0) -> str:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if os.path.exists(path):
-            content = open(path, encoding="utf-8").read()
-            if content:
-                return content
-        time.sleep(0.02)
-    raise AssertionError(f"background output did not arrive: {path}")
 
 
 # ============================================================
@@ -311,8 +299,6 @@ class TestExecutePythonCode:
         assert hasattr(result, "output")
         assert hasattr(result, "error")
         assert hasattr(result, "execution_time")
-        assert hasattr(result, "output_file")
-        assert hasattr(result, "pid")
 
     def test_multiline_code(self):
         """Multi-line code works correctly."""
@@ -324,83 +310,6 @@ print(f"Mean: {mean}")
         result = execute_python_code(code)
         assert result.success is True
         assert "Mean: 30.0" in result.output
-
-
-# ============================================================
-# Background Execution Tests
-# ============================================================
-
-class TestBackgroundExecution:
-    def test_background_child_environment_excludes_parent_credentials(self, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "inert-background-parent-value")
-        result = execute_python_code(
-            _environment_probe_code("OPENAI_API_KEY"),
-            background=True,
-        )
-        try:
-            assert result.success is True
-            assert json.loads(_wait_for_file(result.output_file)) == {
-                "OPENAI_API_KEY": None
-            }
-        finally:
-            if result.output_file and os.path.exists(result.output_file):
-                os.unlink(result.output_file)
-
-    def test_background_returns_immediately(self):
-        """background=True returns quickly (no waiting for code)."""
-        start = time.monotonic()
-        result = execute_python_code(
-            "import time; time.sleep(5); print('done')",
-            background=True,
-        )
-        elapsed = time.monotonic() - start
-        # Should return within 1 second (not wait for 5s sleep)
-        assert elapsed < 2.0
-        assert result.success is True
-        assert result.execution_time == 0.0
-
-    def test_background_has_output_file(self):
-        """Background result includes a valid output file path."""
-        result = execute_python_code('print("bg test")', background=True)
-        assert result.output_file != ""
-        assert result.output_file.startswith("/tmp/mindfulrl_exec_")
-        assert result.output_file.endswith(".txt")
-
-    def test_background_has_pid(self):
-        """Background result includes a process PID."""
-        result = execute_python_code('print("bg test")', background=True)
-        assert result.pid > 0
-
-    def test_background_writes_output(self):
-        """Background process writes output to temp file."""
-        result = execute_python_code('print("background output")', background=True)
-        # Wait for subprocess to complete
-        time.sleep(2)
-        assert os.path.exists(result.output_file)
-        content = open(result.output_file).read()
-        assert "background output" in content
-        # Cleanup
-        os.unlink(result.output_file)
-
-    def test_background_with_data_json(self):
-        """Data injection works in background mode."""
-        result = execute_python_code(
-            'print(data["msg"])',
-            data_json='{"msg": "hello from bg"}',
-            background=True,
-        )
-        time.sleep(2)
-        assert os.path.exists(result.output_file)
-        content = open(result.output_file).read()
-        assert "hello from bg" in content
-        # Cleanup
-        os.unlink(result.output_file)
-
-    def test_background_blocked_import_still_rejected(self):
-        """AST validation still applies in background mode."""
-        result = execute_python_code("import os", background=True)
-        assert result.success is False
-        assert "Blocked import" in result.error
 
 
 # ============================================================
