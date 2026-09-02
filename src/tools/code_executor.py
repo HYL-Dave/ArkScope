@@ -1,26 +1,27 @@
 """
-Code Executor — sandboxed Python code execution for AI agents.
+Code Executor — restricted Python child-process execution for AI agents.
 
 Provides execute_python_code() which:
 1. Validates code via AST (blocked module check)
-2. Runs in isolated subprocess with timeout
+2. Runs in a child process with a closed environment and timeout
 3. Supports data injection via stdin (data_json → `data` variable)
 4. Background mode for long-running tasks (Popen + temp file)
 
-Security: Dual-layer defense
-- Layer 1: AST static analysis blocks dangerous imports before execution
-- Layer 2: Subprocess isolation with timeout prevents runaway processes
+This is not an OS sandbox. The AST check and closed environment reduce accidental
+capability and direct credential inheritance; filesystem, network, process, and
+resource isolation require a separate platform sandbox.
 """
 
 from __future__ import annotations
 
 import ast
 import logging
+import os
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field, asdict
-from typing import FrozenSet, Optional
+from typing import FrozenSet, Mapping, Optional
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,29 @@ _input = _sys.stdin.read()
 data = _json.loads(_input) if _input.strip() else {}
 del _json, _sys, _input
 """
+
+_PYTHON_CHILD_ENV_ALLOWLIST = frozenset({"LANG", "LANGUAGE", "TZ"})
+_PYTHON_CHILD_ENV_DEFAULTS = {
+    "PYTHONIOENCODING": "utf-8",
+    "PYTHONUTF8": "1",
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONNOUSERSITE": "1",
+    "MPLBACKEND": "Agg",
+}
+
+
+def _python_child_environment(
+    source: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Return the non-secret environment allowed into analysis children."""
+    parent = os.environ if source is None else source
+    child = {
+        name: value
+        for name, value in parent.items()
+        if name in _PYTHON_CHILD_ENV_ALLOWLIST or name.startswith("LC_")
+    }
+    child.update(_PYTHON_CHILD_ENV_DEFAULTS)
+    return child
 
 
 # ── Result dataclass ─────────────────────────────────────────
@@ -195,6 +219,7 @@ def _execute_foreground(
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=_python_child_environment(),
         )
         elapsed = time.monotonic() - start
 
@@ -240,6 +265,7 @@ def _execute_background(
             stdin=subprocess.PIPE,
             stdout=out_file,
             stderr=subprocess.STDOUT,
+            env=_python_child_environment(),
         )
 
         # Write stdin data and close
