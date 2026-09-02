@@ -54,7 +54,24 @@ data = _json.loads(_input) if _input.strip() else {}
 del _json, _sys, _input
 """
 
-_PYTHON_CHILD_ENV_ALLOWLIST = frozenset({"LANG", "LANGUAGE", "TZ"})
+_PYTHON_CHILD_ENV_ALLOWLIST = frozenset({
+    "LANG",
+    "LANGUAGE",
+    "LC_ADDRESS",
+    "LC_ALL",
+    "LC_COLLATE",
+    "LC_CTYPE",
+    "LC_IDENTIFICATION",
+    "LC_MEASUREMENT",
+    "LC_MESSAGES",
+    "LC_MONETARY",
+    "LC_NAME",
+    "LC_NUMERIC",
+    "LC_PAPER",
+    "LC_TELEPHONE",
+    "LC_TIME",
+    "TZ",
+})
 _PYTHON_CHILD_ENV_DEFAULTS = {
     "PYTHONIOENCODING": "utf-8",
     "PYTHONUTF8": "1",
@@ -72,7 +89,7 @@ def _python_child_environment(
     child = {
         name: value
         for name, value in parent.items()
-        if name in _PYTHON_CHILD_ENV_ALLOWLIST or name.startswith("LC_")
+        if name in _PYTHON_CHILD_ENV_ALLOWLIST
     }
     child.update(_PYTHON_CHILD_ENV_DEFAULTS)
     return child
@@ -142,7 +159,7 @@ def execute_python_code(
     blocked_modules: FrozenSet[str] = DEFAULT_BLOCKED_MODULES,
 ) -> CodeExecutionResult:
     """
-    Execute Python code in an isolated subprocess.
+    Execute Python code in a restricted subprocess with a closed environment.
 
     The code has access to:
     - `data` variable (injected from data_json via stdin)

@@ -4,7 +4,7 @@ Tests for the Code Executor tool (Phase 5 of agent evolution).
 Tests cover:
 1. AST validation (blocked/allowed imports, syntax errors)
 2. Foreground execution (stdout, stderr, timeout, data injection)
-3. Background execution (Popen, output file, PID)
+3. Closed child-environment behavior
 4. Result dataclass serialization
 """
 
@@ -18,6 +18,7 @@ import pytest
 from src.tools.code_executor import (
     CodeExecutionResult,
     DEFAULT_BLOCKED_MODULES,
+    _python_child_environment,
     execute_python_code,
     validate_code,
 )
@@ -143,6 +144,21 @@ class TestValidateCode:
 # ============================================================
 
 class TestExecutePythonCode:
+    def test_child_environment_uses_an_exact_locale_allowlist(self):
+        child = _python_child_environment(
+            {
+                "LANG": "en_US.UTF-8",
+                "LC_NUMERIC": "C",
+                "LC_API_KEY": "inert-locale-prefixed-secret",
+                "PATH": "/untrusted/path",
+            }
+        )
+
+        assert child["LANG"] == "en_US.UTF-8"
+        assert child["LC_NUMERIC"] == "C"
+        assert "LC_API_KEY" not in child
+        assert "PATH" not in child
+
     def test_simple_print(self):
         """print("hello") produces stdout output."""
         result = execute_python_code('print("hello")')
