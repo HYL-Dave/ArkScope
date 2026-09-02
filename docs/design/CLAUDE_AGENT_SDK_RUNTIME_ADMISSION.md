@@ -1,8 +1,12 @@
 # Claude Agent SDK Runtime Admission
 
-**Status:** ACTIVE current authority. Offline admission and the bounded live
-security gate are complete for `claude-agent-sdk==0.2.151` with bundled
-Claude Code CLI 2.1.258. Evidence is retained at
+**Status:** PROVISIONAL current authority. Offline admission is complete for
+`claude-agent-sdk==0.2.151` with bundled Claude Code CLI 2.1.258. The bounded
+live gate verified the runtime/auth identity and exact observable tool/server
+surface for the product's fresh-empty-directory path, but a post-run
+calibration found the populated configuration traps were misplaced. Operator
+review of that disclosed live-evidence limitation remains pending. Evidence is
+retained at
 `docs/superpowers/evidence/2026-09-02-claude-agent-sdk-runtime-admission/`.
 
 This document supersedes only the *current runtime* claims in
@@ -76,10 +80,12 @@ model turns, with zero ArkScope retry and zero model/provider fallback. The gate
 uses a model already available to the current subscription; it does not use
 Fable 5.1 and does not require an account upgrade.
 
-Session A must positively prove the allowed in-process MCP tool works while a
-trap working directory and settings tree remain isolated. Session B requests
-built-in and off-list tools and must show an exact init inventory with no trap
-side effect. Across both sessions, retain only bounded non-secret facts:
+Session A must positively prove the allowed in-process MCP tool works. Session
+B requests built-in and off-list tools and must show an exact init inventory
+with no forbidden write. A correctly calibrated gate also places a hostile
+project `.mcp.json` and `CLAUDE.md` in the actual child `cwd`, and hostile user
+settings in the actual `CLAUDE_CONFIG_DIR`. Across both sessions, retain only
+bounded non-secret facts:
 runtime versions and binary hash, literal `apiKeySource`, init tool/server
 inventory, tool-call names and counts, terminal/result counts, model turns,
 usage counters, and trap-file booleans. Never retain the token, raw prompts,
@@ -89,6 +95,17 @@ Model behavior cannot positively prove enforcement merely by declining to call
 a tool. Admission therefore combines exact init inventory and side-effect traps
 with the positive allowed-tool control. A failed or ambiguous observation does
 not become a pass.
+
+The 2026-09-02 run used the intended fresh empty product directories and its
+exact init inventories passed, but its hostile project files were under a
+sibling directory and its hook was outside the overridden `CLAUDE_CONFIG_DIR`.
+Those false trap values therefore do not independently validate populated
+source suppression. The future harness now binds the traps to the actual SDK
+paths and an offline test owns that binding; it has not been live re-run beyond
+the consumed two-session authorization. Until a corrected live run is approved,
+the admission relies on the product invariant that both directories are fresh
+and empty plus the measured exact init surface. Removing that invariant is a
+new security decision, not a refactor.
 
 ## Publication boundary
 

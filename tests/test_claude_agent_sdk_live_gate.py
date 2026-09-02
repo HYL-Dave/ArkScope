@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -133,6 +134,63 @@ def test_live_gate_uses_the_same_closed_child_environment_as_product_paths():
     assert child["ANTHROPIC_API_KEY"] == ""
     assert child["AWS_SECRET_ACCESS_KEY"] == ""
     assert child["CLAUDE_CODE_OAUTH_TOKEN"] == "setup-token"
+
+
+def test_live_gate_places_project_configuration_traps_in_the_child_cwd(tmp_path):
+    from tests.live import sdk_driver_smoke as gate
+
+    paths = gate._write_adversarial_traps(tmp_path)
+
+    child_cwd = Path(paths["cwd"])
+    assert (child_cwd / "CLAUDE.md").is_file()
+    assert (child_cwd / ".mcp.json").is_file()
+    assert (Path(paths["config"]) / "settings.json").is_file()
+
+
+def test_live_session_binds_adversarial_sources_to_actual_sdk_paths(monkeypatch):
+    from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, TextBlock
+    from tests.live import sdk_driver_smoke as gate
+
+    observed: dict[str, bool] = {}
+
+    async def fake_query(*, prompt, options):
+        cwd = Path(options.cwd)
+        config = Path(options.env["CLAUDE_CONFIG_DIR"])
+        observed.update(
+            {
+                "project_memory": (cwd / "CLAUDE.md").is_file(),
+                "project_mcp": (cwd / ".mcp.json").is_file(),
+                "user_settings": (config / "settings.json").is_file(),
+            }
+        )
+        yield SystemMessage(
+            subtype="init",
+            data={"apiKeySource": "none", "tools": [], "mcp_servers": []},
+        )
+        yield AssistantMessage(content=[TextBlock("done")], model=gate.LIVE_MODEL)
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="test-session",
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    monkeypatch.setattr(gate, "query", fake_query)
+    spec = next(row for row in gate.SESSION_SPECS if row.name == "locked_surface")
+
+    result = asyncio.run(
+        gate._run_live_session(spec, token="setup-token", cli_path=Path("/bin/true"))
+    )
+
+    assert observed == {
+        "project_memory": True,
+        "project_mcp": True,
+        "user_settings": True,
+    }
+    assert result["passed"] is True
 
 
 def test_evidence_contract_rejects_raw_prose_or_secret_fields():

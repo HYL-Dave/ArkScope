@@ -18,21 +18,38 @@ This packet records the bounded live gate for implementation commit
 `live-admission.json` is the complete retained output. Both sessions reported
 `apiKeySource="none"`. The positive session exposed and called exactly one
 in-process `mcp__ark__admission_probe`; the locked session exposed no tools and
-no MCP servers. Ambient instruction, MCP-launch, hook-launch, and write traps
-all remained false. The measured total was two sessions and three model turns,
-with zero application retries and no fallback.
+no MCP servers. The write marker remained absent. The measured total was two
+sessions and three model turns, with zero application retries and no fallback.
+
+Post-run calibration found that three other false-valued observations in the
+JSON are not independent evidence of configuration suppression. The project
+`.mcp.json` and `CLAUDE.md` traps were written under a sibling of the actual
+child `cwd`; the settings hook was written under `$HOME/.claude` even though
+the child used a separate `CLAUDE_CONFIG_DIR`. Consequently,
+`trap_mcp_started=false` and `ambient_instruction_observed=false` accurately
+record what happened but do not prove that populated project/user sources are
+ignored. The harness has since been corrected and has an offline binding test,
+but was not run again because the two-session authorization was exhausted.
 
 The artifact intentionally excludes the setup-token, credential and account
 identifiers, local paths, process environment, prompts, raw SDK messages, and
-model prose. This admission verifies the Claude Code tool/configuration and
-inherited-secret controls. It does not claim OS-level filesystem or network
-isolation, and it does not validate Fable 5.1 through OAuth.
+model prose. The observation verifies the exact runtime/auth identity, the
+positive allowed-MCP path, the exact init tool/server inventories, the absent
+forbidden write, and the two-session/no-retry/no-fallback budget. Together with
+the product's fresh empty per-call `cwd` and `CLAUDE_CONFIG_DIR`, it supports
+the current product path. It does not independently live-validate
+`setting_sources=[]` or `strict_mcp_config=True` against populated source
+directories, claim OS-level filesystem or network isolation, or validate
+Fable 5.1 through OAuth.
 
 ## Offline gates
 
-- Claude SDK/Auth focus: `90 passed`.
-- Repository suite excluding the independently reproduced stale historical
-  packet node: `5347 passed, 12 skipped`.
+- Claude SDK/Auth focus at the live implementation commit: `90 passed`.
+- Post-run harness-calibration focus: `92 passed`.
+- Repository suite at the live implementation commit, excluding the
+  independently reproduced stale historical packet node: `5347 passed, 12 skipped`.
+- Post-run harness-calibration repository suite under the same exclusion:
+  `5373 passed, 12 skipped, 1 deselected`.
 - Remaining tests in that historical packet: `24 passed, 1 deselected`.
 - The deselected node also fails on unmodified `master` because its sealed
   shadow script predates the required `execution_owner_id` argument.
