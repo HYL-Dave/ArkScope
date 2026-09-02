@@ -41,6 +41,12 @@ Every dimension is load-bearing:
   default.
 - No other task, model, credential, or harness may be selected as a fallback.
 
+As of 2026-09-02, the user reports that the active local ChatGPT account is
+Plus, not Pro. A credential label such as `ChatGPT subscription Pro` is display
+text and is not entitlement evidence. Offline implementation may proceed, but
+ArkScope must not claim a successful live Spark execution until an account that
+passes the Pro and exact-model checks is used.
+
 The `card_translation` identifier remains the durable API/DB key. Product copy
 continues to use `Content Translation` / `內容翻譯` under the terminology rule in
 `docs/design/ARKSCOPE_TERMINOLOGY.md`.
@@ -94,6 +100,25 @@ keeps code generation, calibration, subagents, generic agents, compression,
 card synthesis, and AI Research closed to Spark without maintaining a scattered
 denylist.
 
+`ModelCapability.max_output` becomes `int | None`; `None` means the provider
+maximum is not established, not zero and not an invitation to use a family
+default. The following eager consumers must be updated together:
+
+- `src/agents/openai_agent/agent.py` must omit unknown values from
+  `_OPENAI_MODEL_MAX_OUTPUT`, and `_get_openai_max_output` must reject a known
+  capability whose value is unknown;
+- `src/agents/anthropic_agent/agent.py` must apply the same closed behavior to
+  `_MODEL_MAX_OUTPUT` and `_get_model_max_output`, even though Spark itself is
+  OpenAI-only;
+- `src/tools/code_generator.py` and `src/agents/shared/subagent.py` must retain
+  their existing execution-admission check before any output-limit lookup;
+- direct helper tests must prove that a known unknown value never enters token
+  arithmetic or provider parameters.
+
+Unknown custom models retain their existing provider fallback. A known Spark
+record does not: generic execution is rejected by task admission before an
+output limit is requested.
+
 ### Credential and entitlement policy
 
 Eligibility requires all of the following:
@@ -107,6 +132,12 @@ Eligibility requires all of the following:
 
 Missing plan metadata, stale/missing discovery, a Plus plan, a different auth
 mode, or any model mismatch fails closed before a translation turn starts.
+
+Plan admission reads the token-store record populated by ChatGPT login and then
+rechecks the live app-server `account/read.planType` value. It never infers a
+plan from the credential alias, account label, model name, or rate-limit label.
+The two plan values must normalize to the same reviewed `pro` value before a
+turn can start.
 
 The effective-model view carries the non-secret plan classification for the
 active OAuth credential. It must not persist access tokens or copy plan state
@@ -151,13 +182,21 @@ Reusable Codex process admission belongs in a shared app-server runtime module,
 not in a second copy of the account-usage launcher. Account usage and Spark
 translation share:
 
-- bundled `openai-codex` executable resolution with the existing PATH fallback;
 - the reviewed version allowlist;
 - executable and shebang-interpreter checks;
 - a clean, allowlisted child environment;
 - bounded JSONL stdout/stderr parsing;
 - process-group termination and reap behavior;
 - JWT account-ID validation and `chatgptAuthTokens` login.
+
+Executable policy is intentionally different by operation. Existing bounded
+account observation may retain its current PATH fallback for compatibility, but
+Spark execution is bundled-only. It must resolve `codex_cli_bin`'s bundled
+binary, verify that the resolved target remains inside that installed bundle,
+and probe the exact allowlisted version. Missing/broken bundle imports or paths
+are typed adapter-unavailable failures; Spark execution never consults PATH.
+This matches the bundled-only admission standard used by the Claude execution
+runtime.
 
 Account-usage response parsing remains separate from translation event parsing.
 The refactor must preserve all existing account-usage tests and behavior.
@@ -213,6 +252,23 @@ The final message must be a bare JSON object matching `outputSchema`. It is
 parsed and returned to the existing translation validator. Markdown fences,
 prose, additional keys, and malformed JSON are failures.
 
+### Input and wire bounds
+
+Bounds are checked before process startup so an oversized request consumes no
+subscription quota:
+
+- `translate_text` retains its existing 16,000-character source limit;
+- the canonical UTF-8 JSON user payload produced by `translate_card` is limited
+  to 65,536 bytes;
+- the complete serialized `turn/start` JSONL message is limited to 262,144
+  bytes, including instructions, schema, and protocol framing;
+- the accepted final `agentMessage` text is limited to 65,536 UTF-8 bytes.
+
+These are ArkScope execution limits, not claims about the provider's maximum
+output. Exceeding an input or wire bound raises a closed, non-retryable
+`translation_input_too_large` failure before provider dispatch. Output excess
+remains a non-retryable invalid-output failure.
+
 ### Deadlines and cleanup
 
 One monotonic deadline covers credential refresh, process startup, login,
@@ -240,6 +296,10 @@ failures. Provider rate limits and temporary queueing remain retryable provider
 failures. Protocol drift, unexpected tools, malformed output, and model mismatch
 are typed adapter failures and never count as successful translation.
 
+`translation_input_too_large` is added to the existing closed translation
+failure vocabulary and both frontend locales. It is not collapsed into a
+provider error because no provider call was attempted.
+
 The lifecycle translation endpoint continues to expose the existing closed
 translation-failure DTO. Harness provenance becomes `codex_app_server` for a
 successful Spark translation, while provider and model remain `openai` and
@@ -258,6 +318,9 @@ internal protocol message is returned to the frontend.
   `xhigh`; the provider-observed default is `medium`.
 - Spark is marked as an experimental subscription option, not a built-in
   default or a general recommendation.
+- Settings exposes the SDK-observed subscription plan as non-secret account
+  state. Plus, missing, and unknown plans show a localized ChatGPT-Pro-required
+  reason; display aliases never supply this value.
 - Ineligible saved routes show a localized reason and remain editable.
 - No visible wording suggests API-key support, image support, AI Research
   support, or automatic multi-agent delegation.
@@ -281,30 +344,35 @@ Implementation starts with failing tests that own these boundaries:
 1. Registry tests own the exact model ID, unknown max-output fact, four efforts,
    128k/text-only facts, exact-ID behavior, sole task, sole auth mode, Pro plan,
    and non-default status.
-2. Admission tests prove Spark is rejected for card synthesis, AI Research,
+2. Import and helper tests prove no unknown maximum enters either provider's
+   eager output map, token arithmetic, or provider parameters.
+3. Admission tests prove Spark is rejected for card synthesis, AI Research,
    generic execution without task context, API key, API-key pool, Plus, unknown
    plan, and undiscovered credentials before provider dispatch.
-3. Effective-view tests prove only a Pro OAuth discovery places Spark in the
+4. Effective-view tests prove only a Pro OAuth discovery places Spark in the
    Content Translation picker; invalid saved routes remain visible and blocked.
-4. Discovery tests prove `task_route_tasks` is exactly Content Translation for
+5. Discovery tests prove `task_route_tasks` is exactly Content Translation for
    eligible Pro and empty for Plus/unknown plans.
-5. Runtime-contract tests bind the reviewed CLI versions to a committed schema
+6. Runtime-contract tests bind the reviewed CLI versions to a committed schema
    projection and fail on a missing/changed required method, field, enum, or
    notification shape.
-6. Process tests inspect exact launch arguments, clean environment, temporary
-   paths, disabled features, no inherited secrets, and process-group cleanup.
-7. Protocol tests cover the exact request sequence and reject every command,
+7. Process tests inspect the bundled-only executable, exact launch arguments,
+   clean environment, temporary paths, disabled features, no inherited secrets,
+   no PATH fallback, and process-group cleanup.
+8. Protocol tests cover the exact request sequence and reject every command,
    file, tool, MCP, approval, fallback, malformed-message, wrong-ID, duplicate,
    timeout, and non-completed-turn case.
-8. Translation integration tests prove Spark uses the Codex adapter and the
+9. Boundary tests prove text, card-payload, serialized-wire, and final-output
+   limits at the exact byte edges, with a positive no-provider-call ledger.
+10. Translation integration tests prove Spark uses the Codex adapter and the
    existing schema/validators, while all other subscription models retain their
    current adapters.
-9. Negative call-ledger tests prove failure never builds an API-key client,
+11. Negative call-ledger tests prove failure never builds an API-key client,
    never uses raw Responses, never changes model/effort/credential, and never
    starts a second turn.
-10. Frontend tests own task-only visibility, four effort choices, the
-    Content-Translation use command, localized blocked reasons, and unchanged
-    defaults.
+12. Frontend tests own task-only visibility, four effort choices, the
+    Content-Translation use command, SDK-observed plan display, localized
+    blocked reasons, and unchanged defaults.
 
 Every deny-path test includes a positive control showing the harness reached the
 guard. Focused backend and frontend suites run before the full backend,
@@ -312,8 +380,12 @@ frontend, typecheck, build, and i18n gates.
 
 ## Live Validation Boundary
 
-Offline implementation and tests make no provider call. The first real Spark
-translation is a separately observed hand test after merge and restart:
+Offline implementation and tests make no provider call. Because the current
+local account is reported as Plus, the immediate hand-test expectation is an
+honest Pro-required refusal before `turn/start`, not a successful translation.
+
+The first real successful Spark translation requires a separately supplied
+eligible Pro credential and is then observed after merge and restart:
 
 1. Sync the ChatGPT Pro model list and confirm the exact Spark model is visible.
 2. Confirm Spark appears only under Content Translation with four efforts.
