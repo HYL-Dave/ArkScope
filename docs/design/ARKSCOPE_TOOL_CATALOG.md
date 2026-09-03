@@ -89,7 +89,10 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 **Withheld capability:** `execute_python_analysis` is withheld from every agent
 registry and bridge. Its internal executor remains testable library code, but it
 must not return to an agent surface until an enforced OS sandbox and the real
-`code_execution` permission gate have executable owners.
+`code_execution` permission gate have executable owners. The approved packaged,
+cross-platform re-admission boundary is
+`docs/superpowers/specs/2026-09-03-packaged-cross-platform-python-sandbox-design.md`;
+its portable Python-analysis level does not imply terminal or workspace access.
 
 ### 1.2 Evidence boundaries
 

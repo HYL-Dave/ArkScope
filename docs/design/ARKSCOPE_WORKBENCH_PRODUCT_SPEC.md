@@ -180,7 +180,10 @@ Rules (LOCK):
 > network, process, or resource isolation. It is therefore not registered on any
 > agent surface. The internal executor may return only after those controls and
 > the `code_execution` permission contract have executable owners; a closed
-> environment alone is insufficient.
+> environment alone is insufficient. The approved re-admission architecture is
+> `docs/superpowers/specs/2026-09-03-packaged-cross-platform-python-sandbox-design.md`:
+> a zero-setup packaged Python-over-JSON level precedes, and remains separate
+> from, any future native terminal or workspace authority.
 
 ### 4.4 Memory & context (capability stance)
 
