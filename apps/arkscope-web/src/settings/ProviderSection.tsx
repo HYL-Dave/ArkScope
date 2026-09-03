@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { ListChecks } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   addCredential,
@@ -45,7 +53,7 @@ import {
   probeRuntimeNote,
 } from "../chatgptOAuth";
 import { formatSystemTimestamp } from "../timeDisplay";
-import { ConfirmDialog } from "../ui";
+import { Button, ConfirmDialog, Drawer } from "../ui";
 import type { ModelCommonT } from "../modelRoutingUx";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import { modelReasonLabel, settingsErrorPresentation } from "./settingsBackendCopy";
@@ -233,7 +241,11 @@ export function ProviderSection({
   discovery,
   onRefresh,
   onDiscover,
-  onClearDiscovery,
+  discoveryPanelProvider = null,
+  discoveryPanelOpen = false,
+  onOpenDiscovery = () => {},
+  onCloseDiscovery = () => {},
+  discoveryReturnFocusRef,
   onUseModel,
   settingsReadCache,
   onNavigationGuardChange,
@@ -244,7 +256,11 @@ export function ProviderSection({
   discovery: DiscoveryState;
   onRefresh: () => Promise<void>;
   onDiscover: (provider: ModelProvider, credentialId: string | null) => Promise<void>;
-  onClearDiscovery: (provider: ModelProvider) => void;
+  discoveryPanelProvider?: ModelProvider | null;
+  discoveryPanelOpen?: boolean;
+  onOpenDiscovery?: (provider: ModelProvider) => void;
+  onCloseDiscovery?: () => void;
+  discoveryReturnFocusRef?: RefObject<HTMLElement | null>;
   onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
   settingsReadCache: SettingsReadCache;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
@@ -605,6 +621,20 @@ export function ProviderSection({
 
   const providerErrorText = providerErr ? providerFailureText(providerErr, t, commonT) : null;
   const providerDiagnostic = providerFailureDiagnostic(providerErr, t, commonT);
+  const panelState = discoveryPanelProvider ? discovery[discoveryPanelProvider] : undefined;
+  const panelCredentials = discoveryPanelProvider
+    ? catalog.credentials?.[discoveryPanelProvider]
+      ?? (discoveryPanelProvider === "anthropic"
+        ? runtime?.anthropic.credentials
+        : runtime?.openai.credentials)
+      ?? []
+    : [];
+  const panelCredential = panelState?.result
+    ? panelCredentials.find((credential) => credential.id === panelState.result?.credential_id) ?? null
+    : null;
+  const panelProviderLabel = discoveryPanelProvider === "openai"
+    ? t(($) => $.models.providers.openai)
+    : t(($) => $.models.providers.anthropic);
 
   return (
     <>
@@ -648,13 +678,6 @@ export function ProviderSection({
             ? selectedDraft ?? null
             : activeUsable?.id ?? usable[0]?.id ?? null;
           const selectedAuthMode = usable.find((c) => c.id === selectedCredential)?.auth_type ?? null;
-          // auth_mode of the credential that produced the current discovery result
-          const discoveredAuthMode = discoveryState?.result
-            ? credentials.find((c) => c.id === discoveryState.result?.credential_id)?.auth_type ?? null
-            : null;
-          const discoveredCredential = discoveryState?.result
-            ? credentials.find((c) => c.id === discoveryState.result?.credential_id) ?? null
-            : null;
           return (
             <div className="settings-panel provider-card" key={provider}>
               <div className="settings-panel-head">
@@ -700,22 +723,6 @@ export function ProviderSection({
                 onSyncAccountUsage={(id) => void syncAccountUsage(id)}
                 onRetryReadAccountUsage={(id) => void readCachedAccountUsage(id, true)}
               />
-              {discoveryState?.result && (
-                <DiscoveryResultView
-                  result={discoveryState.result}
-                  authMode={discoveredAuthMode}
-                  credentialLabel={discoveredCredential?.label ?? null}
-                  onClose={() => onClearDiscovery(provider)}
-                  onUse={(model, task) => onUseModel(provider, model, task)}
-                  onRelogin={
-                    provider === "openai" && discoveryState.result.credential_id
-                      ? () => startChatGPTRelogin(discoveryState.result!.credential_id!)
-                      : undefined
-                  }
-                  reloginBusy={chatgptLoginBusy}
-                  developerMode={developerMode}
-                />
-              )}
               <div className="settings-actions">
                 <p className="muted tiny" style={{ width: "100%" }}>
                   {t(($) => $.providers.discovery.description)}
@@ -743,6 +750,16 @@ export function ProviderSection({
                     ? t(($) => $.providers.discovery.listing)
                     : discoverButtonLabel(selectedAuthMode, t)}
                 </button>
+                {discoveryState ? (
+                  <Button
+                    tone="ghost"
+                    size="compact"
+                    icon={<ListChecks size={14} />}
+                    onClick={() => onOpenDiscovery(provider)}
+                  >
+                    {t(($) => $.models.catalog.viewLastResult)}
+                  </Button>
+                ) : null}
               </div>
               {/* Low-frequency setup: collapsed once a usable credential exists. */}
               <SetupDisclosure
@@ -926,6 +943,38 @@ export function ProviderSection({
           );
         })}
       </div>
+      <Drawer
+        open={!!discoveryPanelProvider && discoveryPanelOpen && !!panelState}
+        title={t(($) => $.providers.discovery.drawerTitle, { provider: panelProviderLabel })}
+        onClose={onCloseDiscovery}
+        returnFocusRef={discoveryReturnFocusRef}
+      >
+        {panelState?.loading ? (
+          <p className="muted" role="status">
+            {t(($) => $.providers.discovery.listing)}
+          </p>
+        ) : panelState?.result && discoveryPanelProvider ? (
+          <DiscoveryResultView
+            result={panelState.result}
+            authMode={panelCredential?.auth_type ?? null}
+            credentialLabel={panelCredential?.label ?? null}
+            onUse={(model, task) => {
+              onCloseDiscovery();
+              onUseModel(discoveryPanelProvider, model, task);
+            }}
+            onRelogin={
+              discoveryPanelProvider === "openai" && panelState.result.credential_id
+                ? () => {
+                    onCloseDiscovery();
+                    startChatGPTRelogin(panelState.result!.credential_id!);
+                  }
+                : undefined
+            }
+            reloginBusy={chatgptLoginBusy}
+            developerMode={developerMode}
+          />
+        ) : null}
+      </Drawer>
     </>
   );
 }
@@ -1477,7 +1526,7 @@ export function DiscoveryResultView({
   result: ModelDiscoveryResult;
   authMode: ProviderCredential["auth_type"] | null;
   credentialLabel: string | null;
-  onClose: () => void;
+  onClose?: () => void;
   onUse: (model: string, task: ModelTask) => void;
   // S3: when the failure is machine-classified as reauth_required, offer the
   // in-place re-login right where the error is shown. Optional (old sites OK).
@@ -1525,9 +1574,11 @@ export function DiscoveryResultView({
             {t(($) => $.providers.discovery.officialSource)}
           </a>
         )}
-        <button type="button" className="btn-ghost tiny" onClick={onClose}>
-          {t(($) => $.actions.close)}
-        </button>
+        {onClose ? (
+          <button type="button" className="btn-ghost tiny" onClick={onClose}>
+            {t(($) => $.actions.close)}
+          </button>
+        ) : null}
       </div>
       {errorMessage && <p className="warn-text tiny">{errorMessage}</p>}
       {developerMode ? <DeveloperDiagnostics diagnostics={[result.error]} t={t} /> : null}

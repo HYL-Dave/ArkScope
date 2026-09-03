@@ -339,7 +339,7 @@ describe("ModelRoutingSection provider-first UX", () => {
             {
               ...entry(
                 sparkId,
-                eligible ? "visible" : "advanced",
+                "advanced",
                 eligible,
                 eligible ? null : missingReason,
                 "none",
@@ -490,6 +490,9 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(Array.from(effort.options).map((option) => option.value)).toEqual([
       "", "low", "medium", "high", "xhigh",
     ]);
+    expect(Array.from(model.options)
+      .find((option) => option.value === "gpt-5.3-codex-spark")?.textContent)
+      .not.toContain("進階");
     expect(translation.textContent).toContain("方案：prolite");
     expect(Array.from((labelledControl(researchCard(), "model") as HTMLSelectElement).options)
       .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");

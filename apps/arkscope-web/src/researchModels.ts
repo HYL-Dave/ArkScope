@@ -6,6 +6,7 @@ import type {
   ModelCatalog,
   ModelLifecycleFact,
   ModelProvider,
+  ModelTask,
   ProviderCredential,
 } from "./api";
 
@@ -136,10 +137,18 @@ export function effortOptionsForModel(
 export function taskRouteBlocker(
   catalog: ModelCatalog,
   route: Pick<{ provider: ModelProvider; model: string; effort: string }, "provider" | "model" | "effort">,
+  task: ModelTask,
 ): TaskRouteBlockerReason | null {
   if (taskRouteModelStatus(catalog, route.provider, route.model) === "retired") return "model_retired";
   const effort = route.effort.trim();
-  const supported = effortOptionsForModel(catalog, route.provider, route.model)
+  const effectiveEffortIds = catalog.effective?.tasks?.[task]?.providers?.[route.provider]?.models
+    ?.find((item) => item.id === route.model)?.effort_options;
+  const supported = effortOptionsForModel(
+    catalog,
+    route.provider,
+    route.model,
+    effectiveEffortIds,
+  )
     .some((option) => option.id === effort);
   return supported ? null : "effort_required";
 }

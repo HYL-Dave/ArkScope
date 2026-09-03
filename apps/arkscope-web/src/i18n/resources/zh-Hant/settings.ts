@@ -192,6 +192,7 @@ const settings = {
       seedOnly: "此通道無法線上列出模型。",
       neverDiscovered: "尚未探索此登入的模型",
       verifyAgain: "重新驗證列表",
+      viewLastResult: "查看上次結果",
       sparkUsageHint: "已偵測到 Spark 額度；重新驗證模型清單後才能使用。",
     },
     credentials: {
@@ -433,6 +434,7 @@ const settings = {
     },
     discovery: {
       title: "模型探索",
+      drawerTitle: "模型探索 · {{provider}}",
       description: "列出指定 credential 後端可見或可候選的模型。",
       credentialLabel: "Credential",
       selectCredential: "選擇 credential…",
