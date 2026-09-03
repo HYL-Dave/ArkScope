@@ -24,7 +24,16 @@ _MAX_STDOUT_BYTES = 16 * 1024 * 1024
 _MAX_STDERR_BYTES = 256 * 1024
 _MAX_MODEL_PAGES = 8
 _MAX_MODELS = 256
-_ALLOWED_NOTIFICATIONS = frozenset(
+_MAX_PASSIVE_NOTIFICATIONS = 16
+_PASSIVE_ACCOUNT_NOTIFICATIONS = frozenset(
+    {
+        "account/login/completed",
+        "account/rateLimits/updated",
+        "account/updated",
+        "remoteControl/status/changed",
+    }
+)
+_TRANSLATION_NOTIFICATIONS = frozenset(
     {
         "item/agentMessage/delta",
         "item/completed",
@@ -33,6 +42,32 @@ _ALLOWED_NOTIFICATIONS = frozenset(
         "turn/completed",
         "turn/started",
     }
+)
+_TURN_TELEMETRY_NOTIFICATIONS = frozenset(
+    {
+        "item/reasoning/summaryPartAdded",
+        "item/reasoning/summaryTextDelta",
+        "item/reasoning/textDelta",
+        "thread/settings/updated",
+        "thread/status/changed",
+        "thread/tokenUsage/updated",
+    }
+)
+_TURN_CONTROL_NOTIFICATIONS = frozenset(
+    {
+        "error",
+        "model/rerouted",
+        "model/safetyBuffering/updated",
+        "model/verification",
+        "thread/name/updated",
+        "turn/moderationMetadata",
+    }
+)
+_ALLOWED_NOTIFICATIONS = (
+    _PASSIVE_ACCOUNT_NOTIFICATIONS
+    | _TRANSLATION_NOTIFICATIONS
+    | _TURN_TELEMETRY_NOTIFICATIONS
+    | _TURN_CONTROL_NOTIFICATIONS
 )
 _SAFE_ITEM_TYPES = frozenset({"agentMessage", "reasoning", "userMessage"})
 _TOOL_ITEM_TYPES = frozenset(
@@ -105,19 +140,87 @@ PROTOCOL_PROJECTION = {
         "turn/start": ["turn"],
     },
     "notification_fields": {
+        "account/login/completed": [
+            "error",
+            "loginId",
+            "onboardingEntrypoint",
+            "success",
+        ],
+        "account/rateLimits/updated": ["rateLimits"],
+        "account/updated": ["authMode", "planType"],
+        "error": ["error", "threadId", "turnId", "willRetry"],
         "item/agentMessage/delta": ["delta", "itemId", "threadId", "turnId"],
         "item/completed": ["item", "threadId", "turnId"],
+        "item/reasoning/summaryPartAdded": [
+            "itemId",
+            "summaryIndex",
+            "threadId",
+            "turnId",
+        ],
+        "item/reasoning/summaryTextDelta": [
+            "delta",
+            "itemId",
+            "summaryIndex",
+            "threadId",
+            "turnId",
+        ],
+        "item/reasoning/textDelta": [
+            "contentIndex",
+            "delta",
+            "itemId",
+            "threadId",
+            "turnId",
+        ],
         "item/started": ["item", "threadId", "turnId"],
+        "model/rerouted": [
+            "fromModel",
+            "reason",
+            "threadId",
+            "toModel",
+            "turnId",
+        ],
+        "model/safetyBuffering/updated": [
+            "fasterModel",
+            "model",
+            "reasons",
+            "showBufferingUi",
+            "threadId",
+            "turnId",
+            "useCases",
+        ],
+        "model/verification": ["threadId", "turnId", "verifications"],
+        "remoteControl/status/changed": [
+            "environmentId",
+            "installationId",
+            "serverName",
+            "status",
+        ],
+        "thread/name/updated": ["threadId", "threadName"],
+        "thread/settings/updated": ["threadId", "threadSettings"],
         "thread/started": ["thread"],
+        "thread/status/changed": ["status", "threadId"],
+        "thread/tokenUsage/updated": ["threadId", "tokenUsage", "turnId"],
         "turn/completed": ["threadId", "turn"],
+        "turn/moderationMetadata": ["metadata", "threadId", "turnId"],
         "turn/started": ["threadId", "turn"],
     },
     "nested_fields": {
         "account": ["planType", "type"],
         "agent_message": ["id", "text", "type"],
+        "error": ["additionalDetails", "codexErrorInfo", "message"],
         "model": ["model"],
         "sandbox_policy": ["networkAccess", "type"],
         "thread": ["cwd", "ephemeral", "id", "modelProvider", "parentThreadId"],
+        "thread_settings": [
+            "approvalPolicy",
+            "approvalsReviewer",
+            "cwd",
+            "effort",
+            "model",
+            "modelProvider",
+            "sandboxPolicy",
+        ],
+        "thread_status": ["activeFlags", "type"],
         "turn": ["error", "id", "status"],
     },
 }
@@ -248,6 +351,19 @@ def _validate_thread_started(
         raise _fail("protocol_incompatible")
 
 
+def _next_translation_notification(
+    session: CodexJsonlSession,
+) -> dict[str, Any]:
+    passive_count = 0
+    while True:
+        notification = session.next_notification()
+        if notification.get("method") not in _PASSIVE_ACCOUNT_NOTIFICATIONS:
+            return notification
+        passive_count += 1
+        if passive_count > _MAX_PASSIVE_NOTIFICATIONS:
+            raise _fail("protocol_resource_exhausted")
+
+
 def _validate_turn_start(result: dict[str, Any]) -> str:
     turn = _require_mapping(result.get("turn"))
     turn_id = _require_identifier(turn.get("id"))
@@ -272,16 +388,208 @@ def _validate_event_identity(
         raise _fail("protocol_incompatible")
 
 
+def _require_nonnegative_index(value: Any) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise _fail("protocol_incompatible")
+
+
+def _require_optional_string(value: Any, *, max_length: int = 512) -> None:
+    if value is not None and (
+        not isinstance(value, str) or len(value) > max_length
+    ):
+        raise _fail("protocol_incompatible")
+
+
+def _require_bounded_strings(value: Any) -> None:
+    if not isinstance(value, list) or len(value) > 32:
+        raise _fail("protocol_incompatible")
+    for item in value:
+        if not isinstance(item, str) or len(item) > 512:
+            raise _fail("protocol_incompatible")
+
+
+def _validate_turn_telemetry(
+    notification: dict[str, Any],
+    *,
+    thread_id: str,
+    turn_id: str,
+    cwd: str,
+    model: str,
+    effort: str,
+) -> bool:
+    method = notification.get("method")
+    if method not in _TURN_TELEMETRY_NOTIFICATIONS:
+        return False
+    params = _require_mapping(notification.get("params"))
+
+    if method == "thread/settings/updated":
+        if params.get("threadId") != thread_id:
+            raise _fail("protocol_incompatible")
+        settings = _require_mapping(params.get("threadSettings"))
+        if (
+            settings.get("approvalPolicy") != "never"
+            or settings.get("approvalsReviewer") != "user"
+            or settings.get("cwd") != cwd
+            or settings.get("effort") != effort
+            or settings.get("model") != model
+            or settings.get("modelProvider") != "openai"
+            or settings.get("sandboxPolicy")
+            != {"type": "readOnly", "networkAccess": False}
+        ):
+            raise _fail("protocol_incompatible")
+        return True
+
+    if method == "thread/status/changed":
+        if params.get("threadId") != thread_id:
+            raise _fail("protocol_incompatible")
+        status = _require_mapping(params.get("status"))
+        status_type = status.get("type")
+        if status_type == "active":
+            if status.get("activeFlags") != []:
+                raise _fail("unexpected_tool_activity")
+        elif status_type == "systemError":
+            raise _fail("provider_call_failed")
+        elif status_type != "idle":
+            raise _fail("protocol_incompatible")
+        return True
+
+    _validate_event_identity(params, thread_id=thread_id, turn_id=turn_id)
+    if method == "thread/tokenUsage/updated":
+        _require_mapping(params.get("tokenUsage"))
+        return True
+
+    _require_identifier(params.get("itemId"))
+    if method in {
+        "item/reasoning/summaryPartAdded",
+        "item/reasoning/summaryTextDelta",
+    }:
+        _require_nonnegative_index(params.get("summaryIndex"))
+    else:
+        _require_nonnegative_index(params.get("contentIndex"))
+    if method != "item/reasoning/summaryPartAdded" and not isinstance(
+        params.get("delta"), str
+    ):
+        raise _fail("protocol_incompatible")
+    return True
+
+
+def _error_info_code(value: Any) -> str:
+    if value is None:
+        return "provider_call_failed"
+    if isinstance(value, str):
+        if value == "contextWindowExceeded":
+            return "context_window_exceeded"
+        if value in {"sessionBudgetExceeded", "usageLimitExceeded"}:
+            return "subscription_usage_unavailable"
+        if value == "unauthorized":
+            return "reauth_required"
+        if value in {
+            "badRequest",
+            "cyberPolicy",
+            "internalServerError",
+            "other",
+            "sandboxError",
+            "serverOverloaded",
+            "threadRollbackFailed",
+        }:
+            return "provider_call_failed"
+        raise _fail("protocol_incompatible")
+    if not isinstance(value, dict) or len(value) != 1:
+        raise _fail("protocol_incompatible")
+    kind, detail = next(iter(value.items()))
+    if kind == "activeTurnNotSteerable":
+        detail = _require_mapping(detail)
+        if detail.get("turnKind") not in {"review", "compact"}:
+            raise _fail("protocol_incompatible")
+        return "provider_call_failed"
+    if kind not in {
+        "httpConnectionFailed",
+        "responseStreamConnectionFailed",
+        "responseStreamDisconnected",
+        "responseTooManyFailedAttempts",
+    }:
+        raise _fail("protocol_incompatible")
+    detail = _require_mapping(detail)
+    status = detail.get("httpStatusCode")
+    if status is not None and (
+        isinstance(status, bool)
+        or not isinstance(status, int)
+        or not 0 <= status <= 65535
+    ):
+        raise _fail("protocol_incompatible")
+    return "provider_call_failed"
+
+
+def _error_payload_code(value: Any) -> str:
+    error = _require_mapping(value)
+    message = error.get("message")
+    if not isinstance(message, str):
+        raise _fail("protocol_incompatible")
+    _require_optional_string(error.get("additionalDetails"), max_length=16_384)
+    return _error_info_code(error.get("codexErrorInfo"))
+
+
+def _validate_turn_control(
+    notification: dict[str, Any],
+    *,
+    thread_id: str,
+    turn_id: str,
+    model: str,
+) -> bool:
+    method = notification.get("method")
+    if method not in _TURN_CONTROL_NOTIFICATIONS:
+        return False
+    params = _require_mapping(notification.get("params"))
+
+    if method == "thread/name/updated":
+        if params.get("threadId") != thread_id:
+            raise _fail("protocol_incompatible")
+        _require_optional_string(params.get("threadName"))
+        return True
+
+    _validate_event_identity(params, thread_id=thread_id, turn_id=turn_id)
+    if method == "turn/moderationMetadata":
+        if "metadata" not in params:
+            raise _fail("protocol_incompatible")
+        return True
+    if method == "model/safetyBuffering/updated":
+        if params.get("model") != model:
+            raise _fail("protocol_incompatible")
+        _require_bounded_strings(params.get("reasons"))
+        _require_bounded_strings(params.get("useCases"))
+        if not isinstance(params.get("showBufferingUi"), bool):
+            raise _fail("protocol_incompatible")
+        _require_optional_string(params.get("fasterModel"), max_length=256)
+        return True
+    if method == "model/verification":
+        verifications = params.get("verifications")
+        if not isinstance(verifications, list) or len(verifications) > 8:
+            raise _fail("protocol_incompatible")
+        if any(value != "trustedAccessForCyber" for value in verifications):
+            raise _fail("protocol_incompatible")
+        if verifications:
+            raise _fail("model_unavailable")
+        return True
+    if method == "model/rerouted":
+        if (
+            params.get("fromModel") != model
+            or not isinstance(params.get("toModel"), str)
+            or not params.get("toModel")
+            or len(params["toModel"]) > 256
+            or params.get("reason") != "highRiskCyberActivity"
+        ):
+            raise _fail("protocol_incompatible")
+        raise _fail("model_unavailable")
+    if not isinstance(params.get("willRetry"), bool):
+        raise _fail("protocol_incompatible")
+    raise _fail(_error_payload_code(params.get("error")))
+
+
 def _turn_error_code(turn: dict[str, Any]) -> str:
     error = turn.get("error")
-    info = error.get("codexErrorInfo") if isinstance(error, dict) else None
-    if info == "contextWindowExceeded":
-        return "context_window_exceeded"
-    if info == "usageLimitExceeded":
-        return "subscription_usage_unavailable"
-    if info == "unauthorized":
-        return "reauth_required"
-    return "provider_call_failed"
+    if error is None:
+        return "provider_call_failed"
+    return _error_payload_code(error)
 
 
 def _validate_output(payload: Any, schema: dict[str, Any]) -> None:
@@ -342,7 +650,7 @@ def _run_turn(
     )
     thread_id = _validate_thread_response(thread_result, cwd=cwd, model=model)
     _validate_thread_started(
-        session.next_notification(),
+        _next_translation_notification(session),
         expected_id=thread_id,
         cwd=cwd,
     )
@@ -364,9 +672,25 @@ def _run_turn(
     final_messages: list[str] = []
     saw_started = False
     while True:
-        notification = session.next_notification()
+        notification = _next_translation_notification(session)
         method = notification.get("method")
         params = _require_mapping(notification.get("params"))
+        if _validate_turn_telemetry(
+            notification,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            cwd=cwd,
+            model=model,
+            effort=effort,
+        ):
+            continue
+        if _validate_turn_control(
+            notification,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            model=model,
+        ):
+            continue
         if method == "turn/started":
             if saw_started:
                 raise _fail("protocol_incompatible")

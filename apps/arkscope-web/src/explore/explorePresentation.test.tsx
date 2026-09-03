@@ -71,6 +71,7 @@ interface DiagnosticRow {
 
 interface ExploreErrorPresentation {
   title: string;
+  guidance: string | null;
   diagnostics: {
     title: string;
     status: DiagnosticRow | null;
@@ -757,6 +758,44 @@ describe("Explore presentation boundary", () => {
         ...emptyState("universe_load"),
         code,
       })).toBeNull();
+    }
+  });
+
+  it("explains translation failures and routes recovery without exposing diagnostics", async () => {
+    const { presentExploreError } = await loadPresentation();
+    const cases = [
+      {
+        locale: "zh-Hant" as const,
+        code: "translation_route_unavailable",
+        guidance: "目前無法使用所選的內容翻譯路徑。請改選其他模型，或重新驗證模型清單後再試。",
+        label: "前往任務模型",
+        section: "models" as const,
+      },
+      {
+        locale: "en" as const,
+        code: "translation_auth_rejected",
+        guidance: "The Provider sign-in for Content Translation is no longer valid. Sign in again, then retry.",
+        label: "Go to Provider Sign-in and Credentials",
+        section: "providers" as const,
+      },
+    ];
+
+    for (const item of cases) {
+      const result = presentExploreError({
+        ...emptyState("card_translate"),
+        status: 502,
+        code: item.code,
+        developerDetail: "provider-controlled secret",
+        detailOmitted: true,
+      }, exploreT(item.locale));
+
+      expect(result.guidance).toBe(item.guidance);
+      expect(result.recovery).toEqual({
+        prompt: item.guidance,
+        label: item.label,
+        target: { kind: "settings_section", section: item.section },
+      });
+      expect(result.guidance).not.toContain("provider-controlled");
     }
   });
 

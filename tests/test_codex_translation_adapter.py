@@ -30,6 +30,17 @@ def _record(plan_type: str | None = "pro"):
 def _write_fixture(tmp_path: Path, **overrides) -> tuple[Path, Path, Path]:
     scenario = {
         "live_plan": "pro",
+        "startup_notification": None,
+        "turn_notification": None,
+        "turn_telemetry": [],
+        "turn_control_events": [],
+        "control_thread_id": None,
+        "control_turn_id": None,
+        "control_model": None,
+        "model_verifications": [],
+        "error_info": "usageLimitExceeded",
+        "error_will_retry": False,
+        "turn_settings_mutation": None,
         "models": [_MODEL],
         "model_pages": None,
         "thread_mutation": None,
@@ -92,6 +103,16 @@ for raw in sys.stdin:
     with TRANSCRIPT.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps({"method": method, "params": message.get("params")}, ensure_ascii=False) + "\n")
     if method == "initialized":
+        if SCENARIO["startup_notification"]:
+            emit({
+                "method": SCENARIO["startup_notification"],
+                "params": {
+                    "status": "connected",
+                    "serverName": "reviewed-startup",
+                    "installationId": "reviewed-startup",
+                    "environmentId": None,
+                },
+            })
         continue
     if method == SCENARIO["hang_method"]:
         while True:
@@ -116,6 +137,7 @@ for raw in sys.stdin:
             next_cursor = f"page-{page_index + 1}" if page_index + 1 < len(pages) else None
         emit({"id": request_id, "result": {"data": [{"model": value} for value in values], "nextCursor": next_cursor}})
     elif method == "thread/start":
+        thread_cwd = params["cwd"]
         thread = thread_value(params)
         result = {
             "approvalPolicy": params["approvalPolicy"],
@@ -146,6 +168,118 @@ for raw in sys.stdin:
         thread_id = "wrong-thread" if SCENARIO["wrong_thread"] else "thread-1"
         event_turn_id = "wrong-turn" if SCENARIO["wrong_turn"] else turn_id
         emit({"method": "turn/started", "params": {"threadId": thread_id, "turn": {"id": event_turn_id, "items": [], "status": "inProgress"}}})
+        if SCENARIO["turn_notification"]:
+            emit({
+                "method": SCENARIO["turn_notification"],
+                "params": {"authMode": "chatgpt", "planType": SCENARIO["live_plan"]},
+            })
+        for telemetry_method in SCENARIO["turn_telemetry"]:
+            if telemetry_method == "thread/settings/updated":
+                settings = {
+                    "approvalPolicy": "never",
+                    "approvalsReviewer": "user",
+                    "cwd": thread_cwd,
+                    "effort": params["effort"],
+                    "model": %r,
+                    "modelProvider": "openai",
+                    "sandboxPolicy": params["sandboxPolicy"],
+                }
+                mutation = SCENARIO["turn_settings_mutation"]
+                if mutation == "model":
+                    settings["model"] = "gpt-5.3-codex"
+                elif mutation == "effort":
+                    settings["effort"] = "low"
+                elif mutation == "sandbox":
+                    settings["sandboxPolicy"] = {"type": "workspaceWrite"}
+                telemetry_params = {"threadId": thread_id, "threadSettings": settings}
+            elif telemetry_method == "thread/status/changed":
+                telemetry_params = {
+                    "threadId": thread_id,
+                    "status": {"type": "active", "activeFlags": []},
+                }
+            elif telemetry_method == "thread/tokenUsage/updated":
+                telemetry_params = {
+                    "threadId": thread_id,
+                    "turnId": event_turn_id,
+                    "tokenUsage": {},
+                }
+            elif telemetry_method == "item/reasoning/summaryPartAdded":
+                telemetry_params = {
+                    "threadId": thread_id,
+                    "turnId": event_turn_id,
+                    "itemId": "reasoning-1",
+                    "summaryIndex": 0,
+                }
+            elif telemetry_method == "item/reasoning/summaryTextDelta":
+                telemetry_params = {
+                    "threadId": thread_id,
+                    "turnId": event_turn_id,
+                    "itemId": "reasoning-1",
+                    "summaryIndex": 0,
+                    "delta": "private reasoning summary",
+                }
+            elif telemetry_method == "item/reasoning/textDelta":
+                telemetry_params = {
+                    "threadId": thread_id,
+                    "turnId": event_turn_id,
+                    "itemId": "reasoning-1",
+                    "contentIndex": 0,
+                    "delta": "private reasoning text",
+                }
+            else:
+                raise AssertionError(telemetry_method)
+            emit({"method": telemetry_method, "params": telemetry_params})
+        for control_method in SCENARIO["turn_control_events"]:
+            control_thread_id = SCENARIO["control_thread_id"] or thread_id
+            control_turn_id = SCENARIO["control_turn_id"] or event_turn_id
+            if control_method == "turn/moderationMetadata":
+                control_params = {
+                    "threadId": control_thread_id,
+                    "turnId": control_turn_id,
+                    "metadata": {"classification": "reviewed-fixture"},
+                }
+            elif control_method == "model/safetyBuffering/updated":
+                control_params = {
+                    "threadId": control_thread_id,
+                    "turnId": control_turn_id,
+                    "model": SCENARIO["control_model"] or %r,
+                    "reasons": ["reviewed-fixture"],
+                    "showBufferingUi": True,
+                    "useCases": ["translation"],
+                    "fasterModel": None,
+                }
+            elif control_method == "model/verification":
+                control_params = {
+                    "threadId": control_thread_id,
+                    "turnId": control_turn_id,
+                    "verifications": SCENARIO["model_verifications"],
+                }
+            elif control_method == "thread/name/updated":
+                control_params = {
+                    "threadId": control_thread_id,
+                    "threadName": "Content translation",
+                }
+            elif control_method == "model/rerouted":
+                control_params = {
+                    "threadId": control_thread_id,
+                    "turnId": control_turn_id,
+                    "fromModel": %r,
+                    "toModel": "gpt-5.3-codex",
+                    "reason": "highRiskCyberActivity",
+                }
+            elif control_method == "error":
+                control_params = {
+                    "threadId": control_thread_id,
+                    "turnId": control_turn_id,
+                    "willRetry": SCENARIO["error_will_retry"],
+                    "error": {
+                        "message": "raw provider detail must not escape",
+                        "codexErrorInfo": SCENARIO["error_info"],
+                    },
+                }
+            else:
+                raise AssertionError(control_method)
+            emit({"method": control_method, "params": control_params})
         if SCENARIO["server_request"]:
             emit({"id": 99, "method": "item/commandExecution/requestApproval", "params": {}})
         item_type = SCENARIO["item_type"]
@@ -161,7 +295,15 @@ for raw in sys.stdin:
         emit({"method": "turn/completed", "params": {"threadId": thread_id, "turn": turn}})
     else:
         emit({"id": request_id, "error": {"code": -32601, "message": "unknown"}})
-''' % (sys.executable, json.dumps(scenario, ensure_ascii=False), str(transcript), str(pid_path))
+''' % (
+        sys.executable,
+        json.dumps(scenario, ensure_ascii=False),
+        str(transcript),
+        str(pid_path),
+        _MODEL,
+        _MODEL,
+        _MODEL,
+    )
     executable.write_text(source, encoding="utf-8")
     executable.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     return executable, transcript, pid_path
@@ -251,6 +393,252 @@ def test_translation_runs_one_exact_isolated_thread_and_turn(tmp_path):
     assert turn["input"] == [{"type": "text", "text": "Revenue grew 12%."}]
     assert turn["outputSchema"] == _SCHEMA
     assert turn["sandboxPolicy"] == {"type": "readOnly", "networkAccess": False}
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize(
+    "notification",
+    [
+        "account/login/completed",
+        "account/rateLimits/updated",
+        "account/updated",
+        "remoteControl/status/changed",
+    ],
+)
+def test_reviewed_startup_notification_is_drained_before_translation_events(
+    tmp_path, notification
+):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        startup_notification=notification,
+    )
+
+    result = _run(executable)
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "thread/start" in _methods(transcript)
+    assert "turn/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+def test_reviewed_account_notification_is_drained_during_translation_turn(tmp_path):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        turn_notification="account/updated",
+    )
+
+    result = _run(executable)
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "turn/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize(
+    "notification",
+    [
+        "thread/settings/updated",
+        "thread/status/changed",
+        "thread/tokenUsage/updated",
+        "item/reasoning/summaryPartAdded",
+        "item/reasoning/summaryTextDelta",
+        "item/reasoning/textDelta",
+    ],
+)
+def test_reviewed_turn_telemetry_does_not_replace_translation_events(
+    tmp_path, notification
+):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        turn_telemetry=[notification],
+    )
+
+    result = _run(executable)
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "turn/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize(
+    "notification",
+    [
+        "turn/moderationMetadata",
+        "model/safetyBuffering/updated",
+        "model/verification",
+        "thread/name/updated",
+    ],
+)
+def test_reviewed_turn_control_telemetry_does_not_replace_translation_events(
+    tmp_path, notification
+):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=[notification],
+    )
+
+    result = _run(executable)
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "turn/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize(
+    "notification",
+    [
+        "turn/moderationMetadata",
+        "model/safetyBuffering/updated",
+        "model/verification",
+        "thread/name/updated",
+        "model/rerouted",
+        "error",
+    ],
+)
+def test_turn_control_telemetry_must_match_the_active_thread(
+    tmp_path, notification
+):
+    executable, _, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=[notification],
+        control_thread_id="other-thread",
+    )
+
+    _assert_error(executable, "protocol_incompatible")
+
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize(
+    "notification",
+    [
+        "turn/moderationMetadata",
+        "model/safetyBuffering/updated",
+        "model/verification",
+        "model/rerouted",
+        "error",
+    ],
+)
+def test_turn_control_telemetry_must_match_the_active_turn(
+    tmp_path, notification
+):
+    executable, _, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=[notification],
+        control_turn_id="other-turn",
+    )
+
+    _assert_error(executable, "protocol_incompatible")
+
+    _wait_for_exit(pid_path)
+
+
+def test_safety_buffering_must_echo_the_exact_selected_model(tmp_path):
+    executable, _, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=["model/safetyBuffering/updated"],
+        control_model="gpt-5.3-codex",
+    )
+
+    _assert_error(executable, "protocol_incompatible")
+
+    _wait_for_exit(pid_path)
+
+
+def test_nonempty_model_verification_never_becomes_translation_success(tmp_path):
+    executable, _, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=["model/verification"],
+        model_verifications=["trustedAccessForCyber"],
+    )
+
+    _assert_error(executable, "model_unavailable")
+
+    _wait_for_exit(pid_path)
+
+
+def test_model_reroute_is_rejected_instead_of_accepting_fallback(tmp_path):
+    executable, _, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=["model/rerouted"],
+    )
+
+    _assert_error(executable, "model_unavailable")
+
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize("will_retry", [False, True])
+def test_error_notification_maps_usage_limit_and_reaps_before_retry(
+    tmp_path, will_retry
+):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=["error"],
+        error_info="usageLimitExceeded",
+        error_will_retry=will_retry,
+    )
+
+    _assert_error(executable, "subscription_usage_unavailable")
+
+    assert _methods(transcript).count("turn/start") == 1
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize(
+    ("error_info", "expected_code"),
+    [
+        ("contextWindowExceeded", "context_window_exceeded"),
+        ("unauthorized", "reauth_required"),
+        ("serverOverloaded", "provider_call_failed"),
+        ({"responseStreamDisconnected": {"httpStatusCode": 503}}, "provider_call_failed"),
+    ],
+)
+def test_error_notification_uses_closed_codes_without_exposing_provider_text(
+    tmp_path, error_info, expected_code
+):
+    from src.auth_drivers.codex_translation_adapter import CodexTranslationError
+
+    executable, _, pid_path = _write_fixture(
+        tmp_path,
+        turn_control_events=["error"],
+        error_info=error_info,
+    )
+
+    with pytest.raises(CodexTranslationError) as exc_info:
+        _run(executable)
+    assert exc_info.value.code == expected_code
+    assert str(exc_info.value) == expected_code
+    assert "raw provider detail" not in str(exc_info.value)
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize("mutation", ["model", "effort", "sandbox"])
+def test_turn_settings_telemetry_must_echo_the_selected_execution_boundary(
+    tmp_path, mutation
+):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        turn_telemetry=["thread/settings/updated"],
+        turn_settings_mutation=mutation,
+    )
+
+    _assert_error(executable, "protocol_incompatible")
+
+    assert "turn/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+def test_unreviewed_startup_notification_remains_fail_closed(tmp_path):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        startup_notification="configWarning",
+    )
+
+    _assert_error(executable, "protocol_incompatible")
+
+    assert "thread/start" not in _methods(transcript)
+    assert "turn/start" not in _methods(transcript)
     _wait_for_exit(pid_path)
 
 

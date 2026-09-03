@@ -65,6 +65,34 @@ class _StatusCodeError(_StatusError):
             "translation_quota_exhausted",
             False,
         ),
+        (
+            SubscriptionStructuredOutputError(
+                "protocol_incompatible", "secret-value"
+            ),
+            "translation_route_unavailable",
+            False,
+        ),
+        (
+            SubscriptionStructuredOutputError(
+                "model_unavailable", "secret-value"
+            ),
+            "translation_model_unavailable",
+            False,
+        ),
+        (
+            SubscriptionStructuredOutputError(
+                "structured_output_invalid", "secret-value"
+            ),
+            "translation_output_invalid",
+            False,
+        ),
+        (
+            SubscriptionStructuredOutputError(
+                "timeout", "secret-value"
+            ),
+            "translation_timeout",
+            True,
+        ),
         (_StatusError(401), "translation_auth_rejected", False),
         (_StatusError(403), "translation_auth_rejected", False),
         (_StatusError(404), "translation_model_unavailable", False),

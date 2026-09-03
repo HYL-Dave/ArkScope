@@ -955,6 +955,8 @@ export type TranslationFailureCode =
   | "translation_model_unavailable"
   | "translation_timeout"
   | "translation_output_invalid"
+  | "translation_context_window_exceeded"
+  | "translation_protocol_resource_exhausted"
   | "translation_provider_error"
   | "evidence_changed";
 

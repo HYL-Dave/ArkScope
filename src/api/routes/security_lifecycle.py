@@ -315,7 +315,7 @@ def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResul
             raise ValueError("translation_route_provider")
         if not model or len(model) > 160 or "\0" in model:
             raise ValueError("translation_route_model")
-        harness = translation_harness(provider)
+        harness = translation_harness(provider, model)
         runtime = resolve_fixed_task_runtime("card_translation")
     except Exception:
         raise EvidenceTranslationFailure(

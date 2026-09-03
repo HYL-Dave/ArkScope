@@ -7,6 +7,8 @@ or network runs; the CardRunStore is real (tmp SQLite) to exercise the lifecycle
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
 
@@ -253,6 +255,50 @@ def test_translate_timeout_returns_structured_502_and_stores_no_translation(
         "effort": "high",
         "effective_seconds": 600.0,
     }
+    assert store.get(rid).translations is None
+
+
+def test_translate_subscription_failure_returns_closed_route_metadata(
+    store, stub_generation, monkeypatch
+):
+    from src.auth_drivers.subscription_structured_output import (
+        SubscriptionStructuredOutputError,
+    )
+
+    rid = generate_card(
+        "AAPL", GenerateBody(include_sa=False), dal=object(), store=store
+    )["run_id"]
+    monkeypatch.setattr(
+        routes,
+        "task_route",
+        lambda task: SimpleNamespace(
+            task=task,
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            effort="xhigh",
+        ),
+    )
+
+    def fail(card, **kwargs):
+        raise SubscriptionStructuredOutputError(
+            "protocol_incompatible",
+            "provider-controlled detail must not escape",
+        )
+
+    monkeypatch.setattr(routes, "translate_card", fail)
+
+    with pytest.raises(HTTPException) as exc:
+        translate_card_route(rid, TranslateBody(lang="zh-Hant"), store=store)
+
+    assert exc.value.status_code == 502
+    assert exc.value.detail == {
+        "code": "translation_route_unavailable",
+        "retryable": False,
+        "provider": "openai",
+        "model": "gpt-5.3-codex-spark",
+        "harness": "codex_app_server",
+    }
+    assert "provider-controlled" not in str(exc.value.detail)
     assert store.get(rid).translations is None
 
 

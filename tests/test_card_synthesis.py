@@ -655,7 +655,11 @@ def test_translation_provider_override_uses_explicit_task_effort(
             effort="xhigh", source="db",
         ),
     )
-    monkeypatch.setattr(cs, "translation_harness", lambda selected_provider: "fake")
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda selected_provider, selected_model=None: "fake",
+    )
     calls = []
 
     def translate(selected_model, system, user, schema, target, effort, **kwargs):
@@ -744,7 +748,11 @@ def test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispat
     monkeypatch.setattr(cs, "_synthesize_anthropic", lambda *a, **k: provider_calls.append((a, k)))
     monkeypatch.setattr(cs, "_translate_openai", lambda *a, **k: provider_calls.append((a, k)))
     monkeypatch.setattr(cs, "_translate_anthropic", lambda *a, **k: provider_calls.append((a, k)))
-    monkeypatch.setattr(cs, "translation_harness", lambda _provider: "fake")
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda _provider, _model=None: "fake",
+    )
 
     with pytest.raises(ValueError) as exc:
         _invoke_fixed_task_seam(cs, seam, provider=provider)
@@ -783,7 +791,11 @@ def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
 
     monkeypatch.setattr(cs, "_synthesize_openai", synthesize)
     monkeypatch.setattr(cs, "_translate_openai", translate)
-    monkeypatch.setattr(cs, "translation_harness", lambda _provider: "fake")
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda _provider, _model=None: "fake",
+    )
 
     _invoke_fixed_task_seam(cs, seam, provider="openai")
 
@@ -1153,7 +1165,11 @@ def test_shared_text_translation_has_no_legacy_16000_character_boundary(monkeypa
         "_translate_openai",
         lambda *_args, **_kwargs: {"translated_text": translated},
     )
-    monkeypatch.setattr(cs, "translation_harness", lambda _provider: "fake")
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda _provider, _model=None: "fake",
+    )
 
     result = cs.translate_text(source, lang="zh-Hant", model_timeout_s=30.0)
 

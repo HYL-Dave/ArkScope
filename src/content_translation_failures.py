@@ -53,8 +53,25 @@ def classify_content_translation_failure(
     if isinstance(exc, SubscriptionStructuredOutputError):
         if exc.code == "reauth_required":
             return ContentTranslationFailure("translation_auth_rejected", False)
-        if exc.code in {"insufficient_quota", "usage_limit_reached"}:
+        if exc.code in {
+            "insufficient_quota",
+            "subscription_usage_unavailable",
+            "usage_limit_reached",
+        }:
             return ContentTranslationFailure("translation_quota_exhausted", False)
+        if exc.code in {
+            "adapter_unavailable",
+            "protocol_incompatible",
+            "unexpected_tool_activity",
+            "version_incompatible",
+        }:
+            return ContentTranslationFailure("translation_route_unavailable", False)
+        if exc.code in {"model_effort_unsupported", "model_unavailable"}:
+            return ContentTranslationFailure("translation_model_unavailable", False)
+        if exc.code in {"structured_output_invalid", "structured_output_missing"}:
+            return ContentTranslationFailure("translation_output_invalid", False)
+        if exc.code == "timeout":
+            return ContentTranslationFailure("translation_timeout", True)
         if exc.code == "context_window_exceeded":
             return ContentTranslationFailure(
                 "translation_context_window_exceeded", False
