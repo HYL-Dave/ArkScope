@@ -725,7 +725,7 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 73,
+      common: 74,
       shell: 37,
       settings: 845,
       research: 207,
@@ -798,7 +798,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2404);
+      expect(total, `${locale}.total`).toBe(2405);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1046,6 +1046,7 @@ describe("bundled i18n resources", () => {
           providerCallFailed: "provider 實際呼叫失敗",
           reauthRequired: "登入已失效，請重新登入",
           subscriptionPlanRequired: "需要 ChatGPT Pro 方案",
+          subscriptionPlanUnverified: "尚未確認 ChatGPT 方案；請先同步帳戶用量，再重試",
           modelTaskUnsupported: "此模型不支援這個任務",
           modelOutputLimitUnknown: "此路由尚不知道該模型的輸出上限",
           protocolIncompatible: "內附的模型 adapter 不相容",
@@ -1094,6 +1095,7 @@ describe("bundled i18n resources", () => {
           providerCallFailed: "The live provider call failed",
           reauthRequired: "The sign-in has expired. Sign in again",
           subscriptionPlanRequired: "Requires a ChatGPT Pro plan",
+          subscriptionPlanUnverified: "The ChatGPT plan has not been verified. Sync account usage, then try again",
           modelTaskUnsupported: "This model does not support this task",
           modelOutputLimitUnknown: "This model's output limit is unknown for this route",
           protocolIncompatible: "The bundled model adapter is incompatible",
@@ -1153,7 +1155,7 @@ describe("bundled i18n resources", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toEqual(expectedModels[locale]);
-      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(36);
+      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(37);
       const settings = flattenResource(resources[locale].settings as ResourceTree);
       for (const path of removedSettingsPaths) {
         expect.soft(settings.has(path), `${locale}.settings.${path}`).toBe(false);
@@ -1162,6 +1164,10 @@ describe("bundled i18n resources", () => {
   });
 
   it("preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move", () => {
+    const postSliceCommonModelPaths = [
+      "reasons.modelRetired",
+      "reasons.subscriptionPlanUnverified",
+    ] as const;
     const postSliceSettingsPaths = [
       "workspace.routes.effortRequired",
       "workspace.routes.modelRetired",
@@ -1338,7 +1344,11 @@ describe("bundled i18n resources", () => {
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toBeDefined();
       if (!commonModels) continue;
-      const movedModelCount = flattenResource(commonModels).size - 1;
+      const flattenedCommonModels = flattenResource(commonModels);
+      for (const path of postSliceCommonModelPaths) {
+        expect(flattenedCommonModels.has(path), `${locale}.common.models.${path}`).toBe(true);
+      }
+      const movedModelCount = flattenedCommonModels.size - postSliceCommonModelPaths.length;
       expect(physicalPreSliceCount).toBe(643);
       expect(movedModelCount).toBe(35);
       expect(physicalPreSliceCount + movedModelCount).toBe(678);

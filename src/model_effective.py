@@ -1,10 +1,10 @@
-"""Per-task effective model view (P2.7): registry ∩ discovery ∩ executability.
+"""Per-task effective model view (P2.7): registry, discovery, and executability.
 
-The picker's default list is the intersection of three independent facts:
-1. the model is default-visibility in the code registry (picker policy),
-2. the ACTIVE credential for that task's provider has actually SEEN it
-   (discovery cache, fingerprint-scoped),
-3. the (task, auth_mode) pair can actually execute it (fail-closed contract:
+The picker distinguishes three independent facts:
+1. default visibility in the code registry (picker policy),
+2. whether the active credential has actually seen the model (fingerprint-scoped
+   discovery; missing registry defaults remain visible as unverified seeds),
+3. whether the (task, auth_mode) pair can execute it (fail-closed contract:
    cards use the provider's direct API-key client or its structured subscription
    adapter; api_key_pool is unwired; AI research streams through api_key or the
    provider's own OAuth driver).
@@ -245,6 +245,7 @@ def effective_model_view_v2(
             seen_ids: set[str] = set()
 
             if scope_status == "ok":
+                covered_capabilities: set[str] = set()
                 for capability_id, real_id in sorted(scope["real_default_by_capability"].items()):
                     capability = capability_for(capability_id)
                     if capability is None:
@@ -262,6 +263,35 @@ def effective_model_view_v2(
                         capability=capability,
                     ))
                     seen_ids.add(real_id)
+                    covered_capabilities.add(capability.id)
+                route_capability = (
+                    capability_for(route_model)
+                    if provider == current_provider and route_model
+                    else None
+                )
+                for capability in all_models(provider):
+                    if (
+                        capability.picker_visibility != "default"
+                        or capability.id in covered_capabilities
+                        or (
+                            route_capability is not None
+                            and route_capability.id == capability.id
+                        )
+                    ):
+                        continue
+                    entries.append(_v2_entry(
+                        model_id=capability.id,
+                        label=capability.label,
+                        status="seed",
+                        visible_to_credential=None,
+                        task=task,
+                        provider=provider,
+                        auth_mode=credential.auth_mode if credential is not None else None,
+                        plan_type=credential.plan_type if credential is not None else None,
+                        provider_reason=provider_reason,
+                        capability=capability,
+                    ))
+                    seen_ids.add(capability.id)
             else:
                 for capability in all_models(provider):
                     if capability.picker_visibility != "default":

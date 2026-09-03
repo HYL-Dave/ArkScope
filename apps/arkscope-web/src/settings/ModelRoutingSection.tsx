@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  EffectiveProviderModelEntry,
   ModelCatalog,
   ModelOption,
   ModelProvider,
@@ -158,23 +159,21 @@ export function ModelRoutingSection({
           const currentEntries = rawEntries.filter((entry) => (
             taskRouteModelStatus(catalog, row.provider, entry.id) === "current"
           ));
+          const retainedRouteEntry: EffectiveProviderModelEntry = {
+            id: row.model,
+            label: row.model,
+            status: "route",
+            visible_to_credential: null,
+            eligible: taskRouteModelStatus(catalog, row.provider, row.model) !== "retired",
+            reason_code: taskRouteModelStatus(catalog, row.provider, row.model) === "retired"
+              ? "model_retired"
+              : "model_not_in_registry",
+            thinking_mode: "none",
+            effort_options: undefined,
+          };
           const entries = currentEntries.some((entry) => entry.id === row.model) || !row.model
             ? currentEntries
-            : [
-                ...currentEntries,
-                {
-                  id: row.model,
-                  label: row.model,
-                  status: "route" as const,
-                  visible_to_credential: null,
-                  eligible: taskRouteModelStatus(catalog, row.provider, row.model) !== "retired",
-                  reason_code: taskRouteModelStatus(catalog, row.provider, row.model) === "retired"
-                    ? "model_retired"
-                    : "model_not_in_registry",
-                  thinking_mode: "none",
-                  effort_options: undefined,
-                },
-              ];
+            : [...currentEntries, retainedRouteEntry];
           const providerReason = modelProviderReason(context, providerBlock);
           const groups = groupedModelEntries(entries, providerReason, commonT);
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;

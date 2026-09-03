@@ -232,6 +232,31 @@ def test_spark_execution_requires_the_exact_task_auth_and_plan_tuple():
     ) is None
 
 
+def test_unknown_plan_is_reported_as_unverified_not_as_plan_required():
+    for plan_type in (None, "", "   ", "not a valid plan value"):
+        assert model_execution_admission_detail(
+            "gpt-5.3-codex-spark",
+            task="card_translation",
+            auth_mode="chatgpt_oauth",
+            plan_type=plan_type,
+        ) == {
+            "code": "subscription_plan_unverified",
+            "field": "credential",
+        }
+
+
+def test_known_plus_plan_still_reports_plan_required():
+    assert model_execution_admission_detail(
+        "gpt-5.3-codex-spark",
+        task="card_translation",
+        auth_mode="chatgpt_oauth",
+        plan_type="plus",
+    ) == {
+        "code": "subscription_plan_required",
+        "field": "credential",
+    }
+
+
 def test_existing_models_remain_unrestricted_by_task_auth_and_plan():
     assert model_execution_admission_detail(
         "gpt-5.6-sol",

@@ -270,6 +270,9 @@ class _FakeTokenStore:
         self.loads.append((provider, auth_mode, credential_id))
         return self.record
 
+    def save(self, *, provider, auth_mode, credential_id, record):
+        self.record = record
+
 
 def test_claude_oauth_structured_output_uses_locked_agent_sdk_options(tmp_path, monkeypatch):
     from src.auth_drivers import subscription_structured_output as mod
@@ -1171,7 +1174,7 @@ def test_spark_failure_never_changes_model_auth_or_provider(monkeypatch):
     assert raw_clients == []
 
 
-@pytest.mark.parametrize("plan_type", ["plus", None, "team"])
+@pytest.mark.parametrize("plan_type", ["plus", "team"])
 def test_spark_requires_pro_before_adapter_dispatch(monkeypatch, plan_type):
     from src.auth_drivers import subscription_structured_output as mod
 
@@ -1202,3 +1205,48 @@ def test_spark_requires_pro_before_adapter_dispatch(monkeypatch, plan_type):
 
     assert exc_info.value.code == "subscription_plan_required"
     assert adapter_calls == []
+
+
+def test_unknown_stored_plan_dispatches_live_verification_and_backfills(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    record = StoredTokenRecord(
+        access_token="oauth-token",
+        plan_type=None,
+        metadata={"account_id": "acct-fixture"},
+    )
+    store = _FakeTokenStore(record)
+    calls = []
+    monkeypatch.setattr(mod, "_refresh_chatgpt_token", lambda **_kwargs: record)
+
+    def fake_adapter(**kwargs):
+        calls.append(kwargs)
+        kwargs["plan_observer"]("pro")
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        "src.auth_drivers.codex_translation_adapter.run_codex_translation",
+        fake_adapter,
+    )
+
+    result = mod.run_subscription_structured_output(
+        task="card_translation",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id="local:7",
+        model="gpt-5.3-codex-spark",
+        system="Translate exactly.",
+        user="Revenue grew 12%.",
+        output_name="emit_translation",
+        output_description="Emit the translation.",
+        schema=_schema(),
+        effort="medium",
+        token_store=store,
+        timeout_s=30.0,
+    )
+
+    assert result == {"ok": True}
+    assert len(calls) == 1
+    assert store.record.plan_type == "pro"
+    assert store.record.plan_observed_at is not None
+    assert store.record.access_token == "oauth-token"

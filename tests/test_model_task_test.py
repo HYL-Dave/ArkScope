@@ -370,7 +370,6 @@ def test_oauth_card_canary_uses_one_subscription_structured_call(
     ("active", "task", "expected"),
     [
         (_active("chatgpt_oauth", plan_type="plus"), "card_translation", "subscription_plan_required"),
-        (_active("chatgpt_oauth", plan_type=None), "card_translation", "subscription_plan_required"),
         (_active("api_key", plan_type=None), "card_translation", "task_auth_mode_unsupported"),
         (_active("chatgpt_oauth", plan_type="pro"), "card_synthesis", "model_task_unsupported"),
     ],
@@ -392,6 +391,27 @@ def test_spark_ineligible_contexts_stop_before_discovery_or_provider(
     assert result.error_code == expected
     assert calls == {"api": [], "driver": [], "subscription": []}
     assert cache.calls == []
+
+
+def test_unknown_spark_plan_defers_to_bounded_subscription_dispatch(monkeypatch, tmp_path):
+    scope = DiscoveryScope(
+        status="ok",
+        discovered_at="2026-09-03T00:00:00Z",
+        models=[CachedModel("gpt-5.3-codex-spark", "Spark", "provider_api")],
+    )
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active("chatgpt_oauth", plan_type=None),
+        task="card_translation",
+        provider="openai",
+        model="gpt-5.3-codex-spark",
+        effort="medium",
+        cache=_Cache(scope),
+    )
+
+    assert result.status == "ok"
+    assert len(calls["subscription"]) == 1
 
 
 def test_spark_requires_successful_exact_discovery_before_provider(monkeypatch, tmp_path):

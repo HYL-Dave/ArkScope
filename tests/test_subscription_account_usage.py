@@ -9,9 +9,10 @@ import sqlite3
 import stat
 import sys
 import time
-from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -70,6 +71,11 @@ class _TokenStore:
     def load(self, *, provider, auth_mode, credential_id):
         self.loads += 1
         return self.record
+
+    def save(self, *, provider, auth_mode, credential_id, record):
+        assert provider == "openai"
+        assert auth_mode == "chatgpt_oauth"
+        self.record = record
 
 
 def _rate_limits_payload() -> dict:
@@ -178,6 +184,7 @@ def _write_codex_fixture(
     unexpected_method: str | None = None,
     startup_notification: str | None = None,
     hang_method: str | None = None,
+    live_plan: str = "plus",
 ) -> tuple[Path, Path, Path]:
     executable = root / "codex-fixture"
     transcript = root / "methods.jsonl"
@@ -231,7 +238,7 @@ for raw in sys.stdin:
     elif method == "account/login/start":
         emit({"id": request_id, "result": {"type": "chatgptAuthTokens"}})
     elif method == "account/read":
-        emit({"id": request_id, "result": {"account": {"type": "chatgpt", "email": "raw@example.invalid", "planType": "plus"}, "requiresOpenaiAuth": True}})
+        emit({"id": request_id, "result": {"account": {"type": "chatgpt", "email": "raw@example.invalid", "planType": %r}, "requiresOpenaiAuth": True}})
     elif method == "account/rateLimits/read":
         if UNEXPECTED:
             emit({"method": UNEXPECTED, "params": {"secret": %r}})
@@ -255,6 +262,7 @@ for raw in sys.stdin:
         hang_method,
         _REMOTE_CONTROL_SENTINEL,
         _REMOTE_CONTROL_SENTINEL,
+        live_plan,
         _ACCOUNT_ID,
     )
     executable.write_text(source, encoding="utf-8")
@@ -406,6 +414,38 @@ def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_tu
     _wait_for_process_exit(int(pid_path.read_text()))
 
 
+def test_account_sync_redetermines_and_persists_live_plan_without_relogin(tmp_path):
+    from dataclasses import replace
+
+    from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    stored = replace(_token_record(), plan_type=None, account_label="ChatGPT subscription")
+    token_store = _TokenStore(stored)
+    executable, transcript, pid_path = _write_codex_fixture(tmp_path, live_plan="pro")
+    service = OAuthAccountSyncService(
+        observation_store=OAuthObservationStore(tmp_path / "profile.db"),
+        token_store=token_store,
+        adapter=CodexAccountUsageAdapter(executable=executable, timeout_seconds=2.0),
+    )
+
+    result = service.sync(
+        credential_id="local:1",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+    )
+
+    assert result.sync_status == "succeeded"
+    assert token_store.record.plan_type == "pro"
+    assert token_store.record.plan_observed_at is not None
+    assert token_store.record.access_token == stored.access_token
+    assert [
+        json.loads(line)["method"] for line in transcript.read_text().splitlines()
+    ].count("account/read") == 1
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
 def test_codex_model_catalog_preserves_provider_model_and_effort_contract(tmp_path):
     from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
 
@@ -458,7 +498,10 @@ def test_codex_model_catalog_follows_cursors_and_omits_hidden_rows(monkeypatch):
     monkeypatch.setattr(
         adapter,
         "_run_authenticated",
-        lambda *, record, operation: ("account-fixture", operation(Session())),
+        lambda *, record, operation: (
+            SimpleNamespace(account_id="account-fixture", plan_type="plus"),
+            operation(Session()),
+        ),
     )
 
     models = adapter.read_model_catalog(record=_token_record())
@@ -901,11 +944,11 @@ def test_account_sync_is_singleflight_per_credential(tmp_path):
             self.started = threading.Event()
             self.release = threading.Event()
 
-        def read_account_usage(self, *, credential_id, record, observed_at=None):
+        def read_account_usage_with_plan(self, *, credential_id, record, observed_at=None):
             self.calls += 1
             self.started.set()
             assert self.release.wait(timeout=2.0)
-            return _snapshot_input(credential_id=credential_id)
+            return _snapshot_input(credential_id=credential_id), "plus"
 
     observations = OAuthObservationStore(tmp_path / "profile.db")
     token_store = _TokenStore(_token_record())
