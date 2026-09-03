@@ -13,6 +13,7 @@ import concurrent.futures
 from datetime import datetime, timezone
 import inspect
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -51,6 +52,9 @@ from src.auth_drivers.chatgpt_oauth_probe import (
 )
 from src.auth_drivers.probe_harness import redact
 from src.auth_drivers.token_store import get_token_store
+
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriptionStructuredOutputError(RuntimeError):
@@ -421,7 +425,10 @@ async def _codex_structured_output_async(
                 plan_type=plan_type,
                 observed_at=datetime.now(timezone.utc),
             )
-        except ChatGPTOAuthLoginError:
+        except ChatGPTOAuthLoginError as exc:
+            if exc.error_code == "plan_observation_store_failed":
+                logger.warning("ChatGPT plan diagnostic could not be stored")
+                return
             raise CodexTranslationError("provider_call_failed") from None
 
     try:

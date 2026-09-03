@@ -1,5 +1,13 @@
 # Codex Spark Content Translation Implementation Plan
 
+> **Historical plan notice (2026-09-03):** The original Pro-name admission
+> described below is superseded by the current authority in
+> `docs/superpowers/specs/2026-09-02-codex-spark-content-translation-design.md`.
+> Exact same-credential `model/list` observation now controls Spark execution;
+> raw `planType` is diagnostic and a Spark usage bucket is only a revalidation
+> hint. This file is retained as the RED-first implementation record and must
+> not be used as current admission policy.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Admit `gpt-5.3-codex-spark` as an optional Content Translation model only for an exact, discovered ChatGPT Pro OAuth credential, using the bundled Codex app-server with no fallback.

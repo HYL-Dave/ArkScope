@@ -31,6 +31,7 @@ def _write_fixture(tmp_path: Path, **overrides) -> tuple[Path, Path, Path]:
     scenario = {
         "live_plan": "pro",
         "models": [_MODEL],
+        "model_pages": None,
         "thread_mutation": None,
         "item_type": None,
         "server_request": False,
@@ -104,7 +105,16 @@ for raw in sys.stdin:
     elif method == "account/read":
         emit({"id": request_id, "result": {"account": {"type": "chatgpt", "planType": SCENARIO["live_plan"]}, "requiresOpenaiAuth": True}})
     elif method == "model/list":
-        emit({"id": request_id, "result": {"data": [{"model": value} for value in SCENARIO["models"]], "nextCursor": None}})
+        pages = SCENARIO["model_pages"]
+        if pages is None:
+            values = SCENARIO["models"]
+            next_cursor = None
+        else:
+            cursor = params.get("cursor")
+            page_index = 0 if cursor is None else int(cursor.removeprefix("page-"))
+            values = pages[page_index]
+            next_cursor = f"page-{page_index + 1}" if page_index + 1 < len(pages) else None
+        emit({"id": request_id, "result": {"data": [{"model": value} for value in values], "nextCursor": next_cursor}})
     elif method == "thread/start":
         thread = thread_value(params)
         result = {
@@ -244,13 +254,33 @@ def test_translation_runs_one_exact_isolated_thread_and_turn(tmp_path):
     _wait_for_exit(pid_path)
 
 
-def test_token_store_plan_must_be_pro_before_process_start(tmp_path):
+def test_translation_finds_the_exact_model_on_a_bounded_second_page(tmp_path):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        model_pages=[["gpt-5.6-luna"], [_MODEL]],
+    )
+
+    result = _run(executable)
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    rows = [json.loads(line) for line in transcript.read_text().splitlines()]
+    model_requests = [row for row in rows if row["method"] == "model/list"]
+    assert [row["params"]["cursor"] for row in model_requests] == [None, "page-1"]
+    assert [row["method"] for row in rows].count("thread/start") == 1
+    assert [row["method"] for row in rows].count("turn/start") == 1
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize("stored_plan", ["plus", "prolite", "team"])
+def test_token_store_plan_name_is_diagnostic_not_admission(tmp_path, stored_plan):
     executable, transcript, pid_path = _write_fixture(tmp_path)
 
-    _assert_error(executable, "subscription_plan_required", record=_record("plus"))
+    result = _run(executable, record=_record(stored_plan))
 
-    assert not transcript.exists()
-    assert not pid_path.exists()
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "model/list" in _methods(transcript)
+    assert "thread/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
 
 
 def test_unknown_stored_plan_reaches_account_read_and_uses_live_plan(tmp_path):
@@ -277,36 +307,53 @@ def test_unknown_stored_plan_reaches_account_read_and_uses_live_plan(tmp_path):
     _wait_for_exit(pid_path)
 
 
-def test_unknown_stored_plan_requires_a_backfill_owner_before_process_start(tmp_path):
+def test_unknown_stored_plan_does_not_block_exact_live_entitlement(tmp_path):
     executable, transcript, pid_path = _write_fixture(tmp_path, live_plan="pro")
 
-    _assert_error(
-        executable,
-        "subscription_plan_unverified",
-        record=_record(None),
-    )
+    result = _run(executable, record=_record(None))
 
-    assert not transcript.exists()
-    assert not pid_path.exists()
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "model/list" in _methods(transcript)
+    _wait_for_exit(pid_path)
 
 
-@pytest.mark.parametrize(
-    ("live_plan", "expected_code"),
-    [
-        ("plus", "subscription_plan_required"),
-        ("team", "subscription_plan_required"),
-        ("", "subscription_plan_unverified"),
-        (None, "subscription_plan_unverified"),
-    ],
-)
-def test_live_account_plan_must_be_pro_before_thread_start(
-    tmp_path, live_plan, expected_code
+@pytest.mark.parametrize("live_plan", ["pro", "prolite", "plus", "team"])
+def test_live_account_plan_name_is_diagnostic_not_admission(tmp_path, live_plan):
+    executable, transcript, pid_path = _write_fixture(tmp_path, live_plan=live_plan)
+
+    result = _run(executable)
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "model/list" in _methods(transcript)
+    assert "thread/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize("live_plan", [None, ""])
+def test_missing_live_account_plan_does_not_override_exact_model_entitlement(
+    tmp_path,
+    live_plan,
 ):
     executable, transcript, pid_path = _write_fixture(tmp_path, live_plan=live_plan)
 
-    _assert_error(executable, expected_code)
+    result = _run(executable, record=_record(None))
 
-    assert "thread/start" not in _methods(transcript)
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert "model/list" in _methods(transcript)
+    assert "thread/start" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+@pytest.mark.parametrize("live_plan", [7, "x" * 81])
+def test_malformed_live_account_plan_remains_protocol_incompatible(
+    tmp_path,
+    live_plan,
+):
+    executable, transcript, pid_path = _write_fixture(tmp_path, live_plan=live_plan)
+
+    _assert_error(executable, "protocol_incompatible", record=_record(None))
+
+    assert "model/list" not in _methods(transcript)
     _wait_for_exit(pid_path)
 
 

@@ -100,7 +100,7 @@ describe("shared model picker authority", () => {
       .toEqual([
         ["available", "可供此任務使用", ["ready"]],
         ["visible_disabled", "此登入可見", ["disabled"]],
-        ["advanced", "進階／未驗證", ["advanced"]],
+        ["advanced", "其他模型", ["advanced"]],
         ["current", "目前路由", ["route"]],
       ]);
     expect(groups.flatMap((group) => group.entries).map((item) => ({
@@ -117,9 +117,28 @@ describe("shared model picker authority", () => {
       .toEqual([
         "Available for this task",
         "Visible to this sign-in",
-        "Advanced / unverified",
+        "Other models",
         "Current route",
       ]);
+  });
+
+  it("places eligible seed-only defaults with available models without an unverified claim", () => {
+    const seed = entry("claude-sonnet-5", {
+      status: "seed",
+      visible_to_credential: null,
+      eligible: true,
+    });
+
+    const groups = groupedModelEntries(
+      [seed],
+      null,
+      commonT("zh-Hant"),
+      "seed_only",
+    );
+
+    expect(groups.find((group) => group.id === "available")?.entries.map((item) => item.id))
+      .toEqual(["claude-sonnet-5"]);
+    expect(groups.find((group) => group.id === "advanced")?.entries).toEqual([]);
   });
 
   it("keeps old-sidecar compatibility entries visibly unverified", () => {

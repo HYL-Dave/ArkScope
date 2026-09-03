@@ -8,6 +8,7 @@ that all route handlers share.
 from __future__ import annotations
 
 import hmac
+import logging
 import os
 import sqlite3
 import threading
@@ -17,6 +18,9 @@ from pathlib import Path
 
 from src.tools.data_access import DataAccessLayer
 from src.tools.registry import ToolRegistry, create_default_registry
+
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -415,12 +419,15 @@ class OAuthAccountSyncService:
                         plan_type=observed_plan,
                         observed_at=observation.observed_at,
                     )
-                    self.token_store.save(
-                        provider=provider,
-                        auth_mode=auth_mode,
-                        credential_id=credential_id,
-                        record=current,
-                    )
+                    try:
+                        self.token_store.save(
+                            provider=provider,
+                            auth_mode=auth_mode,
+                            credential_id=credential_id,
+                            record=current,
+                        )
+                    except Exception:  # noqa: BLE001 - plan metadata is diagnostic only
+                        logger.warning("ChatGPT plan diagnostic could not be stored")
                 snapshot = self.observation_store.record_account_snapshot(
                     credential_id=credential_id,
                     provider=provider,

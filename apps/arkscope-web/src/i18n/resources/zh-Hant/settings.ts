@@ -192,6 +192,7 @@ const settings = {
       seedOnly: "此通道無法線上列出模型。",
       neverDiscovered: "尚未探索此登入的模型",
       verifyAgain: "重新驗證列表",
+      sparkUsageHint: "已偵測到 Spark 額度；重新驗證模型清單後才能使用。",
     },
     credentials: {
       openProviders: "前往 Provider 登入與憑證",
@@ -200,6 +201,7 @@ const settings = {
     compatibility: {
       advanced: "進階",
       unverified: "未驗證",
+      notInLastModelList: "上次模型清單未包含",
       restartSidecar: "請重啟／更新 sidecar 後再執行模型測試。",
       unavailableReasons: "不可選：{{value}}",
     },
@@ -249,6 +251,7 @@ const settings = {
     metrics: {
       latency: "延遲 {{value}} ms",
       testedAt: "測試時間 {{timestamp}}",
+      modelListObservedAt: "上次列出模型：{{timestamp}}",
       verifiedAt: "驗證時間：{{timestamp}}",
       officialPricing: "查看官方價格",
     },

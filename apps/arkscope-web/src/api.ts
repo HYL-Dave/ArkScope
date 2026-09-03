@@ -132,6 +132,7 @@ export type ModelReasonCode =
   | "discovery_unavailable"
   | "missing_active_credential"
   | "model_auth_unverified"
+  | "model_entitlement_unverified"
   | "model_not_in_registry"
   | "model_not_visible"
   | "model_output_limit_unknown"
@@ -182,6 +183,11 @@ export interface EffectiveProviderSummary {
   // Additive for older sidecars that emitted effective providers before plan
   // admission was projected.
   plan_type?: string | null;
+  entitlement_hints?: Array<{
+    model_id: string;
+    source: "subscription_usage";
+    observed_at: string;
+  }>;
 }
 
 export interface EffectiveTaskModels {

@@ -15,7 +15,6 @@ from src.auth_drivers.codex_app_server_runtime import (
     CodexJsonlSession,
     run_authenticated_codex_operation,
 )
-from src.subscription_plan import normalize_subscription_plan
 
 
 SPARK_MODEL = "gpt-5.3-codex-spark"
@@ -23,6 +22,8 @@ _SPARK_EFFORTS = frozenset({"low", "medium", "high", "xhigh"})
 _MAX_REQUEST_BYTES = 2 * 1024 * 1024
 _MAX_STDOUT_BYTES = 16 * 1024 * 1024
 _MAX_STDERR_BYTES = 256 * 1024
+_MAX_MODEL_PAGES = 8
+_MAX_MODELS = 256
 _ALLOWED_NOTIFICATIONS = frozenset(
     {
         "item/agentMessage/delta",
@@ -146,18 +147,10 @@ def _require_identifier(value: Any) -> str:
     return value
 
 
-def _require_plan(value: Any) -> str:
-    normalized = normalize_subscription_plan(value)
-    if normalized is None:
-        raise _fail("subscription_plan_unverified")
-    if normalized != "pro":
-        raise _fail("subscription_plan_required")
-    return "pro"
-
-
-def _require_exact_model(models: dict[str, Any], model: str) -> None:
+def _model_page(models: Any) -> tuple[list[str], str | None]:
+    models = _require_mapping(models)
     rows = models.get("data")
-    if not isinstance(rows, list):
+    if not isinstance(rows, list) or len(rows) > 100:
         raise _fail("protocol_incompatible")
     discovered: list[str] = []
     for row in rows:
@@ -168,10 +161,43 @@ def _require_exact_model(models: dict[str, Any], model: str) -> None:
             raise _fail("protocol_incompatible")
         discovered.append(value)
     cursor = models.get("nextCursor")
-    if cursor is not None and not isinstance(cursor, str):
+    if cursor is not None and (
+        not isinstance(cursor, str) or not cursor or len(cursor) > 512
+    ):
         raise _fail("protocol_incompatible")
-    if model not in discovered:
-        raise _fail("model_unavailable")
+    return discovered, cursor
+
+
+def _require_exact_model(
+    session: CodexJsonlSession,
+    model: str,
+) -> int:
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
+    seen_models: set[str] = set()
+    for page_index in range(_MAX_MODEL_PAGES):
+        request_id = 4 + page_index
+        models = session.request(
+            request_id,
+            "model/list",
+            {"cursor": cursor, "includeHidden": True, "limit": 100},
+        )
+        page, next_cursor = _model_page(models)
+        for discovered_model in page:
+            if discovered_model in seen_models:
+                raise _fail("protocol_incompatible")
+            seen_models.add(discovered_model)
+        if len(seen_models) > _MAX_MODELS:
+            raise _fail("protocol_incompatible")
+        if model in seen_models:
+            return request_id + 1
+        if next_cursor is None:
+            raise _fail("model_unavailable")
+        if next_cursor in seen_cursors:
+            raise _fail("protocol_incompatible")
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
+    raise _fail("protocol_incompatible")
 
 
 def _thread_identity(thread: Any, *, cwd: str) -> str:
@@ -290,19 +316,13 @@ def _run_turn(
     user: str,
     schema: dict[str, Any],
 ) -> dict[str, Any]:
-    _require_plan(context.plan_type)
-    models = session.request(
-        4,
-        "model/list",
-        {"cursor": None, "includeHidden": True, "limit": 100},
-    )
-    _require_exact_model(models, model)
+    next_request_id = _require_exact_model(session, model)
 
     cwd_path = context.codex_home / "translation-workspace"
     cwd_path.mkdir(mode=0o700)
     cwd = str(cwd_path)
     thread_result = session.request(
-        5,
+        next_request_id,
         "thread/start",
         {
             "allowProviderModelFallback": False,
@@ -330,7 +350,7 @@ def _run_turn(
         raise _fail("protocol_incompatible")
 
     turn_result = session.request(
-        6,
+        next_request_id + 1,
         "turn/start",
         {
             "effort": effort,
@@ -434,14 +454,8 @@ def run_codex_translation(
         raise _fail("structured_output_invalid")
     if not isinstance(schema, dict):
         raise _fail("structured_output_invalid")
-    stored_plan = normalize_subscription_plan(getattr(record, "plan_type", None))
-    if stored_plan is not None:
-        _require_plan(stored_plan)
-    elif plan_observer is None:
-        raise _fail("subscription_plan_unverified")
-
     def operation(session: CodexJsonlSession, context: CodexAuthenticatedContext):
-        if plan_observer is not None:
+        if plan_observer is not None and context.plan_type is not None:
             plan_observer(context.plan_type)
         return _run_turn(
             session,
@@ -469,6 +483,4 @@ def run_codex_translation(
     except CodexTranslationError:
         raise
     except CodexAppServerRuntimeError as exc:
-        if exc.code == "account_plan_unavailable":
-            raise _fail("subscription_plan_unverified") from None
         raise _fail(exc.code) from None

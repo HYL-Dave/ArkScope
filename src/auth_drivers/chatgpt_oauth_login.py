@@ -789,7 +789,7 @@ def persist_chatgpt_plan_observation(
         except Exception:
             raise ChatGPTOAuthLoginError(
                 "OAuth account plan could not be stored; retry later",
-                error_code="token_store_unavailable",
+                error_code="plan_observation_store_failed",
             ) from None
         return updated
 

@@ -1067,7 +1067,7 @@ def resolve_active_credential(
                     auth_mode=active.auth_type,
                     credential_id=active.id,
                 )
-            except Exception:  # noqa: BLE001 - missing plan must fail closed
+            except Exception:  # noqa: BLE001 - optional diagnostic only
                 logger.warning("active OAuth plan lookup failed", exc_info=True)
             else:
                 raw_plan = getattr(token_record, "plan_type", None)

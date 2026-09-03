@@ -79,6 +79,8 @@ def _task_route_tasks(model: str, *, plan_type: str | None = None) -> list[str]:
     capability = capability_for(model)
     if capability is None or capability.task_route_status != "current":
         return []
+    if capability.exact_model_id and model != capability.id:
+        return []
     return [
         task
         for task in ("card_synthesis", "card_translation", "ai_research")
@@ -383,13 +385,19 @@ class OpenAIChatGPTOAuthDriver:
             adapter = _subscription_catalog_adapter()
             if hasattr(adapter, "read_model_catalog_with_plan"):
                 catalog, observed_plan = adapter.read_model_catalog_with_plan(record=rec)
-                rec = persist_chatgpt_plan_observation(
-                    credential_id=self._credential_id,
-                    token_store=self._token_store,
-                    expected_record=rec,
-                    plan_type=observed_plan,
-                    observed_at=datetime.now(timezone.utc),
-                )
+                if observed_plan is not None:
+                    try:
+                        rec = persist_chatgpt_plan_observation(
+                            credential_id=self._credential_id,
+                            token_store=self._token_store,
+                            expected_record=rec,
+                            plan_type=observed_plan,
+                            observed_at=datetime.now(timezone.utc),
+                        )
+                    except ChatGPTOAuthLoginError as exc:
+                        if exc.error_code != "plan_observation_store_failed":
+                            raise
+                        logger.warning("ChatGPT plan diagnostic could not be stored")
             else:
                 catalog = adapter.read_model_catalog(record=rec)
         except Exception as exc:  # noqa: BLE001 — never raise discovery; degrade to seed

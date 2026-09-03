@@ -417,7 +417,7 @@ class CodexAccountUsageAdapter:
         credential_id: str,
         record,
         observed_at: str | datetime | None = None,
-    ) -> tuple[OAuthAccountObservation, str]:
+    ) -> tuple[OAuthAccountObservation, str | None]:
         def read(session: CodexJsonlSession):
             rate_limits_result = session.request(4, "account/rateLimits/read")
             usage_result = session.request(5, "account/usage/read")
@@ -461,7 +461,7 @@ class CodexAccountUsageAdapter:
 
     def read_model_catalog_with_plan(
         self, *, record
-    ) -> tuple[list[CodexSubscriptionModel], str]:
+    ) -> tuple[list[CodexSubscriptionModel], str | None]:
         def read(session: CodexJsonlSession) -> list[CodexSubscriptionModel]:
             cursor: str | None = None
             seen_cursors: set[str] = set()

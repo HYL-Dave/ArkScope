@@ -1,6 +1,7 @@
 """Effective picker tests (P2.7 Task 4): per-task verified/advanced partition."""
 
 import hashlib
+import json
 from dataclasses import replace
 
 import src.model_effective as model_effective_module
@@ -51,7 +52,7 @@ def test_fable_5_1_api_key_is_executable_but_oauth_is_not_live_verified():
         ) is False
 
 
-def test_spark_task_auth_executability_requires_pro_oauth_translation():
+def test_spark_task_auth_executability_uses_oauth_translation_not_plan_name():
     spark = capability_for("gpt-5.3-codex-spark")
 
     assert spark is not None
@@ -62,13 +63,14 @@ def test_spark_task_auth_executability_requires_pro_oauth_translation():
         spark,
         plan_type="pro",
     ) is True
-    assert task_auth_executable(
-        "card_translation",
-        "openai",
-        "chatgpt_oauth",
-        spark,
-        plan_type="plus",
-    ) is False
+    for diagnostic_plan in ("plus", "prolite", None):
+        assert task_auth_executable(
+            "card_translation",
+            "openai",
+            "chatgpt_oauth",
+            spark,
+            plan_type=diagnostic_plan,
+        ) is True
     assert task_auth_executable(
         "card_translation",
         "openai",
@@ -152,8 +154,12 @@ def test_new_registry_default_appears_as_seed_when_discovery_predates_it(tmp_pat
     assert entries["claude-opus-5"]["visible_to_credential"] is True
     assert entries["claude-fable-5-1"]["status"] == "seed"
     assert entries["claude-fable-5-1"]["visible_to_credential"] is None
+    assert entries["claude-fable-5-1"]["eligible"] is True
+    assert entries["claude-fable-5-1"]["reason_code"] is None
     assert entries["claude-sonnet-5"]["status"] == "seed"
     assert entries["claude-sonnet-5"]["visible_to_credential"] is None
+    assert entries["claude-sonnet-5"]["eligible"] is True
+    assert entries["claude-sonnet-5"]["reason_code"] is None
 
 
 def test_discovered_real_id_still_wins_over_the_seed_entry(tmp_path):
@@ -205,6 +211,26 @@ def test_registry_seed_does_not_claim_advanced_exact_model_entitlement(tmp_path)
     assert spark["status"] == "advanced"
     assert spark["visible_to_credential"] is False
     assert spark["eligible"] is False
+    assert spark["reason_code"] == "model_not_visible"
+
+
+def test_exact_model_requires_a_successful_discovery_scope(tmp_path):
+    view = effective_model_view_v2(
+        cache=ModelDiscoveryCache(tmp_path / "profile_state.db"),
+        routes=_routes_mixed(),
+        credentials={
+            "openai": ActiveCredential(
+                "openai", "o1", "chatgpt_oauth", "oauth", "prolite"
+            ),
+            "anthropic": None,
+        },
+    )
+
+    entries = view["tasks"]["card_translation"]["providers"]["openai"]["models"]
+    spark = next(entry for entry in entries if entry["id"] == "gpt-5.3-codex-spark")
+    assert spark["visible_to_credential"] is None
+    assert spark["eligible"] is False
+    assert spark["reason_code"] == "model_entitlement_unverified"
 
 
 def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
@@ -384,7 +410,7 @@ def test_resolver_reads_oauth_plan_from_token_store_not_display_alias(
     assert credential.plan_type == "plus"
 
 
-def test_spark_effective_view_distinguishes_pro_plus_and_wrong_tasks(tmp_path):
+def test_spark_effective_view_uses_exact_discovery_not_plan_name(tmp_path):
     cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
     cache.record_run(
         provider="openai",
@@ -435,15 +461,11 @@ def test_spark_effective_view_distinguishes_pro_plus_and_wrong_tasks(tmp_path):
             if entry["id"] == "gpt-5.3-codex-spark"
         )
 
-    pro = spark_entry("pro")
-    assert pro["visible_to_credential"] is True
-    assert pro["eligible"] is True
-    assert pro["reason_code"] is None
-
-    plus = spark_entry("plus")
-    assert plus["visible_to_credential"] is True
-    assert plus["eligible"] is False
-    assert plus["reason_code"] == "subscription_plan_required"
+    for diagnostic_plan in ("pro", "prolite", "plus", None):
+        spark = spark_entry(diagnostic_plan)
+        assert spark["visible_to_credential"] is True
+        assert spark["eligible"] is True
+        assert spark["reason_code"] is None
 
 
 def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_path):
@@ -461,6 +483,91 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     block = out["effective"]["tasks"]["ai_research"]
     assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
+
+
+def test_model_catalog_exposes_only_a_closed_spark_usage_hint(monkeypatch, tmp_path):
+    from src.api.routes import config_routes as cr
+    from src.auth_drivers import PlaintextTokenStore, StoredTokenRecord
+    from src.auth_drivers.oauth_status import (
+        OAuthAccountObservation,
+        OAuthAccountPayload,
+        OAuthObservationStore,
+        OAuthRateLimitSnapshot,
+        OAuthUsageSummary,
+    )
+    from src.model_credentials import CredentialStore
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEYS", raising=False)
+    store = CredentialStore(tmp_path / "profile_state.db")
+    row = store.add_oauth_credential(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        alias="ChatGPT subscription",
+    )
+    credential_id = f"local:{row.id}"
+    token_store = PlaintextTokenStore(tmp_path / "tokens.json")
+    token_store.save(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id=credential_id,
+        record=StoredTokenRecord(
+            access_token="fixture-secret-token",
+            plan_type="prolite",
+        ),
+    )
+    observation_store = OAuthObservationStore(store.db_path)
+    observation_store.record_account_snapshot(
+        credential_id=credential_id,
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        observation=OAuthAccountObservation(
+            account_fingerprint="f" * 64,
+            source="codex_app_server",
+            observed_at="2026-09-03T01:02:03+00:00",
+            payload=OAuthAccountPayload(
+                rate_limits=OAuthRateLimitSnapshot(
+                    limit_id="codex",
+                    plan_type="prolite",
+                ),
+                rate_limits_by_limit_id={
+                    "opaque-provider-limit-id": OAuthRateLimitSnapshot(
+                        limit_id="opaque-provider-limit-id",
+                        limit_name="GPT-5.3-Codex-Spark",
+                        plan_type="prolite",
+                    ),
+                },
+                usage_summary=OAuthUsageSummary(),
+            ),
+        ),
+    )
+
+    out = cr.model_catalog(
+        store=store,
+        token_store=token_store,
+        observation_store=observation_store,
+    )
+
+    assert out["effective"]["providers"]["openai"]["entitlement_hints"] == [
+        {
+            "model_id": "gpt-5.3-codex-spark",
+            "source": "subscription_usage",
+            "observed_at": "2026-09-03T01:02:03+00:00",
+        }
+    ]
+    spark = next(
+        entry
+        for entry in out["effective"]["tasks"]["card_translation"]["providers"][
+            "openai"
+        ]["models"]
+        if entry["id"] == "gpt-5.3-codex-spark"
+    )
+    assert spark["eligible"] is False
+    assert spark["reason_code"] == "model_entitlement_unverified"
+    rendered = json.dumps(out, sort_keys=True)
+    assert "fixture-secret-token" not in rendered
+    assert "opaque-provider-limit-id" not in rendered
+    assert "f" * 64 not in rendered
 
 
 def test_resolver_pool_identity_and_fingerprint_match_discovery(monkeypatch, tmp_path):

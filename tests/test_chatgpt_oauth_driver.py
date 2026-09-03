@@ -233,17 +233,38 @@ def test_discover_uses_app_server_catalog_and_keeps_subscription_only_model_meta
     assert spark.task_route_tasks == ["card_translation"]
 
 
-def test_spark_discovery_does_not_advertise_tasks_without_pro_plan(monkeypatch):
+@pytest.mark.parametrize("plan_type", ["pro", "prolite", "plus", None])
+def test_spark_discovery_advertises_translation_from_exact_model_not_plan_name(
+    monkeypatch,
+    plan_type,
+):
     _install_catalog(monkeypatch, models=(_catalog_model("gpt-5.3-codex-spark"),))
     monkeypatch.setattr(
         mod,
         "_refresh_login",
-        lambda **_: StoredTokenRecord(access_token="cg-FRESH", plan_type="plus"),
+        lambda **_: StoredTokenRecord(access_token="cg-FRESH", plan_type=plan_type),
     )
 
     result = _run(_driver().discover_models())
 
     assert result.status == "ok"
+    assert result.models[0].task_route_tasks == ["card_translation"]
+
+
+def test_spark_discovery_does_not_advertise_a_case_variant_as_the_exact_model(
+    monkeypatch,
+):
+    _install_catalog(monkeypatch, models=(_catalog_model("GPT-5.3-CODEX-SPARK"),))
+    monkeypatch.setattr(
+        mod,
+        "_refresh_login",
+        lambda **_: StoredTokenRecord(access_token="cg-FRESH", plan_type="prolite"),
+    )
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "ok"
+    assert result.models[0].id == "GPT-5.3-CODEX-SPARK"
     assert result.models[0].task_route_tasks == []
 
 
@@ -301,6 +322,76 @@ def test_discovery_persists_live_plan_without_changing_token_material(
     assert token_store.record.access_token == original.access_token
     assert token_store.record.refresh_token == original.refresh_token
     assert token_store.record.metadata == original.metadata
+
+
+def test_discovery_keeps_exact_catalog_when_plan_diagnostic_save_fails(
+    monkeypatch,
+):
+    original = StoredTokenRecord(access_token="cg-ORIGINAL", plan_type=None)
+
+    class CatalogAdapter:
+        def read_model_catalog_with_plan(self, *, record):
+            assert record is original
+            return [_catalog_model("gpt-5.3-codex-spark")], "prolite"
+
+    def fail_diagnostic_write(**_kwargs):
+        raise ChatGPTOAuthLoginError(
+            "diagnostic write failed",
+            error_code="plan_observation_store_failed",
+        )
+
+    monkeypatch.setattr(mod, "_refresh_login", lambda **_: original)
+    monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter)
+    monkeypatch.setattr(mod, "persist_chatgpt_plan_observation", fail_diagnostic_write)
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "ok"
+    assert result.models[0].id == "gpt-5.3-codex-spark"
+    assert result.models[0].task_route_tasks == ["card_translation"]
+
+
+def test_discovery_rejects_catalog_when_token_generation_changed(monkeypatch):
+    original = StoredTokenRecord(access_token="cg-ORIGINAL", plan_type=None)
+
+    class CatalogAdapter:
+        def read_model_catalog_with_plan(self, *, record):
+            assert record is original
+            return [_catalog_model("gpt-5.3-codex-spark")], "prolite"
+
+    def reject_stale_generation(**_kwargs):
+        raise ChatGPTOAuthLoginError(
+            "credential changed",
+            error_code="credential_changed_during_sync",
+        )
+
+    monkeypatch.setattr(mod, "_refresh_login", lambda **_: original)
+    monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter)
+    monkeypatch.setattr(mod, "persist_chatgpt_plan_observation", reject_stale_generation)
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "error"
+    assert all(model.id != "gpt-5.3-codex-spark" for model in result.models)
+
+
+def test_discovery_accepts_exact_catalog_when_live_plan_is_absent(
+    monkeypatch,
+):
+    original = StoredTokenRecord(access_token="cg-ORIGINAL", plan_type=None)
+
+    class CatalogAdapter:
+        def read_model_catalog_with_plan(self, *, record):
+            assert record is original
+            return [_catalog_model("gpt-5.3-codex-spark")], None
+
+    monkeypatch.setattr(mod, "_refresh_login", lambda **_: original)
+    monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter)
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "ok"
+    assert result.models[0].task_route_tasks == ["card_translation"]
 
 
 def test_discover_keeps_reviewed_current_models_available_to_existing_task_routes(monkeypatch):

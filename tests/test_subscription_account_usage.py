@@ -446,6 +446,74 @@ def test_account_sync_redetermines_and_persists_live_plan_without_relogin(tmp_pa
     _wait_for_process_exit(int(pid_path.read_text()))
 
 
+def test_account_sync_keeps_usage_available_when_live_plan_is_absent(tmp_path):
+    from dataclasses import replace
+
+    from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    stored = replace(_token_record(), plan_type=None, account_label="ChatGPT subscription")
+    token_store = _TokenStore(stored)
+    executable, transcript, pid_path = _write_codex_fixture(tmp_path, live_plan=None)
+    service = OAuthAccountSyncService(
+        observation_store=OAuthObservationStore(tmp_path / "profile.db"),
+        token_store=token_store,
+        adapter=CodexAccountUsageAdapter(executable=executable, timeout_seconds=2.0),
+    )
+
+    result = service.sync(
+        credential_id="local:1",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+    )
+
+    assert result.sync_status == "succeeded"
+    assert result.snapshot is not None
+    assert token_store.record == stored
+    assert [
+        json.loads(line)["method"] for line in transcript.read_text().splitlines()
+    ].count("account/read") == 1
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
+def test_account_sync_keeps_usage_when_plan_diagnostic_save_fails(tmp_path):
+    from src.api.dependencies import OAuthAccountSyncService
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    stored = _token_record()
+
+    class DiagnosticWriteFailureStore(_TokenStore):
+        def save(self, **_kwargs):
+            raise OSError("fixture diagnostic store failure")
+
+    token_store = DiagnosticWriteFailureStore(stored)
+    executable, transcript, pid_path = _write_codex_fixture(
+        tmp_path,
+        live_plan="prolite",
+    )
+    service = OAuthAccountSyncService(
+        observation_store=OAuthObservationStore(tmp_path / "profile.db"),
+        token_store=token_store,
+        adapter=CodexAccountUsageAdapter(executable=executable, timeout_seconds=2.0),
+    )
+
+    result = service.sync(
+        credential_id="local:1",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+    )
+
+    assert result.sync_status == "succeeded"
+    assert result.snapshot is not None
+    assert token_store.record is stored
+    assert [
+        json.loads(line)["method"] for line in transcript.read_text().splitlines()
+    ].count("account/read") == 1
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
 def test_codex_model_catalog_preserves_provider_model_and_effort_contract(tmp_path):
     from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
 

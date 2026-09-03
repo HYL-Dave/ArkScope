@@ -49,6 +49,7 @@ export function modelReasonLabel(id: string, t: ModelCommonT): string {
     case "task_auth_mode_unsupported": return t(($) => $.models.reasons.taskAuthModeUnsupported);
     case "task_test_unsupported": return t(($) => $.models.reasons.taskTestUnsupported);
     case "model_auth_unverified": return t(($) => $.models.reasons.modelAuthUnverified);
+    case "model_entitlement_unverified": return t(($) => $.models.reasons.modelEntitlementUnverified);
     case "task_capability_missing": return t(($) => $.models.reasons.taskCapabilityMissing);
     case "model_not_visible": return t(($) => $.models.reasons.modelNotVisible);
     case "model_not_in_registry": return t(($) => $.models.reasons.modelNotInRegistry);

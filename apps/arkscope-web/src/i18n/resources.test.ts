@@ -725,9 +725,9 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 74,
+      common: 75,
       shell: 37,
-      settings: 845,
+      settings: 848,
       research: 207,
       explore: 844,
       portfolio: 374,
@@ -798,7 +798,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2405);
+      expect(total, `${locale}.total`).toBe(2409);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1031,12 +1031,13 @@ describe("bundled i18n resources", () => {
         groups: {
           available: "可供此任務使用",
           visibleDisabled: "此登入可見",
-          advanced: "進階／未驗證",
+          advanced: "其他模型",
           current: "目前路由",
         },
         reasons: {
           missingActiveCredential: "尚未設定此 provider 的登入",
-          modelAuthUnverified: "此登入尚未實際驗證此模型；請改用 API key 或選擇其他模型",
+          modelAuthUnverified: "Claude OAuth 尚未開放；需經受控 live 驗證與版本更新",
+          modelEntitlementUnverified: "尚未確認此登入可用此模型；請重新驗證模型清單",
           taskAuthModeUnsupported: "此登入方式不支援這個任務",
           taskTestUnsupported: "此登入方式尚不支援實際測試",
           taskCapabilityMissing: "缺少任務能力",
@@ -1080,12 +1081,13 @@ describe("bundled i18n resources", () => {
         groups: {
           available: "Available for this task",
           visibleDisabled: "Visible to this sign-in",
-          advanced: "Advanced / unverified",
+          advanced: "Other models",
           current: "Current route",
         },
         reasons: {
           missingActiveCredential: "No sign-in is configured for this provider",
-          modelAuthUnverified: "This model has not been live-verified for this sign-in. Use an API key or choose another model",
+          modelAuthUnverified: "Claude OAuth is not enabled; controlled live validation and a version update are required",
+          modelEntitlementUnverified: "This model is not yet confirmed for this sign-in. Verify the model list again",
           taskAuthModeUnsupported: "This sign-in method does not support the task",
           taskTestUnsupported: "This sign-in method does not yet support live testing",
           taskCapabilityMissing: "Task capability is missing",
@@ -1155,7 +1157,7 @@ describe("bundled i18n resources", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toEqual(expectedModels[locale]);
-      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(37);
+      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(38);
       const settings = flattenResource(resources[locale].settings as ResourceTree);
       for (const path of removedSettingsPaths) {
         expect.soft(settings.has(path), `${locale}.settings.${path}`).toBe(false);
@@ -1167,6 +1169,7 @@ describe("bundled i18n resources", () => {
     const postSliceCommonModelPaths = [
       "reasons.modelRetired",
       "reasons.subscriptionPlanUnverified",
+      "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
       "workspace.routes.effortRequired",
@@ -1174,7 +1177,10 @@ describe("bundled i18n resources", () => {
       "models.route.effortRequired",
       "models.route.modelRetired",
       "models.catalog.selectEffort",
+      "models.catalog.sparkUsageHint",
       "models.credentials.plan",
+      "models.compatibility.notInLastModelList",
+      "models.metrics.modelListObservedAt",
       "models.metrics.officialPricing",
       "actions.refreshStatus",
       "dataStorage.coverage.generatedAt",

@@ -1,8 +1,8 @@
 # Claude Fable 5.1 Cutover Specification
 
-> **Status:** User-approved on 2026-09-02. API-key live canary is authorized;
-> Claude OAuth live verification is explicitly deferred because the current
-> subscription does not expose Claude Fable 5.1.
+> **Status:** User-approved on 2026-09-02. The API-key live canary is GREEN;
+> Claude OAuth remains a reviewed release-policy block until a separately
+> authorized controlled canary succeeds and the reviewed version is updated.
 
 ## Product Decision
 
@@ -18,14 +18,16 @@
 
 ## Authentication Boundary
 
-- The Anthropic API-key path is eligible for Fable 5.1 and will receive a
-  bounded live canary after all offline gates pass.
-- The current Claude OAuth subscription does not expose Fable 5.1. ArkScope
-  must label this exact model/authentication pair as not live-verified and
-  reject it before a provider call. This is not a permanent provider-wide
-  incompatibility claim.
+- The Anthropic API-key path is eligible for Fable 5.1 and passed its bounded
+  two-call live canary on 2026-09-02.
+- Claude OAuth does not provide an online model-list authority. ArkScope must
+  label this exact model/authentication pair as a release-policy block and
+  reject it before route persistence or a provider call. Seed-only discovery
+  cannot clear it; the API-key route remains independently eligible.
 - A future subscription upgrade does not require an architectural rewrite. A
-  successful OAuth canary can remove the model/authentication admission block.
+  separately authorized successful OAuth canary plus an explicit reviewed
+  registry/version update can remove the model/authentication admission block;
+  routine use, re-login, or Settings discovery cannot remove it automatically.
 - No OAuth live call is authorized in this slice and no OAuth support may be
   claimed from seed-only discovery.
 

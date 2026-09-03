@@ -43,7 +43,7 @@ def _fail(code: str = "protocol_incompatible") -> CodexAppServerRuntimeError:
 @dataclass(frozen=True)
 class CodexAuthenticatedContext:
     account_id: str
-    plan_type: str
+    plan_type: str | None
     codex_home: Path
 
 
@@ -573,9 +573,13 @@ def run_authenticated_codex_operation(
             account = account_result.get("account")
             if not isinstance(account, dict) or account.get("type") != "chatgpt":
                 raise _fail("account_mismatch")
-            plan_type = account.get("planType")
-            if not isinstance(plan_type, str) or not plan_type.strip() or len(plan_type) > 80:
-                raise _fail("account_plan_unavailable")
+            raw_plan_type = account.get("planType")
+            if raw_plan_type is None:
+                plan_type = None
+            elif isinstance(raw_plan_type, str) and len(raw_plan_type) <= 80:
+                plan_type = raw_plan_type.strip().lower() or None
+            else:
+                raise _fail()
             email = account.get("email")
             if email is not None and (
                 not isinstance(email, str) or not email or len(email) > 320
@@ -585,7 +589,7 @@ def run_authenticated_codex_operation(
                 raise _fail()
             context = CodexAuthenticatedContext(
                 account_id=account_id,
-                plan_type=plan_type.strip().lower(),
+                plan_type=plan_type,
                 codex_home=codex_home,
             )
             return context, operation(session, context)

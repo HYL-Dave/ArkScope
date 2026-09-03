@@ -781,6 +781,7 @@ export function ResearchView({
     selectedProviderChoice?.block?.models ?? [],
     selectedProviderReason,
     commonT,
+    selectedProviderChoice?.block?.cache_state,
   ).map((group) => ({
     ...group,
     entries: group.entries.filter((entry) => (
