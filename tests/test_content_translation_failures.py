@@ -104,7 +104,27 @@ def test_translation_failure_codes_are_the_exact_closed_vocabulary():
             "translation_model_unavailable",
             "translation_timeout",
             "translation_output_invalid",
+            "translation_context_window_exceeded",
+            "translation_protocol_resource_exhausted",
             "translation_provider_error",
             "evidence_changed",
         }
     )
+
+
+@pytest.mark.parametrize(
+    ("adapter_code", "expected_code"),
+    [
+        ("context_window_exceeded", "translation_context_window_exceeded"),
+        ("protocol_resource_exhausted", "translation_protocol_resource_exhausted"),
+    ],
+)
+def test_spark_capacity_failures_remain_distinct(adapter_code, expected_code):
+    from src.content_translation_failures import classify_content_translation_failure
+
+    failure = classify_content_translation_failure(
+        SubscriptionStructuredOutputError(adapter_code, "secret-value")
+    )
+
+    assert failure.code == expected_code
+    assert failure.retryable is False

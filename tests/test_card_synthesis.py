@@ -1128,3 +1128,60 @@ def test_subscription_sdk_timeout_cause_is_typed(monkeypatch, provider):
         )
 
     assert caught.value.effective_seconds == 123.0
+
+
+def test_shared_text_translation_has_no_legacy_16000_character_boundary(monkeypatch):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    source = "s" * 16_001
+    translated = "t" * 16_001
+    monkeypatch.setattr(cs, "ensure_env_loaded", lambda: None)
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: TaskRoute(
+            task="card_translation",
+            provider="openai",
+            model="gpt-5.6-luna",
+            effort="medium",
+            source="db",
+        ),
+    )
+    monkeypatch.setattr(
+        cs,
+        "_translate_openai",
+        lambda *_args, **_kwargs: {"translated_text": translated},
+    )
+    monkeypatch.setattr(cs, "translation_harness", lambda _provider: "fake")
+
+    result = cs.translate_text(source, lang="zh-Hant", model_timeout_s=30.0)
+
+    assert result["translated_text"] == translated
+
+
+def test_spark_text_translation_reports_codex_app_server_harness(monkeypatch):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    monkeypatch.setattr(cs, "ensure_env_loaded", lambda: None)
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: TaskRoute(
+            task="card_translation",
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            effort="medium",
+            source="db",
+        ),
+    )
+    monkeypatch.setattr(
+        cs,
+        "_translate_openai",
+        lambda *_args, **_kwargs: {"translated_text": "譯文"},
+    )
+
+    result = cs.translate_text("source", lang="zh-Hant", model_timeout_s=30.0)
+
+    assert result["harness"] == "codex_app_server"

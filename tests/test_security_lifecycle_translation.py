@@ -346,3 +346,23 @@ def test_translation_rejects_unsupported_locale_and_malformed_output():
         ).fetchone()[0] == 0
     finally:
         conn.close()
+
+
+def test_lifecycle_persistence_keeps_its_16000_character_boundary():
+    from src.security_lifecycle_translation import (
+        EvidenceTranslationFailure,
+        EvidenceTranslationResult,
+        _validated_result,
+    )
+
+    with pytest.raises(EvidenceTranslationFailure) as exc_info:
+        _validated_result(
+            EvidenceTranslationResult(
+                translated_text="x" * 16_001,
+                provider="openai",
+                model="gpt-5.3-codex-spark",
+                harness="codex_app_server",
+            )
+        )
+
+    assert exc_info.value.code == "translation_output_invalid"

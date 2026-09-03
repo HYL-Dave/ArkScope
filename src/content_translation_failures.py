@@ -21,6 +21,8 @@ TRANSLATION_FAILURE_CODES = frozenset(
         "translation_model_unavailable",
         "translation_timeout",
         "translation_output_invalid",
+        "translation_context_window_exceeded",
+        "translation_protocol_resource_exhausted",
         "translation_provider_error",
         "evidence_changed",
     }
@@ -53,6 +55,14 @@ def classify_content_translation_failure(
             return ContentTranslationFailure("translation_auth_rejected", False)
         if exc.code in {"insufficient_quota", "usage_limit_reached"}:
             return ContentTranslationFailure("translation_quota_exhausted", False)
+        if exc.code == "context_window_exceeded":
+            return ContentTranslationFailure(
+                "translation_context_window_exceeded", False
+            )
+        if exc.code == "protocol_resource_exhausted":
+            return ContentTranslationFailure(
+                "translation_protocol_resource_exhausted", False
+            )
 
     status = getattr(exc, "status_code", None)
     if status in {401, 403}:
