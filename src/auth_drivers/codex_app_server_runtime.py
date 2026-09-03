@@ -15,7 +15,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Mapping, TypeVar
 
 
 ALLOWED_CODEX_APP_SERVER_VERSIONS = frozenset({"0.147.0", "0.151.0"})
@@ -26,6 +26,44 @@ _DEFAULT_MAX_REQUEST_BYTES = 64 * 1024
 _DEFAULT_MAX_STDOUT_BYTES = 256 * 1024
 _DEFAULT_MAX_STDERR_BYTES = 64 * 1024
 _T = TypeVar("_T")
+
+_CLOSED_CONFIG_ITEMS: tuple[tuple[str, bool | str], ...] = (
+    ("agents.enabled", False),
+    ("features.apps", False),
+    ("features.auth_elicitation", False),
+    ("features.browser_use", False),
+    ("features.browser_use_external", False),
+    ("features.browser_use_full_cdp_access", False),
+    ("features.code_mode", False),
+    ("features.code_mode_host", False),
+    ("features.computer_use", False),
+    ("features.enable_mcp_apps", False),
+    ("features.hooks", False),
+    ("features.image_generation", False),
+    ("features.in_app_browser", False),
+    ("features.multi_agent", False),
+    ("features.multi_agent_v2", False),
+    ("features.plugin_sharing", False),
+    ("features.plugins", False),
+    ("features.remote_plugin", False),
+    ("features.shell_tool", False),
+    ("features.skill_mcp_dependency_install", False),
+    ("features.skill_search", False),
+    ("features.standalone_web_search", False),
+    ("features.tool_call_mcp_elicitation", False),
+    ("features.tool_suggest", False),
+    ("features.unified_exec", False),
+    ("features.view_image", False),
+    ("features.web_search_cached", False),
+    ("features.web_search_request", False),
+    ("include_apps_instructions", False),
+    ("include_collaboration_mode_instructions", False),
+    ("include_environment_context", False),
+    ("include_permissions_instructions", False),
+    ("tools.experimental_request_user_input.enabled", False),
+    ("tools.update_plan.enabled", False),
+    ("web_search", "disabled"),
+)
 
 
 class CodexAppServerRuntimeError(RuntimeError):
@@ -38,6 +76,25 @@ class CodexAppServerRuntimeError(RuntimeError):
 
 def _fail(code: str = "protocol_incompatible") -> CodexAppServerRuntimeError:
     return CodexAppServerRuntimeError(code)
+
+
+def closed_codex_config_overrides() -> dict[str, bool | str]:
+    """Return the reviewed no-tool app-server configuration."""
+    return dict(_CLOSED_CONFIG_ITEMS)
+
+
+def _config_cli_value(value: bool | str) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return json.dumps(value, ensure_ascii=True)
+
+
+def _app_server_command(runtime: CodexAppServerRuntime) -> list[str]:
+    command = [str(runtime.launcher)]
+    for key, value in _CLOSED_CONFIG_ITEMS:
+        command.extend(("-c", f"{key}={_config_cli_value(value)}"))
+    command.extend(("app-server", "--strict-config", "--stdio"))
+    return command
 
 
 @dataclass(frozen=True)
@@ -315,6 +372,7 @@ class CodexJsonlSession:
         *,
         deadline: float,
         allowed_notifications: frozenset[str],
+        rejected_notifications: Mapping[str, str] | None,
         max_request_bytes: int,
         max_stdout_bytes: int,
         max_stderr_bytes: int,
@@ -327,6 +385,7 @@ class CodexJsonlSession:
         self.stderr = process.stderr
         self.deadline = deadline
         self.allowed_notifications = allowed_notifications
+        self.rejected_notifications = dict(rejected_notifications or {})
         self.max_request_bytes = max_request_bytes
         self.max_stdout_bytes = max_stdout_bytes
         self.max_stderr_bytes = max_stderr_bytes
@@ -437,7 +496,12 @@ class CodexJsonlSession:
             return message
         if not isinstance(method, str):
             raise _fail()
-        if "id" in message or method not in self.allowed_notifications:
+        if "id" in message:
+            raise _fail()
+        rejected_code = self.rejected_notifications.get(method)
+        if rejected_code is not None:
+            raise _fail(rejected_code)
+        if method not in self.allowed_notifications:
             raise _fail()
         if not isinstance(message.get("params", {}), dict):
             raise _fail()
@@ -485,6 +549,7 @@ def run_authenticated_codex_operation(
     timeout_seconds: float,
     executable: str | Path | None,
     allowed_notifications: frozenset[str],
+    rejected_notifications: Mapping[str, str] | None = None,
     operation: Callable[[CodexJsonlSession, CodexAuthenticatedContext], _T],
     max_request_bytes: int = _DEFAULT_MAX_REQUEST_BYTES,
     max_stdout_bytes: int = _DEFAULT_MAX_STDOUT_BYTES,
@@ -522,7 +587,7 @@ def run_authenticated_codex_operation(
         _verify_version(runtime, environment, deadline)
         try:
             process = subprocess.Popen(
-                [str(runtime.launcher), "app-server", "--stdio"],
+                _app_server_command(runtime),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -538,6 +603,7 @@ def run_authenticated_codex_operation(
                 process,
                 deadline=deadline,
                 allowed_notifications=allowed_notifications,
+                rejected_notifications=rejected_notifications,
                 max_request_bytes=runtime.max_request_bytes,
                 max_stdout_bytes=runtime.max_stdout_bytes,
                 max_stderr_bytes=runtime.max_stderr_bytes,

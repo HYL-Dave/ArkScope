@@ -44,6 +44,7 @@ def _write_fixture(tmp_path: Path, **overrides) -> tuple[Path, Path, Path]:
         "models": [_MODEL],
         "model_pages": None,
         "thread_mutation": None,
+        "mcp_startup_status": None,
         "item_type": None,
         "server_request": False,
         "wrong_thread": False,
@@ -161,6 +162,17 @@ for raw in sys.stdin:
         elif mutation == "sandbox":
             result["sandbox"] = {"type": "workspaceWrite", "networkAccess": False, "writableRoots": []}
         emit({"method": "thread/started", "params": {"thread": thread}})
+        if SCENARIO["mcp_startup_status"]:
+            emit({
+                "method": "mcpServer/startupStatus/updated",
+                "params": {
+                    "threadId": "thread-1",
+                    "name": "codex_apps",
+                    "status": SCENARIO["mcp_startup_status"],
+                    "error": None,
+                    "failureReason": None,
+                },
+            })
         emit({"id": request_id, "result": result})
     elif method == "turn/start":
         turn_id = "turn-1"
@@ -385,6 +397,43 @@ def test_translation_runs_one_exact_isolated_thread_and_turn(tmp_path):
     assert thread["runtimeWorkspaceRoots"] == []
     assert thread["selectedCapabilityRoots"] == []
     assert thread["allowProviderModelFallback"] is False
+    assert thread["config"] == {
+        "agents.enabled": False,
+        "features.apps": False,
+        "features.auth_elicitation": False,
+        "features.browser_use": False,
+        "features.browser_use_external": False,
+        "features.browser_use_full_cdp_access": False,
+        "features.code_mode": False,
+        "features.code_mode_host": False,
+        "features.computer_use": False,
+        "features.enable_mcp_apps": False,
+        "features.hooks": False,
+        "features.image_generation": False,
+        "features.in_app_browser": False,
+        "features.multi_agent": False,
+        "features.multi_agent_v2": False,
+        "features.plugin_sharing": False,
+        "features.plugins": False,
+        "features.remote_plugin": False,
+        "features.shell_tool": False,
+        "features.skill_mcp_dependency_install": False,
+        "features.skill_search": False,
+        "features.standalone_web_search": False,
+        "features.tool_call_mcp_elicitation": False,
+        "features.tool_suggest": False,
+        "features.unified_exec": False,
+        "features.view_image": False,
+        "features.web_search_cached": False,
+        "features.web_search_request": False,
+        "include_apps_instructions": False,
+        "include_collaboration_mode_instructions": False,
+        "include_environment_context": False,
+        "include_permissions_instructions": False,
+        "tools.experimental_request_user_input.enabled": False,
+        "tools.update_plan.enabled": False,
+        "web_search": "disabled",
+    }
     cwd = Path(thread["cwd"])
     assert not cwd.exists()
     turn = next(row["params"] for row in rows if row["method"] == "turn/start")
@@ -393,6 +442,18 @@ def test_translation_runs_one_exact_isolated_thread_and_turn(tmp_path):
     assert turn["input"] == [{"type": "text", "text": "Revenue grew 12%."}]
     assert turn["outputSchema"] == _SCHEMA
     assert turn["sandboxPolicy"] == {"type": "readOnly", "networkAccess": False}
+    _wait_for_exit(pid_path)
+
+
+def test_mcp_startup_is_rejected_before_translation_turn(tmp_path):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        mcp_startup_status="starting",
+    )
+
+    _assert_error(executable, "unexpected_tool_activity")
+
+    assert "turn/start" not in _methods(transcript)
     _wait_for_exit(pid_path)
 
 
