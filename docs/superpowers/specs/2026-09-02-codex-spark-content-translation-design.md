@@ -1,7 +1,7 @@
 # Codex Spark Content Translation Design
 
-**Status:** Product direction approved 2026-09-02; revised 2026-09-03 after
-input-bound and bundled-runtime rulings; written-spec review pending
+**Status:** Approved for implementation 2026-09-03 after input-bound,
+bundled-runtime, entitlement, and code-execution-convergence rulings
 
 ## Goal
 
@@ -112,8 +112,8 @@ default. The following eager consumers must be updated together:
 - `src/agents/anthropic_agent/agent.py` must apply the same closed behavior to
   `_MODEL_MAX_OUTPUT` and `_get_model_max_output`, even though Spark itself is
   OpenAI-only;
-- `src/tools/code_generator.py` and `src/agents/shared/subagent.py` must retain
-  their existing execution-admission check before any output-limit lookup;
+- `src/agents/shared/subagent.py` and every remaining generic execution seam
+  must retain its execution-admission check before any output-limit lookup;
 - direct helper tests must prove that a known unknown value never enters token
   arithmetic or provider parameters.
 
@@ -202,13 +202,11 @@ external `codex` from `PATH`. This preserves packageability without requiring a
 separately installed Codex CLI and matches the bundled-only admission standard
 used by the Claude execution runtime.
 
-The existing `src/tools/code_generator.py` Codex backend is part of this
-repository-wide executable ruling even though it uses `codex exec` rather than
-the app-server protocol. Before Spark execution is admitted, its
-`shutil.which("codex")` and literal `"codex"` launch must move to the same
-bundled-path and reviewed-version authority. Its task behavior and credential
-policy do not otherwise change in this slice. Explicit executable injection may
-remain as a test seam; it is not an operator-facing PATH override.
+The approved code-execution-convergence slice removed the old
+`src/tools/code_generator.py` Codex backend and its external-CLI/API fallback.
+Spark must not recreate that path. Explicit executable injection may remain as
+a test seam in the shared app-server runtime; it is not an operator-facing PATH
+override.
 
 Account-usage response parsing remains separate from translation event parsing.
 The refactor must preserve all existing account-usage tests and behavior.
@@ -261,8 +259,9 @@ the process on any:
   excess, duplicate final message, missing final message, or non-completed turn.
 
 The final message must be a bare JSON object matching `outputSchema`. It is
-parsed and returned to the existing translation validator. Markdown fences,
-prose, additional keys, and malformed JSON are failures.
+parsed and validated with the declared `jsonschema` dependency before being
+returned to the existing translation validator. Markdown fences, prose,
+additional keys, and malformed JSON are failures.
 
 ### Semantic limits and protocol safety
 
@@ -293,9 +292,11 @@ separately named protocol-resource budget that:
 
 This internal resource guard is not a user-tunable model setting. Settings must
 show provider maximum input/output as unknown when it is unknown, rather than
-claiming that the guard is a model limit. The implementation plan must ground
-the exact byte budget against the reviewed app-server framing and at least the
-largest admitted Content Translation fixture before product code is written.
+claiming that the guard is a model limit. Account observation retains 64 KiB per
+request, 256 KiB aggregate stdout, and 64 KiB stderr. Spark translation uses
+2 MiB per request line, 16 MiB aggregate stdout, and 256 KiB stderr; a
+600,000-character translation fixture is the positive control. These are
+process-protocol budgets, not model limits.
 
 ### Deadlines and cleanup
 
@@ -387,9 +388,9 @@ Implementation starts with failing tests that own these boundaries:
    notification shape.
 7. Process tests inspect the bundled-only executable, exact launch arguments,
    clean environment, temporary paths, disabled features, no inherited secrets,
-   no PATH fallback, and process-group cleanup. Separate owners prove both the
-   account-usage default and the existing `codex exec` code-generator backend
-   use the same bundled authority and cannot fall back to an external binary.
+   no PATH fallback, and process-group cleanup. Separate owners prove account
+   observation and Spark translation use the same bundled authority, and a
+   repository tripwire forbids reintroducing an external Codex executable lookup.
 8. Protocol tests cover the exact request sequence and reject every command,
    file, tool, MCP, approval, fallback, malformed-message, wrong-ID, duplicate,
    timeout, and non-completed-turn case.
