@@ -52,7 +52,11 @@ from src.model_routing import (
     route_capability_warnings,
     task_route_admission_detail,
 )
-from src.model_capabilities import capability_for
+from src.model_capabilities import (
+    capability_for,
+    model_auth_admission_detail,
+    model_entitlement_admission_detail,
+)
 from src.tools.data_access import DataAccessLayer
 from src.tools.analysis_tools import get_watchlist_overview, get_morning_brief
 
@@ -61,6 +65,7 @@ logger = logging.getLogger(__name__)
 
 # The per-task model routes this surface manages (matches model_routing.TaskId).
 _ROUTE_TASKS = ("card_synthesis", "card_translation", "ai_research")
+_SPARK_MODEL_ID = "gpt-5.3-codex-spark"
 
 
 def _credential_apply_enabled() -> bool:
@@ -83,6 +88,36 @@ def _oauth_observation_store(store: CredentialStore, candidate):
     from src.auth_drivers.oauth_status import OAuthObservationStore
 
     return OAuthObservationStore(store.db_path)
+
+
+def _subscription_entitlement_hints(observation_store, summary) -> list[dict[str, str]]:
+    """Project closed, non-authoritative model hints from cached usage only."""
+    if summary.get("auth_mode") != "chatgpt_oauth":
+        return []
+    try:
+        snapshot = observation_store.read_account_snapshot(summary["credential_id"])
+    except Exception:  # noqa: BLE001 - an optional hint must not break the catalog
+        return []
+    if (
+        snapshot is None
+        or snapshot.provider != "openai"
+        or snapshot.auth_mode != "chatgpt_oauth"
+        or snapshot.credential_id != summary["credential_id"]
+    ):
+        return []
+    capability = capability_for(_SPARK_MODEL_ID)
+    expected_label = capability.label.casefold() if capability is not None else ""
+    if not any(
+        isinstance(limit.limit_name, str)
+        and limit.limit_name.strip().casefold() == expected_label
+        for limit in snapshot.payload.rate_limits_by_limit_id.values()
+    ):
+        return []
+    return [{
+        "model_id": _SPARK_MODEL_ID,
+        "source": "subscription_usage",
+        "observed_at": snapshot.observed_at,
+    }]
 
 
 def _run_coro(coro):
@@ -122,6 +157,7 @@ def _restricted_task_route_admission_detail(
         or capability.allowed_auth_modes
         or capability.required_plans
         or capability.exact_model_id
+        or capability.unverified_auth_modes
     ):
         credential = resolve_active_credential(
             provider,
@@ -139,6 +175,12 @@ def _restricted_task_route_admission_detail(
     )
     if detail is not None:
         return detail
+    auth_detail = model_auth_admission_detail(
+        model,
+        credential.auth_mode if credential is not None else None,
+    )
+    if auth_detail is not None:
+        return auth_detail
     if capability is None or not capability.exact_model_id:
         return None
     if credential is None:
@@ -149,9 +191,11 @@ def _restricted_task_route_admission_detail(
         credential_id=credential.credential_id,
         secret_fingerprint=credential.secret_fingerprint,
     )
-    if scope.status != "ok" or model not in {row.model_id for row in scope.models}:
-        return {"code": "model_not_visible", "field": "model"}
-    return None
+    return model_entitlement_admission_detail(
+        model,
+        discovery_status=scope.status,
+        discovered_model_ids={row.model_id for row in scope.models},
+    )
 
 
 class RouteUpdate(BaseModel):
@@ -362,6 +406,7 @@ def model_catalog(
             routes=routes,
             credentials=credentials,
         )
+        resolved_observation_store = _oauth_observation_store(store, observation_store)
         for provider, summary in v2["providers"].items():
             if summary is None:
                 continue
@@ -373,6 +418,13 @@ def model_catalog(
                 None,
             )
             summary["label"] = inventory_row.label if inventory_row else summary["credential_id"]
+            if provider == "openai":
+                hints = _subscription_entitlement_hints(
+                    resolved_observation_store,
+                    summary,
+                )
+                if hints:
+                    summary["entitlement_hints"] = hints
         legacy = legacy_effective_alias(v2)
         effective = {
             "providers": v2["providers"],
@@ -1072,7 +1124,7 @@ def run_task_model_test(
         effort,
         task=body.task,
         # This route only validates the requested shape. The bounded dispatcher
-        # reads and verifies the active credential, plan, and exact discovery.
+        # reads the active credential and verifies exact model discovery.
         auth_mode=(
             capability.allowed_auth_modes[0]
             if capability is not None and capability.allowed_auth_modes

@@ -1,14 +1,15 @@
 # Codex Spark Content Translation Design
 
-**Status:** Offline GREEN 2026-09-03 after input-bound, bundled-runtime,
-entitlement, and code-execution-convergence rulings. Live Spark execution
-remains unverified because the current account is Plus rather than Pro.
+**Status:** Offline implementation amended 2026-09-03 after live UI observation
+proved that provider plan labels are not a reliable entitlement contract. Live
+Spark execution remains separately gated on exact same-credential `model/list`
+observation and a post-merge hand-test.
 
 ## Goal
 
 Make `gpt-5.3-codex-spark` an explicit, optional execution choice for ArkScope's
-existing Content Translation task when an eligible ChatGPT Pro subscription is
-active.
+existing Content Translation task when the active ChatGPT OAuth credential
+directly lists that exact model.
 
 Spark is admitted here because low latency and a separate subscription quota are
 useful for bounded translation. This is a maintenance and quota-allocation
@@ -28,7 +29,7 @@ task       = card_translation
 provider   = openai
 model      = gpt-5.3-codex-spark
 auth_mode  = chatgpt_oauth
-plan       = pro
+entitlement = exact same-credential model/list hit
 harness    = codex_app_server
 ```
 
@@ -37,16 +38,20 @@ Every dimension is load-bearing:
 - Spark is not admitted for `card_synthesis` or `ai_research`.
 - Spark is not admitted through `api_key`, `api_key_pool`, or environment-key
   fallback.
-- ChatGPT Plus and unknown/missing plan states are not admitted.
+- Provider plan labels are diagnostic only and do not grant or deny execution.
+- A Spark-specific usage bucket is supporting evidence that model discovery
+  should be refreshed; it is never execution authority.
 - Spark remains optional and does not replace the built-in Content Translation
   default.
 - No other task, model, credential, or harness may be selected as a fallback.
 
-As of 2026-09-02, the user reports that the active local ChatGPT account is
-Plus, not Pro. A credential label such as `ChatGPT subscription Pro` is display
-text and is not entitlement evidence. Offline implementation may proceed, but
-ArkScope must not claim a successful live Spark execution until an account that
-passes the Pro and exact-model checks is used.
+The earlier statement that the active account was Plus was not supported by a
+provider observation and is withdrawn. The provider currently reports the raw
+plan label `prolite` and exposes a Spark-specific usage bucket, but neither fact
+proves the exact model is executable. A credential label such as
+`ChatGPT subscription Pro` is also display text. ArkScope claims Spark
+entitlement only after the same credential's exact `model/list` result includes
+`gpt-5.3-codex-spark`.
 
 The `card_translation` identifier remains the durable API/DB key. Product copy
 continues to use `Content Translation` / `內容翻譯` under the terminology rule in
@@ -81,7 +86,7 @@ The code-reviewed capability record gains closed execution-policy metadata:
 
 - allowed task routes;
 - allowed auth modes;
-- required subscription plans, when applicable;
+- provider plan metadata for diagnostics only;
 - whether model IDs must match exactly rather than inherit prefix variants;
 - an adapter identifier for non-provider-native execution;
 - an unknown-safe maximum-output representation.
@@ -91,7 +96,7 @@ Existing models retain their current behavior through defaults. Spark uses:
 ```text
 allowed_tasks          = (card_translation,)
 allowed_auth_modes     = (chatgpt_oauth,)
-required_plans         = (pro,)
+required_plans         = ()
 exact_model_id         = true
 execution_adapter      = codex_app_server
 provider_max_output    = unknown
@@ -127,33 +132,46 @@ output limit is requested.
 Eligibility requires all of the following:
 
 1. The active OpenAI credential is `chatgpt_oauth`.
-2. Its token-store record reports the normalized plan `pro`.
-3. A successful discovery scope for that exact credential contains the exact
+2. A successful discovery scope for that exact credential contains the exact
    model ID `gpt-5.3-codex-spark`.
-4. The app-server execution session independently reports plan `pro`, lists the
-   exact model, and returns the exact requested model from `thread/start`.
+3. The app-server execution session independently lists the exact model and
+   returns the exact requested model from `thread/start`.
 
-Missing plan metadata, stale/missing discovery, a Plus plan, a different auth
-mode, or any model mismatch fails closed before a translation turn starts.
+Stale/missing discovery, a different auth mode, or any model mismatch fails
+closed before a translation turn starts. A plan label that is missing, new, or
+different does not override direct model observation.
 
-Plan admission reads the token-store record populated by ChatGPT login and then
-rechecks the live app-server `account/read.planType` value. It never infers a
-plan from the credential alias, account label, model name, or rate-limit label.
-The two plan values must normalize to the same reviewed `pro` value before a
-turn can start.
+ArkScope may retain the token-store and live app-server `account/read.planType`
+values as bounded, non-secret diagnostics. A valid observed value may refresh
+that diagnostic without requiring re-login. Its absence does not block model
+listing or execution, while malformed protocol values still fail closed. No
+plan value is inferred from a credential alias, account label, model name, or
+rate-limit label.
+
+A token-generation mismatch, unreadable token store, or malformed plan value
+still invalidates the operation. Once the same token generation has been
+confirmed, failure to save only the plan diagnostic is non-authoritative: it is
+logged without discarding an exact model list, a valid translation result, or a
+usage snapshot.
 
 The effective-model view carries the non-secret plan classification for the
 active OAuth credential. It must not persist access tokens or copy plan state
 into the model-discovery tables. The token store remains authoritative for the
-current plan; the discovery cache remains authoritative for the last observed
-model list.
+last observed diagnostic label; the discovery cache remains authoritative for
+the last observed model list and therefore for picker admission.
+
+An account-usage snapshot may expose a bounded Spark hint containing only the
+canonical model ID, source category, and observation time. It must not expose
+the provider's opaque limit ID, account fingerprint, token, or raw payload. A
+hint without exact model discovery leaves Spark disabled and asks the operator
+to verify the model list again.
 
 ### Picker behavior
 
 Spark appears as a selectable advanced model only in the Content Translation
-picker when the active ChatGPT Pro credential has successfully discovered it.
-It is not seeded when discovery has not run, and it does not appear as a
-candidate for API-key, Plus, card-synthesis, or AI-Research routes.
+picker when the active ChatGPT OAuth credential has successfully discovered its
+exact ID. It is not executable when discovery has not run, and it does not
+appear as a candidate for API-key, card-synthesis, or AI-Research routes.
 
 If a previously saved invalid Spark route exists, the current-route row remains
 visible but disabled with a bounded reason. It is never silently removed,
@@ -161,7 +179,13 @@ rewritten, or executed through another route.
 
 The account discovery panel may continue to display provider-observed Spark
 capabilities. Its `task_route_tasks` value becomes exactly
-`["card_translation"]` only for an eligible Pro record; otherwise it is empty.
+`["card_translation"]` for the exact observed Spark row regardless of the raw
+plan label; otherwise it is empty.
+
+Both discovery and execution traverse the bounded `model/list` cursor contract.
+Execution checks at most eight pages and 256 unique model IDs, rejects malformed
+or repeated cursors and duplicate IDs, and treats budget exhaustion as protocol
+incompatibility rather than falsely asserting that Spark is absent.
 
 ## Execution Architecture
 
@@ -341,17 +365,18 @@ internal protocol message is returned to the frontend.
 
 ## UI Behavior
 
-- The Content Translation model selector can choose Spark only in the eligible
-  ChatGPT Pro/discovered state.
+- The Content Translation model selector can choose Spark only after an exact
+  same-credential discovery hit.
 - The provider discovery card offers its existing task-use command only for
   Content Translation.
 - The four provider-observed effort choices remain `low`, `medium`, `high`, and
   `xhigh`; the provider-observed default is `medium`.
 - Spark is marked as an experimental subscription option, not a built-in
   default or a general recommendation.
-- Settings exposes the SDK-observed subscription plan as non-secret account
-  state. Plus, missing, and unknown plans show a localized ChatGPT-Pro-required
-  reason; display aliases never supply this value.
+- Settings exposes the SDK-observed subscription plan as non-secret diagnostic
+  state. It does not translate a raw label into an entitlement tier.
+- A Spark usage bucket without exact discovery shows a localized request to
+  verify the model list again and remains disabled.
 - Ineligible saved routes show a localized reason and remain editable.
 - No visible wording suggests API-key support, image support, AI Research
   support, or automatic multi-agent delegation.
@@ -373,17 +398,19 @@ internal protocol message is returned to the frontend.
 Implementation starts with failing tests that own these boundaries:
 
 1. Registry tests own the exact model ID, unknown max-output fact, four efforts,
-   128k/text-only facts, exact-ID behavior, sole task, sole auth mode, Pro plan,
-   and non-default status.
+   128k/text-only facts, exact-ID behavior, sole task, sole auth mode, absence
+   of plan-name admission, and non-default status.
 2. Import and helper tests prove no unknown maximum enters either provider's
    eager output map, token arithmetic, or provider parameters.
 3. Admission tests prove Spark is rejected for card synthesis, AI Research,
-   generic execution without task context, API key, API-key pool, Plus, unknown
-   plan, and undiscovered credentials before provider dispatch.
-4. Effective-view tests prove only a Pro OAuth discovery places Spark in the
-   Content Translation picker; invalid saved routes remain visible and blocked.
+   generic execution without task context, API key, API-key pool, and
+   undiscovered credentials before provider dispatch, while raw plan labels do
+   not override exact discovery.
+4. Effective-view tests prove only exact same-credential OAuth discovery places
+   Spark in the Content Translation picker; invalid saved routes remain visible
+   and blocked, and a usage hint alone cannot make one eligible.
 5. Discovery tests prove `task_route_tasks` is exactly Content Translation for
-   eligible Pro and empty for Plus/unknown plans.
+   the observed Spark row regardless of plan label.
 6. Runtime-contract tests bind the reviewed CLI versions to a committed schema
    projection and fail on a missing/changed required method, field, enum, or
    notification shape.
@@ -416,21 +443,20 @@ frontend, typecheck, build, and i18n gates.
 
 ## Offline Admission Evidence
 
-The implementation admits only the exact Pro subscription tuple described in
-this authority. It uses the reviewed `openai-codex` bundled runtime, creates one
+The implementation admits only the exact observed subscription tuple described
+in this authority. It uses the reviewed `openai-codex` bundled runtime, creates one
 fresh process/home/cwd/thread/turn, verifies the echoed model and sandbox before
 the turn, rejects tool or command activity, validates the final message against
 the existing Content Translation schema, and has no retry or fallback path.
-The frontend projects the backend-observed plan rather than inferring it from a
-credential label. A Plus account sees Spark only under Content Translation as a
-disabled option with a localized Pro requirement; old sidecars do not fabricate
-the capability.
+The frontend projects the backend-observed raw plan rather than inferring it from
+a credential label. Missing exact discovery keeps Spark disabled even when a
+usage bucket exists; old sidecars do not fabricate the capability.
 
 Offline gates at the implementation tip are:
 
-- focused Spark/runtime/backend contracts: `394 passed`;
-- complete product backend: `5370 passed, 12 skipped`;
-- complete frontend: `109 files, 1366 passed`;
+- focused entitlement, routing, and runtime contracts: `372 passed`;
+- complete product backend: `5436 passed, 12 skipped`;
+- complete frontend: `109 files, 1371 passed`;
 - TypeScript typecheck, production build, and i18n visible-literal scanner:
   GREEN, with zero new i18n debt.
 
@@ -439,22 +465,22 @@ push was performed for this offline admission.
 
 ## Live Validation Boundary
 
-Offline implementation and tests make no provider call. Because the current
-local account is reported as Plus, the immediate hand-test expectation is an
-honest Pro-required refusal before `turn/start`, not a successful translation.
+Offline implementation and tests make no provider call. The first real
+successful Spark translation is observed after merge and restart:
 
-The first real successful Spark translation requires a separately supplied
-eligible Pro credential and is then observed after merge and restart:
-
-1. Sync the ChatGPT Pro model list and confirm the exact Spark model is visible.
-2. Confirm Spark appears only under Content Translation with four efforts.
-3. Run one bounded model-task test or one short source-text translation.
-4. Confirm translated output, latency, provider/model/harness provenance, and
+1. Verify the active ChatGPT OAuth model list and inspect its observation time.
+2. If only the Spark usage hint exists, confirm Spark remains disabled with a
+   revalidation instruction.
+3. Confirm the exact Spark model appears only under Content Translation with
+   four efforts after the exact list includes it.
+4. Run one bounded model-task test or one short source-text translation.
+5. Confirm translated output, latency, provider/model/harness provenance, and
    separate Spark quota movement.
-5. Confirm card synthesis and AI Research cannot select Spark.
+6. Confirm card synthesis and AI Research cannot select Spark.
 
 That observation validates the current account entitlement and live app-server
-behavior. It does not widen Spark to API keys, Plus, other tasks, or fallback.
+behavior. It does not establish a general relationship among provider plan
+labels and does not widen Spark to API keys, other tasks, or fallback.
 
 ## Non-Goals
 

@@ -193,6 +193,7 @@ const settings = {
       seedOnly: "This channel cannot list models online.",
       neverDiscovered: "Models have not been discovered for this sign-in",
       verifyAgain: "Verify list again",
+      sparkUsageHint: "Spark quota was detected. Verify the model list again before use.",
     },
     credentials: {
       openProviders: "Go to Provider Sign-in and Credentials",
@@ -201,6 +202,7 @@ const settings = {
     compatibility: {
       advanced: "Advanced",
       unverified: "Unverified",
+      notInLastModelList: "Not in the last model list",
       restartSidecar: "Restart or update the sidecar before running a live model test.",
       unavailableReasons: "Unavailable: {{value}}",
     },
@@ -250,6 +252,7 @@ const settings = {
     metrics: {
       latency: "Latency: {{value}} ms",
       testedAt: "Tested {{timestamp}}",
+      modelListObservedAt: "Last model listing: {{timestamp}}",
       verifiedAt: "Verified: {{timestamp}}",
       officialPricing: "Official pricing",
     },

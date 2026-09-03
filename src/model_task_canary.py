@@ -26,6 +26,7 @@ from src.auth_drivers.subscription_structured_output import (
 from src.model_capabilities import (
     capability_for,
     model_auth_admission_detail,
+    model_entitlement_admission_detail,
     model_execution_admission_detail,
 )
 from src.model_credentials import resolve_active_credential, test_model
@@ -405,9 +406,22 @@ async def dispatch_task_model_test(
     model_visible = any(
         _visibility_matches(model, item.model_id) for item in scope.models
     )
-    if (capability is not None and capability.exact_model_id and (
-        scope.status != "ok" or not model_visible
-    )) or (scope.status == "ok" and not model_visible):
+    entitlement_detail = model_entitlement_admission_detail(
+        model,
+        discovery_status=scope.status,
+        discovered_model_ids={item.model_id for item in scope.models},
+    )
+    if entitlement_detail is not None:
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="unsupported",
+            error_code=entitlement_detail["code"],
+        )
+    if scope.status == "ok" and not model_visible:
         return _result(
             task=task, provider=provider, model=model, effort=effort,
             active=active, status="unsupported", error_code="model_not_visible",

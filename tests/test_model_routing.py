@@ -149,7 +149,7 @@ def test_shared_task_route_admission_is_the_bounded_authority(
     assert task_route_admission_detail(provider, model, effort) == detail
 
 
-def test_spark_task_route_admission_uses_task_auth_and_plan_context():
+def test_spark_task_route_admission_uses_task_and_auth_not_plan_name():
     from src.model_routing import task_route_admission_detail
 
     assert task_route_admission_detail(
@@ -160,14 +160,15 @@ def test_spark_task_route_admission_uses_task_auth_and_plan_context():
         auth_mode="chatgpt_oauth",
         plan_type="pro",
     ) is None
-    assert task_route_admission_detail(
-        "openai",
-        "gpt-5.3-codex-spark",
-        "medium",
-        task="card_translation",
-        auth_mode="chatgpt_oauth",
-        plan_type="plus",
-    ) == {"code": "subscription_plan_required", "field": "credential"}
+    for diagnostic_plan in ("prolite", "plus", None):
+        assert task_route_admission_detail(
+            "openai",
+            "gpt-5.3-codex-spark",
+            "medium",
+            task="card_translation",
+            auth_mode="chatgpt_oauth",
+            plan_type=diagnostic_plan,
+        ) is None
     assert task_route_admission_detail(
         "openai",
         "gpt-5.3-codex-spark",
@@ -238,26 +239,37 @@ def _spark_route_stores(tmp_path, *, plan_type="pro", discovered=True):
             plan_type=plan_type,
         ),
     )
-    if discovered:
+    if discovered is not False:
         ModelDiscoveryCache(store.db_path).record_run(
             provider="openai",
             auth_mode="chatgpt_oauth",
             credential_id=credential_id,
             secret_fingerprint="oauth",
             status="ok",
-            models=[{
-                "id": "gpt-5.3-codex-spark",
-                "label": "GPT-5.3-Codex-Spark",
-                "source": "provider_api",
-            }],
+            models=(
+                [{
+                    "id": "gpt-5.3-codex-spark",
+                    "label": "GPT-5.3-Codex-Spark",
+                    "source": "provider_api",
+                }]
+                if discovered is True
+                else []
+            ),
         )
     return store, tokens
 
 
-def test_update_model_routes_accepts_only_discovered_pro_spark_tuple(tmp_path):
+@pytest.mark.parametrize("diagnostic_plan", ["pro", "prolite", "plus", None])
+def test_update_model_routes_accepts_discovered_spark_regardless_of_plan_name(
+    tmp_path, diagnostic_plan,
+):
     from src.model_route_store import ModelRouteStore
 
-    store, tokens = _spark_route_stores(tmp_path, plan_type="pro", discovered=True)
+    store, tokens = _spark_route_stores(
+        tmp_path,
+        plan_type=diagnostic_plan,
+        discovered=True,
+    )
     result = update_model_routes(
         ModelRoutesUpdate(routes={
             "card_translation": RouteUpdate(
@@ -278,28 +290,26 @@ def test_update_model_routes_accepts_only_discovered_pro_spark_tuple(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("plan_type", "discovered", "expected_detail"),
+    ("discovered", "expected_detail"),
     [
         (
-            "plus",
-            True,
-            {"code": "subscription_plan_required", "field": "credential"},
+            False,
+            {"code": "model_entitlement_unverified", "field": "model"},
         ),
         (
-            "pro",
-            False,
+            "missing",
             {"code": "model_not_visible", "field": "model"},
         ),
     ],
 )
-def test_update_model_routes_rejects_ineligible_spark_before_write(
-    tmp_path, plan_type, discovered, expected_detail,
+def test_update_model_routes_requires_exact_spark_discovery_before_write(
+    tmp_path, discovered, expected_detail,
 ):
     from src.model_route_store import ModelRouteStore
 
     store, tokens = _spark_route_stores(
         tmp_path,
-        plan_type=plan_type,
+        plan_type="prolite",
         discovered=discovered,
     )
 
@@ -599,6 +609,66 @@ def test_save_route_claude_oauth_active_preserves_effort_without_drop_warning(tm
     assert w is None
     assert res["routes"]["ai_research"]["effort"] == "high"
     cfg_mod.get_agent_config.cache_clear()
+
+
+def test_save_route_rejects_fable_5_1_for_claude_oauth(tmp_path):
+    from src.model_route_store import ModelRouteStore
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    store.add_oauth_credential(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        alias="Claude subscription",
+        make_active=True,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "card_translation": RouteUpdate(
+                    provider="anthropic",
+                    model="claude-fable-5-1",
+                    effort="high",
+                ),
+            }),
+            store=store,
+            token_store=None,
+            observation_store=None,
+        )
+
+    assert exc_info.value.detail == {"code": "model_auth_unverified", "field": "model"}
+    assert ModelRouteStore(store.db_path).get("card_translation") is None
+
+
+def test_save_route_accepts_fable_5_1_for_anthropic_api_key(tmp_path):
+    from src.model_route_store import ModelRouteStore
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    store.add(
+        provider="anthropic",
+        auth_type="api_key",
+        alias="Claude API",
+        secret="fixture-api-key",
+        make_active=True,
+    )
+
+    result = update_model_routes(
+        ModelRoutesUpdate(routes={
+            "card_translation": RouteUpdate(
+                provider="anthropic",
+                model="claude-fable-5-1",
+                effort="high",
+            ),
+        }),
+        store=store,
+        token_store=None,
+        observation_store=None,
+    )
+
+    assert result["routes"]["card_translation"]["model"] == "claude-fable-5-1"
+    saved = ModelRouteStore(store.db_path).get("card_translation")
+    assert saved is not None
+    assert saved.model == "claude-fable-5-1"
 
 
 def test_save_route_chatgpt_oauth_active_points_at_discovery(tmp_path, monkeypatch):

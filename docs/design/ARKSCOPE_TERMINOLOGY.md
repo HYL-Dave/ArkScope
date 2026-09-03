@@ -123,9 +123,14 @@ printed in the interface.
 | Model settings section | Model and Task Routing | 模型與任務路由 | Refers to per-task Provider/model selection. |
 | Model picker group | Available for this task | 可供此任務使用 | Eligibility is semantic metadata, never inferred from the label. |
 | Model picker group | Visible to this sign-in | 此登入可見 | Visible does not imply eligible for the selected task. |
-| Model picker group | Advanced / unverified | 進階／未驗證 | Compatibility state remains explicit metadata. |
+| Model picker group | Other models | 其他模型 | Grouping is not itself a verification verdict; item-level state carries any restriction. |
 | Model picker group | Current route | 目前路由 | The persisted route, even when absent from discovery. |
 | Model compatibility note | Legacy sidecar compatibility mode | 舊 sidecar 相容模式 | Compose from `baseLabel` plus explicit compatibility; never parse a decorated label. |
+| Model-list channel state | This channel cannot list models online. | 此通道不提供線上模型清單。 | Provider-level `seed_only` state; do not mark every otherwise eligible seed model as unverified. |
+| Stale API-key model row | Not in the last model list | 上次模型清單未包含 | Pair with the exact model-list observation time; it is not an auth-path verdict. |
+| Exact-model entitlement pending | This model is not yet confirmed for this sign-in. Verify the model list again. | 尚未確認此登入可用此模型；請重新驗證模型清單 | A usage bucket may prompt revalidation but never grants execution. |
+| Reviewed model/auth release block | Claude OAuth is not enabled; controlled live validation and a version update are required | Claude OAuth 尚未開放；需經受控 live 驗證與版本更新 | Used for Fable 5.1 OAuth policy; it is not a self-clearing discovery state. |
+| Subscription plan metadata | Provider-reported plan | Provider 回報方案 | Diagnostic display only; raw values such as `prolite` are not entitlement tiers. |
 | Fixed AI task | Content translation | 內容翻譯 | `card_translation` remains the durable identifier; former wording may remain only as an invisible search alias. |
 | Fixed-task runtime section | Fixed AI Task Runtime Limits | 固定 AI 任務執行限制 | Covers card synthesis and translation runtime bounds. |
 | Research runtime section | AI Research Runtime Limits | AI 研究執行限制 | Covers AI Research session and run bounds. |

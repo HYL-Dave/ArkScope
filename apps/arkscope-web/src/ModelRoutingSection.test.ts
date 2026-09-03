@@ -243,8 +243,8 @@ describe("ModelRoutingSection provider-first UX", () => {
       { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
     ];
     cat.credentials = {
-      openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT Plus")],
-      anthropic: [cred("anthropic", "local:4", "api_key", "Claude API")],
+      openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT subscription")],
+      anthropic: [cred("anthropic", "local:4", "claude_code_oauth", "Claude subscription")],
     };
     cat.effort_options.openai = TASK_EFFORT_IDS
       .map((id) => ({
@@ -280,7 +280,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     cat.effective = {
       providers: {
         openai: { credential_id: "local:7", auth_mode: "chatgpt_oauth", label: "ChatGPT Plus" },
-        anthropic: { credential_id: "local:4", auth_mode: "api_key", label: "Claude API" },
+        anthropic: { credential_id: "local:4", auth_mode: "claude_code_oauth", label: "Claude subscription" },
       },
       tasks: {
         ai_research: taskBlock("openai"),
@@ -299,7 +299,12 @@ describe("ModelRoutingSection provider-first UX", () => {
     return host!.querySelector('[data-testid="route-card_translation"]')!;
   }
 
-  function sparkCatalog(planType: "plus" | "pro", eligible: boolean): ModelCatalog {
+  function sparkCatalog(
+    planType: string,
+    eligible: boolean,
+    usageHint = false,
+    missingReason: "model_entitlement_unverified" | "model_not_visible" = "model_entitlement_unverified",
+  ): ModelCatalog {
     const cat = catalogV2();
     const sparkId = "gpt-5.3-codex-spark";
     cat.current_model_ids = [...(cat.current_model_ids ?? []), sparkId];
@@ -315,6 +320,11 @@ describe("ModelRoutingSection provider-first UX", () => {
     cat.effective!.providers!.openai = {
       ...cat.effective!.providers!.openai!,
       plan_type: planType,
+      entitlement_hints: usageHint ? [{
+        model_id: sparkId,
+        source: "subscription_usage",
+        observed_at: "2026-09-03T01:02:03Z",
+      }] : undefined,
     };
     const task = cat.effective!.tasks.card_translation!;
     const openai = task.providers!.openai!;
@@ -329,9 +339,11 @@ describe("ModelRoutingSection provider-first UX", () => {
             {
               ...entry(
                 sparkId,
-                "visible",
+                eligible ? "visible" : "advanced",
                 eligible,
-                eligible ? null : "subscription_plan_required",
+                eligible ? null : missingReason,
+                "none",
+                eligible ? true : null,
               ),
               effort_options: ["low", "medium", "high", "xhigh"],
             },
@@ -403,7 +415,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     ) as HTMLSelectElement;
     expectLocalizedControlName(card, "effort", "AI 研究 Effort");
     expect(Array.from(select.querySelectorAll("optgroup")).map((g) => g.label)).toEqual([
-      "可供此任務使用", "此登入可見", "進階／未驗證", "目前路由",
+      "可供此任務使用", "此登入可見", "其他模型", "目前路由",
     ]);
     const terra = Array.from(select.options).find((option) => option.value === "gpt-5.6-terra")!;
     expect(terra.disabled).toBe(true);
@@ -424,35 +436,44 @@ describe("ModelRoutingSection provider-first UX", () => {
     ) as HTMLSelectElement;
     expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-sonnet-5")?.textContent)
-      .toContain("未驗證");
+      .not.toContain("未驗證");
     expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-opus-5")?.textContent)
       .toContain("進階");
   });
 
-  it("shows Spark to Plus users as a Pro-only Content Translation option", () => {
-    const cat = sparkCatalog("plus", false);
-    render(vi.fn(), cat, undefined, {
-      draft: {
-        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_translation: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "low", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-      },
-    });
+  it.each(["model_entitlement_unverified", "model_not_visible"] as const)(
+    "uses Spark usage only to prompt exact model-list revalidation from %s",
+    (reason) => {
+      const cat = sparkCatalog("prolite", false, true, reason);
+      render(vi.fn(), cat, undefined, {
+        draft: {
+          ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+          card_translation: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "low", custom: false },
+          card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        },
+      });
 
-    const translation = translationCard();
-    const model = labelledControl(translation, "model") as HTMLSelectElement;
-    const spark = Array.from(model.options)
-      .find((option) => option.value === "gpt-5.3-codex-spark")!;
-    expect(spark.disabled).toBe(true);
-    expect(spark.textContent).toContain("需要 ChatGPT Pro 方案");
-    expect(translation.textContent).toContain("方案：Plus");
-    expect(translation.textContent).toContain("不可選：");
-    expect(translation.textContent).toContain("需要 ChatGPT Pro 方案");
-  });
+      const translation = translationCard();
+      const model = labelledControl(translation, "model") as HTMLSelectElement;
+      const spark = Array.from(model.options)
+        .find((option) => option.value === "gpt-5.3-codex-spark")!;
+      expect(spark.disabled).toBe(true);
+      expect(spark.textContent).toContain(
+        reason === "model_entitlement_unverified"
+          ? "尚未確認此登入可用此模型"
+          : "此登入的探索清單未顯示此模型",
+      );
+      expect(translation.textContent).toContain("方案：prolite");
+      expect(translation.textContent)
+        .toContain("已偵測到 Spark 額度；重新驗證模型清單後才能使用");
+      expect(translation.textContent).toContain("不可選：");
+      expect(buttonByText(translation, "重新驗證列表")).toBeTruthy();
+    },
+  );
 
-  it("enables Spark only for Pro Content Translation with its exact effort set", () => {
-    const cat = sparkCatalog("pro", true);
+  it("enables exactly discovered Spark regardless of diagnostic plan name", () => {
+    const cat = sparkCatalog("prolite", true);
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
@@ -469,7 +490,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(Array.from(effort.options).map((option) => option.value)).toEqual([
       "", "low", "medium", "high", "xhigh",
     ]);
-    expect(translation.textContent).toContain("方案：Pro");
+    expect(translation.textContent).toContain("方案：prolite");
     expect(Array.from((labelledControl(researchCard(), "model") as HTMLSelectElement).options)
       .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
     const synthesis = host!.querySelector('[data-testid="route-card_synthesis"]')!;
@@ -546,7 +567,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat);
     expect(researchCard().textContent).toContain("ChatGPT Plus");
     expect(researchCard().textContent).toContain("已取得可見模型清單");
-    expect(researchCard().textContent).toContain("驗證時間");
+    expect(researchCard().textContent).toContain("上次列出模型");
     expect(researchCard().textContent).not.toContain("測試時間");
 
     disposeRender();
@@ -570,7 +591,11 @@ describe("ModelRoutingSection provider-first UX", () => {
   });
 
   it("shows the selected Anthropic credential and its seed-only state", () => {
-    render(vi.fn(), catalogV2(), undefined, {
+    const cat = catalogV2();
+    for (const task of Object.values(cat.effective!.tasks)) {
+      task!.providers!.anthropic!.discovered_at = "2026-09-03T01:02:03Z";
+    }
+    render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "low", custom: false },
         card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
@@ -578,10 +603,71 @@ describe("ModelRoutingSection provider-first UX", () => {
       },
     });
     const card = researchCard();
-    expect(card.textContent).toContain("Claude API");
+    expect(card.textContent).toContain("Claude subscription");
     expect(card.textContent).toContain("此通道無法線上列出模型");
+    const model = labelledControl(card, "model") as HTMLSelectElement;
+    expect(Array.from(model.options)
+      .find((option) => option.value === "claude-sonnet-5")?.textContent)
+      .not.toContain("未驗證");
+    expect(card.textContent).not.toContain("上次列出模型");
     expect(card.textContent).not.toContain("重新登入");
     expect(card.textContent).not.toContain("設為 active");
+  });
+
+  it("describes an API-key seed as absent from the last model list", () => {
+    const cat = catalogV2();
+    cat.effective!.providers!.anthropic = {
+      ...cat.effective!.providers!.anthropic!,
+      auth_mode: "api_key",
+      label: "Claude API",
+    };
+    const block = cat.effective!.tasks.card_translation!.providers!.anthropic!;
+    block.cache_state = "ok";
+    block.discovered_at = "2026-07-25T00:00:00Z";
+    block.models = [
+      entry("claude-fable-5-1", "seed", true, null, "adaptive_always_on", null),
+    ];
+    render(vi.fn(), cat, undefined, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-fable-5-1", effort: "high", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      },
+    });
+
+    const option = Array.from((labelledControl(translationCard(), "model") as HTMLSelectElement).options)
+      .find((candidate) => candidate.value === "claude-fable-5-1")!;
+    expect(option.disabled).toBe(false);
+    expect(option.textContent).toContain("上次模型清單未包含");
+    expect(option.textContent).not.toContain("未驗證");
+  });
+
+  it("states that Fable 5.1 OAuth is a controlled release policy", () => {
+    const cat = catalogV2();
+    const block = cat.effective!.tasks.card_translation!.providers!.anthropic!;
+    block.models = [
+      entry(
+        "claude-fable-5-1",
+        "seed",
+        false,
+        "model_auth_unverified",
+        "adaptive_always_on",
+        null,
+      ),
+    ];
+    render(vi.fn(), cat, undefined, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-fable-5-1", effort: "high", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      },
+    });
+
+    const option = Array.from((labelledControl(translationCard(), "model") as HTMLSelectElement).options)
+      .find((candidate) => candidate.value === "claude-fable-5-1")!;
+    expect(option.disabled).toBe(true);
+    expect(option.textContent).toContain("Claude OAuth 尚未開放");
+    expect(translationCard().textContent).toContain("需經受控 live 驗證與版本更新");
   });
 
   it("refreshes discovery for the selected provider credential", () => {
@@ -758,7 +844,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       .toEqual([
         "Available for this task",
         "Visible to this sign-in",
-        "Advanced / unverified",
+        "Other models",
         "Current route",
       ]);
     expectLocalizedControlName(research, "provider", "AI Research Provider");

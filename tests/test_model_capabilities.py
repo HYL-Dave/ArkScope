@@ -9,6 +9,7 @@ from src.model_capabilities import (
     all_models,
     capability_for,
     default_picker_models,
+    model_entitlement_admission_detail,
     model_execution_admission_detail,
 )
 
@@ -188,20 +189,20 @@ def test_fable_5_1_client_compaction_is_separate_from_provider_compaction():
     assert client_compaction_admission_detail(retired.id, True) is None
 
 
-def test_spark_is_exact_pro_oauth_content_translation_only():
+def test_spark_is_exact_oauth_content_translation_only():
     cap = capability_for("gpt-5.3-codex-spark")
 
     assert cap is not None
     assert cap.max_output is None
     assert cap.allowed_tasks == ("card_translation",)
     assert cap.allowed_auth_modes == ("chatgpt_oauth",)
-    assert cap.required_plans == ("pro",)
+    assert cap.required_plans == ()
     assert cap.exact_model_id is True
     assert cap.execution_adapter == "codex_app_server"
     assert capability_for("gpt-5.3-codex-spark-preview") is None
 
 
-def test_spark_execution_requires_the_exact_task_auth_and_plan_tuple():
+def test_spark_execution_requires_the_exact_task_and_auth_tuple():
     assert model_execution_admission_detail("gpt-5.3-codex-spark") == {
         "code": "model_task_unsupported",
         "field": "task",
@@ -215,46 +216,47 @@ def test_spark_execution_requires_the_exact_task_auth_and_plan_tuple():
         "code": "task_auth_mode_unsupported",
         "field": "credential",
     }
-    assert model_execution_admission_detail(
-        "gpt-5.3-codex-spark",
-        task="card_translation",
-        auth_mode="chatgpt_oauth",
-        plan_type="plus",
-    ) == {
-        "code": "subscription_plan_required",
-        "field": "credential",
-    }
-    assert model_execution_admission_detail(
-        "gpt-5.3-codex-spark",
-        task="card_translation",
-        auth_mode="chatgpt_oauth",
-        plan_type="  PRO ",
-    ) is None
+    for diagnostic_plan in ("pro", "prolite", "plus", None):
+        assert model_execution_admission_detail(
+            "gpt-5.3-codex-spark",
+            task="card_translation",
+            auth_mode="chatgpt_oauth",
+            plan_type=diagnostic_plan,
+        ) is None
 
 
-def test_unknown_plan_is_reported_as_unverified_not_as_plan_required():
+def test_unknown_plan_does_not_replace_exact_model_entitlement():
     for plan_type in (None, "", "   ", "not a valid plan value"):
         assert model_execution_admission_detail(
             "gpt-5.3-codex-spark",
             task="card_translation",
             auth_mode="chatgpt_oauth",
             plan_type=plan_type,
-        ) == {
-            "code": "subscription_plan_unverified",
-            "field": "credential",
-        }
+        ) is None
 
 
-def test_known_plus_plan_still_reports_plan_required():
+def test_provider_plan_names_are_diagnostic_not_spark_admission():
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
         task="card_translation",
         auth_mode="chatgpt_oauth",
-        plan_type="plus",
-    ) == {
-        "code": "subscription_plan_required",
-        "field": "credential",
-    }
+        plan_type="future-provider-plan-name",
+    ) is None
+
+
+def test_spark_entitlement_requires_the_literal_provider_model_id():
+    observed = {"gpt-5.3-codex-spark"}
+
+    assert model_entitlement_admission_detail(
+        "gpt-5.3-codex-spark",
+        discovery_status="ok",
+        discovered_model_ids=observed,
+    ) is None
+    assert model_entitlement_admission_detail(
+        "GPT-5.3-CODEX-SPARK",
+        discovery_status="ok",
+        discovered_model_ids=observed,
+    ) == {"code": "model_not_visible", "field": "model"}
 
 
 def test_existing_models_remain_unrestricted_by_task_auth_and_plan():

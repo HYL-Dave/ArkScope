@@ -41,14 +41,15 @@ const common = {
     groups: {
       available: "Available for this task",
       visibleDisabled: "Visible to this sign-in",
-      advanced: "Advanced / unverified",
+      advanced: "Other models",
       current: "Current route",
     },
     reasons: {
       missingActiveCredential: "No sign-in is configured for this provider",
       taskAuthModeUnsupported: "This sign-in method does not support the task",
       taskTestUnsupported: "This sign-in method does not yet support live testing",
-      modelAuthUnverified: "This model has not been live-verified for this sign-in. Use an API key or choose another model",
+      modelAuthUnverified: "Claude OAuth is not enabled; controlled live validation and a version update are required",
+      modelEntitlementUnverified: "This model is not yet confirmed for this sign-in. Verify the model list again",
       taskCapabilityMissing: "Task capability is missing",
       modelNotVisible: "This model does not appear in the discovery list for this sign-in",
       modelNotInRegistry: "Custom or unknown model; capabilities are unverified",

@@ -74,12 +74,13 @@ describe("Models terminology", () => {
 
     const expected = {
       "zh-Hant": {
-        groups: ["可供此任務使用", "此登入可見", "進階／未驗證", "目前路由"],
+        groups: ["可供此任務使用", "此登入可見", "其他模型", "目前路由"],
         reasons: [
           "尚未設定此 provider 的登入",
           "此登入方式不支援這個任務",
           "此登入方式尚不支援實際測試",
-          "此登入尚未實際驗證此模型；請改用 API key 或選擇其他模型",
+          "Claude OAuth 尚未開放；需經受控 live 驗證與版本更新",
+          "尚未確認此登入可用此模型；請重新驗證模型清單",
           "缺少任務能力",
           "此登入的探索清單未顯示此模型",
           "自訂／未知模型，尚未驗證能力",
@@ -110,12 +111,13 @@ describe("Models terminology", () => {
         compatibility: ["未驗證（舊 sidecar 相容模式）", "未驗證（舊 sidecar 相容模式）。"],
       },
       en: {
-        groups: ["Available for this task", "Visible to this sign-in", "Advanced / unverified", "Current route"],
+        groups: ["Available for this task", "Visible to this sign-in", "Other models", "Current route"],
         reasons: [
           "No sign-in is configured for this provider",
           "This sign-in method does not support the task",
           "This sign-in method does not yet support live testing",
-          "This model has not been live-verified for this sign-in. Use an API key or choose another model",
+          "Claude OAuth is not enabled; controlled live validation and a version update are required",
+          "This model is not yet confirmed for this sign-in. Verify the model list again",
           "Task capability is missing",
           "This model does not appear in the discovery list for this sign-in",
           "Custom or unknown model; capabilities are unverified",
@@ -155,6 +157,7 @@ describe("Models terminology", () => {
       "task_auth_mode_unsupported",
       "task_test_unsupported",
       "model_auth_unverified",
+      "model_entitlement_unverified",
       "task_capability_missing",
       "model_not_visible",
       "model_not_in_registry",

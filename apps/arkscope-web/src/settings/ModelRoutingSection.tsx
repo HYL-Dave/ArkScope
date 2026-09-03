@@ -61,13 +61,16 @@ function modelEntrySuffix(
   entry: ModelEntryWithReason,
   t: SettingsT,
   commonT: ModelCommonT,
+  cacheState?: string,
 ): string | null {
   if (entry.disabledReason) return modelReasonLabel(entry.disabledReason, commonT);
   if (entry.compatibility === "legacy_unverified") {
     return t(($) => $.models.compatibility.unverified);
   }
   if (entry.status === "advanced") return t(($) => $.models.compatibility.advanced);
-  if (entry.status === "seed") return t(($) => $.models.compatibility.unverified);
+  if (entry.status === "seed" && cacheState === "ok") {
+    return t(($) => $.models.compatibility.notInLastModelList);
+  }
   if (entry.status === "route" && entry.reason_code) {
     return modelReasonLabel(entry.reason_code, commonT);
   }
@@ -175,7 +178,27 @@ export function ModelRoutingSection({
             ? currentEntries
             : [...currentEntries, retainedRouteEntry];
           const providerReason = modelProviderReason(context, providerBlock);
-          const groups = groupedModelEntries(entries, providerReason, commonT);
+          const groups = groupedModelEntries(
+            entries,
+            providerReason,
+            commonT,
+            providerBlock?.cache_state,
+          );
+          const hasSparkUsageHint = !!(
+            task.id === "card_translation"
+            && row.provider === "openai"
+            && context?.entitlement_hints?.some(
+              (hint) => hint.model_id === "gpt-5.3-codex-spark"
+                && hint.source === "subscription_usage",
+            )
+            && entries.some(
+              (entry) => entry.id === "gpt-5.3-codex-spark"
+                && (
+                  entry.reason_code === "model_entitlement_unverified"
+                  || entry.reason_code === "model_not_visible"
+                ),
+            )
+          );
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
           const selectedModelStatus = taskRouteModelStatus(catalog, row.provider, row.model);
           const selectedReason = selectedModelStatus === "retired"
@@ -305,9 +328,9 @@ export function ModelRoutingSection({
                       </span>
                     )}
                     <span>{modelCatalogStateLabel(providerBlock?.cache_state, t, commonT)}</span>
-                    {providerBlock?.discovered_at && (
+                    {providerBlock?.cache_state === "ok" && providerBlock.discovered_at && (
                       <span>
-                        {t(($) => $.models.metrics.verifiedAt, {
+                        {t(($) => $.models.metrics.modelListObservedAt, {
                           timestamp: formatSystemTimestamp(providerBlock.discovered_at),
                         })}
                       </span>
@@ -329,6 +352,12 @@ export function ModelRoutingSection({
                   </>
                 )}
               </div>
+
+              {hasSparkUsageHint ? (
+                <p className="field-help">
+                  {t(($) => $.models.catalog.sparkUsageHint)}
+                </p>
+              ) : null}
 
               {compatMode ? (
                 <p className="warn-text">
@@ -361,7 +390,12 @@ export function ModelRoutingSection({
                     {groups.map((group) => (
                       <optgroup key={group.id} label={group.label}>
                         {group.entries.map((entry) => {
-                          const suffix = modelEntrySuffix(entry, t, commonT);
+                          const suffix = modelEntrySuffix(
+                            entry,
+                            t,
+                            commonT,
+                            providerBlock?.cache_state,
+                          );
                           return (
                             <option
                               key={`${group.id}:${entry.id}`}

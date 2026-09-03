@@ -41,6 +41,7 @@ MODEL_REASON_CODES = frozenset(
         "discovery_unavailable",
         "missing_active_credential",
         "model_auth_unverified",
+        "model_entitlement_unverified",
         "model_not_in_registry",
         "model_not_visible",
         "model_output_limit_unknown",
@@ -245,7 +246,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         supports_tool_calling=False,
         allowed_tasks=("card_translation",),
         allowed_auth_modes=("chatgpt_oauth",),
-        required_plans=("pro",),
         exact_model_id=True,
         execution_adapter="codex_app_server",
         task_route_status="current",
@@ -443,6 +443,26 @@ def model_execution_admission_detail(
             return {"code": "subscription_plan_unverified", "field": "credential"}
         if normalized_plan not in capability.required_plans:
             return {"code": "subscription_plan_required", "field": "credential"}
+    return None
+
+
+def model_entitlement_admission_detail(
+    model: str,
+    *,
+    discovery_status: str,
+    discovered_model_ids: set[str] | frozenset[str],
+) -> dict[str, str] | None:
+    """Require direct per-credential observation for exact-id models."""
+    capability = capability_for(model)
+    if capability is None or not capability.exact_model_id:
+        return None
+    requested_model = (model or "").strip()
+    if requested_model != capability.id:
+        return {"code": "model_not_visible", "field": "model"}
+    if discovery_status != "ok":
+        return {"code": "model_entitlement_unverified", "field": "model"}
+    if requested_model not in discovered_model_ids:
+        return {"code": "model_not_visible", "field": "model"}
     return None
 
 

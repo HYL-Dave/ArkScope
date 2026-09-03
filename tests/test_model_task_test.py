@@ -369,7 +369,6 @@ def test_oauth_card_canary_uses_one_subscription_structured_call(
 @pytest.mark.parametrize(
     ("active", "task", "expected"),
     [
-        (_active("chatgpt_oauth", plan_type="plus"), "card_translation", "subscription_plan_required"),
         (_active("api_key", plan_type=None), "card_translation", "task_auth_mode_unsupported"),
         (_active("chatgpt_oauth", plan_type="pro"), "card_synthesis", "model_task_unsupported"),
     ],
@@ -427,11 +426,14 @@ def test_spark_requires_successful_exact_discovery_before_provider(monkeypatch, 
     )
 
     assert result.status == "unsupported"
-    assert result.error_code == "model_not_visible"
+    assert result.error_code == "model_entitlement_unverified"
     assert calls == {"api": [], "driver": [], "subscription": []}
 
 
-def test_spark_pro_task_test_dispatches_once_with_the_task(monkeypatch, tmp_path):
+@pytest.mark.parametrize("diagnostic_plan", ["pro", "prolite", "plus", None])
+def test_spark_task_test_dispatches_once_after_exact_discovery(
+    monkeypatch, tmp_path, diagnostic_plan,
+):
     scope = DiscoveryScope(
         status="ok",
         discovered_at="2026-09-03T00:00:00Z",
@@ -441,7 +443,7 @@ def test_spark_pro_task_test_dispatches_once_with_the_task(monkeypatch, tmp_path
     result, calls, _ = _run(
         monkeypatch,
         tmp_path,
-        active=_active("chatgpt_oauth", plan_type="pro"),
+        active=_active("chatgpt_oauth", plan_type=diagnostic_plan),
         task="card_translation",
         provider="openai",
         model="gpt-5.3-codex-spark",
@@ -696,7 +698,7 @@ def test_task_test_route_defers_spark_entitlement_to_bounded_dispatch(
         return SimpleNamespace(
             model_dump=lambda: {
                 "status": "unsupported",
-                "error_code": "subscription_plan_required",
+                "error_code": "model_entitlement_unverified",
             }
         )
 
@@ -715,6 +717,6 @@ def test_task_test_route_defers_spark_entitlement_to_bounded_dispatch(
 
     assert response == {
         "status": "unsupported",
-        "error_code": "subscription_plan_required",
+        "error_code": "model_entitlement_unverified",
     }
     assert len(dispatched) == 1

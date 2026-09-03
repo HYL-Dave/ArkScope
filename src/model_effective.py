@@ -25,6 +25,7 @@ from src.model_capabilities import (
     all_models,
     capability_for,
     model_auth_admission_detail,
+    model_entitlement_admission_detail,
     model_execution_admission_detail,
 )
 from src.model_discovery_cache import ModelDiscoveryCache
@@ -117,6 +118,8 @@ def _model_eligibility(
     plan_type: str | None,
     provider_reason: str | None,
     capability: ModelCapability | None,
+    discovery_status: str,
+    discovered_model_ids: set[str],
 ) -> tuple[bool, str | None]:
     if provider_reason is not None:
         return False, provider_reason
@@ -130,6 +133,13 @@ def _model_eligibility(
     )
     if execution_detail is not None:
         return False, execution_detail["code"]
+    entitlement_detail = model_entitlement_admission_detail(
+        capability.id,
+        discovery_status=discovery_status,
+        discovered_model_ids=discovered_model_ids,
+    )
+    if entitlement_detail is not None:
+        return False, entitlement_detail["code"]
     if capability.task_route_status == "retired":
         return False, "model_retired"
     auth_detail = model_auth_admission_detail(capability.id, auth_mode)
@@ -152,6 +162,8 @@ def _v2_entry(
     plan_type: str | None,
     provider_reason: str | None,
     capability: ModelCapability | None,
+    discovery_status: str,
+    discovered_model_ids: set[str],
 ) -> dict[str, Any]:
     eligible, reason = _model_eligibility(
         task=task,
@@ -160,6 +172,8 @@ def _v2_entry(
         plan_type=plan_type,
         provider_reason=provider_reason,
         capability=capability,
+        discovery_status=discovery_status,
+        discovered_model_ids=discovered_model_ids,
     )
     entry = {
         "id": model_id,
@@ -261,6 +275,8 @@ def effective_model_view_v2(
                         plan_type=credential.plan_type if credential is not None else None,
                         provider_reason=provider_reason,
                         capability=capability,
+                        discovery_status=scope_status,
+                        discovered_model_ids=scope["real_ids"],
                     ))
                     seen_ids.add(real_id)
                     covered_capabilities.add(capability.id)
@@ -290,6 +306,8 @@ def effective_model_view_v2(
                         plan_type=credential.plan_type if credential is not None else None,
                         provider_reason=provider_reason,
                         capability=capability,
+                        discovery_status=scope_status,
+                        discovered_model_ids=scope["real_ids"],
                     ))
                     seen_ids.add(capability.id)
             else:
@@ -307,6 +325,8 @@ def effective_model_view_v2(
                         plan_type=credential.plan_type if credential is not None else None,
                         provider_reason=provider_reason,
                         capability=capability,
+                        discovery_status=scope_status,
+                        discovered_model_ids=scope["real_ids"],
                     ))
                     seen_ids.add(capability.id)
 
@@ -326,6 +346,8 @@ def effective_model_view_v2(
                     plan_type=credential.plan_type if credential is not None else None,
                     provider_reason=provider_reason,
                     capability=capability,
+                    discovery_status=scope_status,
+                    discovered_model_ids=scope["real_ids"],
                 ))
                 seen_ids.add(capability.id)
 
@@ -350,6 +372,8 @@ def effective_model_view_v2(
                     plan_type=credential.plan_type if credential is not None else None,
                     provider_reason=provider_reason,
                     capability=capability,
+                    discovery_status=scope_status,
+                    discovered_model_ids=scope["real_ids"],
                 ))
 
             provider_blocks[provider] = {

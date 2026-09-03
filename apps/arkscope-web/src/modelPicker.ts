@@ -58,6 +58,7 @@ export function groupedModelEntries(
   entries: ModelEntryInput[],
   providerReason: string | null,
   t: ModelCommonT,
+  cacheState?: string,
 ): ModelEntryGroup[] {
   const availableLabel = modelGroupLabel("available", t);
   const visibleDisabledLabel = modelGroupLabel("visible_disabled", t);
@@ -69,11 +70,19 @@ export function groupedModelEntries(
     baseLabel: entry.baseLabel ?? entry.label,
     compatibility: entry.compatibility ?? null,
   }));
+  const seedOnlyAvailable = (entry: ModelEntryWithReason) => (
+    cacheState === "seed_only"
+    && entry.status === "seed"
+    && !entry.disabledReason
+  );
   return [
     {
       id: "available",
       label: availableLabel,
-      entries: withReason.filter((entry) => entry.status === "visible" && !entry.disabledReason),
+      entries: withReason.filter((entry) => (
+        (entry.status === "visible" && !entry.disabledReason)
+        || seedOnlyAvailable(entry)
+      )),
     },
     {
       id: "visible_disabled",
@@ -83,7 +92,10 @@ export function groupedModelEntries(
     {
       id: "advanced",
       label: advancedLabel,
-      entries: withReason.filter((entry) => entry.status === "advanced" || entry.status === "seed"),
+      entries: withReason.filter((entry) => (
+        entry.status === "advanced"
+        || (entry.status === "seed" && !seedOnlyAvailable(entry))
+      )),
     },
     {
       id: "current",

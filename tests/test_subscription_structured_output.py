@@ -1174,8 +1174,8 @@ def test_spark_failure_never_changes_model_auth_or_provider(monkeypatch):
     assert raw_clients == []
 
 
-@pytest.mark.parametrize("plan_type", ["plus", "team"])
-def test_spark_requires_pro_before_adapter_dispatch(monkeypatch, plan_type):
+@pytest.mark.parametrize("plan_type", ["plus", "prolite", "team"])
+def test_spark_plan_name_is_diagnostic_before_adapter_dispatch(monkeypatch, plan_type):
     from src.auth_drivers import subscription_structured_output as mod
 
     record = StoredTokenRecord(access_token="oauth-token", plan_type=plan_type)
@@ -1183,28 +1183,27 @@ def test_spark_requires_pro_before_adapter_dispatch(monkeypatch, plan_type):
     monkeypatch.setattr(mod, "_refresh_chatgpt_token", lambda **_kwargs: record)
     monkeypatch.setattr(
         "src.auth_drivers.codex_translation_adapter.run_codex_translation",
-        lambda **kwargs: adapter_calls.append(kwargs),
+        lambda **kwargs: adapter_calls.append(kwargs) or {"ok": True},
     )
 
-    with pytest.raises(mod.SubscriptionStructuredOutputError) as exc_info:
-        mod.run_subscription_structured_output(
-            task="card_translation",
-            provider="openai",
-            auth_mode="chatgpt_oauth",
-            credential_id="local:7",
-            model="gpt-5.3-codex-spark",
-            system="Translate exactly.",
-            user="Revenue grew 12%.",
-            output_name="emit_translation",
-            output_description="Emit the translation.",
-            schema=_schema(),
-            effort="medium",
-            token_store=_FakeTokenStore(record),
-            timeout_s=30.0,
-        )
+    result = mod.run_subscription_structured_output(
+        task="card_translation",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id="local:7",
+        model="gpt-5.3-codex-spark",
+        system="Translate exactly.",
+        user="Revenue grew 12%.",
+        output_name="emit_translation",
+        output_description="Emit the translation.",
+        schema=_schema(),
+        effort="medium",
+        token_store=_FakeTokenStore(record),
+        timeout_s=30.0,
+    )
 
-    assert exc_info.value.code == "subscription_plan_required"
-    assert adapter_calls == []
+    assert result == {"ok": True}
+    assert len(adapter_calls) == 1
 
 
 def test_unknown_stored_plan_dispatches_live_verification_and_backfills(monkeypatch):
@@ -1250,3 +1249,48 @@ def test_unknown_stored_plan_dispatches_live_verification_and_backfills(monkeypa
     assert store.record.plan_type == "pro"
     assert store.record.plan_observed_at is not None
     assert store.record.access_token == "oauth-token"
+
+
+def test_plan_diagnostic_save_failure_does_not_discard_spark_output(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    record = StoredTokenRecord(
+        access_token="oauth-token",
+        plan_type=None,
+        metadata={"account_id": "acct-fixture"},
+    )
+
+    class DiagnosticWriteFailureStore(_FakeTokenStore):
+        def save(self, **_kwargs):
+            raise OSError("fixture diagnostic store failure")
+
+    store = DiagnosticWriteFailureStore(record)
+    monkeypatch.setattr(mod, "_refresh_chatgpt_token", lambda **_kwargs: record)
+
+    def fake_adapter(**kwargs):
+        kwargs["plan_observer"]("prolite")
+        return {"translated_text": "營收成長 12%。"}
+
+    monkeypatch.setattr(
+        "src.auth_drivers.codex_translation_adapter.run_codex_translation",
+        fake_adapter,
+    )
+
+    result = mod.run_subscription_structured_output(
+        task="card_translation",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id="local:7",
+        model="gpt-5.3-codex-spark",
+        system="Translate exactly.",
+        user="Revenue grew 12%.",
+        output_name="emit_translation",
+        output_description="Emit the translation.",
+        schema=_schema(),
+        effort="medium",
+        token_store=store,
+        timeout_s=30.0,
+    )
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert store.record is record
