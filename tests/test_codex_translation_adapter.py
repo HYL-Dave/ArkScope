@@ -45,6 +45,7 @@ def _write_fixture(tmp_path: Path, **overrides) -> tuple[Path, Path, Path]:
         "model_pages": None,
         "thread_mutation": None,
         "mcp_startup_status": None,
+        "deprecation_notice": False,
         "item_type": None,
         "server_request": False,
         "wrong_thread": False,
@@ -171,6 +172,14 @@ for raw in sys.stdin:
                     "status": SCENARIO["mcp_startup_status"],
                     "error": None,
                     "failureReason": None,
+                },
+            })
+        if SCENARIO["deprecation_notice"]:
+            emit({
+                "method": "deprecationNotice",
+                "params": {
+                    "summary": "A reviewed runtime setting is deprecated.",
+                    "details": "Use its current replacement.",
                 },
             })
         emit({"id": request_id, "result": result})
@@ -424,8 +433,6 @@ def test_translation_runs_one_exact_isolated_thread_and_turn(tmp_path):
         "features.tool_suggest": False,
         "features.unified_exec": False,
         "features.view_image": False,
-        "features.web_search_cached": False,
-        "features.web_search_request": False,
         "include_apps_instructions": False,
         "include_collaboration_mode_instructions": False,
         "include_environment_context": False,
@@ -452,6 +459,18 @@ def test_mcp_startup_is_rejected_before_translation_turn(tmp_path):
     )
 
     _assert_error(executable, "unexpected_tool_activity")
+
+    assert "turn/start" not in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+def test_deprecation_notice_is_rejected_before_translation_turn(tmp_path):
+    executable, transcript, pid_path = _write_fixture(
+        tmp_path,
+        deprecation_notice=True,
+    )
+
+    _assert_error(executable, "protocol_incompatible")
 
     assert "turn/start" not in _methods(transcript)
     _wait_for_exit(pid_path)

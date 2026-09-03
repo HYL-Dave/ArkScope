@@ -54,8 +54,6 @@ _CLOSED_CONFIG_ITEMS: tuple[tuple[str, bool | str], ...] = (
     ("features.tool_suggest", False),
     ("features.unified_exec", False),
     ("features.view_image", False),
-    ("features.web_search_cached", False),
-    ("features.web_search_request", False),
     ("include_apps_instructions", False),
     ("include_collaboration_mode_instructions", False),
     ("include_environment_context", False),

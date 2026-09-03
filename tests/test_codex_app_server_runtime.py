@@ -112,8 +112,6 @@ def test_authenticated_runtime_launches_app_server_with_closed_tool_surface(tmp_
         "features.tool_suggest=false",
         "features.unified_exec=false",
         "features.view_image=false",
-        "features.web_search_cached=false",
-        "features.web_search_request=false",
         "include_apps_instructions=false",
         "include_collaboration_mode_instructions=false",
         "include_environment_context=false",
