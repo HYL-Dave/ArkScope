@@ -65,6 +65,13 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sector_performance,
     )
     from src.tools.options_tools import calculate_greeks
+    from src.tools.financial_calculation_tools import (
+        calculate_compound_growth,
+        calculate_dcf,
+        calculate_implied_valuation,
+        calculate_peer_statistics,
+        calculate_weighted_scenarios,
+    )
     from src.tools.option_chain_tools import get_option_chain as _get_option_chain
     from src.tools.iv_skew_tools import get_iv_skew_analysis as _get_iv_skew_analysis
     from src.tools.portfolio_tools import get_portfolio_analysis as _get_portfolio_analysis
@@ -282,6 +289,92 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         """
         result = calculate_greeks(S=S, K=K, T=T, r=r, sigma=sigma, option_type=option_type)
         return _serialize_result(result, "calculate_greeks")
+
+    @function_tool
+    def tool_calculate_compound_growth(
+        start_value: float,
+        end_value: float,
+        periods: float,
+    ) -> str:
+        """Calculate total change and compound growth from explicit values."""
+        result = calculate_compound_growth(
+            start_value=start_value,
+            end_value=end_value,
+            periods=periods,
+        )
+        return _serialize_result(result, "calculate_compound_growth")
+
+    @function_tool
+    def tool_calculate_dcf(
+        free_cash_flows: List[float],
+        discount_rate: float,
+        terminal_growth_rate: float,
+        cash: float = 0.0,
+        total_debt: float = 0.0,
+        shares_outstanding: Optional[float] = None,
+        current_price: Optional[float] = None,
+    ) -> str:
+        """Calculate an explicit DCF projection and EV-to-equity bridge."""
+        result = calculate_dcf(
+            free_cash_flows=free_cash_flows,
+            discount_rate=discount_rate,
+            terminal_growth_rate=terminal_growth_rate,
+            cash=cash,
+            total_debt=total_debt,
+            shares_outstanding=shares_outstanding,
+            current_price=current_price,
+        )
+        return _serialize_result(result, "calculate_dcf")
+
+    @function_tool
+    def tool_calculate_peer_statistics(
+        values: List[float],
+        target_value: Optional[float] = None,
+    ) -> str:
+        """Calculate deterministic peer statistics and population-z-score outliers."""
+        result = calculate_peer_statistics(
+            values=values,
+            target_value=target_value,
+        )
+        return _serialize_result(result, "calculate_peer_statistics")
+
+    @function_tool
+    def tool_calculate_implied_valuation(
+        target_metric: float,
+        multiples: List[float],
+        value_basis: Literal["enterprise_value", "equity_value"],
+        cash: float = 0.0,
+        total_debt: float = 0.0,
+        shares_outstanding: Optional[float] = None,
+        current_price: Optional[float] = None,
+    ) -> str:
+        """Apply explicit multiples without conflating EV and equity value."""
+        result = calculate_implied_valuation(
+            target_metric=target_metric,
+            multiples=multiples,
+            value_basis=value_basis,
+            cash=cash,
+            total_debt=total_debt,
+            shares_outstanding=shares_outstanding,
+            current_price=current_price,
+        )
+        return _serialize_result(result, "calculate_implied_valuation")
+
+    @function_tool
+    def tool_calculate_weighted_scenarios(
+        values: List[float],
+        weights: List[float],
+        labels: Optional[List[str]] = None,
+        current_price: Optional[float] = None,
+    ) -> str:
+        """Calculate a probability-weighted value from explicit scenarios."""
+        result = calculate_weighted_scenarios(
+            values=values,
+            weights=weights,
+            labels=labels,
+            current_price=current_price,
+        )
+        return _serialize_result(result, "calculate_weighted_scenarios")
 
     @function_tool
     def tool_get_option_chain(
@@ -1024,6 +1117,11 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_price_change,
         tool_get_sector_performance,
         tool_calculate_greeks,
+        tool_calculate_compound_growth,
+        tool_calculate_dcf,
+        tool_calculate_implied_valuation,
+        tool_calculate_peer_statistics,
+        tool_calculate_weighted_scenarios,
         tool_get_option_chain,
         tool_get_iv_skew_analysis,
         tool_detect_news_volume_anomaly,

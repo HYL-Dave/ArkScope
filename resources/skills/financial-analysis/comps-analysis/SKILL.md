@@ -6,7 +6,7 @@ required_params: [ticker]
 aliases: [comps, comp]
 category: financial-analysis
 data_sources:
-  required: [get_fundamentals_analysis, get_detailed_financials]
+  required: [get_fundamentals_analysis, get_detailed_financials, calculate_peer_statistics, calculate_implied_valuation]
   optional: [get_sec_filings, get_peer_comparison]
 output: report
 ---
@@ -24,6 +24,8 @@ and comparing valuation multiples to determine relative value.
 2. **get_fundamentals_analysis** — IBKR snapshot (P/E, P/B, P/S, market cap, real-time)
 3. **get_peer_comparison** — Pre-built peer group with comparative metrics
 4. **get_sec_filings** — Recent 10-K/10-Q for segment data and guidance
+5. **calculate_peer_statistics** — Auditable peer aggregates and outlier flags
+6. **calculate_implied_valuation** — Explicit multiple-to-value calculations
 
 ## Workflow
 
@@ -47,16 +49,15 @@ and comparing valuation multiples to determine relative value.
 
 ### Step 3: Build Comparison Table
 - Build the comparison matrix from metrics returned by ArkScope tools
-- Include median and mean for each metric across the peer group
-- Flag outliers (>2 standard deviations from median)
-- If the tools do not return a required aggregate or outlier result, show the
-  needed formula and inputs and mark it as unavailable rather than estimating it
+- Call `calculate_peer_statistics` for each metric included in the summary
+- Use its explicit population-z-score rule to flag outliers; describe the rule accurately
 
 ### Step 4: Valuation Assessment
 - Compare {ticker}'s multiples to peer median:
   - **Premium justified if**: Higher growth, better margins, stronger moat
   - **Discount warranted if**: Lower growth, weaker margins, higher risk
-- Calculate implied value using peer median multiples applied to {ticker}'s financials
+- Call `calculate_implied_valuation` with the metric's correct enterprise-value
+  or equity-value basis; never mix the two bases
 - Provide a valuation range (low/mid/high) based on different multiples
 
 ## Quality Checks

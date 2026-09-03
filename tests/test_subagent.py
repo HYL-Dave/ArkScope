@@ -150,6 +150,18 @@ class TestSubagentRegistry:
         assert "web_browse" in SUBAGENT_REGISTRY["deep_researcher"].tool_names
         assert SUBAGENT_REGISTRY["reviewer"].tool_names == ["get_ticker_news"]
 
+    def test_code_analyst_uses_the_bounded_financial_calculators(self):
+        expected = {
+            "calculate_compound_growth",
+            "calculate_dcf",
+            "calculate_implied_valuation",
+            "calculate_peer_statistics",
+            "calculate_weighted_scenarios",
+        }
+        cfg = SUBAGENT_REGISTRY["code_analyst"]
+        assert expected <= set(cfg.tool_names)
+        assert all(tool_name in cfg.system_prompt for tool_name in expected)
+
 
 # ============================================================
 # Provider Detection Tests

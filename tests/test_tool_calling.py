@@ -15,6 +15,12 @@ def test_prompt_discloses_that_arbitrary_python_execution_is_unavailable():
     assert "Do not invent precise calculations" in SYSTEM_PROMPT
 
 
+def test_prompt_routes_supported_precise_math_to_deterministic_tools():
+    assert "deterministic financial calculation tools" in SYSTEM_PROMPT
+    assert "calculate_dcf" in SYSTEM_PROMPT
+    assert "calculate_peer_statistics" in SYSTEM_PROMPT
+
+
 def test_prompt_preserves_the_tool_vs_subagent_boundary():
     assert "SUBAGENT DELEGATION" in SYSTEM_PROMPT
     assert "TOOL vs SUBAGENT" in SYSTEM_PROMPT
