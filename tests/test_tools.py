@@ -193,7 +193,7 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All tools should be registered (incl. P1.2 macro_calendar)."""
-        assert len(registry.list_all()) == 49
+        assert len(registry.list_all()) == 54
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
@@ -203,6 +203,9 @@ class TestRegistry:
             "get_ticker_prices", "get_current_quote", "get_price_change", "get_sector_performance",
             "get_ticker_data_coverage",
             "calculate_greeks", "get_option_chain", "get_iv_skew_analysis",
+            "calculate_compound_growth", "calculate_dcf",
+            "calculate_implied_valuation", "calculate_peer_statistics",
+            "calculate_weighted_scenarios",
             "detect_news_volume_anomaly", "detect_event_chains",
             "get_fundamentals_analysis", "get_sec_filings",
             "get_watchlist_overview", "get_morning_brief",
@@ -219,6 +222,7 @@ class TestRegistry:
         assert len(registry.list_by_category("news")) == 11
         assert len(registry.list_by_category("prices")) == 4
         assert len(registry.list_by_category("options")) == 3
+        assert len(registry.list_by_category("calculation")) == 5
         assert len(registry.list_by_category("signals")) == 0
         assert len(registry.list_by_category("analysis")) == 15
         assert len(registry.list_by_category("portfolio")) == 7
@@ -227,7 +231,7 @@ class TestRegistry:
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 49
+        assert len(schema) == 54
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -238,7 +242,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 49
+        assert len(schema) == 54
         for tool in schema:
             assert "name" in tool
             assert "description" in tool

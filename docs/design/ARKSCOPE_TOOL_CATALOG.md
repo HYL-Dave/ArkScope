@@ -49,6 +49,11 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `calculate_greeks` | options | S*, K*, T*, r*, sigma*, option_type?, model?, dividend_yield? | pure caller-supplied option math |
 | `get_option_chain` | options | ticker*, expiry?, num_strikes?, max_expirations_for_term_structure? | live IBKR option chain |
 | `get_iv_skew_analysis` | options | ticker*, expiry?, num_strikes? | live-chain skew calculation |
+| `calculate_compound_growth` | calculation | start_value*, end_value*, periods* | pure caller-supplied compound growth |
+| `calculate_dcf` | calculation | free_cash_flows*, discount_rate*, terminal_growth_rate*, cash?, total_debt?, shares_outstanding?, current_price? | pure caller-supplied DCF and equity bridge |
+| `calculate_implied_valuation` | calculation | target_metric*, multiples*, value_basis*, cash?, total_debt?, shares_outstanding?, current_price? | pure caller-supplied multiple valuation |
+| `calculate_peer_statistics` | calculation | values*, target_value? | pure caller-supplied peer statistics |
+| `calculate_weighted_scenarios` | calculation | values*, weights*, labels?, current_price? | pure caller-supplied scenario weighting |
 | `get_fundamentals_analysis` | analysis | ticker*, period? | cached SEC facts with qualified local price |
 | `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
 | `get_sec_filings` | analysis | ticker*, filing_types?, limit? | SEC filings |

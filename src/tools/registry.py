@@ -158,6 +158,7 @@ class ToolRegistry:
         self._register_news_tools()
         self._register_price_tools()
         self._register_options_tools()
+        self._register_financial_calculation_tools()
         self._register_news_event_tools()
         self._register_analysis_tools()
         self._register_security_lifecycle_tools()
@@ -382,6 +383,105 @@ class ToolRegistry:
                 ToolParameter("num_strikes", "integer",
                               "Strikes above/below ATM (default: 10)",
                               required=False),
+            ],
+        ))
+
+    def _register_financial_calculation_tools(self) -> None:
+        from .financial_calculation_tools import (
+            calculate_compound_growth,
+            calculate_dcf,
+            calculate_implied_valuation,
+            calculate_peer_statistics,
+            calculate_weighted_scenarios,
+        )
+
+        self.register(ToolDefinition(
+            name="calculate_compound_growth",
+            description=(
+                "Calculate total change and compound annual or period growth "
+                "from explicit positive start/end values."
+            ),
+            function=calculate_compound_growth,
+            category="calculation",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("start_value", "number", "Positive starting value"),
+                ToolParameter("end_value", "number", "Positive ending value"),
+                ToolParameter("periods", "number", "Positive number of periods"),
+            ],
+        ))
+        self.register(ToolDefinition(
+            name="calculate_dcf",
+            description=(
+                "Discount an explicit free-cash-flow projection, calculate a "
+                "perpetuity-growth terminal value, and bridge enterprise value "
+                "to equity and optional per-share value."
+            ),
+            function=calculate_dcf,
+            category="calculation",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("free_cash_flows", "array", "Ordered projected FCF values"),
+                ToolParameter("discount_rate", "number", "Decimal discount rate, e.g. 0.10"),
+                ToolParameter("terminal_growth_rate", "number", "Decimal terminal growth rate below the discount rate"),
+                ToolParameter("cash", "number", "Cash in the same units as FCF", required=False, default=0.0),
+                ToolParameter("total_debt", "number", "Debt in the same units as FCF", required=False, default=0.0),
+                ToolParameter("shares_outstanding", "number", "Positive shares in compatible units", required=False),
+                ToolParameter("current_price", "number", "Positive current price for upside/downside", required=False),
+            ],
+        ))
+        self.register(ToolDefinition(
+            name="calculate_peer_statistics",
+            description=(
+                "Calculate auditable peer mean, median, range, quartiles, "
+                "dispersion, and population-z-score outliers."
+            ),
+            function=calculate_peer_statistics,
+            category="calculation",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("values", "array", "Finite comparable peer metric values"),
+                ToolParameter("target_value", "number", "Optional target metric for premium to median", required=False),
+            ],
+        ))
+        self.register(ToolDefinition(
+            name="calculate_implied_valuation",
+            description=(
+                "Apply explicit peer multiples to a target metric while keeping "
+                "enterprise-value and equity-value bases distinct."
+            ),
+            function=calculate_implied_valuation,
+            category="calculation",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("target_metric", "number", "Positive target financial metric"),
+                ToolParameter("multiples", "array", "Positive valuation multiples"),
+                ToolParameter(
+                    "value_basis",
+                    "string",
+                    "Whether the multiple yields enterprise or equity value",
+                    enum=["enterprise_value", "equity_value"],
+                ),
+                ToolParameter("cash", "number", "Cash for EV-to-equity bridge", required=False, default=0.0),
+                ToolParameter("total_debt", "number", "Debt for EV-to-equity bridge", required=False, default=0.0),
+                ToolParameter("shares_outstanding", "number", "Positive shares for per-share value", required=False),
+                ToolParameter("current_price", "number", "Positive current price for upside/downside", required=False),
+            ],
+        ))
+        self.register(ToolDefinition(
+            name="calculate_weighted_scenarios",
+            description=(
+                "Calculate a probability-weighted value from explicit scenario "
+                "values and weights that sum to one."
+            ),
+            function=calculate_weighted_scenarios,
+            category="calculation",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("values", "array", "Scenario values"),
+                ToolParameter("weights", "array", "Nonnegative probabilities summing to 1"),
+                ToolParameter("labels", "array", "Optional labels matching the values", required=False),
+                ToolParameter("current_price", "number", "Positive current price for upside/downside", required=False),
             ],
         ))
 

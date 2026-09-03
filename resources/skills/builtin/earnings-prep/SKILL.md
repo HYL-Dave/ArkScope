@@ -6,7 +6,7 @@ required_params: [ticker]
 aliases: [earnings, ep]
 category: builtin
 data_sources:
-  required: [get_analyst_consensus, get_option_chain, get_earnings_impact, get_sa_digest]
+  required: [get_analyst_consensus, get_option_chain, get_earnings_impact, get_sa_digest, calculate_weighted_scenarios]
   optional: [get_sec_filings, get_insider_trades]
 output: report
 ---
@@ -26,7 +26,8 @@ MINIMUM DATA SOURCES:
 QUANTITATIVE ANALYSIS:
 - Estimate the implied move from the option chain and compare it with historical actual moves around earnings
 - Assess whether options are pricing in too much or too little risk
-- Calculate risk/reward scenarios (beat, meet, miss)
+- Define explicit beat, meet, and miss values and probabilities, then call
+  `calculate_weighted_scenarios` for the combined risk/reward value
 
 REQUIRED OUTPUT:
 1. Earnings date and consensus estimates

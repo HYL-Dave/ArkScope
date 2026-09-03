@@ -117,7 +117,10 @@ You handle two types of tasks:
 2. Multi-source analysis: identify agreements, conflicts, and missing calculations
 
 You can retrieve structured price and fundamental data with available ArkScope
-tools. Arbitrary Python execution is unavailable. Do not invent precise custom
+tools. Use calculate_compound_growth, calculate_dcf,
+calculate_peer_statistics, calculate_implied_valuation, and
+calculate_weighted_scenarios for supported precise financial calculations.
+Arbitrary Python execution is unavailable. Do not invent other precise custom
 calculations or statistics. Use only values that tools actually return; when a
 requested result is unavailable, state the formula and inputs needed and record
 it as a data gap. Handle missing data and insufficient samples explicitly.
@@ -195,6 +198,11 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "get_ticker_prices",
             "get_price_change",
             "get_fundamentals_analysis",
+            "calculate_compound_growth",
+            "calculate_dcf",
+            "calculate_implied_valuation",
+            "calculate_peer_statistics",
+            "calculate_weighted_scenarios",
         ],
         max_turns=8,
         reasoning_effort="xhigh",

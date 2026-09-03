@@ -6,7 +6,7 @@ required_params: [ticker]
 aliases: [dcf, valuation]
 category: financial-analysis
 data_sources:
-  required: [get_detailed_financials, get_fundamentals_analysis]
+  required: [get_detailed_financials, get_fundamentals_analysis, calculate_compound_growth, calculate_dcf, calculate_weighted_scenarios]
   optional: [get_sec_filings, get_analyst_consensus]
 output: report
 ---
@@ -22,8 +22,11 @@ to estimate intrinsic value and margin of safety.
 
 1. **get_detailed_financials** — Historical financials from SEC EDGAR (revenue, FCF, margins, ROIC)
 2. **get_fundamentals_analysis** — Current market data (market cap, shares outstanding)
-3. **get_sec_filings** — Management guidance, segment data, capex plans
-4. **get_analyst_consensus** — Consensus estimates for revenue/earnings growth
+3. **calculate_compound_growth** — Auditable historical growth from cited endpoints
+4. **calculate_dcf** — Discount projections and bridge enterprise value to equity value
+5. **calculate_weighted_scenarios** — Combine explicit scenario values and probabilities
+6. **get_sec_filings** — Management guidance, segment data, capex plans
+7. **get_analyst_consensus** — Consensus estimates for revenue/earnings growth
 
 ## Workflow
 
@@ -33,7 +36,7 @@ to estimate intrinsic value and margin of safety.
   - Capital expenditures, depreciation & amortization
   - Working capital changes
   - Free cash flow (FCF = Operating CF - Capex)
-- Calculate historical growth rates and margins
+- Call `calculate_compound_growth` for each historical growth rate used
 - Identify trends and inflection points
 
 ### Step 2: Build Assumptions
@@ -64,12 +67,14 @@ a precise result.
 - Forecast FCF for 5-10 years (depending on visibility)
 - Terminal value using perpetuity growth method (2-3% terminal growth)
 - Cross-check terminal value as % of total (should be 50-75%)
+- Call `calculate_dcf` separately for each scenario; cite its returned inputs and formulas
 
 ### Step 4: Scenario Analysis
 - **Base case**: Consensus-aligned, most likely outcome
 - **Bull case**: Higher growth, margin expansion, successful execution
 - **Bear case**: Growth deceleration, margin compression, competitive pressure
 - Weight: 50% base, 25% bull, 25% bear (or adjust based on conviction)
+- Call `calculate_weighted_scenarios` for the final weighted fair value
 
 ## Quality Checks
 

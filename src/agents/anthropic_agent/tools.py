@@ -279,6 +279,121 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["S", "K", "T", "r", "sigma"]
             }
         },
+        # Pure financial calculations
+        {
+            "name": "calculate_compound_growth",
+            "description": (
+                "Calculate total change and compound annual or period growth "
+                "from explicit positive start/end values."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "start_value": {"type": "number"},
+                    "end_value": {"type": "number"},
+                    "periods": {"type": "number"},
+                },
+                "required": ["start_value", "end_value", "periods"],
+            },
+        },
+        {
+            "name": "calculate_dcf",
+            "description": (
+                "Discount an explicit free-cash-flow projection, calculate a "
+                "perpetuity-growth terminal value, and bridge enterprise value "
+                "to equity and optional per-share value."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "free_cash_flows": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                    },
+                    "discount_rate": {"type": "number"},
+                    "terminal_growth_rate": {"type": "number"},
+                    "cash": {"type": "number", "default": 0.0},
+                    "total_debt": {"type": "number", "default": 0.0},
+                    "shares_outstanding": {"type": "number"},
+                    "current_price": {"type": "number"},
+                },
+                "required": [
+                    "free_cash_flows",
+                    "discount_rate",
+                    "terminal_growth_rate",
+                ],
+            },
+        },
+        {
+            "name": "calculate_peer_statistics",
+            "description": (
+                "Calculate auditable peer mean, median, range, quartiles, "
+                "dispersion, and population-z-score outliers."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "values": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                    },
+                    "target_value": {"type": "number"},
+                },
+                "required": ["values"],
+            },
+        },
+        {
+            "name": "calculate_implied_valuation",
+            "description": (
+                "Apply explicit peer multiples to a target metric while keeping "
+                "enterprise-value and equity-value bases distinct."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "target_metric": {"type": "number"},
+                    "multiples": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                    },
+                    "value_basis": {
+                        "type": "string",
+                        "enum": ["enterprise_value", "equity_value"],
+                    },
+                    "cash": {"type": "number", "default": 0.0},
+                    "total_debt": {"type": "number", "default": 0.0},
+                    "shares_outstanding": {"type": "number"},
+                    "current_price": {"type": "number"},
+                },
+                "required": ["target_metric", "multiples", "value_basis"],
+            },
+        },
+        {
+            "name": "calculate_weighted_scenarios",
+            "description": (
+                "Calculate a probability-weighted value from explicit scenario "
+                "values and weights that sum to one."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "values": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                    },
+                    "weights": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "current_price": {"type": "number"},
+                },
+                "required": ["values", "weights"],
+            },
+        },
         {
             "name": "get_option_chain",
             "description": (
@@ -1265,6 +1380,13 @@ def execute_tool(
         get_sector_performance,
     )
     from src.tools.options_tools import calculate_greeks
+    from src.tools.financial_calculation_tools import (
+        calculate_compound_growth,
+        calculate_dcf,
+        calculate_implied_valuation,
+        calculate_peer_statistics,
+        calculate_weighted_scenarios,
+    )
     from src.tools.option_chain_tools import get_option_chain
     from src.tools.iv_skew_tools import get_iv_skew_analysis
     from src.tools.portfolio_tools import get_portfolio_analysis
@@ -1361,6 +1483,39 @@ def execute_tool(
             r=tool_input["r"],
             sigma=tool_input["sigma"],
             option_type=tool_input.get("option_type", "C")
+        ),
+        "calculate_compound_growth": lambda: calculate_compound_growth(
+            start_value=tool_input["start_value"],
+            end_value=tool_input["end_value"],
+            periods=tool_input["periods"],
+        ),
+        "calculate_dcf": lambda: calculate_dcf(
+            free_cash_flows=tool_input["free_cash_flows"],
+            discount_rate=tool_input["discount_rate"],
+            terminal_growth_rate=tool_input["terminal_growth_rate"],
+            cash=tool_input.get("cash", 0.0),
+            total_debt=tool_input.get("total_debt", 0.0),
+            shares_outstanding=tool_input.get("shares_outstanding"),
+            current_price=tool_input.get("current_price"),
+        ),
+        "calculate_peer_statistics": lambda: calculate_peer_statistics(
+            values=tool_input["values"],
+            target_value=tool_input.get("target_value"),
+        ),
+        "calculate_implied_valuation": lambda: calculate_implied_valuation(
+            target_metric=tool_input["target_metric"],
+            multiples=tool_input["multiples"],
+            value_basis=tool_input["value_basis"],
+            cash=tool_input.get("cash", 0.0),
+            total_debt=tool_input.get("total_debt", 0.0),
+            shares_outstanding=tool_input.get("shares_outstanding"),
+            current_price=tool_input.get("current_price"),
+        ),
+        "calculate_weighted_scenarios": lambda: calculate_weighted_scenarios(
+            values=tool_input["values"],
+            weights=tool_input["weights"],
+            labels=tool_input.get("labels"),
+            current_price=tool_input.get("current_price"),
         ),
         "get_option_chain": lambda: get_option_chain(
             ticker=tool_input["ticker"],

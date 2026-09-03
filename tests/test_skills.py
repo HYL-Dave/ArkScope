@@ -145,6 +145,33 @@ class TestExpandSkill:
         # Disclaimer present so agent doesn't treat investor opinion as fact
         assert "investor-opinion" in result or "investor opinion" in result
 
+    def test_financial_analysis_skills_bind_deterministic_calculators(self):
+        expected = {
+            "dcf_model": {
+                "calculate_compound_growth",
+                "calculate_dcf",
+                "calculate_weighted_scenarios",
+            },
+            "comps_analysis": {
+                "calculate_peer_statistics",
+                "calculate_implied_valuation",
+            },
+            "earnings_prep": {"calculate_weighted_scenarios"},
+        }
+
+        for skill_name, tool_names in expected.items():
+            skill = SKILL_REGISTRY[skill_name]
+            sources = skill.data_sources or {}
+            bound = set(sources.get("required", [])) | set(
+                sources.get("optional", [])
+            )
+            assert tool_names <= bound
+
+            expanded = expand_skill(skill_name, {"ticker": "NVDA"})
+            assert expanded is not None
+            for tool_name in tool_names:
+                assert tool_name in expanded
+
     def test_full_analysis_mentions_get_sa_digest(self):
         """P1.3 spec §7.2: full_analysis recommends get_sa_digest(ticker, days=14)."""
         result = expand_skill("full_analysis", {"ticker": "NVDA"})
