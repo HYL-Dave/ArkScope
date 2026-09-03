@@ -195,6 +195,7 @@ const settings = {
     },
     credentials: {
       openProviders: "前往 Provider 登入與憑證",
+      plan: "方案：{{value}}",
     },
     compatibility: {
       advanced: "進階",

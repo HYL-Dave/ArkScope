@@ -196,6 +196,7 @@ const settings = {
     },
     credentials: {
       openProviders: "Go to Provider Sign-in and Credentials",
+      plan: "Plan: {{value}}",
     },
     compatibility: {
       advanced: "Advanced",

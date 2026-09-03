@@ -724,9 +724,9 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 62,
+      common: 73,
       shell: 37,
-      settings: 844,
+      settings: 845,
       research: 207,
       explore: 843,
       portfolio: 374,
@@ -797,7 +797,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2391);
+      expect(total, `${locale}.total`).toBe(2403);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1044,6 +1044,17 @@ describe("bundled i18n resources", () => {
           discoveryUnavailable: "暫時無法讀取模型探索狀態",
           providerCallFailed: "provider 實際呼叫失敗",
           reauthRequired: "登入已失效，請重新登入",
+          subscriptionPlanRequired: "需要 ChatGPT Pro 方案",
+          modelTaskUnsupported: "此模型不支援這個任務",
+          modelOutputLimitUnknown: "此路由尚不知道該模型的輸出上限",
+          protocolIncompatible: "內附的模型 adapter 不相容",
+          protocolResourceExhausted: "模型 adapter 已超出受限資源",
+          contextWindowExceeded: "內容超出此模型的 context window",
+          versionIncompatible: "內附的模型 runtime 版本不相容",
+          subscriptionUsageUnavailable: "目前無法使用 ChatGPT 訂閱額度",
+          adapterUnavailable: "內附的模型 adapter 無法使用",
+          timeout: "模型請求逾時",
+          modelRetired: "此模型已退出新執行",
         },
         authModes: {
           apiKey: "API key",
@@ -1081,6 +1092,17 @@ describe("bundled i18n resources", () => {
           discoveryUnavailable: "Model discovery status is temporarily unavailable",
           providerCallFailed: "The live provider call failed",
           reauthRequired: "The sign-in has expired. Sign in again",
+          subscriptionPlanRequired: "Requires a ChatGPT Pro plan",
+          modelTaskUnsupported: "This model does not support this task",
+          modelOutputLimitUnknown: "This model's output limit is unknown for this route",
+          protocolIncompatible: "The bundled model adapter is incompatible",
+          protocolResourceExhausted: "The model adapter exceeded its bounded resources",
+          contextWindowExceeded: "The content exceeds this model's context window",
+          versionIncompatible: "The bundled model runtime version is incompatible",
+          subscriptionUsageUnavailable: "ChatGPT subscription usage is currently unavailable",
+          adapterUnavailable: "The bundled model adapter is unavailable",
+          timeout: "The model request timed out",
+          modelRetired: "This model is retired for new runs",
         },
         authModes: {
           apiKey: "API key",
@@ -1130,7 +1152,7 @@ describe("bundled i18n resources", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toEqual(expectedModels[locale]);
-      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(25);
+      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(36);
       const settings = flattenResource(resources[locale].settings as ResourceTree);
       for (const path of removedSettingsPaths) {
         expect.soft(settings.has(path), `${locale}.settings.${path}`).toBe(false);
@@ -1145,6 +1167,7 @@ describe("bundled i18n resources", () => {
       "models.route.effortRequired",
       "models.route.modelRetired",
       "models.catalog.selectEffort",
+      "models.credentials.plan",
       "models.metrics.officialPricing",
       "actions.refreshStatus",
       "dataStorage.coverage.generatedAt",
@@ -1316,8 +1339,8 @@ describe("bundled i18n resources", () => {
       if (!commonModels) continue;
       const movedModelCount = flattenResource(commonModels).size - 1;
       expect(physicalPreSliceCount).toBe(643);
-      expect(movedModelCount).toBe(24);
-      expect(physicalPreSliceCount + movedModelCount).toBe(667);
+      expect(movedModelCount).toBe(35);
+      expect(physicalPreSliceCount + movedModelCount).toBe(678);
       expect(flattenResource(settings.locale as ResourceTree).size).toBe(3);
       expect(workspaceCount).toBe(95);
       for (const [subtree, count] of Object.entries(expectedSubtreeCounts)) {

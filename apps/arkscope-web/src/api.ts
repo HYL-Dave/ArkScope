@@ -155,6 +155,9 @@ export interface EffectiveProviderSummary {
   credential_id: string;
   auth_mode: CredentialAuthType;
   label: string;
+  // Additive for older sidecars that emitted effective providers before plan
+  // admission was projected.
+  plan_type?: string | null;
 }
 
 export interface EffectiveTaskModels {
