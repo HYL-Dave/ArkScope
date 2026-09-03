@@ -17,12 +17,18 @@ from src.model_discovery_cache import CachedModel, DiscoveryScope
 from src.model_effective import ActiveCredential, task_auth_executable, task_capability_ok
 
 
-def _active(auth_mode: str = "api_key", provider: str = "openai") -> ActiveCredential:
+def _active(
+    auth_mode: str = "api_key",
+    provider: str = "openai",
+    *,
+    plan_type: str | None = None,
+) -> ActiveCredential:
     return ActiveCredential(
         provider=provider,
         credential_id="local:7",
         auth_mode=auth_mode,
         secret_fingerprint="oauth" if "oauth" in auth_mode else "abc123",
+        plan_type=plan_type,
     )
 
 
@@ -361,6 +367,105 @@ def test_oauth_card_canary_uses_one_subscription_structured_call(
 
 
 @pytest.mark.parametrize(
+    ("active", "task", "expected"),
+    [
+        (_active("chatgpt_oauth", plan_type="plus"), "card_translation", "subscription_plan_required"),
+        (_active("chatgpt_oauth", plan_type=None), "card_translation", "subscription_plan_required"),
+        (_active("api_key", plan_type=None), "card_translation", "task_auth_mode_unsupported"),
+        (_active("chatgpt_oauth", plan_type="pro"), "card_synthesis", "model_task_unsupported"),
+    ],
+)
+def test_spark_ineligible_contexts_stop_before_discovery_or_provider(
+    monkeypatch, tmp_path, active, task, expected,
+):
+    result, calls, cache = _run(
+        monkeypatch,
+        tmp_path,
+        active=active,
+        task=task,
+        provider="openai",
+        model="gpt-5.3-codex-spark",
+        effort="medium",
+    )
+
+    assert result.status == "unsupported"
+    assert result.error_code == expected
+    assert calls == {"api": [], "driver": [], "subscription": []}
+    assert cache.calls == []
+
+
+def test_spark_requires_successful_exact_discovery_before_provider(monkeypatch, tmp_path):
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active("chatgpt_oauth", plan_type="pro"),
+        task="card_translation",
+        provider="openai",
+        model="gpt-5.3-codex-spark",
+        effort="medium",
+        cache=_Cache(DiscoveryScope(status="never_discovered", discovered_at=None, models=[])),
+    )
+
+    assert result.status == "unsupported"
+    assert result.error_code == "model_not_visible"
+    assert calls == {"api": [], "driver": [], "subscription": []}
+
+
+def test_spark_pro_task_test_dispatches_once_with_the_task(monkeypatch, tmp_path):
+    scope = DiscoveryScope(
+        status="ok",
+        discovered_at="2026-09-03T00:00:00Z",
+        models=[CachedModel("gpt-5.3-codex-spark", "Spark", "provider_api")],
+    )
+
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active("chatgpt_oauth", plan_type="pro"),
+        task="card_translation",
+        provider="openai",
+        model="gpt-5.3-codex-spark",
+        effort="medium",
+        cache=_Cache(scope),
+    )
+
+    assert result.status == "ok"
+    assert result.latency_ms is not None
+    assert len(calls["subscription"]) == 1
+    assert calls["subscription"][0]["task"] == "card_translation"
+    assert calls["api"] == [] and calls["driver"] == []
+
+
+def test_dispatch_passes_token_store_to_active_credential_resolution(
+    monkeypatch, tmp_path,
+):
+    import src.model_task_canary as mt
+
+    observed = {}
+    token_store = object()
+
+    def resolve(provider, store, **kwargs):
+        observed.update(provider=provider, store=store, **kwargs)
+        return None
+
+    monkeypatch.setattr(mt, "resolve_active_credential", resolve)
+    store = _Store(tmp_path / "profile_state.db")
+    result = asyncio.run(
+        mt.dispatch_task_model_test(
+            task="card_translation",
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            effort="medium",
+            store=store,
+            token_store=token_store,
+        )
+    )
+
+    assert result.error_code == "missing_active_credential"
+    assert observed["token_store"] is token_store
+
+
+@pytest.mark.parametrize(
     ("error", "expected"),
     [
         (SubscriptionStructuredOutputError("reauth_required", "login again"), "reauth_required"),
@@ -557,3 +662,39 @@ def test_task_test_route_dispatches_custom_and_current_explicit_routes(
         "task": "ai_research", "provider": "openai", "model": model,
         "effort": effort,
     }
+
+
+def test_task_test_route_defers_spark_entitlement_to_bounded_dispatch(
+    monkeypatch, tmp_path,
+):
+    from src.api.routes import config_routes as cr
+
+    dispatched = []
+
+    async def fake_dispatch(**kwargs):
+        dispatched.append(kwargs)
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "status": "unsupported",
+                "error_code": "subscription_plan_required",
+            }
+        )
+
+    monkeypatch.setattr(cr, "dispatch_task_model_test", fake_dispatch)
+
+    response = cr.run_task_model_test(
+        cr.TaskModelTestRequest(
+            task="card_translation",
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            effort="medium",
+        ),
+        store=_Store(tmp_path / "profile_state.db"),
+        token_store=object(),
+    )
+
+    assert response == {
+        "status": "unsupported",
+        "error_code": "subscription_plan_required",
+    }
+    assert len(dispatched) == 1
