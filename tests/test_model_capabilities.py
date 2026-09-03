@@ -5,6 +5,8 @@ they are untouched in Task 1, so divergence beyond the five ruled fixes fails
 loudly here instead of surfacing later as a silent behavior change.
 """
 
+import pytest
+
 from src.model_capabilities import (
     all_models,
     capability_for,
@@ -244,18 +246,30 @@ def test_provider_plan_names_are_diagnostic_not_spark_admission():
     ) is None
 
 
-def test_spark_entitlement_requires_the_literal_provider_model_id():
-    observed = {"gpt-5.3-codex-spark"}
-
+def test_spark_exact_entitlement_accepts_the_literal_provider_model_id():
     assert model_entitlement_admission_detail(
         "gpt-5.3-codex-spark",
         discovery_status="ok",
-        discovered_model_ids=observed,
+        discovered_model_ids={"gpt-5.3-codex-spark"},
     ) is None
+
+
+@pytest.mark.parametrize(
+    ("requested_model", "discovered_model"),
+    (
+        ("GPT-5.3-CODEX-SPARK", "GPT-5.3-CODEX-SPARK"),
+        ("gpt-5.3-codex-spark", "GPT-5.3-CODEX-SPARK"),
+    ),
+    ids=("request-case-variant", "discovery-case-variant"),
+)
+def test_case_variant_never_satisfies_exact_model_entitlement(
+    requested_model: str,
+    discovered_model: str,
+):
     assert model_entitlement_admission_detail(
-        "GPT-5.3-CODEX-SPARK",
+        requested_model,
         discovery_status="ok",
-        discovered_model_ids=observed,
+        discovered_model_ids={discovered_model},
     ) == {"code": "model_not_visible", "field": "model"}
 
 
