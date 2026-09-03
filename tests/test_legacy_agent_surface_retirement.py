@@ -6,6 +6,24 @@ from pathlib import Path
 
 
 _ROOT = Path(__file__).resolve().parents[1]
+_CODEX_LAUNCH_CALLS = frozenset(
+    {
+        "Popen",
+        "call",
+        "check_call",
+        "check_output",
+        "execl",
+        "execlp",
+        "execv",
+        "execve",
+        "getoutput",
+        "getstatusoutput",
+        "run",
+        "spawnl",
+        "spawnlp",
+        "system",
+    }
+)
 
 
 def _tree(relative_path: str) -> ast.Module:
@@ -60,6 +78,56 @@ def _route_paths(function: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
         if isinstance(value, ast.Constant) and isinstance(value.value, str):
             paths.add(value.value)
     return paths
+
+
+def _call_leaf_name(call: ast.Call) -> str | None:
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return None
+
+
+def _literal_command_head(call: ast.Call) -> str | None:
+    if not call.args:
+        return None
+    command = call.args[0]
+    if isinstance(command, (ast.List, ast.Tuple)) and command.elts:
+        command = command.elts[0]
+    if not isinstance(command, ast.Constant) or not isinstance(command.value, str):
+        return None
+    pieces = command.value.strip().split(maxsplit=1)
+    return pieces[0] if pieces else None
+
+
+def _external_codex_runtime_hits(source: str) -> set[tuple[str, int]]:
+    hits: set[tuple[str, int]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        if (
+            isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "shutil"
+            and node.func.attr == "which"
+            and _literal_command_head(node) == "codex"
+        ):
+            hits.add(("which", node.lineno))
+        if (
+            _call_leaf_name(node) in _CODEX_LAUNCH_CALLS
+            and _literal_command_head(node) == "codex"
+        ):
+            hits.add(("launch", node.lineno))
+    return hits
+
+
+def _spark_generic_surface_hits(source: str) -> set[int]:
+    return {
+        node.lineno
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Constant)
+        and node.value == "gpt-5.3-codex-spark"
+    }
 
 
 def test_agent_query_signatures_and_replay_schema_have_no_obsolete_attachment_surface():
@@ -147,6 +215,67 @@ def test_model_callable_research_and_tool_owners_remain_registered():
         "get_ticker_prices",
         "search_news_by_keyword",
     } <= names
+
+
+def test_external_path_codex_runtime_cannot_return_to_product_code():
+    planted = """
+import shutil
+import subprocess
+shutil.which("codex")
+subprocess.run(["codex", "app-server"])
+"""
+    assert _external_codex_runtime_hits(planted) == {("which", 4), ("launch", 5)}
+
+    hits = {
+        str(path.relative_to(_ROOT)): _external_codex_runtime_hits(
+            path.read_text(encoding="utf-8")
+        )
+        for path in (_ROOT / "src").rglob("*.py")
+    }
+    assert {path: found for path, found in hits.items() if found} == {}
+
+
+def test_spark_cannot_enter_api_key_or_generic_agent_surfaces():
+    planted = 'MODEL = "gpt-5.3-codex-spark"\n'
+    assert _spark_generic_surface_hits(planted) == {1}
+
+    generic_paths = [*(_ROOT / "src/agents").rglob("*.py")]
+    generic_paths.append(_ROOT / "src/auth_drivers/api_key_drivers.py")
+    hits = {
+        str(path.relative_to(_ROOT)): _spark_generic_surface_hits(
+            path.read_text(encoding="utf-8")
+        )
+        for path in generic_paths
+    }
+    assert {path: found for path, found in hits.items() if found} == {}
+
+    from src.model_capabilities import model_execution_admission_detail
+
+    assert model_execution_admission_detail(
+        "gpt-5.3-codex-spark",
+        task="card_translation",
+        auth_mode="api_key",
+        plan_type="pro",
+    ) == {"code": "task_auth_mode_unsupported", "field": "credential"}
+    assert model_execution_admission_detail(
+        "gpt-5.3-codex-spark",
+        task="ai_research",
+        auth_mode="chatgpt_oauth",
+        plan_type="pro",
+    ) == {"code": "model_task_unsupported", "field": "task"}
+
+
+def test_python_executor_is_not_registered_for_agent_use():
+    def retired_names(names: set[str]) -> set[str]:
+        return names & {"execute_python_analysis"}
+
+    assert retired_names({"execute_python_analysis"}) == {
+        "execute_python_analysis"
+    }
+
+    from src.tools.registry import create_default_registry
+
+    assert retired_names(set(create_default_registry().list_names())) == set()
 
 
 def test_obsolete_attachment_pipeline_and_dependency_are_absent():
