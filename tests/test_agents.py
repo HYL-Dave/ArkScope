@@ -444,6 +444,41 @@ class TestOpenAIMaxTokens:
         # Unknown model gets default
         assert _get_openai_max_output("gpt-4.1") == 128000
 
+    def test_known_model_with_unknown_output_limit_is_rejected(self):
+        from src.agents.openai_agent.agent import (
+            _OPENAI_MODEL_MAX_OUTPUT,
+            _get_openai_max_output,
+        )
+
+        assert "gpt-5.3-codex-spark" not in _OPENAI_MODEL_MAX_OUTPUT
+        with pytest.raises(ValueError) as exc_info:
+            _get_openai_max_output("gpt-5.3-codex-spark")
+
+        assert exc_info.value.args == (
+            {"code": "model_output_limit_unknown", "field": "model"},
+        )
+
+
+def test_anthropic_known_model_with_unknown_output_limit_is_rejected(monkeypatch):
+    from src.agents.anthropic_agent import agent as anthropic_agent
+
+    class UnknownOutputCapability:
+        provider = "anthropic"
+        max_output = None
+
+    monkeypatch.setattr(
+        anthropic_agent,
+        "capability_for",
+        lambda model: UnknownOutputCapability(),
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        anthropic_agent._get_model_max_output("claude-future")
+
+    assert exc_info.value.args == (
+        {"code": "model_output_limit_unknown", "field": "model"},
+    )
+
 
 # ============================================================
 # OpenAI _extract_tool_info Tests

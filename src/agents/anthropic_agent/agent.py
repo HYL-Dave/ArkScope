@@ -125,13 +125,19 @@ _EFFORT_MODELS = frozenset(
 )
 
 # 各模型最大 output tokens（API 硬限制）— registry-derived
-_MODEL_MAX_OUTPUT = {c.id: c.max_output for c in all_models("anthropic")}
+_MODEL_MAX_OUTPUT = {
+    c.id: c.max_output
+    for c in all_models("anthropic")
+    if c.max_output is not None
+}
 
 
 def _get_model_max_output(model: str) -> int:
     """Return the model's maximum output token limit."""
     cap = capability_for(model)
     if cap is not None and cap.provider == "anthropic":
+        if cap.max_output is None:
+            raise ValueError({"code": "model_output_limit_unknown", "field": "model"})
         return cap.max_output
     return 64000  # safe fallback (unknown / non-anthropic ids)
 

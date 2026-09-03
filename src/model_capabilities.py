@@ -45,7 +45,7 @@ class ModelCapability:
     supports_compaction: bool
     context_mode: str                 # "standard" | "ga_1m" | "beta_1m"
     context_limit: int
-    max_output: int
+    max_output: int | None
     supports_structured_output: bool = True
     supports_tool_calling: bool = True
     runtime_ready: bool = True
@@ -58,6 +58,11 @@ class ModelCapability:
     # Auth modes that ArkScope has not live-verified for this exact model.
     # This is an admission fact, not a provider-wide compatibility claim.
     unverified_auth_modes: tuple[str, ...] = ()
+    allowed_tasks: tuple[str, ...] = ()
+    allowed_auth_modes: tuple[str, ...] = ()
+    required_plans: tuple[str, ...] = ()
+    exact_model_id: bool = False
+    execution_adapter: str = "provider_native"
     task_route_status: str = "retired"  # current | retired; independent of adapter readiness
     in_routing_seed: bool = False
     aliases: tuple[str, ...] = ()      # OFFICIAL aliases only (e.g. "gpt-5.6"→Sol)
@@ -203,6 +208,28 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ),
     # ── OpenAI ───────────────────────────────────────────────────
     ModelCapability(
+        id="gpt-5.3-codex-spark", provider="openai",
+        label="GPT-5.3-Codex-Spark",
+        picker_visibility="advanced", thinking_mode="none",
+        effort_options=_OPENAI_CODEX_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=128_000, max_output=None,
+        supports_tool_calling=False,
+        allowed_tasks=("card_translation",),
+        allowed_auth_modes=("chatgpt_oauth",),
+        required_plans=("pro",),
+        exact_model_id=True,
+        execution_adapter="codex_app_server",
+        task_route_status="current",
+        in_routing_seed=False,
+        quality="fast", speed="fast", cost_tier="low",
+        recommended_for=("card_translation",),
+        source_url="https://openai.com/index/introducing-gpt-5-3-codex-spark/",
+        verified_at="2026-09-02",
+        notes="ChatGPT Pro research preview; exact-id Content Translation route "
+              "through the bundled Codex app-server only. Provider maximum "
+              "output is not published.",
+    ),
+    ModelCapability(
         id="gpt-5.6-sol", provider="openai", label="GPT-5.6 Sol",
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
@@ -323,6 +350,8 @@ def capability_for(model: str) -> ModelCapability | None:
         return exact
     lowered = query.lower()
     for cap in _BY_PREFIX:
+        if cap.exact_model_id:
+            continue
         if _matches_reviewed_variant(cap.id, lowered):
             return cap
     return None
@@ -357,11 +386,31 @@ def _matches_reviewed_variant(canonical_id: str, query: str) -> bool:
     return True
 
 
-def model_execution_admission_detail(model: str) -> dict[str, str] | None:
-    """Return a typed block for history-only models at any new execution seam."""
+def model_execution_admission_detail(
+    model: str,
+    *,
+    task: str | None = None,
+    auth_mode: str | None = None,
+    plan_type: str | None = None,
+) -> dict[str, str] | None:
+    """Return a typed block when a model cannot execute in this context."""
     capability = capability_for(model)
-    if capability is not None and not capability.new_execution_allowed:
+    if capability is None:
+        return None
+    if not capability.new_execution_allowed:
         return {"code": "model_retired", "field": "model"}
+    normalized_task = (task or "").strip().lower()
+    if capability.allowed_tasks and normalized_task not in capability.allowed_tasks:
+        return {"code": "model_task_unsupported", "field": "task"}
+    normalized_auth_mode = (auth_mode or "").strip().lower()
+    if (
+        capability.allowed_auth_modes
+        and normalized_auth_mode not in capability.allowed_auth_modes
+    ):
+        return {"code": "task_auth_mode_unsupported", "field": "credential"}
+    normalized_plan = (plan_type or "").strip().lower()
+    if capability.required_plans and normalized_plan not in capability.required_plans:
+        return {"code": "subscription_plan_required", "field": "credential"}
     return None
 
 

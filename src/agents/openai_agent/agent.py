@@ -64,7 +64,9 @@ from src.model_capabilities import all_models as _all_capabilities
 from src.model_capabilities import capability_for as _capability_for
 
 _OPENAI_MODEL_MAX_OUTPUT = {
-    c.id: c.max_output for c in _all_capabilities("openai")
+    c.id: c.max_output
+    for c in _all_capabilities("openai")
+    if c.max_output is not None
 }
 _OPENAI_DEFAULT_MAX_OUTPUT = 128000
 
@@ -73,6 +75,8 @@ def _get_openai_max_output(model: str) -> int:
     """Return the model's maximum output token limit."""
     cap = _capability_for(model)
     if cap is not None and cap.provider == "openai":
+        if cap.max_output is None:
+            raise ValueError({"code": "model_output_limit_unknown", "field": "model"})
         return cap.max_output
     return _OPENAI_DEFAULT_MAX_OUTPUT
 
