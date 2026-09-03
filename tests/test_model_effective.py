@@ -51,6 +51,40 @@ def test_fable_5_1_api_key_is_executable_but_oauth_is_not_live_verified():
         ) is False
 
 
+def test_spark_task_auth_executability_requires_pro_oauth_translation():
+    spark = capability_for("gpt-5.3-codex-spark")
+
+    assert spark is not None
+    assert task_auth_executable(
+        "card_translation",
+        "openai",
+        "chatgpt_oauth",
+        spark,
+        plan_type="pro",
+    ) is True
+    assert task_auth_executable(
+        "card_translation",
+        "openai",
+        "chatgpt_oauth",
+        spark,
+        plan_type="plus",
+    ) is False
+    assert task_auth_executable(
+        "card_translation",
+        "openai",
+        "api_key",
+        spark,
+        plan_type="pro",
+    ) is False
+    assert task_auth_executable(
+        "card_synthesis",
+        "openai",
+        "chatgpt_oauth",
+        spark,
+        plan_type="pro",
+    ) is False
+
+
 def _routes_mixed() -> dict:
     # Round-3 MF1: the DEFAULT config shape — anthropic cards + openai research.
     return {
@@ -245,6 +279,101 @@ def test_resolver_covers_env_only_keys(monkeypatch, tmp_path):
     assert cred.secret_fingerprint == _fp("sk-env-only")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-rotated")
     assert resolve_active_credential("openai").secret_fingerprint == _fp("sk-rotated")
+
+
+def test_resolver_reads_oauth_plan_from_token_store_not_display_alias(
+    monkeypatch, tmp_path,
+):
+    from src.auth_drivers import PlaintextTokenStore, StoredTokenRecord
+    from src.model_credentials import CredentialStore, resolve_active_credential
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    db = tmp_path / "profile_state.db"
+    store = CredentialStore(db)
+    row = store.add_oauth_credential(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        alias="ChatGPT subscription Pro",
+    )
+    credential_id = f"local:{row.id}"
+    tokens = PlaintextTokenStore(tmp_path / "tokens.json")
+    tokens.save(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id=credential_id,
+        record=StoredTokenRecord(access_token="fixture-token", plan_type="plus"),
+    )
+
+    credential = resolve_active_credential(
+        "openai",
+        store,
+        token_store=tokens,
+    )
+
+    assert credential is not None
+    assert credential.plan_type == "plus"
+
+
+def test_spark_effective_view_distinguishes_pro_plus_and_wrong_tasks(tmp_path):
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id="o1",
+        secret_fingerprint="oauth",
+        status="ok",
+        models=[{
+            "id": "gpt-5.3-codex-spark",
+            "label": "GPT-5.3-Codex-Spark",
+            "source": "provider_api",
+        }],
+    )
+    routes = {
+        task: TaskRoute(
+            task=task,
+            provider="openai",
+            model=(
+                "gpt-5.3-codex-spark"
+                if task == "card_translation"
+                else "gpt-5.6-luna"
+            ),
+            effort="medium",
+        )
+        for task in ("card_synthesis", "card_translation", "ai_research")
+    }
+
+    def spark_entry(plan_type):
+        view = effective_model_view_v2(
+            cache=cache,
+            routes=routes,
+            credentials={
+                "openai": ActiveCredential(
+                    "openai", "o1", "chatgpt_oauth", "oauth", plan_type
+                ),
+                "anthropic": None,
+            },
+        )
+        assert view["providers"]["openai"]["plan_type"] == plan_type
+        for task in ("card_synthesis", "ai_research"):
+            assert all(
+                entry["id"] != "gpt-5.3-codex-spark"
+                for entry in view["tasks"][task]["providers"]["openai"]["models"]
+            )
+        return next(
+            entry
+            for entry in view["tasks"]["card_translation"]["providers"]["openai"]["models"]
+            if entry["id"] == "gpt-5.3-codex-spark"
+        )
+
+    pro = spark_entry("pro")
+    assert pro["visible_to_credential"] is True
+    assert pro["eligible"] is True
+    assert pro["reason_code"] is None
+
+    plus = spark_entry("plus")
+    assert plus["visible_to_credential"] is True
+    assert plus["eligible"] is False
+    assert plus["reason_code"] == "subscription_plan_required"
 
 
 def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_path):
@@ -664,11 +793,13 @@ def test_model_catalog_effective_gains_provider_indexed_shape(monkeypatch, tmp_p
         "anthropic": {
             "credential_id": f"local:{anthropic.id}",
             "auth_mode": "api_key",
+            "plan_type": None,
             "label": "Claude primary",
         },
         "openai": {
             "credential_id": f"local:{openai.id}",
             "auth_mode": "api_key",
+            "plan_type": None,
             "label": "OpenAI primary",
         },
     }

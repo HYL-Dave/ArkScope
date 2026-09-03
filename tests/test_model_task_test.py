@@ -260,6 +260,8 @@ def test_dispatch_precedence_rejects_cross_provider_oauth_before_capability(monk
     assert calls == {"api": [], "driver": [], "subscription": []}
 
     for capability in all_models():
+        if not capability.new_execution_allowed or capability.allowed_auth_modes:
+            continue
         for task in ("card_synthesis", "card_translation", "ai_research"):
             assert task_capability_ok(task, capability) == task_auth_executable(
                 task, capability.provider, "api_key", capability

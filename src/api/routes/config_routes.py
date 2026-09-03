@@ -104,6 +104,56 @@ def _active_auth_mode(provider: str, store: CredentialStore) -> str | None:
         return None
 
 
+def _restricted_task_route_admission_detail(
+    *,
+    task: str,
+    provider: str,
+    model: str,
+    effort: str,
+    store: CredentialStore,
+    token_store,
+    observation_store,
+) -> dict[str, str] | None:
+    """Apply credential and discovery policy for restricted registry entries."""
+    capability = capability_for(model)
+    credential = None
+    if capability is not None and (
+        capability.allowed_tasks
+        or capability.allowed_auth_modes
+        or capability.required_plans
+        or capability.exact_model_id
+    ):
+        credential = resolve_active_credential(
+            provider,
+            store,
+            token_store=token_store,
+            observation_store=observation_store,
+        )
+    detail = task_route_admission_detail(
+        provider,
+        model,
+        effort,
+        task=task,
+        auth_mode=credential.auth_mode if credential is not None else None,
+        plan_type=credential.plan_type if credential is not None else None,
+    )
+    if detail is not None:
+        return detail
+    if capability is None or not capability.exact_model_id:
+        return None
+    if credential is None:
+        return {"code": "task_auth_mode_unsupported", "field": "credential"}
+    scope = ModelDiscoveryCache(store.db_path).get(
+        provider=provider,
+        auth_mode=credential.auth_mode,
+        credential_id=credential.credential_id,
+        secret_fingerprint=credential.secret_fingerprint,
+    )
+    if scope.status != "ok" or model not in {row.model_id for row in scope.models}:
+        return {"code": "model_not_visible", "field": "model"}
+    return None
+
+
 class RouteUpdate(BaseModel):
     provider: Provider
     model: str
@@ -1015,7 +1065,12 @@ def run_task_model_test(
     if not model:
         raise HTTPException(status_code=400, detail="model is required")
     effort = body.effort.strip()
-    detail = task_route_admission_detail(body.provider, model, effort)
+    detail = task_route_admission_detail(
+        body.provider,
+        model,
+        effort,
+        task=body.task,
+    )
     if detail is not None:
         raise HTTPException(status_code=400, detail=detail)
     result = _run_coro(dispatch_task_model_test(
@@ -1033,6 +1088,8 @@ def run_task_model_test(
 def update_model_routes(
     body: ModelRoutesUpdate,
     store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
 ):
     """Persist per-task provider/model routing in the profile DB (app-managed
     authority — CONFIG_AUTHORITY_PLAN §2). `user_profile.local.yaml` is now fallback
@@ -1054,7 +1111,15 @@ def update_model_routes(
             raise HTTPException(status_code=400, detail=f"{task}: model is required")
         effort = update.effort.strip()
         warnings: list[str] = []
-        detail = task_route_admission_detail(update.provider, model, effort)
+        detail = _restricted_task_route_admission_detail(
+            task=task,
+            provider=update.provider,
+            model=model,
+            effort=effort,
+            store=store,
+            token_store=token_store,
+            observation_store=observation_store,
+        )
         if detail is not None:
             raise HTTPException(status_code=400, detail=detail)
         inferred = model_provider(model)
@@ -1211,7 +1276,12 @@ def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
         if inferred and inferred != provider:  # same prefix-mismatch guard as update_model_routes
             skipped.append(task)
             continue
-        if task_route_admission_detail(provider, model, effort) is not None:
+        if task_route_admission_detail(
+            provider,
+            model,
+            effort,
+            task=task,
+        ) is not None:
             skipped.append(task)
             continue
         require_profile_state_write("model_route_import", {"task": task})

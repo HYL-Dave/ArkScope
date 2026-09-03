@@ -70,8 +70,13 @@ def _anthropic_fixed_task_tool_choice(model: str, name: str) -> dict[str, str]:
     return {"type": "tool", "name": name}
 
 
-def _require_task_route(provider: Provider, model: str, effort: str) -> None:
-    detail = task_route_admission_detail(provider, model, effort)
+def _require_task_route(
+    task: str,
+    provider: Provider,
+    model: str,
+    effort: str,
+) -> None:
+    detail = task_route_admission_detail(provider, model, effort, task=task)
     if detail is not None:
         raise ValueError(detail)
 
@@ -533,7 +538,7 @@ def synthesize_card(
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
         effort = route.effort if route.provider == "anthropic" else "high"
-        _require_task_route(provider, model, effort)
+        _require_task_route("card_synthesis", provider, model, effort)
         synth, effort_meta = _synthesize_anthropic(
             packet,
             model,
@@ -544,7 +549,7 @@ def synthesize_card(
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
         effort = route.effort if route.provider == "openai" else "high"
-        _require_task_route(provider, model, effort)
+        _require_task_route("card_synthesis", provider, model, effort)
         synth, effort_meta = _synthesize_openai(
             packet,
             model,
@@ -694,7 +699,7 @@ def translate_text(
     effort = route.effort if provider == route.provider else "medium"
     if provider not in ("anthropic", "openai"):
         raise ValueError(f"unknown provider: {provider}")
-    _require_task_route(provider, model, effort)
+    _require_task_route("card_translation", provider, model, effort)
     harness = translation_harness(provider)
 
     if provider == "anthropic":
@@ -788,7 +793,7 @@ def translate_card(
     effort = route.effort if provider == route.provider else "medium"
     if provider not in ("anthropic", "openai"):
         raise ValueError(f"unknown provider: {provider}")
-    _require_task_route(provider, model, effort)
+    _require_task_route("card_translation", provider, model, effort)
     if provider == "anthropic":
         translated = _translate_anthropic(
             model,
