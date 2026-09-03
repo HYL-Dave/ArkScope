@@ -23,7 +23,11 @@ from src.auth_drivers.subscription_structured_output import (
     SubscriptionStructuredOutputError,
     run_subscription_structured_output_async,
 )
-from src.model_capabilities import capability_for, model_auth_admission_detail
+from src.model_capabilities import (
+    capability_for,
+    model_auth_admission_detail,
+    model_execution_admission_detail,
+)
 from src.model_credentials import resolve_active_credential, test_model
 from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_effective import task_capability_ok
@@ -137,6 +141,7 @@ async def _run_subscription_card_canary(
         # The sync FastAPI route owns one short-lived asyncio.run() loop. Await the
         # provider adapter in that loop; never create a second executor/session.
         payload = await run_subscription_structured_output_async(
+            task=task,
             provider=provider,
             auth_mode=active.auth_mode,
             credential_id=active.credential_id,
@@ -168,7 +173,18 @@ async def _run_subscription_card_canary(
             latency_ms=round((time.perf_counter() - started) * 1000),
         )
     except SubscriptionStructuredOutputError as exc:
-        code = "reauth_required" if exc.code == "reauth_required" else "provider_call_failed"
+        exposed_codes = frozenset(
+            {
+                "context_window_exceeded",
+                "protocol_incompatible",
+                "protocol_resource_exhausted",
+                "reauth_required",
+                "subscription_usage_unavailable",
+                "timeout",
+                "version_incompatible",
+            }
+        )
+        code = exc.code if exc.code in exposed_codes else "provider_call_failed"
         return _result(
             task=task,
             provider=provider,
@@ -308,7 +324,11 @@ async def dispatch_task_model_test(
     timeout_s: float = 45.0,
 ) -> TaskModelTestResult:
     """Run one bounded test using the fixed five-step dispatch precedence."""
-    active = resolve_active_credential(provider, store)
+    active = resolve_active_credential(
+        provider,
+        store,
+        token_store=token_store,
+    )
     if active is None or active.provider != provider:
         return _result(
             task=task, provider=provider, model=model, effort=effort,
@@ -325,11 +345,30 @@ async def dispatch_task_model_test(
 
     capability = capability_for(model)
     inferred_provider = model_provider(model)
-    if (
-        inferred_provider is not None and inferred_provider != provider
-    ) or (
-        capability is not None
-        and (capability.provider != provider or not task_capability_ok(task, capability))
+    if inferred_provider is not None and inferred_provider != provider:
+        return _result(
+            task=task, provider=provider, model=model, effort=effort,
+            active=active, status="unsupported", error_code="task_capability_missing",
+        )
+
+    execution_detail = model_execution_admission_detail(
+        model,
+        task=task,
+        auth_mode=active.auth_mode,
+        plan_type=active.plan_type,
+    )
+    if execution_detail is not None:
+        return _result(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            active=active,
+            status="unsupported",
+            error_code=execution_detail["code"],
+        )
+    if capability is not None and (
+        capability.provider != provider or not task_capability_ok(task, capability)
     ):
         return _result(
             task=task, provider=provider, model=model, effort=effort,
@@ -360,9 +399,12 @@ async def dispatch_task_model_test(
             task=task, provider=provider, model=model, effort=effort,
             active=active, status="error", error_code="discovery_unavailable", warning=exc,
         )
-    if scope.status == "ok" and not any(
+    model_visible = any(
         _visibility_matches(model, item.model_id) for item in scope.models
-    ):
+    )
+    if (capability is not None and capability.exact_model_id and (
+        scope.status != "ok" or not model_visible
+    )) or (scope.status == "ok" and not model_visible):
         return _result(
             task=task, provider=provider, model=model, effort=effort,
             active=active, status="unsupported", error_code="model_not_visible",

@@ -1065,11 +1065,24 @@ def run_task_model_test(
     if not model:
         raise HTTPException(status_code=400, detail="model is required")
     effort = body.effort.strip()
+    capability = capability_for(model)
     detail = task_route_admission_detail(
         body.provider,
         model,
         effort,
         task=body.task,
+        # This route only validates the requested shape. The bounded dispatcher
+        # reads and verifies the active credential, plan, and exact discovery.
+        auth_mode=(
+            capability.allowed_auth_modes[0]
+            if capability is not None and capability.allowed_auth_modes
+            else None
+        ),
+        plan_type=(
+            capability.required_plans[0]
+            if capability is not None and capability.required_plans
+            else None
+        ),
     )
     if detail is not None:
         raise HTTPException(status_code=400, detail=detail)
