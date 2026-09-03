@@ -287,6 +287,53 @@ describe("ModelRoutingSection provider-first UX", () => {
     return host!.querySelector('[data-testid="route-ai_research"]')!;
   }
 
+  function translationCard() {
+    return host!.querySelector('[data-testid="route-card_translation"]')!;
+  }
+
+  function sparkCatalog(planType: "plus" | "pro", eligible: boolean): ModelCatalog {
+    const cat = catalogV2();
+    const sparkId = "gpt-5.3-codex-spark";
+    cat.current_model_ids = [...(cat.current_model_ids ?? []), sparkId];
+    cat.models = [
+      ...cat.models,
+      {
+        ...MODELS[0],
+        id: sparkId,
+        label: sparkId,
+        effort_options: ["low", "medium", "high", "xhigh"],
+      },
+    ];
+    cat.effective!.providers!.openai = {
+      ...cat.effective!.providers!.openai!,
+      plan_type: planType,
+    };
+    const task = cat.effective!.tasks.card_translation!;
+    const openai = task.providers!.openai!;
+    cat.effective!.tasks.card_translation = {
+      ...task,
+      providers: {
+        ...task.providers,
+        openai: {
+          ...openai,
+          models: [
+            ...openai.models,
+            {
+              ...entry(
+                sparkId,
+                "visible",
+                eligible,
+                eligible ? null : "subscription_plan_required",
+              ),
+              effort_options: ["low", "medium", "high", "xhigh"],
+            },
+          ],
+        },
+      },
+    };
+    return cat;
+  }
+
   function buttonByText(parent: ParentNode, text: string): HTMLButtonElement {
     return Array.from(parent.querySelectorAll("button"))
       .find((button) => button.textContent?.trim() === text) as HTMLButtonElement;
@@ -373,6 +420,53 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-opus-5")?.textContent)
       .toContain("進階");
+  });
+
+  it("shows Spark to Plus users as a Pro-only Content Translation option", () => {
+    const cat = sparkCatalog("plus", false);
+    render(vi.fn(), cat, undefined, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      },
+    });
+
+    const translation = translationCard();
+    const model = labelledControl(translation, "model") as HTMLSelectElement;
+    const spark = Array.from(model.options)
+      .find((option) => option.value === "gpt-5.3-codex-spark")!;
+    expect(spark.disabled).toBe(true);
+    expect(spark.textContent).toContain("需要 ChatGPT Pro 方案");
+    expect(translation.textContent).toContain("方案：Plus");
+    expect(translation.textContent).toContain("不可選：");
+    expect(translation.textContent).toContain("需要 ChatGPT Pro 方案");
+  });
+
+  it("enables Spark only for Pro Content Translation with its exact effort set", () => {
+    const cat = sparkCatalog("pro", true);
+    render(vi.fn(), cat, undefined, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "high", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      },
+    });
+
+    const translation = translationCard();
+    const model = labelledControl(translation, "model") as HTMLSelectElement;
+    const effort = labelledControl(translation, "effort") as HTMLSelectElement;
+    expect(Array.from(model.options)
+      .find((option) => option.value === "gpt-5.3-codex-spark")?.disabled).toBe(false);
+    expect(Array.from(effort.options).map((option) => option.value)).toEqual([
+      "", "low", "medium", "high", "xhigh",
+    ]);
+    expect(translation.textContent).toContain("方案：Pro");
+    expect(Array.from((labelledControl(researchCard(), "model") as HTMLSelectElement).options)
+      .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
+    const synthesis = host!.querySelector('[data-testid="route-card_synthesis"]')!;
+    expect(Array.from((labelledControl(synthesis, "model") as HTMLSelectElement).options)
+      .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
   });
 
   it("has no advanced checkbox, manual override details, or duplicate seed selector", () => {
@@ -623,6 +717,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat);
     const card = researchCard();
     expect(buttonByText(card, "OpenAI")).toBeTruthy();
+    expect(host!.textContent).not.toContain("gpt-5.3-codex-spark");
     expect(card.textContent).toContain("未驗證（舊 sidecar 相容模式）");
     expect(card.textContent).toContain("請重啟／更新 sidecar 後再執行模型測試");
     expect((buttonByText(card, "實際測試")).disabled).toBe(true);

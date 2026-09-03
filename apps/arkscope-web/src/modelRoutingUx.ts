@@ -55,6 +55,17 @@ export function modelReasonLabel(id: string, t: ModelCommonT): string {
     case "discovery_unavailable": return t(($) => $.models.reasons.discoveryUnavailable);
     case "provider_call_failed": return t(($) => $.models.reasons.providerCallFailed);
     case "reauth_required": return t(($) => $.models.reasons.reauthRequired);
+    case "subscription_plan_required": return t(($) => $.models.reasons.subscriptionPlanRequired);
+    case "model_task_unsupported": return t(($) => $.models.reasons.modelTaskUnsupported);
+    case "model_output_limit_unknown": return t(($) => $.models.reasons.modelOutputLimitUnknown);
+    case "protocol_incompatible": return t(($) => $.models.reasons.protocolIncompatible);
+    case "protocol_resource_exhausted": return t(($) => $.models.reasons.protocolResourceExhausted);
+    case "context_window_exceeded": return t(($) => $.models.reasons.contextWindowExceeded);
+    case "version_incompatible": return t(($) => $.models.reasons.versionIncompatible);
+    case "subscription_usage_unavailable": return t(($) => $.models.reasons.subscriptionUsageUnavailable);
+    case "adapter_unavailable": return t(($) => $.models.reasons.adapterUnavailable);
+    case "timeout": return t(($) => $.models.reasons.timeout);
+    case "model_retired": return t(($) => $.models.reasons.modelRetired);
     default: return id;
   }
 }
@@ -137,6 +148,7 @@ export function providerContexts(
       credential_id: active.id,
       auth_mode: active.auth_type,
       label: active.label,
+      plan_type: null,
     };
   };
   return { openai: fromInventory("openai"), anthropic: fromInventory("anthropic") };

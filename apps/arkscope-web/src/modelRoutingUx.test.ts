@@ -86,6 +86,17 @@ describe("Models terminology", () => {
           "暫時無法讀取模型探索狀態",
           "provider 實際呼叫失敗",
           "登入已失效，請重新登入",
+          "需要 ChatGPT Pro 方案",
+          "此模型不支援這個任務",
+          "此路由尚不知道該模型的輸出上限",
+          "內附的模型 adapter 不相容",
+          "模型 adapter 已超出受限資源",
+          "內容超出此模型的 context window",
+          "內附的模型 runtime 版本不相容",
+          "目前無法使用 ChatGPT 訂閱額度",
+          "內附的模型 adapter 無法使用",
+          "模型請求逾時",
+          "此模型已退出新執行",
         ],
         authModes: ["API key", "API key pool", "ChatGPT 訂閱登入", "Claude 訂閱登入"],
         thinkingModes: [
@@ -110,6 +121,17 @@ describe("Models terminology", () => {
           "Model discovery status is temporarily unavailable",
           "The live provider call failed",
           "The sign-in has expired. Sign in again",
+          "Requires a ChatGPT Pro plan",
+          "This model does not support this task",
+          "This model's output limit is unknown for this route",
+          "The bundled model adapter is incompatible",
+          "The model adapter exceeded its bounded resources",
+          "The content exceeds this model's context window",
+          "The bundled model runtime version is incompatible",
+          "ChatGPT subscription usage is currently unavailable",
+          "The bundled model adapter is unavailable",
+          "The model request timed out",
+          "This model is retired for new runs",
         ],
         authModes: ["API key", "API key pool", "ChatGPT subscription sign-in", "Claude subscription sign-in"],
         thinkingModes: [
@@ -137,6 +159,17 @@ describe("Models terminology", () => {
       "discovery_unavailable",
       "provider_call_failed",
       "reauth_required",
+      "subscription_plan_required",
+      "model_task_unsupported",
+      "model_output_limit_unknown",
+      "protocol_incompatible",
+      "protocol_resource_exhausted",
+      "context_window_exceeded",
+      "version_incompatible",
+      "subscription_usage_unavailable",
+      "adapter_unavailable",
+      "timeout",
+      "model_retired",
     ];
     const authModeIds = ["api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"];
     const thinkingModeIds = [
@@ -235,7 +268,7 @@ describe("providerContexts", () => {
       anthropic: [],
     });
     expect(contexts.openai).toEqual({
-      credential_id: "local:8", auth_mode: "chatgpt_oauth", label: "openai primary",
+      credential_id: "local:8", auth_mode: "chatgpt_oauth", label: "openai primary", plan_type: null,
     });
     expect(contexts.anthropic).toBeNull();
   });

@@ -294,6 +294,17 @@ export function ModelRoutingSection({
                   <>
                     <strong>{context.label}</strong>
                     <span>{modelAuthModeLabel(context.auth_mode, commonT)}</span>
+                    {context.plan_type && (
+                      <span>
+                        {t(($) => $.models.credentials.plan, {
+                          value: context.plan_type === "plus"
+                            ? "Plus"
+                            : context.plan_type === "pro"
+                              ? "Pro"
+                              : context.plan_type,
+                        })}
+                      </span>
+                    )}
                     <span>{modelCatalogStateLabel(providerBlock?.cache_state, t, commonT)}</span>
                     {providerBlock?.discovered_at && (
                       <span>
