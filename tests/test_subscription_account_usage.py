@@ -224,7 +224,7 @@ for raw in sys.stdin:
     message = json.loads(raw)
     method = message.get("method")
     with open(TRANSCRIPT, "a", encoding="utf-8") as handle:
-        handle.write(json.dumps({"method": method, "codex_home": os.environ.get("CODEX_HOME"), "argv0": sys.argv[0], "path": os.environ.get("PATH"), "environment_keys": sorted(os.environ)}) + "\\n")
+        handle.write(json.dumps({"method": method, "codex_home": os.environ.get("CODEX_HOME"), "argv0": sys.argv[0], "argv": sys.argv[1:], "path": os.environ.get("PATH"), "environment_keys": sorted(os.environ)}) + "\\n")
     if method == HANG:
         while True:
             time.sleep(1)

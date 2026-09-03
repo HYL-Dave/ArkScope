@@ -13,6 +13,7 @@ from src.auth_drivers.codex_app_server_runtime import (
     CodexAppServerRuntimeError,
     CodexAuthenticatedContext,
     CodexJsonlSession,
+    closed_codex_config_overrides,
     run_authenticated_codex_operation,
 )
 
@@ -69,6 +70,9 @@ _ALLOWED_NOTIFICATIONS = (
     | _TURN_TELEMETRY_NOTIFICATIONS
     | _TURN_CONTROL_NOTIFICATIONS
 )
+_REJECTED_NOTIFICATIONS = {
+    "mcpServer/startupStatus/updated": "unexpected_tool_activity",
+}
 _SAFE_ITEM_TYPES = frozenset({"agentMessage", "reasoning", "userMessage"})
 _TOOL_ITEM_TYPES = frozenset(
     {
@@ -102,6 +106,7 @@ PROTOCOL_PROJECTION = {
             "approvalPolicy",
             "approvalsReviewer",
             "baseInstructions",
+            "config",
             "cwd",
             "developerInstructions",
             "dynamicTools",
@@ -120,6 +125,7 @@ PROTOCOL_PROJECTION = {
             "threadId",
         ],
     },
+    "rejected_notifications": sorted(_REJECTED_NOTIFICATIONS),
     "responses": {
         "account/login/start": ["type"],
         "account/read": ["account", "requiresOpenaiAuth"],
@@ -172,6 +178,13 @@ PROTOCOL_PROJECTION = {
             "turnId",
         ],
         "item/started": ["item", "threadId", "turnId"],
+        "mcpServer/startupStatus/updated": [
+            "error",
+            "failureReason",
+            "name",
+            "status",
+            "threadId",
+        ],
         "model/rerouted": [
             "fromModel",
             "reason",
@@ -637,6 +650,7 @@ def _run_turn(
             "approvalPolicy": "never",
             "approvalsReviewer": "user",
             "baseInstructions": system,
+            "config": closed_codex_config_overrides(),
             "cwd": cwd,
             "developerInstructions": None,
             "dynamicTools": [],
@@ -798,6 +812,7 @@ def run_codex_translation(
             timeout_seconds=timeout_s,
             executable=executable,
             allowed_notifications=_ALLOWED_NOTIFICATIONS,
+            rejected_notifications=_REJECTED_NOTIFICATIONS,
             operation=operation,
             max_request_bytes=_MAX_REQUEST_BYTES,
             max_stdout_bytes=_MAX_STDOUT_BYTES,

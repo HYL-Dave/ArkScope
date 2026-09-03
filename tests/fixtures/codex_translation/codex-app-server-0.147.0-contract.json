@@ -14,6 +14,7 @@
     "v2/ErrorNotification.json": "0c20c2cdee947cc249a1ea70063469e6fdde83dfa1b7b6abc04dfe050902241d",
     "v2/ItemCompletedNotification.json": "cfbd72e98b6103825a1e6b2393fc82472b7f2d85d57a5263cc6e4fff5fde1b5f",
     "v2/ItemStartedNotification.json": "f6677d223483607c666c56b2b1cf1e872046cdbed4d025deadd853f23831656c",
+    "v2/McpServerStatusUpdatedNotification.json": "d6f4cb120b2363d321247592f03b9afbbf2762ad6d8af31b88c1b1bf39c4c7aa",
     "v2/ModelReroutedNotification.json": "37cd3c1b3a3560b85b01d4061a07d830fc9ed93b80e4663f975f9197cdb501ef",
     "v2/ModelSafetyBufferingUpdatedNotification.json": "4cf853e3a2f968fdfde75206fd497d3d530b26769026bee343c3ef09ce438cfd",
     "v2/ModelVerificationNotification.json": "4f27a99d0c8664c29abb4d65384ab16853bbc29b61de5e749111cefdc6994655",
@@ -71,6 +72,7 @@
         "approvalPolicy",
         "approvalsReviewer",
         "baseInstructions",
+        "config",
         "cwd",
         "developerInstructions",
         "dynamicTools",
@@ -113,6 +115,7 @@
       "item/reasoning/summaryTextDelta": ["delta", "itemId", "summaryIndex", "threadId", "turnId"],
       "item/reasoning/textDelta": ["contentIndex", "delta", "itemId", "threadId", "turnId"],
       "item/started": ["item", "threadId", "turnId"],
+      "mcpServer/startupStatus/updated": ["error", "failureReason", "name", "status", "threadId"],
       "model/rerouted": ["fromModel", "reason", "threadId", "toModel", "turnId"],
       "model/safetyBuffering/updated": ["fasterModel", "model", "reasons", "showBufferingUi", "threadId", "turnId", "useCases"],
       "model/verification": ["threadId", "turnId", "verifications"],
@@ -126,6 +129,9 @@
       "turn/moderationMetadata": ["metadata", "threadId", "turnId"],
       "turn/started": ["threadId", "turn"]
     },
+    "rejected_notifications": [
+      "mcpServer/startupStatus/updated"
+    ],
     "nested_fields": {
       "account": ["planType", "type"],
       "agent_message": ["id", "text", "type"],
