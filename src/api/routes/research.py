@@ -377,7 +377,12 @@ async def create_research_run(
     effort = effort.strip() if isinstance(effort, str) else ""
     if not model:
         raise HTTPException(status_code=422, detail={"code": "model_required", "field": "model"})
-    detail = task_route_admission_detail(provider, model, effort)
+    detail = task_route_admission_detail(
+        provider,
+        model,
+        effort,
+        task="ai_research",
+    )
     if detail is not None:
         raise HTTPException(status_code=422, detail=detail)
     auth_mode, credential_id = _resolve_auth_metadata(provider)

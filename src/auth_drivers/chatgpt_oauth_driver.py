@@ -70,7 +70,7 @@ def _subscription_catalog_adapter():
     return CodexAccountUsageAdapter()
 
 
-def _task_route_tasks(model: str) -> list[str]:
+def _task_route_tasks(model: str, *, plan_type: str | None = None) -> list[str]:
     from src.model_capabilities import capability_for
     from src.model_effective import task_auth_executable
 
@@ -80,7 +80,13 @@ def _task_route_tasks(model: str) -> list[str]:
     return [
         task
         for task in ("card_synthesis", "card_translation", "ai_research")
-        if task_auth_executable(task, "openai", "chatgpt_oauth", capability)
+        if task_auth_executable(
+            task,
+            "openai",
+            "chatgpt_oauth",
+            capability,
+            plan_type=plan_type,
+        )
     ]
 
 
@@ -393,7 +399,7 @@ class OpenAIChatGPTOAuthDriver:
                 effort_options=list(row.supported_reasoning_efforts),
                 default_effort=row.default_reasoning_effort,
                 input_modalities=list(row.input_modalities),
-                task_route_tasks=_task_route_tasks(row.model),
+                task_route_tasks=_task_route_tasks(row.model, plan_type=rec.plan_type),
             )
             for row in catalog
         ]

@@ -217,7 +217,7 @@ def test_discover_uses_app_server_catalog_and_keeps_subscription_only_model_meta
     monkeypatch.setattr(
         mod,
         "_refresh_login",
-        lambda **_: StoredTokenRecord(access_token="cg-FRESH"),
+        lambda **_: StoredTokenRecord(access_token="cg-FRESH", plan_type="pro"),
     )
     monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter, raising=False)
 
@@ -230,7 +230,21 @@ def test_discover_uses_app_server_catalog_and_keeps_subscription_only_model_meta
     assert spark.effort_options == ["low", "medium", "high", "xhigh"]
     assert spark.default_effort == "medium"
     assert spark.input_modalities == ["text"]
-    assert spark.task_route_tasks == []
+    assert spark.task_route_tasks == ["card_translation"]
+
+
+def test_spark_discovery_does_not_advertise_tasks_without_pro_plan(monkeypatch):
+    _install_catalog(monkeypatch, models=(_catalog_model("gpt-5.3-codex-spark"),))
+    monkeypatch.setattr(
+        mod,
+        "_refresh_login",
+        lambda **_: StoredTokenRecord(access_token="cg-FRESH", plan_type="plus"),
+    )
+
+    result = _run(_driver().discover_models())
+
+    assert result.status == "ok"
+    assert result.models[0].task_route_tasks == []
 
 
 def test_discover_keeps_reviewed_current_models_available_to_existing_task_routes(monkeypatch):

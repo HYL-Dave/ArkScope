@@ -205,7 +205,12 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
     if provider not in ("openai", "anthropic"):
         raise ValueError(f"Unknown provider: {provider}")
     normalized_effort = effort.strip() if isinstance(effort, str) else ""
-    detail = task_route_admission_detail(provider, model, normalized_effort)
+    detail = task_route_admission_detail(
+        provider,
+        model,
+        normalized_effort,
+        task="ai_research",
+    )
     if detail is not None:
         raise ValueError(detail)
     wire_effort = normalized_effort
@@ -364,7 +369,12 @@ def _resolve_query_task_route(
             status_code=422,
             detail={"code": "model_required", "field": "model"},
         )
-    detail = task_route_admission_detail(provider, model, effort)
+    detail = task_route_admission_detail(
+        provider,
+        model,
+        effort,
+        task="ai_research",
+    )
     if detail is not None:
         raise HTTPException(status_code=422, detail=detail)
     return model, effort

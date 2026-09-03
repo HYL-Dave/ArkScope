@@ -79,6 +79,7 @@ def test_catalog_exposes_canonical_current_and_retired_model_policy():
     assert set(policy.current_model_ids) == {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-5.3-codex-spark",
     }
     assert len(policy.retired_model_ids) == 13
     assert "claude-fable-5" in policy.retired_model_ids
@@ -148,6 +149,35 @@ def test_shared_task_route_admission_is_the_bounded_authority(
     assert task_route_admission_detail(provider, model, effort) == detail
 
 
+def test_spark_task_route_admission_uses_task_auth_and_plan_context():
+    from src.model_routing import task_route_admission_detail
+
+    assert task_route_admission_detail(
+        "openai",
+        "gpt-5.3-codex-spark",
+        "medium",
+        task="card_translation",
+        auth_mode="chatgpt_oauth",
+        plan_type="pro",
+    ) is None
+    assert task_route_admission_detail(
+        "openai",
+        "gpt-5.3-codex-spark",
+        "medium",
+        task="card_translation",
+        auth_mode="chatgpt_oauth",
+        plan_type="plus",
+    ) == {"code": "subscription_plan_required", "field": "credential"}
+    assert task_route_admission_detail(
+        "openai",
+        "gpt-5.3-codex-spark",
+        "medium",
+        task="ai_research",
+        auth_mode="chatgpt_oauth",
+        plan_type="pro",
+    ) == {"code": "model_task_unsupported", "field": "task"}
+
+
 def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
     from src.model_route_store import ModelRouteStore
@@ -185,6 +215,110 @@ def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
     assert rc["card_synthesis"]["source"] == "db"
 
     cfg_mod.get_agent_config.cache_clear()
+
+
+def _spark_route_stores(tmp_path, *, plan_type="pro", discovered=True):
+    from src.auth_drivers import PlaintextTokenStore, StoredTokenRecord
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    row = store.add_oauth_credential(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        alias="ChatGPT local",
+    )
+    credential_id = f"local:{row.id}"
+    tokens = PlaintextTokenStore(tmp_path / "tokens.json")
+    tokens.save(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id=credential_id,
+        record=StoredTokenRecord(
+            access_token="fixture-token",
+            plan_type=plan_type,
+        ),
+    )
+    if discovered:
+        ModelDiscoveryCache(store.db_path).record_run(
+            provider="openai",
+            auth_mode="chatgpt_oauth",
+            credential_id=credential_id,
+            secret_fingerprint="oauth",
+            status="ok",
+            models=[{
+                "id": "gpt-5.3-codex-spark",
+                "label": "GPT-5.3-Codex-Spark",
+                "source": "provider_api",
+            }],
+        )
+    return store, tokens
+
+
+def test_update_model_routes_accepts_only_discovered_pro_spark_tuple(tmp_path):
+    from src.model_route_store import ModelRouteStore
+
+    store, tokens = _spark_route_stores(tmp_path, plan_type="pro", discovered=True)
+    result = update_model_routes(
+        ModelRoutesUpdate(routes={
+            "card_translation": RouteUpdate(
+                provider="openai",
+                model="gpt-5.3-codex-spark",
+                effort="medium",
+            ),
+        }),
+        store=store,
+        token_store=tokens,
+        observation_store=None,
+    )
+
+    assert result["routes"]["card_translation"]["model"] == "gpt-5.3-codex-spark"
+    saved = ModelRouteStore(store.db_path).get("card_translation")
+    assert saved is not None
+    assert saved.model == "gpt-5.3-codex-spark"
+
+
+@pytest.mark.parametrize(
+    ("plan_type", "discovered", "expected_detail"),
+    [
+        (
+            "plus",
+            True,
+            {"code": "subscription_plan_required", "field": "credential"},
+        ),
+        (
+            "pro",
+            False,
+            {"code": "model_not_visible", "field": "model"},
+        ),
+    ],
+)
+def test_update_model_routes_rejects_ineligible_spark_before_write(
+    tmp_path, plan_type, discovered, expected_detail,
+):
+    from src.model_route_store import ModelRouteStore
+
+    store, tokens = _spark_route_stores(
+        tmp_path,
+        plan_type=plan_type,
+        discovered=discovered,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "card_translation": RouteUpdate(
+                    provider="openai",
+                    model="gpt-5.3-codex-spark",
+                    effort="medium",
+                ),
+            }),
+            store=store,
+            token_store=tokens,
+            observation_store=None,
+        )
+
+    assert exc_info.value.detail == expected_detail
+    assert ModelRouteStore(store.db_path).get("card_translation") is None
 
 
 def test_update_research_runtime_persists_to_profile_db(tmp_path, monkeypatch):

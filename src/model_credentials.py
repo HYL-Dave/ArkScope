@@ -1022,6 +1022,7 @@ class _ActiveCredentialInfo:
     credential_id: str
     auth_mode: str
     secret_fingerprint: str
+    plan_type: str | None = None
 
 
 def resolve_active_credential(
@@ -1057,9 +1058,24 @@ def resolve_active_credential(
     if active is None:
         return None
     if active.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
+        plan_type = None
+        load_token = getattr(token_store, "load", None)
+        if callable(load_token):
+            try:
+                token_record = load_token(
+                    provider=provider,
+                    auth_mode=active.auth_type,
+                    credential_id=active.id,
+                )
+            except Exception:  # noqa: BLE001 - missing plan must fail closed
+                logger.warning("active OAuth plan lookup failed", exc_info=True)
+            else:
+                raw_plan = getattr(token_record, "plan_type", None)
+                plan_type = str(raw_plan).strip().lower() if raw_plan else None
         return ActiveCredential(
             provider=provider, credential_id=active.id,
             auth_mode=active.auth_type, secret_fingerprint="oauth",
+            plan_type=plan_type,
         )
     if not active.available:
         return None

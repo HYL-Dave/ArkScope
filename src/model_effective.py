@@ -25,6 +25,7 @@ from src.model_capabilities import (
     all_models,
     capability_for,
     model_auth_admission_detail,
+    model_execution_admission_detail,
 )
 from src.model_discovery_cache import ModelDiscoveryCache
 
@@ -39,12 +40,17 @@ class ActiveCredential:
     credential_id: str
     auth_mode: str
     secret_fingerprint: str
+    plan_type: str | None = None
 
 
 def task_capability_ok(task: str, capability: ModelCapability) -> bool:
     """Can the model itself satisfy ``task``? Auth is deliberately separate."""
     if not capability.runtime_ready:
         return False
+    if capability.allowed_tasks and task not in capability.allowed_tasks:
+        return False
+    if capability.execution_adapter != "provider_native":
+        return task == "card_translation" and capability.supports_structured_output
     if task in _CARD_TASKS:
         return capability.supports_tool_calling and capability.supports_structured_output
     if task == "ai_research":
@@ -71,13 +77,24 @@ def _task_auth_mode_ok(task: str, provider: str, auth_mode: str | None) -> bool:
 
 
 def task_auth_executable(
-    task: str, provider: str, auth_mode: str | None, capability: ModelCapability
+    task: str,
+    provider: str,
+    auth_mode: str | None,
+    capability: ModelCapability,
+    *,
+    plan_type: str | None = None,
 ) -> bool:
     """Can (task, provider, auth_mode) actually execute this model? Fail closed."""
     return (
         capability.provider == provider
         and _task_auth_mode_ok(task, provider, auth_mode)
         and task_capability_ok(task, capability)
+        and model_execution_admission_detail(
+            capability.id,
+            task=task,
+            auth_mode=auth_mode,
+            plan_type=plan_type,
+        ) is None
         and model_auth_admission_detail(capability.id, auth_mode) is None
     )
 
@@ -97,6 +114,7 @@ def _model_eligibility(
     task: str,
     provider: str,
     auth_mode: str | None,
+    plan_type: str | None,
     provider_reason: str | None,
     capability: ModelCapability | None,
 ) -> tuple[bool, str | None]:
@@ -104,6 +122,14 @@ def _model_eligibility(
         return False, provider_reason
     if capability is None:
         return True, "model_not_in_registry"
+    execution_detail = model_execution_admission_detail(
+        capability.id,
+        task=task,
+        auth_mode=auth_mode,
+        plan_type=plan_type,
+    )
+    if execution_detail is not None:
+        return False, execution_detail["code"]
     if capability.task_route_status == "retired":
         return False, "model_retired"
     auth_detail = model_auth_admission_detail(capability.id, auth_mode)
@@ -123,6 +149,7 @@ def _v2_entry(
     task: str,
     provider: str,
     auth_mode: str | None,
+    plan_type: str | None,
     provider_reason: str | None,
     capability: ModelCapability | None,
 ) -> dict[str, Any]:
@@ -130,6 +157,7 @@ def _v2_entry(
         task=task,
         provider=provider,
         auth_mode=auth_mode,
+        plan_type=plan_type,
         provider_reason=provider_reason,
         capability=capability,
     )
@@ -194,6 +222,7 @@ def effective_model_view_v2(
         providers_out[provider] = {
             "credential_id": credential.credential_id,
             "auth_mode": credential.auth_mode,
+            "plan_type": credential.plan_type,
         }
 
     tasks_out: dict[str, Any] = {}
@@ -228,6 +257,7 @@ def effective_model_view_v2(
                         task=task,
                         provider=provider,
                         auth_mode=credential.auth_mode if credential is not None else None,
+                        plan_type=credential.plan_type if credential is not None else None,
                         provider_reason=provider_reason,
                         capability=capability,
                     ))
@@ -244,6 +274,7 @@ def effective_model_view_v2(
                         task=task,
                         provider=provider,
                         auth_mode=credential.auth_mode if credential is not None else None,
+                        plan_type=credential.plan_type if credential is not None else None,
                         provider_reason=provider_reason,
                         capability=capability,
                     ))
@@ -251,6 +282,8 @@ def effective_model_view_v2(
 
             for capability in all_models(provider):
                 if capability.picker_visibility != "advanced":
+                    continue
+                if capability.allowed_tasks and task not in capability.allowed_tasks:
                     continue
                 entries.append(_v2_entry(
                     model_id=capability.id,
@@ -260,6 +293,7 @@ def effective_model_view_v2(
                     task=task,
                     provider=provider,
                     auth_mode=credential.auth_mode if credential is not None else None,
+                    plan_type=credential.plan_type if credential is not None else None,
                     provider_reason=provider_reason,
                     capability=capability,
                 ))
@@ -283,6 +317,7 @@ def effective_model_view_v2(
                     task=task,
                     provider=provider,
                     auth_mode=credential.auth_mode if credential is not None else None,
+                    plan_type=credential.plan_type if credential is not None else None,
                     provider_reason=provider_reason,
                     capability=capability,
                 ))
