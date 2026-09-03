@@ -97,7 +97,7 @@ describe("Lifecycle transition activity", () => {
     expect(articles[0]?.textContent).toContain("OLD -> NEW");
     expect(articles[0]?.textContent).toContain("Automatic tracking change");
     expect(articles[0]?.textContent).toContain("2 watchlist memberships archived");
-    expect(articles[0]?.textContent).toContain("Seeking Alpha picks retained");
+    expect(articles[0]?.textContent).toContain("Current Alpha Picks retained");
     expect(articles[0]?.textContent).toContain("simple-symbol-continuation · v1");
     expect(onAcknowledge).not.toHaveBeenCalled();
 
