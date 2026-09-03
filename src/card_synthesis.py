@@ -76,7 +76,19 @@ def _require_task_route(
     model: str,
     effort: str,
 ) -> None:
-    detail = task_route_admission_detail(provider, model, effort, task=task)
+    capability = capability_for(model)
+    # Credential facts are checked again at the live transport boundary. Here we
+    # validate that this task route has at least one admitted runtime context.
+    auth_mode = capability.allowed_auth_modes[0] if capability and capability.allowed_auth_modes else None
+    plan_type = capability.required_plans[0] if capability and capability.required_plans else None
+    detail = task_route_admission_detail(
+        provider,
+        model,
+        effort,
+        task=task,
+        auth_mode=auth_mode,
+        plan_type=plan_type,
+    )
     if detail is not None:
         raise ValueError(detail)
 
@@ -216,6 +228,7 @@ _SYSTEM_SCHEMA_PROMPT = (
 
 def _subscription_structured_output_if_active(
     *,
+    task: str = "card_synthesis",
     provider: Provider,
     model: str,
     system: str,
@@ -232,13 +245,18 @@ def _subscription_structured_output_if_active(
     An OAuth-active call never reaches those clients, so it cannot silently bill
     a key after the user selected subscription auth.
     """
-    execution_detail = model_execution_admission_detail(model)
-    if execution_detail is not None:
-        raise ValueError(execution_detail)
     from src.auth_drivers.live_resolver import resolve_live_auth
 
     resolution = resolve_live_auth(provider)
     if resolution.source != "oauth_driver_unwired":
+        execution_detail = model_execution_admission_detail(
+            model,
+            task=task,
+            auth_mode="api_key",
+            plan_type=None,
+        )
+        if execution_detail is not None:
+            raise ValueError(execution_detail)
         return None
     if not resolution.credential_id:
         raise RuntimeError(f"{provider} subscription credential has no id")
@@ -252,6 +270,7 @@ def _subscription_structured_output_if_active(
 
     try:
         return run_subscription_structured_output(
+            task=task,
             provider=provider,
             auth_mode=auth_mode,
             credential_id=resolution.credential_id,
@@ -650,6 +669,13 @@ def translation_harness(provider: Provider) -> str:
     return f"{provider}_sdk"
 
 
+def _translation_harness(provider: Provider, model: str) -> str:
+    capability = capability_for(model)
+    if capability is not None and capability.execution_adapter == "codex_app_server":
+        return "codex_app_server"
+    return translation_harness(provider)
+
+
 def translate_text(
     text: str,
     *,
@@ -665,7 +691,6 @@ def translate_text(
     if (
         not isinstance(text, str)
         or not text.strip()
-        or len(text) > 16000
         or "\0" in text
     ):
         raise ValueError("translation_source_text")
@@ -700,7 +725,7 @@ def translate_text(
     if provider not in ("anthropic", "openai"):
         raise ValueError(f"unknown provider: {provider}")
     _require_task_route("card_translation", provider, model, effort)
-    harness = translation_harness(provider)
+    harness = _translation_harness(provider, model)
 
     if provider == "anthropic":
         translated = _translate_anthropic(
@@ -732,7 +757,6 @@ def translate_text(
     if (
         not isinstance(translated_text, str)
         or not translated_text.strip()
-        or len(translated_text) > 16000
         or "\0" in translated_text
     ):
         raise TextTranslationOutputInvalid("translation_output_invalid")
@@ -840,6 +864,7 @@ def _translate_anthropic(
 
     def run_once(selected_effort: str) -> dict:
         subscription_payload = _subscription_structured_output_if_active(
+            task="card_translation",
             provider="anthropic",
             model=model,
             system=subscription_system or system,
@@ -916,6 +941,7 @@ def _translate_openai(
 
     def run_once(selected_effort: str) -> dict:
         subscription_payload = _subscription_structured_output_if_active(
+            task="card_translation",
             provider="openai",
             model=model,
             system=system,

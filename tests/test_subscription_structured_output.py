@@ -1085,3 +1085,120 @@ def test_claude_timeout_waits_for_bounded_subprocess_cleanup(monkeypatch):
     assert "timed out" in str(error)
     assert stream.close_started is True
     assert stream.closed is True
+
+
+def test_spark_translation_uses_codex_adapter_once_and_never_builds_raw_client(
+    monkeypatch,
+):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    calls = []
+    raw_clients = []
+    record = StoredTokenRecord(access_token="oauth-token", plan_type="pro")
+    monkeypatch.setattr(mod, "_refresh_chatgpt_token", lambda **_kwargs: record)
+    monkeypatch.setattr(
+        "src.auth_drivers.codex_translation_adapter.run_codex_translation",
+        lambda **kwargs: calls.append(kwargs) or {"ok": True},
+    )
+    monkeypatch.setattr(
+        mod,
+        "_openai_client",
+        lambda *args, **kwargs: raw_clients.append((args, kwargs)),
+    )
+
+    result = mod.run_subscription_structured_output(
+        task="card_translation",
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential_id="local:7",
+        model="gpt-5.3-codex-spark",
+        system="Translate exactly.",
+        user="Revenue grew 12%.",
+        output_name="emit_translation",
+        output_description="Emit the translation.",
+        schema=_schema(),
+        effort="medium",
+        token_store=_FakeTokenStore(record),
+        timeout_s=30.0,
+    )
+
+    assert result == {"ok": True}
+    assert len(calls) == 1
+    assert calls[0]["credential_id"] == "local:7"
+    assert calls[0]["record"] is record
+    assert calls[0]["model"] == "gpt-5.3-codex-spark"
+    assert calls[0]["effort"] == "medium"
+    assert raw_clients == []
+
+
+def test_spark_failure_never_changes_model_auth_or_provider(monkeypatch):
+    from src.auth_drivers import subscription_structured_output as mod
+    from src.auth_drivers.codex_translation_adapter import CodexTranslationError
+
+    record = StoredTokenRecord(access_token="oauth-token", plan_type="pro")
+    raw_clients = []
+    monkeypatch.setattr(mod, "_refresh_chatgpt_token", lambda **_kwargs: record)
+    monkeypatch.setattr(
+        "src.auth_drivers.codex_translation_adapter.run_codex_translation",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            CodexTranslationError("protocol_incompatible")
+        ),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_openai_client",
+        lambda *args, **kwargs: raw_clients.append((args, kwargs)),
+    )
+
+    with pytest.raises(mod.SubscriptionStructuredOutputError) as exc_info:
+        mod.run_subscription_structured_output(
+            task="card_translation",
+            provider="openai",
+            auth_mode="chatgpt_oauth",
+            credential_id="local:7",
+            model="gpt-5.3-codex-spark",
+            system="Translate exactly.",
+            user="Revenue grew 12%.",
+            output_name="emit_translation",
+            output_description="Emit the translation.",
+            schema=_schema(),
+            effort="medium",
+            token_store=_FakeTokenStore(record),
+            timeout_s=30.0,
+        )
+
+    assert exc_info.value.code == "protocol_incompatible"
+    assert raw_clients == []
+
+
+@pytest.mark.parametrize("plan_type", ["plus", None, "team"])
+def test_spark_requires_pro_before_adapter_dispatch(monkeypatch, plan_type):
+    from src.auth_drivers import subscription_structured_output as mod
+
+    record = StoredTokenRecord(access_token="oauth-token", plan_type=plan_type)
+    adapter_calls = []
+    monkeypatch.setattr(mod, "_refresh_chatgpt_token", lambda **_kwargs: record)
+    monkeypatch.setattr(
+        "src.auth_drivers.codex_translation_adapter.run_codex_translation",
+        lambda **kwargs: adapter_calls.append(kwargs),
+    )
+
+    with pytest.raises(mod.SubscriptionStructuredOutputError) as exc_info:
+        mod.run_subscription_structured_output(
+            task="card_translation",
+            provider="openai",
+            auth_mode="chatgpt_oauth",
+            credential_id="local:7",
+            model="gpt-5.3-codex-spark",
+            system="Translate exactly.",
+            user="Revenue grew 12%.",
+            output_name="emit_translation",
+            output_description="Emit the translation.",
+            schema=_schema(),
+            effort="medium",
+            token_store=_FakeTokenStore(record),
+            timeout_s=30.0,
+        )
+
+    assert exc_info.value.code == "subscription_plan_required"
+    assert adapter_calls == []
