@@ -49,6 +49,7 @@ function knownModelReasonLabel(id: string, t: ModelCommonT): string | null {
     case "discovery_unavailable":
     case "provider_call_failed":
     case "reauth_required":
+    case "subscription_plan_unverified":
       return sharedModelReasonLabel(id, t);
     default:
       return null;

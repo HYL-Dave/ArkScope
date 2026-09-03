@@ -55,6 +55,7 @@ export function modelReasonLabel(id: string, t: ModelCommonT): string {
     case "discovery_unavailable": return t(($) => $.models.reasons.discoveryUnavailable);
     case "provider_call_failed": return t(($) => $.models.reasons.providerCallFailed);
     case "reauth_required": return t(($) => $.models.reasons.reauthRequired);
+    case "subscription_plan_unverified": return t(($) => $.models.reasons.subscriptionPlanUnverified);
     case "subscription_plan_required": return t(($) => $.models.reasons.subscriptionPlanRequired);
     case "model_task_unsupported": return t(($) => $.models.reasons.modelTaskUnsupported);
     case "model_output_limit_unknown": return t(($) => $.models.reasons.modelOutputLimitUnknown);

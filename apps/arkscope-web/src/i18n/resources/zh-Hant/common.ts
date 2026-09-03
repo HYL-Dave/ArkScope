@@ -55,6 +55,7 @@ const common = {
       discoveryUnavailable: "暫時無法讀取模型探索狀態",
       providerCallFailed: "provider 實際呼叫失敗",
       reauthRequired: "登入已失效，請重新登入",
+      subscriptionPlanUnverified: "尚未確認 ChatGPT 方案；請先同步帳戶用量，再重試",
       subscriptionPlanRequired: "需要 ChatGPT Pro 方案",
       modelTaskUnsupported: "此模型不支援這個任務",
       modelOutputLimitUnknown: "此路由尚不知道該模型的輸出上限",

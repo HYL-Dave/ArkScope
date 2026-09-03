@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import math
@@ -37,12 +38,14 @@ import stat
 import threading
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib import error, request
 from urllib.parse import parse_qs, urlencode, urlparse
+
+from src.subscription_plan import normalize_subscription_plan
 
 from .probe_harness import redact
 from .token_store import StoredTokenRecord
@@ -340,7 +343,9 @@ def _account_label(plan_type: str) -> str:
     return f"ChatGPT {plan_type}".strip() if plan_type else "ChatGPT subscription"
 
 
-def _token_response_to_record(resp: dict) -> tuple[StoredTokenRecord, str, str]:
+def _token_response_to_record(
+    resp: dict, *, observed_at: datetime | None = None
+) -> tuple[StoredTokenRecord, str, str]:
     access = _str(resp.get("access_token"))
     refresh = _str(resp.get("refresh_token"))
     id_token = _str(resp.get("id_token"))
@@ -354,6 +359,9 @@ def _token_response_to_record(resp: dict) -> tuple[StoredTokenRecord, str, str]:
         refresh_token=refresh,
         expires_at=_extract_access_token_expiry(access),
         plan_type=plan_type or None,
+        plan_observed_at=(
+            _plan_observation_time(observed_at).isoformat() if plan_type else None
+        ),
         account_label=label,
         metadata={"account_id": claims.get("account_id", ""), "id_token": id_token},
     )
@@ -391,7 +399,7 @@ def complete_login(
 
     exchange = exchange or _exchange_authorization_code
     resp = exchange(code=code, code_verifier=pending.code_verifier)  # 400/401 raises — NO fallback; BEFORE any lock
-    record, plan_type, label = _token_response_to_record(resp)
+    record, plan_type, label = _token_response_to_record(resp, observed_at=now)
 
     if pending.relogin_credential_id:
         return _complete_relogin(
@@ -670,6 +678,122 @@ def oauth_credential_lock(
         thread_lock.release()
 
 
+def _token_generation_matches(before: StoredTokenRecord, after: StoredTokenRecord) -> bool:
+    def values(record: StoredTokenRecord) -> tuple[str, str, str, str]:
+        metadata = record.metadata or {}
+        return (
+            str(record.access_token or ""),
+            str(record.refresh_token or ""),
+            str(metadata.get("account_id") or ""),
+            str(metadata.get("id_token") or ""),
+        )
+
+    return all(
+        hmac.compare_digest(left, right)
+        for left, right in zip(values(before), values(after))
+    )
+
+
+def _plan_observation_time(value: datetime | str | None) -> datetime:
+    if value is None:
+        observed = datetime.now(timezone.utc)
+    elif isinstance(value, datetime):
+        observed = value
+    elif isinstance(value, str):
+        try:
+            observed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise ChatGPTOAuthLoginError(
+                "ChatGPT plan observation time is invalid",
+                error_code="protocol_incompatible",
+            ) from None
+    else:
+        raise ChatGPTOAuthLoginError(
+            "ChatGPT plan observation time is invalid",
+            error_code="protocol_incompatible",
+        )
+    if observed.tzinfo is None:
+        raise ChatGPTOAuthLoginError(
+            "ChatGPT plan observation time is invalid",
+            error_code="protocol_incompatible",
+        )
+    return observed.astimezone(timezone.utc)
+
+
+def merge_chatgpt_plan_observation(
+    record: StoredTokenRecord,
+    *,
+    plan_type: str,
+    observed_at: datetime | str | None = None,
+) -> StoredTokenRecord:
+    """Merge one live account/read plan without touching token material."""
+    normalized = normalize_subscription_plan(plan_type)
+    if normalized is None:
+        raise ChatGPTOAuthLoginError(
+            "ChatGPT account plan is unavailable",
+            error_code="account_plan_unavailable",
+        )
+    observed = _plan_observation_time(observed_at)
+    if record.plan_observed_at:
+        previous = _plan_observation_time(record.plan_observed_at)
+        if previous >= observed:
+            return record
+    return replace(
+        record,
+        plan_type=normalized,
+        plan_observed_at=observed.isoformat(),
+        account_label=f"ChatGPT {normalized}",
+    )
+
+
+def persist_chatgpt_plan_observation(
+    *,
+    credential_id: str,
+    token_store: Any,
+    expected_record: StoredTokenRecord,
+    plan_type: str,
+    observed_at: datetime | str | None = None,
+) -> StoredTokenRecord:
+    """Persist a live plan only while the observed token generation is current."""
+    with oauth_credential_lock(credential_id):
+        try:
+            current = token_store.load(
+                provider=PROVIDER,
+                auth_mode=AUTH_MODE,
+                credential_id=credential_id,
+            )
+        except Exception:
+            raise ChatGPTOAuthLoginError(
+                "OAuth token store is unavailable; retry later",
+                error_code="token_store_unavailable",
+            ) from None
+        if current is None or not _token_generation_matches(expected_record, current):
+            raise ChatGPTOAuthLoginError(
+                "OAuth credential changed while its account plan was being read",
+                error_code="credential_changed_during_sync",
+            )
+        updated = merge_chatgpt_plan_observation(
+            current,
+            plan_type=plan_type,
+            observed_at=observed_at,
+        )
+        if updated == current:
+            return current
+        try:
+            token_store.save(
+                provider=PROVIDER,
+                auth_mode=AUTH_MODE,
+                credential_id=credential_id,
+                record=updated,
+            )
+        except Exception:
+            raise ChatGPTOAuthLoginError(
+                "OAuth account plan could not be stored; retry later",
+                error_code="token_store_unavailable",
+            ) from None
+        return updated
+
+
 def _is_expired(record: StoredTokenRecord, *, now: datetime) -> bool:
     if not record.expires_at:
         return False  # unknown expiry — don't auto-refresh; callers force before critical ops
@@ -682,17 +806,27 @@ def _is_expired(record: StoredTokenRecord, *, now: datetime) -> bool:
     return now >= exp - _EXPIRY_BUFFER
 
 
-def _refresh_response_to_record(resp: dict, prev: StoredTokenRecord) -> StoredTokenRecord:
+def _refresh_response_to_record(
+    resp: dict, prev: StoredTokenRecord, *, observed_at: datetime | None = None
+) -> StoredTokenRecord:
     access = _str(resp.get("access_token")) or prev.access_token
     refresh = _str(resp.get("refresh_token")) or prev.refresh_token
-    id_token = _str(resp.get("id_token")) or _str((prev.metadata or {}).get("id_token"))
-    claims = _extract_id_token_claims(id_token) if id_token else {}
-    plan_type = claims.get("plan_type") or (prev.plan_type or "")
+    response_id_token = _str(resp.get("id_token"))
+    id_token = response_id_token or _str((prev.metadata or {}).get("id_token"))
+    # A retained ID token is storage material, not a new plan observation.
+    claims = _extract_id_token_claims(response_id_token) if response_id_token else {}
+    observed_plan = claims.get("plan_type") or ""
+    plan_type = observed_plan or (prev.plan_type or "")
     return StoredTokenRecord(
         access_token=access,
         refresh_token=refresh,
         expires_at=_extract_access_token_expiry(access),
         plan_type=plan_type or None,
+        plan_observed_at=(
+            _plan_observation_time(observed_at).isoformat()
+            if observed_plan
+            else prev.plan_observed_at
+        ),
         account_label=_account_label(plan_type) if plan_type else (prev.account_label or "ChatGPT subscription"),
         metadata={"account_id": claims.get("account_id") or (prev.metadata or {}).get("account_id", ""), "id_token": id_token},
     )
@@ -872,7 +1006,7 @@ def refresh_if_needed(
                 error_code="transport_error",
             ) from None
         try:
-            new_record = _refresh_response_to_record(resp, record)
+            new_record = _refresh_response_to_record(resp, record, observed_at=now)
         except Exception:  # noqa: BLE001 - malformed provider payload
             _record_refresh_error(
                 observations,

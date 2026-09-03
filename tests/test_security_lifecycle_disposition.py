@@ -8,6 +8,7 @@ from typing import get_args
 
 import pytest
 
+from src.model_capabilities import MODEL_REASON_CODES
 from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
 from src.security_lifecycle_disposition import (
     LIFECYCLE_DISPOSITION_REASONS,
@@ -245,6 +246,15 @@ def test_backend_and_frontend_lifecycle_vocabularies_have_exact_parity():
         == frontend_authorities["automation_triggers_runtime"]
     )
     assert backend == frontend, _vocabulary_mismatches(backend, frontend)
+
+
+def test_backend_and_frontend_model_reason_codes_have_exact_parity():
+    frontend = _typescript_compiler_authorities(
+        _FRONTEND_API_SOURCE,
+        {"model_reason_codes": {"kind": "type", "name": "ModelReasonCode"}},
+    )
+
+    assert frontend["model_reason_codes"] == MODEL_REASON_CODES
 
 
 def _blocker(code: str, *, retryable: bool, context: dict | None = None) -> dict:

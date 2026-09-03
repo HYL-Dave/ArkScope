@@ -6,7 +6,15 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ModelRoutingSection } from "./Settings";
-import type { ModelCatalog, ModelOption, ProviderCredential, TaskRoute, TaskModelTestResult } from "./api";
+import type {
+  EffectiveProviderModelEntry,
+  ModelCatalog,
+  ModelOption,
+  ModelReasonCode,
+  ProviderCredential,
+  TaskModelTestResult,
+  TaskRoute,
+} from "./api";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -220,10 +228,10 @@ describe("ModelRoutingSection provider-first UX", () => {
     id: string,
     status: "visible" | "advanced" | "route" | "seed",
     eligible: boolean,
-    reason: string | null,
+    reason: ModelReasonCode | null,
     thinking = "none",
     visible: boolean | null = true,
-  ) => ({
+  ): EffectiveProviderModelEntry => ({
     id, label: id, status, visible_to_credential: visible, eligible,
     reason_code: reason, thinking_mode: thinking,
   });

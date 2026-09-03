@@ -20,6 +20,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from src.subscription_plan import normalize_subscription_plan
+
 _ANTHROPIC_DOCS = "https://docs.anthropic.com/en/docs/about-claude/models/all-models"
 _OPENAI_DOCS = "https://developers.openai.com/api/docs/models"
 _ANTHROPIC_CTX_DOC = "https://platform.claude.com/docs/en/build-with-claude/context-windows"
@@ -31,6 +33,33 @@ _OPENAI_56_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
 _OPENAI_STANDARD_EFFORTS = ("none", "low", "medium", "high", "xhigh")
 _OPENAI_CODEX_EFFORTS = ("low", "medium", "high", "xhigh")
 _OPUS_EFFORTS = ("max", "xhigh", "high", "medium", "low")
+
+MODEL_REASON_CODES = frozenset(
+    {
+        "adapter_unavailable",
+        "context_window_exceeded",
+        "discovery_unavailable",
+        "missing_active_credential",
+        "model_auth_unverified",
+        "model_not_in_registry",
+        "model_not_visible",
+        "model_output_limit_unknown",
+        "model_retired",
+        "model_task_unsupported",
+        "protocol_incompatible",
+        "protocol_resource_exhausted",
+        "provider_call_failed",
+        "reauth_required",
+        "subscription_plan_required",
+        "subscription_plan_unverified",
+        "subscription_usage_unavailable",
+        "task_auth_mode_unsupported",
+        "task_capability_missing",
+        "task_test_unsupported",
+        "timeout",
+        "version_incompatible",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -408,9 +437,12 @@ def model_execution_admission_detail(
         and normalized_auth_mode not in capability.allowed_auth_modes
     ):
         return {"code": "task_auth_mode_unsupported", "field": "credential"}
-    normalized_plan = (plan_type or "").strip().lower()
-    if capability.required_plans and normalized_plan not in capability.required_plans:
-        return {"code": "subscription_plan_required", "field": "credential"}
+    if capability.required_plans:
+        normalized_plan = normalize_subscription_plan(plan_type)
+        if normalized_plan is None:
+            return {"code": "subscription_plan_unverified", "field": "credential"}
+        if normalized_plan not in capability.required_plans:
+            return {"code": "subscription_plan_required", "field": "credential"}
     return None
 
 

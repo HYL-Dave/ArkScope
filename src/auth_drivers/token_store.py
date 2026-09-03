@@ -29,6 +29,7 @@ class StoredTokenRecord:
     refresh_token: Optional[str] = None
     expires_at: Optional[str] = None  # ISO; None for non-expiring (e.g. setup-token status)
     plan_type: Optional[str] = None
+    plan_observed_at: Optional[str] = None
     account_label: Optional[str] = None  # redacted display only (NOT raw email/PII)
     # provider internals (id_token, account_id, …). NEVER render/log raw — status()
     # deliberately excludes it; treat as opaque/secret in any future UI/debug surface.
@@ -62,6 +63,7 @@ def _rec_from_obj(d: dict) -> StoredTokenRecord:
         refresh_token=d.get("refresh_token"),
         expires_at=d.get("expires_at"),
         plan_type=d.get("plan_type"),
+        plan_observed_at=d.get("plan_observed_at"),
         account_label=d.get("account_label"),
         metadata=d.get("metadata") or {},
     )

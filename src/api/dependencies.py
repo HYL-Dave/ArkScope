@@ -368,10 +368,17 @@ class OAuthAccountSyncService:
                 update={"sync_status": "failed", "sync_error_code": "missing_token"}
             )
         try:
-            observation = account_adapter.read_account_usage(
-                credential_id=credential_id,
-                record=record,
-            )
+            observed_plan = None
+            if provider == "openai":
+                observation, observed_plan = account_adapter.read_account_usage_with_plan(
+                    credential_id=credential_id,
+                    record=record,
+                )
+            else:
+                observation = account_adapter.read_account_usage(
+                    credential_id=credential_id,
+                    record=record,
+                )
         except (AnthropicAccountUsageError, CodexAccountUsageError) as exc:
             return cached.model_copy(
                 update={"sync_status": "failed", "sync_error_code": exc.code}
@@ -397,6 +404,22 @@ class OAuthAccountSyncService:
                             "sync_status": "failed",
                             "sync_error_code": "credential_changed_during_sync",
                         }
+                    )
+                if observed_plan is not None:
+                    from src.auth_drivers.chatgpt_oauth_login import (
+                        merge_chatgpt_plan_observation,
+                    )
+
+                    current = merge_chatgpt_plan_observation(
+                        current,
+                        plan_type=observed_plan,
+                        observed_at=observation.observed_at,
+                    )
+                    self.token_store.save(
+                        provider=provider,
+                        auth_mode=auth_mode,
+                        credential_id=credential_id,
+                        record=current,
                     )
                 snapshot = self.observation_store.record_account_snapshot(
                     credential_id=credential_id,

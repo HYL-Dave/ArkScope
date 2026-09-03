@@ -137,6 +137,76 @@ def test_effective_view_handles_mixed_providers_per_task(tmp_path):
     assert "mystery-model" in advanced_ids
 
 
+def test_new_registry_default_appears_as_seed_when_discovery_predates_it(tmp_path):
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path),
+        routes=_routes_mixed(),
+        credentials=_credentials(),
+    )
+
+    entries = {
+        entry["id"]: entry
+        for entry in view["tasks"]["card_synthesis"]["providers"]["anthropic"]["models"]
+    }
+    assert entries["claude-opus-5"]["status"] == "visible"
+    assert entries["claude-opus-5"]["visible_to_credential"] is True
+    assert entries["claude-fable-5-1"]["status"] == "seed"
+    assert entries["claude-fable-5-1"]["visible_to_credential"] is None
+    assert entries["claude-sonnet-5"]["status"] == "seed"
+    assert entries["claude-sonnet-5"]["visible_to_credential"] is None
+
+
+def test_discovered_real_id_still_wins_over_the_seed_entry(tmp_path):
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(
+        provider="anthropic",
+        auth_mode="api_key",
+        credential_id="a1",
+        secret_fingerprint=_fp("sk-ant"),
+        status="ok",
+        models=[{
+            "id": "claude-fable-5-1-20260901",
+            "label": "Fable 5.1",
+            "source": "provider_api",
+        }],
+    )
+
+    view = effective_model_view_v2(
+        cache=cache,
+        routes=_routes_mixed(),
+        credentials=_credentials(),
+    )
+    entries = view["tasks"]["card_synthesis"]["providers"]["anthropic"]["models"]
+    assert [entry["id"] for entry in entries].count("claude-fable-5-1-20260901") == 1
+    assert not any(entry["id"] == "claude-fable-5-1" for entry in entries)
+
+
+def test_pinned_only_retired_model_stays_absent_from_the_registry_union(tmp_path):
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path),
+        routes=_routes_mixed(),
+        credentials=_credentials(),
+    )
+
+    for task in ("card_synthesis", "card_translation", "ai_research"):
+        entries = view["tasks"][task]["providers"]["anthropic"]["models"]
+        assert all(entry["id"] != "claude-fable-5" for entry in entries)
+
+
+def test_registry_seed_does_not_claim_advanced_exact_model_entitlement(tmp_path):
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path),
+        routes=_routes_mixed(),
+        credentials=_credentials(),
+    )
+
+    entries = view["tasks"]["card_translation"]["providers"]["openai"]["models"]
+    spark = next(entry for entry in entries if entry["id"] == "gpt-5.3-codex-spark")
+    assert spark["status"] == "advanced"
+    assert spark["visible_to_credential"] is False
+    assert spark["eligible"] is False
+
+
 def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
     routes = _routes_mixed()
     routes["ai_research"] = TaskRoute(task="ai_research", provider="openai",

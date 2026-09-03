@@ -13,6 +13,7 @@ from typing import Any, Callable, TypeVar
 from src.auth_drivers.codex_app_server_runtime import (
     ALLOWED_CODEX_APP_SERVER_VERSIONS,
     CodexAppServerRuntimeError,
+    CodexAuthenticatedContext,
     CodexJsonlSession,
     resolve_codex_app_server_runtime,
     run_authenticated_codex_operation,
@@ -393,7 +394,7 @@ class CodexAccountUsageAdapter:
         *,
         record,
         operation: Callable[[CodexJsonlSession], _T],
-    ) -> tuple[str, _T]:
+    ) -> tuple[CodexAuthenticatedContext, _T]:
         """Run one bounded read against an isolated, credential-bound app-server."""
         try:
             context, result = run_authenticated_codex_operation(
@@ -408,15 +409,15 @@ class CodexAccountUsageAdapter:
             )
         except CodexAppServerRuntimeError as exc:
             raise _fail(exc.code) from None
-        return context.account_id, result
+        return context, result
 
-    def read_account_usage(
+    def read_account_usage_with_plan(
         self,
         *,
         credential_id: str,
         record,
         observed_at: str | datetime | None = None,
-    ) -> OAuthAccountObservation:
+    ) -> tuple[OAuthAccountObservation, str]:
         def read(session: CodexJsonlSession):
             rate_limits_result = session.request(4, "account/rateLimits/read")
             usage_result = session.request(5, "account/usage/read")
@@ -424,11 +425,12 @@ class CodexAccountUsageAdapter:
             usage_summary, daily = _usage_payload(usage_result)
             return rate_limits, by_id, reset_count, usage_summary, daily
 
-        account_id, values = self._run_authenticated(record=record, operation=read)
+        context, values = self._run_authenticated(record=record, operation=read)
         rate_limits, by_id, reset_count, usage_summary, daily = values
-
-        return OAuthAccountObservation(
-            account_fingerprint=_account_fingerprint(credential_id, account_id),
+        observation = OAuthAccountObservation(
+            account_fingerprint=_account_fingerprint(
+                credential_id, context.account_id
+            ),
             source="codex_app_server",
             schema_version=1,
             observed_at=_observed_at(observed_at),
@@ -441,8 +443,25 @@ class CodexAccountUsageAdapter:
                 daily_usage_buckets=daily,
             ),
         )
+        return observation, context.plan_type
 
-    def read_model_catalog(self, *, record) -> list[CodexSubscriptionModel]:
+    def read_account_usage(
+        self,
+        *,
+        credential_id: str,
+        record,
+        observed_at: str | datetime | None = None,
+    ) -> OAuthAccountObservation:
+        observation, _ = self.read_account_usage_with_plan(
+            credential_id=credential_id,
+            record=record,
+            observed_at=observed_at,
+        )
+        return observation
+
+    def read_model_catalog_with_plan(
+        self, *, record
+    ) -> tuple[list[CodexSubscriptionModel], str]:
         def read(session: CodexJsonlSession) -> list[CodexSubscriptionModel]:
             cursor: str | None = None
             seen_cursors: set[str] = set()
@@ -471,7 +490,11 @@ class CodexAccountUsageAdapter:
                 cursor = next_cursor
             raise _fail()
 
-        _, models = self._run_authenticated(record=record, operation=read)
+        context, models = self._run_authenticated(record=record, operation=read)
         if not models:
             raise _fail()
+        return models, context.plan_type
+
+    def read_model_catalog(self, *, record) -> list[CodexSubscriptionModel]:
+        models, _ = self.read_model_catalog_with_plan(record=record)
         return models

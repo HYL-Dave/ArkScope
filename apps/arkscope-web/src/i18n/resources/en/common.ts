@@ -55,6 +55,7 @@ const common = {
       discoveryUnavailable: "Model discovery status is temporarily unavailable",
       providerCallFailed: "The live provider call failed",
       reauthRequired: "The sign-in has expired. Sign in again",
+      subscriptionPlanUnverified: "The ChatGPT plan has not been verified. Sync account usage, then try again",
       subscriptionPlanRequired: "Requires a ChatGPT Pro plan",
       modelTaskUnsupported: "This model does not support this task",
       modelOutputLimitUnknown: "This model's output limit is unknown for this route",

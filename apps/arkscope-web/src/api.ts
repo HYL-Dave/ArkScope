@@ -126,13 +126,37 @@ export interface EffectiveModelEntry {
 
 export type EffectiveModelStatus = "visible" | "seed" | "advanced" | "route";
 
+export type ModelReasonCode =
+  | "adapter_unavailable"
+  | "context_window_exceeded"
+  | "discovery_unavailable"
+  | "missing_active_credential"
+  | "model_auth_unverified"
+  | "model_not_in_registry"
+  | "model_not_visible"
+  | "model_output_limit_unknown"
+  | "model_retired"
+  | "model_task_unsupported"
+  | "protocol_incompatible"
+  | "protocol_resource_exhausted"
+  | "provider_call_failed"
+  | "reauth_required"
+  | "subscription_plan_required"
+  | "subscription_plan_unverified"
+  | "subscription_usage_unavailable"
+  | "task_auth_mode_unsupported"
+  | "task_capability_missing"
+  | "task_test_unsupported"
+  | "timeout"
+  | "version_incompatible";
+
 export interface EffectiveProviderModelEntry {
   id: string;
   label: string;
   status: EffectiveModelStatus;
   visible_to_credential: boolean | null;
   eligible: boolean;
-  reason_code: string | null;
+  reason_code: ModelReasonCode | null;
   effort_options?: string[];
   thinking_mode:
     | "none"
@@ -145,7 +169,7 @@ export interface EffectiveProviderModelEntry {
 
 export interface EffectiveProviderModels {
   executable: boolean;
-  reason_code: string | null;
+  reason_code: ModelReasonCode | null;
   models: EffectiveProviderModelEntry[];
   cache_state: "ok" | "seed_only" | "never_discovered" | string;
   discovered_at: string | null;
@@ -350,7 +374,7 @@ export interface TaskModelTestResult {
   auth_mode: CredentialAuthType | null;
   credential_id: string | null;
   status: "ok" | "error" | "unsupported";
-  error_code: string | null;
+  error_code: ModelReasonCode | null;
   latency_ms: number | null;
   tested_at: string;
   fallback_effort: string | null;

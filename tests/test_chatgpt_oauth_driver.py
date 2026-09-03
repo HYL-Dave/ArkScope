@@ -247,6 +247,62 @@ def test_spark_discovery_does_not_advertise_tasks_without_pro_plan(monkeypatch):
     assert result.models[0].task_route_tasks == []
 
 
+def test_discovery_persists_live_plan_without_changing_token_material(
+    monkeypatch,
+    tmp_path,
+):
+    class TokenStore:
+        def __init__(self):
+            self.record = StoredTokenRecord(
+                access_token="cg-ORIGINAL",
+                refresh_token="cg-REFRESH",
+                plan_type=None,
+                metadata={"account_id": "acct_123"},
+            )
+
+        def load(self, *, provider, auth_mode, credential_id):
+            assert (provider, auth_mode, credential_id) == (
+                "openai",
+                "chatgpt_oauth",
+                "local:7",
+            )
+            return self.record
+
+        def save(self, *, provider, auth_mode, credential_id, record):
+            assert (provider, auth_mode, credential_id) == (
+                "openai",
+                "chatgpt_oauth",
+                "local:7",
+            )
+            self.record = record
+
+    class CatalogAdapter:
+        def read_model_catalog_with_plan(self, *, record):
+            assert record.access_token == "cg-ORIGINAL"
+            return [_catalog_model("gpt-5.3-codex-spark")], "pro"
+
+    token_store = TokenStore()
+    original = token_store.record
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setattr(mod, "_refresh_login", lambda **_: original)
+    monkeypatch.setattr(mod, "_subscription_catalog_adapter", CatalogAdapter)
+
+    result = _run(
+        OpenAIChatGPTOAuthDriver(
+            credential=_Cred(7),
+            token_store=token_store,
+        ).discover_models()
+    )
+
+    assert result.status == "ok"
+    assert result.models[0].task_route_tasks == ["card_translation"]
+    assert token_store.record.plan_type == "pro"
+    assert token_store.record.plan_observed_at is not None
+    assert token_store.record.access_token == original.access_token
+    assert token_store.record.refresh_token == original.refresh_token
+    assert token_store.record.metadata == original.metadata
+
+
 def test_discover_keeps_reviewed_current_models_available_to_existing_task_routes(monkeypatch):
     _install_catalog(monkeypatch, models=(_catalog_model("gpt-5.6-sol"),))
 

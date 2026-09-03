@@ -363,6 +363,7 @@ describe("Settings backend copy boundary", () => {
       "discovery_unavailable",
       "provider_call_failed",
       "reauth_required",
+      "subscription_plan_unverified",
     ];
     const cases = [
       {
@@ -381,6 +382,7 @@ describe("Settings backend copy boundary", () => {
           "暫時無法讀取模型探索狀態",
           "provider 實際呼叫失敗",
           "登入已失效，請重新登入",
+          "尚未確認 ChatGPT 方案；請先同步帳戶用量，再重試",
         ],
       },
       {
@@ -399,6 +401,7 @@ describe("Settings backend copy boundary", () => {
           "Model discovery status is temporarily unavailable",
           "The live provider call failed",
           "The sign-in has expired. Sign in again",
+          "The ChatGPT plan has not been verified. Sync account usage, then try again",
         ],
       },
     ];

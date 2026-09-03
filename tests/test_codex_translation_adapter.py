@@ -253,11 +253,58 @@ def test_token_store_plan_must_be_pro_before_process_start(tmp_path):
     assert not pid_path.exists()
 
 
-@pytest.mark.parametrize("live_plan", ["plus", "team", "", None])
-def test_live_account_plan_must_be_pro_before_thread_start(tmp_path, live_plan):
+def test_unknown_stored_plan_reaches_account_read_and_uses_live_plan(tmp_path):
+    executable, transcript, pid_path = _write_fixture(tmp_path, live_plan="pro")
+    observed = []
+    from src.auth_drivers.codex_translation_adapter import run_codex_translation
+
+    result = run_codex_translation(
+        credential_id="local:1",
+        record=_record(None),
+        model=_MODEL,
+        effort="medium",
+        system="Translate the supplied content and emit only the requested object.",
+        user="Revenue grew 12%.",
+        schema=_SCHEMA,
+        timeout_s=2.0,
+        executable=executable,
+        plan_observer=observed.append,
+    )
+
+    assert result == {"translated_text": "營收成長 12%。"}
+    assert observed == ["pro"]
+    assert "account/read" in _methods(transcript)
+    _wait_for_exit(pid_path)
+
+
+def test_unknown_stored_plan_requires_a_backfill_owner_before_process_start(tmp_path):
+    executable, transcript, pid_path = _write_fixture(tmp_path, live_plan="pro")
+
+    _assert_error(
+        executable,
+        "subscription_plan_unverified",
+        record=_record(None),
+    )
+
+    assert not transcript.exists()
+    assert not pid_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("live_plan", "expected_code"),
+    [
+        ("plus", "subscription_plan_required"),
+        ("team", "subscription_plan_required"),
+        ("", "subscription_plan_unverified"),
+        (None, "subscription_plan_unverified"),
+    ],
+)
+def test_live_account_plan_must_be_pro_before_thread_start(
+    tmp_path, live_plan, expected_code
+):
     executable, transcript, pid_path = _write_fixture(tmp_path, live_plan=live_plan)
 
-    _assert_error(executable, "subscription_plan_required")
+    _assert_error(executable, expected_code)
 
     assert "thread/start" not in _methods(transcript)
     _wait_for_exit(pid_path)

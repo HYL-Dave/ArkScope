@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
@@ -15,6 +15,7 @@ from src.auth_drivers.codex_app_server_runtime import (
     CodexJsonlSession,
     run_authenticated_codex_operation,
 )
+from src.subscription_plan import normalize_subscription_plan
 
 
 SPARK_MODEL = "gpt-5.3-codex-spark"
@@ -146,7 +147,10 @@ def _require_identifier(value: Any) -> str:
 
 
 def _require_plan(value: Any) -> str:
-    if not isinstance(value, str) or value.strip().lower() != "pro":
+    normalized = normalize_subscription_plan(value)
+    if normalized is None:
+        raise _fail("subscription_plan_unverified")
+    if normalized != "pro":
         raise _fail("subscription_plan_required")
     return "pro"
 
@@ -417,6 +421,7 @@ def run_codex_translation(
     schema: dict[str, Any],
     timeout_s: float,
     executable: str | Path | None = None,
+    plan_observer: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Run one exact-model translation without retry or transport fallback."""
     if not isinstance(credential_id, str) or not credential_id or len(credential_id) > 512:
@@ -429,7 +434,24 @@ def run_codex_translation(
         raise _fail("structured_output_invalid")
     if not isinstance(schema, dict):
         raise _fail("structured_output_invalid")
-    _require_plan(getattr(record, "plan_type", None))
+    stored_plan = normalize_subscription_plan(getattr(record, "plan_type", None))
+    if stored_plan is not None:
+        _require_plan(stored_plan)
+    elif plan_observer is None:
+        raise _fail("subscription_plan_unverified")
+
+    def operation(session: CodexJsonlSession, context: CodexAuthenticatedContext):
+        if plan_observer is not None:
+            plan_observer(context.plan_type)
+        return _run_turn(
+            session,
+            context,
+            model=model,
+            effort=effort,
+            system=system,
+            user=user,
+            schema=schema,
+        )
 
     try:
         _, result = run_authenticated_codex_operation(
@@ -438,15 +460,7 @@ def run_codex_translation(
             timeout_seconds=timeout_s,
             executable=executable,
             allowed_notifications=_ALLOWED_NOTIFICATIONS,
-            operation=lambda session, context: _run_turn(
-                session,
-                context,
-                model=model,
-                effort=effort,
-                system=system,
-                user=user,
-                schema=schema,
-            ),
+            operation=operation,
             max_request_bytes=_MAX_REQUEST_BYTES,
             max_stdout_bytes=_MAX_STDOUT_BYTES,
             max_stderr_bytes=_MAX_STDERR_BYTES,
@@ -456,5 +470,5 @@ def run_codex_translation(
         raise
     except CodexAppServerRuntimeError as exc:
         if exc.code == "account_plan_unavailable":
-            raise _fail("subscription_plan_required") from None
+            raise _fail("subscription_plan_unverified") from None
         raise _fail(exc.code) from None

@@ -22,6 +22,7 @@ import asyncio
 import concurrent.futures
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Optional
 
 from src.agents.shared.compressor.reducers import get_reducer
@@ -31,6 +32,7 @@ from src.auth_drivers.protocol import LLMRequest, LLMResponse, TokenUsage
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
 
 from .chatgpt_oauth_login import ChatGPTOAuthLoginError
+from .chatgpt_oauth_login import persist_chatgpt_plan_observation
 from .chatgpt_oauth_login import provider_error_requires_reauth
 from .chatgpt_oauth_login import refresh_if_needed as _refresh_login
 from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _PROBE_MODEL, _to_dict
@@ -378,7 +380,18 @@ class OpenAIChatGPTOAuthDriver:
                 error_code="reauth_required",
             )
         try:
-            catalog = _subscription_catalog_adapter().read_model_catalog(record=rec)
+            adapter = _subscription_catalog_adapter()
+            if hasattr(adapter, "read_model_catalog_with_plan"):
+                catalog, observed_plan = adapter.read_model_catalog_with_plan(record=rec)
+                rec = persist_chatgpt_plan_observation(
+                    credential_id=self._credential_id,
+                    token_store=self._token_store,
+                    expected_record=rec,
+                    plan_type=observed_plan,
+                    observed_at=datetime.now(timezone.utc),
+                )
+            else:
+                catalog = adapter.read_model_catalog(record=rec)
         except Exception as exc:  # noqa: BLE001 — never raise discovery; degrade to seed
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,

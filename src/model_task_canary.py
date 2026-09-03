@@ -357,7 +357,10 @@ async def dispatch_task_model_test(
         auth_mode=active.auth_mode,
         plan_type=active.plan_type,
     )
-    if execution_detail is not None:
+    if (
+        execution_detail is not None
+        and execution_detail["code"] != "subscription_plan_unverified"
+    ):
         return _result(
             task=task,
             provider=provider,

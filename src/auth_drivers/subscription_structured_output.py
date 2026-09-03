@@ -400,13 +400,30 @@ async def _codex_structured_output_async(
         auth_mode="chatgpt_oauth",
         plan_type=getattr(record, "plan_type", None),
     )
-    if detail is not None:
+    if detail is not None and detail["code"] != "subscription_plan_unverified":
         raise SubscriptionStructuredOutputError(
             detail["code"],
             "The selected subscription route is not executable for this task.",
         )
 
     remaining = _remaining(deadline)
+
+    def observe_plan(plan_type: str) -> None:
+        from src.auth_drivers.chatgpt_oauth_login import (
+            persist_chatgpt_plan_observation,
+        )
+
+        try:
+            persist_chatgpt_plan_observation(
+                credential_id=credential_id,
+                token_store=token_store,
+                expected_record=record,
+                plan_type=plan_type,
+                observed_at=datetime.now(timezone.utc),
+            )
+        except ChatGPTOAuthLoginError:
+            raise CodexTranslationError("provider_call_failed") from None
+
     try:
         return await _await_owned_sync_call(
             lambda: run_codex_translation(
@@ -418,6 +435,7 @@ async def _codex_structured_output_async(
                 user=user,
                 schema=schema,
                 timeout_s=remaining,
+                plan_observer=observe_plan,
             )
         )
     except CodexTranslationError as exc:

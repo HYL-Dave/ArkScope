@@ -28,6 +28,7 @@ from src.auth_drivers.chatgpt_oauth_login import (
     _StateStore,
     complete_login,
     extract_code_from_redirect_url,
+    persist_chatgpt_plan_observation,
     refresh_if_needed,
     start_login,
 )
@@ -174,6 +175,91 @@ def _seed(ts: _TokStore, *, expires_at, refresh="refresh-1", cid="local:1"):
         access_token=_access(), refresh_token=refresh, expires_at=expires_at,
         plan_type="plus", account_label="ChatGPT plus", metadata={"account_id": "acct_123"},
     )
+
+
+def test_plan_type_can_be_redetermined_without_a_new_login():
+    ts = _TokStore()
+    _seed(ts, expires_at="2100-01-01T00:00:00+00:00")
+    original = ts.load(provider="openai", auth_mode="chatgpt_oauth", credential_id="local:1")
+
+    updated = persist_chatgpt_plan_observation(
+        credential_id="local:1",
+        token_store=ts,
+        expected_record=original,
+        plan_type=" PRO ",
+        observed_at=_NOW,
+    )
+
+    assert updated.plan_type == "pro"
+    assert updated.account_label == "ChatGPT pro"
+    assert ts.saved[("openai", "chatgpt_oauth", "local:1")] == updated
+
+
+def test_redetermination_records_when_the_plan_was_observed_and_rejects_stale_write():
+    ts = _TokStore()
+    _seed(ts, expires_at="2100-01-01T00:00:00+00:00")
+    original = ts.load(provider="openai", auth_mode="chatgpt_oauth", credential_id="local:1")
+    newer = persist_chatgpt_plan_observation(
+        credential_id="local:1",
+        token_store=ts,
+        expected_record=original,
+        plan_type="pro",
+        observed_at=_NOW + timedelta(minutes=1),
+    )
+    stale = persist_chatgpt_plan_observation(
+        credential_id="local:1",
+        token_store=ts,
+        expected_record=newer,
+        plan_type="plus",
+        observed_at=_NOW,
+    )
+
+    assert newer.plan_observed_at == "2030-01-01T00:01:00+00:00"
+    assert stale == newer
+    assert stale.plan_type == "pro"
+
+
+def test_redetermination_never_changes_or_returns_token_material():
+    ts = _TokStore()
+    _seed(ts, expires_at="2100-01-01T00:00:00+00:00")
+    original = ts.load(provider="openai", auth_mode="chatgpt_oauth", credential_id="local:1")
+
+    updated = persist_chatgpt_plan_observation(
+        credential_id="local:1",
+        token_store=ts,
+        expected_record=original,
+        plan_type="pro",
+        observed_at=_NOW,
+    )
+
+    assert updated.access_token == original.access_token
+    assert updated.refresh_token == original.refresh_token
+    assert updated.metadata == original.metadata
+
+
+def test_redetermination_rejects_a_changed_token_generation():
+    ts = _TokStore()
+    _seed(ts, expires_at="2100-01-01T00:00:00+00:00")
+    original = ts.load(provider="openai", auth_mode="chatgpt_oauth", credential_id="local:1")
+    replacement = StoredTokenRecord(
+        access_token="different-access-token",
+        refresh_token="different-refresh-token",
+        expires_at=original.expires_at,
+        metadata={"account_id": "acct_123"},
+    )
+    ts.saved[("openai", "chatgpt_oauth", "local:1")] = replacement
+
+    with pytest.raises(ChatGPTOAuthLoginError) as exc_info:
+        persist_chatgpt_plan_observation(
+            credential_id="local:1",
+            token_store=ts,
+            expected_record=original,
+            plan_type="pro",
+            observed_at=_NOW,
+        )
+
+    assert exc_info.value.error_code == "credential_changed_during_sync"
+    assert ts.saved[("openai", "chatgpt_oauth", "local:1")] == replacement
 
 
 # --- start_login --------------------------------------------------------------
@@ -399,6 +485,34 @@ def test_refresh_if_needed_refreshes_when_expired(tmp_path):
     assert status.last_refresh_success_at == _NOW.isoformat()
     assert status.last_refresh_error_at is None
     assert events == ["grant", "sync"]
+
+
+def test_refresh_without_new_id_token_preserves_the_newer_live_plan_observation():
+    ts = _TokStore()
+    _seed(ts, expires_at="2100-01-01T00:00:00+00:00")
+    key = ("openai", "chatgpt_oauth", "local:1")
+    ts.saved[key].metadata["id_token"] = _id_token(plan="plus")
+    original = ts.saved[key]
+    live = persist_chatgpt_plan_observation(
+        credential_id="local:1",
+        token_store=ts,
+        expected_record=original,
+        plan_type="pro",
+        observed_at=_NOW,
+    )
+
+    refreshed = refresh_if_needed(
+        credential_id="local:1",
+        token_store=ts,
+        now=_NOW + timedelta(days=1),
+        force=True,
+        refresh=lambda **_kwargs: {"access_token": _access(_FUTURE_EXP + 60)},
+    )
+
+    assert refreshed.access_token != live.access_token
+    assert refreshed.plan_type == "pro"
+    assert refreshed.plan_observed_at == _NOW.isoformat()
+    assert refreshed.metadata["id_token"] == live.metadata["id_token"]
 
 
 def test_refresh_if_needed_treats_near_expiry_as_expired_with_buffer():
