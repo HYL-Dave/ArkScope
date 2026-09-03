@@ -312,6 +312,7 @@ def derive_action_proposal_specs(
                 add("archive_manual_memberships")
             if set(source_values) & {
                 "sa_alpha_picks_current",
+                "sa_alpha_picks_former",
                 "legacy_config_seed",
             }:
                 add("hide_from_active_universe")

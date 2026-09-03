@@ -21,6 +21,7 @@ NOW = datetime(2026, 7, 19, 12, 0, 0, tzinfo=timezone.utc)
 NOW_TEXT = "2026-07-19T12:00:00+00:00"
 LEGACY_SOURCE = "legacy_config_seed"
 SA_SOURCE = "sa_alpha_picks_current"
+FORMER_SA_SOURCE = "sa_alpha_picks_former"
 
 
 def _active_universe():
@@ -94,6 +95,21 @@ def _set_current_refresh(
         )
 
 
+def _set_closed_refresh(
+    path: Path,
+    *,
+    last_success_at: str | None,
+    ok: int,
+) -> None:
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO sa_refresh_meta "
+            "(scope, last_attempt_at, last_success_at, ok, updated_at) "
+            "VALUES ('closed', ?, ?, ?, ?)",
+            (NOW_TEXT, last_success_at, ok, NOW_TEXT),
+        )
+
+
 def _assert_sanitized_unavailable(exc, expected_reasons, *secrets: object) -> None:
     expected_sources = tuple(expected_reasons)
     assert exc.unavailable_sources == expected_sources
@@ -109,7 +125,7 @@ def _assert_sanitized_unavailable(exc, expected_reasons, *secrets: object) -> No
         assert str(secret) not in rendered
 
 
-def test_snapshot_unions_all_four_sources_and_retains_sorted_provenance(databases):
+def test_snapshot_unions_all_sources_and_retains_sorted_provenance(databases):
     au = _active_universe()
     databases.profile.import_lists(
         [{"name": "Core", "tickers": [" aapl ", "nvda"]}]
@@ -136,7 +152,12 @@ def test_snapshot_unions_all_four_sources_and_retains_sorted_provenance(database
         "AAPL": ("manual_lists",),
         "GOOG": (SA_SOURCE,),
         "MSFT": ("portfolio_open",),
-        "NVDA": tuple(sorted(au.SOURCE_KEYS)),
+        "NVDA": tuple(sorted((
+            "manual_lists",
+            "portfolio_open",
+            SA_SOURCE,
+            LEGACY_SOURCE,
+        ))),
         "TSLA": (LEGACY_SOURCE,),
     }
     assert tuple(snapshot.source_status) == tuple(sorted(au.SOURCE_KEYS))
@@ -256,7 +277,7 @@ def test_portfolio_equity_classes_include_stock_etf_option_and_warn_on_others(
     assert hostile_token not in repr(warnings)
 
 
-def test_alpha_picks_current_excludes_stale_and_closed(databases):
+def test_alpha_picks_current_excludes_stale_and_keeps_closed_separate(databases):
     _active_universe()
     _insert_pick(databases.sa_path, "ACTIVE")
     _insert_pick(
@@ -275,8 +296,175 @@ def test_alpha_picks_current_excludes_stale_and_closed(databases):
 
     snapshot = _snapshot(databases)
 
-    assert snapshot.tickers == ("ACTIVE",)
-    assert snapshot.sources_by_ticker == {"ACTIVE": (SA_SOURCE,)}
+    assert snapshot.tickers == ("ACTIVE", "CLOSED")
+    assert snapshot.sources_by_ticker == {
+        "ACTIVE": (SA_SOURCE,),
+        "CLOSED": (FORMER_SA_SOURCE,),
+    }
+
+
+def test_former_alpha_picks_is_a_parallel_active_source(databases):
+    au = _active_universe()
+    _insert_pick(databases.sa_path, "CURRENT")
+    _insert_pick(
+        databases.sa_path,
+        "FORMER",
+        status="closed",
+        picked_date="2026-07-02",
+    )
+    _insert_pick(
+        databases.sa_path,
+        "FORMER-STALE",
+        status="closed",
+        stale=1,
+        picked_date="2026-07-03",
+    )
+    _insert_pick(
+        databases.sa_path,
+        "BOTH",
+        status="current",
+        picked_date="2026-07-04",
+    )
+    _insert_pick(
+        databases.sa_path,
+        "BOTH",
+        status="closed",
+        picked_date="2026-07-05",
+    )
+    _set_current_refresh(databases.sa_path, last_success_at=NOW_TEXT, ok=1)
+    _set_closed_refresh(databases.sa_path, last_success_at=NOW_TEXT, ok=1)
+
+    snapshot = _snapshot(databases)
+
+    assert FORMER_SA_SOURCE in au.SOURCE_KEYS
+    assert snapshot.tickers == ("BOTH", "CURRENT", "FORMER")
+    assert snapshot.sources_by_ticker == {
+        "BOTH": tuple(sorted((SA_SOURCE, FORMER_SA_SOURCE))),
+        "CURRENT": (SA_SOURCE,),
+        "FORMER": (FORMER_SA_SOURCE,),
+    }
+    assert snapshot.source_status[FORMER_SA_SOURCE].last_success_at == NOW_TEXT
+    assert snapshot.source_status[FORMER_SA_SOURCE].warnings == ()
+
+
+def test_applied_identity_link_moves_former_tracking_without_rewriting_sa_history(
+    databases,
+):
+    _insert_pick(
+        databases.sa_path,
+        "OLD",
+        status="closed",
+        picked_date="2026-07-02",
+    )
+    _insert_pick(
+        databases.sa_path,
+        "RESTORED",
+        status="closed",
+        picked_date="2026-07-03",
+    )
+    _set_closed_refresh(databases.sa_path, last_success_at=NOW_TEXT, ok=1)
+    databases.profile.set_universe_hidden("OLD", True)
+    with sqlite3.connect(databases.profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE ticker_identity_links ("
+            "source_ticker TEXT NOT NULL, successor_ticker TEXT NOT NULL, "
+            "reversed_at TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO ticker_identity_links "
+            "(source_ticker,successor_ticker,reversed_at) VALUES (?,?,?)",
+            [
+                ("OLD", "NEW", None),
+                ("RESTORED", "NO-LONGER-CURRENT", NOW_TEXT),
+            ],
+        )
+
+    snapshot = _snapshot(databases)
+
+    assert snapshot.tickers == ("NEW", "RESTORED")
+    assert snapshot.sources_by_ticker == {
+        "NEW": (FORMER_SA_SOURCE,),
+        "RESTORED": (FORMER_SA_SOURCE,),
+    }
+    with sqlite3.connect(databases.sa_path) as conn:
+        stored = conn.execute(
+            "SELECT symbol FROM sa_alpha_picks ORDER BY symbol"
+        ).fetchall()
+    assert stored == [("OLD",), ("RESTORED",)]
+
+
+def test_conflicting_identity_links_fail_closed_instead_of_misrouting_collection(
+    databases,
+):
+    _set_current_refresh(databases.sa_path, last_success_at=NOW_TEXT, ok=1)
+    _set_closed_refresh(databases.sa_path, last_success_at=NOW_TEXT, ok=1)
+    with sqlite3.connect(databases.profile_path) as conn:
+        conn.execute(
+            "CREATE TABLE ticker_identity_links ("
+            "source_ticker TEXT NOT NULL, successor_ticker TEXT NOT NULL, "
+            "reversed_at TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO ticker_identity_links "
+            "(source_ticker,successor_ticker,reversed_at) VALUES (?,?,NULL)",
+            [("DO_NOT_LEAK_OLD", "NEW_ONE"), ("DO_NOT_LEAK_OLD", "NEW_TWO")],
+        )
+
+    with pytest.raises(_active_universe().ActiveUniverseUnavailable) as caught:
+        _snapshot(databases)
+
+    _assert_sanitized_unavailable(
+        caught.value,
+        {key: "source_db_unreadable" for key in _active_universe().SOURCE_KEYS},
+        "DO_NOT_LEAK_OLD",
+        "NEW_ONE",
+        "NEW_TWO",
+    )
+
+
+def test_former_alpha_pick_crosses_real_news_and_price_scope_consumers(
+    databases,
+    monkeypatch,
+    tmp_path,
+):
+    import src.collectors.finnhub_news as finnhub_news
+    import src.collectors.polygon_news as massive_news
+    import src.market_data_direct as market_data_direct
+
+    _insert_pick(
+        databases.sa_path,
+        "FORMER",
+        status="closed",
+        picked_date="2026-07-02",
+    )
+    _set_closed_refresh(databases.sa_path, last_success_at=NOW_TEXT, ok=1)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(databases.profile_path))
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(databases.sa_path))
+
+    assert massive_news.load_tickers(scope="active-universe") == ["FORMER"]
+    assert finnhub_news.load_tickers(scope="active-universe") == ["FORMER"]
+
+    observed: dict[str, object] = {}
+
+    def capture_price_scope(**kwargs):
+        observed.update(kwargs)
+        return {"status": "captured"}
+
+    monkeypatch.setattr(
+        market_data_direct,
+        "_run_backfill_body",
+        capture_price_scope,
+    )
+    result = market_data_direct.backfill_prices_direct(
+        provider="polygon",
+        polygon_src=object(),
+        db_path=str(tmp_path / "market_data.db"),
+        today=NOW.date(),
+        acquire_gateway_lock=False,
+    )
+
+    assert result == {"status": "captured"}
+    assert observed["raw"] == ["FORMER"]
 
 
 def test_alpha_latest_refresh_failure_warns_without_withdrawing_facts(databases):
@@ -391,7 +579,9 @@ def test_missing_profile_db_reports_three_profile_sources_without_paths(
     sa_path = tmp_path / "sa_capture.db"
     sa_capture_store.connect(str(sa_path)).close()
     missing = tmp_path / "DO_NOT_LEAK_PROFILE_TOKEN.db"
-    profile_sources = tuple(key for key in au.SOURCE_KEYS if key != SA_SOURCE)
+    profile_sources = tuple(
+        key for key in au.SOURCE_KEYS if key not in au.SA_SOURCE_SCOPES
+    )
     missing_reasons = {key: "source_db_missing" for key in profile_sources}
 
     with pytest.raises(au.ActiveUniverseUnavailable) as caught:
@@ -448,7 +638,7 @@ def test_missing_profile_db_reports_three_profile_sources_without_paths(
     )
 
 
-def test_missing_sa_db_reports_only_alpha_source_without_fake_empty(
+def test_missing_sa_db_reports_both_alpha_sources_without_fake_empty(
     tmp_path, databases
 ):
     au = _active_universe()
@@ -463,7 +653,10 @@ def test_missing_sa_db_reports_only_alpha_source_without_fake_empty(
 
     _assert_sanitized_unavailable(
         caught.value,
-        {SA_SOURCE: "source_db_missing"},
+        {
+            SA_SOURCE: "source_db_missing",
+            FORMER_SA_SOURCE: "source_db_missing",
+        },
         missing,
         "DO_NOT_LEAK_SA_TOKEN",
     )
@@ -481,7 +674,10 @@ def test_missing_sa_db_reports_only_alpha_source_without_fake_empty(
         )
     _assert_sanitized_unavailable(
         caught_schema.value,
-        {SA_SOURCE: "required_schema_missing"},
+        {
+            SA_SOURCE: "required_schema_missing",
+            FORMER_SA_SOURCE: "required_schema_missing",
+        },
         missing_schema,
     )
 
@@ -495,7 +691,10 @@ def test_missing_sa_db_reports_only_alpha_source_without_fake_empty(
         )
     _assert_sanitized_unavailable(
         caught_unreadable.value,
-        {SA_SOURCE: "source_db_unreadable"},
+        {
+            SA_SOURCE: "source_db_unreadable",
+            FORMER_SA_SOURCE: "source_db_unreadable",
+        },
         unreadable,
         "DO_NOT_LEAK_CORRUPT_SA_TOKEN",
     )

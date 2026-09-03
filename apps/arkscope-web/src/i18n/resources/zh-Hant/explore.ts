@@ -528,7 +528,8 @@ const explore = {
     trackingSources: {
       manualLists: "手動清單",
       portfolioOpen: "未平倉投資部位",
-      saAlphaPicksCurrent: "Seeking Alpha 選股",
+      saAlphaPicksCurrent: "目前 Alpha Picks",
+      saAlphaPicksFormer: "歷史 Alpha Picks",
       legacyConfigSeed: "舊設定匯入",
     },
     proposalBlocks: {

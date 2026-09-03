@@ -12,10 +12,15 @@ from pathlib import Path
 from src import sa_capture_store
 
 
+SA_SOURCE_SCOPES = {
+    "sa_alpha_picks_current": "current",
+    "sa_alpha_picks_former": "closed",
+}
 SOURCE_KEYS = (
     "manual_lists",
     "portfolio_open",
     "sa_alpha_picks_current",
+    "sa_alpha_picks_former",
     "legacy_config_seed",
 )
 EQUITY_ASSET_CLASSES = frozenset({"stock", "etf", "option"})
@@ -23,7 +28,7 @@ SA_STALE_AFTER_HOURS = 48
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _PROFILE_SOURCE_KEYS = tuple(
-    key for key in SOURCE_KEYS if key != "sa_alpha_picks_current"
+    key for key in SOURCE_KEYS if key not in SA_SOURCE_SCOPES
 )
 _ALLOWED_UNAVAILABLE_REASONS = frozenset(
     {"source_db_missing", "source_db_unreadable", "required_schema_missing"}
@@ -88,6 +93,10 @@ class _RequiredSchemaMissing(Exception):
     def __init__(self, source_keys: tuple[str, ...]):
         self.source_keys = source_keys
         super().__init__("required schema missing")
+
+
+class _IdentityLinksInvalid(Exception):
+    pass
 
 
 def _open_read_only(path: str | Path) -> sqlite3.Connection:
@@ -168,9 +177,50 @@ def _count_warnings(**counts: int) -> tuple[str, ...]:
     )
 
 
+def _read_identity_links(conn: sqlite3.Connection) -> dict[str, str]:
+    if "ticker_identity_links" not in _table_names(conn):
+        return {}
+    columns = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(ticker_identity_links)")
+    }
+    required = {"source_ticker", "successor_ticker", "reversed_at"}
+    if not required.issubset(columns):
+        raise _IdentityLinksInvalid
+    rows = conn.execute(
+        "SELECT source_ticker, successor_ticker FROM ticker_identity_links "
+        "WHERE reversed_at IS NULL"
+    ).fetchall()
+    links: dict[str, str] = {}
+    for row in rows:
+        source = _normalize_symbol(row["source_ticker"])
+        successor = _normalize_symbol(row["successor_ticker"])
+        if not source or not successor or source == successor:
+            raise _IdentityLinksInvalid
+        previous = links.get(source)
+        if previous is not None and previous != successor:
+            raise _IdentityLinksInvalid
+        links[source] = successor
+
+    for source in links:
+        current = source
+        seen: set[str] = set()
+        while current in links:
+            if current in seen:
+                raise _IdentityLinksInvalid
+            seen.add(current)
+            current = links[current]
+    return links
+
+
 def _read_profile_sources(
     path: str | Path,
-) -> tuple[dict[str, set[str]], set[str], dict[str, tuple[str, ...]]]:
+) -> tuple[
+    dict[str, set[str]],
+    set[str],
+    dict[str, tuple[str, ...]],
+    dict[str, str],
+]:
     conn = _open_read_only(path)
     try:
         missing_sources = _profile_missing_sources(conn)
@@ -203,6 +253,7 @@ def _read_profile_sources(
         hidden_rows = conn.execute(
             "SELECT ticker FROM ticker_meta WHERE hidden_at IS NOT NULL"
         ).fetchall()
+        identity_links = _read_identity_links(conn)
     finally:
         conn.close()
 
@@ -239,33 +290,15 @@ def _read_profile_sources(
             invalid_symbol_count=legacy_invalid
         ),
     }
-    return memberships, hidden, warnings
+    return memberships, hidden, warnings, identity_links
 
 
-def _read_sa_source(
-    path: str | Path, *, now: datetime
-) -> tuple[set[str], SourceStatus]:
-    conn = _open_read_only(path)
-    try:
-        if not _SA_REQUIRED_TABLES.issubset(_table_names(conn)):
-            raise _RequiredSchemaMissing(("sa_alpha_picks_current",))
-        pick_rows = conn.execute(
-            """
-            SELECT DISTINCT symbol
-            FROM sa_alpha_picks
-            WHERE portfolio_status='current' AND is_stale=0
-            """
-        ).fetchall()
-        refresh = conn.execute(
-            """
-            SELECT last_attempt_at, last_success_at, ok
-            FROM sa_refresh_meta WHERE scope='current'
-            """
-        ).fetchone()
-    finally:
-        conn.close()
-
-    symbols, invalid_count = _normalized_row_symbols(pick_rows, "symbol")
+def _sa_source_status(
+    refresh: sqlite3.Row | None,
+    *,
+    invalid_count: int,
+    now: datetime,
+) -> SourceStatus:
     warnings = list(_count_warnings(invalid_symbol_count=invalid_count))
     last_success_at: str | None = None
     if refresh is None:
@@ -283,12 +316,64 @@ def _read_sa_source(
             hours=SA_STALE_AFTER_HOURS
         ):
             warnings.append("stale_refresh")
-
-    return symbols, SourceStatus(
+    return SourceStatus(
         available=True,
         last_success_at=last_success_at,
         warnings=tuple(sorted(warnings)),
     )
+
+
+def _read_sa_sources(
+    path: str | Path, *, now: datetime
+) -> tuple[dict[str, set[str]], dict[str, SourceStatus]]:
+    conn = _open_read_only(path)
+    try:
+        if not _SA_REQUIRED_TABLES.issubset(_table_names(conn)):
+            raise _RequiredSchemaMissing(tuple(SA_SOURCE_SCOPES))
+        rows_by_scope = {
+            scope: conn.execute(
+                "SELECT DISTINCT symbol FROM sa_alpha_picks "
+                "WHERE portfolio_status=? AND is_stale=0",
+                (scope,),
+            ).fetchall()
+            for scope in SA_SOURCE_SCOPES.values()
+        }
+        refresh_by_scope = {
+            scope: conn.execute(
+                "SELECT last_attempt_at, last_success_at, ok "
+                "FROM sa_refresh_meta WHERE scope=?",
+                (scope,),
+            ).fetchone()
+            for scope in SA_SOURCE_SCOPES.values()
+        }
+    finally:
+        conn.close()
+
+    memberships: dict[str, set[str]] = {}
+    statuses: dict[str, SourceStatus] = {}
+    for source_key, scope in SA_SOURCE_SCOPES.items():
+        symbols, invalid_count = _normalized_row_symbols(
+            rows_by_scope[scope],
+            "symbol",
+        )
+        memberships[source_key] = symbols
+        statuses[source_key] = _sa_source_status(
+            refresh_by_scope[scope],
+            invalid_count=invalid_count,
+            now=now,
+        )
+    return memberships, statuses
+
+
+def _current_identity(symbol: str, links: Mapping[str, str]) -> str:
+    current = symbol
+    seen: set[str] = set()
+    while current in links:
+        if current in seen:
+            raise _IdentityLinksInvalid
+        seen.add(current)
+        current = links[current]
+    return current
 
 
 def build_active_universe_snapshot(
@@ -308,11 +393,15 @@ def build_active_universe_snapshot(
     hidden: set[str] = set()
     source_reasons: dict[str, str] = {}
     causes: list[BaseException] = []
+    identity_links: dict[str, str] = {}
 
     try:
-        profile_memberships, hidden, profile_warnings = _read_profile_sources(
-            profile_path
-        )
+        (
+            profile_memberships,
+            hidden,
+            profile_warnings,
+            identity_links,
+        ) = _read_profile_sources(profile_path)
         source_memberships.update(profile_memberships)
         for key in _PROFILE_SOURCE_KEYS:
             source_status[key] = SourceStatus(
@@ -333,13 +422,23 @@ def build_active_universe_snapshot(
             {key: "source_db_unreadable" for key in _PROFILE_SOURCE_KEYS}
         )
         causes.append(exc)
+    except _IdentityLinksInvalid as exc:
+        source_reasons.update(
+            {key: "source_db_unreadable" for key in SOURCE_KEYS}
+        )
+        causes.append(exc)
 
     try:
-        sa_symbols, sa_status = _read_sa_source(sa_path, now=generated_at)
-        source_memberships["sa_alpha_picks_current"] = sa_symbols
-        source_status["sa_alpha_picks_current"] = sa_status
+        sa_memberships, sa_statuses = _read_sa_sources(
+            sa_path,
+            now=generated_at,
+        )
+        source_memberships.update(sa_memberships)
+        source_status.update(sa_statuses)
     except FileNotFoundError as exc:
-        source_reasons["sa_alpha_picks_current"] = "source_db_missing"
+        source_reasons.update(
+            {key: "source_db_missing" for key in SA_SOURCE_SCOPES}
+        )
         causes.append(exc)
     except _RequiredSchemaMissing as exc:
         source_reasons.update(
@@ -347,7 +446,9 @@ def build_active_universe_snapshot(
         )
         causes.append(exc)
     except sqlite3.DatabaseError as exc:
-        source_reasons["sa_alpha_picks_current"] = "source_db_unreadable"
+        source_reasons.update(
+            {key: "source_db_unreadable" for key in SA_SOURCE_SCOPES}
+        )
         causes.append(exc)
 
     if source_reasons:
@@ -359,7 +460,8 @@ def build_active_universe_snapshot(
     sources_by_ticker_sets: dict[str, set[str]] = {}
     for source_key in SOURCE_KEYS:
         for ticker in source_memberships[source_key]:
-            sources_by_ticker_sets.setdefault(ticker, set()).add(source_key)
+            current_ticker = _current_identity(ticker, identity_links)
+            sources_by_ticker_sets.setdefault(current_ticker, set()).add(source_key)
     for ticker in hidden:
         sources_by_ticker_sets.pop(ticker, None)
 

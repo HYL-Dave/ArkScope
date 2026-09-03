@@ -304,8 +304,14 @@ def test_symbol_search_unavailable_returns_sanitized_503(
     assert caught.value.detail == {
         "code": "active_universe_unavailable",
         "status": "unavailable",
-        "unavailable_sources": ["sa_alpha_picks_current"],
-        "source_reasons": {"sa_alpha_picks_current": "source_db_missing"},
+        "unavailable_sources": [
+            "sa_alpha_picks_current",
+            "sa_alpha_picks_former",
+        ],
+        "source_reasons": {
+            "sa_alpha_picks_current": "source_db_missing",
+            "sa_alpha_picks_former": "source_db_missing",
+        },
     }
     rendered = repr(caught.value.detail)
     assert "do-not-leak" not in rendered

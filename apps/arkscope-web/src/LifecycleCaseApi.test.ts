@@ -19,7 +19,7 @@ const CASE_DETAIL = {
   kinds: [{ event_type: "merger_agreement", effective_date: null }],
   current_assessment: null,
   current_acknowledgement: null,
-  active_sources: ["manual_lists"],
+  active_sources: ["manual_lists", "sa_alpha_picks_former"],
   source_context: "available",
   components: {},
   investigation_run_count: 0,
@@ -131,6 +131,10 @@ describe("security lifecycle case API", () => {
       projected_block_reason: null,
       replacement_ticker: null,
     }]);
+    expect(result.active_sources).toEqual([
+      "manual_lists",
+      "sa_alpha_picks_former",
+    ]);
     expect("evidence" in result).toBe(false);
     expect("automation_runs" in result).toBe(false);
     expect("observation_fingerprint_sha256" in result).toBe(false);

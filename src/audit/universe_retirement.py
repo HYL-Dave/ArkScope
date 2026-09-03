@@ -273,11 +273,15 @@ class _ProfileSources:
 class _SaSources:
     current_nonstale_picks: tuple[str, ...]
     current_refresh_meta: tuple[object, ...] | None
+    former_nonstale_picks: tuple[str, ...]
+    former_refresh_meta: tuple[object, ...] | None
 
     def fingerprint_payload(self) -> dict[str, object]:
         return {
             "current_nonstale_picks": self.current_nonstale_picks,
             "current_refresh_meta": self.current_refresh_meta,
+            "former_nonstale_picks": self.former_nonstale_picks,
+            "former_refresh_meta": self.former_refresh_meta,
         }
 
 
@@ -521,9 +525,17 @@ def _read_sa_sources(path: str | Path) -> _SaSources:
             "SELECT symbol FROM sa_alpha_picks "
             "WHERE portfolio_status='current' AND is_stale=0"
         ).fetchall()
+        former_rows = connection.execute(
+            "SELECT symbol FROM sa_alpha_picks "
+            "WHERE portfolio_status='closed' AND is_stale=0"
+        ).fetchall()
         refresh_row = connection.execute(
             "SELECT last_attempt_at, last_success_at, snapshot_ts, row_count, ok, "
             "last_error, updated_at FROM sa_refresh_meta WHERE scope='current'"
+        ).fetchone()
+        former_refresh_row = connection.execute(
+            "SELECT last_attempt_at, last_success_at, snapshot_ts, row_count, ok, "
+            "last_error, updated_at FROM sa_refresh_meta WHERE scope='closed'"
         ).fetchone()
     except RequiredSchemaMissing:
         raise
@@ -533,10 +545,18 @@ def _read_sa_sources(path: str | Path) -> _SaSources:
         connection.close()
 
     picks = tuple(sorted(_normalize_ticker(row["symbol"]) for row in pick_rows))
+    former_picks = tuple(
+        sorted(_normalize_ticker(row["symbol"]) for row in former_rows)
+    )
     refresh = tuple(refresh_row) if refresh_row is not None else None
+    former_refresh = (
+        tuple(former_refresh_row) if former_refresh_row is not None else None
+    )
     return _SaSources(
         current_nonstale_picks=picks,
         current_refresh_meta=refresh,
+        former_nonstale_picks=former_picks,
+        former_refresh_meta=former_refresh,
     )
 
 
@@ -621,6 +641,8 @@ def _observed_sources_by_ticker(
         record(ticker, _LEGACY_SOURCE_KEY)
     for ticker in state.sa.current_nonstale_picks:
         record(ticker, "sa_alpha_picks_current")
+    for ticker in state.sa.former_nonstale_picks:
+        record(ticker, "sa_alpha_picks_former")
 
     return {
         ticker: tuple(sorted(source_keys))
