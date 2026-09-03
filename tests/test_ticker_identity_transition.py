@@ -554,6 +554,7 @@ def test_preview_lists_exact_profile_owned_effects_and_retained_facts(tmp_path):
             conn,
             sources=(
                 "sa_alpha_picks_current",
+                "sa_alpha_picks_former",
                 "legacy_config_seed",
                 "manual_lists",
             ),
@@ -598,7 +599,10 @@ def test_preview_lists_exact_profile_owned_effects_and_retained_facts(tmp_path):
             "successor_hidden": False,
             "unhide_successor": False,
         }
-        assert preview["provider_owned_sources"] == ["sa_alpha_picks_current"]
+        assert preview["provider_owned_sources"] == [
+            "sa_alpha_picks_current",
+            "sa_alpha_picks_former",
+        ]
         assert preview["caveats"] == [
             "provider_owned_sources_retained",
             "successor_already_tracked",
@@ -1754,6 +1758,7 @@ def test_apply_and_reverse_append_truthful_activity_in_same_transaction(tmp_path
                 "manual_lists",
                 "legacy_config_seed",
                 "sa_alpha_picks_current",
+                "sa_alpha_picks_former",
             ),
         )
         ids = _id_factory()
@@ -1795,7 +1800,10 @@ def test_apply_and_reverse_append_truthful_activity_in_same_transaction(tmp_path
                 {"change_type": "watchlist_membership_added", "count": 1},
                 {"change_type": "watchlist_membership_archived", "count": 1},
             ],
-            "provider_owned_retained": ["sa_alpha_picks_current"],
+            "provider_owned_retained": [
+                "sa_alpha_picks_current",
+                "sa_alpha_picks_former",
+            ],
             "state_sha256": applied["transition"]["after_snapshot_sha256"],
             "rule_id": "lifecycle.simple_symbol_continuation",
             "rule_version": "1",
@@ -1830,7 +1838,10 @@ def test_apply_and_reverse_append_truthful_activity_in_same_transaction(tmp_path
         assert [row["activity_type"] for row in rows] == ["reversed", "applied"]
         assert rows[0]["state_sha256"] == restored_digest
         assert rows[0]["user_owned_changes"] == applied_activity["user_owned_changes"]
-        assert rows[0]["provider_owned_retained"] == ["sa_alpha_picks_current"]
+        assert rows[0]["provider_owned_retained"] == [
+            "sa_alpha_picks_current",
+            "sa_alpha_picks_former",
+        ]
         assert rows[0]["decision_provenance_sha256"] == provenance
     finally:
         conn.close()

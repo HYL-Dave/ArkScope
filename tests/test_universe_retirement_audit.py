@@ -46,6 +46,7 @@ def _insert_pick(
     symbol: str,
     *,
     picked_date: str = "2026-07-01",
+    status: str = "current",
 ) -> None:
     symbol_key = symbol.strip().upper()
     with _REAL_SQLITE_CONNECT(path) as conn:
@@ -62,8 +63,8 @@ def _insert_pick(
         conn.execute(
             "INSERT INTO sa_alpha_picks "
             "(lineage_id, symbol, company, picked_date, portfolio_status, is_stale) "
-            "VALUES (?, ?, ?, ?, 'current', 0)",
-            (lineage_id, symbol, f"{symbol_key} Inc", picked_date),
+            "VALUES (?, ?, ?, ?, ?, 0)",
+            (lineage_id, symbol, f"{symbol_key} Inc", picked_date, status),
         )
 
 
@@ -73,6 +74,16 @@ def _set_current_refresh(path: Path, *, row_count: int = 1) -> None:
             "INSERT OR REPLACE INTO sa_refresh_meta "
             "(scope, last_attempt_at, last_success_at, snapshot_ts, row_count, ok, "
             "last_error, updated_at) VALUES ('current', ?, ?, ?, ?, 1, NULL, ?)",
+            (NOW_TEXT, NOW_TEXT, NOW_TEXT, row_count, NOW_TEXT),
+        )
+
+
+def _set_closed_refresh(path: Path, *, row_count: int = 1) -> None:
+    with _REAL_SQLITE_CONNECT(path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO sa_refresh_meta "
+            "(scope, last_attempt_at, last_success_at, snapshot_ts, row_count, ok, "
+            "last_error, updated_at) VALUES ('closed', ?, ?, ?, ?, 1, NULL, ?)",
             (NOW_TEXT, NOW_TEXT, NOW_TEXT, row_count, NOW_TEXT),
         )
 
@@ -494,6 +505,31 @@ def test_preview_is_read_only_and_emits_semantic_source_fingerprints(
 
         assert required_shape in malformed_exc.value.missing
         assert str(malformed) not in str(malformed_exc.value)
+
+
+def test_preview_accounts_for_former_alpha_picks_as_a_distinct_source(
+    sources,
+):
+    audit = _audit()
+    before = _preview(audit, sources)
+    _insert_pick(
+        sources.sa_path,
+        "FORMER",
+        picked_date="2026-07-02",
+        status="closed",
+    )
+    _set_closed_refresh(sources.sa_path)
+
+    report = _preview(audit, sources)
+    former = next(row for row in report["rows"] if row["ticker"] == "FORMER")
+
+    assert former["classification"] == "db_only"
+    assert former["sources"] == ["sa_alpha_picks_former"]
+    assert report["counts"]["snapshot_active"] == 4
+    assert (
+        report["fingerprints"]["sa_sources_sha256"]
+        != before["fingerprints"]["sa_sources_sha256"]
+    )
 
 
 def test_preview_proves_legacy_overview_subset_or_stops(sources, tmp_path):

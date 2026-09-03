@@ -494,6 +494,7 @@ export function lifecycleTrackingSourceLabel(
     manual_lists: copy.trackingSources.manualLists,
     portfolio_open: copy.trackingSources.portfolioOpen,
     sa_alpha_picks_current: copy.trackingSources.saAlphaPicksCurrent,
+    sa_alpha_picks_former: copy.trackingSources.saAlphaPicksFormer,
     legacy_config_seed: copy.trackingSources.legacyConfigSeed,
   };
   return labels[value as SecurityLifecycleTrackingSource] ?? copy.states.unknownValue;

@@ -169,6 +169,21 @@ describe("Lifecycle presentation", () => {
     expect(lifecycleSourcePresenceLabel("source_missing", "en")).not.toContain("Unresolved");
   });
 
+  it("labels current and former Alpha Picks as separate tracking sources", async () => {
+    const { lifecycleTrackingSourceLabel } = await import(
+      /* @vite-ignore */ PRESENTATION_MODULE
+    );
+
+    expect(lifecycleTrackingSourceLabel("sa_alpha_picks_current", "en"))
+      .toBe("Current Alpha Picks");
+    expect(lifecycleTrackingSourceLabel("sa_alpha_picks_former", "en"))
+      .toBe("Former Alpha Picks");
+    expect(lifecycleTrackingSourceLabel("sa_alpha_picks_current", "zh-Hant"))
+      .toBe("目前 Alpha Picks");
+    expect(lifecycleTrackingSourceLabel("sa_alpha_picks_former", "zh-Hant"))
+      .toBe("歷史 Alpha Picks");
+  });
+
   it("preserves decimal assessment facts and unknown values", async () => {
     const { formatAssessmentDecimal } = await import(/* @vite-ignore */ PRESENTATION_MODULE);
 

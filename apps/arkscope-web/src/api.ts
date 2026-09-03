@@ -2485,6 +2485,7 @@ export type SecurityLifecycleTrackingSource =
   | "manual_lists"
   | "portfolio_open"
   | "sa_alpha_picks_current"
+  | "sa_alpha_picks_former"
   | "legacy_config_seed";
 export type SecurityLifecycleSecAdmissionState =
   | "pending"
@@ -3542,6 +3543,7 @@ const LIFECYCLE_TRACKING_SOURCES: readonly SecurityLifecycleTrackingSource[] = [
   "manual_lists",
   "portfolio_open",
   "sa_alpha_picks_current",
+  "sa_alpha_picks_former",
   "legacy_config_seed",
 ];
 const LIFECYCLE_SEC_ADMISSION_STATES:

@@ -1413,6 +1413,26 @@ def test_same_symbol_venue_transfer_proposes_notify_and_keep_tracking(tmp_path):
         conn.close()
 
 
+def test_terminal_former_alpha_pick_proposes_stopping_active_collection(tmp_path):
+    conn, store, case_id = _context(tmp_path)
+    try:
+        assessment = _draft(store, case_id, outcomes=("listing_ended",))
+        _accept(store, assessment)
+        result = store.generate_action_proposals(
+            case_id=case_id,
+            observation_fingerprint_sha256=_FINGERPRINT,
+            sources_by_ticker={"EA": ("sa_alpha_picks_former",)},
+            at=_LATER,
+        )
+
+        assert {item["action_type"] for item in result["proposals"]} == {
+            "hide_from_active_universe",
+            "notify",
+        }
+    finally:
+        conn.close()
+
+
 def test_successful_zero_result_run_can_support_inconclusive_acknowledgement(tmp_path):
     conn, store, case_id = _context(tmp_path)
     try:

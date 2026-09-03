@@ -528,7 +528,8 @@ const explore = {
     trackingSources: {
       manualLists: "Manual lists",
       portfolioOpen: "Open portfolio position",
-      saAlphaPicksCurrent: "Seeking Alpha picks",
+      saAlphaPicksCurrent: "Current Alpha Picks",
+      saAlphaPicksFormer: "Former Alpha Picks",
       legacyConfigSeed: "Imported legacy settings",
     },
     proposalBlocks: {
