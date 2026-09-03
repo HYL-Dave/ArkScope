@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stop agent-authored Python from directly inheriting ArkScope credentials, retire the hidden code-generation/CLI fallback path, and make the remaining Claude OAuth probe use only the reviewed bundled runtime.
+**Goal:** Stop agent-authored Python from directly inheriting ArkScope credentials, remove it from agent-facing surfaces until real OS containment exists, retire the hidden code-generation/CLI fallback path, and make the remaining Claude OAuth probe use only the reviewed bundled runtime.
 
-**Architecture:** Keep one direct Python executor library: the calling model, if the product tool is admitted after the open safety decision, authors code and the existing tool loop owns correction. Launch it with a closed child environment, but describe it honestly as a restricted subprocess rather than an OS sandbox. Remove the nested model generator and its external-CLI/API fallback surface; replace the obsolete Claude P3 subprocess probes with the existing fail-closed structured-output SDK path, and remove default Codex account-usage fallback to an external `PATH` binary.
+**Architecture:** Keep one internal Python executor library with a closed child environment, but do not register it in any agent registry, bridge, prompt, subagent, or current skill. The closed environment is credential isolation, not an OS sandbox. Remove the nested model generator and its external-CLI/API fallback surface; replace the obsolete Claude P3 subprocess probes with the existing fail-closed structured-output SDK path, and remove default Codex account-usage fallback to an external `PATH` binary.
 
 **Tech Stack:** Python 3, `subprocess`, pytest, OpenAI Agents SDK tool wrappers, Anthropic tool schemas.
 
@@ -17,7 +17,7 @@
 - The immediate environment fix is not an OS sandbox: filesystem, process, network, CPU, memory, and output containment remain a separate design and implementation slice.
 - The Claude credential probe must use the reviewed `claude-agent-sdk` bundled binary; no `PATH` lookup or external CLI fallback.
 - Remove hidden model retries and all automatic subscription-to-API billing fallback by deleting the nested code generator.
-- Open decision before Task 3: default-disable the agent-facing Python tool until real OS containment exists (recommended), or knowingly retain its narrowed direct-code surface.
+- User decision: default-disable the agent-facing Python tool until real OS containment and permission enforcement exist. Retain only the internal executor and compatibility readers.
 
 ---
 
@@ -132,11 +132,11 @@ git commit -m "fix(auth): remove external CLI probe fallbacks"
 
 **Interfaces:**
 - Consumes: direct caller-authored Python and JSON data.
-- Produces: if admitted by the open safety decision, one three-surface contract with required `code`, optional `data_json`, and optional bounded `timeout`; otherwise no agent registration until OS containment lands. In either case there is no `task`, `background`, `generated_code`, PID, output file, code model, code backend, hidden retry, CLI, or billing fallback.
+- Produces: one internal direct-code library contract with required `code`, optional `data_json`, and optional bounded `timeout`; no agent registration until OS containment lands. There is no `task`, `background`, `generated_code`, PID, output file, code model, code backend, hidden retry, CLI, or billing fallback.
 
 - [x] **Step 1: Rewrite contract tests first**
 
-Require exact parameter parity across registry, OpenAI, and Anthropic surfaces; require direct code execution; require the obsolete generator module and three config fields to be absent. Remove tests whose sole purpose was to preserve the retired behavior.
+Require direct internal code execution; require the obsolete generator module and three config fields to be absent. Require every agent-facing registry and bridge to omit the execution tool. Remove tests whose sole purpose was to preserve the retired behavior.
 
 - [x] **Step 2: Run the focused RED contract tests**
 
@@ -146,7 +146,7 @@ Expected: FAIL on the still-present task/background/config/generator surfaces.
 
 - [x] **Step 3: Remove the retired implementation and narrow every product surface**
 
-Delete `code_generator.py`; remove the task/background dispatch and result fields; make each bridge expose only the common direct-code schema; update prompts so the current model writes code and uses its normal tool loop to inspect errors and retry explicitly.
+Delete `code_generator.py`; remove the task/background dispatch and result fields; remove the direct-code tool from each agent bridge, prompt, subagent, and current skill while retaining the internal executor for bounded library tests.
 
 - [x] **Step 4: Remove stale configuration and references**
 
@@ -173,12 +173,12 @@ git commit -m "refactor(tools): retire nested code generation"
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 
 **Interfaces:**
-- Consumes: the narrowed direct-code tool contract.
-- Produces: current documentation that calls the runtime a restricted subprocess and records full OS containment as an unresolved security prerequisite.
+- Consumes: the internal direct-code executor contract and the user's fail-closed admission decision.
+- Produces: no agent-facing Python execution surface; current documentation records full OS containment and permission enforcement as prerequisites for re-admission.
 
-- [x] **Step 1: Add documentation contract tests or existing-doc assertions where appropriate**
+- [x] **Step 1: Add documentation and agent-surface contract tests**
 
-Extend the exact tool-surface tests to reject `task` and `background` in current catalog rows and to require explicit non-sandbox wording.
+Require the registry, both model bridges, prompts, subagents, and current skills to omit `execute_python_analysis`; retain a direct internal executor test. Require the catalog and product spec to record the withheld capability and OS-sandbox prerequisite.
 
 - [x] **Step 2: Run the RED documentation checks**
 
@@ -188,17 +188,17 @@ Expected: FAIL against the stale catalog/product wording.
 
 - [x] **Step 3: Update current documentation and decision history**
 
-Record the security source-to-sink, the retired hidden model/fallback path, the remaining filesystem/network/resource containment gap, and the fact that no live provider call was made.
+Record the security source-to-sink, the retired hidden model/fallback path, the user's fail-closed decision, the remaining filesystem/network/resource containment gap, and the fact that no live provider call was made.
 
-- [ ] **Step 4: Verify scope and behavior**
+- [x] **Step 4: Verify scope and behavior**
 
 Run focused tests, `git diff --check`, repository reference scans for `code_generator`, external PATH Claude/Codex use in product code, and then the complete backend suite.
 
-- [ ] **Step 5: Independent post-patch security review**
+- [x] **Step 5: Independent post-patch security review**
 
 Have a read-only reviewer attempt to disprove direct-environment isolation, find remaining generator/fallback entry points, and distinguish residual OS-sandbox risk from fixed inheritance.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/design/ARKSCOPE_TOOL_CATALOG.md docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md docs/design/PROJECT_PRIORITY_MAP.md tests/test_tool_calling.py docs/superpowers/plans/2026-09-03-code-execution-convergence.md

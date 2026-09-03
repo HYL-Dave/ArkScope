@@ -57,7 +57,11 @@ class TestSkillRegistry:
         from src.tools.registry import create_default_registry
 
         registered_tools = set(create_default_registry().list_names())
-        retired_tools = {"tavily_search", "tavily_fetch"}
+        retired_tools = {
+            "execute_python_analysis",
+            "tavily_search",
+            "tavily_fetch",
+        }
         for name, skill in SKILL_REGISTRY.items():
             assert skill.name == name
             assert skill.description
@@ -73,8 +77,22 @@ class TestSkillRegistry:
                 f"{sorted(required - registered_tools)}"
             )
             assert retired_tools.isdisjoint(required | optional), (
-                f"{name} still references a retired Tavily tool"
+                f"{name} still references a retired or withheld tool"
             )
+
+    def test_current_skill_instructions_do_not_request_python_execution(self):
+        root = os.path.dirname(os.path.dirname(__file__))
+        skills_root = os.path.join(root, "resources", "skills")
+        offenders = []
+        for current_root, _, filenames in os.walk(skills_root):
+            for filename in filenames:
+                if filename != "SKILL.md":
+                    continue
+                path = os.path.join(current_root, filename)
+                with open(path, encoding="utf-8") as handle:
+                    if "execute_python_analysis" in handle.read():
+                        offenders.append(os.path.relpath(path, root))
+        assert offenders == []
 
     def test_full_analysis_requires_ticker(self):
         assert SKILL_REGISTRY["full_analysis"].required_params == ["ticker"]

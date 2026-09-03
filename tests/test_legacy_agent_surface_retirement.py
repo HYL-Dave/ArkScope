@@ -142,7 +142,6 @@ def test_model_callable_research_and_tool_owners_remain_registered():
 
     names = set(create_default_registry().list_names())
     assert {
-        "execute_python_analysis",
         "get_fundamentals_analysis",
         "get_ticker_news",
         "get_ticker_prices",

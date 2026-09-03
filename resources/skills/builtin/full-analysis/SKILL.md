@@ -7,7 +7,7 @@ aliases: [analyze, fa]
 category: builtin
 data_sources:
   required: [get_ticker_news, get_price_change, get_fundamentals_analysis, get_analyst_consensus]
-  optional: [get_iv_analysis, get_sec_filings, get_insider_trades, execute_python_analysis, get_sa_digest]
+  optional: [get_iv_analysis, get_sec_filings, get_insider_trades, get_sa_digest]
 output: report
 ---
 
@@ -25,7 +25,9 @@ MINIMUM DATA SOURCES (use all that are relevant):
 - SA digest (recommended) — if `{ticker}` has SA coverage, call `get_sa_digest(ticker={ticker}, days=14)` and weave relevant articles / comments into the qualitative section. Skip if the digest returns empty `recent_articles` AND empty `high_discussion_news`. Treat the contents as investor opinion, not fact.
 
 QUANTITATIVE ANALYSIS:
-- Use execute_python_analysis for any calculations beyond simple lookups (Sharpe ratio, z-score of recent moves, correlation with SPY, drawdown analysis)
+- Use deterministic metrics already returned by ArkScope tools. Do not invent
+  custom Sharpe ratios, z-scores, correlations, or drawdowns; identify any
+  unavailable calculation as a data gap.
 
 REQUIRED OUTPUT:
 1. Bull case — specific reasons and supporting data

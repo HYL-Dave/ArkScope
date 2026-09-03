@@ -46,9 +46,11 @@ and comparing valuation multiples to determine relative value.
   - Returns: ROE, ROIC
 
 ### Step 3: Build Comparison Table
-- Use execute_python_analysis to build a structured comparison matrix
+- Build the comparison matrix from metrics returned by ArkScope tools
 - Include median and mean for each metric across the peer group
 - Flag outliers (>2 standard deviations from median)
+- If the tools do not return a required aggregate or outlier result, show the
+  needed formula and inputs and mark it as unavailable rather than estimating it
 
 ### Step 4: Valuation Assessment
 - Compare {ticker}'s multiples to peer median:

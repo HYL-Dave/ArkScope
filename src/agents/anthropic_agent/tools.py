@@ -596,46 +596,15 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["ticker"]
             }
         },
-        # Execution Tools
-        {
-            "name": "execute_python_analysis",
-            "description": (
-                "Run Python for ANY numerical calculation or data analysis. "
-                "Write the Python code yourself, inspect explicit errors, and retry through "
-                "the normal tool loop when needed. Do not calculate mentally. Runs in a "
-                "restricted child process with numpy, pandas, and scipy; pass all input "
-                "through data_json."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "Python code to execute"
-                    },
-                    "data_json": {
-                        "type": "string",
-                        "description": "JSON string of data to inject (accessible as `data` variable)"
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "Execution timeout in seconds (default: 120)"
-                    }
-                },
-                "required": ["code"]
-            }
-        },
         # Subagent Delegation
         {
             "name": "delegate_to_subagent",
             "description": (
                 "Delegate a subtask to a specialized subagent. Each subagent has its own "
                 "model, system prompt, and tool subset. Returns structured JSON results. "
-                "Use for multi-step research+compute (code_analyst), deep investigation "
+                "Use for multi-step quantitative evidence review (code_analyst), deep investigation "
                 "(deep_researcher), fast summarization (data_summarizer), or "
-                "adversarial review of conclusions (reviewer). "
-                "For single calculations with data you already have, use "
-                "execute_python_analysis directly instead."
+                "adversarial review of conclusions (reviewer)."
             ),
             "input_schema": {
                 "type": "object",
@@ -645,7 +614,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                         "enum": ["code_analyst", "deep_researcher", "data_summarizer", "reviewer"],
                         "description": (
                             "Subagent to delegate to: "
-                            "code_analyst (quantitative Python analysis + autonomous design), "
+                            "code_analyst (quantitative evidence review using existing data tools), "
                             "deep_researcher (multi-source investigation), "
                             "data_summarizer (fast bulk summarization), "
                             "reviewer (critical analysis review, finds flaws/risks)"
@@ -1316,7 +1285,6 @@ def execute_tool(
         get_sec_filings,
         get_insider_trades,
     )
-    from src.tools.code_executor import execute_python_code
     from src.tools.web_tools import web_browse
     from src.tools.analyst_tools import get_analyst_consensus
     from src.tools.report_tools import save_report, list_reports, get_report
@@ -1437,11 +1405,6 @@ def execute_tool(
         ),
         "get_watchlist_overview": lambda: get_watchlist_overview(dal),
         "get_morning_brief": lambda: get_morning_brief(dal),
-        "execute_python_analysis": lambda: execute_python_code(
-            code=tool_input["code"],
-            data_json=tool_input.get("data_json", ""),
-            timeout=tool_input.get("timeout", 120),
-        ),
         "delegate_to_subagent": lambda: _dispatch_subagent(tool_input, dal),
         # Analyst tools (Phase 11b) — no DAL needed
         "get_analyst_consensus": lambda: get_analyst_consensus(

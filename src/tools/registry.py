@@ -165,7 +165,6 @@ class ToolRegistry:
         self._register_report_tools()
         self._register_memory_tools()
         self._register_web_tools()
-        self._register_execution_tools()
         self._register_monitor_tools()
         self._register_freshness_tools()
         self._register_sa_tools()
@@ -833,33 +832,6 @@ class ToolRegistry:
                 ToolParameter("max_chars", "integer", "Max chars to return per call (default: 5000)", required=False, default=5000),
             ],
         ))
-
-    def _register_execution_tools(self) -> None:
-        from .code_executor import execute_python_code
-
-        self.register(ToolDefinition(
-            name="execute_python_analysis",
-            description=(
-                "Run Python for ANY numerical calculation or data analysis. "
-                "Write the Python code yourself, inspect explicit errors, and retry through "
-                "the normal tool loop when needed. Do not calculate mentally. Runs in a "
-                "restricted child process with numpy, pandas, and scipy; pass all input "
-                "through data_json."
-            ),
-            function=execute_python_code,
-            category="execution",
-            requires_dal=False,
-            parameters=[
-                ToolParameter("code", "string", "Python code to execute", required=True),
-                ToolParameter("data_json", "string",
-                              "JSON string of data to inject (accessible as `data` variable)",
-                              required=False, default=""),
-                ToolParameter("timeout", "integer",
-                              "Execution timeout in seconds (default: 120)",
-                              required=False, default=120),
-            ],
-        ))
-
 
     def _register_monitor_tools(self) -> None:
         from .monitor_tools import scan_alerts

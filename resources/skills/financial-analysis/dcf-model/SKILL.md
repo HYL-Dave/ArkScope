@@ -37,7 +37,10 @@ to estimate intrinsic value and margin of safety.
 - Identify trends and inflection points
 
 ### Step 2: Build Assumptions
-Use execute_python_analysis for all calculations:
+Use only values and deterministic metrics returned by ArkScope tools. Show the
+formula and cited inputs for each projection. If a custom calculation cannot be
+verified with available tool output, mark it as a data gap instead of inventing
+a precise result.
 
 **Revenue Growth**:
 - Historical CAGR as baseline

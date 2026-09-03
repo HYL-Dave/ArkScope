@@ -85,7 +85,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sec_filings,
         get_insider_trades,
     )
-    from src.tools.code_executor import execute_python_code
     from src.tools.analyst_tools import get_analyst_consensus
     from src.tools.report_tools import (
         save_report as _save_report,
@@ -512,34 +511,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_earnings_impact")
 
     # ================================================================
-    # Execution Tools
-    # ================================================================
-
-    @function_tool
-    def tool_execute_python_analysis(
-        code: str,
-        data_json: str = "",
-        timeout: int = 120,
-    ) -> str:
-        """Run Python for ANY numerical calculation or data analysis.
-
-        IMPORTANT: Always use this tool instead of calculating mentally.
-        Write the Python code yourself. The restricted child process returns
-        explicit errors so you can correct the code through the normal tool loop.
-
-        Args:
-            code: Python code to execute
-            data_json: JSON data passed as `data` variable in code
-            timeout: Execution timeout in seconds (default: 120)
-        """
-        result = execute_python_code(
-            code=code,
-            data_json=data_json,
-            timeout=timeout,
-        )
-        return _serialize_result(result, "execute_python_analysis")
-
-    # ================================================================
     # Subagent Delegation
     # ================================================================
 
@@ -549,10 +520,10 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         task: str,
         context_json: str = "",
     ) -> str:
-        """Delegate a subtask to a specialized subagent. Each subagent has its own model, system prompt, and tool subset. Returns structured JSON results. For single calculations with data you already have, use execute_python_analysis directly instead.
+        """Delegate a subtask to a specialized subagent. Each subagent has its own model, system prompt, and tool subset. Returns structured JSON results.
 
         Available subagents:
-        - code_analyst: Multi-step quantitative research — fetches data AND computes (anomaly detection, custom models)
+        - code_analyst: Multi-step quantitative evidence review using existing ArkScope data tools
         - deep_researcher: Thorough multi-source investigation (news, prices, fundamentals, options, signals)
         - data_summarizer: Fast bulk data retrieval and concise summarization
         - reviewer: Critical analysis review — finds logical flaws, overlooked risks, confidence adjustment
@@ -1068,7 +1039,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_portfolio_analysis,
         tool_get_portfolio_holdings,
         tool_get_earnings_impact,
-        tool_execute_python_analysis,
         tool_delegate_to_subagent,
         tool_save_report,
         tool_list_reports,
