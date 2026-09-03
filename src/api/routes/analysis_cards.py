@@ -31,7 +31,9 @@ from src.card_synthesis import (
     render_card_markdown,
     synthesize_card,
     translate_card,
+    translation_harness,
 )
+from src.content_translation_failures import classify_content_translation_failure
 from src.evidence_packet import gather_evidence
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.api.personalization import (
@@ -292,6 +294,10 @@ def translate_card_route(
     cached = (run.translations or {}).get(lang)
     if cached:
         return {"run_id": run_id, "lang": lang, "card": cached, "cached": True}
+    route = task_route("card_translation")
+    provider = route.provider
+    model = route.model
+    harness = translation_harness(provider, model)
     runtime = resolve_fixed_task_runtime("card_translation")
     # Gate BEFORE spending tokens, so a future permission engine can deny pre-LLM.
     require_db_write("card_translate", {"run_id": run_id, "lang": lang})
@@ -305,8 +311,22 @@ def translate_card_route(
         logger.warning("Card translate timed out for run %s: %s", run_id, exc)
         raise HTTPException(status_code=502, detail=exc.detail("card_translation"))
     except Exception as exc:
-        logger.warning("Card translate failed for run %s: %s", run_id, exc)
-        raise HTTPException(status_code=502, detail=f"translate failed: {exc}")
+        failure = classify_content_translation_failure(exc)
+        logger.warning(
+            "Card translate failed for run %s (%s)",
+            run_id,
+            failure.code,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": failure.code,
+                "retryable": failure.retryable,
+                "provider": provider,
+                "model": model,
+                "harness": harness,
+            },
+        )
     store.set_translation(run_id, lang, translated)
     return {"run_id": run_id, "lang": lang, "card": translated, "cached": False}
 

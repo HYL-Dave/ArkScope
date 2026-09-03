@@ -26,6 +26,7 @@ export function ExploreErrorNotice({
   const { t } = useTranslation("explore");
   const presentation = presentExploreError(state, t);
   const recovery = onNavigate ? presentation.recovery : null;
+  const guidance = presentation.guidance ?? recovery?.prompt ?? null;
   const diagnosticRows = [
     presentation.diagnostics.status,
     presentation.diagnostics.code,
@@ -51,7 +52,7 @@ export function ExploreErrorNotice({
         </>
       )}
     >
-      {recovery ? <p>{recovery.prompt}</p> : null}
+      {guidance ? <p>{guidance}</p> : null}
       {developerMode ? (
         <section aria-label={presentation.diagnostics.title}>
           <strong>{presentation.diagnostics.title}</strong>

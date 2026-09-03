@@ -2402,6 +2402,8 @@ describe("Lifecycle workflow", () => {
       ["translation_model_unavailable", "The selected content translation model is unavailable.", "目前無法使用所選內容翻譯模型。", "settings"],
       ["translation_timeout", "Translation timed out. Try again.", "翻譯逾時，請重試。", "retry"],
       ["translation_output_invalid", "The model returned an invalid translation output. Try again.", "模型回傳的翻譯格式無效，請重試。", "retry"],
+      ["translation_context_window_exceeded", "The evidence text exceeds the selected model's context window. Choose another model.", "證據文字超過所選模型可接受的上下文，請改選其他模型。", "settings"],
+      ["translation_protocol_resource_exhausted", "The translation response exceeded this route's safe processing limit. Choose another model.", "翻譯回應超過此路徑的安全處理上限，請改選其他模型。", "settings"],
       ["translation_provider_error", "The translation service could not complete the request. Try again.", "翻譯服務暫時無法完成要求，請重試。", "retry"],
       ["evidence_changed", "The source evidence changed. Refresh the case before translating again.", "來源證據已變更，請重新整理案件後再翻譯。", null],
     ] as const;

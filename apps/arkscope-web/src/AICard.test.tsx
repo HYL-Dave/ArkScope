@@ -355,9 +355,11 @@ async function mountTab({
 async function mountCardView({
   cardValue = SOURCE_CARD,
   developerMode = false,
+  onNavigateTarget = vi.fn(),
 }: {
   cardValue?: ResultCard;
   developerMode?: boolean;
+  onNavigateTarget?: (target: NavigationTarget) => void;
 } = {}) {
   await mount(
     <CardView
@@ -367,7 +369,7 @@ async function mountCardView({
       saved={false}
       onSave={vi.fn()}
       developerMode={developerMode}
-      onNavigateTarget={vi.fn()}
+      onNavigateTarget={onNavigateTarget}
     />,
   );
 }
@@ -737,16 +739,29 @@ describe("AI Card localization", () => {
   });
 
   it("maps explicit translation failure without raw detail", async () => {
+    const onNavigateTarget = vi.fn();
     apiMocks.translateCard.mockRejectedValueOnce(
-      structuredError("card_translation_failed", `/analysis/cards/${RUN_ID}/translate`),
+      structuredError(
+        "translation_route_unavailable",
+        `/analysis/cards/${RUN_ID}/translate`,
+      ),
     );
-    await mountCardView({ developerMode: false });
+    await mountCardView({ developerMode: false, onNavigateTarget });
     const questionNode = host!.querySelector(".cardview-q");
     await click(buttonByText("繁中"));
     await waitForCalls(apiMocks.translateCard, 1);
 
     expect(host!.querySelector('[role="alert"] .ui-status-badge')?.textContent)
       .toBe("無法翻譯卡片。");
+    expect(host!.textContent).toContain(
+      "目前無法使用所選的內容翻譯路徑。請改選其他模型，或重新驗證模型清單後再試。",
+    );
+    expect(host!.textContent).not.toContain("translation_route_unavailable");
+    await click(buttonByText("前往任務模型"));
+    expect(onNavigateTarget).toHaveBeenCalledWith({
+      kind: "settings_section",
+      section: "models",
+    });
     expect(host!.querySelector(".cardview-q")).toBe(questionNode);
     expect(questionNode?.textContent).toContain(SOURCE_QUESTION);
     expect(host!.textContent).not.toContain(RAW_ERROR);

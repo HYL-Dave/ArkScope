@@ -656,7 +656,15 @@ class TextTranslationOutputInvalid(ValueError):
     """The fixed one-field translation response did not match its contract."""
 
 
-def translation_harness(provider: Provider) -> str:
+def translation_harness(provider: Provider, model: str | None = None) -> str:
+    if model is not None:
+        capability = capability_for(model)
+        if (
+            capability is not None
+            and capability.execution_adapter == "codex_app_server"
+        ):
+            return "codex_app_server"
+
     from src.auth_drivers.live_resolver import resolve_live_auth
 
     resolution = resolve_live_auth(provider)
@@ -667,13 +675,6 @@ def translation_harness(provider: Provider) -> str:
             else "claude_subscription_structured_output"
         )
     return f"{provider}_sdk"
-
-
-def _translation_harness(provider: Provider, model: str) -> str:
-    capability = capability_for(model)
-    if capability is not None and capability.execution_adapter == "codex_app_server":
-        return "codex_app_server"
-    return translation_harness(provider)
 
 
 def translate_text(
@@ -725,7 +726,7 @@ def translate_text(
     if provider not in ("anthropic", "openai"):
         raise ValueError(f"unknown provider: {provider}")
     _require_task_route("card_translation", provider, model, effort)
-    harness = _translation_harness(provider, model)
+    harness = translation_harness(provider, model)
 
     if provider == "anthropic":
         translated = _translate_anthropic(

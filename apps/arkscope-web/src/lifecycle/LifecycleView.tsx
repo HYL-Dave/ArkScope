@@ -810,6 +810,8 @@ const TRANSLATION_FAILURE_CODES: readonly TranslationFailureCode[] = [
   "translation_model_unavailable",
   "translation_timeout",
   "translation_output_invalid",
+  "translation_context_window_exceeded",
+  "translation_protocol_resource_exhausted",
   "translation_provider_error",
   "evidence_changed",
 ];
@@ -866,6 +868,14 @@ export function translationFailurePresentation(
     translation_output_invalid: {
       message: t(($) => $.lifecycle.translation.outputInvalid),
       action: "retry",
+    },
+    translation_context_window_exceeded: {
+      message: t(($) => $.lifecycle.translation.contextWindowExceeded),
+      action: "settings",
+    },
+    translation_protocol_resource_exhausted: {
+      message: t(($) => $.lifecycle.translation.protocolResourceExhausted),
+      action: "settings",
     },
     translation_provider_error: {
       message: t(($) => $.lifecycle.translation.providerError),

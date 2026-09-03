@@ -69,6 +69,7 @@ export type ExploreDiagnosticRow = {
 
 export type ExploreErrorPresentation = {
   title: string;
+  guidance: string | null;
   diagnostics: {
     title: string;
     status: ExploreDiagnosticRow | null;
@@ -442,6 +443,38 @@ const RECOVERY_TARGETS = {
     kind: "settings_section",
     section: "providers",
   },
+  translation_auth_rejected: {
+    kind: "settings_section",
+    section: "providers",
+  },
+  translation_context_window_exceeded: {
+    kind: "settings_section",
+    section: "models",
+  },
+  translation_credential_missing: {
+    kind: "settings_section",
+    section: "providers",
+  },
+  translation_model_unavailable: {
+    kind: "settings_section",
+    section: "models",
+  },
+  translation_output_invalid: {
+    kind: "settings_section",
+    section: "models",
+  },
+  translation_protocol_resource_exhausted: {
+    kind: "settings_section",
+    section: "models",
+  },
+  translation_quota_exhausted: {
+    kind: "settings_section",
+    section: "models",
+  },
+  translation_route_unavailable: {
+    kind: "settings_section",
+    section: "models",
+  },
 } as const satisfies Record<string, ExploreSettingsTarget>;
 
 export function recoveryTargetForExploreError(
@@ -453,9 +486,43 @@ export function recoveryTargetForExploreError(
 }
 
 function recoveryActionCopy(target: ExploreSettingsTarget, t: ExploreT): string {
-  return target.section === "providers"
-    ? t(($) => $.errors.recovery.providers)
-    : t(($) => $.errors.recovery.dataSources);
+  if (target.section === "providers") {
+    return t(($) => $.errors.recovery.providers);
+  }
+  if (target.section === "models") {
+    return t(($) => $.errors.recovery.models);
+  }
+  return t(($) => $.errors.recovery.dataSources);
+}
+
+function translationGuidance(code: string | null, t: ExploreT): string | null {
+  switch (code) {
+    case "translation_route_unavailable":
+      return t(($) => $.errors.translationGuidance.routeUnavailable);
+    case "translation_credential_missing":
+      return t(($) => $.errors.translationGuidance.credentialMissing);
+    case "translation_auth_rejected":
+      return t(($) => $.errors.translationGuidance.authRejected);
+    case "translation_rate_limited":
+      return t(($) => $.errors.translationGuidance.rateLimited);
+    case "translation_quota_exhausted":
+      return t(($) => $.errors.translationGuidance.quotaExhausted);
+    case "translation_model_unavailable":
+      return t(($) => $.errors.translationGuidance.modelUnavailable);
+    case "translation_timeout":
+    case "model_timeout":
+      return t(($) => $.errors.translationGuidance.timeout);
+    case "translation_output_invalid":
+      return t(($) => $.errors.translationGuidance.outputInvalid);
+    case "translation_context_window_exceeded":
+      return t(($) => $.errors.translationGuidance.contextWindowExceeded);
+    case "translation_protocol_resource_exhausted":
+      return t(($) => $.errors.translationGuidance.protocolResourceExhausted);
+    case "translation_provider_error":
+      return t(($) => $.errors.translationGuidance.providerError);
+    default:
+      return null;
+  }
 }
 
 export function presentExploreError(
@@ -472,10 +539,13 @@ export function presentExploreError(
   const developerDetail = safeDiagnosticDetail(state.developerDetail);
   const detailOmitted = state.detailOmitted
     || (state.developerDetail !== null && developerDetail === null);
+  const guidance = state.operation === "card_translate"
+    ? translationGuidance(code, t)
+    : null;
   const recoveryTarget = recoveryTargetForExploreError(state);
   const recovery = recoveryTarget
     ? {
-        prompt: t(($) => $.errors.diagnostics.recoveryPrompt),
+        prompt: guidance ?? t(($) => $.errors.diagnostics.recoveryPrompt),
         label: recoveryActionCopy(recoveryTarget, t),
         target: recoveryTarget,
       }
@@ -483,6 +553,7 @@ export function presentExploreError(
 
   return {
     title: OPERATION_PRESENTERS[state.operation](t),
+    guidance,
     diagnostics: {
       title: t(($) => $.errors.diagnostics.title),
       status: status === null
