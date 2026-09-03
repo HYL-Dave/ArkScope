@@ -1,7 +1,8 @@
 # Codex Spark Content Translation Design
 
-**Status:** Approved for implementation 2026-09-03 after input-bound,
-bundled-runtime, entitlement, and code-execution-convergence rulings
+**Status:** Offline GREEN 2026-09-03 after input-bound, bundled-runtime,
+entitlement, and code-execution-convergence rulings. Live Spark execution
+remains unverified because the current account is Plus rather than Pro.
 
 ## Goal
 
@@ -412,6 +413,29 @@ Implementation starts with failing tests that own these boundaries:
 Every deny-path test includes a positive control showing the harness reached the
 guard. Focused backend and frontend suites run before the full backend,
 frontend, typecheck, build, and i18n gates.
+
+## Offline Admission Evidence
+
+The implementation admits only the exact Pro subscription tuple described in
+this authority. It uses the reviewed `openai-codex` bundled runtime, creates one
+fresh process/home/cwd/thread/turn, verifies the echoed model and sandbox before
+the turn, rejects tool or command activity, validates the final message against
+the existing Content Translation schema, and has no retry or fallback path.
+The frontend projects the backend-observed plan rather than inferring it from a
+credential label. A Plus account sees Spark only under Content Translation as a
+disabled option with a localized Pro requirement; old sidecars do not fabricate
+the capability.
+
+Offline gates at the implementation tip are:
+
+- focused Spark/runtime/backend contracts: `394 passed`;
+- complete product backend: `5370 passed, 12 skipped`;
+- complete frontend: `109 files, 1366 passed`;
+- TypeScript typecheck, production build, and i18n visible-literal scanner:
+  GREEN, with zero new i18n debt.
+
+No provider call, production database access, migration, App restart, merge, or
+push was performed for this offline admission.
 
 ## Live Validation Boundary
 
