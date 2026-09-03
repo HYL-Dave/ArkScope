@@ -452,10 +452,14 @@ The frontend projects the backend-observed raw plan rather than inferring it fro
 a credential label. Missing exact discovery keeps Spark disabled even when a
 usage bucket exists; old sidecars do not fabricate the capability.
 
+Exact-ID casing is owned in both directions: request-side variants and
+discovery-side variants each fail independently, and weakening either literal
+comparison kills its corresponding named test.
+
 Offline gates at the implementation tip are:
 
-- focused entitlement, routing, and runtime contracts: `372 passed`;
-- complete product backend: `5436 passed, 12 skipped`;
+- focused entitlement, routing, and runtime contracts: `374 passed`;
+- complete product backend: `5438 passed, 12 skipped`;
 - complete frontend: `109 files, 1371 passed`;
 - TypeScript typecheck, production build, and i18n visible-literal scanner:
   GREEN, with zero new i18n debt.
