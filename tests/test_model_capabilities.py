@@ -9,6 +9,7 @@ from src.model_capabilities import (
     all_models,
     capability_for,
     default_picker_models,
+    model_execution_admission_detail,
 )
 
 _PRE_CONSOLIDATION_IDS = {
@@ -103,9 +104,11 @@ def test_picker_visibility_matches_the_ruling():
     for current in ("claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
                     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
         assert vis[current] == "default", current
+    assert vis["gpt-5.3-codex-spark"] == "advanced"
     for pinned in (set(vis) - {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-5.3-codex-spark",
     }):
         assert vis[pinned] == "pinned_only", pinned
 
@@ -183,6 +186,59 @@ def test_fable_5_1_client_compaction_is_separate_from_provider_compaction():
     }
     assert client_compaction_admission_detail(current.id, False) is None
     assert client_compaction_admission_detail(retired.id, True) is None
+
+
+def test_spark_is_exact_pro_oauth_content_translation_only():
+    cap = capability_for("gpt-5.3-codex-spark")
+
+    assert cap is not None
+    assert cap.max_output is None
+    assert cap.allowed_tasks == ("card_translation",)
+    assert cap.allowed_auth_modes == ("chatgpt_oauth",)
+    assert cap.required_plans == ("pro",)
+    assert cap.exact_model_id is True
+    assert cap.execution_adapter == "codex_app_server"
+    assert capability_for("gpt-5.3-codex-spark-preview") is None
+
+
+def test_spark_execution_requires_the_exact_task_auth_and_plan_tuple():
+    assert model_execution_admission_detail("gpt-5.3-codex-spark") == {
+        "code": "model_task_unsupported",
+        "field": "task",
+    }
+    assert model_execution_admission_detail(
+        "gpt-5.3-codex-spark",
+        task="card_translation",
+        auth_mode="api_key",
+        plan_type="pro",
+    ) == {
+        "code": "task_auth_mode_unsupported",
+        "field": "credential",
+    }
+    assert model_execution_admission_detail(
+        "gpt-5.3-codex-spark",
+        task="card_translation",
+        auth_mode="chatgpt_oauth",
+        plan_type="plus",
+    ) == {
+        "code": "subscription_plan_required",
+        "field": "credential",
+    }
+    assert model_execution_admission_detail(
+        "gpt-5.3-codex-spark",
+        task="card_translation",
+        auth_mode="chatgpt_oauth",
+        plan_type="  PRO ",
+    ) is None
+
+
+def test_existing_models_remain_unrestricted_by_task_auth_and_plan():
+    assert model_execution_admission_detail(
+        "gpt-5.6-sol",
+        task="ai_research",
+        auth_mode="api_key",
+        plan_type=None,
+    ) is None
 
 
 def test_prefix_precedence_is_structural_not_list_order():
@@ -340,7 +396,7 @@ def test_new_generation_entries_present_with_task0_facts():
 
 def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
     opus5 = capability_for("claude-opus-5")
-    assert len(all_models()) == 19
+    assert len(all_models()) == 20
     assert opus5.provider == "anthropic"
     assert opus5.context_limit == 1_000_000 and opus5.max_output == 128_000
     assert opus5.thinking_mode == "adaptive_default_on"
@@ -354,7 +410,8 @@ def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
 
 def test_known_retired_models_keep_capabilities_but_leave_new_task_routes():
     current = {"claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
-               "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
+               "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+               "gpt-5.3-codex-spark"}
     retired = {cap.id for cap in all_models()} - current
     assert len(retired) == 13
     for model_id in retired:
