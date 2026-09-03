@@ -575,7 +575,7 @@ def run_authenticated_codex_operation(
                 raise _fail("account_mismatch")
             plan_type = account.get("planType")
             if not isinstance(plan_type, str) or not plan_type.strip() or len(plan_type) > 80:
-                raise _fail()
+                raise _fail("account_plan_unavailable")
             email = account.get("email")
             if email is not None and (
                 not isinstance(email, str) or not email or len(email) > 320
