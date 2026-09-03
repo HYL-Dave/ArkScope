@@ -175,12 +175,12 @@ Rules (LOCK):
 > **Implementation boundary (2026-09-03):** The ASK/once/session/always
 > permission engine above is still a product contract, not an implemented
 > enforcement layer; `src/api/permissions.py::require_permission` currently
-> records intent only. The Python analysis child now receives a closed
-> non-secret environment, but it is not an OS sandbox and does not provide
-> filesystem, network, process, or resource isolation. Agent admission of this
-> capability remains a release decision until those controls have an executable
-> owner; a closed environment alone must never be presented as satisfying the
-> `code_execution` permission contract.
+> records intent only. The Python analysis child receives a closed non-secret
+> environment, but it is not an OS sandbox and does not provide filesystem,
+> network, process, or resource isolation. It is therefore not registered on any
+> agent surface. The internal executor may return only after those controls and
+> the `code_execution` permission contract have executable owners; a closed
+> environment alone is insufficient.
 
 ### 4.4 Memory & context (capability stance)
 

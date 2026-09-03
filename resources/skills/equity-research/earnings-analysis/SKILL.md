@@ -36,7 +36,9 @@ identify trends, and evaluate forward guidance against expectations.
 - Historical context: Is this beat/miss pattern consistent?
 
 ### Step 2: Financial Quality Assessment
-Use execute_python_analysis for calculations:
+Use only values and deterministic metrics returned by ArkScope tools. For any
+ratio the tools do not provide, show the formula and source inputs and mark the
+result as unavailable rather than inventing a precise value.
 
 **Revenue Quality**:
 - Organic vs acquisition-driven growth

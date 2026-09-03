@@ -7,7 +7,7 @@ aliases: [earnings, ep]
 category: builtin
 data_sources:
   required: [get_analyst_consensus, get_option_chain, get_earnings_impact, get_sa_digest]
-  optional: [get_sec_filings, get_insider_trades, execute_python_analysis]
+  optional: [get_sec_filings, get_insider_trades]
 output: report
 ---
 

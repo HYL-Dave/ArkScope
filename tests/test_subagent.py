@@ -125,7 +125,7 @@ class TestSubagentRegistry:
         assert len(cfg.tool_names) <= 3  # reviewer relies on reasoning
         assert "delegate_to_subagent" not in cfg.tool_names
 
-    def test_code_analyst_has_enhanced_tools(self):
+    def test_code_analyst_uses_existing_data_tools_without_python_execution(self):
         from src.tools.registry import create_default_registry
 
         registry_names = {
@@ -140,9 +140,13 @@ class TestSubagentRegistry:
         assert configured_names <= registry_names
 
         cfg = SUBAGENT_REGISTRY["code_analyst"]
-        assert "execute_python_analysis" in cfg.tool_names
+        assert "execute_python_analysis" not in cfg.tool_names
         assert "get_fundamentals_analysis" in cfg.tool_names
         assert "web_browse" not in cfg.tool_names
+        assert all(
+            "execute_python_analysis" not in config.tool_names
+            for config in SUBAGENT_REGISTRY.values()
+        )
         assert "web_browse" in SUBAGENT_REGISTRY["deep_researcher"].tool_names
         assert SUBAGENT_REGISTRY["reviewer"].tool_names == ["get_ticker_news"]
 

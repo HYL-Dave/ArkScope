@@ -8,7 +8,7 @@ category: builtin
 auto_apply: false
 data_sources:
   required: [get_sector_performance]
-  optional: [get_price_change, execute_python_analysis]
+  optional: [get_price_change]
 output: report
 ---
 

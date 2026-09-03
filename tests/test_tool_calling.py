@@ -1,4 +1,4 @@
-"""Contract tests for direct, caller-authored Python analysis."""
+"""Contracts for the withheld agent-facing Python execution capability."""
 
 from __future__ import annotations
 
@@ -9,71 +9,41 @@ from unittest.mock import MagicMock
 
 from src.agents.shared.prompts import SYSTEM_PROMPT
 
-_PUBLIC_PARAMETERS = {"code", "data_json", "timeout"}
-
-
-def _openai_execution_tool():
-    from src.agents.openai_agent.tools import create_openai_tools
-
-    return next(
-        tool
-        for tool in create_openai_tools(MagicMock())
-        if getattr(tool, "name", "").endswith("execute_python_analysis")
-    )
-
-
-def _anthropic_execution_tool() -> dict:
-    from src.agents.anthropic_agent.tools import get_anthropic_tools
-
-    return next(
-        tool
-        for tool in get_anthropic_tools()
-        if tool["name"] == "execute_python_analysis"
-    )
-
-
-def test_prompt_requires_auditable_calculation_and_caller_authored_code():
-    assert "ALWAYS use execute_python_analysis" in SYSTEM_PROMPT
-    assert "DO NOT CALCULATE MENTALLY" in SYSTEM_PROMPT.upper()
-    section = SYSTEM_PROMPT[SYSTEM_PROMPT.index("CODE EXECUTION") :]
-    assert "write" in section.lower() and "Python code" in section
-    assert "inspect" in section.lower() and "error" in section.lower()
-    assert "auto-generates" not in section
+def test_prompt_discloses_that_arbitrary_python_execution_is_unavailable():
+    assert "execute_python_analysis" not in SYSTEM_PROMPT
+    assert "Arbitrary Python execution is unavailable" in SYSTEM_PROMPT
+    assert "Do not invent precise calculations" in SYSTEM_PROMPT
 
 
 def test_prompt_preserves_the_tool_vs_subagent_boundary():
     assert "SUBAGENT DELEGATION" in SYSTEM_PROMPT
     assert "TOOL vs SUBAGENT" in SYSTEM_PROMPT
     section = SYSTEM_PROMPT[SYSTEM_PROMPT.index("TOOL vs SUBAGENT") :][:700]
-    assert "execute_python_analysis" in section
+    assert "existing data tools" in section
     assert "code_analyst" in section
 
 
-def test_registry_exposes_only_the_direct_code_contract():
+def test_registry_withholds_python_execution_from_agents():
     from src.tools.registry import create_default_registry
 
-    tool = create_default_registry().get("execute_python_analysis")
-    assert tool is not None
-    assert {parameter.name for parameter in tool.parameters} == _PUBLIC_PARAMETERS
-    assert next(parameter for parameter in tool.parameters if parameter.name == "code").required
-    assert "mentally" in tool.description.lower()
-    assert "restricted" in tool.description.lower()
-    assert "sandbox" not in tool.description.lower()
+    assert create_default_registry().get("execute_python_analysis") is None
 
 
-def test_anthropic_bridge_exposes_only_the_direct_code_contract():
-    tool = _anthropic_execution_tool()
-    assert set(tool["input_schema"]["properties"]) == _PUBLIC_PARAMETERS
-    assert tool["input_schema"]["required"] == ["code"]
-    assert "restricted" in tool["description"].lower()
-    assert "sandbox" not in tool["description"].lower()
+def test_anthropic_bridge_withholds_python_execution():
+    from src.agents.anthropic_agent.tools import get_anthropic_tools
+
+    assert all(
+        tool["name"] != "execute_python_analysis" for tool in get_anthropic_tools()
+    )
 
 
-def test_openai_bridge_exposes_only_the_direct_code_contract():
-    tool = _openai_execution_tool()
-    assert set(tool.params_json_schema["properties"]) == _PUBLIC_PARAMETERS
-    assert "restricted" in tool.description.lower()
-    assert "sandbox" not in tool.description.lower()
+def test_openai_bridge_withholds_python_execution():
+    from src.agents.openai_agent.tools import create_openai_tools
+
+    assert all(
+        not getattr(tool, "name", "").endswith("execute_python_analysis")
+        for tool in create_openai_tools(MagicMock())
+    )
 
 
 def test_direct_code_dispatch_executes_without_a_nested_model_call():
@@ -115,19 +85,19 @@ def test_nested_code_generator_and_its_config_are_retired():
     )
 
 
-def test_current_tool_catalog_has_the_exact_direct_contract():
+def test_current_tool_catalog_records_python_execution_as_withheld():
     root = Path(__file__).resolve().parents[1]
     catalog = (root / "docs/design/ARKSCOPE_TOOL_CATALOG.md").read_text(
         encoding="utf-8"
     )
-    row = next(
-        line for line in catalog.splitlines() if "`execute_python_analysis`" in line
+    active_rows = (
+        line
+        for line in catalog.splitlines()
+        if line.startswith("|") and "`execute_python_analysis`" in line
     )
-    assert "code*" in row
-    assert "data_json?" in row
-    assert "timeout?" in row
-    assert "task?" not in row
-    assert "background?" not in row
+    assert list(active_rows) == []
+    assert "`execute_python_analysis` is withheld" in catalog
+    assert "OS sandbox" in catalog
 
 
 def test_product_spec_records_the_unimplemented_permission_and_sandbox_boundary():
@@ -141,17 +111,19 @@ def test_product_spec_records_the_unimplemented_permission_and_sandbox_boundary(
     assert "not an implemented" in boundary
     assert "records intent only" in boundary
     assert "not an OS sandbox" in boundary
-    assert "filesystem, network, process, or resource isolation" in boundary
+    normalized_boundary = boundary.replace("\n> ", " ")
+    assert "filesystem, network, process, or resource isolation" in normalized_boundary
+    assert "not registered on any agent surface" in normalized_boundary
 
 
-def test_execution_tool_remains_present_in_both_agent_bridges():
+def test_execution_tool_is_absent_from_both_agent_bridges():
     from src.agents.anthropic_agent.tools import get_anthropic_tools
     from src.agents.openai_agent.tools import create_openai_tools
 
-    assert any(
-        tool["name"] == "execute_python_analysis" for tool in get_anthropic_tools()
+    assert all(
+        tool["name"] != "execute_python_analysis" for tool in get_anthropic_tools()
     )
-    assert any(
-        getattr(tool, "name", "").endswith("execute_python_analysis")
+    assert all(
+        not getattr(tool, "name", "").endswith("execute_python_analysis")
         for tool in create_openai_tools(MagicMock())
     )

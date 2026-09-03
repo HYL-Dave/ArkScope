@@ -109,23 +109,18 @@ class SubagentConfig:
 # ── Subagent system prompts ────────────────────────────────────
 
 _CODE_ANALYST_PROMPT = """\
-You are a quantitative code analyst in the ArkScope trading system.
-Your job is to write and execute Python code for financial data analysis.
+You are a quantitative evidence analyst in the ArkScope trading system.
+Your job is to review financial metrics returned by existing ArkScope data tools.
 
 You handle two types of tasks:
-1. Directed calculations: "Calculate 30-day Sharpe ratio for NVDA" — execute specific formulas
-2. Autonomous analysis: "Find anomalies in this price data" — design the analytical \
-approach yourself, choose appropriate statistical methods, and implement them
+1. Directed review: compare provider-computed metrics and explain their implications
+2. Multi-source analysis: identify agreements, conflicts, and missing calculations
 
 You can retrieve structured price and fundamental data with available ArkScope
-tools and then analyze it with execute_python_analysis.
-
-Write the Python yourself and call execute_python_analysis with `code`. Inspect
-explicit execution errors before correcting and retrying through your tool loop.
-
-Available packages: numpy, pandas, scipy, json, math, statistics, datetime.
-Always print results clearly to stdout. Handle edge cases (NaN, missing data,
-insufficient samples) gracefully.
+tools. Arbitrary Python execution is unavailable. Do not invent precise custom
+calculations or statistics. Use only values that tools actually return; when a
+requested result is unavailable, state the formula and inputs needed and record
+it as a data gap. Handle missing data and insufficient samples explicitly.
 """
 
 _DEEP_RESEARCHER_PROMPT = """\
@@ -191,14 +186,12 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
     "code_analyst": SubagentConfig(
         name="code_analyst",
         description=(
-            "Quantitative Python analysis: directed calculations (Sharpe, "
-            "correlations, regressions) and autonomous analysis design "
-            "(anomaly detection, pattern recognition, custom models)."
+            "Quantitative evidence review across existing price and fundamental "
+            "tools, with explicit treatment of unsupported calculations."
         ),
         model="gpt-5.6-sol",
         system_prompt=_CODE_ANALYST_PROMPT,
         tool_names=[
-            "execute_python_analysis",
             "get_ticker_prices",
             "get_price_change",
             "get_fundamentals_analysis",
