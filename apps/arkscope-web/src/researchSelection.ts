@@ -214,7 +214,7 @@ export function resolveResearchSelection({
     provider: tuple.provider,
     model: tuple.model,
     effort: tuple.effort ?? "",
-  });
+  }, "ai_research");
   if (routeBlocker === "model_retired") {
     return blocked(tuple, provenance, routeBlocker, authMode);
   }

@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { ListChecks } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type {
   EffectiveProviderModelEntry,
@@ -41,6 +42,8 @@ import {
   type SettingsT,
 } from "./settingsCopy";
 
+const SPARK_MODEL_ID = "gpt-5.3-codex-spark";
+
 function taskDescription(task: ModelTask, t: SettingsT): string {
   switch (task) {
     case "card_synthesis":
@@ -67,6 +70,7 @@ function modelEntrySuffix(
   if (entry.compatibility === "legacy_unverified") {
     return t(($) => $.models.compatibility.unverified);
   }
+  if (entry.id === SPARK_MODEL_ID && entry.status === "advanced") return null;
   if (entry.status === "advanced") return t(($) => $.models.compatibility.advanced);
   if (entry.status === "seed" && cacheState === "ok") {
     return t(($) => $.models.compatibility.notInLastModelList);
@@ -114,6 +118,8 @@ export function ModelRoutingSection({
   onTest,
   onReset,
   onDiscover = async () => {},
+  discoveryAvailable = {},
+  onOpenDiscovery = () => {},
   onInvalidateTest = () => {},
   onOpenProviders = () => {},
   developerMode,
@@ -126,6 +132,8 @@ export function ModelRoutingSection({
   onTest: (task: ModelTask) => Promise<void>;
   onReset: (task: ModelTask) => Promise<void>;
   onDiscover?: (provider: ModelProvider, credentialId: string) => Promise<void> | void;
+  discoveryAvailable?: Partial<Record<ModelProvider, boolean>>;
+  onOpenDiscovery?: (provider: ModelProvider) => void;
   onInvalidateTest?: (task: ModelTask) => void;
   onOpenProviders?: () => void;
   developerMode: boolean;
@@ -218,7 +226,7 @@ export function ModelRoutingSection({
           const selectedEffort = effortOptions.some(
             (item) => item.id === row.effort.trim(),
           ) ? row.effort.trim() : "";
-          const routeBlocker = taskRouteBlocker(catalog, row);
+          const routeBlocker = taskRouteBlocker(catalog, row, task.id);
           const currentTest = testState[task.id];
           const testIsCurrent = !!(
             currentTest?.snapshot
@@ -335,13 +343,25 @@ export function ModelRoutingSection({
                         })}
                       </span>
                     )}
-                    <button
-                      type="button"
-                      className="btn-ghost small"
-                      onClick={() => void onDiscover(row.provider, context.credential_id)}
-                    >
-                      {t(($) => $.models.catalog.verifyAgain)}
-                    </button>
+                    <div className="model-credential-actions">
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        onClick={() => void onDiscover(row.provider, context.credential_id)}
+                      >
+                        {t(($) => $.models.catalog.verifyAgain)}
+                      </button>
+                      {discoveryAvailable[row.provider] ? (
+                        <button
+                          type="button"
+                          className="btn-ghost small"
+                          onClick={() => onOpenDiscovery(row.provider)}
+                        >
+                          <ListChecks size={14} aria-hidden="true" />
+                          {t(($) => $.models.catalog.viewLastResult)}
+                        </button>
+                      ) : null}
+                    </div>
                   </>
                 ) : (
                   <>

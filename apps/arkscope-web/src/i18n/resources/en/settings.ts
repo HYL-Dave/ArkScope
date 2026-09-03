@@ -193,6 +193,7 @@ const settings = {
       seedOnly: "This channel cannot list models online.",
       neverDiscovered: "Models have not been discovered for this sign-in",
       verifyAgain: "Verify list again",
+      viewLastResult: "View last result",
       sparkUsageHint: "Spark quota was detected. Verify the model list again before use.",
     },
     credentials: {
@@ -434,6 +435,7 @@ const settings = {
     },
     discovery: {
       title: "Model Discovery",
+      drawerTitle: "Model Discovery · {{provider}}",
       description: "List models visible or available to a selected credential backend.",
       credentialLabel: "Credential",
       selectCredential: "Select a credential...",

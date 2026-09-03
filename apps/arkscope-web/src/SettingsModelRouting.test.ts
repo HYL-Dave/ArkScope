@@ -128,6 +128,72 @@ const catalog: ModelCatalog = {
   },
 };
 
+function catalogWithSparkTranslation(): ModelCatalog {
+  const sparkId = "gpt-5.3-codex-spark";
+  const credential: ProviderCredential = {
+    id: "local:7",
+    provider: "openai",
+    auth_type: "chatgpt_oauth",
+    label: "ChatGPT subscription Pro",
+    account_label: "prolite",
+    expires_at: null,
+    source: "profile_state.db",
+    available: true,
+    masked: null,
+    active: true,
+    editable: true,
+    can_discover_models: true,
+    can_test_models: true,
+    notes: "",
+  };
+  const translation = catalog.effective!.tasks.card_translation!;
+  return {
+    ...catalog,
+    current_model_ids: [...(catalog.current_model_ids ?? []), sparkId],
+    model_lifecycle: [
+      ...(catalog.model_lifecycle ?? []),
+      { id: sparkId, provider: "openai", task_route_status: "current", aliases: [] },
+    ],
+    credentials: { ...catalog.credentials, openai: [credential] },
+    effective: {
+      providers: {
+        ...catalog.effective!.providers,
+        openai: {
+          credential_id: credential.id,
+          auth_mode: credential.auth_type,
+          label: credential.label,
+          plan_type: "prolite",
+        },
+      },
+      tasks: {
+        ...catalog.effective!.tasks,
+        card_translation: {
+          ...translation,
+          providers: {
+            ...translation.providers,
+            openai: {
+              executable: true,
+              reason_code: null,
+              cache_state: "ok",
+              discovered_at: "2026-09-03T12:00:00Z",
+              models: [{
+                id: sparkId,
+                label: "GPT-5.3-Codex-Spark",
+                status: "advanced",
+                visible_to_credential: true,
+                eligible: true,
+                reason_code: null,
+                thinking_mode: "none",
+                effort_options: ["low", "medium", "high", "xhigh"],
+              }],
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
@@ -248,6 +314,55 @@ async function click(element: HTMLElement) {
 }
 
 describe("Settings model route save gate", () => {
+  it("saves an exact discovered Spark route using its per-task effort facts", async () => {
+    controls.catalogOverride = catalogWithSparkTranslation();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const translation = host.querySelector('[data-testid="route-card_translation"]')!;
+    const openai = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "OpenAI")!;
+    await click(openai);
+    const model = translation.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-model-label"]',
+    )!;
+    const effort = translation.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-effort-label"]',
+    )!;
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      selectSetter?.call(model, "gpt-5.3-codex-spark");
+      model.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => {
+      selectSetter?.call(effort, "xhigh");
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+
+    const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!;
+    expect(effort.value).toBe("xhigh");
+    expect(save.disabled).toBe(false);
+    await click(save);
+    expect(controls.saveModelRoutes).toHaveBeenCalledWith(expect.objectContaining({
+      card_translation: {
+        provider: "openai",
+        model: "gpt-5.3-codex-spark",
+        effort: "xhigh",
+      },
+    }));
+  });
+
   it.each(["default", "none"])(
     "clears a hydrated %s effort when Provider discovery selects a model",
     (legacyEffort) => {
@@ -420,7 +535,7 @@ describe("Settings model route save gate", () => {
         .find((row) => row.textContent?.includes(credential.label))!;
       await click(Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
         .find((button) => button.textContent?.trim() === "列模型")!);
-      await click(Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      await click(Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
         .find((button) => button.textContent?.trim() === "用於生成")!);
 
       const route = host.querySelector('[data-testid="route-card_synthesis"]')!;
@@ -1047,12 +1162,18 @@ describe("Settings model route save gate", () => {
     const discover = Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "列模型")!;
     await click(discover);
-    expect(host.textContent).toContain("gpt-discovered");
+    expect(document.querySelector('.ui-drawer[role="dialog"]')?.textContent)
+      .toContain("gpt-discovered");
 
     await click(tabWithText("資料與同步"));
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     await click(tabWithText("AI 與模型"));
-    expect(host.textContent).toContain("gpt-discovered");
+    const reopen = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "查看上次結果")!;
+    await click(reopen);
+    expect(document.querySelector('.ui-drawer[role="dialog"]')?.textContent)
+      .toContain("gpt-discovered");
+    expect(controls.discoverModels).toHaveBeenCalledTimes(1);
   });
 
   it("renders the model-routing owner in English without backend task labels", async () => {
@@ -1228,7 +1349,8 @@ describe("Settings model route save gate", () => {
       .find((button) => button.textContent?.trim() === "OpenAI")!;
     const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "儲存")!;
-    expect(host.textContent).toContain("gpt-discovered");
+    const discoveryDrawer = document.querySelector<HTMLElement>('.ui-drawer[role="dialog"]')!;
+    expect(discoveryDrawer.textContent).toContain("gpt-discovered");
     expect(custom.value).toBe("gpt-custom-preserved");
     expect(effort.value).toBe("high");
     expect(save.disabled).toBe(false);
@@ -1245,7 +1367,99 @@ describe("Settings model route save gate", () => {
     expect(effort.value).toBe("high");
     expect(openai.getAttribute("aria-pressed")).toBe("true");
     expect(save.disabled).toBe(false);
-    expect(host.textContent).toContain("gpt-discovered");
+    expect(document.querySelector('.ui-drawer[role="dialog"]')).toBe(discoveryDrawer);
+    expect(discoveryDrawer.textContent).toContain("gpt-discovered");
+  });
+
+  it("opens model discovery beside the route action and reopens it without another request", async () => {
+    controls.catalogOverride = catalogWithSparkTranslation();
+    controls.discoverModels.mockResolvedValue({
+      provider: "openai",
+      credential_id: "local:7",
+      status: "ok",
+      models: [{
+        id: "gpt-5.3-codex-spark",
+        provider: "openai",
+        label: "GPT-5.3-Codex-Spark",
+        source: "provider_api",
+      }],
+      error: null,
+      source_url: null,
+    } satisfies ModelDiscoveryResult);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const translation = host.querySelector('[data-testid="route-card_translation"]')!;
+    const openai = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "OpenAI")!;
+    await click(openai);
+    const verify = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "重新驗證列表")!;
+    verify.focus();
+    await click(verify);
+
+    let drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
+    expect(drawer?.textContent).toContain("模型探索");
+    expect(drawer?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(host.querySelector(".provider-card .discovery-box")).toBeNull();
+    const close = drawer!.querySelector<HTMLButtonElement>('[aria-label="關閉"]')!;
+    await click(close);
+    expect(document.body.querySelector('.ui-drawer[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(verify);
+
+    const reopen = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "查看上次結果")!;
+    await click(reopen);
+    drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
+    expect(drawer?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(controls.discoverModels).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the same model discovery drawer from a credential row", async () => {
+    controls.catalogOverride = catalogWithSparkTranslation();
+    controls.discoverModels.mockResolvedValue({
+      provider: "openai",
+      credential_id: "local:7",
+      status: "ok",
+      models: [{
+        id: "gpt-5.3-codex-spark",
+        provider: "openai",
+        label: "GPT-5.3-Codex-Spark",
+        source: "provider_api",
+      }],
+      error: null,
+      source_url: null,
+    } satisfies ModelDiscoveryResult);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(React.createElement(TestSettingsView, {
+        runtime: null,
+        developerMode: false,
+        onRuntimeChanged: vi.fn(),
+      }));
+    });
+    await flush();
+
+    const credentialRow = Array.from(host.querySelectorAll<HTMLElement>(".credential-row"))
+      .find((row) => row.textContent?.includes("ChatGPT subscription Pro"))!;
+    const discover = Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "列模型")!;
+    await click(discover);
+
+    const drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
+    expect(drawer?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(host.querySelector(".provider-card .discovery-box")).toBeNull();
   });
 
   it("hides raw catalog and mutation diagnostics outside Developer Mode", async () => {

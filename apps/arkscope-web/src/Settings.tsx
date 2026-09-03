@@ -333,7 +333,10 @@ export function SettingsView({
   const personalizationTabRef = useRef<HTMLButtonElement>(null);
   const dataSyncTabRef = useRef<HTMLButtonElement>(null);
   const dialogReturnFocusRef = useRef<HTMLElement | null>(null);
+  const discoveryReturnFocusRef = useRef<HTMLElement | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryState>({});
+  const [discoveryPanelProvider, setDiscoveryPanelProvider] = useState<ModelProvider | null>(null);
+  const [discoveryPanelOpen, setDiscoveryPanelOpen] = useState(false);
   const [testState, setTestState] = useState<TestState>({});
   const shellOverlay = useShellOverlay();
 
@@ -469,6 +472,10 @@ export function SettingsView({
     anchor.focus({ preventScroll: true });
     setPendingReveal((current) => (current === pendingReveal ? null : current));
   }, [activeGroup, investorPendingRevealSequence, pendingReveal]);
+
+  useEffect(() => {
+    if (activeGroup !== "ai_models") setDiscoveryPanelOpen(false);
+  }, [activeGroup]);
 
   useEffect(() => {
     const scrollOwner = settingsScrollOwnerRef.current;
@@ -630,7 +637,7 @@ export function SettingsView({
           setRouteOutcome({ kind: "missing_model", task: task.id });
           return;
         }
-        if (taskRouteBlocker(catalog, row)) return;
+        if (taskRouteBlocker(catalog, row, task.id)) return;
         routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort.trim() };
       }
       await saveModelRoutes(routes);
@@ -773,7 +780,16 @@ export function SettingsView({
     }
   }
 
+  function openDiscoveryPanel(provider: ModelProvider) {
+    discoveryReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setDiscoveryPanelProvider(provider);
+    setDiscoveryPanelOpen(true);
+  }
+
   async function discoverAndRefresh(provider: ModelProvider, credentialId: string | null) {
+    openDiscoveryPanel(provider);
     setDiscovery((prev) => ({
       ...prev,
       [provider]: { loading: true, result: null, credentialId },
@@ -831,6 +847,9 @@ export function SettingsView({
           catalog={catalog}
           runtime={runtime}
           discovery={discovery}
+          discoveryPanelProvider={discoveryPanelProvider}
+          discoveryPanelOpen={discoveryPanelOpen}
+          discoveryReturnFocusRef={discoveryReturnFocusRef}
           settingsReadCache={readCache}
           developerMode={developerMode}
           onRefresh={async () => {
@@ -842,13 +861,8 @@ export function SettingsView({
           onDiscover={async (provider, credentialId) => {
             await discoverAndRefresh(provider, credentialId);
           }}
-          onClearDiscovery={(provider) => {
-            setDiscovery((prev) => {
-              const next = { ...prev };
-              delete next[provider];
-              return next;
-            });
-          }}
+          onOpenDiscovery={openDiscoveryPanel}
+          onCloseDiscovery={() => setDiscoveryPanelOpen(false)}
           onUseModel={(provider, model, task) => {
             invalidateTaskTest(task);
             onDraftForTask(setDraft, catalog, task, provider, model);
@@ -932,7 +946,7 @@ export function SettingsView({
             onDraft={setDraft}
             onTest={async (task) => {
             const row = draft[task];
-            if (!row || !row.model.trim() || taskRouteBlocker(catalog, row)) return;
+            if (!row || !row.model.trim() || taskRouteBlocker(catalog, row, task)) return;
             const context = modelProviderContexts[row.provider];
             if (!context) return;
             const snapshot: TaskTestSnapshot = {
@@ -986,6 +1000,11 @@ export function SettingsView({
             }}
             onInvalidateTest={invalidateTaskTest}
             onDiscover={discoverAndRefresh}
+            discoveryAvailable={{
+              anthropic: !!discovery.anthropic,
+              openai: !!discovery.openai,
+            }}
+            onOpenDiscovery={openDiscoveryPanel}
             onOpenProviders={() => revealSection("providers")}
             onReset={async (task) => {
             setRouteOutcome(null);

@@ -178,7 +178,7 @@ export function blockedRouteSaves(
   for (const task of Object.keys(draft) as ModelTask[]) {
     const row = draft[task];
     if (!row) continue;
-    const routeBlocker = taskRouteBlocker(catalog, row);
+    const routeBlocker = taskRouteBlocker(catalog, row, task);
     if (routeBlocker) {
       blocked.push({ task, reason: routeBlocker });
       continue;

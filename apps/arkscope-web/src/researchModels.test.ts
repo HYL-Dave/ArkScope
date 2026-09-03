@@ -7,6 +7,7 @@ import {
   effortOptionsForModel,
   isTaskRouteEffort,
   matchModelLifecycle,
+  taskRouteBlocker,
   taskRouteModelStatus,
 } from "./researchModels";
 
@@ -147,6 +148,41 @@ describe("effortOptionsForModel", () => {
   it("enforces provider identity for known model effort facts", () => {
     expect(effortOptionsForModel(catalog, "anthropic", "gpt-5.6-luna"))
       .toEqual([]);
+  });
+
+  it("validates a discovered task-only model against its effective effort facts", () => {
+    const sparkId = "gpt-5.3-codex-spark";
+    const taskOnlyCatalog = {
+      ...catalog,
+      current_model_ids: [...(catalog.current_model_ids ?? []), sparkId],
+      model_lifecycle: [
+        ...(catalog.model_lifecycle ?? []),
+        { id: sparkId, provider: "openai" as const, task_route_status: "current" as const, aliases: [] },
+      ],
+      effective: {
+        providers: {},
+        tasks: {
+          card_translation: {
+            providers: {
+              openai: {
+                models: [{ id: sparkId, effort_options: ["low", "medium", "high", "xhigh"] }],
+              },
+            },
+          },
+        },
+      },
+    } as unknown as ModelCatalog;
+
+    expect(taskRouteBlocker(taskOnlyCatalog, {
+      provider: "openai",
+      model: sparkId,
+      effort: "xhigh",
+    }, "card_translation")).toBeNull();
+    expect(taskRouteBlocker(taskOnlyCatalog, {
+      provider: "openai",
+      model: sparkId,
+      effort: "max",
+    }, "card_translation")).toBe("effort_required");
   });
 });
 

@@ -727,7 +727,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 75,
       shell: 37,
-      settings: 848,
+      settings: 850,
       research: 207,
       explore: 844,
       portfolio: 374,
@@ -798,7 +798,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2409);
+      expect(total, `${locale}.total`).toBe(2411);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1178,6 +1178,7 @@ describe("bundled i18n resources", () => {
       "models.route.modelRetired",
       "models.catalog.selectEffort",
       "models.catalog.sparkUsageHint",
+      "models.catalog.viewLastResult",
       "models.credentials.plan",
       "models.compatibility.notInLastModelList",
       "models.metrics.modelListObservedAt",
@@ -1199,6 +1200,7 @@ describe("bundled i18n resources", () => {
       "providers.accountUsage.syncClaudeCost",
       "providers.accountUsage.fiveHourWindow",
       "providers.accountUsage.sevenDayWindow",
+      "providers.discovery.drawerTitle",
       "dataSources.extension.degraded",
       "dataSources.extension.workloads.alphaPicks",
       "dataSources.extension.workloads.marketNews",
