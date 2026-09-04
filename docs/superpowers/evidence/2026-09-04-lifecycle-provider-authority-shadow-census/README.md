@@ -22,8 +22,12 @@ application database.
   request. EODHD and Nasdaq have zero budget. This mode exists only to validate
   the corrected official timeline parser; it cannot read a production DB or
   substitute a second provider request.
-- `universe-manifest`: intentionally refuses until a separate production-read
-  authorization is granted.
+- `universe-manifest`: requires an exact spec/commit/network-zero
+  acknowledgement plus explicit profile and Alpha Picks database paths. It
+  uses the existing read-only active-universe projection, never resolves a
+  credential or creates a transport, and emits a private `0700/0600` manifest
+  plus a ticker-free public attestation. It does not authorize or execute the
+  derived provider budget.
 
 Each provider lane records whether it executed and an exact skip reason. A
 negative oracle result is a successful experiment outcome: it rejects the
@@ -36,6 +40,12 @@ Live evidence files are create-only. They contain normalized identifiers,
 parsed fields, response digests, byte/request accounting, elapsed time, and the
 closed outcome vocabulary. They never retain raw provider bodies, key-bearing
 URLs, authorization headers, API keys, account records, or unrelated rows.
+
+The full-universe manifest is stricter because it reflects private watchlist,
+portfolio, and Alpha Picks membership. Its exact rows stay under the
+git-ignored profile data boundary. Only aggregate counts and cryptographic
+digests enter this tracked evidence directory; per-ticker source provenance is
+never published.
 
 Offline admission:
 

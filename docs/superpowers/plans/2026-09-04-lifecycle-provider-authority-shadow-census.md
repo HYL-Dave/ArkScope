@@ -590,7 +590,10 @@ independent review before any Stage 3 census or authority design.
 
 **Files:**
 - Modify: `docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census/run_census.py`
-- Create after separately authorized read: `docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census/universe-manifest.json`
+- Create after separately authorized read: private git-ignored
+  `data/private_evidence/lifecycle-provider-authority-universe-manifest/`
+- Create after separately authorized read: tracked aggregate-only
+  `docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census/universe-manifest/`
 - Create after separately authorized calls: `docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census/universe-summary.json`
 - Modify: `tests/test_lifecycle_provider_census_runner.py`
 
@@ -613,17 +616,28 @@ def test_universe_manifest_is_sorted_exact_and_digest_bound():
 Also reject `SMCI*`, duplicate normalized tickers, empty sources, and any count
 supplied by the caller rather than derived from exact rows.
 
+The private manifest must preserve internal ticker identity separately from
+provider request identity. Own the reviewed `BRK B -> BRK.B` Massive mapping,
+reject any unreviewed non-provider-shaped ticker, and publish only the mapping
+count rather than either value.
+
 - [ ] **Step 2: Add read-only manifest mode**
 
 Open the production inputs only with SQLite URI `mode=ro`, make no provider
 call, and record the actual count. Treat 186 as the last recorded comparison,
-not a hardcoded assertion.
+not a hardcoded assertion. The full ticker/source rows and seal are `0600`
+inside a new `0700` git-ignored directory. The tracked attestation contains no
+ticker or per-symbol source membership and binds the private file by SHA-256.
 
 - [ ] **Step 3: Stop for active-pass authorization**
 
 Derive the Massive ceiling as exactly `N`, where `N` is the sealed manifest
 count. Add two Nasdaq and, if admitted/configured, two EODHD requests. Do not
 authorize inactive or event requests in this step.
+
+The manifest records this budget with status `not_authorized`. Raising the
+known-case transport's 14-request Massive ceiling is part of the later active-
+pass implementation and must not weaken that existing gate.
 
 - [ ] **Step 4: Run and seal only the active pass**
 

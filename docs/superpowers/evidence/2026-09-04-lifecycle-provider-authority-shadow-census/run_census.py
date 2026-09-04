@@ -8,10 +8,12 @@ commit-bound acknowledgement and writes create-only normalized evidence.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -42,6 +44,11 @@ from src.security_lifecycle_provider_census import (  # noqa: E402
     render_census_summary,
 )
 from src.data_provider_config import ProviderConfigMissing  # noqa: E402
+from src.active_universe import (  # noqa: E402
+    SOURCE_KEYS,
+    ActiveUniverseUnavailable,
+    build_active_universe_snapshot,
+)
 
 
 SPEC = (
@@ -67,12 +74,17 @@ LC_HAPN_REVALIDATION_RELATION = ("LC", "HAPN", "2026-06-22")
 MASSIVE_MIN_REQUEST_INTERVAL_SECONDS = 12.5
 SUMMARY_NAME = "census-summary.json"
 SEAL_NAME = "SHA256SUMS"
+UNIVERSE_MANIFEST_NAME = "universe-manifest.json"
+UNIVERSE_ATTESTATION_NAME = "universe-manifest-attestation.json"
+PRIVATE_UNIVERSE_MANIFEST_DIRNAME = "lifecycle-provider-authority-universe-manifest"
 
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _STABLE_ID = re.compile(r"^BBG[A-Z0-9_]{8,29}$")
 _UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _FAILURE_CODE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
+_PROVIDER_TICKER = re.compile(r"^[A-Z][A-Z0-9]*(?:[.-][A-Z0-9]+)*$")
+_MASSIVE_TICKER_OVERRIDES = {"BRK B": "BRK.B"}
 _FORBIDDEN_PACKET_KEYS = frozenset(
     {
         "apikey",
@@ -432,6 +444,19 @@ def event_revalidation_acknowledgement(
     )
 
 
+def universe_manifest_acknowledgement(*, spec_sha256: str, admitted_commit: str) -> str:
+    if (
+        _SHA256.fullmatch(spec_sha256) is None
+        or _COMMIT.fullmatch(admitted_commit) is None
+    ):
+        raise ValueError("universe_manifest_acknowledgement")
+    return (
+        f"SPEC_SHA256={spec_sha256};"
+        "MODE=universe-manifest;NETWORK=0;"
+        f"ADMITTED_COMMIT={admitted_commit}"
+    )
+
+
 def inspect_repository_state(root: Path = ROOT) -> RepositoryState:
     try:
         head = subprocess.run(
@@ -489,6 +514,54 @@ def _assert_live_admission(
     for name in (SUMMARY_NAME, SEAL_NAME):
         if (output_dir / name).exists():
             raise CensusRunnerFailure("packet_output_exists")
+
+
+def _assert_universe_manifest_admission(
+    *,
+    acknowledgement: str | None,
+    admitted_commit: str | None,
+    repository_state: RepositoryState | None,
+    profile_db_path: Path | None,
+    sa_db_path: Path | None,
+    private_output_dir: Path | None,
+    public_output_dir: Path,
+) -> tuple[Path, Path, Path]:
+    if (
+        not isinstance(admitted_commit, str)
+        or _COMMIT.fullmatch(admitted_commit) is None
+    ):
+        raise CensusRunnerFailure("live_acknowledgement")
+    expected = universe_manifest_acknowledgement(
+        spec_sha256=spec_sha256(), admitted_commit=admitted_commit
+    )
+    if acknowledgement != expected:
+        raise CensusRunnerFailure("live_acknowledgement")
+    state = repository_state or inspect_repository_state()
+    if state.head != admitted_commit or not state.clean:
+        raise CensusRunnerFailure("live_repository_state")
+    if profile_db_path is None or sa_db_path is None or private_output_dir is None:
+        raise CensusRunnerFailure("universe_manifest_paths_required")
+
+    profile = profile_db_path.resolve()
+    sa = sa_db_path.resolve()
+    private = private_output_dir.resolve()
+    public = public_output_dir.resolve()
+    if not profile.is_file() or not sa.is_file():
+        raise CensusRunnerFailure("universe_manifest_database_unavailable")
+    expected_private = (
+        profile.parent / "private_evidence" / PRIVATE_UNIVERSE_MANIFEST_DIRNAME
+    ).resolve()
+    if private != expected_private:
+        raise CensusRunnerFailure("universe_manifest_private_path")
+    if (
+        private == public
+        or private in public.parents
+        or public in private.parents
+        or private.exists()
+        or public.exists()
+    ):
+        raise CensusRunnerFailure("packet_output_exists")
+    return profile, sa, private
 
 
 def _failure_outcome(error: CensusTransportFailure) -> str:
@@ -1118,6 +1191,232 @@ def _run_known_case_live(
     }
 
 
+def digest_tickers(tickers: tuple[str, ...]) -> str:
+    if (
+        not isinstance(tickers, tuple)
+        or not tickers
+        or any(not isinstance(ticker, str) or not ticker for ticker in tickers)
+        or tuple(sorted(set(tickers))) != tickers
+    ):
+        raise CensusRunnerFailure("universe_manifest_tickers_invalid")
+    return hashlib.sha256(canonical_json(list(tickers)).encode("utf-8")).hexdigest()
+
+
+def build_universe_manifest(
+    rows: Iterable[tuple[str, tuple[str, ...]]],
+    *,
+    observation_timestamp: str,
+    admitted_commit: str,
+) -> dict[str, object]:
+    timestamp = _timestamp(observation_timestamp)
+    if _COMMIT.fullmatch(admitted_commit) is None:
+        raise CensusRunnerFailure("universe_manifest_commit")
+
+    seen: set[str] = set()
+    normalized_rows: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, (tuple, list)) or len(row) != 2:
+            raise CensusRunnerFailure("universe_manifest_row_invalid")
+        ticker, sources = row
+        if not isinstance(ticker, str):
+            raise CensusRunnerFailure("universe_manifest_ticker_invalid")
+        normalized_ticker = ticker.strip().upper()
+        if normalized_ticker in seen:
+            raise CensusRunnerFailure("universe_manifest_ticker_duplicate")
+        seen.add(normalized_ticker)
+        massive_ticker = _MASSIVE_TICKER_OVERRIDES.get(normalized_ticker)
+        if massive_ticker is None and _PROVIDER_TICKER.fullmatch(normalized_ticker):
+            massive_ticker = normalized_ticker
+        if (
+            ticker != normalized_ticker
+            or massive_ticker is None
+            or _PROVIDER_TICKER.fullmatch(massive_ticker) is None
+        ):
+            raise CensusRunnerFailure("universe_manifest_ticker_invalid")
+        if (
+            not isinstance(sources, tuple)
+            or not sources
+            or any(source not in SOURCE_KEYS for source in sources)
+            or len(sources) != len(set(sources))
+        ):
+            raise CensusRunnerFailure("universe_manifest_sources_invalid")
+        normalized_rows.append(
+            {
+                "ticker": normalized_ticker,
+                "massive_ticker": massive_ticker,
+                "sources": sorted(sources),
+            }
+        )
+
+    normalized_rows.sort(key=lambda item: str(item["ticker"]))
+    if not normalized_rows:
+        raise CensusRunnerFailure("universe_manifest_empty")
+    tickers = tuple(str(row["ticker"]) for row in normalized_rows)
+    rows_digest = hashlib.sha256(
+        canonical_json(normalized_rows).encode("utf-8")
+    ).hexdigest()
+    count = len(normalized_rows)
+    return {
+        "version": 1,
+        "mode": "universe-manifest",
+        "observation_timestamp": timestamp,
+        "spec_sha256": spec_sha256(),
+        "admitted_commit": admitted_commit,
+        "count": count,
+        "tickers": list(tickers),
+        "tickers_sha256": digest_tickers(tickers),
+        "rows": normalized_rows,
+        "rows_sha256": rows_digest,
+        "active_pass_request_budget": {
+            "massive": count,
+            "eodhd": 2,
+            "nasdaq": 2,
+            "exact_http_requests": count + 4,
+        },
+        "active_pass_status": "not_authorized",
+    }
+
+
+def _source_warning_counts(snapshot: object) -> dict[str, int]:
+    statuses = getattr(snapshot, "source_status", None)
+    if not isinstance(statuses, dict) or set(statuses) != set(SOURCE_KEYS):
+        raise CensusRunnerFailure("universe_manifest_source_status_invalid")
+    counts: Counter[str] = Counter()
+    for status in statuses.values():
+        warnings = getattr(status, "warnings", None)
+        if not isinstance(warnings, tuple) or any(
+            not isinstance(warning, str)
+            or not warning
+            or len(warning) > 128
+            or not warning.isprintable()
+            for warning in warnings
+        ):
+            raise CensusRunnerFailure("universe_manifest_source_status_invalid")
+        counts.update(warnings)
+    return dict(sorted(counts.items()))
+
+
+def _universe_manifest_attestation(
+    packet: Mapping[str, object], *, source_warning_counts: Mapping[str, int]
+) -> dict[str, object]:
+    rows = packet.get("rows")
+    if not isinstance(rows, list):
+        raise CensusRunnerFailure("universe_manifest_row_invalid")
+    source_counts = {source: 0 for source in SOURCE_KEYS}
+    override_count = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            raise CensusRunnerFailure("universe_manifest_row_invalid")
+        ticker = row.get("ticker")
+        massive_ticker = row.get("massive_ticker")
+        sources = row.get("sources")
+        if not isinstance(ticker, str) or not isinstance(massive_ticker, str):
+            raise CensusRunnerFailure("universe_manifest_row_invalid")
+        if ticker != massive_ticker:
+            override_count += 1
+        if not isinstance(sources, list):
+            raise CensusRunnerFailure("universe_manifest_row_invalid")
+        for source in sources:
+            if source not in source_counts:
+                raise CensusRunnerFailure("universe_manifest_sources_invalid")
+            source_counts[source] += 1
+    if any(
+        type(count) is not int or count < 0 for count in source_warning_counts.values()
+    ):
+        raise CensusRunnerFailure("universe_manifest_source_status_invalid")
+
+    private_digest = hashlib.sha256(
+        canonical_json(dict(packet)).encode("utf-8")
+    ).hexdigest()
+    return {
+        "version": 1,
+        "mode": "universe-manifest-attestation",
+        "observation_timestamp": packet["observation_timestamp"],
+        "spec_sha256": packet["spec_sha256"],
+        "admitted_commit": packet["admitted_commit"],
+        "count": packet["count"],
+        "tickers_sha256": packet["tickers_sha256"],
+        "rows_sha256": packet["rows_sha256"],
+        "private_manifest_sha256": private_digest,
+        "source_membership_counts": source_counts,
+        "source_warning_counts": dict(sorted(source_warning_counts.items())),
+        "massive_identifier_override_count": override_count,
+        "active_pass_request_budget": packet["active_pass_request_budget"],
+        "active_pass_status": packet["active_pass_status"],
+    }
+
+
+def _snapshot_rows(
+    snapshot: object, *, observation_timestamp: str
+) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], dict[str, int]]:
+    tickers = getattr(snapshot, "tickers", None)
+    sources_by_ticker = getattr(snapshot, "sources_by_ticker", None)
+    unavailable = getattr(snapshot, "unavailable_sources", None)
+    generated_at = getattr(snapshot, "generated_at", None)
+    if (
+        not isinstance(tickers, tuple)
+        or not isinstance(sources_by_ticker, dict)
+        or unavailable != ()
+        or tuple(sorted(sources_by_ticker)) != tickers
+    ):
+        raise CensusRunnerFailure("universe_manifest_snapshot_invalid")
+    try:
+        generated = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
+        observed = datetime.fromisoformat(observation_timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        raise CensusRunnerFailure("universe_manifest_snapshot_invalid") from None
+    if generated != observed:
+        raise CensusRunnerFailure("universe_manifest_snapshot_invalid")
+    return tuple(sources_by_ticker.items()), _source_warning_counts(snapshot)
+
+
+def _write_private_manifest(packet: Mapping[str, object], *, output_dir: Path) -> None:
+    _assert_packet_safe(packet)
+    try:
+        output_dir.mkdir(parents=True, mode=0o700, exist_ok=False)
+        os.chmod(output_dir, 0o700)
+        manifest_path = output_dir / UNIVERSE_MANIFEST_NAME
+        manifest_bytes = canonical_json(dict(packet)).encode("utf-8")
+        descriptor = os.open(
+            manifest_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(manifest_bytes)
+        digest = hashlib.sha256(manifest_bytes).hexdigest()
+        seal_bytes = f"{digest}  {UNIVERSE_MANIFEST_NAME}\n".encode("ascii")
+        descriptor = os.open(
+            output_dir / SEAL_NAME,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(seal_bytes)
+    except FileExistsError:
+        raise CensusRunnerFailure("packet_output_exists") from None
+    except OSError:
+        raise CensusRunnerFailure("universe_manifest_output_failed") from None
+    verify_seal(output_dir=output_dir)
+
+
+def _write_universe_attestation(
+    attestation: Mapping[str, object], *, output_dir: Path
+) -> None:
+    _assert_packet_safe(attestation)
+    try:
+        output_dir.mkdir(parents=True, exist_ok=False)
+        path = output_dir / UNIVERSE_ATTESTATION_NAME
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(canonical_json(dict(attestation)))
+    except FileExistsError:
+        raise CensusRunnerFailure("packet_output_exists") from None
+    except OSError:
+        raise CensusRunnerFailure("universe_manifest_output_failed") from None
+    seal_packet(output_dir=output_dir, files=(path,))
+    verify_seal(output_dir=output_dir)
+
+
 def _assert_packet_safe(value: object) -> None:
     if isinstance(value, dict):
         for key, item in value.items():
@@ -1199,6 +1498,9 @@ def run_census(
     repository_state: RepositoryState | None = None,
     output_dir: Path = PACKET_DIR,
     production_db_path: Path | None = None,
+    profile_db_path: Path | None = None,
+    sa_db_path: Path | None = None,
+    private_output_dir: Path | None = None,
     timer: Callable[[], float] = time.perf_counter,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> dict[str, object]:
@@ -1210,7 +1512,39 @@ def run_census(
     if mode == "fixture-replay":
         return _fixture_replay(replay_fixture, timestamp)
     if mode == "universe-manifest":
-        raise CensusRunnerFailure("universe_manifest_not_authorized")
+        if production_db_path is not None:
+            raise CensusRunnerFailure("production_database_argument_invalid")
+        profile, sa, private = _assert_universe_manifest_admission(
+            acknowledgement=acknowledgement,
+            admitted_commit=admitted_commit,
+            repository_state=repository_state,
+            profile_db_path=profile_db_path,
+            sa_db_path=sa_db_path,
+            private_output_dir=private_output_dir,
+            public_output_dir=output_dir,
+        )
+        try:
+            snapshot = build_active_universe_snapshot(
+                profile_db=profile,
+                sa_db=sa,
+                now=datetime.fromisoformat(timestamp.replace("Z", "+00:00")),
+            )
+        except ActiveUniverseUnavailable:
+            raise CensusRunnerFailure("universe_manifest_source_unavailable") from None
+        except (OSError, sqlite3.Error, ValueError):
+            raise CensusRunnerFailure("universe_manifest_read_failed") from None
+        rows, warning_counts = _snapshot_rows(snapshot, observation_timestamp=timestamp)
+        private_packet = build_universe_manifest(
+            rows,
+            observation_timestamp=timestamp,
+            admitted_commit=admitted_commit,
+        )
+        attestation = _universe_manifest_attestation(
+            private_packet, source_warning_counts=warning_counts
+        )
+        _write_private_manifest(private_packet, output_dir=private)
+        _write_universe_attestation(attestation, output_dir=output_dir)
+        return attestation
 
     _assert_live_admission(
         mode=mode,
@@ -1279,15 +1613,40 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--acknowledgement")
     parser.add_argument("--admitted-commit")
     parser.add_argument("--profile-db", type=Path)
+    parser.add_argument("--sa-db", type=Path)
+    parser.add_argument("--private-output-dir", type=Path)
     parser.add_argument("--production-db", type=Path)
-    parser.add_argument("--output-dir", type=Path, default=PACKET_DIR)
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args(argv)
+    output_dir = args.output_dir or (
+        PACKET_DIR / "universe-manifest"
+        if args.mode == "universe-manifest"
+        else PACKET_DIR
+    )
 
-    if args.mode in {"dry-run", "fixture-replay", "universe-manifest"}:
+    if args.mode in {"dry-run", "fixture-replay"}:
         resolver = lambda provider: (_ for _ in ()).throw(  # noqa: E731
             AssertionError(f"offline_credential_access:{provider}")
         )
         packet = run_census(mode=args.mode, credential_resolver=resolver)
+        sys.stdout.write(canonical_json(packet))
+        return 0
+
+    if args.mode == "universe-manifest":
+        resolver = lambda provider: (_ for _ in ()).throw(  # noqa: E731
+            AssertionError(f"manifest_credential_access:{provider}")
+        )
+        packet = run_census(
+            mode=args.mode,
+            credential_resolver=resolver,
+            acknowledgement=args.acknowledgement,
+            admitted_commit=args.admitted_commit,
+            profile_db_path=args.profile_db,
+            sa_db_path=args.sa_db,
+            private_output_dir=args.private_output_dir,
+            output_dir=output_dir,
+            production_db_path=args.production_db,
+        )
         sys.stdout.write(canonical_json(packet))
         return 0
 
@@ -1308,7 +1667,7 @@ def _main(argv: list[str] | None = None) -> int:
             transport=transport,
             acknowledgement=args.acknowledgement,
             admitted_commit=args.admitted_commit,
-            output_dir=args.output_dir,
+            output_dir=output_dir,
             production_db_path=args.production_db,
         )
     finally:
