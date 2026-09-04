@@ -99,7 +99,7 @@ def event_fixture(
     successor: str,
     *,
     event_type: str = "ticker_change",
-    effective_date: str = "2026-06-27",
+    effective_date: str = "2026-06-22",
     next_url: object = _MISSING,
 ) -> dict[str, object]:
     successor_event: dict[str, object] = {
@@ -180,7 +180,7 @@ def test_massive_events_requires_stable_identifier_and_exact_ticker_change():
         stable_id="BBG_TEST_LC", api_key="secret", budget=budget()
     )
 
-    assert row.events == (("LC", "HAPN", "2026-06-27"),)
+    assert row.events == (("LC", "HAPN", "2026-06-22"),)
     assert row.stable_id == "BBG_TEST_LC"
     assert row.source_locator == f"{MASSIVE_EVENTS_PREFIX}BBG_TEST_LC/events"
 
@@ -194,7 +194,7 @@ def test_massive_events_accepts_official_timeline_shape_without_result_ticker():
                 "events": [
                     {
                         "type": "ticker_change",
-                        "date": "2026-06-27",
+                        "date": "2026-06-22",
                         "ticker_change": {"ticker": "HAPN"},
                     },
                     {
@@ -211,7 +211,7 @@ def test_massive_events_accepts_official_timeline_shape_without_result_ticker():
         stable_id="BBG_TEST_LC", api_key="secret", budget=budget()
     )
 
-    assert row.events == (("LC", "HAPN", "2026-06-27"),)
+    assert row.events == (("LC", "HAPN", "2026-06-22"),)
 
 
 def test_massive_events_accepts_an_empty_timeline_as_no_relation():
@@ -233,12 +233,12 @@ def test_massive_events_accepts_an_empty_timeline_as_no_relation():
             [
                 {
                     "type": "ticker_change",
-                    "date": "2026-06-27",
+                    "date": "2026-06-22",
                     "ticker_change": {"ticker": "LC"},
                 },
                 {
                     "type": "ticker_change",
-                    "date": "2026-06-27",
+                    "date": "2026-06-22",
                     "ticker_change": {"ticker": "HAPN"},
                 },
             ],
@@ -253,7 +253,7 @@ def test_massive_events_accepts_an_empty_timeline_as_no_relation():
                 },
                 {
                     "type": "ticker_change",
-                    "date": "2026-06-27",
+                    "date": "2026-06-22",
                     "ticker_change": {"ticker": "LC"},
                 },
             ],
@@ -528,7 +528,7 @@ def test_massive_events_reject_unknown_event_types():
 
 @pytest.mark.parametrize(
     "effective_date",
-    ("2026-6-27", "2026-06-27T00:00:00Z", "2026-02-30", "not-a-date", None),
+    ("2026-6-22", "2026-06-22T00:00:00Z", "2026-02-30", "not-a-date", None),
 )
 def test_massive_events_reject_malformed_dates(effective_date: object):
     transport, _session = transport_with_json(
@@ -624,7 +624,7 @@ def test_massive_accepts_only_absent_null_or_empty_next_url(next_url: object):
         stable_id="BBG_TEST_LC", api_key="secret", budget=budget()
     )
 
-    assert result.events == (("LC", "HAPN", "2026-06-27"),)
+    assert result.events == (("LC", "HAPN", "2026-06-22"),)
 
 
 def test_massive_rejects_redirect_wrong_content_type_and_provider_error():

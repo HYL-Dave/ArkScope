@@ -154,7 +154,7 @@ class FakeLiveTransport:
         if stable_id == "BBG000000LC":
             events = (("LC", "HAPN", "2025-06-27"),)
         elif stable_id == "BBG001YKDND6":
-            events = (("LC", "HAPN", "2026-06-27"),)
+            events = (("LC", "HAPN", "2026-06-22"),)
         return MassiveTickerEventsResult(
             stable_id=stable_id,
             events=events,
@@ -470,16 +470,33 @@ def test_event_revalidation_executes_only_one_massive_request_and_seals_packet(
     assert packet["relation"] == {
         "source_ticker": "LC",
         "successor_ticker": "HAPN",
-        "effective_date": "2026-06-27",
+        "effective_date": "2026-06-22",
         "outcome": "confirmed",
     }
     assert packet["request_observations"][0]["parsed_fields"] == {
         "stable_id": "BBG001YKDND6",
-        "events": [["LC", "HAPN", "2026-06-27"]],
+        "events": [["LC", "HAPN", "2026-06-22"]],
     }
     summary = (tmp_path / runner.SUMMARY_NAME).read_text(encoding="utf-8")
     assert "SENSITIVE_MASSIVE_KEY" not in summary
     runner.verify_seal(output_dir=tmp_path)
+
+
+def test_retained_event_revalidation_packet_preserves_the_stale_oracle() -> None:
+    packet_dir = runner.PACKET_DIR / "attempt-2-event-revalidation"
+    runner.verify_seal(output_dir=packet_dir)
+    packet = json.loads((packet_dir / runner.SUMMARY_NAME).read_bytes())
+
+    assert packet["relation"] == {
+        "source_ticker": "LC",
+        "successor_ticker": "HAPN",
+        "effective_date": "2026-06-27",
+        "outcome": "contradicted",
+    }
+    parsed_event = tuple(
+        packet["request_observations"][0]["parsed_fields"]["events"][0]
+    )
+    assert parsed_event == runner.LC_HAPN_REVALIDATION_RELATION
 
 
 def test_event_revalidation_rejects_known_case_acknowledgement_before_credentials(

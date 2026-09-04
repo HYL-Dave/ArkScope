@@ -2,13 +2,13 @@
 
 **Status:** Provider-free preflight, the separately authorized read-only Alpha
 Picks identity census, detached census implementation, profile-backed EODHD
-Settings field, and two known-case attempts are complete. Attempt 2 passes the
-listing-state gate with active and inactive controls across Massive, EODHD, and
-Nasdaq. The ticker-change gate remains unadmitted: a contract-valid Massive
-event timeline exposed an ArkScope parser defect, whose offline repair requires
-a separately authorized `LC` revalidation. Any full-universe read, production
-write, migration, runtime authority change, App restart, and push remain
-separate gates.
+Settings field, two known-case attempts, and the separately authorized one-call
+ticker-event revalidation are complete. Attempt 2 passes the listing-state gate
+with active and inactive controls across Massive, EODHD, and Nasdaq. The
+revalidation returned exact `LC -> HAPN` on `2026-06-22`, so the corrected
+official-shape parser passes its live known-case gate. Any full-universe read,
+production write, migration, runtime authority change, App restart, and push
+remain separate gates.
 
 **Date:** 2026-09-04
 
@@ -131,8 +131,9 @@ and derives only adjacent old-to-new pairs, using the later ticker's date as the
 effective date. Duplicate dates, repeated ticker values, malformed values, and
 unsupported event types are ambiguous and fail closed. Attempt 2 demonstrated
 that the original adapter's invented `results.ticker` requirement rejected a
-successful response; the corrected normalization remains offline-only until a
-new live `LC` event request confirms it against the provider.
+successful response. The bounded live revalidation subsequently confirmed that
+the corrected parser discovers exact `LC -> HAPN` on `2026-06-22` from the
+shared Composite FIGI timeline.
 
 Official contract:
 `https://massive.com/docs/rest/stocks/corporate-actions/ticker-events`.
@@ -343,10 +344,29 @@ that stable identifier's Ticker Events timeline. Its fixed budget is
 DB read, or application write.
 
 The revalidation passes only when the corrected parser returns exact
-`LC -> HAPN` with effective date `2026-06-27`. Another `LC` successor is a
+`LC -> HAPN` with effective date `2026-06-22`. Another `LC` successor is a
 contradiction; no `LC` relation, malformed chronology, duplicate dates or
 tickers, an unsupported event, or a provider failure does not pass. The live
 request requires a new exact commit/spec/source-packet/budget authorization.
+
+### 6.7 Ticker-event revalidation ruling
+
+The separately authorized run at `2026-09-04T14:31:35Z` made exactly one
+Massive request and zero EODHD or Nasdaq requests, with no retry or fallback.
+The corrected parser returned the shared Composite FIGI and exact event
+`LC -> HAPN` on `2026-06-22`. Happen's filed Form 8-K independently states that
+the `LC` to `HAPN` trading-symbol change became effective at market open on
+that date and that the common stock's CUSIP remained unchanged:
+<https://www.sec.gov/Archives/edgar/data/1409970/000140997026000140/lc-20260622.htm>.
+
+The immutable live packet records `contradicted` because the frozen runner
+mistakenly expected `2026-06-27`. That date was an oracle defect, not provider
+disagreement. The RED-first regression reproduced the false contradiction;
+the corrected `2026-06-22` oracle now passes against the exact live parsed
+shape without making another provider request. The packet and original seal
+remain unchanged so this correction is auditable. The known-case
+ticker-change discovery gate therefore passes, but this changes no runtime
+authority and authorizes no lifecycle mutation.
 
 ## 7. Stage 3 Full-Universe Census
 
