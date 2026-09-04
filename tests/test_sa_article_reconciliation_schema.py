@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import subprocess
 import sys
@@ -101,6 +102,74 @@ def _create_v1(path: Path) -> None:
         conn.close()
 
 
+def _create_v2_with_provider_marked_symbol(
+    path: Path,
+    *,
+    target_collision: bool = False,
+) -> None:
+    seeded = scs.connect(str(path))
+    seeded.close()
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("DELETE FROM schema_migrations WHERE version > 2")
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_migrations(version, applied_at) "
+            "VALUES (2, '2026-09-03T00:00:00+00:00')"
+        )
+        conn.execute("PRAGMA user_version = 2")
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' "
+            "AND name LIKE '%reject_provider_marker%'"
+        ).fetchall():
+            conn.execute(f'DROP TRIGGER "{row[0]}"')
+        conn.execute(
+            "INSERT INTO sa_pick_lineages"
+            "(lineage_id, symbol_key, picked_date, created_at) "
+            "VALUES (79, 'SMCI*', '2022-11-15', '2026-07-19T00:00:00+00:00')"
+        )
+        conn.executemany(
+            "INSERT INTO sa_alpha_picks "
+            "(id, lineage_id, symbol, company, picked_date, closed_date, "
+            "portfolio_status, is_stale, return_pct, raw_data) "
+            "VALUES (?, 79, 'SMCI*', 'Super Micro Computer', '2022-11-15', "
+            "?, 'closed', 0, ?, ?)",
+            [
+                (
+                    7901,
+                    "2024-03-19",
+                    968.59,
+                    json.dumps({"cells": ["", "SMCI*", "11/15/2022"]}),
+                ),
+                (
+                    7902,
+                    "2024-10-30",
+                    301.41,
+                    json.dumps({"cells": ["", "SMCI*", "11/15/2022"]}),
+                ),
+            ],
+        )
+        conn.execute(
+            "INSERT INTO sa_articles(article_id, url, title) "
+            "VALUES ('smci-exit', 'https://sa/smci-exit', 'SMCI exit')"
+        )
+        conn.execute(
+            "INSERT INTO sa_pick_article_links "
+            "(link_id, lineage_id, article_id, role, event_anchor_date, "
+            "link_source, evidence_codes, linked_at) "
+            "VALUES (7903, 79, 'smci-exit', 'exit', '2024-10-30', "
+            "'user', '[]', '2026-07-19T00:00:00+00:00')"
+        )
+        if target_collision:
+            conn.execute(
+                "INSERT INTO sa_pick_lineages"
+                "(lineage_id, symbol_key, picked_date, created_at) "
+                "VALUES (80, 'SMCI', '2022-11-15', '2026-07-20T00:00:00+00:00')"
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _lineage_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT p.id, p.closed_date, l.lineage_id, l.symbol_key, l.picked_date "
@@ -151,10 +220,10 @@ def _insert_lineage_and_article(conn: sqlite3.Connection) -> tuple[int, str]:
     return lineage_id, article_id
 
 
-def test_fresh_v2_schema_has_lineage_link_decision_and_provider_evidence_contract(tmp_path):
+def test_fresh_v3_schema_has_lineage_link_decision_and_provider_evidence_contract(tmp_path):
     conn = scs.connect(str(tmp_path / "fresh.db"))
     try:
-        assert scs.SCHEMA_VERSION == 2
+        assert scs.SCHEMA_VERSION == 3
         tables = {
             row[0]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -202,6 +271,114 @@ def test_fresh_v2_schema_has_lineage_link_decision_and_provider_evidence_contrac
         assert "decision = 'rejected'" in decision_sql
     finally:
         conn.close()
+
+
+def test_v3_schema_rejects_provider_markers_in_persisted_symbol_identity(tmp_path):
+    conn = scs.connect(str(tmp_path / "symbol-invariant.db"))
+    try:
+        with pytest.raises(sqlite3.IntegrityError, match="provider marker"):
+            conn.execute(
+                "INSERT INTO sa_pick_lineages(symbol_key, picked_date, created_at) "
+                "VALUES ('SMCI*', '2022-11-15', ?)",
+                (scs.now_ts(),),
+            )
+
+        conn.execute(
+            "INSERT INTO sa_pick_lineages(symbol_key, picked_date, created_at) "
+            "VALUES ('SMCI', '2022-11-15', ?)",
+            (scs.now_ts(),),
+        )
+        lineage_id = conn.execute(
+            "SELECT lineage_id FROM sa_pick_lineages WHERE symbol_key='SMCI'"
+        ).fetchone()[0]
+        with pytest.raises(sqlite3.IntegrityError, match="provider marker"):
+            conn.execute(
+                "INSERT INTO sa_alpha_picks "
+                "(lineage_id, symbol, company, picked_date, portfolio_status) "
+                "VALUES (?, 'SMCI*', 'Super Micro Computer', '2022-11-15', 'closed')",
+                (lineage_id,),
+            )
+
+        conn.execute(
+            "INSERT INTO sa_alpha_picks "
+            "(lineage_id, symbol, company, picked_date, portfolio_status) "
+            "VALUES (?, 'SMCI', 'Super Micro Computer', '2022-11-15', 'closed')",
+            (lineage_id,),
+        )
+        with pytest.raises(sqlite3.IntegrityError, match="provider marker"):
+            conn.execute(
+                "UPDATE sa_pick_lineages SET symbol_key='SMCI*' WHERE lineage_id=?",
+                (lineage_id,),
+            )
+        with pytest.raises(sqlite3.IntegrityError, match="provider marker"):
+            conn.execute(
+                "UPDATE sa_alpha_picks SET symbol='SMCI*' WHERE lineage_id=?",
+                (lineage_id,),
+            )
+    finally:
+        conn.close()
+
+
+def test_v2_to_v3_migration_canonicalizes_identity_and_preserves_provider_literal(
+    tmp_path,
+):
+    path = tmp_path / "provider-marker-v2.db"
+    _create_v2_with_provider_marked_symbol(path)
+
+    conn = scs.connect(str(path))
+    try:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        picks = conn.execute(
+            "SELECT id, symbol, closed_date, return_pct, raw_data, lineage_id "
+            "FROM sa_alpha_picks ORDER BY id"
+        ).fetchall()
+        assert [tuple(row[:4]) for row in picks] == [
+            (7901, "SMCI", "2024-03-19", 968.59),
+            (7902, "SMCI", "2024-10-30", 301.41),
+        ]
+        assert {row[5] for row in picks} == {79}
+        assert all(json.loads(row[4])["cells"][1] == "SMCI*" for row in picks)
+        assert tuple(
+            conn.execute(
+                "SELECT symbol_key, picked_date FROM sa_pick_lineages WHERE lineage_id=79"
+            ).fetchone()
+        ) == ("SMCI", "2022-11-15")
+        assert conn.execute(
+            "SELECT lineage_id FROM sa_pick_article_links WHERE link_id=7903"
+        ).fetchone()[0] == 79
+        assert conn.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE version=3"
+        ).fetchone()[0] == 1
+        with pytest.raises(sqlite3.IntegrityError, match="provider marker"):
+            conn.execute(
+                "UPDATE sa_alpha_picks SET symbol='SMCI*' WHERE id=7901"
+            )
+        with pytest.raises(sqlite3.IntegrityError, match="provider marker"):
+            conn.execute(
+                "UPDATE sa_pick_lineages SET symbol_key='SMCI*' WHERE lineage_id=79"
+            )
+    finally:
+        conn.close()
+
+
+def test_v2_to_v3_symbol_collision_fails_closed_without_partial_rewrite(tmp_path):
+    path = tmp_path / "provider-marker-collision-v2.db"
+    _create_v2_with_provider_marked_symbol(path, target_collision=True)
+    before_conn = sqlite3.connect(path)
+    before_conn.row_factory = sqlite3.Row
+    before = _schema_snapshot(before_conn)
+    before_conn.close()
+
+    with pytest.raises(RuntimeError, match="Alpha Picks canonical symbol collision"):
+        scs.connect(str(path))
+
+    after_conn = sqlite3.connect(path)
+    after_conn.row_factory = sqlite3.Row
+    try:
+        assert _schema_snapshot(after_conn) == before
+        assert after_conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    finally:
+        after_conn.close()
 
 
 def test_v1_migration_backfills_one_lineage_for_current_and_closed_rows(tmp_path):
@@ -450,10 +627,10 @@ def test_v1_to_v2_migration_is_serialized_across_two_real_processes(tmp_path):
     ]
     outputs = [proc.communicate(timeout=60) for proc in procs]
     assert all(proc.returncode == 0 for proc in procs), outputs
-    assert all(stdout.strip() == "2" for stdout, _ in outputs)
+    assert all(stdout.strip() == "3" for stdout, _ in outputs)
     conn = sqlite3.connect(path)
     try:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute(
             "SELECT COUNT(*) FROM sa_alpha_picks WHERE lineage_id IS NULL"

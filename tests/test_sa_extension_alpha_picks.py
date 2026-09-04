@@ -196,7 +196,7 @@ def test_alpha_picks_scraper_parses_live_company_column_shape():
         },
         {
             "company": "",
-            "symbol": "SMCI*",
+            "symbol": "SMCI",
             "picked_date": "2022-11-15",
             "closed_date": "2024-10-30",
             "return_pct": 301.41,
