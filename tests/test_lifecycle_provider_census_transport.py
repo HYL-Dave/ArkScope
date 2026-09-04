@@ -136,6 +136,20 @@ def transport_with_eodhd(
     )
 
 
+def eodhd_row(
+    code: object,
+    *,
+    country: object = "USA",
+    exchange: object = "NASDAQ",
+) -> dict[str, object]:
+    row = {"Code": code}
+    if country is not _MISSING:
+        row["Country"] = country
+    if exchange is not _MISSING:
+        row["Exchange"] = exchange
+    return row
+
+
 def assert_closed_failure(
     error: Exception, expected_code: str, *untrusted_values: str
 ) -> None:
@@ -579,7 +593,7 @@ def test_massive_enforces_one_mib_response_and_fourteen_mib_aggregate_caps():
 
 
 def test_eodhd_active_and_delisted_sets_require_complete_requested_accounting():
-    transport = transport_with_eodhd(active=[{"Code": "AAPL"}], delisted=[])
+    transport = transport_with_eodhd(active=[eodhd_row("AAPL")], delisted=[])
 
     result = transport.fetch_eodhd_symbol_sets(
         symbols=("AAPL", "TA"), api_key="secret", budget=budget()
@@ -593,8 +607,8 @@ def test_eodhd_active_and_delisted_sets_require_complete_requested_accounting():
 
 def test_eodhd_calls_only_us_status_endpoint_twice_with_same_sorted_manifest():
     secret = "eodhd-secret-sentinel"
-    active = [{"Code": "AAPL"}]
-    delisted = [{"Code": "TA"}, {"Code": "ARCH"}]
+    active = [eodhd_row("AAPL")]
+    delisted = [eodhd_row("TA", exchange="NYSE"), eodhd_row("ARCH")]
     active_body = json.dumps(active, sort_keys=True, separators=(",", ":")).encode(
         "ascii"
     )
@@ -650,7 +664,7 @@ def test_eodhd_calls_only_us_status_endpoint_twice_with_same_sorted_manifest():
 
 def test_eodhd_rejects_active_and_delisted_overlap():
     transport = transport_with_eodhd(
-        active=[{"Code": "AAPL"}], delisted=[{"Code": "AAPL"}]
+        active=[eodhd_row("AAPL")], delisted=[eodhd_row("AAPL")]
     )
 
     with pytest.raises(CensusTransportFailure) as caught:
@@ -663,7 +677,7 @@ def test_eodhd_rejects_active_and_delisted_overlap():
 
 @pytest.mark.parametrize("delisted", (False, True))
 def test_eodhd_rejects_duplicate_codes(delisted: bool):
-    duplicate = [{"Code": "AAPL"}, {"Code": "AAPL"}]
+    duplicate = [eodhd_row("AAPL"), eodhd_row("AAPL")]
     transport = transport_with_eodhd(
         active=[] if delisted else duplicate,
         delisted=duplicate if delisted else [],
@@ -678,7 +692,7 @@ def test_eodhd_rejects_duplicate_codes(delisted: bool):
 
 
 def test_eodhd_rejects_unexpected_code():
-    transport = transport_with_eodhd(active=[{"Code": "MSFT"}], delisted=[])
+    transport = transport_with_eodhd(active=[eodhd_row("MSFT")], delisted=[])
 
     with pytest.raises(CensusTransportFailure) as caught:
         transport.fetch_eodhd_symbol_sets(
@@ -703,6 +717,78 @@ def test_eodhd_rejects_malformed_rows(row: object):
     assert_closed_failure(caught.value, "eodhd_row_invalid", "aapl", "AAPL ")
 
 
+@pytest.mark.parametrize("lane", ("active", "delisted"))
+@pytest.mark.parametrize(
+    "country",
+    (
+        pytest.param(_MISSING, id="missing"),
+        pytest.param(None, id="null"),
+        pytest.param("", id="empty"),
+        pytest.param("USA ", id="not-exact"),
+        pytest.param("CAN", id="foreign"),
+        pytest.param(123, id="non-string"),
+    ),
+)
+def test_eodhd_rejects_invalid_country_provenance(lane: str, country: object):
+    row = eodhd_row("AAPL", country=country)
+    transport = transport_with_eodhd(
+        active=[row] if lane == "active" else [],
+        delisted=[row] if lane == "delisted" else [],
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_country_invalid")
+
+
+@pytest.mark.parametrize("lane", ("active", "delisted"))
+@pytest.mark.parametrize(
+    "exchange",
+    (
+        pytest.param(_MISSING, id="missing"),
+        pytest.param(None, id="null"),
+        pytest.param("", id="empty"),
+        pytest.param(" ", id="blank"),
+        pytest.param(" NASDAQ", id="leading-space"),
+        pytest.param("NAS\0DAQ", id="non-printable"),
+        pytest.param("X" * 129, id="too-long"),
+        pytest.param(123, id="non-string"),
+    ),
+)
+def test_eodhd_rejects_invalid_exchange_provenance(lane: str, exchange: object):
+    row = eodhd_row("AAPL", exchange=exchange)
+    transport = transport_with_eodhd(
+        active=[row] if lane == "active" else [],
+        delisted=[row] if lane == "delisted" else [],
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_exchange_invalid")
+
+
+def test_eodhd_accepts_open_bounded_printable_exchange_vocabulary():
+    boundary_venue = "FUTURE-US-VENUE-" + "X" * 112
+    assert len(boundary_venue) == 128
+    transport = transport_with_eodhd(
+        active=[eodhd_row("AAPL", exchange=boundary_venue)],
+        delisted=[eodhd_row("TA", exchange="ANOTHER US VENUE")],
+    )
+
+    result = transport.fetch_eodhd_symbol_sets(
+        symbols=("AAPL", "TA"), api_key="secret", budget=budget()
+    )
+
+    assert result.active == ("AAPL",)
+    assert result.delisted == ("TA",)
+
+
 def test_eodhd_rejects_non_us_exchange_endpoint_before_http(monkeypatch):
     session = FakeSession()
     monkeypatch.setattr(
@@ -722,7 +808,7 @@ def test_eodhd_rejects_non_us_exchange_endpoint_before_http(monkeypatch):
 
 
 def test_eodhd_budget_stops_before_more_than_two_requests():
-    session = FakeSession([json_response([{"Code": "AAPL"}]), json_response([])])
+    session = FakeSession([json_response([eodhd_row("AAPL")]), json_response([])])
     transport = LifecycleProviderCensusTransport(session=session)
     b = budget()
     transport.fetch_eodhd_symbol_sets(symbols=("AAPL",), api_key="secret", budget=b)
@@ -790,7 +876,7 @@ def test_eodhd_api_token_is_added_only_inside_dependency_log_redaction(monkeypat
 
     monkeypatch.setattr(census_transport, "dependency_log_redaction", RedactionGuard)
     transport = LifecycleProviderCensusTransport(
-        session=GuardedSession([json_response([{"Code": "AAPL"}]), json_response([])])
+        session=GuardedSession([json_response([eodhd_row("AAPL")]), json_response([])])
     )
 
     transport.fetch_eodhd_symbol_sets(
@@ -818,7 +904,7 @@ def test_eodhd_debug_logs_redact_raw_and_encoded_credentials(caplog):
             return super().get(url, **kwargs)
 
     transport = LifecycleProviderCensusTransport(
-        session=LoggingSession([json_response([{"Code": "AAPL"}]), json_response([])])
+        session=LoggingSession([json_response([eodhd_row("AAPL")]), json_response([])])
     )
     transport.fetch_eodhd_symbol_sets(symbols=("AAPL",), api_key=key, budget=budget())
 

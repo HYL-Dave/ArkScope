@@ -28,6 +28,7 @@ MAX_MASSIVE_RESPONSE_BYTES = 1024 * 1024
 MAX_MASSIVE_TOTAL_BYTES = 14 * 1024 * 1024
 MAX_EODHD_RESPONSE_BYTES = 1024 * 1024
 MAX_EODHD_TOTAL_BYTES = 2 * 1024 * 1024
+_MAX_EODHD_EXCHANGE_LENGTH = 128
 MAX_NASDAQ_FILE_BYTES = 8 * 1024 * 1024
 MAX_NASDAQ_TOTAL_BYTES = 12 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 15
@@ -395,6 +396,17 @@ def _parse_eodhd_codes(body: bytes, requested: set[str]) -> tuple[str, ...]:
         if not isinstance(row, dict):
             raise CensusTransportFailure("eodhd_row_invalid")
         code = _validate_eodhd_symbol(row.get("Code"), code="eodhd_row_invalid")
+        if row.get("Country") != "USA":
+            raise CensusTransportFailure("eodhd_country_invalid")
+        exchange = row.get("Exchange")
+        if (
+            not isinstance(exchange, str)
+            or not exchange
+            or exchange != exchange.strip()
+            or len(exchange) > _MAX_EODHD_EXCHANGE_LENGTH
+            or not exchange.isprintable()
+        ):
+            raise CensusTransportFailure("eodhd_exchange_invalid")
         if code in codes:
             raise CensusTransportFailure("eodhd_code_duplicate")
         if code not in requested:
