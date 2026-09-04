@@ -179,9 +179,9 @@ def _listing_snapshot(
         return _ListingSnapshot("conflicting", None, "provider_disagreement")
     state = "active" if states == {True} else "inactive"
 
-    stable_ids = {row.stable_id for row in rows if row.stable_id is not None}
-    if not stable_ids:
+    if any(row.stable_id is None for row in rows):
         return _ListingSnapshot(state, None, "missing_stable_identity")
+    stable_ids = {row.stable_id for row in rows}
     if len(stable_ids) != 1:
         return _ListingSnapshot(state, None, "stable_identity_conflict")
     return _ListingSnapshot(state, next(iter(stable_ids)), None)
@@ -239,17 +239,22 @@ def _classify_lc(
     conversion_rows = tuple(
         row
         for row in observations
-        if row.axis == "economic_successor"
-        and _exact_ticker(row.source_ticker, "LC")
-        and row.complete
+        if row.axis == "economic_successor" and _exact_ticker(row.source_ticker, "LC")
     )
     if any(not row.complete for row in rename_rows):
         return _result("LC", "ambiguous", source.state, "incomplete_observation")
+    if any(not row.complete for row in conversion_rows):
+        return _result("LC", "ambiguous", source.state, "incomplete_observation")
+    complete_conversion_rows = tuple(row for row in conversion_rows if row.complete)
     if not rename_rows:
-        outcome = "contradicted" if conversion_rows else "ambiguous"
-        reason = "relation_axis_contradicted" if conversion_rows else "relation_missing"
+        outcome = "contradicted" if complete_conversion_rows else "ambiguous"
+        reason = (
+            "relation_axis_contradicted"
+            if complete_conversion_rows
+            else "relation_missing"
+        )
         return _result("LC", outcome, source.state, reason)
-    if conversion_rows:
+    if complete_conversion_rows:
         return _result("LC", "ambiguous", source.state, "relation_axis_conflict")
 
     successors = {row.successor_ticker for row in rename_rows}
@@ -258,9 +263,9 @@ def _classify_lc(
     if successors != {_LC_SUCCESSOR}:
         return _result("LC", "contradicted", source.state, "relation_contradicted")
 
-    relation_ids = {row.stable_id for row in rename_rows if row.stable_id is not None}
-    if not relation_ids:
+    if any(row.stable_id is None for row in rename_rows):
         return _result("LC", "ambiguous", source.state, "missing_stable_identity")
+    relation_ids = {row.stable_id for row in rename_rows}
     if len(relation_ids) != 1 or relation_ids != {source.stable_id}:
         return _result("LC", "ambiguous", source.state, "stable_identity_conflict")
 

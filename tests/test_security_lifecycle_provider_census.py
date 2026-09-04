@@ -256,6 +256,43 @@ def test_lc_requires_stable_identity_agreement():
     assert result.successor is None
 
 
+def test_every_participating_lc_relation_row_requires_stable_identity():
+    rows = (
+        observation("massive", "listing_state", "LC", active=False),
+        observation("massive", "ticker_change", "LC", successor="HAPN"),
+        observation(
+            "eodhd",
+            "ticker_change",
+            "LC",
+            successor="HAPN",
+            stable_id=None,
+        ),
+        observation("massive", "listing_state", "HAPN", active=True),
+    )
+    result = classify_known_case("LC", rows)
+    assert result.outcome == "ambiguous"
+    assert result.successor is None
+    assert result.reasons == ("missing_stable_identity",)
+
+
+def test_incomplete_lc_conversion_cannot_disappear_beside_valid_rename():
+    rows = (
+        observation("massive", "listing_state", "LC", active=False),
+        observation("massive", "ticker_change", "LC", successor="HAPN"),
+        observation(
+            "massive",
+            "economic_successor",
+            "LC",
+            complete=False,
+        ),
+        observation("massive", "listing_state", "HAPN", active=True),
+    )
+    result = classify_known_case("LC", rows)
+    assert result.outcome == "ambiguous"
+    assert result.successor is None
+    assert result.reasons == ("incomplete_observation",)
+
+
 def test_same_security_ticker_change_is_not_a_merger_conversion():
     listing_rows = (
         observation("massive", "listing_state", "LC", active=False),
@@ -396,6 +433,22 @@ def test_missing_stable_identity_is_ambiguous():
         ),
     )
     assert classify_known_case("AAPL", rows).outcome == "ambiguous"
+
+
+def test_every_participating_listing_row_requires_stable_identity():
+    rows = (
+        observation("massive", "listing_state", "AAPL", active=True),
+        observation(
+            "eodhd",
+            "listing_state",
+            "AAPL",
+            active=True,
+            stable_id=None,
+        ),
+    )
+    result = classify_known_case("AAPL", rows)
+    assert result.outcome == "ambiguous"
+    assert result.reasons == ("missing_stable_identity",)
 
 
 def test_duplicate_contradictory_provider_rows_are_rejected():
