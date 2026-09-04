@@ -50,16 +50,26 @@ SPEC = (
 )
 KNOWN_CASES_FIXTURE = ROOT / "tests/fixtures/lifecycle_provider_census/known_cases.json"
 REPLAY_FIXTURE = ROOT / "tests/fixtures/lifecycle_provider_census/normalized_replay.json"
-MODES = ("dry-run", "fixture-replay", "known-case-live", "universe-manifest")
+ATTEMPT_2_DIR = PACKET_DIR / "attempt-2"
+MODES = (
+    "dry-run",
+    "fixture-replay",
+    "known-case-live",
+    "ticker-event-revalidation",
+    "universe-manifest",
+)
 CLOSED_OUTCOMES = tuple(sorted(CENSUS_OUTCOMES))
 REQUEST_BUDGET = {"massive": 14, "eodhd": 2, "nasdaq": 2}
 MAXIMUM_HTTP_REQUESTS = sum(REQUEST_BUDGET.values())
+EVENT_REVALIDATION_REQUEST_BUDGET = {"massive": 1, "eodhd": 0, "nasdaq": 0}
+EVENT_REVALIDATION_MAXIMUM_HTTP_REQUESTS = 1
 MASSIVE_MIN_REQUEST_INTERVAL_SECONDS = 12.5
 SUMMARY_NAME = "census-summary.json"
 SEAL_NAME = "SHA256SUMS"
 
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_STABLE_ID = re.compile(r"^BBG[A-Z0-9_]{8,29}$")
 _UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _FAILURE_CODE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 _FORBIDDEN_PACKET_KEYS = frozenset(
@@ -399,6 +409,28 @@ def live_acknowledgement(*, spec_sha256: str, admitted_commit: str) -> str:
     )
 
 
+def attempt_2_summary_sha256() -> str:
+    verify_seal(output_dir=ATTEMPT_2_DIR)
+    return hashlib.sha256((ATTEMPT_2_DIR / SUMMARY_NAME).read_bytes()).hexdigest()
+
+
+def event_revalidation_acknowledgement(
+    *, spec_sha256: str, source_sha256: str, admitted_commit: str
+) -> str:
+    if (
+        _SHA256.fullmatch(spec_sha256) is None
+        or _SHA256.fullmatch(source_sha256) is None
+        or _COMMIT.fullmatch(admitted_commit) is None
+    ):
+        raise ValueError("event_revalidation_acknowledgement")
+    return (
+        f"SPEC_SHA256={spec_sha256};"
+        "BUDGET=massive:1,eodhd:0,nasdaq:0;"
+        f"SOURCE_SHA256={source_sha256};"
+        f"ADMITTED_COMMIT={admitted_commit}"
+    )
+
+
 def inspect_repository_state(root: Path = ROOT) -> RepositoryState:
     try:
         head = subprocess.run(
@@ -425,6 +457,7 @@ def inspect_repository_state(root: Path = ROOT) -> RepositoryState:
 
 def _assert_live_admission(
     *,
+    mode: str,
     acknowledgement: str | None,
     admitted_commit: str | None,
     repository_state: RepositoryState | None,
@@ -433,9 +466,18 @@ def _assert_live_admission(
 ) -> None:
     if not isinstance(admitted_commit, str) or _COMMIT.fullmatch(admitted_commit) is None:
         raise CensusRunnerFailure("live_acknowledgement")
-    expected = live_acknowledgement(
-        spec_sha256=spec_sha256(), admitted_commit=admitted_commit
-    )
+    if mode == "known-case-live":
+        expected = live_acknowledgement(
+            spec_sha256=spec_sha256(), admitted_commit=admitted_commit
+        )
+    elif mode == "ticker-event-revalidation":
+        expected = event_revalidation_acknowledgement(
+            spec_sha256=spec_sha256(),
+            source_sha256=attempt_2_summary_sha256(),
+            admitted_commit=admitted_commit,
+        )
+    else:
+        raise CensusRunnerFailure("census_mode")
     if acknowledgement != expected:
         raise CensusRunnerFailure("live_acknowledgement")
     state = repository_state or inspect_repository_state()
@@ -545,6 +587,185 @@ def _nasdaq_symbols(body: bytes, requested: set[str]) -> list[str]:
         if ticker in requested:
             matched.add(ticker)
     return sorted(matched)
+
+
+def _attempt_2_lc_stable_id() -> str:
+    verify_seal(output_dir=ATTEMPT_2_DIR)
+    packet = _json_object(ATTEMPT_2_DIR / SUMMARY_NAME, code="attempt_2_packet")
+    if packet.get("mode") != "known-case-live":
+        raise CensusRunnerFailure("attempt_2_packet")
+    rows = packet.get("request_observations")
+    if not isinstance(rows, list):
+        raise CensusRunnerFailure("attempt_2_packet")
+
+    stable_ids: list[str] = []
+    for ticker, active in (("LC", False), ("HAPN", True)):
+        matches = [
+            row
+            for row in rows
+            if isinstance(row, dict)
+            and row.get("provider") == "massive"
+            and row.get("endpoint_family") == "all_tickers"
+            and row.get("requested_identifiers") == [ticker]
+            and row.get("attempts") == 1
+            and row.get("result_code") == "confirmed"
+        ]
+        if len(matches) != 1:
+            raise CensusRunnerFailure("attempt_2_identity")
+        parsed = matches[0].get("parsed_fields")
+        if (
+            not isinstance(parsed, dict)
+            or parsed.get("ticker") != ticker
+            or parsed.get("found") is not True
+            or parsed.get("active") is not active
+        ):
+            raise CensusRunnerFailure("attempt_2_identity")
+        stable_id = parsed.get("stable_id")
+        if not isinstance(stable_id, str) or _STABLE_ID.fullmatch(stable_id) is None:
+            raise CensusRunnerFailure("attempt_2_identity")
+        stable_ids.append(stable_id)
+    if len(set(stable_ids)) != 1:
+        raise CensusRunnerFailure("attempt_2_identity")
+    return stable_ids[0]
+
+
+def _run_event_revalidation(
+    *,
+    credential_resolver: Callable[[str], str],
+    transport: LifecycleProviderCensusTransport,
+    timestamp: str,
+    admitted_commit: str,
+    timer: Callable[[], float],
+) -> dict[str, object]:
+    stable_id = _attempt_2_lc_stable_id()
+    source_digest = attempt_2_summary_sha256()
+    budget = CensusRequestBudget(max_massive_requests=1)
+    expected_relation = ("LC", "HAPN", "2026-06-27")
+    expected_state = "exact_lc_to_hapn"
+    requests: list[dict[str, object]] = []
+    lane_reason = "executed"
+
+    try:
+        massive_key = credential_resolver("massive")
+    except ProviderConfigMissing:
+        massive_key = None
+        lane_reason = "credential_unavailable"
+    except Exception:
+        raise CensusRunnerFailure("credential_resolution_failed") from None
+
+    outcome = "credential_unavailable"
+    if massive_key is None:
+        requests.append(
+            {
+                "provider": "massive",
+                "endpoint_family": "ticker_events",
+                "requested_identifiers": [stable_id],
+                "expected_state": expected_state,
+                "attempts": 0,
+                "body_bytes": 0,
+                "http_status_family": None,
+                "elapsed_ms": 0.0,
+                "response_sha256s": [],
+                "parsed_fields": {},
+                "result_code": outcome,
+            }
+        )
+    else:
+        before = budget.massive_requests
+        started = timer()
+        try:
+            result = transport.fetch_massive_ticker_events(
+                stable_id=stable_id,
+                api_key=massive_key,
+                budget=budget,
+            )
+        except CensusTransportFailure as error:
+            failed = _failed_request(
+                provider="massive",
+                endpoint_family="ticker_events",
+                requested=(stable_id,),
+                expected=expected_state,
+                attempts=budget.massive_requests - before,
+                error=error,
+                elapsed_ms=_elapsed_ms(started, timer),
+            )
+            requests.append(failed)
+            outcome = str(failed["result_code"])
+        else:
+            source_relations = tuple(
+                event for event in result.events if event[0] == "LC"
+            )
+            if expected_relation in result.events and source_relations == (
+                expected_relation,
+            ):
+                outcome = "confirmed"
+            elif source_relations:
+                outcome = "contradicted"
+            else:
+                outcome = "ambiguous"
+            requests.append(
+                _success_request(
+                    provider="massive",
+                    endpoint_family="ticker_events",
+                    requested=(stable_id,),
+                    expected=expected_state,
+                    attempts=budget.massive_requests - before,
+                    body_bytes=result.response_bytes,
+                    response_sha256s=(result.response_sha256,),
+                    parsed_fields={
+                        "stable_id": result.stable_id,
+                        "events": [list(event) for event in result.events],
+                    },
+                    elapsed_ms=_elapsed_ms(started, timer),
+                    result_code=outcome,
+                )
+            )
+
+    diagnostics = dict(transport.diagnostics(budget))
+    if (
+        diagnostics.get("massive_requests", 0) > 1
+        or diagnostics.get("eodhd_requests", 0) != 0
+        or diagnostics.get("nasdaq_requests", 0) != 0
+    ):
+        raise CensusRunnerFailure("request_accounting")
+    providers = {
+        provider: {
+            "attempts": diagnostics.get(f"{provider}_requests", 0),
+            "body_bytes": diagnostics.get(f"{provider}_body_bytes", 0),
+        }
+        for provider in sorted(EVENT_REVALIDATION_REQUEST_BUDGET)
+    }
+    return {
+        "version": 1,
+        "mode": "ticker-event-revalidation",
+        "observation_timestamp": timestamp,
+        "spec_sha256": spec_sha256(),
+        "source_packet_sha256": source_digest,
+        "admitted_commit": admitted_commit,
+        "request_budget": dict(EVENT_REVALIDATION_REQUEST_BUDGET),
+        "maximum_http_requests": EVENT_REVALIDATION_MAXIMUM_HTTP_REQUESTS,
+        "request_accounting": {
+            "maximum_http_requests": EVENT_REVALIDATION_MAXIMUM_HTTP_REQUESTS,
+            "providers": providers,
+            "total_attempts": sum(row["attempts"] for row in providers.values()),
+            "total_body_bytes": sum(row["body_bytes"] for row in providers.values()),
+        },
+        "lanes": {
+            "massive": {
+                "executed": lane_reason == "executed",
+                "reason": lane_reason,
+            },
+            "eodhd": {"executed": False, "reason": "not_in_manifest"},
+            "nasdaq": {"executed": False, "reason": "not_in_manifest"},
+        },
+        "request_observations": requests,
+        "relation": {
+            "source_ticker": expected_relation[0],
+            "successor_ticker": expected_relation[1],
+            "effective_date": expected_relation[2],
+            "outcome": outcome,
+        },
+    }
 
 
 def _run_known_case_live(
@@ -991,6 +1212,7 @@ def run_census(
         raise CensusRunnerFailure("universe_manifest_not_authorized")
 
     _assert_live_admission(
+        mode=mode,
         acknowledgement=acknowledgement,
         admitted_commit=admitted_commit,
         repository_state=repository_state,
@@ -999,14 +1221,23 @@ def run_census(
     )
     if transport is None:
         raise CensusRunnerFailure("live_transport_required")
-    packet = _run_known_case_live(
-        credential_resolver=credential_resolver,
-        transport=transport,
-        timestamp=timestamp,
-        admitted_commit=admitted_commit,
-        timer=timer,
-        sleeper=sleeper,
-    )
+    if mode == "ticker-event-revalidation":
+        packet = _run_event_revalidation(
+            credential_resolver=credential_resolver,
+            transport=transport,
+            timestamp=timestamp,
+            admitted_commit=admitted_commit,
+            timer=timer,
+        )
+    else:
+        packet = _run_known_case_live(
+            credential_resolver=credential_resolver,
+            transport=transport,
+            timestamp=timestamp,
+            admitted_commit=admitted_commit,
+            timer=timer,
+            sleeper=sleeper,
+        )
     summary = render_packet(packet, output_dir=output_dir)
     seal_packet(output_dir=output_dir, files=(summary,))
     verify_seal(output_dir=output_dir)

@@ -17,6 +17,11 @@ application database.
   key is recorded as `credential_unavailable`, not replaced by an environment
   value. Massive request starts are spaced by at least 12.5 seconds, and a
   failed request retains only its normalized local failure code.
+- `ticker-event-revalidation`: binds the sealed Attempt 2 `LC`/`HAPN`
+  Composite FIGI observation and permits exactly one new Massive Ticker Events
+  request. EODHD and Nasdaq have zero budget. This mode exists only to validate
+  the corrected official timeline parser; it cannot read a production DB or
+  substitute a second provider request.
 - `universe-manifest`: intentionally refuses until a separate production-read
   authorization is granted.
 

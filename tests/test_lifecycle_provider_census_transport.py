@@ -276,6 +276,27 @@ def test_massive_events_rejects_ambiguous_timelines(
     assert caught.value.code == expected_code
 
 
+def test_massive_events_rejects_unbounded_timeline_before_projection():
+    events = [
+        {
+            "type": "ticker_change",
+            "date": f"{1950 + index:04d}-01-01",
+            "ticker_change": {"ticker": f"T{index}"},
+        }
+        for index in range(65)
+    ]
+    transport, _session = transport_with_json(
+        {"status": "OK", "results": {"name": "Lifecycle fixture", "events": events}}
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_massive_ticker_events(
+            stable_id="BBG_TEST_LC", api_key="secret", budget=budget()
+        )
+
+    assert caught.value.code == "massive_event_timeline_too_large"
+
+
 def test_massive_listing_returns_exact_normalized_secret_free_result():
     secret = "massive-secret-sentinel"
     payload = listing_fixture("ARCH", False, stable_id="BBG_TEST_ARCH")
