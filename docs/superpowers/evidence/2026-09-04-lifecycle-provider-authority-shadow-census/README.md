@@ -15,7 +15,8 @@ application database.
 - `known-case-live`: remains gated by an exact spec digest, admitted commit,
   and `14 Massive + 2 EODHD + 2 Nasdaq` acknowledgement. A missing profile
   key is recorded as `credential_unavailable`, not replaced by an environment
-  value. Live execution is not authorized or performed by the offline commit.
+  value. Massive request starts are spaced by at least 12.5 seconds, and a
+  failed request retains only its normalized local failure code.
 - `universe-manifest`: intentionally refuses until a separate production-read
   authorization is granted.
 
@@ -67,9 +68,9 @@ request returned a 4xx status family. The packet intentionally retained only
 the status family, so it does not prove the exact HTTP status. This sequence is
 consistent with the official Stocks Basic limit of five API calls per minute:
 <https://massive.com/pricing?product=stocks>. It must not be interpreted as
-Ticker Events coverage or entitlement evidence. Before another authorized
-attempt, the runner needs pre-request pacing and must retain the normalized
-local failure code without retaining response text.
+Ticker Events coverage or entitlement evidence. The subsequent runner revision
+adds pre-request pacing and retains the normalized local failure code without
+retaining response text. It does not retry any failed request.
 
 The seal verifies, the packet contains no raw response body, and a comparison
 against the one admitted profile credential found zero credential-value

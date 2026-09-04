@@ -54,12 +54,14 @@ MODES = ("dry-run", "fixture-replay", "known-case-live", "universe-manifest")
 CLOSED_OUTCOMES = tuple(sorted(CENSUS_OUTCOMES))
 REQUEST_BUDGET = {"massive": 14, "eodhd": 2, "nasdaq": 2}
 MAXIMUM_HTTP_REQUESTS = sum(REQUEST_BUDGET.values())
+MASSIVE_MIN_REQUEST_INTERVAL_SECONDS = 12.5
 SUMMARY_NAME = "census-summary.json"
 SEAL_NAME = "SHA256SUMS"
 
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+_FAILURE_CODE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 _FORBIDDEN_PACKET_KEYS = frozenset(
     {
         "apikey",
@@ -105,6 +107,29 @@ class RepositoryState:
     def __post_init__(self) -> None:
         if _COMMIT.fullmatch(self.head) is None or type(self.clean) is not bool:
             raise ValueError("repository_state")
+
+
+class _MassiveRequestPacer:
+    def __init__(
+        self,
+        *,
+        timer: Callable[[], float],
+        sleeper: Callable[[float], None],
+    ) -> None:
+        self._timer = timer
+        self._sleeper = sleeper
+        self._previous_start: float | None = None
+
+    def wait(self) -> None:
+        now = self._timer()
+        if self._previous_start is not None:
+            target = self._previous_start + MASSIVE_MIN_REQUEST_INTERVAL_SECONDS
+            if now < target:
+                self._sleeper(target - now)
+                now = self._timer()
+            if now + 0.001 < target:
+                raise CensusRunnerFailure("massive_request_pacing")
+        self._previous_start = now
 
 
 def canonical_json(value: object) -> str:
@@ -425,6 +450,8 @@ def _assert_live_admission(
 
 def _failure_outcome(error: CensusTransportFailure) -> str:
     code = error.code
+    if not isinstance(code, str) or _FAILURE_CODE.fullmatch(code) is None:
+        raise CensusRunnerFailure("transport_failure_code")
     if code.endswith("_unauthorized"):
         return "not_entitled"
     if code.endswith("_not_found"):
@@ -500,7 +527,7 @@ def _failed_request(
         "http_status_family": family,
         "elapsed_ms": elapsed_ms,
         "response_sha256s": [],
-        "parsed_fields": {},
+        "parsed_fields": {"failure_code": error.code},
         "result_code": _failure_outcome(error),
     }
 
@@ -527,8 +554,10 @@ def _run_known_case_live(
     timestamp: str,
     admitted_commit: str,
     timer: Callable[[], float],
+    sleeper: Callable[[float], None],
 ) -> dict[str, object]:
     budget = CensusRequestBudget()
+    massive_pacer = _MassiveRequestPacer(timer=timer, sleeper=sleeper)
     requests: list[dict[str, object]] = []
     oracle_observations: list[CensusObservation] = []
     listings: dict[str, MassiveListingResult] = {}
@@ -544,6 +573,7 @@ def _run_known_case_live(
     if massive_key is not None:
         lane_reasons["massive"] = "executed"
         for ticker, expected_active in _LISTING_REQUESTS:
+            massive_pacer.wait()
             before = budget.massive_requests
             started = timer()
             try:
@@ -631,6 +661,7 @@ def _run_known_case_live(
                     }
                 )
                 continue
+            massive_pacer.wait()
             before = budget.massive_requests
             started = timer()
             try:
@@ -947,6 +978,7 @@ def run_census(
     output_dir: Path = PACKET_DIR,
     production_db_path: Path | None = None,
     timer: Callable[[], float] = time.perf_counter,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> dict[str, object]:
     if mode not in MODES:
         raise CensusRunnerFailure("census_mode")
@@ -973,6 +1005,7 @@ def run_census(
         timestamp=timestamp,
         admitted_commit=admitted_commit,
         timer=timer,
+        sleeper=sleeper,
     )
     summary = render_packet(packet, output_dir=output_dir)
     seal_packet(output_dir=output_dir, files=(summary,))

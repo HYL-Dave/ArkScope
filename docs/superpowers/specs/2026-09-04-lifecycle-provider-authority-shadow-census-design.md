@@ -218,6 +218,11 @@ The maximum core envelope is 18 HTTP requests:
   exact-symbol delisted request for the nine-symbol manifest; and
 - Nasdaq Trader: the two existing complete current-directory files.
 
+Massive Stocks Basic is limited to five calls per minute. The detached runner
+must therefore separate the start of every Massive request by at least 12.5
+seconds. This is proactive pacing, not a retry: no failed request is repeated,
+and every request still consumes the same fixed run budget exactly once.
+
 If an exact Massive reference row lacks a usable Composite FIGI, its event
 result is `ambiguous`; the runner must not spend another request by silently
 falling back to the potentially reused ticker identifier.
@@ -245,6 +250,7 @@ The packet records only:
 - provider and endpoint family;
 - exact normalized requested identifiers and expected state;
 - request count, response byte count, HTTP status family, and elapsed time;
+- a normalized local failure code when a request fails, without response text;
 - response-body SHA-256 and closed parsed fields needed by the oracle;
 - observation time and the closed result code; and
 - an aggregate comparison table.

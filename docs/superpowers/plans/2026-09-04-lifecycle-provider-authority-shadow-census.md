@@ -42,6 +42,9 @@ binding.
 - Live requests have zero retry, redirect, or fallback. Evidence never retains
   a secret, authorization header, key-bearing URL, raw body, account record, or
   unrelated provider row.
+- Massive request starts are proactively spaced by at least 12.5 seconds to
+  respect the documented Stocks Basic five-calls-per-minute limit. Pacing does
+  not repeat a failed request or expand the fixed budget.
 - The initial core canary permits at most 14 Massive, 2 EODHD, and 2 Nasdaq
   HTTP requests. Paid EODHD symbol history is a later independent gate.
 
@@ -556,6 +559,11 @@ budget to the authorization.
 Use the active profile's Massive credential and, only if Task 3 has landed and
 the profile contains it, EODHD credential. Make no retry. A missing EODHD key
 becomes `credential_unavailable`; do not source an environment value.
+
+Retain the normalized local failure code for a failed request. Do not retain
+provider response text. The first authorized attempt established that status
+family alone is insufficient to distinguish rate limiting from entitlement or
+coverage failure.
 
 - [ ] **Step 4: Verify request and secret boundaries**
 
