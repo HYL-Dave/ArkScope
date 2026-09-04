@@ -1,4 +1,4 @@
-"""Bounded Massive/Nasdaq transport for the detached lifecycle census only."""
+"""Bounded Massive/EODHD/Nasdaq transport for the detached lifecycle census."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from data_sources.dependency_log_redaction import dependency_log_redaction
 
 MASSIVE_LISTING_URL = "https://api.massive.com/v3/reference/tickers"
 MASSIVE_EVENTS_PREFIX = "https://api.massive.com/vX/reference/tickers/"
+EODHD_EXCHANGE_SYMBOL_LIST_URL = "https://eodhd.com/api/exchange-symbol-list/US"
 NASDAQ_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
 
@@ -25,18 +26,24 @@ MAX_EODHD_REQUESTS = 2
 MAX_NASDAQ_REQUESTS = 2
 MAX_MASSIVE_RESPONSE_BYTES = 1024 * 1024
 MAX_MASSIVE_TOTAL_BYTES = 14 * 1024 * 1024
+MAX_EODHD_RESPONSE_BYTES = 1024 * 1024
+MAX_EODHD_TOTAL_BYTES = 2 * 1024 * 1024
 MAX_NASDAQ_FILE_BYTES = 8 * 1024 * 1024
 MAX_NASDAQ_TOTAL_BYTES = 12 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 15
 
 _CANONICAL_MASSIVE_LISTING_URL = "https://api.massive.com/v3/reference/tickers"
 _CANONICAL_MASSIVE_EVENTS_PREFIX = "https://api.massive.com/vX/reference/tickers/"
+_CANONICAL_EODHD_EXCHANGE_SYMBOL_LIST_URL = (
+    "https://eodhd.com/api/exchange-symbol-list/US"
+)
 _NASDAQ_URLS = frozenset((NASDAQ_LISTED_URL, OTHER_LISTED_URL))
 _CREDENTIAL_QUERY_NAMES = frozenset(
     {
         "apikey",
         "api-key",
         "api_key",
+        "api_token",
         "authorization",
         "access_token",
         "token",
@@ -89,8 +96,10 @@ class CensusRequestBudget:
         ):
             raise ValueError("census_request_budget")
         self._massive_identities: set[tuple[str, ...]] = set()
+        self._eodhd_identities: set[tuple[str, ...]] = set()
         self._nasdaq_identities: set[str] = set()
         self._massive_body_bytes = 0
+        self._eodhd_body_bytes = 0
         self._nasdaq_body_bytes = 0
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -131,6 +140,28 @@ class CensusRequestBudget:
         self._nasdaq_identities.add(source_url)
         self.nasdaq_requests += 1
 
+    def require_eodhd_pair_capacity(
+        self, identities: tuple[tuple[str, ...], tuple[str, ...]]
+    ) -> None:
+        if any(not self._valid_identity(identity) for identity in identities):
+            raise CensusTransportFailure("eodhd_request_identity_invalid")
+        if self.eodhd_requests + 2 > self.max_eodhd_requests:
+            raise CensusTransportFailure("eodhd_request_budget")
+        if identities[0] == identities[1] or any(
+            identity in self._eodhd_identities for identity in identities
+        ):
+            raise CensusTransportFailure("eodhd_request_duplicate")
+
+    def reserve_eodhd(self, identity: tuple[str, ...]) -> None:
+        if not self._valid_identity(identity):
+            raise CensusTransportFailure("eodhd_request_identity_invalid")
+        if self.eodhd_requests >= self.max_eodhd_requests:
+            raise CensusTransportFailure("eodhd_request_budget")
+        if identity in self._eodhd_identities:
+            raise CensusTransportFailure("eodhd_request_duplicate")
+        self._eodhd_identities.add(identity)
+        self.eodhd_requests += 1
+
     def record_massive_body(self, count: int) -> None:
         if (
             type(count) is not int
@@ -149,6 +180,15 @@ class CensusRequestBudget:
             raise CensusTransportFailure("nasdaq_byte_budget")
         self._nasdaq_body_bytes += count
 
+    def record_eodhd_body(self, count: int) -> None:
+        if (
+            type(count) is not int
+            or count < 0
+            or self._eodhd_body_bytes + count > MAX_EODHD_TOTAL_BYTES
+        ):
+            raise CensusTransportFailure("eodhd_byte_budget")
+        self._eodhd_body_bytes += count
+
     @property
     def massive_body_bytes(self) -> int:
         return self._massive_body_bytes
@@ -157,11 +197,16 @@ class CensusRequestBudget:
     def nasdaq_body_bytes(self) -> int:
         return self._nasdaq_body_bytes
 
+    @property
+    def eodhd_body_bytes(self) -> int:
+        return self._eodhd_body_bytes
+
     def diagnostics(self) -> dict[str, int]:
         return {
             "massive_requests": self.massive_requests,
             "massive_body_bytes": self.massive_body_bytes,
             "eodhd_requests": self.eodhd_requests,
+            "eodhd_body_bytes": self.eodhd_body_bytes,
             "nasdaq_requests": self.nasdaq_requests,
             "nasdaq_body_bytes": self.nasdaq_body_bytes,
         }
@@ -190,6 +235,21 @@ class MassiveTickerEventsResult:
 
 
 @dataclass(frozen=True)
+class EodhdSymbolSetsResult:
+    requested: tuple[str, ...]
+    active: tuple[str, ...]
+    delisted: tuple[str, ...]
+    unreported: tuple[str, ...]
+    complete: bool
+    active_source_locator: str
+    delisted_source_locator: str
+    active_response_sha256: str
+    delisted_response_sha256: str
+    active_response_bytes: int
+    delisted_response_bytes: int
+
+
+@dataclass(frozen=True)
 class NasdaqDirectoryResult:
     source_locator: str
     body: bytes
@@ -204,9 +264,9 @@ class _HttpPayload:
     content_type: str
 
 
-def _normalized_api_key(api_key: object) -> str:
+def _normalized_api_key(api_key: object, *, code_prefix: str = "massive") -> str:
     if not isinstance(api_key, str) or not api_key.strip():
-        raise CensusTransportFailure("massive_api_key_missing")
+        raise CensusTransportFailure(f"{code_prefix}_api_key_missing")
     return api_key.strip()
 
 
@@ -217,6 +277,13 @@ def _validate_ticker(value: object, *, code: str) -> str:
     if canonical_length > 16:
         raise CensusTransportFailure(code)
     return value
+
+
+def _validate_eodhd_symbol(value: object, *, code: str) -> str:
+    symbol = _validate_ticker(value, code=code)
+    if symbol.endswith("*"):
+        raise CensusTransportFailure(code)
+    return symbol
 
 
 def _validate_stable_id(value: object) -> str:
@@ -276,7 +343,14 @@ def _credential_free_url(url: str, api_key: str | None) -> None:
 
 
 def _allowed_request_url(url: str) -> bool:
-    if url == _CANONICAL_MASSIVE_LISTING_URL or url in _NASDAQ_URLS:
+    if (
+        url
+        in (
+            _CANONICAL_MASSIVE_LISTING_URL,
+            _CANONICAL_EODHD_EXCHANGE_SYMBOL_LIST_URL,
+        )
+        or url in _NASDAQ_URLS
+    ):
         return True
     if not url.startswith(_CANONICAL_MASSIVE_EVENTS_PREFIX) or not url.endswith(
         "/events"
@@ -286,7 +360,7 @@ def _allowed_request_url(url: str) -> bool:
     return _STABLE_ID.fullmatch(stable_id) is not None
 
 
-def _json_body(body: bytes) -> object:
+def _json_body(body: bytes, *, code_prefix: str = "massive") -> object:
     payload: object = None
     failed = False
     try:
@@ -294,7 +368,7 @@ def _json_body(body: bytes) -> object:
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
         failed = True
     if failed:
-        raise CensusTransportFailure("massive_invalid_json") from None
+        raise CensusTransportFailure(f"{code_prefix}_invalid_json") from None
     return payload
 
 
@@ -309,6 +383,24 @@ def _validate_massive_envelope(body: bytes) -> Mapping[str, Any]:
     if payload.get("next_url") not in (None, ""):
         raise CensusTransportFailure("massive_pagination_unsupported")
     return payload
+
+
+def _parse_eodhd_codes(body: bytes, requested: set[str]) -> tuple[str, ...]:
+    payload = _json_body(body, code_prefix="eodhd")
+    if not isinstance(payload, list):
+        raise CensusTransportFailure("eodhd_invalid_json")
+
+    codes: list[str] = []
+    for row in payload:
+        if not isinstance(row, dict):
+            raise CensusTransportFailure("eodhd_row_invalid")
+        code = _validate_eodhd_symbol(row.get("Code"), code="eodhd_row_invalid")
+        if code in codes:
+            raise CensusTransportFailure("eodhd_code_duplicate")
+        if code not in requested:
+            raise CensusTransportFailure("eodhd_code_unexpected")
+        codes.append(code)
+    return tuple(sorted(codes))
 
 
 class LifecycleProviderCensusTransport:
@@ -375,6 +467,7 @@ class LifecycleProviderCensusTransport:
         source_locator: str,
         params: Mapping[str, object] | None,
         api_key: str | None,
+        credential_query_name: str | None,
         expected_content_type: str,
         code_prefix: str,
         maximum_bytes: int,
@@ -389,6 +482,7 @@ class LifecycleProviderCensusTransport:
                 request_url=request_url,
                 params=params,
                 api_key=api_key,
+                credential_query_name=credential_query_name,
                 expected_content_type=expected_content_type,
                 code_prefix=code_prefix,
                 maximum_bytes=maximum_bytes,
@@ -401,6 +495,7 @@ class LifecycleProviderCensusTransport:
         request_url: str,
         params: Mapping[str, object] | None,
         api_key: str | None,
+        credential_query_name: str | None,
         expected_content_type: str,
         code_prefix: str,
         maximum_bytes: int,
@@ -408,8 +503,10 @@ class LifecycleProviderCensusTransport:
     ) -> _HttpPayload:
         request_params = dict(params) if params is not None else None
         if api_key is not None:
+            if credential_query_name not in ("apiKey", "api_token"):
+                raise CensusTransportFailure("request_credential_parameter")
             request_params = dict(request_params or {})
-            request_params["apiKey"] = api_key
+            request_params[credential_query_name] = api_key
 
         response: Any | None = None
         request_failed = False
@@ -518,6 +615,7 @@ class LifecycleProviderCensusTransport:
                 "limit": 2,
             },
             api_key=key,
+            credential_query_name="apiKey",
             expected_content_type="application/json",
             code_prefix="massive",
             maximum_bytes=MAX_MASSIVE_RESPONSE_BYTES,
@@ -603,6 +701,7 @@ class LifecycleProviderCensusTransport:
             source_locator=request_url,
             params=None,
             api_key=key,
+            credential_query_name="apiKey",
             expected_content_type="application/json",
             code_prefix="massive",
             maximum_bytes=MAX_MASSIVE_RESPONSE_BYTES,
@@ -649,6 +748,97 @@ class LifecycleProviderCensusTransport:
             response_bytes=len(payload.body),
         )
 
+    def fetch_eodhd_symbol_sets(
+        self,
+        *,
+        symbols: tuple[str, ...],
+        api_key: str,
+        budget: CensusRequestBudget,
+    ) -> EodhdSymbolSetsResult:
+        if not isinstance(symbols, tuple) or not symbols:
+            raise CensusTransportFailure("eodhd_symbols_invalid")
+        requested = tuple(
+            sorted(
+                _validate_eodhd_symbol(symbol, code="eodhd_symbols_invalid")
+                for symbol in symbols
+            )
+        )
+        if len(requested) != len(set(requested)):
+            raise CensusTransportFailure("eodhd_symbol_duplicate")
+        key = _normalized_api_key(api_key, code_prefix="eodhd")
+        if not isinstance(budget, CensusRequestBudget):
+            raise CensusTransportFailure("census_request_budget_invalid")
+
+        request_url = EODHD_EXCHANGE_SYMBOL_LIST_URL
+        _credential_free_url(request_url, key)
+        if not _allowed_request_url(request_url):
+            raise CensusTransportFailure("request_url_unsupported")
+        if budget.eodhd_body_bytes >= MAX_EODHD_TOTAL_BYTES:
+            raise CensusTransportFailure("eodhd_byte_budget")
+
+        manifest = ",".join(requested)
+        identities = (
+            ("exchange-symbol-list", "US", "0", *requested),
+            ("exchange-symbol-list", "US", "1", *requested),
+        )
+        budget.require_eodhd_pair_capacity(identities)
+
+        parsed: list[tuple[str, ...]] = []
+        source_locators: list[str] = []
+        response_digests: list[str] = []
+        response_sizes: list[int] = []
+        requested_set = set(requested)
+        for delisted, identity in enumerate(identities):
+            canonical_params = (
+                ("symbols", manifest),
+                ("fmt", "json"),
+                ("delisted", str(delisted)),
+            )
+            source_locator = f"{request_url}?{urlencode(canonical_params)}"
+            _credential_free_url(source_locator, key)
+            budget.reserve_eodhd(identity)
+            payload = self._request(
+                request_url=request_url,
+                source_locator=source_locator,
+                params={
+                    "symbols": manifest,
+                    "fmt": "json",
+                    "delisted": delisted,
+                },
+                api_key=key,
+                credential_query_name="api_token",
+                expected_content_type="application/json",
+                code_prefix="eodhd",
+                maximum_bytes=MAX_EODHD_RESPONSE_BYTES,
+                aggregate_remaining_bytes=(
+                    MAX_EODHD_TOTAL_BYTES - budget.eodhd_body_bytes
+                ),
+            )
+            budget.record_eodhd_body(len(payload.body))
+            parsed.append(_parse_eodhd_codes(payload.body, requested_set))
+            source_locators.append(source_locator)
+            response_digests.append(hashlib.sha256(payload.body).hexdigest())
+            response_sizes.append(len(payload.body))
+
+        active_set = set(parsed[0])
+        delisted_set = set(parsed[1])
+        if active_set & delisted_set:
+            raise CensusTransportFailure("eodhd_status_overlap")
+        unreported = tuple(sorted(requested_set - active_set - delisted_set))
+        return EodhdSymbolSetsResult(
+            requested=requested,
+            active=parsed[0],
+            delisted=parsed[1],
+            unreported=unreported,
+            complete=not unreported,
+            active_source_locator=source_locators[0],
+            delisted_source_locator=source_locators[1],
+            active_response_sha256=response_digests[0],
+            delisted_response_sha256=response_digests[1],
+            active_response_bytes=response_sizes[0],
+            delisted_response_bytes=response_sizes[1],
+        )
+
     def fetch_nasdaq_directory(
         self, source_url: str, *, budget: CensusRequestBudget
     ) -> NasdaqDirectoryResult:
@@ -664,6 +854,7 @@ class LifecycleProviderCensusTransport:
             source_locator=source_url,
             params=None,
             api_key=None,
+            credential_query_name=None,
             expected_content_type="text/plain",
             code_prefix="nasdaq",
             maximum_bytes=MAX_NASDAQ_FILE_BYTES,
@@ -694,9 +885,12 @@ class LifecycleProviderCensusTransport:
 __all__ = [
     "CensusRequestBudget",
     "CensusTransportFailure",
+    "EODHD_EXCHANGE_SYMBOL_LIST_URL",
+    "EodhdSymbolSetsResult",
     "LifecycleProviderCensusTransport",
     "MASSIVE_EVENTS_PREFIX",
     "MASSIVE_LISTING_URL",
+    "MAX_EODHD_REQUESTS",
     "MAX_MASSIVE_REQUESTS",
     "MAX_NASDAQ_REQUESTS",
     "MassiveListingResult",

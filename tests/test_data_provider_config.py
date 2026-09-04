@@ -34,7 +34,7 @@ def hermetic(monkeypatch, tmp_path):
     monkeypatch.setattr("src.env_keys.reload_var_from_file",
                         lambda name: (os.environ.pop(name, None), False)[1])
     managed_vars = (
-        "MASSIVE_API_KEY", "POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
+        "MASSIVE_API_KEY", "POLYGON_API_KEY", "EODHD_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
         "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID",
         "ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT",
     )
@@ -82,6 +82,196 @@ def test_massive_uses_its_current_credential_authority():
         (),
     )
     assert "polygon" not in dpc.PROVIDER_FIELDS
+
+
+def test_eodhd_census_uses_profile_value_not_ambient_environment(monkeypatch, store):
+    monkeypatch.setenv("EODHD_API_KEY", "ambient-secret")
+    store.set_field("eodhd", "api_key", "profile-secret")
+
+    from src.security_lifecycle_provider_census_credentials import (
+        resolve_census_credential,
+    )
+
+    before = dict(os.environ)
+    assert resolve_census_credential(store, "eodhd") == "profile-secret"
+    assert dict(os.environ) == before
+    assert dpc.provider_config_missing_detail("eodhd", "api_key")["provider"] == "eodhd"
+    assert dpc.importable_env_vars(dpc.PROVIDER_FIELDS["eodhd"][0]) == ()
+
+
+def test_census_credential_resolver_accepts_only_massive_and_eodhd(store):
+    from src.security_lifecycle_provider_census_credentials import (
+        resolve_census_credential,
+    )
+
+    for provider in ("finnhub", "EODHD", "massive ", ""):
+        with pytest.raises(ValueError, match="census_credential_provider"):
+            resolve_census_credential(store, provider)
+
+
+@pytest.mark.parametrize(
+    "provider_fields",
+    (
+        None,
+        {},
+        {"api_key": ""},
+        {"api_key": "   "},
+        {"api_key": 123},
+        {"api_key": "secret", "extra": "unexpected"},
+    ),
+)
+def test_census_credential_resolver_rejects_nonexact_profile_mapping(
+    provider_fields,
+):
+    from src.security_lifecycle_provider_census_credentials import (
+        resolve_census_credential,
+    )
+
+    class FakeStore:
+        def get_all(self):
+            return {} if provider_fields is None else {"eodhd": provider_fields}
+
+    with pytest.raises(dpc.ProviderConfigMissing) as exc:
+        resolve_census_credential(FakeStore(), "eodhd")
+
+    assert exc.value.as_dict() == dpc.provider_config_missing_detail(
+        "eodhd", "api_key"
+    )
+
+
+def test_census_credential_resolver_reads_only_the_requested_profile_mapping(
+    monkeypatch,
+):
+    from src.security_lifecycle_provider_census_credentials import (
+        resolve_census_credential,
+    )
+
+    class RecordingStore:
+        def __init__(self):
+            self.reads = 0
+
+        def get_all(self):
+            self.reads += 1
+            return {
+                "massive": {"api_key": " massive-profile "},
+                "eodhd": {"api_key": "eodhd-profile"},
+                "unrelated": {"api_key": "unrelated-secret", "extra": "row"},
+            }
+
+    monkeypatch.setenv("MASSIVE_API_KEY", "massive-ambient")
+    store = RecordingStore()
+    before = dict(os.environ)
+
+    assert resolve_census_credential(store, "massive") == "massive-profile"
+    assert store.reads == 1
+    assert dict(os.environ) == before
+
+
+def test_eodhd_config_file_cannot_become_app_authority(
+    store, monkeypatch, tmp_path
+):
+    from fastapi import HTTPException
+
+    from src.api.routes import providers_config as pc
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("EODHD_API_KEY=file-secret\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    monkeypatch.setenv("EODHD_API_KEY", "file-secret")
+
+    with pytest.raises(HTTPException) as exc:
+        pc.import_provider_config_field(
+            "eodhd",
+            "api_key",
+            pc.ProviderConfigImportEnv(source_env_var="EODHD_API_KEY"),
+            store=store,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == {
+        "code": "provider_config_import_not_supported",
+        "provider": "eodhd",
+        "field": "api_key",
+    }
+    assert "eodhd" not in store.get_all()
+
+
+def test_eodhd_settings_entry_is_profile_backed_and_not_generically_testable(
+    store,
+):
+    from src.api.routes import providers_config as pc
+
+    out = pc.put_provider_config(
+        "eodhd",
+        pc.ProviderConfigUpdate(fields={"api_key": "eodhd-profile-secret"}),
+        store=store,
+    )
+
+    assert store.get_all()["eodhd"] == {"api_key": "eodhd-profile-secret"}
+    assert out["testable"] is False
+    assert "eodhd" not in pc._TESTABLE
+    assert out["fields"][0]["app_value_masked"] == "eodh…cret"
+
+
+def test_eodhd_generic_connection_test_route_is_closed(store, monkeypatch):
+    from fastapi import HTTPException
+
+    from src.api.routes import providers_config as pc
+
+    store.set_field("eodhd", "api_key", "profile-secret")
+    monkeypatch.setenv("EODHD_API_KEY", "ambient-secret")
+
+    def forbidden_probe(provider):
+        raise AssertionError(f"generic provider probe called for {provider}")
+
+    monkeypatch.setattr(pc, "run_connection_test", forbidden_probe)
+
+    with pytest.raises(HTTPException) as exc:
+        pc.test_provider("eodhd", store=store)
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == {
+        "code": "provider_test_census_only",
+        "provider": "eodhd",
+    }
+
+
+def test_eodhd_generic_env_bridge_preserves_explicit_shell_override(
+    store, monkeypatch
+):
+    from src.security_lifecycle_provider_census_credentials import (
+        resolve_census_credential,
+    )
+
+    store.set_field("eodhd", "api_key", "profile-secret")
+    monkeypatch.setenv("EODHD_API_KEY", "ambient-secret")
+
+    applied = dpc.apply_env(store)
+
+    assert os.environ["EODHD_API_KEY"] == "ambient-secret"
+    assert "EODHD_API_KEY" not in applied
+    assert resolve_census_credential(store, "eodhd") == "profile-secret"
+
+
+def test_eodhd_config_file_is_not_a_runtime_fallback(store, monkeypatch, tmp_path):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("EODHD_API_KEY=file-secret\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    store.set_setting(dpc.PROVIDER_ENV_FALLBACK_KEY, "true")
+
+    applied = dpc.apply_env(store)
+
+    assert "EODHD_API_KEY" not in os.environ
+    assert "EODHD_API_KEY" not in env_keys.keys_loaded_from_file()
+    assert "EODHD_API_KEY" not in applied
+    assert "eodhd" not in store.get_all()
 
 
 def test_massive_env_resolution_never_revives_legacy_polygon_alias(monkeypatch):

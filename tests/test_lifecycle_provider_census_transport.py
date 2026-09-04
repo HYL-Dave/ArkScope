@@ -128,6 +128,14 @@ def transport_with_json(
     return LifecycleProviderCensusTransport(session=session), session
 
 
+def transport_with_eodhd(
+    *, active: object, delisted: object
+) -> LifecycleProviderCensusTransport:
+    return LifecycleProviderCensusTransport(
+        session=FakeSession([json_response(active), json_response(delisted)])
+    )
+
+
 def assert_closed_failure(
     error: Exception, expected_code: str, *untrusted_values: str
 ) -> None:
@@ -568,6 +576,277 @@ def test_massive_enforces_one_mib_response_and_fourteen_mib_aggregate_caps():
         b.record_massive_body(1024 * 1024)
     with pytest.raises(CensusTransportFailure, match="massive_byte_budget"):
         b.record_massive_body(1)
+
+
+def test_eodhd_active_and_delisted_sets_require_complete_requested_accounting():
+    transport = transport_with_eodhd(active=[{"Code": "AAPL"}], delisted=[])
+
+    result = transport.fetch_eodhd_symbol_sets(
+        symbols=("AAPL", "TA"), api_key="secret", budget=budget()
+    )
+
+    assert result.active == ("AAPL",)
+    assert result.delisted == ()
+    assert result.unreported == ("TA",)
+    assert result.complete is False
+
+
+def test_eodhd_calls_only_us_status_endpoint_twice_with_same_sorted_manifest():
+    secret = "eodhd-secret-sentinel"
+    active = [{"Code": "AAPL"}]
+    delisted = [{"Code": "TA"}, {"Code": "ARCH"}]
+    active_body = json.dumps(active, sort_keys=True, separators=(",", ":")).encode(
+        "ascii"
+    )
+    delisted_body = json.dumps(delisted, sort_keys=True, separators=(",", ":")).encode(
+        "ascii"
+    )
+    session = FakeSession([json_response(active), json_response(delisted)])
+    transport = LifecycleProviderCensusTransport(session=session)
+    b = budget()
+
+    result = transport.fetch_eodhd_symbol_sets(
+        symbols=("TA", "AAPL", "ARCH"), api_key=secret, budget=b
+    )
+
+    assert result.requested == ("AAPL", "ARCH", "TA")
+    assert result.active == ("AAPL",)
+    assert result.delisted == ("ARCH", "TA")
+    assert result.unreported == ()
+    assert result.complete is True
+    assert result.active_response_sha256 == hashlib.sha256(active_body).hexdigest()
+    assert result.delisted_response_sha256 == hashlib.sha256(delisted_body).hexdigest()
+    assert result.active_response_bytes == len(active_body)
+    assert result.delisted_response_bytes == len(delisted_body)
+    assert result.active_source_locator.endswith(
+        "?symbols=AAPL%2CARCH%2CTA&fmt=json&delisted=0"
+    )
+    assert result.delisted_source_locator.endswith(
+        "?symbols=AAPL%2CARCH%2CTA&fmt=json&delisted=1"
+    )
+    assert secret not in repr(result)
+    assert len(session.calls) == 2
+    for index, call in enumerate(session.calls):
+        assert call["url"] == census_transport.EODHD_EXCHANGE_SYMBOL_LIST_URL
+        assert call["params"] == {
+            "symbols": "AAPL,ARCH,TA",
+            "fmt": "json",
+            "delisted": index,
+            "api_token": secret,
+        }
+        assert call["allow_redirects"] is False
+        assert call["timeout"] == 15
+        assert call["stream"] is True
+    assert b.diagnostics() == {
+        "massive_requests": 0,
+        "massive_body_bytes": 0,
+        "eodhd_requests": 2,
+        "eodhd_body_bytes": len(active_body) + len(delisted_body),
+        "nasdaq_requests": 0,
+        "nasdaq_body_bytes": 0,
+    }
+    assert secret not in json.dumps(b.diagnostics(), sort_keys=True)
+
+
+def test_eodhd_rejects_active_and_delisted_overlap():
+    transport = transport_with_eodhd(
+        active=[{"Code": "AAPL"}], delisted=[{"Code": "AAPL"}]
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_status_overlap")
+
+
+@pytest.mark.parametrize("delisted", (False, True))
+def test_eodhd_rejects_duplicate_codes(delisted: bool):
+    duplicate = [{"Code": "AAPL"}, {"Code": "AAPL"}]
+    transport = transport_with_eodhd(
+        active=[] if delisted else duplicate,
+        delisted=duplicate if delisted else [],
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_code_duplicate")
+
+
+def test_eodhd_rejects_unexpected_code():
+    transport = transport_with_eodhd(active=[{"Code": "MSFT"}], delisted=[])
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_code_unexpected", "MSFT")
+
+
+@pytest.mark.parametrize(
+    "row",
+    (None, [], {}, {"Code": None}, {"Code": "aapl"}, {"Code": "AAPL "}),
+)
+def test_eodhd_rejects_malformed_rows(row: object):
+    transport = transport_with_eodhd(active=[row], delisted=[])
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_row_invalid", "aapl", "AAPL ")
+
+
+def test_eodhd_rejects_non_us_exchange_endpoint_before_http(monkeypatch):
+    session = FakeSession()
+    monkeypatch.setattr(
+        census_transport,
+        "EODHD_EXCHANGE_SYMBOL_LIST_URL",
+        "https://eodhd.com/api/exchange-symbol-list/LSE",
+    )
+    transport = LifecycleProviderCensusTransport(session=session)
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "request_url_unsupported")
+    assert session.calls == []
+
+
+def test_eodhd_budget_stops_before_more_than_two_requests():
+    session = FakeSession([json_response([{"Code": "AAPL"}]), json_response([])])
+    transport = LifecycleProviderCensusTransport(session=session)
+    b = budget()
+    transport.fetch_eodhd_symbol_sets(symbols=("AAPL",), api_key="secret", budget=b)
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(symbols=("TA",), api_key="secret", budget=b)
+
+    assert_closed_failure(caught.value, "eodhd_request_budget")
+    assert b.eodhd_requests == 2
+    assert len(session.calls) == 2
+
+
+def test_eodhd_rejects_redirect_and_oversized_body():
+    redirect = FakeResponse(
+        302,
+        headers={"Location": census_transport.EODHD_EXCHANGE_SYMBOL_LIST_URL},
+    )
+    oversized = FakeResponse(
+        headers={
+            "Content-Type": "application/json",
+            "Content-Length": str(1024 * 1024 + 1),
+        }
+    )
+    transport = LifecycleProviderCensusTransport(
+        session=FakeSession([redirect, oversized])
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+    assert_closed_failure(caught.value, "eodhd_redirect")
+    assert redirect.closed is True
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key="secret", budget=budget()
+        )
+    assert_closed_failure(caught.value, "eodhd_response_too_large")
+    assert oversized.closed is True
+
+
+def test_eodhd_api_token_is_added_only_inside_dependency_log_redaction(monkeypatch):
+    secret = "eodhd key+/%"
+    state = {"active": False, "entries": 0}
+
+    class RedactionGuard:
+        def __init__(self, values: object) -> None:
+            assert tuple(values) == (secret,)  # type: ignore[arg-type]
+
+        def __enter__(self):
+            assert state["active"] is False
+            state["active"] = True
+            state["entries"] += 1
+
+        def __exit__(self, exc_type, exc, traceback):
+            state["active"] = False
+
+    class GuardedSession(FakeSession):
+        def get(self, url: str, **kwargs: object) -> FakeResponse:
+            assert state["active"] is True
+            assert kwargs["params"]["api_token"] == secret  # type: ignore[index]
+            assert "apiKey" not in kwargs["params"]  # type: ignore[operator]
+            return super().get(url, **kwargs)
+
+    monkeypatch.setattr(census_transport, "dependency_log_redaction", RedactionGuard)
+    transport = LifecycleProviderCensusTransport(
+        session=GuardedSession([json_response([{"Code": "AAPL"}]), json_response([])])
+    )
+
+    transport.fetch_eodhd_symbol_sets(
+        symbols=("AAPL",), api_key=secret, budget=budget()
+    )
+
+    assert state == {"active": False, "entries": 2}
+
+
+def test_eodhd_debug_logs_redact_raw_and_encoded_credentials(caplog):
+    key = "eodhd key+/%"
+    encoded_key = quote(key, safe="")
+    form_encoded_key = quote_plus(key, safe="")
+    logger = logging.getLogger("urllib3.connectionpool")
+    caplog.set_level(logging.DEBUG, logger=logger.name)
+
+    class LoggingSession(FakeSession):
+        def get(self, url: str, **kwargs: object) -> FakeResponse:
+            logger.debug(
+                "eodhd raw=%s encoded=%s form=%s retained=yes",
+                key,
+                encoded_key,
+                form_encoded_key,
+            )
+            return super().get(url, **kwargs)
+
+    transport = LifecycleProviderCensusTransport(
+        session=LoggingSession([json_response([{"Code": "AAPL"}]), json_response([])])
+    )
+    transport.fetch_eodhd_symbol_sets(symbols=("AAPL",), api_key=key, budget=budget())
+
+    assert "retained=yes" in caplog.text
+    for variant in (key, encoded_key, form_encoded_key):
+        assert variant not in caplog.text
+
+
+def test_eodhd_transport_failure_is_closed_and_secret_free():
+    secret = "eodhd-secret-sentinel"
+
+    class FailingSession(FakeSession):
+        def get(self, url: str, **kwargs: object) -> FakeResponse:
+            self.calls.append({"url": url, **kwargs})
+            raise requests.Timeout(
+                f"failed {url}?api_token={kwargs['params']['api_token']}"
+            )
+
+    session = FailingSession()
+    transport = LifecycleProviderCensusTransport(session=session)
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_eodhd_symbol_sets(
+            symbols=("AAPL",), api_key=secret, budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "eodhd_transport_unavailable", secret)
+    assert len(session.calls) == 1
 
 
 @pytest.mark.parametrize(

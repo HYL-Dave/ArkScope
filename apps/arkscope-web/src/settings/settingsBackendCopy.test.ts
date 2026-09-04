@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+
 import { createInstance } from "i18next";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +16,7 @@ import {
   providerHealthCopy,
   providerKeySourceLabel,
   providerName,
+  providerTestUnavailableCopy,
   providerTestCopy,
   saSegmentLabel,
   scheduleBodyBacklogCopy,
@@ -39,10 +42,11 @@ function modelCommonT(locale: Locale): ModelCommonT {
 describe("Settings backend copy boundary", () => {
   it("maps known provider and config field ids without backend labels", () => {
     const providerIds = [
-      "massive", "finnhub", "fred", "financial_datasets", "ibkr", "sec_edgar", "seeking_alpha",
+      "massive", "eodhd", "finnhub", "fred", "financial_datasets", "ibkr", "sec_edgar", "seeking_alpha",
     ];
     const fieldIds: Array<[string, string]> = [
       ["massive", "api_key"],
+      ["eodhd", "api_key"],
       ["finnhub", "api_key"],
       ["fred", "api_key"],
       ["financial_datasets", "api_key"],
@@ -54,13 +58,13 @@ describe("Settings backend copy boundary", () => {
     const cases = [
       {
         locale: "zh-Hant" as const,
-        providers: ["Massive", "Finnhub", "FRED", "Financial Datasets（付費）", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha（Extension）"],
-        fields: ["API key", "API key", "API key", "API key", "Gateway 主機", "Gateway 連接埠", "Client ID", "聯絡 Email"],
+        providers: ["Massive", "EODHD", "Finnhub", "FRED", "Financial Datasets（付費）", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha（Extension）"],
+        fields: ["API key", "API key", "API key", "API key", "API key", "Gateway 主機", "Gateway 連接埠", "Client ID", "聯絡 Email"],
       },
       {
         locale: "en" as const,
-        providers: ["Massive", "Finnhub", "FRED", "Financial Datasets (paid)", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha (Extension)"],
-        fields: ["API key", "API key", "API key", "API key", "Gateway host", "Gateway port", "Client ID", "Contact email"],
+        providers: ["Massive", "EODHD", "Finnhub", "FRED", "Financial Datasets (paid)", "IBKR Gateway", "SEC EDGAR", "Seeking Alpha (Extension)"],
+        fields: ["API key", "API key", "API key", "API key", "API key", "Gateway host", "Gateway port", "Client ID", "Contact email"],
       },
     ];
 
@@ -153,6 +157,37 @@ describe("Settings backend copy boundary", () => {
         .toEqual(expected.values);
       expect(expected.values.join(" ")).not.toContain("PLANTED_RAW_TEST_DETAIL");
     }
+  });
+
+  it("reserves EODHD live validation for the bounded census in both locales", () => {
+    const cases = [
+      {
+        locale: "zh-Hant" as const,
+        eodhd: "EODHD 即時驗證僅透過有限額的生命週期普查執行。",
+        generic: "不提供（按次計費）",
+      },
+      {
+        locale: "en" as const,
+        eodhd: "EODHD live validation runs only through the bounded lifecycle census.",
+        generic: "Unavailable (pay per request)",
+      },
+    ];
+
+    for (const expected of cases) {
+      const t = settingsT(expected.locale);
+      expect(providerTestUnavailableCopy("eodhd", t)).toBe(expected.eodhd);
+      expect(providerTestUnavailableCopy("financial_datasets", t)).toBe(expected.generic);
+    }
+  });
+
+  it("renders provider-specific unavailable copy in both config table layouts", () => {
+    const source = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");
+    const renderedCalls = source.match(
+      /\{providerTestUnavailableCopy\(pid, t\)\}/g,
+    ) ?? [];
+
+    expect(renderedCalls).toHaveLength(2);
+    expect(source).not.toContain("$.dataSources.providers.config.testUnavailable");
   });
 
   it("maps exactly five active schedule source ids without backend labels", () => {

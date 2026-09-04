@@ -167,6 +167,8 @@ export function providerName(id: string, t: SettingsT): string {
   switch (id) {
     case "massive":
       return t(($) => $.dataSources.providers.names.massive);
+    case "eodhd":
+      return t(($) => $.dataSources.providers.names.eodhd);
     case "finnhub":
       return t(($) => $.dataSources.providers.names.finnhub);
     case "fred":
@@ -191,6 +193,7 @@ export function providerConfigFieldLabel(
 ): string {
   switch (provider) {
     case "massive":
+    case "eodhd":
     case "finnhub":
     case "fred":
     case "financial_datasets":
@@ -308,6 +311,12 @@ export function providerTestCopy(
     return t(($) => $.dataSources.providers.test.failed, { providerId });
   }
   return t(($) => $.dataSources.providers.test.unavailable, { providerId });
+}
+
+export function providerTestUnavailableCopy(id: string, t: SettingsT): string {
+  return id === "eodhd"
+    ? t(($) => $.dataSources.providers.config.eodhdCensusValidationOnly)
+    : t(($) => $.dataSources.providers.config.testUnavailable);
 }
 
 export function scheduleSourceCopy(
