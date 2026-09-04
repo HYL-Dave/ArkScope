@@ -3,10 +3,13 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sqlite3
+import stat
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -314,15 +317,277 @@ def test_unknown_modes_fail_before_dependency_access(mode: str) -> None:
     assert resolver.calls == []
 
 
-def test_universe_manifest_remains_separately_gated() -> None:
+def test_universe_manifest_is_sorted_exact_private_and_digest_bound() -> None:
+    packet = runner.build_universe_manifest(
+        (
+            ("SMCI", ("manual_lists", "sa_alpha_picks_former")),
+            ("BRK B", ("manual_lists",)),
+            ("AAPL", ("portfolio_open",)),
+        ),
+        observation_timestamp="2026-09-04T01:02:03Z",
+        admitted_commit="a" * 40,
+    )
+
+    assert packet["count"] == 3
+    assert packet["tickers"] == ["AAPL", "BRK B", "SMCI"]
+    assert packet["rows"] == [
+        {
+            "ticker": "AAPL",
+            "massive_ticker": "AAPL",
+            "sources": ["portfolio_open"],
+        },
+        {
+            "ticker": "BRK B",
+            "massive_ticker": "BRK.B",
+            "sources": ["manual_lists"],
+        },
+        {
+            "ticker": "SMCI",
+            "massive_ticker": "SMCI",
+            "sources": ["manual_lists", "sa_alpha_picks_former"],
+        },
+    ]
+    assert packet["tickers_sha256"] == runner.digest_tickers(("AAPL", "BRK B", "SMCI"))
+    assert (
+        packet["rows_sha256"]
+        == hashlib.sha256(
+            runner.canonical_json(packet["rows"]).encode("utf-8")
+        ).hexdigest()
+    )
+    assert packet["active_pass_request_budget"] == {
+        "massive": 3,
+        "eodhd": 2,
+        "nasdaq": 2,
+        "exact_http_requests": 7,
+    }
+
+
+@pytest.mark.parametrize(
+    ("rows", "failure"),
+    (
+        ((("SMCI*", ("manual_lists",)),), "universe_manifest_ticker_invalid"),
+        ((("AAPL", ()),), "universe_manifest_sources_invalid"),
+        ((("AAPL", ("unknown",)),), "universe_manifest_sources_invalid"),
+        (
+            (
+                ("AAPL", ("manual_lists",)),
+                (" aapl ", ("portfolio_open",)),
+            ),
+            "universe_manifest_ticker_duplicate",
+        ),
+    ),
+)
+def test_universe_manifest_rejects_invalid_identity_or_source_shape(
+    rows: tuple[tuple[str, tuple[str, ...]], ...], failure: str
+) -> None:
+    with pytest.raises(runner.CensusRunnerFailure, match=failure):
+        runner.build_universe_manifest(
+            rows,
+            observation_timestamp="2026-09-04T01:02:03Z",
+            admitted_commit="a" * 40,
+        )
+
+
+def test_universe_manifest_mode_is_read_only_private_and_publicly_redacted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile = tmp_path / "profile.db"
+    sa = tmp_path / "sa.db"
+    profile.touch()
+    sa.touch()
+    private_output = (
+        tmp_path
+        / "private_evidence"
+        / runner.PRIVATE_UNIVERSE_MANIFEST_DIRNAME
+    )
+    public_output = tmp_path / "public"
+    observed: dict[str, object] = {}
+
+    def snapshot_loader(*, profile_db, sa_db, now):
+        observed.update(profile_db=profile_db, sa_db=sa_db, now=now)
+        return SimpleNamespace(
+            tickers=("AAPL", "BRK B", "SMCI"),
+            sources_by_ticker={
+                "AAPL": ("portfolio_open",),
+                "BRK B": ("manual_lists",),
+                "SMCI": ("manual_lists", "sa_alpha_picks_former"),
+            },
+            source_status={
+                "manual_lists": SimpleNamespace(warnings=()),
+                "portfolio_open": SimpleNamespace(warnings=()),
+                "sa_alpha_picks_current": SimpleNamespace(warnings=("stale_refresh",)),
+                "sa_alpha_picks_former": SimpleNamespace(warnings=()),
+                "legacy_config_seed": SimpleNamespace(warnings=()),
+            },
+            unavailable_sources=(),
+            generated_at="2026-09-04T01:02:03+00:00",
+        )
+
+    monkeypatch.setattr(runner, "build_active_universe_snapshot", snapshot_loader)
     resolver = RejectingResolver()
-    with pytest.raises(runner.CensusRunnerFailure, match="universe_manifest_not_authorized"):
+    attestation = runner.run_census(
+        mode="universe-manifest",
+        credential_resolver=resolver,
+        transport=RejectingTransport(),
+        acknowledgement=runner.universe_manifest_acknowledgement(
+            spec_sha256=runner.spec_sha256(), admitted_commit="a" * 40
+        ),
+        admitted_commit="a" * 40,
+        repository_state=runner.RepositoryState("a" * 40, True),
+        observation_timestamp="2026-09-04T01:02:03Z",
+        profile_db_path=profile,
+        sa_db_path=sa,
+        private_output_dir=private_output,
+        output_dir=public_output,
+    )
+
+    assert resolver.calls == []
+    assert observed["profile_db"] == profile
+    assert observed["sa_db"] == sa
+    assert attestation["count"] == 3
+    assert attestation["source_membership_counts"] == {
+        "legacy_config_seed": 0,
+        "manual_lists": 2,
+        "portfolio_open": 1,
+        "sa_alpha_picks_current": 0,
+        "sa_alpha_picks_former": 1,
+    }
+    assert attestation["source_warning_counts"] == {"stale_refresh": 1}
+    assert attestation["massive_identifier_override_count"] == 1
+    rendered = runner.canonical_json(attestation)
+    assert "tickers" not in attestation
+    assert "rows" not in attestation
+    assert "AAPL" not in rendered
+    assert "BRK B" not in rendered
+    assert "SMCI" not in rendered
+
+    private_packet = json.loads(
+        (private_output / runner.UNIVERSE_MANIFEST_NAME).read_bytes()
+    )
+    assert private_packet["tickers"] == ["AAPL", "BRK B", "SMCI"]
+    assert (
+        attestation["private_manifest_sha256"]
+        == hashlib.sha256(
+            (private_output / runner.UNIVERSE_MANIFEST_NAME).read_bytes()
+        ).hexdigest()
+    )
+    assert stat.S_IMODE(os.stat(private_output).st_mode) == 0o700
+    assert (
+        stat.S_IMODE(os.stat(private_output / runner.UNIVERSE_MANIFEST_NAME).st_mode)
+        == 0o600
+    )
+    assert stat.S_IMODE(os.stat(private_output / runner.SEAL_NAME).st_mode) == 0o600
+    runner.verify_seal(output_dir=private_output)
+    runner.verify_seal(output_dir=public_output)
+
+
+@pytest.mark.parametrize("acknowledgement", (None, "", "wrong"))
+def test_universe_manifest_requires_exact_ack_before_database_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    acknowledgement: str | None,
+) -> None:
+    def reject_snapshot(**_kwargs):
+        raise AssertionError("snapshot_read")
+
+    monkeypatch.setattr(runner, "build_active_universe_snapshot", reject_snapshot)
+    with pytest.raises(runner.CensusRunnerFailure, match="live_acknowledgement"):
         runner.run_census(
             mode="universe-manifest",
-            credential_resolver=resolver,
-            transport=RejectingTransport(),
+            credential_resolver=RejectingResolver(),
+            acknowledgement=acknowledgement,
+            admitted_commit="a" * 40,
+            repository_state=runner.RepositoryState("a" * 40, True),
+            profile_db_path=tmp_path / "profile.db",
+            sa_db_path=tmp_path / "sa.db",
+            private_output_dir=tmp_path / "private",
+            output_dir=tmp_path / "public",
         )
-    assert resolver.calls == []
+
+
+def test_universe_manifest_mode_rejects_dirty_state_before_database_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reject_snapshot(**_kwargs):
+        raise AssertionError("snapshot_read")
+
+    monkeypatch.setattr(runner, "build_active_universe_snapshot", reject_snapshot)
+    with pytest.raises(runner.CensusRunnerFailure, match="live_repository_state"):
+        runner.run_census(
+            mode="universe-manifest",
+            credential_resolver=RejectingResolver(),
+            acknowledgement=runner.universe_manifest_acknowledgement(
+                spec_sha256=runner.spec_sha256(), admitted_commit="a" * 40
+            ),
+            admitted_commit="a" * 40,
+            repository_state=runner.RepositoryState("a" * 40, False),
+            profile_db_path=tmp_path / "profile.db",
+            sa_db_path=tmp_path / "sa.db",
+            private_output_dir=tmp_path / "private",
+            output_dir=tmp_path / "public",
+        )
+
+
+def test_universe_manifest_refuses_existing_output_before_snapshot_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile = tmp_path / "profile.db"
+    sa = tmp_path / "sa.db"
+    profile.touch()
+    sa.touch()
+    private = (
+        tmp_path
+        / "private_evidence"
+        / runner.PRIVATE_UNIVERSE_MANIFEST_DIRNAME
+    )
+    private.mkdir(parents=True)
+
+    def reject_snapshot(**_kwargs):
+        raise AssertionError("snapshot_read")
+
+    monkeypatch.setattr(runner, "build_active_universe_snapshot", reject_snapshot)
+    with pytest.raises(runner.CensusRunnerFailure, match="packet_output_exists"):
+        runner.run_census(
+            mode="universe-manifest",
+            credential_resolver=RejectingResolver(),
+            acknowledgement=runner.universe_manifest_acknowledgement(
+                spec_sha256=runner.spec_sha256(), admitted_commit="a" * 40
+            ),
+            admitted_commit="a" * 40,
+            repository_state=runner.RepositoryState("a" * 40, True),
+            profile_db_path=profile,
+            sa_db_path=sa,
+            private_output_dir=private,
+            output_dir=tmp_path / "public",
+        )
+
+
+def test_universe_manifest_rejects_private_output_outside_profile_data_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile = tmp_path / "profile.db"
+    sa = tmp_path / "sa.db"
+    profile.touch()
+    sa.touch()
+
+    def reject_snapshot(**_kwargs):
+        raise AssertionError("snapshot_read")
+
+    monkeypatch.setattr(runner, "build_active_universe_snapshot", reject_snapshot)
+    with pytest.raises(runner.CensusRunnerFailure, match="universe_manifest_private_path"):
+        runner.run_census(
+            mode="universe-manifest",
+            credential_resolver=RejectingResolver(),
+            acknowledgement=runner.universe_manifest_acknowledgement(
+                spec_sha256=runner.spec_sha256(), admitted_commit="a" * 40
+            ),
+            admitted_commit="a" * 40,
+            repository_state=runner.RepositoryState("a" * 40, True),
+            profile_db_path=profile,
+            sa_db_path=sa,
+            private_output_dir=tmp_path / "tracked-looking-output",
+            output_dir=tmp_path / "public",
+        )
 
 
 @pytest.mark.parametrize(

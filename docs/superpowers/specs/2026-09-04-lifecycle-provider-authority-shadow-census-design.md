@@ -13,7 +13,7 @@ remain separate gates.
 **Date:** 2026-09-04
 
 **Current merged implementation:**
-`af80fe6008900c6e210dc79e80a6b2f7efaf2968`
+`bc42e1376bbbe55f3be3b290bc5f6d47e83f0991`
 
 **Relationship to existing authority:** This document does not change the
 running lifecycle policy. It freezes the experiment required before deciding
@@ -376,6 +376,23 @@ of the `SMCI*` provider marker, but the runner must build a fresh read-only
 manifest under separate production-read authorization and bind its exact row
 count and SHA-256. It must not hardcode either 186 or the earlier 187.
 
+The executable manifest is private profile evidence, not a public repository
+artifact. It contains exact ticker rows and per-row source provenance in a
+git-ignored create-only directory with mode `0700`; the manifest and seal use
+mode `0600`. The tracked evidence packet contains only a public attestation:
+count, ticker-set and row digests, whole-private-manifest digest, aggregate
+source/warning counts, identifier-override count, and the derived request
+budget. It must not expose the ticker list or identify which symbols came from
+an open portfolio position.
+
+Internal market-data identity and provider request identity remain separate.
+The current universe intentionally contains the internal class-share spelling
+`BRK B`, while Massive requires the reviewed `BRK.B` spelling. The private
+manifest binds both values and rejects every other non-provider-shaped ticker;
+it does not rewrite the active universe or silently drop the row. Provider-
+specific bulk-list semantics remain an active-pass concern and cannot be
+inferred from this mapping.
+
 The census is split so later costs are known before they are incurred:
 
 1. active-state pass: exactly one Massive exact-active request per manifest
@@ -387,6 +404,15 @@ The census is split so later costs are known before they are incurred:
 No pagination over an unfiltered Massive universe is allowed. No Ticker Events
 request is made for an ordinary active symbol. Request budgets are derived from
 the sealed manifest and missing subset, not chosen after execution.
+
+The manifest step performs zero provider and credential access and leaves the
+active pass explicitly unauthorized. If its exact count is `N`, the next
+active-pass envelope is exactly `N` Massive attempts, two EODHD attempts, and
+two Nasdaq attempts (`N + 4` total), with zero retry or fallback. The existing
+known-case transport ceiling of 14 Massive attempts is not sufficient for a
+full-universe run; a later RED-first active-pass implementation must make the
+manifest-bound `N` an instance limit without weakening the 14-request
+known-case gate.
 
 ## 8. Alpha Picks Identity Feasibility Result
 
