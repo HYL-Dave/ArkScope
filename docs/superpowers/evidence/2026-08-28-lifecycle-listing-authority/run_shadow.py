@@ -418,6 +418,7 @@ def _persist_listing(item: dict, root: Path) -> tuple[tuple[dict, ...], tuple[di
         kernel = SecurityLifecycleFactKernel(store)
         claim = kernel.reserve_run(
             case_id=case_id,
+            execution_owner_id="listing-authority-shadow",
             observation_fingerprint_sha256=hashlib.sha256(name.encode()).hexdigest(),
             policy_version="trusted-lifecycle-automation-v4",
             mode="historical",
@@ -427,7 +428,11 @@ def _persist_listing(item: dict, root: Path) -> tuple[tuple[dict, ...], tuple[di
             at=AT,
         )
         blockers = tuple(
-            AutomationBlocker(code=code, retryable=True, context={})
+            AutomationBlocker(
+                code=code,
+                retryable=code != "massive_credential_missing",
+                context={},
+            )
             for code in blocker_codes
         )
         completed = kernel.complete_run(
@@ -437,7 +442,11 @@ def _persist_listing(item: dict, root: Path) -> tuple[tuple[dict, ...], tuple[di
             blockers=blockers,
             decision_tier=None if blockers else "verified_automatic",
             action_readiness=None if blockers else "not_applicable",
-            retry_at="2026-08-29T22:00:00Z" if blockers else None,
+            retry_at=(
+                "2026-08-29T22:00:00Z"
+                if blockers and all(blocker.retryable for blocker in blockers)
+                else None
+            ),
             diagnostics={"listing_records": len(listing_rows)},
             at=AT,
         )
