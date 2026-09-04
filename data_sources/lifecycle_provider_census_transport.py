@@ -291,7 +291,7 @@ def _json_body(body: bytes) -> object:
     failed = False
     try:
         payload = json.loads(body)
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
         failed = True
     if failed:
         raise CensusTransportFailure("massive_invalid_json") from None
