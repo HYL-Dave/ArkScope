@@ -26,6 +26,7 @@ MAX_EODHD_REQUESTS = 2
 MAX_NASDAQ_REQUESTS = 2
 MAX_MASSIVE_RESPONSE_BYTES = 1024 * 1024
 MAX_MASSIVE_TOTAL_BYTES = 14 * 1024 * 1024
+MAX_MASSIVE_EVENT_ENTRIES = 64
 MAX_EODHD_RESPONSE_BYTES = 1024 * 1024
 MAX_EODHD_TOTAL_BYTES = 2 * 1024 * 1024
 _MAX_EODHD_EXCHANGE_LENGTH = 128
@@ -726,6 +727,8 @@ class LifecycleProviderCensusTransport:
         results = envelope.get("results")
         if not isinstance(results, dict) or not isinstance(results.get("events"), list):
             raise CensusTransportFailure("massive_invalid_json")
+        if len(results["events"]) > MAX_MASSIVE_EVENT_ENTRIES:
+            raise CensusTransportFailure("massive_event_timeline_too_large")
 
         timeline: list[tuple[str, str]] = []
         for event in results["events"]:

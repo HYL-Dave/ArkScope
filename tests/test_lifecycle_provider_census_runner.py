@@ -150,11 +150,11 @@ class FakeLiveTransport:
         budget.reserve_massive(("events", stable_id))
         body = self._payload("events", stable_id)
         budget.record_massive_body(len(body))
-        events = (
-            (("LC", "HAPN", "2025-06-27"),)
-            if stable_id == "BBG000000LC"
-            else ()
-        )
+        events = ()
+        if stable_id == "BBG000000LC":
+            events = (("LC", "HAPN", "2025-06-27"),)
+        elif stable_id == "BBG001YKDND6":
+            events = (("LC", "HAPN", "2026-06-27"),)
         return MassiveTickerEventsResult(
             stable_id=stable_id,
             events=events,
@@ -229,6 +229,14 @@ class FakeLiveTransport:
 def _ack(commit: str = "a" * 40) -> str:
     return runner.live_acknowledgement(
         spec_sha256=runner.spec_sha256(), admitted_commit=commit
+    )
+
+
+def _event_ack(commit: str = "a" * 40) -> str:
+    return runner.event_revalidation_acknowledgement(
+        spec_sha256=runner.spec_sha256(),
+        source_sha256=runner.attempt_2_summary_sha256(),
+        admitted_commit=commit,
     )
 
 
@@ -424,6 +432,105 @@ def test_known_case_live_executes_exact_budget_and_seals_normalized_packet(
     assert "SENSITIVE_EODHD_KEY" not in summary
     assert (tmp_path / runner.SEAL_NAME).is_file()
     runner.verify_seal(output_dir=tmp_path)
+
+
+def test_event_revalidation_executes_only_one_massive_request_and_seals_packet(
+    tmp_path: Path,
+) -> None:
+    resolver = FakeResolver()
+    transport = FakeLiveTransport()
+    packet = runner.run_census(
+        mode="ticker-event-revalidation",
+        credential_resolver=resolver,
+        transport=transport,
+        acknowledgement=_event_ack(),
+        admitted_commit="a" * 40,
+        repository_state=runner.RepositoryState("a" * 40, True),
+        output_dir=tmp_path,
+        observation_timestamp="2026-09-04T01:02:03Z",
+    )
+
+    assert resolver.calls == ["massive"]
+    assert transport.calls == [("massive_events", "BBG001YKDND6")]
+    assert packet["request_budget"] == {
+        "massive": 1,
+        "eodhd": 0,
+        "nasdaq": 0,
+    }
+    assert packet["request_accounting"] == {
+        "maximum_http_requests": 1,
+        "providers": {
+            "eodhd": {"attempts": 0, "body_bytes": 0},
+            "massive": {"attempts": 1, "body_bytes": 19},
+            "nasdaq": {"attempts": 0, "body_bytes": 0},
+        },
+        "total_attempts": 1,
+        "total_body_bytes": 19,
+    }
+    assert packet["relation"] == {
+        "source_ticker": "LC",
+        "successor_ticker": "HAPN",
+        "effective_date": "2026-06-27",
+        "outcome": "confirmed",
+    }
+    assert packet["request_observations"][0]["parsed_fields"] == {
+        "stable_id": "BBG001YKDND6",
+        "events": [["LC", "HAPN", "2026-06-27"]],
+    }
+    summary = (tmp_path / runner.SUMMARY_NAME).read_text(encoding="utf-8")
+    assert "SENSITIVE_MASSIVE_KEY" not in summary
+    runner.verify_seal(output_dir=tmp_path)
+
+
+def test_event_revalidation_rejects_known_case_acknowledgement_before_credentials(
+    tmp_path: Path,
+) -> None:
+    resolver = RejectingResolver()
+
+    with pytest.raises(runner.CensusRunnerFailure, match="live_acknowledgement"):
+        runner.run_census(
+            mode="ticker-event-revalidation",
+            credential_resolver=resolver,
+            transport=RejectingTransport(),
+            acknowledgement=_ack(),
+            admitted_commit="a" * 40,
+            repository_state=runner.RepositoryState("a" * 40, True),
+            output_dir=tmp_path,
+        )
+
+    assert resolver.calls == []
+
+
+def test_event_revalidation_never_promotes_a_missing_lc_relation(
+    tmp_path: Path,
+) -> None:
+    class MissingRelationTransport(FakeLiveTransport):
+        def fetch_massive_ticker_events(self, *, stable_id, api_key, budget):
+            result = super().fetch_massive_ticker_events(
+                stable_id=stable_id,
+                api_key=api_key,
+                budget=budget,
+            )
+            return MassiveTickerEventsResult(
+                stable_id=result.stable_id,
+                events=(),
+                source_locator=result.source_locator,
+                response_sha256=result.response_sha256,
+                response_bytes=result.response_bytes,
+            )
+
+    packet = runner.run_census(
+        mode="ticker-event-revalidation",
+        credential_resolver=FakeResolver(),
+        transport=MissingRelationTransport(),
+        acknowledgement=_event_ack(),
+        admitted_commit="a" * 40,
+        repository_state=runner.RepositoryState("a" * 40, True),
+        output_dir=tmp_path,
+    )
+
+    assert packet["relation"]["outcome"] == "ambiguous"
+    assert packet["request_observations"][0]["result_code"] == "ambiguous"
 
 
 def test_missing_eodhd_credential_skips_only_that_lane(tmp_path: Path) -> None:

@@ -333,6 +333,21 @@ The create-only normalized packet is under `attempt-2/`, its seal verifies,
 and neither admitted profile credential appears in plaintext. This ruling
 admits no runtime authority, lifecycle mutation, or automatic retirement.
 
+### 6.6 Ticker-event parser revalidation gate
+
+The parser repair may be checked with one new Massive request only. The runner
+must derive the exact shared `LC`/`HAPN` Composite FIGI from the sealed Attempt
+2 packet, bind that packet digest into a new acknowledgement, and request only
+that stable identifier's Ticker Events timeline. Its fixed budget is
+`massive:1,eodhd:0,nasdaq:0`, with zero retry, fallback, redirect, production
+DB read, or application write.
+
+The revalidation passes only when the corrected parser returns exact
+`LC -> HAPN` with effective date `2026-06-27`. Another `LC` successor is a
+contradiction; no `LC` relation, malformed chronology, duplicate dates or
+tickers, an unsupported event, or a provider failure does not pass. The live
+request requires a new exact commit/spec/source-packet/budget authorization.
+
 ## 7. Stage 3 Full-Universe Census
 
 Stage 3 is allowed only for an axis whose known-case canary passes. The most
