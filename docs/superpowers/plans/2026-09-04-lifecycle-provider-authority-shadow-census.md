@@ -603,7 +603,7 @@ independent review before any Stage 3 census or authority design.
 - Produces: sealed active-pass and missing-subset manifests with exact counts
   and SHA-256 values.
 
-- [ ] **Step 1: Write RED manifest stability tests**
+- [x] **Step 1: Write RED manifest stability tests**
 
 ```python
 def test_universe_manifest_is_sorted_exact_and_digest_bound():
@@ -621,7 +621,7 @@ provider request identity. Own the reviewed `BRK B -> BRK.B` Massive mapping,
 reject any unreviewed non-provider-shaped ticker, and publish only the mapping
 count rather than either value.
 
-- [ ] **Step 2: Add read-only manifest mode**
+- [x] **Step 2: Add read-only manifest mode**
 
 Open the production inputs only with SQLite URI `mode=ro`, make no provider
 call, and record the actual count. Treat 186 as the last recorded comparison,
@@ -629,7 +629,7 @@ not a hardcoded assertion. The full ticker/source rows and seal are `0600`
 inside a new `0700` git-ignored directory. The tracked attestation contains no
 ticker or per-symbol source membership and binds the private file by SHA-256.
 
-- [ ] **Step 3: Stop for active-pass authorization**
+- [x] **Step 3: Stop for active-pass authorization**
 
 Derive the Massive ceiling as exactly `N`, where `N` is the sealed manifest
 count. Add two Nasdaq and, if admitted/configured, two EODHD requests. Do not
@@ -638,6 +638,10 @@ authorize inactive or event requests in this step.
 The manifest records this budget with status `not_authorized`. Raising the
 known-case transport's 14-request Massive ceiling is part of the later active-
 pass implementation and must not weaken that existing gate.
+
+The sealed 2026-09-04 manifest contains `N = 186`; the exact stopped envelope
+is therefore 186 Massive + 2 EODHD + 2 Nasdaq = 190 HTTP attempts. No request
+in that envelope has been authorized or executed.
 
 - [ ] **Step 4: Run and seal only the active pass**
 
