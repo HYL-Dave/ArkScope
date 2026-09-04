@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "fixture_kind": "closed_synthetic_normalized",
+  "observation_timestamp": "2026-09-04T00:00:00Z",
+  "known_cases_sha256": "16b361697864ae2c36812b7107e4de266fff4204e93425d8c4af4b2187486a49",
+  "normalized_content_sha256": "9c0cc3f98c9afff54d2c22eebc191178784cc13f8b09d412e0efc26f7e750ef9",
+  "request_budget": {
+    "massive": 14,
+    "eodhd": 2,
+    "nasdaq": 2
+  },
+  "request_observations": [
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["LC"],
+      "expected_state": "inactive",
+      "attempts": 1,
+      "body_bytes": 101,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["1111111111111111111111111111111111111111111111111111111111111111"],
+      "parsed_fields": {
+        "ticker": "LC",
+        "found": true,
+        "active": false,
+        "stable_id": "BBG000SYNTHLC",
+        "delisted_date": "2025-06-26"
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["HAPN"],
+      "expected_state": "active",
+      "attempts": 1,
+      "body_bytes": 102,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["2222222222222222222222222222222222222222222222222222222222222222"],
+      "parsed_fields": {
+        "ticker": "HAPN",
+        "found": true,
+        "active": true,
+        "stable_id": "BBG000SYNTHLC",
+        "delisted_date": null
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["ARCH"],
+      "expected_state": "inactive",
+      "attempts": 1,
+      "body_bytes": 103,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["3333333333333333333333333333333333333333333333333333333333333333"],
+      "parsed_fields": {
+        "ticker": "ARCH",
+        "found": true,
+        "active": false,
+        "stable_id": "BBG000SYNTHARCH",
+        "delisted_date": "2019-10-01"
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["CNR"],
+      "expected_state": "active",
+      "attempts": 1,
+      "body_bytes": 104,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["4444444444444444444444444444444444444444444444444444444444444444"],
+      "parsed_fields": {
+        "ticker": "CNR",
+        "found": true,
+        "active": true,
+        "stable_id": "BBG000SYNTHCNR",
+        "delisted_date": null
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["LTHM"],
+      "expected_state": "inactive",
+      "attempts": 1,
+      "body_bytes": 105,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["5555555555555555555555555555555555555555555555555555555555555555"],
+      "parsed_fields": {
+        "ticker": "LTHM",
+        "found": true,
+        "active": false,
+        "stable_id": "BBG000SYNTHLTHM",
+        "delisted_date": "2024-01-04"
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["ALTM"],
+      "expected_state": "active",
+      "attempts": 1,
+      "body_bytes": 106,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["6666666666666666666666666666666666666666666666666666666666666666"],
+      "parsed_fields": {
+        "ticker": "ALTM",
+        "found": true,
+        "active": true,
+        "stable_id": "BBG000SYNTHALTM",
+        "delisted_date": null
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["TA"],
+      "expected_state": "inactive",
+      "attempts": 1,
+      "body_bytes": 107,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["7777777777777777777777777777777777777777777777777777777777777777"],
+      "parsed_fields": {
+        "ticker": "TA",
+        "found": true,
+        "active": false,
+        "stable_id": "BBG000SYNTHTA",
+        "delisted_date": "2019-12-23"
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["AAPL"],
+      "expected_state": "active",
+      "attempts": 1,
+      "body_bytes": 108,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["8888888888888888888888888888888888888888888888888888888888888888"],
+      "parsed_fields": {
+        "ticker": "AAPL",
+        "found": true,
+        "active": true,
+        "stable_id": "BBG000SYNTHAAPL",
+        "delisted_date": null
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "all_tickers",
+      "requested_identifiers": ["SMCI"],
+      "expected_state": "active",
+      "attempts": 1,
+      "body_bytes": 109,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["9999999999999999999999999999999999999999999999999999999999999999"],
+      "parsed_fields": {
+        "ticker": "SMCI",
+        "found": true,
+        "active": true,
+        "stable_id": "BBG000SYNTHSMCI",
+        "delisted_date": null
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "ticker_events",
+      "requested_identifiers": ["BBG000SYNTHLC"],
+      "expected_state": "LC_TO_HAPN",
+      "attempts": 1,
+      "body_bytes": 201,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      "parsed_fields": {
+        "stable_id": "BBG000SYNTHLC",
+        "events": [["LC", "HAPN", "2025-06-27"]]
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "ticker_events",
+      "requested_identifiers": ["BBG000SYNTHARCH"],
+      "expected_state": "no_ticker_change_alias",
+      "attempts": 1,
+      "body_bytes": 202,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+      "parsed_fields": {
+        "stable_id": "BBG000SYNTHARCH",
+        "events": []
+      },
+      "result_code": "coverage_limited"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "ticker_events",
+      "requested_identifiers": ["BBG000SYNTHLTHM"],
+      "expected_state": "no_ticker_change_alias",
+      "attempts": 1,
+      "body_bytes": 203,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+      "parsed_fields": {
+        "stable_id": "BBG000SYNTHLTHM",
+        "events": []
+      },
+      "result_code": "coverage_limited"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "ticker_events",
+      "requested_identifiers": ["BBG000SYNTHTA"],
+      "expected_state": "no_ticker_change_alias",
+      "attempts": 1,
+      "body_bytes": 204,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"],
+      "parsed_fields": {
+        "stable_id": "BBG000SYNTHTA",
+        "events": []
+      },
+      "result_code": "coverage_limited"
+    },
+    {
+      "provider": "massive",
+      "endpoint_family": "ticker_events",
+      "requested_identifiers": ["BBG000SYNTHAAPL"],
+      "expected_state": "no_ticker_change",
+      "attempts": 1,
+      "body_bytes": 205,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"],
+      "parsed_fields": {
+        "stable_id": "BBG000SYNTHAAPL",
+        "events": []
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "eodhd",
+      "endpoint_family": "exchange_symbol_list",
+      "requested_identifiers": ["AAPL", "ALTM", "ARCH", "CNR", "HAPN", "LC", "LTHM", "SMCI", "TA"],
+      "expected_state": "active_and_delisted_partition",
+      "attempts": 2,
+      "body_bytes": 701,
+      "http_status_family": "2xx",
+      "elapsed_ms": 2.0,
+      "response_sha256s": [
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      ],
+      "parsed_fields": {
+        "active": ["AAPL", "ALTM", "CNR", "HAPN", "SMCI"],
+        "delisted": ["ARCH", "LC", "LTHM", "TA"],
+        "unreported": [],
+        "complete": true
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "nasdaq",
+      "endpoint_family": "nasdaq_listed",
+      "requested_identifiers": ["AAPL", "ALTM", "ARCH", "CNR", "HAPN", "LC", "LTHM", "SMCI", "TA"],
+      "expected_state": "current_directory",
+      "attempts": 1,
+      "body_bytes": 801,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"],
+      "parsed_fields": {
+        "matched": ["AAPL", "HAPN", "SMCI"]
+      },
+      "result_code": "confirmed"
+    },
+    {
+      "provider": "nasdaq",
+      "endpoint_family": "other_listed",
+      "requested_identifiers": ["AAPL", "ALTM", "ARCH", "CNR", "HAPN", "LC", "LTHM", "SMCI", "TA"],
+      "expected_state": "current_directory",
+      "attempts": 1,
+      "body_bytes": 802,
+      "http_status_family": "2xx",
+      "elapsed_ms": 1.0,
+      "response_sha256s": ["23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01"],
+      "parsed_fields": {
+        "matched": ["ALTM", "CNR"]
+      },
+      "result_code": "confirmed"
+    }
+  ],
+  "oracle_observations": [
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "LC",
+      "successor_ticker": null,
+      "active": false,
+      "stable_id": "BBG000SYNTHLC",
+      "effective_date": null,
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "HAPN",
+      "successor_ticker": null,
+      "active": true,
+      "stable_id": "BBG000SYNTHLC",
+      "effective_date": null,
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "ticker_change",
+      "source_ticker": "LC",
+      "successor_ticker": "HAPN",
+      "active": null,
+      "stable_id": "BBG000SYNTHLC",
+      "effective_date": "2025-06-27",
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "ARCH",
+      "successor_ticker": null,
+      "active": false,
+      "stable_id": "BBG000SYNTHARCH",
+      "effective_date": null,
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "LTHM",
+      "successor_ticker": null,
+      "active": false,
+      "stable_id": "BBG000SYNTHLTHM",
+      "effective_date": null,
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "TA",
+      "successor_ticker": null,
+      "active": false,
+      "stable_id": "BBG000SYNTHTA",
+      "effective_date": null,
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "AAPL",
+      "successor_ticker": null,
+      "active": true,
+      "stable_id": "BBG000SYNTHAAPL",
+      "effective_date": null,
+      "complete": true
+    },
+    {
+      "provider": "massive",
+      "axis": "listing_state",
+      "source_ticker": "SMCI",
+      "successor_ticker": null,
+      "active": true,
+      "stable_id": "BBG000SYNTHSMCI",
+      "effective_date": null,
+      "complete": true
+    }
+  ],
+  "outcome_samples": [
+    {"sample_id": "positive_authority", "result_code": "confirmed", "reason": "expected_evidence_present"},
+    {"sample_id": "incompatible_complete", "result_code": "contradicted", "reason": "complete_incompatible_evidence"},
+    {"sample_id": "history_window", "result_code": "coverage_limited", "reason": "history_outside_coverage"},
+    {"sample_id": "paid_endpoint", "result_code": "not_entitled", "reason": "plan_excludes_endpoint"},
+    {"sample_id": "missing_profile_key", "result_code": "credential_unavailable", "reason": "profile_credential_absent"},
+    {"sample_id": "bounded_transport", "result_code": "provider_unavailable", "reason": "bounded_transport_failed"},
+    {"sample_id": "identity_conflict", "result_code": "ambiguous", "reason": "stable_identity_unresolved"}
+  ]
+}
