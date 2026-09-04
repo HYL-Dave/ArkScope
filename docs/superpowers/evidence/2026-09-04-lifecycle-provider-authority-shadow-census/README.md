@@ -125,3 +125,30 @@ content. A later `LC` event revalidation is a new explicitly budgeted request,
 not a retry hidden inside this attempt. The `attempt-2/SHA256SUMS` seal verifies,
 and comparison against both admitted profile credential values found zero
 plaintext matches in the normalized packet.
+
+## Ticker-Event Revalidation
+
+The separately authorized revalidation at `2026-09-04T14:31:35Z` was bound to
+commit `6097b3c59516b0482405d1fa713163eb3010d242`, the exact parser-repair spec,
+the sealed Attempt 2 summary, and a one-request Massive-only budget. It made
+exactly one request, received one 2xx response, and parsed exact
+`LC -> HAPN` on `2026-06-22` from the shared Composite FIGI timeline. EODHD and
+Nasdaq made zero requests; no retry, fallback, raw body, credential value, or
+application write occurred.
+
+The immutable packet under `attempt-2-event-revalidation/` says
+`contradicted` because its frozen expected date was incorrectly set to
+`2026-06-27`. Happen's filed Form 8-K states that the symbol change became
+effective at market open on `2026-06-22` and that the common stock's CUSIP
+remained unchanged. The provider result is therefore correct and the old
+oracle is not. A RED-first regression reproduced this false contradiction
+before the runner oracle was corrected. The original packet and seal are
+retained byte-for-byte; no second provider request was made.
+
+Primary-source check:
+<https://www.sec.gov/Archives/edgar/data/1409970/000140997026000140/lc-20260622.htm>.
+
+Post-correction verification is `256` focused tests and `5709 passed / 12
+skipped` for the complete backend suite. The RED owner first failed with the
+old `2026-06-27` oracle and `contradicted` outcome before the implementation
+was corrected.

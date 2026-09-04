@@ -63,6 +63,7 @@ REQUEST_BUDGET = {"massive": 14, "eodhd": 2, "nasdaq": 2}
 MAXIMUM_HTTP_REQUESTS = sum(REQUEST_BUDGET.values())
 EVENT_REVALIDATION_REQUEST_BUDGET = {"massive": 1, "eodhd": 0, "nasdaq": 0}
 EVENT_REVALIDATION_MAXIMUM_HTTP_REQUESTS = 1
+LC_HAPN_REVALIDATION_RELATION = ("LC", "HAPN", "2026-06-22")
 MASSIVE_MIN_REQUEST_INTERVAL_SECONDS = 12.5
 SUMMARY_NAME = "census-summary.json"
 SEAL_NAME = "SHA256SUMS"
@@ -640,7 +641,7 @@ def _run_event_revalidation(
     stable_id = _attempt_2_lc_stable_id()
     source_digest = attempt_2_summary_sha256()
     budget = CensusRequestBudget(max_massive_requests=1)
-    expected_relation = ("LC", "HAPN", "2026-06-27")
+    expected_relation = LC_HAPN_REVALIDATION_RELATION
     expected_state = "exact_lc_to_hapn"
     requests: list[dict[str, object]] = []
     lane_reason = "executed"
