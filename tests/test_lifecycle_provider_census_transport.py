@@ -102,15 +102,25 @@ def event_fixture(
     effective_date: str = "2026-06-27",
     next_url: object = _MISSING,
 ) -> dict[str, object]:
-    event: dict[str, object] = {
+    successor_event: dict[str, object] = {
         "type": event_type,
         "date": effective_date,
     }
     if event_type == "ticker_change":
-        event["ticker_change"] = {"ticker": successor}
+        successor_event["ticker_change"] = {"ticker": successor}
     payload: dict[str, object] = {
         "status": "OK",
-        "results": {"ticker": source, "events": [event]},
+        "results": {
+            "name": "Lifecycle fixture",
+            "events": [
+                successor_event,
+                {
+                    "type": "ticker_change",
+                    "date": "2024-01-01",
+                    "ticker_change": {"ticker": source},
+                },
+            ],
+        },
     }
     if next_url is not _MISSING:
         payload["next_url"] = next_url
@@ -173,6 +183,97 @@ def test_massive_events_requires_stable_identifier_and_exact_ticker_change():
     assert row.events == (("LC", "HAPN", "2026-06-27"),)
     assert row.stable_id == "BBG_TEST_LC"
     assert row.source_locator == f"{MASSIVE_EVENTS_PREFIX}BBG_TEST_LC/events"
+
+
+def test_massive_events_accepts_official_timeline_shape_without_result_ticker():
+    transport, _session = transport_with_json(
+        {
+            "status": "OK",
+            "results": {
+                "name": "Lifecycle fixture",
+                "events": [
+                    {
+                        "type": "ticker_change",
+                        "date": "2026-06-27",
+                        "ticker_change": {"ticker": "HAPN"},
+                    },
+                    {
+                        "type": "ticker_change",
+                        "date": "2024-01-01",
+                        "ticker_change": {"ticker": "LC"},
+                    },
+                ],
+            },
+        }
+    )
+
+    row = transport.fetch_massive_ticker_events(
+        stable_id="BBG_TEST_LC", api_key="secret", budget=budget()
+    )
+
+    assert row.events == (("LC", "HAPN", "2026-06-27"),)
+
+
+def test_massive_events_accepts_an_empty_timeline_as_no_relation():
+    transport, _session = transport_with_json(
+        {"status": "OK", "results": {"name": "Apple Inc.", "events": []}}
+    )
+
+    row = transport.fetch_massive_ticker_events(
+        stable_id="BBG_TEST_AAPL", api_key="secret", budget=budget()
+    )
+
+    assert row.events == ()
+
+
+@pytest.mark.parametrize(
+    ("events", "expected_code"),
+    (
+        (
+            [
+                {
+                    "type": "ticker_change",
+                    "date": "2026-06-27",
+                    "ticker_change": {"ticker": "LC"},
+                },
+                {
+                    "type": "ticker_change",
+                    "date": "2026-06-27",
+                    "ticker_change": {"ticker": "HAPN"},
+                },
+            ],
+            "massive_event_date_ambiguous",
+        ),
+        (
+            [
+                {
+                    "type": "ticker_change",
+                    "date": "2024-01-01",
+                    "ticker_change": {"ticker": "LC"},
+                },
+                {
+                    "type": "ticker_change",
+                    "date": "2026-06-27",
+                    "ticker_change": {"ticker": "LC"},
+                },
+            ],
+            "massive_event_ticker_duplicate",
+        ),
+    ),
+)
+def test_massive_events_rejects_ambiguous_timelines(
+    events: list[dict[str, object]], expected_code: str
+):
+    transport, _session = transport_with_json(
+        {"status": "OK", "results": {"name": "Lifecycle fixture", "events": events}}
+    )
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_massive_ticker_events(
+            stable_id="BBG_TEST_LC", api_key="secret", budget=budget()
+        )
+
+    assert caught.value.code == expected_code
 
 
 def test_massive_listing_returns_exact_normalized_secret_free_result():

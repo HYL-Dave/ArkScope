@@ -2,16 +2,18 @@
 
 **Status:** Provider-free preflight, the separately authorized read-only Alpha
 Picks identity census, detached census implementation, profile-backed EODHD
-Settings field, and known-case attempt 1 are complete and merged through
-`483b0877`. Attempt 1 is insufficient for authority admission because neither
-active Massive control completed. A paced known-case rerun with an EODHD
-profile credential, any further production read or write, migration, runtime
-authority change, App restart, and push remain separate gates.
+Settings field, and two known-case attempts are complete. Attempt 2 passes the
+listing-state gate with active and inactive controls across Massive, EODHD, and
+Nasdaq. The ticker-change gate remains unadmitted: a contract-valid Massive
+event timeline exposed an ArkScope parser defect, whose offline repair requires
+a separately authorized `LC` revalidation. Any full-universe read, production
+write, migration, runtime authority change, App restart, and push remain
+separate gates.
 
 **Date:** 2026-09-04
 
 **Current merged implementation:**
-`483b0877cf9de1feab467f34b1cd583443e426bc`
+`af80fe6008900c6e210dc79e80a6b2f7efaf2968`
 
 **Relationship to existing authority:** This document does not change the
 running lifecycle policy. It freezes the experiment required before deciding
@@ -121,6 +123,16 @@ is not pre-approved as identity authority, terminal authority, merger
 consideration, or an economic-successor source. Until another reviewed
 candidate-discovery mechanism exists, Composite FIGI cannot replace this
 operational role merely because a known oracle already supplies both tickers.
+
+The formal response example contains `results.name` and `results.events`, not
+`results.ticker`. Each timeline event owns its exact ticker and date. For the
+bounded census, ArkScope sorts a complete ticker-change timeline by exact date
+and derives only adjacent old-to-new pairs, using the later ticker's date as the
+effective date. Duplicate dates, repeated ticker values, malformed values, and
+unsupported event types are ambiguous and fail closed. Attempt 2 demonstrated
+that the original adapter's invented `results.ticker` requirement rejected a
+successful response; the corrected normalization remains offline-only until a
+new live `LC` event request confirms it against the provider.
 
 Official contract:
 `https://massive.com/docs/rest/stocks/corporate-actions/ticker-events`.
@@ -297,6 +309,29 @@ family. `LC` and `HAPN` were observed under the same Composite FIGI, and
 saved profile credential. The experiment therefore has no validated
 discrimination control and admits no authority axis. Its negative outcome is
 the intended fail-closed result, not a partial production admission.
+
+### 6.5 Attempt 2 ruling
+
+The paced rerun made the full 18-request envelope exactly once: 14 Massive,
+two EODHD, and two Nasdaq. All nine Massive listing requests completed without
+rate limiting. The required active controls `AAPL` and canonical `SMCI`, the
+inactive controls `ARCH`, `LTHM`, and `TA`, and the `LC`/`HAPN` inactive/active
+pair were observed. EODHD returned a complete disjoint partition for all nine
+symbols, and Nasdaq returned the expected current-directory controls. The
+known-case listing-state axis therefore passes with both positive and negative
+controls.
+
+The ticker-change axis does not pass. The `LC` and `AAPL` event responses
+reached successful provider envelopes, but the old adapter rejected them
+because it required a non-contractual `results.ticker` field. Three other
+stable identifiers returned `massive_not_found`. The aggregate oracle is five
+confirmed cases, one ambiguous `LC`, and zero contradictions. Fixing the parser
+does not rewrite this measurement into a pass; one separately authorized,
+bounded `LC` revalidation must establish exact `LC -> HAPN` discovery.
+
+The create-only normalized packet is under `attempt-2/`, its seal verifies,
+and neither admitted profile credential appears in plaintext. This ruling
+admits no runtime authority, lifecycle mutation, or automatic retirement.
 
 ## 7. Stage 3 Full-Universe Census
 
