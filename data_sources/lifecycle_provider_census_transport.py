@@ -726,11 +726,8 @@ class LifecycleProviderCensusTransport:
         results = envelope.get("results")
         if not isinstance(results, dict) or not isinstance(results.get("events"), list):
             raise CensusTransportFailure("massive_invalid_json")
-        source_ticker = _validate_ticker(
-            results.get("ticker"), code="massive_event_ticker_invalid"
-        )
 
-        normalized_events: list[tuple[str, str, str]] = []
+        timeline: list[tuple[str, str]] = []
         for event in results["events"]:
             if not isinstance(event, dict):
                 raise CensusTransportFailure("massive_invalid_json")
@@ -742,19 +739,31 @@ class LifecycleProviderCensusTransport:
             ticker_change = event.get("ticker_change")
             if not isinstance(ticker_change, dict):
                 raise CensusTransportFailure("massive_invalid_json")
-            successor_ticker = _validate_ticker(
+            ticker = _validate_ticker(
                 ticker_change.get("ticker"), code="massive_event_ticker_invalid"
             )
-            if successor_ticker == source_ticker:
-                raise CensusTransportFailure("massive_event_ticker_invalid")
-            normalized = (source_ticker, successor_ticker, effective_date)
-            if normalized in normalized_events:
+            timeline_entry = (effective_date, ticker)
+            if timeline_entry in timeline:
                 raise CensusTransportFailure("massive_event_duplicate")
-            normalized_events.append(normalized)
+            timeline.append(timeline_entry)
+
+        timeline.sort()
+        if len({effective_date for effective_date, _ticker in timeline}) != len(timeline):
+            raise CensusTransportFailure("massive_event_date_ambiguous")
+        if len({ticker for _effective_date, ticker in timeline}) != len(timeline):
+            raise CensusTransportFailure("massive_event_ticker_duplicate")
+
+        normalized_events = tuple(
+            (source_ticker, successor_ticker, successor_date)
+            for (_source_date, source_ticker), (
+                successor_date,
+                successor_ticker,
+            ) in zip(timeline, timeline[1:])
+        )
 
         return MassiveTickerEventsResult(
             stable_id=requested_stable_id,
-            events=tuple(normalized_events),
+            events=normalized_events,
             source_locator=request_url,
             response_sha256=hashlib.sha256(payload.body).hexdigest(),
             response_bytes=len(payload.body),

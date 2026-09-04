@@ -86,3 +86,37 @@ The seal verifies, the packet contains no raw response body, and a comparison
 against the one admitted profile credential found zero credential-value
 matches. This attempt changes no application state and does not admit any axis
 for full-universe execution.
+
+## Known-Case Attempt 2
+
+The separately authorized paced run at `2026-09-04T14:19:17Z` was bound to
+commit `af80fe6008900c6e210dc79e80a6b2f7efaf2968`, the frozen spec digest, and
+the exact `14 Massive + 2 EODHD + 2 Nasdaq` envelope. It made all 18 requests,
+exactly once each. No redirect, retry, fallback, environment credential, or
+application write occurred.
+
+- Massive returned complete exact listing rows for all required state cases
+  except `ALTM`, which was absent from that exact lookup. It observed `LC`,
+  `ARCH`, `LTHM`, and `TA` inactive; `HAPN`, `CNR`, `AAPL`, and canonical
+  `SMCI` active. `LC` and `HAPN` retained the same non-null Composite FIGI,
+  while `ARCH` and `CNR` retained different FIGIs.
+- EODHD completed both bounded lists and partitioned every requested symbol:
+  `AAPL`, `CNR`, `HAPN`, and `SMCI` active; `ALTM`, `ARCH`, `LC`, `LTHM`, and
+  `TA` delisted. Nasdaq Trader again observed the four currently listed
+  controls across its two files.
+- These positive and negative controls pass the known-case listing-state gate.
+  This admits only a separately authorized full-universe listing-state census;
+  it does not change runtime authority or authorize a terminal transition.
+- The `LC` and `AAPL` Ticker Events requests returned successful Massive
+  envelopes but were rejected by ArkScope as `massive_event_ticker_invalid`.
+  Official Massive responses place each ticker on its timeline event and do
+  not expose the `results.ticker` field required by the original adapter. The
+  other three event requests returned the normalized `massive_not_found`
+  result. Therefore the ticker-change gate remains unadmitted.
+
+The provider response bodies were not retained, so the parser repair is owned
+by the official response-shape regression rather than reconstructed provider
+content. A later `LC` event revalidation is a new explicitly budgeted request,
+not a retry hidden inside this attempt. The `attempt-2/SHA256SUMS` seal verifies,
+and comparison against both admitted profile credential values found zero
+plaintext matches in the normalized packet.
