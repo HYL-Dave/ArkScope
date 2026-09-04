@@ -1,14 +1,17 @@
 # Security Lifecycle Provider Authority Shadow Census Design
 
-**Status:** Provider-free preflight and the separately authorized read-only
-Alpha Picks identity census are complete. Offline implementation, any
-credential read, provider request, further production database read or any
-production write, migration, runtime authority change, App restart, merge,
-and push remain separate gates.
+**Status:** Provider-free preflight, the separately authorized read-only Alpha
+Picks identity census, detached census implementation, profile-backed EODHD
+Settings field, and known-case attempt 1 are complete and merged through
+`483b0877`. Attempt 1 is insufficient for authority admission because neither
+active Massive control completed. A paced known-case rerun with an EODHD
+profile credential, any further production read or write, migration, runtime
+authority change, App restart, and push remain separate gates.
 
 **Date:** 2026-09-04
 
-**Base:** `a5b5b9eaac706139c0f28b33313aee1ae7ae2b7b`
+**Current merged implementation:**
+`483b0877cf9de1feab467f34b1cd583443e426bc`
 
 **Relationship to existing authority:** This document does not change the
 running lifecycle policy. It freezes the experiment required before deciding
@@ -80,6 +83,20 @@ credential has all-history access.
 This endpoint is a candidate authority for exact listing state and stable
 identity. It is not an old-to-new relationship by itself.
 
+Composite FIGI has a precise but bounded role. OpenFIGI defines it as an
+instrument-level aggregation across trading venues in one country or market,
+and its allocation rules state that the Composite and venue FIGIs remain
+unchanged through an equity ticker-symbol change. They also continue to exist
+after delisting and are never reused for another instrument. Consequently,
+matching non-null Composite FIGIs are primary evidence that two exact ticker
+rows refer to the same instrument; they are not evidence that the instrument
+is active, and an old inactive row does not reveal the replacement ticker by
+itself.
+
+Official contracts:
+`https://www.openfigi.com/api/documentation` and
+`https://www.openfigi.com/docs/figi-allocation-rules.pdf`.
+
 Official contract:
 `https://massive.com/docs/rest/stocks/tickers/all-tickers`.
 
@@ -97,8 +114,13 @@ mergers, and acquisitions, but the formal endpoint schema is the admission
 authority for this experiment. No result outside the formal `ticker_change`
 shape may be treated as a supported contract.
 
-This is one candidate source for same-security ticker changes. It is not
-pre-approved as authority for merger consideration or economic successors.
+This is one candidate-discovery source for same-security ticker changes. An
+event can nominate the exact old/new pair and effective date, but stable
+identity and current listing state must be checked independently. The endpoint
+is not pre-approved as identity authority, terminal authority, merger
+consideration, or an economic-successor source. Until another reviewed
+candidate-discovery mechanism exists, Composite FIGI cannot replace this
+operational role merely because a known oracle already supplies both tickers.
 
 Official contract:
 `https://massive.com/docs/rest/stocks/corporate-actions/ticker-events`.
@@ -138,9 +160,12 @@ Official contract:
 
 No formally documented Massive or EODHD endpoint found in this preflight
 provides a general old-security-to-new-security merger-conversion relation.
-There are two candidate symbol-change feeds, but only Massive is both included
-in all plans and already backed by an ArkScope profile credential. Neither may
-be presumed to resolve the known merger cases before measurement.
+Massive supplies a candidate ticker-change feed, while Composite FIGI supplies
+the stronger same-instrument check. Both roles are required for an end-to-end
+unknown ticker change unless a different reviewed discovery source is added.
+EODHD Symbol Change History is a second possible feed but remains paid and
+outside this run. None may be presumed to resolve the known merger cases before
+measurement.
 
 ## 4. Frozen Known-Case Oracle
 
@@ -148,7 +173,7 @@ The expected answers are fixed before any provider request:
 
 | Case | Required answer |
 | --- | --- |
-| `LC` | Return an exact same-security `ticker_change` from `LC` to active `HAPN`, with stable-identity agreement. |
+| `LC` | Discover an exact `ticker_change` candidate from `LC` to `HAPN`, then independently establish inactive `LC`, active `HAPN`, and matching non-null Composite FIGIs. The event discovers the pair; FIGI establishes same-instrument continuity. |
 | `ARCH` | Independently establish that the old `ARCH` security is terminal/inactive. Any observed relation to `CNR` is an acquisition/conversion classification, is not terminal evidence by itself, and must not create an identity alias. |
 | `LTHM` | Independently establish that the old `LTHM` security is terminal/inactive. Any observed relation to `ALTM` is an acquisition/conversion classification, is not terminal evidence by itself, and must not create an identity alias; `ALTM` is evaluated independently. |
 | `TA` | Establish terminal/inactive state without creating a successor alias. |
@@ -228,12 +253,13 @@ result is `ambiguous`; the runner must not spend another request by silently
 falling back to the potentially reused ticker identifier.
 
 The EODHD lane executes only after EODHD has a profile-database credential
-authority. The census resolves the key directly from that authority and never
-from `config/.env` or an ambient process variable. Until then, both planned
-requests resolve locally to `credential_unavailable` and make zero HTTP
-requests. The legacy environment client is prohibited. Whether the project's
-general explicit shell-environment escape hatch remains available to other
-EODHD call sites is a separate credential-authority decision.
+authority. That Settings field now exists as `eodhd.api_key`; it neither imports
+nor falls back to `config/.env`. The census resolves the key directly from that
+authority and never from an ambient process variable. Until a value is saved,
+both planned requests resolve locally to `credential_unavailable` and make
+zero HTTP requests. The legacy environment client is prohibited. Whether the
+project's general explicit shell-environment escape hatch remains available to
+other EODHD call sites is a separate credential-authority decision.
 
 ### 6.2 Paid EODHD history gate
 
@@ -258,6 +284,19 @@ The packet records only:
 It must not retain API keys, authorization headers, query strings containing a
 key, raw response bodies, provider user/account data, unrelated returned rows,
 or production database content.
+
+### 6.4 Attempt 1 ruling
+
+The first authorized run made 14 actual HTTP attempts: 12 Massive, zero EODHD,
+and two Nasdaq. Result rows with `attempts=0` are local skipped/ambiguous
+records, not requests. The first five Massive calls completed and the later
+seven attempts returned 4xx; the original packet retained only the status
+family. `LC` and `HAPN` were observed under the same Composite FIGI, and
+`ARCH`/`LTHM` were observed inactive. However, neither active Massive control
+(`AAPL`, `SMCI`) completed, no ticker-event request completed, and EODHD had no
+saved profile credential. The experiment therefore has no validated
+discrimination control and admits no authority axis. Its negative outcome is
+the intended fail-closed result, not a partial production admission.
 
 ## 7. Stage 3 Full-Universe Census
 
@@ -405,8 +444,9 @@ The census can produce three honest architectures:
    changes attended, with SEC/issuer documents as primary-source prompts and
    citations rather than mutation authority.
 2. **Listing status and exact same-security ticker change both pass.** Design a
-   structured provider-first authority with independent stable-identity
-   agreement and an active successor requirement for ticker changes only.
+   structured provider-first authority where an exact event discovers a
+   candidate pair, matching stable identity establishes continuity, and an
+   independently active successor is required for ticker changes only.
    Economic merger/acquisition successors remain separate securities and
    never become aliases. Acquisition alone neither terminates nor removes the
    tracked target; independently confirmed listing state controls terminal
@@ -419,12 +459,13 @@ incomplete provider response to authorize a rename or terminal retirement.
 
 ## 11. Explicit Non-Goals
 
-This preflight does not:
+The merged census infrastructure and attempt 1 do not:
 
 - change SEC candidate admission, extraction, translation, or the lifecycle UI;
-- add an EODHD credential or runtime provider;
-- call Massive, EODHD, Nasdaq, SEC, IBKR, or any model;
-- perform another production database read or any production write;
+- add EODHD to lifecycle runtime authority or allow environment fallback;
+- authorize another Massive, EODHD, Nasdaq, SEC, IBKR, or model call;
+- authorize another production database read or any production write;
 - delete the 36 observations or the known `ARCH`, `LTHM`, and `TA` histories;
-- change scheduler intervals, request budgets, or automation authority; or
-- authorize a migration, App restart, merge, or push.
+- change scheduler intervals, production request budgets, or automation
+  authority; or
+- authorize a migration, App restart, or push.
