@@ -11,6 +11,7 @@ import sys
 import pytest
 
 from data_sources.lifecycle_provider_census_transport import (
+    CensusTransportFailure,
     EodhdSymbolSetsResult,
     MassiveListingResult,
     MassiveTickerEventsResult,
@@ -65,6 +66,19 @@ class FakeResolver:
         return f"SENSITIVE_{provider.upper()}_KEY"
 
 
+class FakeClock:
+    def __init__(self) -> None:
+        self.value = 1.0
+        self.sleeps: list[float] = []
+
+    def __call__(self) -> float:
+        return self.value
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.value += seconds
+
+
 class FakeLiveTransport:
     _LISTINGS = {
         "LC": (False, "BBG000000LC", "2025-06-26"),
@@ -83,10 +97,12 @@ class FakeLiveTransport:
         *,
         missing_listing: str | None = None,
         eodhd_complete: bool = True,
+        failed_listing: str | None = None,
     ) -> None:
         self.calls: list[tuple[str, str]] = []
         self.missing_listing = missing_listing
         self.eodhd_complete = eodhd_complete
+        self.failed_listing = failed_listing
 
     @staticmethod
     def _payload(kind: str, identifier: str) -> bytes:
@@ -100,6 +116,8 @@ class FakeLiveTransport:
         budget.reserve_massive(
             ("listing", ticker, "true" if expected_active else "false")
         )
+        if ticker == self.failed_listing:
+            raise CensusTransportFailure("massive_rate_limited", status_code=429)
         body = self._payload("listing", ticker)
         budget.record_massive_body(len(body))
         if ticker == self.missing_listing:
@@ -362,6 +380,7 @@ def test_known_case_live_executes_exact_budget_and_seals_normalized_packet(
 ) -> None:
     resolver = FakeResolver()
     transport = FakeLiveTransport()
+    clock = FakeClock()
     packet = runner.run_census(
         mode="known-case-live",
         credential_resolver=resolver,
@@ -371,7 +390,8 @@ def test_known_case_live_executes_exact_budget_and_seals_normalized_packet(
         repository_state=runner.RepositoryState("a" * 40, True),
         output_dir=tmp_path,
         observation_timestamp="2026-09-04T01:02:03Z",
-        timer=lambda: 1.0,
+        timer=clock,
+        sleeper=clock.sleep,
     )
 
     assert resolver.calls == ["massive", "eodhd"]
@@ -393,6 +413,7 @@ def test_known_case_live_executes_exact_budget_and_seals_normalized_packet(
     assert len([call for call in transport.calls if call[0] == "massive_events"]) == 5
     assert len([call for call in transport.calls if call[0] == "eodhd"]) == 1
     assert len([call for call in transport.calls if call[0] == "nasdaq"]) == 2
+    assert clock.sleeps == [runner.MASSIVE_MIN_REQUEST_INTERVAL_SECONDS] * 13
     results = {row["case_id"]: row for row in packet["oracle"]["results"]}
     assert set(results) == {"AAPL", "ARCH", "LC", "LTHM", "SMCI", "TA"}
     assert all(row["outcome"] == "confirmed" for row in results.values())
@@ -408,6 +429,7 @@ def test_known_case_live_executes_exact_budget_and_seals_normalized_packet(
 def test_missing_eodhd_credential_skips_only_that_lane(tmp_path: Path) -> None:
     resolver = FakeResolver(missing=frozenset({"eodhd"}))
     transport = FakeLiveTransport()
+    clock = FakeClock()
     packet = runner.run_census(
         mode="known-case-live",
         credential_resolver=resolver,
@@ -416,7 +438,8 @@ def test_missing_eodhd_credential_skips_only_that_lane(tmp_path: Path) -> None:
         admitted_commit="a" * 40,
         repository_state=runner.RepositoryState("a" * 40, True),
         output_dir=tmp_path,
-        timer=lambda: 1.0,
+        timer=clock,
+        sleeper=clock.sleep,
     )
 
     assert packet["lanes"]["eodhd"] == {
@@ -436,6 +459,7 @@ def test_missing_eodhd_credential_skips_only_that_lane(tmp_path: Path) -> None:
 
 
 def test_live_exact_listing_absence_is_not_positive_authority(tmp_path: Path) -> None:
+    clock = FakeClock()
     packet = runner.run_census(
         mode="known-case-live",
         credential_resolver=FakeResolver(),
@@ -444,7 +468,8 @@ def test_live_exact_listing_absence_is_not_positive_authority(tmp_path: Path) ->
         admitted_commit="a" * 40,
         repository_state=runner.RepositoryState("a" * 40, True),
         output_dir=tmp_path,
-        timer=lambda: 1.0,
+        timer=clock,
+        sleeper=clock.sleep,
     )
 
     observation = next(
@@ -458,6 +483,7 @@ def test_live_exact_listing_absence_is_not_positive_authority(tmp_path: Path) ->
 
 
 def test_live_incomplete_eodhd_partition_is_ambiguous(tmp_path: Path) -> None:
+    clock = FakeClock()
     packet = runner.run_census(
         mode="known-case-live",
         credential_resolver=FakeResolver(),
@@ -466,7 +492,8 @@ def test_live_incomplete_eodhd_partition_is_ambiguous(tmp_path: Path) -> None:
         admitted_commit="a" * 40,
         repository_state=runner.RepositoryState("a" * 40, True),
         output_dir=tmp_path,
-        timer=lambda: 1.0,
+        timer=clock,
+        sleeper=clock.sleep,
     )
 
     observation = next(
@@ -475,6 +502,34 @@ def test_live_incomplete_eodhd_partition_is_ambiguous(tmp_path: Path) -> None:
         if row["provider"] == "eodhd"
     )
     assert observation["result_code"] == "ambiguous"
+
+
+def test_live_failure_retains_only_normalized_failure_code(tmp_path: Path) -> None:
+    clock = FakeClock()
+    packet = runner.run_census(
+        mode="known-case-live",
+        credential_resolver=FakeResolver(),
+        transport=FakeLiveTransport(failed_listing="CNR"),
+        acknowledgement=_ack(),
+        admitted_commit="a" * 40,
+        repository_state=runner.RepositoryState("a" * 40, True),
+        output_dir=tmp_path,
+        timer=clock,
+        sleeper=clock.sleep,
+    )
+
+    observation = next(
+        row
+        for row in packet["request_observations"]
+        if row["provider"] == "massive"
+        and row["endpoint_family"] == "all_tickers"
+        and row["requested_identifiers"] == ["CNR"]
+    )
+    assert observation["http_status_family"] == "4xx"
+    assert observation["result_code"] == "provider_unavailable"
+    assert observation["parsed_fields"] == {
+        "failure_code": "massive_rate_limited"
+    }
 
 
 def test_unexpected_credential_resolver_failure_is_not_reported_as_missing(
@@ -561,7 +616,14 @@ def test_packet_seal_is_create_only_and_verifies_every_output(tmp_path: Path) ->
         runner.seal_packet(output_dir=tmp_path, files=(packet_path,))
 
 
-def test_fixture_cli_prints_json_without_writing_live_packet(tmp_path: Path) -> None:
+def test_fixture_cli_prints_json_without_modifying_live_packet(tmp_path: Path) -> None:
+    packet_paths = tuple(
+        RUNNER_PATH.parent / name
+        for name in (runner.SUMMARY_NAME, runner.SEAL_NAME)
+    )
+    before = {
+        path: path.read_bytes() if path.exists() else None for path in packet_paths
+    }
     result = subprocess.run(
         [sys.executable, str(RUNNER_PATH), "--mode", "fixture-replay"],
         cwd=tmp_path,
@@ -571,8 +633,9 @@ def test_fixture_cli_prints_json_without_writing_live_packet(tmp_path: Path) -> 
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["mode"] == "fixture-replay"
-    assert not (RUNNER_PATH.parent / "census-summary.json").exists()
-    assert not (RUNNER_PATH.parent / "SHA256SUMS").exists()
+    assert {
+        path: path.read_bytes() if path.exists() else None for path in packet_paths
+    } == before
 
 
 def test_readme_states_lane_and_negative_result_contracts() -> None:
