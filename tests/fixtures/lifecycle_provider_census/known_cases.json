@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "cases": [
+    {"case_id": "LC", "source": "LC", "successor": "HAPN", "terminal": false},
+    {"case_id": "ARCH", "source": "ARCH", "successor": null, "terminal": true},
+    {"case_id": "LTHM", "source": "LTHM", "successor": null, "terminal": true},
+    {"case_id": "TA", "source": "TA", "successor": null, "terminal": true},
+    {"case_id": "AAPL", "source": "AAPL", "successor": null, "terminal": false},
+    {"case_id": "SMCI", "source": "SMCI", "successor": null, "terminal": false}
+  ]
+}
