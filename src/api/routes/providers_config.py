@@ -42,7 +42,9 @@ from src.env_keys import ensure_env_loaded, peek_env_file_value
 
 router = APIRouter(tags=["providers"])
 
+# EODHD live validation is reserved for the separately bounded lifecycle census.
 _TESTABLE = {"ibkr", MASSIVE_CONFIG_PROVIDER, "finnhub", "fred", "sec_edgar"}
+_CENSUS_ONLY = frozenset(("eodhd",))
 
 
 def get_data_provider_store_lenient() -> DataProviderConfigStore | None:
@@ -355,6 +357,11 @@ def test_provider(
     require_provider_config_ready("provider_test")
     if provider not in PROVIDER_FIELDS:
         raise HTTPException(status_code=404, detail=f"unknown provider {provider!r}")
+    if provider in _CENSUS_ONLY:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "provider_test_census_only", "provider": provider},
+        )
     try:
         require_provider_configured(provider, store)
     except ProviderConfigMissing as exc:

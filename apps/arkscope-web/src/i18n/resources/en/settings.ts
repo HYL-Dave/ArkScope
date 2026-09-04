@@ -516,6 +516,7 @@ const settings = {
     providers: {
       names: {
         massive: "Massive",
+        eodhd: "EODHD",
         finnhub: "Finnhub",
         fred: "FRED",
         financialDatasets: "Financial Datasets (paid)",
@@ -568,6 +569,7 @@ const settings = {
         importValue: "Import",
         defaultAvailable: "No key required · Available by default",
         testUnavailable: "Unavailable (pay per request)",
+        eodhdCensusValidationOnly: "EODHD live validation runs only through the bounded lifecycle census.",
         pasteKey: "Paste key...",
         clientIdsEnvironmentControlled: "Per-domain client IDs (controlled by environment):",
         clientIdsAfterSave: "IDs after save:",

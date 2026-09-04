@@ -98,6 +98,16 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             env_file_runtime_fallback=False,
         )
     ],
+    "eodhd": [
+        FieldDef(
+            "api_key",
+            "EODHD_API_KEY",
+            True,
+            "API key",
+            env_file_importable=False,
+            env_file_runtime_fallback=False,
+        ),
+    ],
     "finnhub": [FieldDef("api_key", "FINNHUB_API_KEY", True, "API key")],
     "fred": [FieldDef("api_key", "FRED_API_KEY", True, "API key")],
     "financial_datasets": [

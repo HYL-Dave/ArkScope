@@ -515,6 +515,7 @@ const settings = {
     providers: {
       names: {
         massive: "Massive",
+        eodhd: "EODHD",
         finnhub: "Finnhub",
         fred: "FRED",
         financialDatasets: "Financial Datasets（付費）",
@@ -567,6 +568,7 @@ const settings = {
         importValue: "匯入",
         defaultAvailable: "免金鑰 · 預設可用",
         testUnavailable: "不提供（按次計費）",
+        eodhdCensusValidationOnly: "EODHD 即時驗證僅透過有限額的生命週期普查執行。",
         pasteKey: "貼上金鑰…",
         clientIdsEnvironmentControlled: "各域用戶端 ID（環境變數控制中）：",
         clientIdsAfterSave: "存檔後 ID：",

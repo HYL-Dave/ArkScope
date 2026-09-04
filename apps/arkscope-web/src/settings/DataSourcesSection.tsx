@@ -34,6 +34,7 @@ import {
   providerKeySourceLabel,
   providerName,
   providerTestCopy,
+  providerTestUnavailableCopy,
   scheduleOutcomeCopy,
   settingsErrorPresentation,
 } from "./settingsBackendCopy";
@@ -764,7 +765,7 @@ export function DataSourcesSection({
                                 </>
                               ) : (
                                 <span className="muted tiny">
-                                  {t(($) => $.dataSources.providers.config.testUnavailable)}
+                                  {providerTestUnavailableCopy(pid, t)}
                                 </span>
                               )}
                             </div>
@@ -872,7 +873,7 @@ export function DataSourcesSection({
                             </>
                           ) : (
                             <span className="muted tiny">
-                              {t(($) => $.dataSources.providers.config.testUnavailable)}
+                              {providerTestUnavailableCopy(pid, t)}
                             </span>
                           )}
                         </td>
