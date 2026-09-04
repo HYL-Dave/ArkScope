@@ -522,6 +522,32 @@ def test_massive_rejects_malformed_json_without_retaining_raw_body():
     assert_closed_failure(caught.value, "massive_invalid_json", raw_marker)
 
 
+def test_massive_normalizes_oversized_integer_json_value_error():
+    body = b'{"status":"OK","results":[],"provider_value":' + b"9" * 5000 + b"}"
+    response = FakeResponse(body=body, headers={"Content-Type": "application/json"})
+    transport = LifecycleProviderCensusTransport(session=FakeSession([response]))
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_massive_listing(
+            "ARCH", expected_active=False, api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "massive_invalid_json")
+
+
+def test_massive_normalizes_deep_json_recursion_error():
+    body = b"[" * 2000 + b"0" + b"]" * 2000
+    response = FakeResponse(body=body, headers={"Content-Type": "application/json"})
+    transport = LifecycleProviderCensusTransport(session=FakeSession([response]))
+
+    with pytest.raises(CensusTransportFailure) as caught:
+        transport.fetch_massive_listing(
+            "ARCH", expected_active=False, api_key="secret", budget=budget()
+        )
+
+    assert_closed_failure(caught.value, "massive_invalid_json")
+
+
 def test_massive_enforces_one_mib_response_and_fourteen_mib_aggregate_caps():
     oversized = FakeResponse(
         headers={
