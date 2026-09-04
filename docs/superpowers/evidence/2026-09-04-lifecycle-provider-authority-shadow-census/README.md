@@ -162,3 +162,35 @@ Post-correction verification is `256` focused tests and `5709 passed / 12
 skipped` for the complete backend suite. The RED owner first failed with the
 old `2026-06-27` oracle and `contradicted` outcome before the implementation
 was corrected.
+
+## Full-Universe Manifest
+
+The separately authorized read-only snapshot at `2026-09-04T15:10:49Z` was
+bound to implementation commit `f931cd1b40ac8c6a3a6048571a61fdd32cbc1ff8`
+and spec digest
+`e3f751b7d5780836d79a27097c95bf793a55dc5afedc4567fc7ed1a91c0d3faf`.
+It opened the explicit profile and Alpha Picks databases through the existing
+SQLite `mode=ro` and `query_only=ON` projection. Both database file digests
+were unchanged before and after the run. No credential resolver, provider
+transport, HTTP request, retry, fallback, or application write occurred.
+
+The fresh projection contains 186 sorted unique symbols. Aggregate source
+membership counts are 148 manual-list, 10 open-portfolio, 45 current Alpha
+Picks, 56 former Alpha Picks, and zero legacy-seed memberships. A symbol may
+belong to more than one source, so these counts intentionally do not sum to
+186. There were no source warnings and exactly one reviewed provider spelling
+override.
+
+The exact active-pass envelope derived from the sealed manifest is 186
+Massive exact-listing requests, two EODHD list requests, and two Nasdaq Trader
+directory requests: 190 HTTP attempts in total, with zero retry or fallback.
+That envelope is recorded as `not_authorized`; this manifest run executed none
+of it. Inactive/event requests are not included and remain a later,
+missing-subset authorization boundary.
+
+The exact ticker/source rows and their seal remain in the git-ignored profile
+data boundary with directory/file modes `0700/0600`. The tracked
+`universe-manifest/` packet contains only aggregate values and cryptographic
+digests, and its seal verifies. Verification after adding the manifest mode
+was 266 focused tests and `5720 passed / 12 skipped` for the complete backend
+suite.
