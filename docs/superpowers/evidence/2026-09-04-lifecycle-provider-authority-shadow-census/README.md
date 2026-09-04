@@ -41,3 +41,37 @@ pytest -q tests/test_security_lifecycle_provider_census.py \
 python docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census/run_census.py \
   --mode fixture-replay
 ```
+
+## Known-Case Attempt 1
+
+The separately authorized run at `2026-09-04T12:11:11Z` was bound to commit
+`a4c0605957e5885e6d347fddf19864359cd17894` and the spec digest recorded in
+`census-summary.json`. It made 14 HTTP attempts: 12 Massive, zero EODHD, and
+two Nasdaq Trader requests.
+
+- Massive exact listing rows confirmed `ARCH` and `LTHM` inactive. `LC` was
+  inactive and `HAPN` active under the same Composite FIGI, but the required
+  ticker-event request did not complete, so no ticker-change authority was
+  established.
+- `TA`, `AAPL`, and `SMCI` remained ambiguous because their listing requests
+  did not complete. The aggregate oracle therefore produced two `confirmed`
+  and four `ambiguous` results.
+- The EODHD profile field was absent. The lane recorded
+  `credential_unavailable` and made zero EODHD requests; it did not consult an
+  environment variable.
+- Nasdaq Trader completed both directory requests and observed `AAPL`, `HAPN`,
+  and `SMCI` in the Nasdaq file and `CNR` in the other-listed file.
+
+The first five Massive requests completed and every later attempted Massive
+request returned a 4xx status family. The packet intentionally retained only
+the status family, so it does not prove the exact HTTP status. This sequence is
+consistent with the official Stocks Basic limit of five API calls per minute:
+<https://massive.com/pricing?product=stocks>. It must not be interpreted as
+Ticker Events coverage or entitlement evidence. Before another authorized
+attempt, the runner needs pre-request pacing and must retain the normalized
+local failure code without retaining response text.
+
+The seal verifies, the packet contains no raw response body, and a comparison
+against the one admitted profile credential found zero credential-value
+matches. This attempt changes no application state and does not admit any axis
+for full-universe execution.
