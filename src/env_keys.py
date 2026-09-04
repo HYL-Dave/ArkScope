@@ -23,6 +23,7 @@ _loaded_keys: set = set()
 # operator-selected migration can inspect them. Runtime loading, Settings peeks,
 # and fallback reloads must never make them credential authority again.
 _PERMANENTLY_EXCLUDED_FILE_KEYS = frozenset({
+    "EODHD_API_KEY",
     "MASSIVE_API_KEY",
     "POLYGON_API_KEY",
 })

@@ -274,6 +274,21 @@ def test_eodhd_config_file_is_not_a_runtime_fallback(store, monkeypatch, tmp_pat
     assert "eodhd" not in store.get_all()
 
 
+def test_eodhd_config_file_is_excluded_from_plain_env_loading(monkeypatch, tmp_path):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("EODHD_API_KEY=file-secret\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+
+    env_keys.ensure_env_loaded()
+
+    assert "EODHD_API_KEY" not in os.environ
+    assert "EODHD_API_KEY" not in env_keys.keys_loaded_from_file()
+
+
 def test_massive_env_resolution_never_revives_legacy_polygon_alias(monkeypatch):
     assert dpc.PROVIDER_FIELDS["massive"][0].env_var == "MASSIVE_API_KEY"
     monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
