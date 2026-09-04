@@ -466,7 +466,14 @@ Expected: FAIL because the detached runner does not exist.
 - [ ] **Step 3: Implement explicit modes and hard stops**
 
 ```python
-MODES = ("dry-run", "fixture-replay", "known-case-live", "universe-manifest")
+MODES = (
+    "dry-run",
+    "fixture-replay",
+    "known-case-live",
+    "ticker-event-revalidation",
+    "universe-manifest",
+    "universe-active-pass",
+)
 
 
 def run_census(*, mode: str, credential_resolver, transport=None) -> dict[str, object]:
@@ -643,18 +650,44 @@ The sealed 2026-09-04 manifest contains `N = 186`; the exact stopped envelope
 is therefore 186 Massive + 2 EODHD + 2 Nasdaq = 190 HTTP attempts. No request
 in that envelope has been authorized or executed.
 
-- [ ] **Step 4: Run and seal only the active pass**
+- [x] **Step 4: Implement resumable active-pass admission RED-first**
 
-Produce the exact missing/ambiguous subset and digest. Stop without querying
-inactive status or events.
+Freeze `N + 3` work items with an `N + 4` HTTP ceiling. Persist a create-only
+intent before each dispatch and a create-only result afterward. An orphan
+intent is closed as `dispatch_outcome_unknown` and is never reissued. A 429
+closes that task, pauses immediately, and permits a later continuation only
+after the cooling interval. Missing credentials pause before intent creation.
 
-- [ ] **Step 5: Stop for missing-subset authorization**
+Own these failure modes with positive controls:
+
+- wrong acknowledgement, dirty commit, broken source seal, or altered plan or
+  result fails before another provider call;
+- a rate-limited task is called once across two invocations while later tasks
+  complete on resume;
+- a process death after intent causes one unknown result and no second call;
+- no public output exists while a work item remains open; and
+- completion emits only aggregate public data and explicitly performs no
+  lifecycle inference.
+
+The reviewed `BRK B -> BRK.B` mapping applies only to Massive. EODHD and Nasdaq
+must record that provider identity as unresolved instead of guessing a
+provider spelling or aborting the batch. Keep the known-case Massive ceiling
+at 14 by using independent one-request budgets for active-pass rows.
+
+- [ ] **Step 5: Separately authorize, run, and seal only the active pass**
+
+Execute the exact sealed plan. Produce the exact missing/ambiguous subset and
+digest only after every work item has a closed result. Stop without querying
+inactive status or events. The 186-row manifest's 190-request envelope remains
+unauthorized until this separate gate is granted.
+
+- [ ] **Step 6: Stop for missing-subset authorization**
 
 Let `M` be exact inactive candidates and `K` be exact stable-identifier event
 candidates after review. Authorize at most `M + K` additional Massive requests;
 do not request events for ordinary active symbols.
 
-- [ ] **Step 6: Run the conditional pass and summarize disagreement**
+- [ ] **Step 7: Run the conditional pass and summarize disagreement**
 
 Classify exact agreement, contradiction, coverage limitation, and ambiguity.
 Never turn absence from one provider into delisting.
@@ -754,5 +787,5 @@ scheduler.
 - Placeholder scan: all output paths, modes, result values, and request limits
   are explicit; there are no unresolved implementation markers.
 - Type consistency: `CensusObservation`, `CensusCaseResult`,
-  `CensusRequestBudget`, and the four runner modes are introduced once and used
+  `CensusRequestBudget`, and the six runner modes are introduced once and used
   consistently by later tasks.

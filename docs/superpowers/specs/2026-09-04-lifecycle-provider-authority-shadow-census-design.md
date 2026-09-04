@@ -2,18 +2,18 @@
 
 **Status:** Provider-free preflight, the separately authorized read-only Alpha
 Picks identity census, detached census implementation, profile-backed EODHD
-Settings field, two known-case attempts, and the separately authorized one-call
-ticker-event revalidation are complete. Attempt 2 passes the listing-state gate
-with active and inactive controls across Massive, EODHD, and Nasdaq. The
-revalidation returned exact `LC -> HAPN` on `2026-06-22`, so the corrected
-official-shape parser passes its live known-case gate. Any full-universe read,
+Settings field, two known-case attempts, the one-call ticker-event
+revalidation, and the read-only full-universe manifest are complete. The
+resumable active-pass executor is implemented and tested, but its 190-request
+provider envelope remains unauthorized and unexecuted. Any provider execution,
 production write, migration, runtime authority change, App restart, and push
 remain separate gates.
 
 **Date:** 2026-09-04
 
 **Current merged implementation:**
-`bc42e1376bbbe55f3be3b290bc5f6d47e83f0991`
+`bc916deffe69904ef6612fe9acf229ee4bdb5c0c`; the active-pass admission work
+described below remains isolated until separately reviewed and merged.
 
 **Relationship to existing authority:** This document does not change the
 running lifecycle policy. It freezes the experiment required before deciding
@@ -409,10 +409,59 @@ The manifest step performs zero provider and credential access and leaves the
 active pass explicitly unauthorized. If its exact count is `N`, the next
 active-pass envelope is exactly `N` Massive attempts, two EODHD attempts, and
 two Nasdaq attempts (`N + 4` total), with zero retry or fallback. The existing
-known-case transport ceiling of 14 Massive attempts is not sufficient for a
-full-universe run; a later RED-first active-pass implementation must make the
-manifest-bound `N` an instance limit without weakening the 14-request
-known-case gate.
+known-case transport ceiling of 14 Massive attempts remains unchanged. The
+active pass instead creates one independent one-request Massive budget for
+each manifest row, one two-request EODHD budget, and two independent
+one-request Nasdaq budgets.
+
+### 7.1 Read-admission addendum
+
+The original sealed manifest attestation is immutable. A separately sealed
+addendum binds its digest and records the exact repository-owner instruction
+that admitted only the full-universe read-only manifest and exact request
+budget. It explicitly records that no provider call was admitted.
+
+The addendum also closes the sole identifier override: internal `BRK B` is
+preserved, while Massive alone receives its reviewed class-share spelling.
+The reason code is `provider_class_share_spelling`. No EODHD or Nasdaq spelling
+was reviewed for that row, so those two provider identities remain explicitly
+unresolved. The row is neither guessed, silently dropped, nor allowed to stop
+the rest of a pass.
+
+### 7.2 Resumable active-pass contract
+
+For the sealed 186-row manifest, the executor freezes 189 work items before
+network access: 186 one-request Massive exact-active tasks, one two-request
+EODHD active/delisted task, and two one-request Nasdaq directory tasks. Their
+conservative HTTP ceiling is exactly 190. The plan binds the current spec,
+admitted commit, private manifest, public attestation, read-admission addendum,
+task order, task digest, and provider-identity exclusions.
+
+The private checkpoint is append-only at the task level:
+
+1. seal the immutable plan before credential or provider access;
+2. write and fsync a create-only dispatch intent before a provider call;
+3. write and fsync one create-only closed result after the call;
+4. never issue a task whose intent already exists; and
+5. if a prior process left an intent without a result, close it as
+   `dispatch_outcome_unknown`, conservatively charge its whole task budget, and
+   never reissue it.
+
+Only one process may own the checkpoint. Massive dispatch starts remain at
+least 12.5 seconds apart across both a running process and a resumed process.
+A 429 is persisted as the task's closed result and stops the run immediately.
+The same task is never retried; after a 60-second cooling interval, a later
+invocation resumes with the next unopened task. The paused response exposes
+the exact `resume_not_before` timestamp. A missing profile credential pauses
+before writing an intent and can resume after the credential is saved.
+
+No private final packet or public summary may exist while any work item lacks a
+closed result. Once all items are closed, including explicit failed or unknown
+results, the private packet freezes the exact missing/ambiguous subset and its
+digest. The tracked summary contains only aggregate counts and digests. Both
+are labeled `review_required_no_lifecycle_inference`; completion does not
+authorize an inactive query, Ticker Events query, identity transition,
+terminal decision, or application write.
 
 ## 8. Alpha Picks Identity Feasibility Result
 

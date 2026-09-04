@@ -28,6 +28,11 @@ application database.
   credential or creates a transport, and emits a private `0700/0600` manifest
   plus a ticker-free public attestation. It does not authorize or execute the
   derived provider budget.
+- `universe-active-pass`: consumes that sealed private manifest, its public
+  attestation, and the separately sealed read-admission addendum. It requires a
+  new exact spec/source/commit/budget acknowledgement and writes an append-only
+  private checkpoint before making any request. This mode is implemented but
+  its provider envelope has not been authorized or executed.
 
 Each provider lane records whether it executed and an exact skip reason. A
 negative oracle result is a successful experiment outcome: it rejects the
@@ -194,3 +199,38 @@ data boundary with directory/file modes `0700/0600`. The tracked
 digests, and its seal verifies. Verification after adding the manifest mode
 was 266 focused tests and `5720 passed / 12 skipped` for the complete backend
 suite.
+
+The original attestation remains byte-for-byte unchanged. The sealed
+`universe-manifest-read-admission/` addendum records that the repository owner
+explicitly admitted the read-only full-universe manifest and exact request
+budget, while admitting no provider call. It also records why the sole Massive
+identifier differs (`provider_class_share_spelling`) and that the corresponding
+EODHD and Nasdaq identities remain unresolved rather than guessed.
+
+## Full-Universe Active-Pass Admission
+
+The sealed 186-row source produces 189 immutable work items with a conservative
+ceiling of 190 HTTP attempts: 186 Massive, two EODHD, and two Nasdaq. Every
+dispatch is preceded by a create-only intent and followed by one create-only
+result. A process interruption after intent becomes
+`dispatch_outcome_unknown` on resume and that task is never called again. A
+429 closes its task and pauses immediately; continuation after the cooling
+interval starts with the next unopened task. Missing credentials pause before
+an intent is written.
+
+The checkpoint stays in the ignored profile-data boundary. Until every work
+item has a closed result, the runner creates no private final packet, no public
+summary, and no missing-subset inference. Completion creates an aggregate-only
+tracked packet labeled `review_required_no_lifecycle_inference`; inactive and
+Ticker Events calls remain a later authorization boundary.
+
+No active-pass provider request has been authorized or executed as part of
+this implementation. The exact acknowledgement for a future run is generated
+from the then-current spec digest, admitted clean commit, and sealed private
+manifest digest; it must not be copied from this README.
+
+Admission verification completed with 281 focused provider-census tests and
+`5734 passed / 12 skipped / 3 warnings` for the complete backend suite. Reverse
+mutations proved that the resume owners reject reissuing a closed task and that
+the provider-identity owner rejects sending the Massive-only class-share
+spelling through EODHD or Nasdaq.
