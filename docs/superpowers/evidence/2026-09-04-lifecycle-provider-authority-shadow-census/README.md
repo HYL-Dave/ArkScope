@@ -51,9 +51,12 @@ The separately authorized run at `2026-09-04T12:11:11Z` was bound to commit
 two Nasdaq Trader requests.
 
 - Massive exact listing rows confirmed `ARCH` and `LTHM` inactive. `LC` was
-  inactive and `HAPN` active under the same Composite FIGI, but the required
-  ticker-event request did not complete, so no ticker-change authority was
-  established.
+  inactive and `HAPN` active under the same Composite FIGI. OpenFIGI's
+  allocation rules make that strong same-instrument continuity evidence, but
+  the required ticker-event request did not complete. The attempt therefore
+  validated a known candidate pair without validating how ArkScope would
+  discover an unknown replacement ticker; no end-to-end ticker-change
+  authority was established.
 - `TA`, `AAPL`, and `SMCI` remained ambiguous because their listing requests
   did not complete. The aggregate oracle therefore produced two `confirmed`
   and four `ambiguous` results.
@@ -62,6 +65,13 @@ two Nasdaq Trader requests.
   environment variable.
 - Nasdaq Trader completed both directory requests and observed `AAPL`, `HAPN`,
   and `SMCI` in the Nasdaq file and `CNR` in the other-listed file.
+
+Neither active Massive control (`AAPL` or `SMCI`) completed. Although the
+Nasdaq directory observed both, this attempt did not demonstrate that the
+candidate Massive listing-state method distinguishes an independently active
+security from an inactive one. `ARCH` and `LTHM` are useful observations, not
+admission of terminal authority. The whole first attempt is therefore
+insufficient rather than partially passing an authority axis.
 
 The first five Massive requests completed and every later attempted Massive
 request returned a 4xx status family. The packet intentionally retained only
