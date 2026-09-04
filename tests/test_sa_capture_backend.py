@@ -196,6 +196,50 @@ def test_failure_rolls_back_and_records_failure_meta(backend):
     assert meta["row_count"] == 1
 
 
+def test_apply_sa_refresh_separates_provider_marker_from_canonical_symbol(backend):
+    raw_data = {
+        "cells": ["", "SMCI*", "11/15/2022", "10/30/2024", "301.41%"],
+    }
+
+    assert backend.apply_sa_refresh(
+        "closed",
+        [
+            _pick(
+                "SMCI*",
+                picked="2022-11-15",
+                closed_date="2024-10-30",
+                raw_data=raw_data,
+            ),
+            _pick("BRK.B", picked="2024-01-02", closed_date="2025-01-02"),
+        ],
+        T1,
+        T1,
+    ) == 2
+
+    rows = {row["symbol"]: row for row in backend.query_sa_picks("closed")}
+    assert set(rows) == {"BRK.B", "SMCI"}
+    assert backend.get_sa_pick_detail("SMCI", "2022-11-15")["raw_data"] == raw_data
+
+    with sqlite3.connect(backend._sa_db) as conn:
+        lineage_keys = {
+            row[0]
+            for row in conn.execute(
+                "SELECT symbol_key FROM sa_pick_lineages ORDER BY symbol_key"
+            )
+        }
+    assert lineage_keys == {"BRK.B", "SMCI"}
+
+
+def test_apply_sa_refresh_rejects_ambiguous_repeated_provider_marker(backend):
+    with pytest.raises(ValueError, match="Alpha Picks refresh requires a valid symbol"):
+        backend.apply_sa_refresh(
+            "closed",
+            [_pick("SMCI**", closed_date="2024-10-30")],
+            T1,
+            T1,
+        )
+
+
 # --- (6) get_sa_refresh_meta: TEXT passthrough (the .isoformat() fix) --------------
 
 

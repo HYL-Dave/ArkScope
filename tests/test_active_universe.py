@@ -15,6 +15,7 @@ import pytest
 from src import sa_capture_store
 from src.portfolio_state import PortfolioStore
 from src.profile_state import ProfileStateStore, UniverseSourceAnnotation
+from src.tools.backends.sa_capture_backend import SACaptureBackend
 
 
 NOW = datetime(2026, 7, 19, 12, 0, 0, tzinfo=timezone.utc)
@@ -465,6 +466,67 @@ def test_former_alpha_pick_crosses_real_news_and_price_scope_consumers(
 
     assert result == {"status": "captured"}
     assert observed["raw"] == ["FORMER"]
+
+
+def test_provider_marked_former_pick_merges_with_manual_identity_for_consumers(
+    databases,
+    monkeypatch,
+    tmp_path,
+):
+    import src.collectors.polygon_news as massive_news
+    import src.market_data_direct as market_data_direct
+
+    databases.profile.import_lists(
+        [{"name": "Core", "tickers": ["SMCI"]}]
+    )
+    backend = SACaptureBackend(
+        sa_db=str(databases.sa_path),
+        market_db=str(tmp_path / "market_data.db"),
+        base_path=tmp_path,
+    )
+    backend.apply_sa_refresh(
+        "closed",
+        [
+            {
+                "symbol": "SMCI*",
+                "company": "Super Micro Computer",
+                "picked_date": "2022-11-15",
+                "closed_date": "2024-10-30",
+                "raw_data": {"cells": ["", "SMCI*", "11/15/2022"]},
+            }
+        ],
+        NOW_TEXT,
+        NOW_TEXT,
+    )
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(databases.profile_path))
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(databases.sa_path))
+
+    snapshot = _snapshot(databases)
+    assert snapshot.tickers == ("SMCI",)
+    assert snapshot.sources_by_ticker == {
+        "SMCI": tuple(sorted(("manual_lists", FORMER_SA_SOURCE))),
+    }
+    assert massive_news.load_tickers(scope="active-universe") == ["SMCI"]
+
+    observed: dict[str, object] = {}
+
+    def capture_price_scope(**kwargs):
+        observed.update(kwargs)
+        return {"status": "captured"}
+
+    monkeypatch.setattr(
+        market_data_direct,
+        "_run_backfill_body",
+        capture_price_scope,
+    )
+    market_data_direct.backfill_prices_direct(
+        provider="polygon",
+        polygon_src=object(),
+        db_path=str(tmp_path / "market_data.db"),
+        today=NOW.date(),
+        acquire_gateway_lock=False,
+    )
+    assert observed["raw"] == ["SMCI"]
 
 
 def test_alpha_latest_refresh_failure_warns_without_withdrawing_facts(databases):

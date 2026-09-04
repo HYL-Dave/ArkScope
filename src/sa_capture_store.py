@@ -38,7 +38,8 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-SCHEMA_VERSION = 2
+_SCHEMA_VERSION_V2 = 2
+SCHEMA_VERSION = 3
 USE_LOCAL_SA_KEY = "use_local_sa"  # profile_settings key for the persisted flip toggle
 
 
@@ -92,6 +93,18 @@ def canon_date(value) -> Optional[str]:
 def now_ts() -> str:
     """The canonical 'now' string (replaces SQL NOW())."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def canon_sa_pick_symbol(value: object) -> Optional[str]:
+    """Separate an Alpha Picks source marker from the tradable symbol identity."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().upper()
+    if normalized.endswith("*"):
+        normalized = normalized[:-1]
+    if not normalized or "*" in normalized:
+        return None
+    return normalized
 
 
 # --- schema ----------------------------------------------------------------------
@@ -353,6 +366,42 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 """
 
+_V3_SYMBOL_IDENTITY_TRIGGER_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TRIGGER IF NOT EXISTS sa_pick_lineages_reject_provider_marker_insert
+    BEFORE INSERT ON sa_pick_lineages
+    WHEN instr(NEW.symbol_key, '*') > 0
+    BEGIN
+        SELECT RAISE(ABORT, 'Alpha Picks symbol identity contains provider marker');
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS sa_pick_lineages_reject_provider_marker_update
+    BEFORE UPDATE OF symbol_key ON sa_pick_lineages
+    WHEN instr(NEW.symbol_key, '*') > 0
+    BEGIN
+        SELECT RAISE(ABORT, 'Alpha Picks symbol identity contains provider marker');
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS sa_alpha_picks_reject_provider_marker_insert
+    BEFORE INSERT ON sa_alpha_picks
+    WHEN instr(NEW.symbol, '*') > 0
+    BEGIN
+        SELECT RAISE(ABORT, 'Alpha Picks symbol identity contains provider marker');
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS sa_alpha_picks_reject_provider_marker_update
+    BEFORE UPDATE OF symbol ON sa_alpha_picks
+    WHEN instr(NEW.symbol, '*') > 0
+    BEGIN
+        SELECT RAISE(ABORT, 'Alpha Picks symbol identity contains provider marker');
+    END
+    """,
+)
+_SCHEMA += ";\n".join(_V3_SYMBOL_IDENTITY_TRIGGER_STATEMENTS) + ";\n"
+
 
 _V1_TO_V2_STATEMENTS: tuple[str, ...] = (
     """
@@ -567,7 +616,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version == SCHEMA_VERSION:
+        if version in {_SCHEMA_VERSION_V2, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != 1:
@@ -616,6 +665,82 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
 
         conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+            (_SCHEMA_VERSION_V2, now_ts()),
+        )
+        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION_V2}")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
+    """Atomically remove provider marker suffixes from persisted ticker identity."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version == SCHEMA_VERSION:
+            conn.commit()
+            return
+        if version != _SCHEMA_VERSION_V2:
+            raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+
+        lineage_updates: list[tuple[str, int]] = []
+        for lineage_id, symbol_key, picked_date in conn.execute(
+            "SELECT lineage_id, symbol_key, picked_date FROM sa_pick_lineages "
+            "WHERE instr(symbol_key, '*') > 0 ORDER BY lineage_id"
+        ):
+            canonical = canon_sa_pick_symbol(symbol_key)
+            if canonical is None or canonical == symbol_key:
+                raise RuntimeError("invalid Alpha Picks provider-marked lineage symbol")
+            collision = conn.execute(
+                "SELECT lineage_id FROM sa_pick_lineages "
+                "WHERE symbol_key=? AND picked_date=? AND lineage_id<>?",
+                (canonical, picked_date, lineage_id),
+            ).fetchone()
+            if collision is not None:
+                raise RuntimeError("Alpha Picks canonical symbol collision")
+            lineage_updates.append((canonical, int(lineage_id)))
+
+        pick_updates: list[tuple[str, int]] = []
+        for pick_id, lineage_id, symbol in conn.execute(
+            "SELECT id, lineage_id, symbol FROM sa_alpha_picks "
+            "WHERE instr(symbol, '*') > 0 ORDER BY id"
+        ):
+            canonical = canon_sa_pick_symbol(symbol)
+            if canonical is None or canonical == symbol:
+                raise RuntimeError("invalid Alpha Picks provider-marked pick symbol")
+            lineage = conn.execute(
+                "SELECT symbol_key FROM sa_pick_lineages WHERE lineage_id=?",
+                (lineage_id,),
+            ).fetchone()
+            if lineage is None or canon_sa_pick_symbol(lineage[0]) != canonical:
+                raise RuntimeError("Alpha Picks pick and lineage symbol mismatch")
+            pick_updates.append((canonical, int(pick_id)))
+
+        conn.executemany(
+            "UPDATE sa_alpha_picks SET symbol=? WHERE id=?",
+            pick_updates,
+        )
+        conn.executemany(
+            "UPDATE sa_pick_lineages SET symbol_key=? WHERE lineage_id=?",
+            lineage_updates,
+        )
+        remaining = int(
+            conn.execute(
+                "SELECT "
+                "(SELECT COUNT(*) FROM sa_alpha_picks WHERE instr(symbol, '*') > 0) + "
+                "(SELECT COUNT(*) FROM sa_pick_lineages WHERE instr(symbol_key, '*') > 0)"
+            ).fetchone()[0]
+        )
+        if remaining:
+            raise RuntimeError("Alpha Picks provider marker migration incomplete")
+
+        for statement in _V3_SYMBOL_IDENTITY_TRIGGER_STATEMENTS:
+            conn.execute(statement)
+
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
             (SCHEMA_VERSION, now_ts()),
         )
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -626,21 +751,24 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
-    """Ensure a fresh v2 schema or migrate v1 under the correct lock boundary.
+    """Ensure the current schema or migrate older versions under the correct lock.
 
     Current databases take one cheap ``PRAGMA user_version`` fast path. Fresh
     version-0 creation retains the established idempotent ``executescript``
     guarantee: its implicit commit means concurrent creators may interleave, so
-    every statement in ``_SCHEMA`` remains idempotent. The non-idempotent v1-to-v2
-    rebuild is different: every statement, marker update, and preservation check
-    runs inside one ``BEGIN IMMEDIATE`` transaction with a version re-check, so
-    two native-host processes cannot interleave the migration.
+    every statement in ``_SCHEMA`` remains idempotent. Versioned migrations run
+    inside ``BEGIN IMMEDIATE`` transactions with version re-checks, so two native
+    host processes cannot interleave the same migration.
     """
     version = int(conn.execute("PRAGMA user_version").fetchone()[0])
     if version == SCHEMA_VERSION:
         return
     if version == 1:
         _migrate_v1_to_v2(conn)
+        _migrate_v2_to_v3(conn)
+        return
+    if version == _SCHEMA_VERSION_V2:
+        _migrate_v2_to_v3(conn)
         return
     if version != 0:
         raise RuntimeError(f"unsupported sa_capture schema version: {version}")
@@ -651,9 +779,9 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         if version == SCHEMA_VERSION:
             conn.commit()
             return
-        if version == 1:
+        if version in {1, _SCHEMA_VERSION_V2}:
             conn.commit()
-            _migrate_v1_to_v2(conn)
+            ensure_schema(conn)
             return
         if version != 0:
             raise RuntimeError(f"unsupported sa_capture schema version: {version}")

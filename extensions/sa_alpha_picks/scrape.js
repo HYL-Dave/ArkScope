@@ -39,7 +39,10 @@
 
     var symbolIndex = findSymbolIndex(texts);
     if (symbolIndex < 0) continue;
-    var symbol = (texts[symbolIndex] || "").toUpperCase();
+    var providerSymbol = (texts[symbolIndex] || "").trim().toUpperCase();
+    var symbol = providerSymbol.endsWith("*")
+      ? providerSymbol.substring(0, providerSymbol.length - 1)
+      : providerSymbol;
 
     if (isRemovedPage) {
       pick = {

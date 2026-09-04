@@ -378,10 +378,17 @@ class SACaptureBackend(LocalMarketBackend):
         try:
             normalized_picks = []
             for pick in picks:
-                symbol = str(pick.get("symbol") or "").strip().upper()
+                raw_symbol = pick.get("symbol")
                 picked_date = store.canon_date(pick.get("picked_date"))
-                if not symbol or not picked_date:
+                if (
+                    not isinstance(raw_symbol, str)
+                    or not raw_symbol.strip()
+                    or not picked_date
+                ):
                     raise ValueError("Alpha Picks refresh requires symbol and picked_date")
+                symbol = store.canon_sa_pick_symbol(raw_symbol)
+                if symbol is None:
+                    raise ValueError("Alpha Picks refresh requires a valid symbol")
                 normalized_picks.append((pick, symbol, picked_date))
             now = store.now_ts()
             conn.execute("BEGIN IMMEDIATE")

@@ -298,7 +298,7 @@ def test_get_reconciliation_queue_action_is_read_only_and_sanitized(
 
     check = sqlite3.connect(path)
     try:
-        assert check.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert check.execute("PRAGMA user_version").fetchone()[0] == 3
         before = (
             check.execute("SELECT COUNT(*) FROM sa_pick_article_links").fetchone()[0],
             check.execute("SELECT COUNT(*) FROM sa_pick_article_decisions").fetchone()[0],
