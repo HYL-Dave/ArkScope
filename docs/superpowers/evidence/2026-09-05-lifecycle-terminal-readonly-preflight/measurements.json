@@ -1,0 +1,103 @@
+{
+  "status": "readonly_preflight_completed_not_cutover_approval",
+  "observed_at": "2026-09-05T09:29:58+00:00",
+  "safety": {
+    "production_sql_writes": 0,
+    "provider_calls": 0,
+    "credential_values_read": false,
+    "app_stopped_by_this_operation": false,
+    "cross_database_atomic_snapshot": false,
+    "cutover_approval_digest_issued": false,
+    "sqlite_mode": "ro",
+    "query_only": true,
+    "denied_operations_in_completed_run": 0
+  },
+  "production": {
+    "lifecycle_schema": "v3",
+    "membership_tables_present": [],
+    "automation_enabled": false,
+    "automation_apply_profile_transitions": false,
+    "universe_tickers": 186,
+    "source_counts_overlap": {
+      "manual_lists": 148,
+      "portfolio_open": 10,
+      "sa_alpha_picks_current": 45,
+      "sa_alpha_picks_former": 56
+    },
+    "sa_lineages": 105,
+    "sa_lineage_statuses": {"current": 46, "closed": 59},
+    "case_source_counts": {"sec_edgar": 36},
+    "automation_run_status_counts": {"blocked": 60, "failed": 6, "succeeded": 10},
+    "identity_transitions": 0
+  },
+  "target_group": {
+    "tickers": ["ARCH", "LTHM", "TA"],
+    "each_target": {
+      "in_collection_scope": true,
+      "sources": ["sa_alpha_picks_former"],
+      "former_lineages": 1,
+      "current_lineages": 0,
+      "open_positions": 0,
+      "active_manual_memberships": 0,
+      "hidden": false,
+      "identity_links": 0,
+      "cases": 0,
+      "transitions": 0,
+      "price_issue": "security_definition_unavailable"
+    }
+  },
+  "latest_five_sessions": {
+    "first": "2026-08-31",
+    "last": "2026-09-04",
+    "expected_slots_per_session": 26,
+    "complete_tickers_per_session": 183,
+    "partial_tickers_per_session": 0,
+    "unknown_tickers_per_session": 3,
+    "unmatched_rth_rows": 0,
+    "calendar_health": "ok",
+    "observation_health": "ok"
+  },
+  "coverage_15": {
+    "start": "2026-08-21",
+    "end": "2026-09-05",
+    "gap_tickers": 35,
+    "before_first_local_bar_tickers": 32,
+    "no_local_history_tickers": 3,
+    "missing_ticker_days": 223,
+    "repair_eligible_missing_ticker_days": 190,
+    "partial_ticker_days": 0,
+    "first_bar_dates_among_gaps": {"2026-08-31": 31, "2026-08-27": 1, "absent": 3},
+    "repair_eligible_tickers": 32,
+    "repair_provider": "ibkr",
+    "fallback_allowed": false,
+    "repair_preview_sha256": "43f0e182cc7f687e06b91aab9448a2e6b3f18caa8c42846a68d6280f9700b719"
+  },
+  "coverage_120": {
+    "start": "2026-05-08",
+    "end": "2026-09-05",
+    "completed_trading_sessions": 83,
+    "gap_tickers": 186,
+    "before_first_local_bar_tickers": 36,
+    "before_first_local_bar_missing_ticker_days": 2702,
+    "no_local_history_tickers": 3,
+    "no_local_history_missing_ticker_days": 249,
+    "missing_ticker_days": 2951,
+    "partial_observation_tickers": 147,
+    "partial_ticker_days": 438,
+    "partial_missing_slots": 9329,
+    "partial_session_tickers": {"2026-06-05": 145, "2026-06-25": 146, "2026-06-26": 147},
+    "repair_eligible_tickers": 183,
+    "repair_provider": "ibkr",
+    "fallback_allowed": false,
+    "repair_preview_sha256": "15d6a0792911c9680c68b547e7806c0252dc84c2bc2da97133a0b36df0eaf1c7"
+  },
+  "private_evidence_sha256": {
+    "harness": "f4263742543666cbf6c5dec6017f55391c6291a3898c24a7417bd305c5a3776d",
+    "summary.json": "78cc0a082f21ed5076b65373c23c0dafe16ae3978eb449bc4e029c14ca712b1c",
+    "private-universe.json": "cac41ed5df3fc78a8217b3ab38cb8eea957170062ca57bea3bf5f97bc1cd0416",
+    "private-coverage-15.json": "396514518c8d43cf8a8a72b6c7439e5b5f9787e67c08f9bd2660bce6076b56f9",
+    "private-coverage-120.json": "ba7cf2592bc75f0ca6dbfa7a4d40047950dc3f4ef8800291c53af4af1f114add",
+    "private-repair-preview-15.json": "3261d8fdbaf4dffa78cc608114a2ee74b28840a173e873193b5025be4bd2be51",
+    "private-repair-preview-120.json": "303ad57b217fe9b071bb12d319802d19b48367c3f7585d72e6cb165674ad8886"
+  }
+}

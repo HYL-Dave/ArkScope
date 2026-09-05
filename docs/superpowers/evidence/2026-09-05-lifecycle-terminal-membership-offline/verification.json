@@ -1,0 +1,271 @@
+{
+  "backend": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 5834,
+    "report_sha256": "bbf503bc147986f9b0b956446be7c31cc2bba17d01148028990dc2d1aebadd5a",
+    "skipped": 12,
+    "tests": 5846
+  },
+  "base_commit": "9d8cc8603b7dcbbd112ff1cfaed7c92a4931b2f5",
+  "browser": {
+    "local_mutation_requests": 16,
+    "locales": [
+      "en",
+      "zh-Hant"
+    ],
+    "page_errors": [],
+    "production_reads": 0,
+    "provider_calls": 0,
+    "screenshots": [
+      {
+        "file": "screenshots/en-1440-backfill-dialog.png",
+        "sha256": "f46f3c5efa21886c9c02dd6f3ba4bc4de89615973b940ffd7d73fdca6673cf00"
+      },
+      {
+        "file": "screenshots/en-1440-backfill-partial.png",
+        "sha256": "688b9d2cf82a1783364a5bf4bc1de65072d7e9786ecba9257015eb12ba8a4435"
+      },
+      {
+        "file": "screenshots/en-1440-coverage-gaps.png",
+        "sha256": "6c37d5cab37244401be9ff81bac9e48f75f062cda569d5fd09d0bea2b645c6d4"
+      },
+      {
+        "file": "screenshots/en-1440-coverage.png",
+        "sha256": "5b9d7ae1c59c95fa73d28e08b4862846c418aaef27224bc51f0aa68bc3e21944"
+      },
+      {
+        "file": "screenshots/en-1440-former.png",
+        "sha256": "b2b5b87e63d3aad2e656980a75788ef36922548e67bae97548d18f132eb870e0"
+      },
+      {
+        "file": "screenshots/en-1440-lifecycle.png",
+        "sha256": "f3fc8a06bd52fe773bed7c1216e6def03ff7877fe7dd270bba178acb2bde9833"
+      },
+      {
+        "file": "screenshots/en-1440-remove-dialog.png",
+        "sha256": "e0347a7563630cf073f7f8511f3f91d743c904f7bcce33f00541f03db13b81e6"
+      },
+      {
+        "file": "screenshots/en-1440-removed.png",
+        "sha256": "1373be74535f6dd30a5038479ff9cbac4d08cc7822942e3349fd1399472f0bd9"
+      },
+      {
+        "file": "screenshots/en-390-backfill-dialog.png",
+        "sha256": "722394345efe280252c03c0286354597e945b5e858efc25da1dd616466ea8a6d"
+      },
+      {
+        "file": "screenshots/en-390-backfill-partial.png",
+        "sha256": "7c14b6b82e5f4d89bc344b99f4c0f3edbec63c2df14d401fec8544406db40d1b"
+      },
+      {
+        "file": "screenshots/en-390-coverage-gaps.png",
+        "sha256": "0ab6d6eafac02d9ad62e21609636fd3207a3b376219cf330f80405ae05a4bc6c"
+      },
+      {
+        "file": "screenshots/en-390-coverage.png",
+        "sha256": "f323513b2cac75152ae18889a1ee908ed0d39eb0b9b43160e88bbe7222e295d5"
+      },
+      {
+        "file": "screenshots/en-390-former.png",
+        "sha256": "cad24f3126c0df15973eb98ed68412069764f80555f5f95c6520875d1c5c7c74"
+      },
+      {
+        "file": "screenshots/en-390-lifecycle.png",
+        "sha256": "13fe7558da65eb3af15d03c41b99bcd41f0bcaf9976a1c972c5e4910cd74abfb"
+      },
+      {
+        "file": "screenshots/en-390-remove-dialog.png",
+        "sha256": "d8e559daa01c5da2245783d58d30d1bc46f3e12606094aec4d60f593a683d23e"
+      },
+      {
+        "file": "screenshots/en-390-removed.png",
+        "sha256": "88954be592426e1da1d416a1791a08bdb9fe063350b5d8b01425c8e2fde70a4d"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-backfill-dialog.png",
+        "sha256": "36a9817d121fedd22c3fb418c92554f9dc2682e7761034d3d60940d04166f1bb"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-backfill-partial.png",
+        "sha256": "61469b3a2bd99cfb3a401bbdf5289e07befaf2df829b77fb2adfe40dc1058998"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-coverage-gaps.png",
+        "sha256": "c9a8bcaf12e41e9b52dc27f2fb36f0be36f3d2b2a31324f8b2c2eb3e7eead9bc"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-coverage.png",
+        "sha256": "9839d2317a3e5fad8a5f0d77078bad67088217a5b34f7043cc60a3caf6aca1f6"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-former.png",
+        "sha256": "eab4a4acec0ebaa23749651f492be112afc54d943996aa382c7a8d5e85e91612"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-lifecycle.png",
+        "sha256": "e7d5cdcfa81a6c746d2ab24c2245533a9c6d3efa00ecd3c82f51bfa89372b197"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-remove-dialog.png",
+        "sha256": "f76ee861f181190bcd81eb1ace0d18a2ffa96e653bbe59d44a47a98609d97606"
+      },
+      {
+        "file": "screenshots/zh-Hant-1440-removed.png",
+        "sha256": "ad1eb583ee29a724c0066f33aedebab4ff42aac6dfd342335c88fdbb31e10613"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-backfill-dialog.png",
+        "sha256": "d73a4da69fa25142fede051ed45d434814a5cadd3598196f5ba380b82a6b7126"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-backfill-partial.png",
+        "sha256": "dfb22681e826780462e67656bc6e0ca4e9e48143694203b5c80cbde5d89e0e6d"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-coverage-gaps.png",
+        "sha256": "f66210fe30d4aae5957c69d7c092f358e3fc5fc8a836b7ff626b93f525469a05"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-coverage.png",
+        "sha256": "206d50b2fb196ee301058ca6970cf4b6ed4e2f5316d22569d5090e81b66d35bb"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-former.png",
+        "sha256": "3291f092e94cc5bd3601cf08bb5b1fccf94241556662156583d4977d1ecdbb10"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-lifecycle.png",
+        "sha256": "1c235567477ce632fd92dac4b7b92c3ae8ba657743c1bd20f84ee55df5230e32"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-remove-dialog.png",
+        "sha256": "28496c0029dbb28d198120cc70bf2e88a3c1b14d69a87f02606e0162e29988ea"
+      },
+      {
+        "file": "screenshots/zh-Hant-390-removed.png",
+        "sha256": "638bd43dc68b75281e58cdc86aa88b1b45ddc9f9a5697b7db4f7eb99ea368703"
+      }
+    ],
+    "surface_combinations": 12,
+    "unexpected_requests": [],
+    "viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ]
+  },
+  "build": {
+    "remaining_warning": "bundle_over_500_kb",
+    "typescript": "passed",
+    "vite": "passed"
+  },
+  "frontend": {
+    "failed": 0,
+    "files": 111,
+    "passed": 1393,
+    "pending": 0,
+    "report_sha256": "deaca53e221b4cd86bc08113ff9c73244d6997fd50cf9a2cbe28f301449f879a",
+    "tests": 1393
+  },
+  "mutations": {
+    "canary-budget": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_automation_scheduler::test_legacy_canary_budget_cannot_start_the_new_provider_scan"
+      ],
+      "failures": 1,
+      "passed": 314,
+      "report_sha256": "3b2904a5d0649aafb6e5aaa812e6ea77c976e469c7e6b64f70cfd0b7a815594a",
+      "skipped": 0,
+      "tests": 315
+    },
+    "evidence-binding": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_provider_authority::test_listing_identity_and_query_assertions_must_be_bound_to_the_evidence[composite_figi-BBG00HC114X0]",
+        "tests.test_security_lifecycle_provider_authority::test_listing_identity_and_query_assertions_must_be_bound_to_the_evidence[expected_active_state-True]",
+        "tests.test_security_lifecycle_provider_authority::test_listing_identity_and_query_assertions_must_be_bound_to_the_evidence[snapshot_complete-False]"
+      ],
+      "failures": 3,
+      "passed": 175,
+      "report_sha256": "60a7f02fa9d9c67b9be357e79298f9af47e7e802d962330d845ab5fe9e9e5e4a",
+      "skipped": 0,
+      "tests": 178
+    },
+    "install-gate": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_provider_migration::test_provider_upgrade_requires_valid_disabled_automation_before_backup[enabled-true]",
+        "tests.test_security_lifecycle_provider_migration::test_provider_upgrade_requires_valid_disabled_automation_before_backup[apply_profile_transitions-true]",
+        "tests.test_security_lifecycle_provider_migration::test_provider_upgrade_requires_valid_disabled_automation_before_backup[enabled-None]",
+        "tests.test_security_lifecycle_provider_migration::test_provider_upgrade_requires_valid_disabled_automation_before_backup[interval_minutes-invalid]"
+      ],
+      "failures": 4,
+      "passed": 174,
+      "report_sha256": "132461963583b3b4dde575fb84881e4631e10c6f71819ac94d316e22dbdc5cb6",
+      "skipped": 0,
+      "tests": 178
+    },
+    "membership": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_sa_tracking_memberships::test_former_removal_survives_sync_bootstrap_and_renamed_observation",
+        "tests.test_sa_tracking_memberships::test_related_current_with_same_pick_anchor_is_held_not_globally_blacklisted",
+        "tests.test_sa_tracking_memberships::test_sync_projection_detects_unapplied_sa_observations_without_writing"
+      ],
+      "failures": 3,
+      "passed": 175,
+      "report_sha256": "9440b5cfe751d0875f8ea2f7146ced9f857a2c57712108cf8d23ebe50d66aafa",
+      "skipped": 0,
+      "tests": 178
+    },
+    "otc": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_provider_authority::test_otc_continuation_vetoes_terminal_even_when_three_sources_report_delisted"
+      ],
+      "failures": 1,
+      "passed": 177,
+      "report_sha256": "261e72fc39c4fa4327362a65b548e587594769ba05ad66c278ba436db67397bb",
+      "skipped": 0,
+      "tests": 178
+    },
+    "publication": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_provider_store::test_invalid_provider_payload_is_not_silently_ignored_as_if_published"
+      ],
+      "failures": 1,
+      "passed": 177,
+      "report_sha256": "9b94fc69e36fd888938193d46d6945f8a211c101647324917bd83ab20864f358",
+      "skipped": 0,
+      "tests": 178
+    },
+    "restored": {
+      "errors": 0,
+      "failed_owners": [],
+      "failures": 0,
+      "passed": 315,
+      "report_sha256": "c29cc0a1d93c5da9d585d87c877f42ac009116037759413268c94ffb486c146c",
+      "skipped": 0,
+      "tests": 315
+    }
+  },
+  "production": {
+    "app_restart": false,
+    "merge": false,
+    "migration": false,
+    "provider_calls": 0,
+    "push": false,
+    "read": false,
+    "write": false
+  },
+  "status": "offline_verified_production_pending"
+}
