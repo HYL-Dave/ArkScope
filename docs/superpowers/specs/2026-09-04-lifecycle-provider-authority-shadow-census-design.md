@@ -4,16 +4,17 @@
 Picks identity census, detached census implementation, profile-backed EODHD
 Settings field, two known-case attempts, the one-call ticker-event
 revalidation, and the read-only full-universe manifest are complete. The
-resumable active-pass executor is implemented and tested, but its 190-request
-provider envelope remains unauthorized and unexecuted. Any provider execution,
+separately authorized full-universe active pass completed its exact 190-request
+provider envelope and remains review-only. Any additional provider execution,
 production write, migration, runtime authority change, App restart, and push
 remain separate gates.
 
 **Date:** 2026-09-04
 
 **Current merged implementation:**
-`bc916deffe69904ef6612fe9acf229ee4bdb5c0c`; the active-pass admission work
-described below remains isolated until separately reviewed and merged.
+`db1f5f9c65b296d5c3db5ef51522afaa4c5a9c43`; the execution evidence and
+post-run publication-path hardening described below remain isolated until
+separately reviewed and merged.
 
 **Relationship to existing authority:** This document does not change the
 running lifecycle policy. It freezes the experiment required before deciding
@@ -455,6 +456,11 @@ invocation resumes with the next unopened task. The paused response exposes
 the exact `resume_not_before` timestamp. A missing profile credential pauses
 before writing an intent and can resume after the credential is saved.
 
+Atomic publication requires the private checkpoint and the public output
+parent to be on the same filesystem. The runner verifies that condition during
+admission, before creating a checkpoint, resolving a credential, or dispatching
+a provider request. The final rename check remains as defense in depth.
+
 No private final packet or public summary may exist while any work item lacks a
 closed result. Once all items are closed, including explicit failed or unknown
 results, the private packet freezes the exact missing/ambiguous subset and its
@@ -462,6 +468,32 @@ digest. The tracked summary contains only aggregate counts and digests. Both
 are labeled `review_required_no_lifecycle_inference`; completion does not
 authorize an inactive query, Ticker Events query, identity transition,
 terminal decision, or application write.
+
+### 7.3 Full-universe active-pass result
+
+The separately authorized run bound to implementation commit
+`db1f5f9c65b296d5c3db5ef51522afaa4c5a9c43` closed all 189 work items and used
+exactly 190 HTTP attempts: 186 Massive, two EODHD, and two Nasdaq. All 189
+provider tasks returned a 2xx response. No task was retried, no fallback was
+used, no rate limit was observed, and no dispatch outcome was unknown.
+
+The normalized result set contains 186 `confirmed` tasks and three
+`coverage_limited` Massive tasks. The private review set contains four symbols:
+three predeclared terminal-case controls for which Massive did not confirm an
+active exact listing, EODHD reported delisted, and Nasdaq reported directory
+absence; plus the one class-share spelling whose EODHD and Nasdaq identities
+were deliberately left unresolved. The public packet retains only the count
+and digest of that set.
+
+The first publication attempt correctly preserved all completed private
+results but rejected an atomic rename from a `/mnt` checkpoint into a `/tmp`
+worktree. An offline finalization using a transport and credential resolver
+that raise on access published the same sealed ledger on one filesystem; it
+made no additional provider request. This incident produced the admission-time
+same-filesystem requirement above. The completed packet remains
+`review_required_no_lifecycle_inference`: it authorizes no inactive lookup,
+Ticker Events lookup, identity transition, terminal decision, or application
+write.
 
 ## 8. Alpha Picks Identity Feasibility Result
 

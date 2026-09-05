@@ -865,6 +865,34 @@ def test_active_pass_wrong_ack_fails_before_credentials_or_transport(
     assert not evidence.public_output_dir.exists()
 
 
+def test_active_pass_rejects_cross_filesystem_publication_before_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = _active_pass_evidence(tmp_path)
+    resolver = RejectingResolver()
+    monkeypatch.setattr(
+        runner,
+        "_same_filesystem",
+        lambda _left, _right: False,
+        raising=False,
+    )
+
+    with pytest.raises(
+        runner.CensusRunnerFailure,
+        match="active_pass_publication_path_invalid",
+    ):
+        _run_active_pass(
+            evidence,
+            resolver=resolver,
+            transport=RejectingTransport(),
+            clock=FakeActivePassClock(),
+        )
+
+    assert resolver.calls == []
+    assert not evidence.checkpoint_dir.exists()
+    assert not evidence.public_output_dir.exists()
+
+
 def test_active_pass_missing_credential_pauses_without_creating_dispatch_intent(
     tmp_path: Path,
 ) -> None:
