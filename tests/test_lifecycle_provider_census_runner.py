@@ -1101,6 +1101,37 @@ def test_active_pass_public_summary_is_aggregate_only_and_non_inferential(
         assert ticker not in rendered
 
 
+def test_active_pass_incomplete_ledger_cannot_publish_summary(
+    tmp_path: Path,
+) -> None:
+    evidence = _active_pass_evidence(tmp_path)
+    clock = FakeActivePassClock()
+    paused = _run_active_pass(
+        evidence,
+        resolver=FakeResolver(missing=frozenset({"eodhd"})),
+        transport=RejectingTransport(),
+        clock=clock,
+    )
+    assert paused["status"] == "paused_eodhd_credential_unavailable"
+    plan_path = evidence.checkpoint_dir / runner.ACTIVE_PASS_PLAN_NAME
+    plan = json.loads(plan_path.read_bytes())
+
+    with pytest.raises(runner.CensusRunnerFailure, match="active_pass_incomplete"):
+        runner._finalize_active_pass(
+            checkpoint_dir=evidence.checkpoint_dir,
+            output_dir=evidence.public_output_dir,
+            plan=plan,
+            plan_sha256=hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+            results={},
+            utc_now=clock.now,
+        )
+
+    assert not (
+        evidence.checkpoint_dir / runner.ACTIVE_PASS_PRIVATE_SUMMARY_NAME
+    ).exists()
+    assert not evidence.public_output_dir.exists()
+
+
 def test_active_pass_publication_resumes_without_reissuing_provider_calls(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

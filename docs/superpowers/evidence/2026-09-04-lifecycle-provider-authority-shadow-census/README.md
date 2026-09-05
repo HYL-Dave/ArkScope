@@ -232,13 +232,25 @@ returned 2xx; there were zero retries, fallbacks, rate limits, or unknown
 dispatch outcomes.
 
 The aggregate result is 186 `confirmed` tasks and three `coverage_limited`
-Massive tasks. Four symbols require review: the three predeclared terminal-case
-controls share the same three-way observation shape (Massive active listing
-not confirmed, EODHD delisted, Nasdaq directory absent), while the reviewed
-class-share spelling remains deliberately unresolved for EODHD and Nasdaq.
-The tracked packet contains only this aggregate count and its digest. No
-inactive or event request was made, and no lifecycle inference or application
-write occurred.
+Massive tasks; those are task counts, not 186 confirmed-active symbols. Of the
+186 Massive exact-active tasks, 183 found an active listing and three did not.
+For the 185 identities admitted to the shared bulk lanes, EODHD reported 182
+active and three delisted with zero unreported, while the two Nasdaq files
+matched the same 182 active identities. `ARCH`, `LTHM`, and `TA` are the three
+predeclared terminal-case controls with the same three-way observation shape;
+`BRK B` is the fourth review row because its provider-specific EODHD and Nasdaq
+identity remains deliberately unresolved. The tracked packet contains only the
+aggregate count and digest. No inactive or event request was made, and no
+lifecycle inference or application write occurred.
+
+This evidence is sufficient to admit structured listing-state data for the
+terminal/delisting design: three terminal controls agree across Massive, EODHD,
+and Nasdaq, against 183 Massive active controls and 182 resolved controls in
+both shared lanes. It does not by itself admit unattended ticker mutation. The
+separate `LC -> HAPN` revalidation did obtain an exact Massive Ticker Events
+relation for `2026-06-22`, same-Composite-FIGI continuity, and an SEC Form 8-K
+cross-check, but it remains one positive rename case. Rename proposals therefore
+remain attended until a separately budgeted multi-case canary is admitted.
 
 All provider results were durably closed before the initial public publication
 attempt failed. The private checkpoint was on `/mnt/md0` while the clean
@@ -255,8 +267,13 @@ mutations proved that the resume owners reject reissuing a closed task and that
 the provider-identity owner rejects sending the Massive-only class-share
 spelling through EODHD or Nasdaq.
 
-Post-run publication hardening completed with 282 focused provider-census
-tests and `5735 passed / 12 skipped / 3 warnings` for the complete backend
-suite. Its RED owner first reached credential resolution when the public output
-was on another filesystem; after the fix it fails before checkpoint creation,
-credential resolution, or transport access.
+Post-run publication hardening and the direct incomplete-ledger owner completed
+with 283 focused provider-census tests and
+`5736 passed / 12 skipped / 3 warnings` for the complete backend suite. Its RED
+owner first reached credential resolution when the public output was on another
+filesystem; after the fix it fails before checkpoint creation, credential
+resolution, or transport access.
+
+An additional direct owner locks the finalization guard itself: an incomplete
+ledger raises `active_pass_incomplete` and creates neither private nor public
+summary. Disabling that guard makes the named test fail before publication.

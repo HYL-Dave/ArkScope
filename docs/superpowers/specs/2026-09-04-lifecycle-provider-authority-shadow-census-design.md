@@ -478,12 +478,21 @@ provider tasks returned a 2xx response. No task was retried, no fallback was
 used, no rate limit was observed, and no dispatch outcome was unknown.
 
 The normalized result set contains 186 `confirmed` tasks and three
-`coverage_limited` Massive tasks. The private review set contains four symbols:
-three predeclared terminal-case controls for which Massive did not confirm an
-active exact listing, EODHD reported delisted, and Nasdaq reported directory
-absence; plus the one class-share spelling whose EODHD and Nasdaq identities
-were deliberately left unresolved. The public packet retains only the count
-and digest of that set.
+`coverage_limited` Massive tasks; this is a task-result count, not an
+active-symbol count. Massive found 183 of its 186 exact-active listings. Across
+the 185 identities admitted to each shared bulk lane, EODHD reported 182 active
+and three delisted with zero unreported, and the two Nasdaq files matched the
+same 182 active identities. The private review set contains four symbols:
+`ARCH`, `LTHM`, and `TA` have the same three-way terminal observation, while
+`BRK B` remains deliberately unresolved for EODHD and Nasdaq. The public packet
+retains only the count and digest of that set.
+
+The listing-state axis is admitted for the terminal/delisting implementation.
+The ticker-change axis remains attended: the separate `LC -> HAPN` experiment
+has an exact Massive Ticker Events relation on `2026-06-22`, matching non-null
+Composite FIGI continuity, and an SEC Form 8-K cross-check, but only one positive
+rename case. A separately budgeted multi-case canary is required before an
+unattended profile ticker mutation may be admitted.
 
 The first publication attempt correctly preserved all completed private
 results but rejected an atomic rename from a `/mnt` checkpoint into a `/tmp`
