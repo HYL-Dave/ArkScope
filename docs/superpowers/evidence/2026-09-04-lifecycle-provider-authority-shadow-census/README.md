@@ -31,8 +31,8 @@ application database.
 - `universe-active-pass`: consumes that sealed private manifest, its public
   attestation, and the separately sealed read-admission addendum. It requires a
   new exact spec/source/commit/budget acknowledgement and writes an append-only
-  private checkpoint before making any request. This mode is implemented but
-  its provider envelope has not been authorized or executed.
+  private checkpoint before making any request. Its separately authorized
+  190-attempt full-universe execution is complete and remains review-only.
 
 Each provider lane records whether it executed and an exact skip reason. A
 negative oracle result is a successful experiment outcome: it rejects the
@@ -207,7 +207,7 @@ budget, while admitting no provider call. It also records why the sole Massive
 identifier differs (`provider_class_share_spelling`) and that the corresponding
 EODHD and Nasdaq identities remain unresolved rather than guessed.
 
-## Full-Universe Active-Pass Admission
+## Full-Universe Active Pass
 
 The sealed 186-row source produces 189 immutable work items with a conservative
 ceiling of 190 HTTP attempts: 186 Massive, two EODHD, and two Nasdaq. Every
@@ -224,13 +224,39 @@ summary, and no missing-subset inference. Completion creates an aggregate-only
 tracked packet labeled `review_required_no_lifecycle_inference`; inactive and
 Ticker Events calls remain a later authorization boundary.
 
-No active-pass provider request has been authorized or executed as part of
-this implementation. The exact acknowledgement for a future run is generated
-from the then-current spec digest, admitted clean commit, and sealed private
-manifest digest; it must not be copied from this README.
+The separately authorized run completed at `2026-09-05T00:25:56Z`, bound to
+commit `db1f5f9c65b296d5c3db5ef51522afaa4c5a9c43`, the then-current spec digest,
+and private manifest digest. It closed all 189 work items and made exactly 190
+HTTP attempts: 186 Massive, two EODHD, and two Nasdaq. All 189 provider tasks
+returned 2xx; there were zero retries, fallbacks, rate limits, or unknown
+dispatch outcomes.
+
+The aggregate result is 186 `confirmed` tasks and three `coverage_limited`
+Massive tasks. Four symbols require review: the three predeclared terminal-case
+controls share the same three-way observation shape (Massive active listing
+not confirmed, EODHD delisted, Nasdaq directory absent), while the reviewed
+class-share spelling remains deliberately unresolved for EODHD and Nasdaq.
+The tracked packet contains only this aggregate count and its digest. No
+inactive or event request was made, and no lifecycle inference or application
+write occurred.
+
+All provider results were durably closed before the initial public publication
+attempt failed. The private checkpoint was on `/mnt/md0` while the clean
+execution worktree was on `/tmp`, so the required atomic directory rename was
+cross-filesystem and correctly refused. A network- and credential-rejecting
+offline finalizer published the existing sealed ledger to an output path on the
+same filesystem; it issued no additional provider request. A RED-first owner
+now rejects this path mismatch during admission, before checkpoint creation,
+credential resolution, or network access.
 
 Admission verification completed with 281 focused provider-census tests and
 `5734 passed / 12 skipped / 3 warnings` for the complete backend suite. Reverse
 mutations proved that the resume owners reject reissuing a closed task and that
 the provider-identity owner rejects sending the Massive-only class-share
 spelling through EODHD or Nasdaq.
+
+Post-run publication hardening completed with 282 focused provider-census
+tests and `5735 passed / 12 skipped / 3 warnings` for the complete backend
+suite. Its RED owner first reached credential resolution when the public output
+was on another filesystem; after the fix it fails before checkpoint creation,
+credential resolution, or transport access.

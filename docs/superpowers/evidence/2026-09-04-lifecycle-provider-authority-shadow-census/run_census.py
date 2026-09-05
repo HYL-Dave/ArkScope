@@ -214,6 +214,13 @@ def _ensure_directory(path: Path, *, private: bool, code: str) -> None:
         raise CensusRunnerFailure(code) from None
 
 
+def _same_filesystem(left: Path, right: Path) -> bool:
+    try:
+        return os.stat(left).st_dev == os.stat(right).st_dev
+    except OSError:
+        raise CensusRunnerFailure("active_pass_publication_path_invalid") from None
+
+
 def _remove_stale_pending_files(root: Path) -> None:
     if not root.exists():
         return
@@ -2101,6 +2108,12 @@ def _assert_active_pass_admission(
         or public in checkpoint.parents
     ):
         raise CensusRunnerFailure("active_pass_private_path")
+    if (
+        not private_root.is_dir()
+        or not public.parent.is_dir()
+        or not _same_filesystem(private_root, public.parent)
+    ):
+        raise CensusRunnerFailure("active_pass_publication_path_invalid")
     manifest, manifest_digest, attestation_digest, admission_digest = (
         _load_active_pass_sources(
             source_manifest_dir=source_private,
