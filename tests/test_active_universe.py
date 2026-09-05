@@ -53,6 +53,35 @@ def _snapshot(databases, *, now: datetime = NOW):
     )
 
 
+def test_former_tombstone_is_source_specific_and_precedes_alias_projection(databases):
+    from src.sa_tracking_memberships import SaTrackingMembershipStore
+
+    with sqlite3.connect(databases.profile_path) as conn:
+        SaTrackingMembershipStore.install(conn)
+        conn.execute("CREATE TABLE ticker_identity_links (source_ticker TEXT, successor_ticker TEXT, reversed_at TEXT)")
+        conn.execute("INSERT INTO ticker_identity_links VALUES ('OLD', 'NEW', NULL)")
+    tracking = SaTrackingMembershipStore(databases.profile_path)
+    tracking.reconcile(({"lineage_id": 1, "ticker": "OLD", "picked_date": "2025-01-01", "portfolio_status": "closed", "observed_at": NOW_TEXT},), at=NOW_TEXT, bootstrap_actor="attended_user")
+    _insert_pick(databases.sa_path, "OLD", status="closed")
+    tracking.remove(tracking.list_memberships()[0]["membership_id"], at=NOW_TEXT)
+    assert _snapshot(databases).tickers == ()
+    databases.profile.import_lists([{"name": "Independent", "tickers": ["NEW"]}])
+    assert _snapshot(databases).sources_by_ticker == {"NEW": ("manual_lists",)}
+    tracking.restore(tracking.list_memberships()[0]["membership_id"], at=NOW_TEXT)
+    assert _snapshot(databases).sources_by_ticker == {"NEW": ("manual_lists", "sa_alpha_picks_former")}
+
+
+def test_sa_observation_alone_cannot_resurrect_former_after_membership_cutover(databases):
+    from src.sa_tracking_memberships import SaTrackingMembershipStore
+
+    with sqlite3.connect(databases.profile_path) as conn:
+        SaTrackingMembershipStore.install(conn)
+    _insert_pick(databases.sa_path, "NEW", status="closed")
+    before = databases.profile_path.read_bytes()
+    assert _snapshot(databases).tickers == ()
+    assert databases.profile_path.read_bytes() == before
+
+
 def _insert_pick(
     path: Path,
     symbol: str,

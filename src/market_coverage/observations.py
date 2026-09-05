@@ -456,6 +456,22 @@ def _read_session_observations(
     )
 
 
+def _read_first_local_bars(conn, *, interval, aliases, canonical_universe):
+    candidates = aliases.candidates_for(set(canonical_universe))
+    if not candidates:
+        return ()
+    placeholders = ",".join("?" for _ in candidates)
+    result = {}
+    for raw_ticker, raw_time in conn.execute(
+        f"SELECT ticker,MIN(datetime) FROM prices WHERE ticker IN ({placeholders}) AND interval=? GROUP BY ticker",
+        (*candidates, interval),
+    ):
+        ticker = aliases.resolve(_normalize_stored_ticker(raw_ticker, field_name="stored price ticker"))
+        instant = _parse_stored_timestamp(raw_time)
+        result[ticker] = min(instant, result.get(ticker, instant))
+    return tuple(sorted(result.items()))
+
+
 class RthObservationReader:
     def __init__(self, db_path: str | Path) -> None:
         self._db_path = Path(db_path)
@@ -505,6 +521,7 @@ class RthObservationReader:
             )
 
         try:
+            conn.execute("BEGIN")
             price_columns = _table_columns(conn, "prices")
             if (
                 price_columns is None
@@ -548,6 +565,7 @@ class RthObservationReader:
                 aliases=aliases,
                 canonical_universe=canonical_universe,
             )
+            first_local_bars = _read_first_local_bars(conn, interval=interval, aliases=aliases, canonical_universe=canonical_universe)
         except (sqlite3.Error, _StoredDatabaseError):
             return _unavailable(
                 ObservationHealthReason.MARKET_DB_UNREADABLE,
@@ -564,4 +582,5 @@ class RthObservationReader:
             canonical_universe=canonical_universe,
             sessions=observations,
             provider_errors=provider_errors,
+            first_local_bars=first_local_bars,
         )

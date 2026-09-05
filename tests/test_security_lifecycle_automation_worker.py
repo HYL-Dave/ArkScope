@@ -3049,7 +3049,7 @@ def test_worker_records_execution_revision_without_replaying_current_failed_run(
         run = _store(harness).list_automation_runs(case["case_id"])[0]
         context = json.loads(run["query_context_json"])
 
-        assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v4"
+        assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v5"
         assert context["execution_revision"] == "trusted-lifecycle-execution-r1"
         assert AUTOMATION_EXECUTION_REVISION == "trusted-lifecycle-execution-r1"
         assert first["failed"] == 1
@@ -3365,12 +3365,12 @@ def test_changed_observation_or_policy_reenters_and_stales_old_result(
         monkeypatch.setattr(
             policy_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v5",
+            "trusted-lifecycle-automation-v6",
         )
         monkeypatch.setattr(
             worker_module,
             "AUTOMATION_POLICY_VERSION",
-            "trusted-lifecycle-automation-v5",
+            "trusted-lifecycle-automation-v6",
         )
         harness.worker().run()
 

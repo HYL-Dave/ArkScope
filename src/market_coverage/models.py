@@ -220,6 +220,15 @@ class ProviderSyncIssue:
             raise TypeError("provider issue updated_at must be a string or None")
 
 
+class CoverageHistoryGapV2(_CoverageV2Model):
+    ticker: str
+    reason: Literal["before_first_local_bar", "no_local_history", "missing_observations", "partial_observations"]
+    first_local_bar_at: str | None
+    missing_dates: list[str]
+    partial_dates: list[str]
+    provider_issue_reason: ProviderSyncIssueReason | None
+
+
 class TradingDayCoverageV2(_CoverageV2Model):
     version: Literal[2] = 2
     market_scope: MarketScope = MarketScope.US_LISTED_EQUITY_PROXY
@@ -232,6 +241,8 @@ class TradingDayCoverageV2(_CoverageV2Model):
     observation_health: CoverageObservationHealthV2
     days: list[CoverageDayV2] = Field(default_factory=list)
     provider_errors: list[ProviderSyncIssue] = Field(default_factory=list)
+    scope_basis: Literal["current_universe_retrospective"] = "current_universe_retrospective"
+    history_gaps: list[CoverageHistoryGapV2] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -257,6 +268,7 @@ class ObservationReadResult:
     canonical_universe: tuple[str, ...]
     sessions: tuple[RthSessionObservations, ...]
     provider_errors: tuple[ProviderSyncIssue, ...]
+    first_local_bars: tuple[tuple[str, datetime], ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.health, ObservationHealthAssessment):
@@ -293,6 +305,12 @@ class ObservationReadResult:
         ):
             raise TypeError("provider_errors must contain ProviderSyncIssue values")
         canonical_set = set(self.canonical_universe)
+        if not isinstance(self.first_local_bars, tuple) or len({ticker for ticker, _ in self.first_local_bars}) != len(self.first_local_bars):
+            raise ValueError("first_local_bars")
+        for ticker, instant in self.first_local_bars:
+            if ticker not in canonical_set:
+                raise ValueError("first_local_bars")
+            _require_utc(instant, field_name="first_local_bar")
         observation_tickers = {
             observation.ticker
             for session in self.sessions
@@ -306,7 +324,7 @@ class ObservationReadResult:
         if not provider_tickers <= canonical_set:
             raise ValueError("provider issues must belong to canonical_universe")
         if self.health.status is ObservationHealth.UNAVAILABLE and (
-            self.sessions or self.provider_errors
+            self.sessions or self.provider_errors or self.first_local_bars
         ):
             raise ValueError("unavailable observation reads cannot carry database facts")
 

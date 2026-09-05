@@ -28,6 +28,7 @@ import type {
 } from "../api";
 import enExplore from "../i18n/resources/en/explore";
 import zhHantExplore from "../i18n/resources/zh-Hant/explore";
+import { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./listingContract";
 
 export type LifecycleLocale = "en" | "zh-Hant";
 
@@ -281,6 +282,7 @@ export function lifecycleListingAuthorityLabel(
   return closedLifecycleLabel<SecurityLifecycleListingAuthority>(value, {
     nasdaq_trader: copy.nasdaqTrader,
     massive: copy.massive,
+    eodhd: copy.eodhd,
   }, locale);
 }
 
@@ -438,6 +440,20 @@ export function lifecycleAutomationOperatorDetailLabel(
     return null;
   }
   const detail = value as Partial<SecurityLifecycleAutomationOperatorDetail>;
+  if (detail.code === "listing_checks") {
+    const copy = lifecycleCopy(locale).automationOperatorDetails.listingChecks;
+    if (!Array.isArray(detail.missing_checks) || !Array.isArray(detail.provider_issues)
+      || detail.missing_checks.some((key) => !LISTING_CHECK_NAMES.includes(key))
+      || detail.provider_issues.some((issue) => !issue || typeof issue !== "object" || !LISTING_PROVIDER_NAMES.includes(issue.provider) || !LISTING_PROVIDER_ISSUES.includes(issue.reason))
+      || typeof detail.manual_review_required !== "boolean") return null;
+    const checks = detail.missing_checks.map((key) => copy.checks[key]).filter(Boolean);
+    const authorities = lifecycleCopy(locale).listingEvidence.authorities;
+    const providers = { massive: authorities.massive, eodhd: authorities.eodhd, nasdaq: authorities.nasdaqTrader };
+    const issues = detail.provider_issues.map((issue) => narrativeTemplate(copy.providerIssue, {
+      provider: providers[issue.provider], issue: copy.issues[issue.reason],
+    }));
+    return [...checks, ...issues, ...(detail.manual_review_required ? [copy.manualReview] : [])].join("; ");
+  }
   if (
     detail.code !== "candidate_budget_exceeded"
     || !Number.isInteger(detail.candidate_count)

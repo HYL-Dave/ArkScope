@@ -2584,6 +2584,71 @@ def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
     assert "local_refresh" not in res
 
 
+def test_tick_invokes_membership_reconciliation_with_the_real_keyword_only_contract(monkeypatch, tmp_path):
+    import src.sa_tracking_memberships as membership
+    seen = []
+    def reconcile(*, profile_db, sa_db, at):
+        seen.append((profile_db, sa_db, at))
+        return True
+    monkeypatch.setattr(membership, "reconcile_sa_tracking", reconcile)
+    ds.tick_once(_NOW, fire=lambda source: None)
+    assert len(seen) == 1
+    assert str(seen[0][0]) == str(tmp_path / "profile_state.db")
+    assert seen[0][2] == _NOW.isoformat()
+
+
+def test_price_repair_scope_change_is_reported_without_provider_dispatch(monkeypatch):
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", lambda argv: pytest.fail("provider dispatch"))
+    result = ds.run_source("ibkr_prices", "api", tickers=["REMOVED"], price_lookback_days=30,
+                           price_as_of_date="2026-09-04", price_repair_id="a" * 32)
+    assert result["status"] == "skipped"
+    assert result["reason"] == "price_repair_scope_changed"
+    assert ds.status_snapshot()["ibkr_prices"]["last_result"]["price_repair_id"] == "a" * 32
+
+
+def test_price_repair_rechecks_membership_after_waiting_for_gateway(monkeypatch):
+    scopes = iter((["AAPL"], []))
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: next(scopes))
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", lambda argv: pytest.fail("provider dispatch after removal"))
+    result = ds.run_source("ibkr_prices", "api", tickers=["AAPL"], price_lookback_days=30,
+                           price_as_of_date="2026-09-04", price_repair_id="c" * 32)
+    assert result["status"] == "skipped"
+    assert result["reason"] == "price_repair_scope_changed"
+    assert result["price_repair_id"] == "c" * 32
+    assert ds._SOURCE_LOCKS["ibkr_prices"].acquire(blocking=False)
+    ds._SOURCE_LOCKS["ibkr_prices"].release()
+
+
+@pytest.mark.parametrize("remaining", [[], ["AAPL"]])
+@pytest.mark.parametrize("calendar_available", [True, False])
+def test_price_repair_verifies_the_approved_window_and_persists_its_identity(monkeypatch, remaining, calendar_available):
+    from src.market_coverage.models import CalendarHealth, ObservationHealth
+    from src.market_coverage.service import TradingDayCoverageService
+    store = _install_recording_job_store(monkeypatch)
+    clocks = []
+    def verified(self, **kwargs):
+        clocks.append(self._clock())
+        assert kwargs == {"universe": ["AAPL"], "lookback_days": 30, "interval": "15min"}
+        return SimpleNamespace(history_gaps=[SimpleNamespace(ticker=ticker) for ticker in remaining],
+                               observation_health=SimpleNamespace(status=ObservationHealth.OK), days=[],
+                               calendar_health=SimpleNamespace(status=CalendarHealth.OK if calendar_available else CalendarHealth.UNAVAILABLE))
+    monkeypatch.setattr(TradingDayCoverageService, "get_coverage", verified)
+    def worker(argv):
+        args = prices_runtime.parse_args(argv[3:])
+        assert args.no_provider_fallback is True
+        assert args.lookback_days == 30
+        assert str(args.as_of_date) == "2026-08-31"
+        assert args.tickers == "AAPL"
+        return {"returncode": 0, "payload": _scheduled_price_payload()}
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", worker)
+    result = ds.run_source("ibkr_prices", "api", tickers=["AAPL"], price_lookback_days=30,
+                           price_as_of_date="2026-08-31", price_repair_id="b" * 32)
+    assert result["status"] == ("partial" if remaining or not calendar_available else "succeeded")
+    assert str(clocks[0].date()) == "2026-08-31"
+    assert ds._state_store().get("ibkr_prices")["last_result"]["price_repair_id"] == "b" * 32
+    assert store.finished[-1][1]["status"] == ("failed" if remaining or not calendar_available else "succeeded")
+
+
 def test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation(
     monkeypatch,
 ):

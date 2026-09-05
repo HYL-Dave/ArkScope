@@ -20,6 +20,13 @@ const STATUS_LABELS = {
 } satisfies Record<TickerIdentityTransitionStatus, string>;
 
 const BLOCK_LABELS = {
+  listing_authority_required: "Listing authority required",
+  provider_listing_check_required: "Provider check required",
+  provider_listing_check_stale: "Provider check expired",
+  provider_listing_check_changed: "Provider evidence changed",
+  provider_terminal_not_confirmed: "Terminal not confirmed",
+  provider_legacy_event_review: "Legacy event review",
+  provider_continuation_review: "Continuation review",
   successor_missing: "Successor missing",
   successor_not_distinct: "Successor is unchanged",
   outcome_not_executable: "Outcome is not executable",

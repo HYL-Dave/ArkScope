@@ -1,8 +1,29 @@
 import { describe, expect, it } from "vitest";
+import { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./listingContract";
+import en from "../i18n/resources/en/explore";
+import zh from "../i18n/resources/zh-Hant/explore";
 
 const PRESENTATION_MODULE = "./lifecyclePresentation";
 
 describe("Lifecycle presentation", () => {
+  it("covers the closed listing diagnostics in both languages without exposing internal context", async () => {
+    const { lifecycleAutomationOperatorDetailLabel } = await import("./lifecyclePresentation");
+    for (const [locale, dictionary] of [["en", en], ["zh-Hant", zh]] as const) {
+      const copy = dictionary.lifecycle.automationOperatorDetails.listingChecks;
+      expect(Object.keys(copy.checks).sort()).toEqual([...LISTING_CHECK_NAMES].sort());
+      expect(Object.keys(copy.issues).sort()).toEqual([...LISTING_PROVIDER_ISSUES].sort());
+      for (const check of LISTING_CHECK_NAMES) {
+        for (const provider of LISTING_PROVIDER_NAMES) {
+          const label = lifecycleAutomationOperatorDetailLabel({ code: "listing_checks", missing_checks: [check],
+            provider_issues: [{ provider, reason: "rate_limited" }], manual_review_required: true, secret: "private" }, locale);
+          expect(label).toContain(copy.checks[check]);
+          expect(label).toContain(copy.manualReview);
+          expect(label).not.toContain("private");
+        }
+      }
+      expect(lifecycleAutomationOperatorDetailLabel({ code: "listing_checks", missing_checks: [], provider_issues: [null], manual_review_required: false }, locale)).toBeNull();
+    }
+  });
   it("labels listing authority and snapshot states without calling not-found delisted", async () => {
     const {
       lifecycleEvidenceSourceFamilyLabel,

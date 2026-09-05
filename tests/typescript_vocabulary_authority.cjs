@@ -62,14 +62,13 @@ function constStringArray(sourceFile, name) {
   if (!(statement.declarationList.flags & ts.NodeFlags.Const)) {
     fail(`expected exactly one const array declaration named ${name}; found 0`);
   }
-  if (
-    !declaration.initializer
-    || !ts.isArrayLiteralExpression(declaration.initializer)
-  ) {
+  let initializer = declaration.initializer;
+  while (initializer && (ts.isAsExpression(initializer) || ts.isTypeAssertionExpression(initializer))) initializer = initializer.expression;
+  if (!initializer || !ts.isArrayLiteralExpression(initializer)) {
     fail(`const ${name} must be a closed string-literal array`);
   }
 
-  const members = declaration.initializer.elements;
+  const members = initializer.elements;
   if (
     members.length === 0
     || members.some((member) => !ts.isStringLiteral(member))

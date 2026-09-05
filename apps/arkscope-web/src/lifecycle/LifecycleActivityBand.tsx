@@ -44,6 +44,7 @@ function activityChangeLabels(
   t: TFunction<"explore">,
 ): Record<TickerIdentityTransitionActivityChangeType, string> {
   return {
+    sa_membership_suppressed: t(($) => $.lifecycle.activity.changes.saMembershipSuppressed),
     editable_tag_copied: t(($) => $.lifecycle.activity.changes.editableTagCopied),
     legacy_membership_added: t(($) => $.lifecycle.activity.changes.legacyMembershipAdded),
     legacy_membership_archived: t(
@@ -71,6 +72,13 @@ function transitionBlockLabels(
   t: TFunction<"explore">,
 ): Record<TickerIdentityTransitionBlockReason, string> {
   return {
+    listing_authority_required: t(($) => $.lifecycle.transition.blockers.listingAuthorityRequired),
+    provider_listing_check_required: t(($) => $.lifecycle.transition.blockers.providerCheckRequired),
+    provider_listing_check_stale: t(($) => $.lifecycle.transition.blockers.providerCheckStale),
+    provider_listing_check_changed: t(($) => $.lifecycle.transition.blockers.providerCheckChanged),
+    provider_terminal_not_confirmed: t(($) => $.lifecycle.transition.blockers.terminalNotConfirmed),
+    provider_legacy_event_review: t(($) => $.lifecycle.transition.blockers.legacyReview),
+    provider_continuation_review: t(($) => $.lifecycle.transition.blockers.continuationReview),
     successor_missing: t(($) => $.lifecycle.transition.blockers.successorMissing),
     successor_not_distinct: t(($) => $.lifecycle.transition.blockers.successorNotDistinct),
     outcome_not_executable: t(($) => $.lifecycle.transition.blockers.outcomeNotExecutable),

@@ -77,6 +77,8 @@ def observation_fingerprint(observation: dict) -> str:
             "description",
         )
     }
+    if observation.get("source") == "listing_authority":
+        payload["provider_snapshot_sha256"] = observation.get("provider_snapshot_sha256")
     payload["kinds"] = sorted(
         [
             {
@@ -301,13 +303,14 @@ def derive_action_proposal_specs(
             add("remap_symbol", replacement_ticker=successor_ticker)
         if outcomes == {"venue_transfer"}:
             add("keep_tracking")
-        if "portfolio_open" not in source_values and outcomes & {
-            "listing_ended",
+        if "listing_ended" not in outcomes and outcomes & {
             "acquisition_cash",
             "acquisition_stock",
             "acquisition_mixed",
             "acquisition_terms_unknown",
         }:
+            add("keep_tracking")
+        if "portfolio_open" not in source_values and outcomes == {"listing_ended"}:
             if "manual_lists" in source_values:
                 add("archive_manual_memberships")
             if set(source_values) & {
@@ -1810,9 +1813,13 @@ def project_automation_blocker(blocker: Mapping[str, object]) -> dict[str, objec
         context = blocker.get("context")
     else:
         context = blocker.get("operator_detail")
-    if projected["blocker_code"] != "market_confirmation_missing":
+    if projected["blocker_code"] == "listing_status_unresolved":
+        from src.security_lifecycle_provider_diagnostics import listing_operator_detail
+        detail = listing_operator_detail(context)
+    elif projected["blocker_code"] == "market_confirmation_missing":
+        detail = _candidate_budget_operator_detail(context)
+    else:
         return projected
-    detail = _candidate_budget_operator_detail(context)
     if detail is not None:
         projected["operator_detail"] = detail
     return projected
@@ -1949,7 +1956,7 @@ def _read_profile(
             automation_runs, automation_facts, run_total, fact_total = (
                 _automation_history(store, case_id)
             )
-            admission = classify_sec_admission(
+            admission = None if case["source"] == "listing_authority" else classify_sec_admission(
                 observation=observations_by_case.get(
                     case_id,
                     {"ticker": case["ticker"], "filing_form": ""},
@@ -1986,7 +1993,7 @@ def _read_profile(
                     "automation_facts": automation_facts,
                     "automation_run_count": run_total,
                     "automation_fact_count": fact_total,
-                    "sec_admission": {
+                    "sec_admission": None if admission is None else {
                         "state": admission.state,
                         "reason": admission.reason,
                     },
@@ -2002,6 +2009,12 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
         observations = read_market_observations(market_db_path, limit=None)
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("market") from None
+    try:
+        if Path(profile_db_path).is_file():
+            from src.security_lifecycle_provider_store import ProviderCheckStore
+            observations.extend(ProviderCheckStore(profile_db_path).observations())
+    except (OSError, sqlite3.Error, ValueError):
+        raise LifecycleStoreUnavailable("profile") from None
     by_case: dict[str, dict] = {}
     fingerprints: dict[str, str] = {}
     for observation in observations:
@@ -2050,7 +2063,7 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
 
     for case_id, case in by_case.items():
         observation = case.get("observation")
-        if not isinstance(observation, Mapping):
+        if not isinstance(observation, Mapping) or case["source"] == "listing_authority":
             case["sec_admission"] = None
             continue
         if case.get("sec_admission") is None:
@@ -2064,6 +2077,15 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
                 "state": admission.state,
                 "reason": admission.reason,
             }
+
+    if Path(profile_db_path).is_file():
+        from src.sa_tracking_memberships import SaTrackingMembershipStore
+        with sqlite3.connect(f"{Path(profile_db_path).resolve().as_uri()}?mode=ro", uri=True) as conn:
+            provider_authority_installed = SaTrackingMembershipStore.installed(conn)
+        if provider_authority_installed:
+            for case in by_case.values():
+                if case["source"] != "listing_authority":
+                    case["sec_admission"] = {"state": "screened_out", "reason": "regulator_monitor_only"}
 
     cases = sorted(
         by_case.values(),

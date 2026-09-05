@@ -47,6 +47,8 @@ _TOP_LEVEL_FIELDS = {
     "observation_health",
     "days",
     "provider_errors",
+    "scope_basis",
+    "history_gaps",
 }
 _DAY_FIELDS = {
     "date",
@@ -315,8 +317,14 @@ def test_service_emits_exact_v2_contract_without_retired_fields(tmp_path):
     assert result["version"] == 2
     assert result["market_scope"] == "us_listed_equity_proxy"
     assert result["coverage_session"] == "rth"
-    serialized = repr(result)
-    assert not any(retired in serialized for retired in _RETIRED_FIELDS)
+    def keys(value):
+        if isinstance(value, dict):
+            return set(value).union(*(keys(item) for item in value.values()))
+        if isinstance(value, list):
+            return set().union(*(keys(item) for item in value))
+        return set()
+
+    assert not keys(result) & _RETIRED_FIELDS
 
 
 def test_empty_active_universe_returns_honest_unknown_coverage(tmp_path):

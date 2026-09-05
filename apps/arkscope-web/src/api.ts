@@ -6,6 +6,8 @@
 
 import { SSEFrameParser, type SSEFrame } from "./sse";
 import type { UiLocale } from "./i18n/locale";
+import { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./lifecycle/listingContract";
+export { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./lifecycle/listingContract";
 
 export interface ApiStatus {
   status: string;
@@ -2532,6 +2534,7 @@ export type SecurityLifecycleSecAdmissionReason =
   | "no_material_tracked_security_fact"
   | "identity_binding_missing"
   | "regulator_screening_incomplete"
+  | "regulator_monitor_only"
   | "unknown_form";
 export type SecurityLifecycleProposalStatus = "proposed" | "dismissed";
 export type SecurityLifecycleProposalBlockReason =
@@ -2620,7 +2623,7 @@ export type SecurityLifecycleEvidenceSourceFamily =
   | "publisher"
   | "general_web"
   | "manual";
-export type SecurityLifecycleListingAuthority = "nasdaq_trader" | "massive";
+export type SecurityLifecycleListingAuthority = "nasdaq_trader" | "massive" | "eodhd";
 export type SecurityLifecycleListingStatus =
   | "active"
   | "inactive"
@@ -2670,7 +2673,13 @@ export interface SecurityLifecycleCandidateBudgetExceededOperatorDetail {
   provider_contacted: false;
 }
 export type SecurityLifecycleAutomationOperatorDetail =
-  SecurityLifecycleCandidateBudgetExceededOperatorDetail;
+  SecurityLifecycleCandidateBudgetExceededOperatorDetail | SecurityLifecycleListingOperatorDetail;
+export interface SecurityLifecycleListingOperatorDetail {
+  code: "listing_checks";
+  missing_checks: Array<typeof LISTING_CHECK_NAMES[number]>;
+  provider_issues: Array<{ provider: typeof LISTING_PROVIDER_NAMES[number]; reason: typeof LISTING_PROVIDER_ISSUES[number] }>;
+  manual_review_required: boolean;
+}
 export type SecurityLifecycleFactType =
   | "source_ticker"
   | "successor_ticker"
@@ -2685,6 +2694,57 @@ export type SecurityLifecycleFactType =
 export interface SecurityLifecycleObservationKind {
   event_type: SecurityLifecycleEventType;
   effective_date: string | null;
+}
+
+export const ALPHA_TRACKING_REASONS = [
+  "current_observed", "bootstrap_accepted", "capture_gap", "identity_ambiguous", "related_security",
+  "user_removed", "user_restored", "user_accepted", "terminal_delisting",
+] as const;
+export interface AlphaTrackingMembership {
+  membership_id: string;
+  ticker: string;
+  picked_date: string;
+  portfolio_status: "current" | "closed";
+  state: "tracking" | "removed" | "candidate";
+  reason: typeof ALPHA_TRACKING_REASONS[number];
+  accepted_at: string | null;
+  removed_at: string | null;
+}
+export interface AlphaTrackingResponse {
+  available: boolean;
+  memberships: AlphaTrackingMembership[];
+  sync_status: "current" | "pending" | "unavailable";
+}
+
+export function parseAlphaTracking(value: unknown): AlphaTrackingResponse {
+  const row = lifecycleCaseRecord(value);
+  if (typeof row.available !== "boolean") throw new Error("invalid_tracking_payload");
+  const memberships = lifecycleCaseArray(row.memberships).map((raw): AlphaTrackingMembership => {
+    const item = lifecycleCaseRecord(raw);
+    return {
+      membership_id: lifecycleCaseString(item.membership_id), ticker: lifecycleCaseString(item.ticker),
+      picked_date: lifecycleCaseString(item.picked_date),
+      portfolio_status: lifecycleCaseEnum(item.portfolio_status, ["current", "closed"] as const),
+      state: lifecycleCaseEnum(item.state, ["tracking", "removed", "candidate"] as const),
+      reason: lifecycleCaseEnum(item.reason, ALPHA_TRACKING_REASONS),
+      accepted_at: lifecycleCaseNullableString(item.accepted_at), removed_at: lifecycleCaseNullableString(item.removed_at),
+    };
+  });
+  if (!row.available && memberships.length) throw new Error("invalid_tracking_payload");
+  return {
+    available: row.available, memberships,
+    sync_status: row.sync_status === undefined ? "unavailable" : lifecycleCaseEnum(row.sync_status, ["current", "pending", "unavailable"] as const),
+  };
+}
+
+export async function getAlphaTracking(): Promise<AlphaTrackingResponse> {
+  return parseAlphaTracking(await getJSON<unknown>("/profile/alpha-picks-tracking"));
+}
+export async function refreshAlphaTracking(): Promise<AlphaTrackingResponse> {
+  return parseAlphaTracking(await sendJSON<unknown>("/profile/alpha-picks-tracking/refresh", "POST", {}));
+}
+export async function commandAlphaTracking(membershipId: string, action: "remove" | "restore" | "accept"): Promise<void> {
+  await sendJSON(`/profile/alpha-picks-tracking/${encodeURIComponent(membershipId)}`, "POST", { action });
 }
 
 export interface SecurityLifecycleObservation {
@@ -2842,6 +2902,16 @@ export interface SecurityLifecycleListingEvidence
   listing: SecurityLifecycleListingSnapshot;
 }
 
+export interface SecurityLifecycleTickerEventEvidence extends SecurityLifecycleEvidenceBase {
+  source_family: "listing_authority";
+  kind: "ticker_event_snapshot";
+  ticker_event: {
+    candidate_ticker: string;
+    latest_ticker: string | null;
+    events: Array<{ source_ticker: string; successor_ticker: string; effective_date: string }>;
+  };
+}
+
 export interface SecurityLifecycleProseEvidence
   extends SecurityLifecycleEvidenceBase {
   source_family: Exclude<
@@ -2860,6 +2930,7 @@ export interface SecurityLifecycleProseEvidence
 
 export type SecurityLifecycleEvidence =
   | SecurityLifecycleListingEvidence
+  | SecurityLifecycleTickerEventEvidence
   | SecurityLifecycleProseEvidence;
 
 export interface SecurityLifecycleActionProposal {
@@ -2903,6 +2974,13 @@ export type TickerIdentityTransitionStatus =
   | "cancelled"
   | "reversed";
 export type TickerIdentityTransitionBlockReason =
+  | "listing_authority_required"
+  | "provider_listing_check_required"
+  | "provider_listing_check_stale"
+  | "provider_listing_check_changed"
+  | "provider_terminal_not_confirmed"
+  | "provider_legacy_event_review"
+  | "provider_continuation_review"
   | "successor_missing"
   | "successor_not_distinct"
   | "outcome_not_executable"
@@ -2933,6 +3011,7 @@ export type TickerIdentityTransitionApprovalAuthority =
   | "automation_policy";
 export type TickerIdentityTransitionActivityType = "applied" | "reversed";
 export type TickerIdentityTransitionActivityChangeType =
+  | "sa_membership_suppressed"
   | "editable_tag_copied"
   | "legacy_membership_added"
   | "legacy_membership_archived"
@@ -3005,6 +3084,7 @@ export interface TickerIdentityTransitionPreview {
   case_id: string;
   caveats: TickerIdentityTransitionCaveat[];
   effects: {
+    sa_tracking_memberships?: Array<{ membership_id: string; ticker: string; picked_date: string; portfolio_status: "current" | "closed" }>;
     editable_tags_to_copy: TickerIdentityEditableTagEffect[];
     legacy_config_seed: Record<
       "add" | "archive" | "reactivate" | "unchanged",
@@ -3141,6 +3221,7 @@ export interface SecurityLifecycleCorroboration {
   regulator: SecurityLifecycleSourceFamilyState | null;
   nasdaq_trader: SecurityLifecycleListingCorroboration | null;
   massive: SecurityLifecycleListingCorroboration | null;
+  eodhd?: SecurityLifecycleListingCorroboration | null;
   ibkr: SecurityLifecycleSourceFamilyState | null;
 }
 
@@ -3170,6 +3251,7 @@ export interface SecurityLifecycleCaseDetail {
   sec_admission: SecurityLifecycleSecAdmission | null;
   observation: SecurityLifecyclePrimaryObservation | null;
   corroboration: SecurityLifecycleCorroboration;
+  current_blockers?: SecurityLifecycleAutomationRun["blockers"];
   proposals: SecurityLifecycleActionProposal[];
   ticker_transition: TickerIdentityTransitionState | null;
 }
@@ -3246,7 +3328,8 @@ export type SecurityLifecycleAutomationFailureReason =
   | "profile_schema_mismatch"
   | "profile_store_unavailable"
   | "automation_scheduler_failed"
-  | "execution_lock_unavailable";
+  | "execution_lock_unavailable"
+  | "provider_scan_budget_unavailable";
 
 export interface SecurityLifecycleAutomationResult {
   status: SecurityLifecycleAutomationResultStatus;
@@ -3342,6 +3425,7 @@ const AUTOMATION_REASONS: readonly SecurityLifecycleAutomationFailureReason[] = 
   "profile_store_unavailable",
   "automation_scheduler_failed",
   "execution_lock_unavailable",
+  "provider_scan_budget_unavailable",
 ];
 
 function automationContractError(): never {
@@ -3594,6 +3678,7 @@ readonly SecurityLifecycleSecAdmissionReason[] = [
   "no_material_tracked_security_fact",
   "identity_binding_missing",
   "regulator_screening_incomplete",
+  "regulator_monitor_only",
   "unknown_form",
 ];
 const LIFECYCLE_SOURCE_FAMILY_STATES:
@@ -3630,6 +3715,7 @@ const LIFECYCLE_LISTING_AUTHORITIES:
 readonly SecurityLifecycleListingAuthority[] = [
   "nasdaq_trader",
   "massive",
+  "eodhd",
 ];
 const LIFECYCLE_AUDIT_COLLECTIONS = [
   "investigation_runs",
@@ -3837,6 +3923,15 @@ function parseLifecycleAutomationOperatorDetail(
   value: unknown,
 ): SecurityLifecycleAutomationOperatorDetail {
   const row = lifecycleCaseRecord(value);
+  if (row.code === "listing_checks") return {
+    code: row.code,
+    missing_checks: lifecycleCaseArray(row.missing_checks).map((item) => lifecycleCaseEnum(item, LISTING_CHECK_NAMES)),
+    provider_issues: lifecycleCaseArray(row.provider_issues).map((item) => {
+      const issue = lifecycleCaseRecord(item);
+      return { provider: lifecycleCaseEnum(issue.provider, LISTING_PROVIDER_NAMES), reason: lifecycleCaseEnum(issue.reason, LISTING_PROVIDER_ISSUES) };
+    }),
+    manual_review_required: lifecycleCaseBoolean(row.manual_review_required),
+  };
   if (row.code !== "candidate_budget_exceeded" || row.provider_contacted !== false) {
     return lifecycleCaseContractError();
   }
@@ -3957,6 +4052,22 @@ function parseLifecycleEvidence(value: unknown): SecurityLifecycleEvidence {
   const sourceUrl = lifecycleCaseNullableString(row.source_url);
   const createdAt = lifecycleCaseString(row.created_at);
   if (sourceFamily === "listing_authority") {
+    if (row.kind === "ticker_event_snapshot") {
+      const event = lifecycleCaseRecord(row.ticker_event);
+      return {
+        evidence_id: evidenceId, source_family: "listing_authority", kind: "ticker_event_snapshot",
+        source_url: sourceUrl, created_at: createdAt,
+        ticker_event: {
+          candidate_ticker: lifecycleCaseString(event.candidate_ticker),
+          latest_ticker: lifecycleCaseNullableString(event.latest_ticker),
+          events: lifecycleCaseArray(event.events).map((raw) => {
+            const item = lifecycleCaseRecord(raw);
+            return { source_ticker: lifecycleCaseString(item.source_ticker),
+              successor_ticker: lifecycleCaseString(item.successor_ticker), effective_date: lifecycleCaseString(item.effective_date) };
+          }),
+        },
+      };
+    }
     const listing = lifecycleCaseRecord(row.listing);
     const directory = listing.directory === null
       ? null
@@ -4163,10 +4274,12 @@ function parseLifecycleCaseDetail(value: unknown): SecurityLifecycleCaseDetail {
         : lifecycleCaseEnum(corroboration.regulator, LIFECYCLE_SOURCE_FAMILY_STATES),
       nasdaq_trader: parseLifecycleListingCorroboration(corroboration.nasdaq_trader),
       massive: parseLifecycleListingCorroboration(corroboration.massive),
+      ...(corroboration.eodhd === undefined ? {} : { eodhd: parseLifecycleListingCorroboration(corroboration.eodhd) }),
       ibkr: corroboration.ibkr === null
         ? null
         : lifecycleCaseEnum(corroboration.ibkr, LIFECYCLE_SOURCE_FAMILY_STATES),
     },
+    current_blockers: row.current_blockers === undefined ? [] : lifecycleCaseArray(row.current_blockers).map(parseLifecycleAutomationBlocker),
     proposals: lifecycleCaseArray(row.proposals).map(parseLifecycleProposal),
     ticker_transition: row.ticker_transition === null
       ? null
@@ -4665,15 +4778,82 @@ export interface TradingDayCoverage {
   observation_health: CoverageObservationHealth;
   days: TradingDayRow[];
   provider_errors: ProviderSyncIssue[];
+  scope_basis?: "current_universe_retrospective";
+  history_gaps?: CoverageHistoryGap[];
 }
 
-export function getTradingDayCoverage(
+export interface CoverageHistoryGap {
+  ticker: string;
+  reason: "before_first_local_bar" | "no_local_history" | "missing_observations" | "partial_observations";
+  first_local_bar_at: string | null;
+  missing_dates: string[];
+  partial_dates: string[];
+  provider_issue_reason: ProviderSyncIssue["reason_code"] | null;
+}
+
+function coverageRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("price_coverage_payload_invalid");
+  return value as Record<string, unknown>;
+}
+function coverageStrings(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.length)) throw new Error("price_coverage_payload_invalid");
+  return value;
+}
+export function parseCoverageHistoryGaps(value: unknown): CoverageHistoryGap[] {
+  if (!Array.isArray(value)) throw new Error("price_coverage_payload_invalid");
+  return value.map((raw) => {
+    const row = coverageRecord(raw);
+    const reasons = ["before_first_local_bar", "no_local_history", "missing_observations", "partial_observations"];
+    const issues = [null, "security_definition_unavailable", "price_data_unresolved", "provider_request_failed", "unknown"];
+    if (typeof row.ticker !== "string" || !row.ticker || !reasons.includes(String(row.reason))
+      || !issues.includes(row.provider_issue_reason as string | null)
+      || !(row.first_local_bar_at === null || typeof row.first_local_bar_at === "string")) throw new Error("price_coverage_payload_invalid");
+    return { ticker: row.ticker, reason: row.reason as CoverageHistoryGap["reason"],
+      first_local_bar_at: row.first_local_bar_at, missing_dates: coverageStrings(row.missing_dates),
+      partial_dates: coverageStrings(row.partial_dates), provider_issue_reason: row.provider_issue_reason as CoverageHistoryGap["provider_issue_reason"] };
+  });
+}
+
+export interface PriceRepairPreview {
+  provider: "ibkr";
+  fallback_allowed: false;
+  interval: "15min";
+  lookback_days: number;
+  as_of_date: string;
+  tickers: string[];
+  blocked_tickers: string[];
+  preview_sha256: string;
+}
+export function parsePriceRepairPreview(value: unknown): PriceRepairPreview {
+  const row = coverageRecord(value);
+  if (row.provider !== "ibkr" || row.fallback_allowed !== false || row.interval !== "15min"
+    || !Number.isInteger(row.lookback_days) || (row.lookback_days as number) < 1 || (row.lookback_days as number) > 120
+    || typeof row.as_of_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.as_of_date)
+    || typeof row.preview_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(row.preview_sha256)) throw new Error("price_coverage_payload_invalid");
+  return { provider: row.provider, fallback_allowed: row.fallback_allowed, interval: row.interval,
+    lookback_days: row.lookback_days as number, as_of_date: row.as_of_date, preview_sha256: row.preview_sha256,
+    tickers: coverageStrings(row.tickers), blocked_tickers: coverageStrings(row.blocked_tickers) };
+}
+export async function getPriceRepairPreview(lookbackDays: number): Promise<PriceRepairPreview> {
+  return parsePriceRepairPreview(await getJSON<unknown>(`/market-data/price-repair/preview?lookback_days=${lookbackDays}`));
+}
+export async function startPriceRepair(preview: PriceRepairPreview): Promise<{ status: "accepted" | "nothing_to_repair"; repair_id: string | null }> {
+  const row = coverageRecord(await sendJSON<unknown>("/market-data/price-repair", "POST", {
+    lookback_days: preview.lookback_days, preview_sha256: preview.preview_sha256,
+  }));
+  if (row.status === "nothing_to_repair") return { status: row.status, repair_id: null };
+  if (row.status !== "accepted" || typeof row.repair_id !== "string" || !/^[a-f0-9]{32}$/.test(row.repair_id)) throw new Error("price_coverage_payload_invalid");
+  return { status: row.status, repair_id: row.repair_id };
+}
+
+export async function getTradingDayCoverage(
   lookbackDays = 10,
   interval = "15min",
 ): Promise<TradingDayCoverage> {
-  return getJSON<TradingDayCoverage>(
+  const result = await getJSON<TradingDayCoverage>(
     `/market-data/trading-days?lookback_days=${lookbackDays}&interval=${encodeURIComponent(interval)}`,
   );
+  return { ...result, history_gaps: "history_gaps" in result ? parseCoverageHistoryGaps(result.history_gaps) : [] };
 }
 
 // --- News feed (score-free, local-first over news + FTS5) ---
@@ -4956,6 +5136,8 @@ export interface ScheduleRunResult {
   status: string;
   reason?: string;
   at?: string;
+  price_repair_id?: string;
+  price_repair?: { remaining_tickers: string[]; observation_health: string; lookback_days: number; as_of_date: string };
   collect?: {
     status?: "succeeded" | "partial" | "failed";
     continuation?: ScheduleContinuationCounts | null;

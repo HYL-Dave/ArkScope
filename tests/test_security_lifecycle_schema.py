@@ -24,6 +24,7 @@ PROFILE_TABLES = {
     "security_lifecycle_case_acknowledgements",
     "security_lifecycle_action_proposals",
     "security_lifecycle_migration_receipts",
+    "security_lifecycle_provider_checks",
 }
 
 

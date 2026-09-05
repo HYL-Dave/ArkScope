@@ -334,12 +334,13 @@ def _build(
     execute_on: str = "2026-08-25",
     priority_resolution: str | None = None,
     unhide_successor: bool = False,
+    case: dict | None = None,
 ) -> dict:
     from src.ticker_identity_transition import TransitionOptions, build_transition_preview
 
     return build_transition_preview(
         conn,
-        case=_case(),
+        case=case or _case(),
         assessment=assessment or _assessment(),
         proposals=proposals if proposals is not None else [_proposal()],
         observation_fingerprint_sha256=_OBSERVATION_FINGERPRINT,
@@ -1452,6 +1453,30 @@ def test_terminal_delisting_archives_and_suppresses_without_creating_successor(
         assert conn.execute(
             "SELECT COUNT(*) FROM ticker_identity_links"
         ).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_terminal_transition_suppresses_membership_before_alias_and_has_reversal_receipt(tmp_path):
+    from tests.test_security_lifecycle_terminal_workflow import setup_workflow
+    from src.ticker_identity_transition import TickerIdentityTransitionStore, TransitionOptions
+
+    context = setup_workflow(tmp_path)
+    conn = sqlite3.connect(context["profile"])
+    try:
+        tracking = context["tracking"]
+        preview = context["service"].preview_case(context["case_id"], options=TransitionOptions(execute_on=context["ended"]))
+        store = TickerIdentityTransitionStore(conn, id_factory=_id_factory(), clock=lambda: context["now"][0])
+        transition = store.approve(preview=preview, approved_preview_sha256=preview["preview_sha256"])
+        result = store.apply(transition["transition_id"], current_preview=preview, expected_preview_sha256=preview["preview_sha256"], trigger="attended_user")
+        assert result["status"] == "applied"
+        assert tracking.active_sources(identity_links={"OLD": "NEW"}) == {}
+        assert tracking.list_memberships()[0]["reason"] == "terminal_delisting"
+        assert conn.execute("SELECT COUNT(*) FROM ticker_identity_links").fetchone()[0] == 0
+        ready = store.reverse_readiness(transition["transition_id"])
+        assert ready["reversible"] is True
+        assert store.reverse(transition["transition_id"], trigger="attended_user")["status"] == "reversed"
+        assert tracking.active_sources() == {"sa_alpha_picks_former": {"OLD"}}
     finally:
         conn.close()
 

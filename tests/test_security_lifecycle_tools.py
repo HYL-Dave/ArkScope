@@ -14,7 +14,7 @@ def _listing_locator(**overrides):
         "adapter": "massive_reference",
         "authority": "massive",
         "directory": None,
-        "candidate_ticker": "B",
+        "candidate_ticker": "EA",
         "expected_active_state": True,
         "listing_status": "active",
         "market": "stocks",
@@ -99,7 +99,7 @@ def _seed_all_evidence_families(store, case_id, fingerprint):
         )
 
     listing_excerpt = json.dumps(
-        {"listing_status": "active", "ticker": "B", "secret": "canonical-only"},
+        {"listing_status": "active", "ticker": "EA", "secret": "canonical-only"},
         separators=(",", ":"),
         sort_keys=True,
     )
@@ -600,7 +600,7 @@ def test_active_case_projection_uses_closed_families_but_preserves_storage(
             "listing": {
                 "authority": "massive",
                 "directory": None,
-                "candidate_ticker": "B",
+                "candidate_ticker": "EA",
                 "listing_status": "active",
                 "market": "stocks",
                 "primary_exchange": "XNAS",
@@ -806,11 +806,7 @@ def test_primary_detail_and_lazy_audit_are_disjoint_closed_projections(
         profile.close()
 
 
-def test_primary_detail_distinguishes_nasdaq_and_massive_corroboration():
-    from src.tools.security_lifecycle_tools import (
-        project_security_lifecycle_case_detail,
-    )
-
+def _corroboration_case():
     source = {
         "case_id": "slc_authorities",
         "source": "sec_edgar",
@@ -880,7 +876,12 @@ def test_primary_detail_distinguishes_nasdaq_and_massive_corroboration():
         ],
     }
 
-    primary = project_security_lifecycle_case_detail(source)
+    return source
+
+
+def test_primary_detail_distinguishes_nasdaq_and_massive_corroboration():
+    from src.tools.security_lifecycle_tools import project_security_lifecycle_case_detail
+    primary = project_security_lifecycle_case_detail(_corroboration_case())
 
     assert primary["corroboration"]["nasdaq_trader"] == {
         "listing_status": "inactive",
@@ -889,6 +890,22 @@ def test_primary_detail_distinguishes_nasdaq_and_massive_corroboration():
     }
     assert primary["corroboration"]["massive"]["listing_status"] == "active"
     assert "source_locator_json" not in json.dumps(primary)
+
+
+def test_listing_corroboration_uses_exact_case_newest_observation_and_active_veto():
+    from src.tools.security_lifecycle_tools import project_security_lifecycle_case_detail
+    source = _corroboration_case()
+    template = source["evidence"][1]
+    source["evidence"] = [
+        {**template, "evidence_id": "new-inactive", "source_locator_json": json.dumps(_listing_locator(listing_status="inactive", source_as_of="2026-08-29"))},
+        template,
+        {**template, "evidence_id": "different-security", "source_locator_json": json.dumps(_listing_locator(candidate_ticker="BUYER", source_as_of="2026-08-30"))},
+    ]
+    listing = project_security_lifecycle_case_detail(source)["corroboration"]["massive"]
+    assert listing["listing_status"] == "inactive"
+    assert listing["source_as_of"] == "2026-08-29"
+    source["evidence"].insert(0, {**template, "evidence_id": "active-otc", "source_locator_json": json.dumps(_listing_locator(market="otc", source_as_of="2026-08-29"))})
+    assert project_security_lifecycle_case_detail(source)["corroboration"]["massive"]["listing_status"] == "active"
 
 
 def test_malformed_stored_listing_isolated_across_list_direct_and_provider_detail(

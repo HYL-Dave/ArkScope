@@ -13,6 +13,7 @@ from typing import Callable, Iterable, Mapping, cast
 from src.market_data_admin import resolve_market_db_path
 from src.security_lifecycle_disposition import (
     LIFECYCLE_QUEUE_BUCKETS,
+    current_automation_run,
     project_lifecycle_disposition,
 )
 from src.security_lifecycle_investigation import (
@@ -73,6 +74,7 @@ _LISTING_LOCATOR_KEYS = frozenset(
 _LISTING_ADAPTER_AUTHORITIES = {
     "nasdaq_symbol_directory": "nasdaq_trader",
     "massive_reference": "massive",
+    "eodhd_symbol_directory": "eodhd",
 }
 _LISTING_DIRECTORIES = frozenset({"nasdaq_listed", "other_listed"})
 _LISTING_STATUSES = frozenset({"active", "inactive", "not_found", "unverified"})
@@ -340,6 +342,28 @@ def _compact_listing(source_locator_json: object) -> dict:
     }
 
 
+def _compact_ticker_event(encoded: object) -> dict:
+    if not isinstance(encoded, str):
+        raise ValueError("ticker_event_locator")
+    value = json.loads(encoded)
+    fields = {"locator_kind", "candidate_ticker", "composite_figi", "events", "latest_ticker", "snapshot_complete"}
+    if (not isinstance(value, dict) or set(value) != fields
+            or value["locator_kind"] != "ticker_event_snapshot" or value["snapshot_complete"] is not True
+            or not isinstance(value["candidate_ticker"], str) or not _TICKER.fullmatch(value["candidate_ticker"])
+            or not isinstance(value["composite_figi"], str) or not _FIGI.fullmatch(value["composite_figi"])
+            or not _nullable_listing_text(value["latest_ticker"], _TICKER)
+            or not isinstance(value["events"], list)):
+        raise ValueError("ticker_event_locator")
+    events = []
+    for row in value["events"]:
+        if (not isinstance(row, list) or len(row) != 3
+                or any(not isinstance(symbol, str) or not _TICKER.fullmatch(symbol) for symbol in row[:2])
+                or not _valid_listing_temporal(row[2], nullable=False)):
+            raise ValueError("ticker_event_locator")
+        events.append({"source_ticker": row[0], "successor_ticker": row[1], "effective_date": row[2]})
+    return {"candidate_ticker": value["candidate_ticker"], "latest_ticker": value["latest_ticker"], "events": events}
+
+
 def _project_automation_run(raw_run: Mapping[str, object]) -> dict[str, object]:
     query_context = raw_run.get("query_context")
     if query_context is not None and not isinstance(query_context, Mapping):
@@ -388,6 +412,12 @@ def project_active_security_lifecycle_case(case: Mapping[str, object]) -> dict:
         if source_family not in _ACTIVE_SOURCE_FAMILIES:
             continue
         if source_family == "listing_authority":
+            if raw.get("kind") == "ticker_event_snapshot":
+                event = _compact_ticker_event(raw.get("source_locator_json"))
+                evidence.append({"evidence_id": raw.get("evidence_id"), "source_family": "listing_authority",
+                                 "kind": "ticker_event_snapshot", "source_url": raw.get("source_url"),
+                                 "created_at": raw.get("created_at"), "ticker_event": event})
+                continue
             if raw.get("kind") != "listing_directory_snapshot":
                 continue
             try:
@@ -455,6 +485,12 @@ def _project_assessment(
         projected["automation_narrative"] = _AUTOMATION_NARRATIVE_KEYS.get(
             str(row.get("rule_id") or ""), "unknownRule"
         )
+        if row.get("rule_id") == "lifecycle.provider_listing_status":
+            outcomes = set(row.get("outcomes") or ())
+            projected["automation_narrative"] = (
+                "terminalDelisting" if outcomes == {"listing_ended"} else
+                "noIdentityChange" if outcomes == {"no_tracked_security_change"} else
+                "simpleSymbolContinuation" if outcomes == {"symbol_changed"} else "insufficientIdentityFacts")
     return projected
 
 
@@ -485,6 +521,7 @@ def _project_audit_evidence(row: Mapping[str, object]) -> dict[str, object]:
                 "source_url",
                 "created_at",
                 "listing",
+                "ticker_event",
             ),
         )
     projected = _closed_fields(
@@ -549,6 +586,7 @@ def _bounded_rows(
 
 def _listing_corroboration(
     evidence: Iterable[Mapping[str, object]],
+    *, ticker: str,
 ) -> dict[str, object | None]:
     snapshots: dict[str, Mapping[str, object]] = {}
     for row in evidence:
@@ -557,9 +595,14 @@ def _listing_corroboration(
         listing = row.get("listing")
         if not isinstance(listing, Mapping):
             continue
+        if listing.get("candidate_ticker") != ticker:
+            continue
         authority = str(listing.get("authority") or "")
-        if authority in {"nasdaq_trader", "massive"}:
-            snapshots[authority] = listing
+        if authority in {"nasdaq_trader", "massive", "eodhd"}:
+            def priority(item):
+                return (str(item.get("source_as_of") or ""), {"active": 3, "inactive": 2, "unverified": 1, "not_found": 0}.get(item.get("listing_status"), -1))
+            if authority not in snapshots or priority(listing) > priority(snapshots[authority]):
+                snapshots[authority] = listing
 
     def compact(authority: str) -> dict[str, object] | None:
         listing = snapshots.get(authority)
@@ -577,6 +620,7 @@ def _listing_corroboration(
     return {
         "nasdaq_trader": compact("nasdaq_trader"),
         "massive": compact("massive"),
+        **({"eodhd": compact("eodhd")} if "eodhd" in snapshots else {}),
     }
 
 
@@ -619,9 +663,13 @@ def project_security_lifecycle_case_detail(
         raise ValueError("source_family_status")
     primary["corroboration"] = {
         "regulator": statuses.get("regulator"),
-        **_listing_corroboration(active.get("evidence", [])),
+        **_listing_corroboration(active.get("evidence", []), ticker=str(active["ticker"])),
         "ibkr": statuses.get("market_infrastructure"),
     }
+    run = current_automation_run(case)
+    primary["current_blockers"] = [
+        project_automation_blocker(row) for row in run.get("blockers", ())
+    ] if run is not None and run.get("status") == "blocked" else []
     return primary
 
 
@@ -976,7 +1024,7 @@ class SecurityLifecycleReadService:
                 if isinstance(observation, Mapping)
                 else None
             )
-            if isinstance(observation, Mapping) and not isinstance(
+            if item.get("source") != "listing_authority" and isinstance(observation, Mapping) and not isinstance(
                 item.get("sec_admission"), Mapping
             ):
                 admission = classify_sec_admission(

@@ -48,6 +48,8 @@ _ADAPTER_SHAPES = {
         "listing_directory_snapshot",
     ),
     "massive_reference": ("listing_authority", "listing_directory_snapshot"),
+    "eodhd_symbol_directory": ("listing_authority", "listing_directory_snapshot"),
+    "massive_ticker_events": ("listing_authority", "ticker_event_snapshot"),
 }
 _SECRET_KEY_MARKERS = (
     "api_key",

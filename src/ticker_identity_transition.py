@@ -27,6 +27,7 @@ _PROFILE_SOURCE_KEYS = frozenset({"manual_lists", _LEGACY_SOURCE_KEY})
 _SYMBOL_OUTCOMES = frozenset({"symbol_changed", "venue_transfer"})
 _ACTIVITY_CHANGE_TYPES = frozenset(
     {
+        "sa_membership_suppressed",
         "editable_tag_copied",
         "legacy_membership_added",
         "legacy_membership_archived",
@@ -116,6 +117,7 @@ def _activity_changes(preview: Mapping[str, object]) -> list[dict]:
         raise ValueError("transition_activity_effects")
 
     counts = {
+        "sa_membership_suppressed": len(effects.get("sa_tracking_memberships") or ()),
         "editable_tag_copied": len(effects.get("editable_tags_to_copy") or ()),
         "legacy_membership_added": len(legacy.get("add") or ()),
         "legacy_membership_archived": len(legacy.get("archive") or ()),
@@ -476,7 +478,7 @@ def _profile_dependency_snapshot(
             tickers,
         )
     )
-    return {
+    result = {
         "editable_tags": tags,
         "legacy_config_seed": legacy,
         "portfolio_open_inputs": _portfolio_dependency_snapshot(
@@ -487,6 +489,11 @@ def _profile_dependency_snapshot(
         "ticker_meta": meta,
         "watchlists": watchlists,
     }
+    from src.sa_tracking_memberships import SaTrackingMembershipStore, terminal_tracking_memberships
+
+    if SaTrackingMembershipStore.installed(conn):
+        result["sa_tracking_memberships"] = terminal_tracking_memberships(conn, source_ticker)
+    return result
 
 
 def _profile_dependency_sha256(
@@ -546,12 +553,15 @@ def _effect_keys(preview: Mapping[str, object]) -> dict[str, list]:
         if source is None:
             raise ValueError("preview_source")
         meta_keys.add(source)
-    return {
+    keys = {
         "ticker_meta": sorted(meta_keys),
         "ticker_tags": [list(key) for key in sorted(tag_keys)],
         "universe_source_memberships": [list(key) for key in sorted(legacy_keys)],
         "watchlist_memberships": [list(key) for key in sorted(watchlist_keys)],
     }
+    if "sa_tracking_memberships" in effects:
+        keys["sa_tracking_memberships"] = [row["membership_id"] for row in effects["sa_tracking_memberships"]]
+    return keys
 
 
 def _affected_snapshot(
@@ -597,7 +607,7 @@ def _affected_snapshot(
             (ticker,),
         )
         meta_rows.extend(_rows_as_dicts(cursor))
-    return {
+    snapshot = {
         "keys": {
             "ticker_meta": meta_keys,
             "ticker_tags": [list(value) for value in tag_keys],
@@ -612,6 +622,14 @@ def _affected_snapshot(
         },
         "version": 1,
     }
+    if "sa_tracking_memberships" in selected:
+        member_ids = list(selected["sa_tracking_memberships"])
+        snapshot["keys"]["sa_tracking_memberships"] = member_ids
+        snapshot["rows"]["sa_tracking_memberships"] = [
+            row for member_id in member_ids
+            for row in _rows_as_dicts(conn.execute("SELECT * FROM sa_tracking_memberships WHERE membership_id=?", (member_id,)))
+        ]
+    return snapshot
 
 
 def _affected_snapshot_sha256(snapshot: Mapping[str, object]) -> str:
@@ -669,6 +687,12 @@ def _restore_affected_snapshot(
         "VALUES (:ticker,:priority,:hidden_at,:updated_at)",
         rows["ticker_meta"],
     )
+    for row in rows.get("sa_tracking_memberships", ()):
+        conn.execute(
+            "UPDATE sa_tracking_memberships SET portfolio_status=:portfolio_status, accepted_at=:accepted_at, "
+            "removed_at=:removed_at, reason=:reason, updated_at=:updated_at WHERE membership_id=:membership_id",
+            row,
+        )
 
 
 def _proposal_state(
@@ -736,6 +760,7 @@ def build_transition_preview(
     observation_fingerprint_sha256: str,
     sources: Iterable[str] | None,
     options: TransitionOptions,
+    at: str | None = None,
 ) -> dict:
     """Return an immutable, canonical projection of every owned profile effect."""
 
@@ -757,6 +782,9 @@ def build_transition_preview(
 
     blockers: list[str] = []
     transition_kind: str | None = None
+    from src.sa_tracking_memberships import SaTrackingMembershipStore
+    if SaTrackingMembershipStore.installed(conn) and case.get("source") != "listing_authority":
+        blockers.append("listing_authority_required")
     if "symbol_changed" in outcomes and outcomes <= _SYMBOL_OUTCOMES:
         if successor_ticker is None:
             blockers.append("successor_missing")
@@ -768,6 +796,12 @@ def build_transition_preview(
         transition_kind = "terminal_delisting"
     else:
         blockers.append("outcome_not_executable")
+
+    if SaTrackingMembershipStore.installed(conn) and case.get("source") == "listing_authority" and transition_kind is not None:
+        from src.security_lifecycle_provider_authority import provider_transition_guard
+        blockers.extend(provider_transition_guard(conn, ticker=source_ticker, observation_fingerprint_sha256=observation_fingerprint,
+            transition_kind=transition_kind, successor_ticker=successor_ticker, effective_date=assessment.get("effective_date"),
+            at=at or _utc_now(), human_accepted=assessment.get("acceptance_authority") == "human"))
 
     if str(assessment.get("case_id") or "") != case_id:
         blockers.append("assessment_case_mismatch")
@@ -858,7 +892,7 @@ def build_transition_preview(
     if transition_kind == "terminal_delisting" and portfolio_open:
         blockers.append("portfolio_position_open")
     suppression["hide_source"] = bool(
-        transition_kind is not None
+        transition_kind in {"symbol_continuation", "terminal_delisting"}
         and not suppression["source_hidden"]
         and not portfolio_open
     )
@@ -904,6 +938,13 @@ def build_transition_preview(
         "successor_ticker": successor_ticker,
         "transition_kind": transition_kind,
     }
+    from src.sa_tracking_memberships import SaTrackingMembershipStore, terminal_tracking_memberships
+
+    if SaTrackingMembershipStore.installed(conn):
+        payload["effects"]["sa_tracking_memberships"] = (
+            terminal_tracking_memberships(conn, source_ticker)
+            if transition_kind == "terminal_delisting" and not portfolio_open else []
+        )
     payload["preview_sha256"] = profile_snapshot_sha256(payload)
     return payload
 
@@ -914,6 +955,7 @@ def build_automation_transition_preflight(
     case: Mapping[str, object],
     request: Mapping[str, object],
     sources: Iterable[str],
+    at: str | None = None,
 ) -> dict:
     """Project a rule request without inventing durable assessment identities."""
 
@@ -997,6 +1039,7 @@ def build_automation_transition_preflight(
         observation_fingerprint_sha256=observation_fingerprint,
         sources=sources,
         options=TransitionOptions(execute_on=effective_date),
+        at=at,
     )
     mismatches = []
     if case_ticker != source_ticker:
@@ -1418,6 +1461,21 @@ class TickerIdentityTransitionStore:
             raise RuntimeError("caller_transaction_open")
         self.conn.execute("BEGIN IMMEDIATE")
 
+    def _provider_guard(self, preview, *, at, automation):
+        from src.sa_tracking_memberships import SaTrackingMembershipStore
+        from src.security_lifecycle_provider_authority import provider_transition_guard
+        if not SaTrackingMembershipStore.installed(self.conn):
+            return ()
+        authority = self.conn.execute("SELECT c.source,a.acceptance_authority,a.effective_date FROM security_lifecycle_cases c "
+            "JOIN security_lifecycle_assessments a ON a.case_id=c.case_id WHERE c.case_id=? AND a.assessment_id=?",
+            (preview.get("case_id"), preview.get("assessment_id"))).fetchone()
+        if authority is None or authority[0] != "listing_authority":
+            return ("listing_authority_required",)
+        return provider_transition_guard(self.conn, ticker=preview["source_ticker"],
+            observation_fingerprint_sha256=preview["observation_fingerprint_sha256"], transition_kind=preview["transition_kind"],
+            successor_ticker=preview.get("successor_ticker"), effective_date=authority[2], at=at,
+            human_accepted=not automation and authority[1] == "human")
+
     @staticmethod
     def _dedupe_key(preview: Mapping[str, object]) -> str:
         parts = (
@@ -1504,6 +1562,8 @@ class TickerIdentityTransitionStore:
 
         self._begin()
         try:
+            if self._provider_guard(preview, at=now, automation=automation):
+                raise ValueError("preview_changed")
             if not _assessment_authority_matches(
                 self.conn,
                 assessment_id=assessment_id,
@@ -1937,16 +1997,18 @@ class TickerIdentityTransitionStore:
                     transition["approved_assessment_fingerprint_sha256"]
                 ),
             )
+            provider_blockers = self._provider_guard(current_preview, at=now, automation=transition["approval_authority"] == "automation_policy")
             if (
                 not current_preview_valid
                 or current_digest != transition["approved_preview_sha256"]
                 or current_profile_digest != observed_profile_digest
                 or not assessment_current
+                or provider_blockers
             ):
                 result = self._blocked_apply(
                     transition_id=transition_id,
                     trigger=trigger,
-                    reasons=["preview_changed"],
+                    reasons=list(provider_blockers) or ["preview_changed"],
                     observed_preview_sha256=current_digest,
                     at=now,
                     mark_needs_review=True,
@@ -2064,6 +2126,19 @@ class TickerIdentityTransitionStore:
                     raise RuntimeError("preview_changed_during_apply")
             self._step("source_membership_archives")
 
+            from src.sa_tracking_memberships import SaTrackingMembershipStore
+
+            for member in effects.get("sa_tracking_memberships", ()):
+                cursor = self.conn.execute(
+                    "UPDATE sa_tracking_memberships SET removed_at=?, reason='terminal_delisting', updated_at=? "
+                    "WHERE membership_id=? AND removed_at IS NULL AND accepted_at IS NOT NULL",
+                    (now, now, member["membership_id"]),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("preview_changed_during_apply")
+                SaTrackingMembershipStore._event(self.conn, member["membership_id"], "remove", "lifecycle_transition", now,
+                                                {"transition_id": transition_id, "preview_sha256": current_digest})
+
             suppression = effects["suppression"]
             if suppression["unhide_successor"]:
                 if successor_ticker is None:
@@ -2161,6 +2236,11 @@ class TickerIdentityTransitionStore:
                 }
 
             _restore_affected_snapshot(self.conn, before_snapshot)
+            from src.sa_tracking_memberships import SaTrackingMembershipStore
+
+            for member in before_snapshot["rows"].get("sa_tracking_memberships", ()):
+                SaTrackingMembershipStore._event(self.conn, member["membership_id"], "restore", "lifecycle_reversal", now,
+                                                {"transition_id": transition_id})
             restored = _affected_snapshot(
                 self.conn,
                 keys=before_snapshot["keys"],

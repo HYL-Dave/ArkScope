@@ -296,6 +296,8 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "hosted_search",
             "nasdaq_symbol_directory",
             "massive_reference",
+            "massive_ticker_events",
+            "eodhd_symbol_directory",
         }
     )
     assert getattr(schema, "AUTOMATION_MODES", None) == frozenset(
@@ -348,6 +350,7 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "security_lifecycle_investigation_runs",
             "security_lifecycle_automation_runs",
             "security_lifecycle_automation_run_blockers",
+            "security_lifecycle_provider_checks",
             "security_lifecycle_evidence",
             "security_lifecycle_automation_facts",
             "security_lifecycle_evidence_translations",
@@ -410,6 +413,7 @@ def test_current_profile_authority_closes_automation_run_fact_translation_vocabu
             "translated_at",
         ]
         assert _indexes(conn, "idx_security_lifecycle_") == {
+            "idx_security_lifecycle_provider_checks_ticker",
             "idx_security_lifecycle_cases_identity",
             "idx_security_lifecycle_runs_case_created",
             "idx_security_lifecycle_automation_runs_case_created",
@@ -474,7 +478,10 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
         verify_v2_profile_connection,
     )
 
-    assert V2_PROFILE_INDEX_SQL == PROFILE_INDEX_SQL
+    assert set(PROFILE_INDEX_SQL) - set(V2_PROFILE_INDEX_SQL) == {
+        "idx_security_lifecycle_provider_checks_ticker",
+    }
+    assert all(PROFILE_INDEX_SQL[name] == sql for name, sql in V2_PROFILE_INDEX_SQL.items())
     assert V2_AUTOMATION_BLOCKER_CODES == _V2_AUTOMATION_BLOCKER_CODES
     assert V2_EVIDENCE_SOURCE_FAMILIES == frozenset(
         {"regulator", "market_infrastructure", "publisher", "general_web", "manual"}
@@ -508,6 +515,7 @@ def test_v2_schema_remains_exact_and_rejects_v3_listing_rows():
         not in {
             "security_lifecycle_automation_run_blockers",
             "security_lifecycle_evidence",
+            "security_lifecycle_provider_checks",
         }
     }
 

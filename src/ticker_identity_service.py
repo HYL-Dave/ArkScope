@@ -177,6 +177,7 @@ class TickerIdentityService:
             observation_fingerprint_sha256=fingerprint,
             sources=sources,
             options=options,
+            at=self._clock() if self._clock is not None else None,
         )
 
     def preview_case(self, case_id: str, *, options: TransitionOptions) -> dict:

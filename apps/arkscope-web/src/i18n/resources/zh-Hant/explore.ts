@@ -95,6 +95,27 @@ const explore = {
     toolCount: "{{count}} 個工具",
     watchlistAsOf: "自選股資料時間",
   },
+  alphaTracking: {
+    syncPending: "最近一次 SA 擷取尚未整合至本地追蹤。",
+    syncUnavailable: "無法確認 SA 同步狀態；已儲存的追蹤選擇仍保留。",
+    commandForTicker: "{{command}} {{ticker}}",
+    source: "追蹤來源", custom: "手動清單", current: "Current Alpha Picks", former: "Former Alpha Picks",
+    ticker: "代號", pickedDate: "推薦日期", state: "追蹤狀態", reason: "原因", actions: "操作",
+    refresh: "更新本機成員資格", failed: "無法取得最新追蹤狀態，請重新讀取後確認。",
+    unavailable: "追蹤成員資格尚待完成資料遷移。", empty: "沒有符合的成員資格。",
+    states: { tracking: "追蹤中", removed: "已移除", candidate: "待確認" },
+    commands: { remove: "停止 Former 追蹤", restore: "恢復追蹤", accept: "接受成員資格" },
+    confirm: {
+      remove: "停止 {{ticker}} 的 Former Alpha Picks 來源。SA 同步與代號改名不會恢復這筆追蹤；其他清單與持倉不受影響。",
+      restore: "恢復 {{ticker}} 的 Former Alpha Picks 來源，繼續收集價格與新聞。",
+      accept: "將這筆 {{ticker}} 的 SA 推薦接受為獨立追蹤成員，不搬移既有歷史或持倉。",
+    },
+    reasons: {
+      current_observed: "SA 現行推薦", bootstrap_accepted: "已接受的歷史成員", capture_gap: "沒有先前接受的成員資格",
+      identity_ambiguous: "成員身分有歧義", related_security: "關聯證券身分待確認",
+      user_removed: "由你移除", user_restored: "由你恢復", user_accepted: "由你接受", terminal_delisting: "已確認下市，須由標的事件撤銷處置",
+    },
+  },
   watchlist: {
     listSummary: "{{kind}} · {{count}} 個有效標的",
     noteCount: {
@@ -223,6 +244,7 @@ const explore = {
     listsRemoved: "移除 {{count}} 個舊清單",
   },
   lifecycle: {
+    tickerEvents: "代號變更紀錄",
     title: "標的事件調查",
     aria: "標的事件調查",
     workflow: {
@@ -265,6 +287,7 @@ const explore = {
         noMaterialTrackedSecurityFact: "未找到與追蹤證券直接相關的重要事實",
         identityBindingMissing: "申報尚未精確綁定目前追蹤的證券",
         regulatorScreeningIncomplete: "SEC 篩選未完整完成",
+        regulatorMonitorOnly: "SEC 僅供提醒；追蹤變更以結構化上市狀態為準",
         unknownForm: "未識別的申報類型，需要複查",
       },
     },
@@ -593,6 +616,7 @@ const explore = {
     },
     listingEvidence: {
       authorities: {
+        eodhd: "EODHD",
         nasdaqTrader: "Nasdaq Trader",
         massive: "Massive",
       },
@@ -677,6 +701,14 @@ const explore = {
       transitionApprovalUnavailable: "追蹤轉移核准暫時無法完成；已排程重新驗證",
     },
     automationOperatorDetails: {
+      listingChecks: {
+        providerIssue: "{{provider}}: {{issue}}",
+        manualReview: "代號歷史不可用；停止收集前須明確核准下市判定",
+        checks: { delisting: "缺少有日期的明確下市證據", stocks: "尚未排除主板持續交易", otc: "尚未排除 OTC 延續交易",
+          eodhd: "缺少 EODHD 下市確認", nasdaq: "須確認兩份現行 Nasdaq 名錄", identity: "缺少穩定證券身分",
+          continuation: "尚未確認或排除同一證券改名延續", freshness: "上市狀態查核已過期", source_conflict: "仍在交易的紀錄與下市證據衝突", integrity: "上市證據不完整或無效" },
+        issues: { credential_missing: "缺少 API key", rate_limited: "請求受到限流", access_denied: "存取遭拒", unavailable: "來源不可用", mapping_required: "需要精確代號對應", not_found: "無可用歷史" },
+      },
       candidateBudgetExceeded: "{{candidateCount}} 個候選標的超過 IBKR 查詢上限 {{queryLimit}}；未聯絡 IBKR。",
     },
     citationKinds: {
@@ -734,6 +766,7 @@ const explore = {
         watchlistMembershipAdded: "已新增觀察清單成員",
         watchlistMembershipArchived: "已封存觀察清單成員",
         watchlistMembershipReactivated: "已重新啟用觀察清單成員",
+        saMembershipSuppressed: "已停止本機 Alpha Picks 成員追蹤",
       },
     },
     eventKinds: {
@@ -760,6 +793,13 @@ const explore = {
         reversed: "已反轉",
       },
       blockers: {
+        listingAuthorityRequired: "SEC 僅為提醒，變更追蹤須有現行上市證據",
+        providerCheckRequired: "需要現行 provider 上市狀態查核",
+        providerCheckStale: "Provider 上市狀態查核已過期",
+        providerCheckChanged: "核准後 provider 上市證據已變更",
+        terminalNotConfirmed: "尚未確認終止下市",
+        legacyReview: "歷史下市須人工核准",
+        continuationReview: "同一證券改名延續須人工核准",
         successorMissing: "必須填寫承接標的代號",
         successorNotDistinct: "承接標的代號必須不同於目前代號",
         outcomeNotExecutable: "已接受的結果不支援自動追蹤轉移",
@@ -782,7 +822,7 @@ const explore = {
         successorHasLaterTransition: "承接標的已有後續轉移",
       },
       caveats: {
-        providerOwnedSourcesRetained: "Seeking Alpha 追蹤維持由該資料來源管理",
+        providerOwnedSourcesRetained: "保留 Seeking Alpha 原始歷史；本機是否收集依此處列出的變更為準",
         portfolioPositionRetained: "原代號 {{ticker}} 的券商部位仍會保留",
         successorAlreadyTracked: "承接標的已存在於至少一個目的地",
       },
@@ -791,6 +831,7 @@ const explore = {
         status: "轉移狀態",
         executeOn: "排程日期",
         watchlists: "手動清單",
+        saMemberships: "停止本機 Alpha Picks 成員追蹤（僅明確還原或撤銷事件可恢復）",
         legacySeed: "舊設定匯入",
         tags: "可編輯標籤",
         priority: "優先序",

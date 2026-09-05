@@ -547,6 +547,7 @@ def backfill_prices_direct(
     today: Optional[date] = None,
     now_et: Optional[datetime] = None,
     acquire_gateway_lock: bool = True,
+    allow_provider_fallback: bool = True,
 ) -> dict:
     """Direct provider→SQLite price backfill (FULL-WINDOW TOP-UP, 2d) — heal sparse/partial
     days in the local ``prices`` table from IBKR or Massive.
@@ -578,7 +579,7 @@ def backfill_prices_direct(
     if provider == "ibkr":
         if ibkr_src is None:
             ibkr_src = _default_ibkr_src()
-        if polygon_src is None:
+        if polygon_src is None and allow_provider_fallback:
             # IBKR primary + Massive FALLBACK (the documented design) — also on the live
             # path, not just when a test injects polygon_src. Best-effort: a missing
             # A missing Massive key (construction raises) must not break IBKR-only backfill.
@@ -587,6 +588,8 @@ def backfill_prices_direct(
             except Exception:  # noqa: BLE001
                 logger.info("Massive fallback unavailable (e.g. no API key); IBKR-only backfill")
                 polygon_src = None
+        if not allow_provider_fallback:
+            polygon_src = None
     elif provider == "polygon" and polygon_src is None:
         polygon_src = _default_polygon_src()
 

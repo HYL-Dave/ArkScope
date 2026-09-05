@@ -633,6 +633,9 @@ def _canonical_excerpt(record: ListingRecord) -> str:
             "primary_exchange": record.primary_exchange,
             "security_type": record.security_type,
             "issuer_cik": record.issuer_cik,
+            "composite_figi": record.composite_figi,
+            "expected_active_state": record.expected_active,
+            "snapshot_complete": record.snapshot_complete,
             "delisted_utc": record.delisted_utc,
             "source_as_of": record.source_as_of,
             "provider_last_updated_utc": record.provider_last_updated_utc,
@@ -674,6 +677,7 @@ def _evidence(record: ListingRecord) -> ListingEvidence:
         }
     )
     nasdaq = record.adapter == "nasdaq_symbol_directory"
+    eodhd = record.adapter == "eodhd_symbol_directory"
     return ListingEvidence(
         evidence_id=f"listing-{identity[:32]}",
         source_family="listing_authority",
@@ -683,10 +687,10 @@ def _evidence(record: ListingRecord) -> ListingEvidence:
         title=(
             f"Nasdaq Trader {record.directory} exact symbol lookup"
             if nasdaq
-            else "Massive exact ticker reference lookup"
+            else "EODHD exact symbol status lookup" if eodhd else "Massive exact ticker reference lookup"
         ),
-        publisher="Nasdaq Trader" if nasdaq else "Massive",
-        domain="nasdaqtrader.com" if nasdaq else "api.massive.com",
+        publisher="Nasdaq Trader" if nasdaq else "EODHD" if eodhd else "Massive",
+        domain="nasdaqtrader.com" if nasdaq else "eodhd.com" if eodhd else "api.massive.com",
         source_published_at=record.file_created_at if nasdaq else None,
         retrieved_at=record.retrieved_at,
         excerpt=excerpt,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import json
 import re
 from typing import Any
@@ -38,6 +39,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="{ibkr,massive}",
     )
     parser.add_argument("--gateway-lock-held", action="store_true")
+    parser.add_argument("--no-provider-fallback", action="store_true")
+    parser.add_argument("--as-of-date", type=date.fromisoformat)
     return parser.parse_args(argv)
 
 
@@ -133,14 +136,22 @@ def _run_worker(
     lookback_days: int,
     provider: str,
     gateway_lock_held: bool,
+    no_provider_fallback: bool = False,
+    as_of_date: date | None = None,
 ) -> dict[str, Any]:
     from src.market_data_direct import backfill_prices_direct
 
+    options = {}
+    if no_provider_fallback:
+        options["allow_provider_fallback"] = False
+    if as_of_date is not None:
+        options["today"] = as_of_date
     return backfill_prices_direct(
         tickers_arg=tickers,
         lookback_days=lookback_days,
         provider=provider,
         acquire_gateway_lock=not gateway_lock_held,
+        **options,
     )
 
 
@@ -148,11 +159,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         _apply_provider_config()
+        options = {}
+        if args.no_provider_fallback:
+            options["no_provider_fallback"] = True
+        if args.as_of_date is not None:
+            options["as_of_date"] = args.as_of_date
         result = _run_worker(
             tickers=args.tickers,
             lookback_days=args.lookback_days,
             provider=args.provider,
             gateway_lock_held=args.gateway_lock_held,
+            **options,
         )
         payload = sanitize_result(result)
         code = 1 if payload["status"] == "failed" else 0
