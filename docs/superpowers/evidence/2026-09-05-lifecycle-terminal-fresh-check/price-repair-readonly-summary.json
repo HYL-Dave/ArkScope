@@ -1,0 +1,51 @@
+{
+  "hypothetical_after_attended_disposition": true,
+  "previews": [
+    {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": 0,
+      "calendar_health": "ok",
+      "lookback_days": 5,
+      "missing_ticker_days": 0,
+      "observation_health": "ok",
+      "partial_ticker_days": 0,
+      "preview_sha256": "085009ac0e6327120a246443c75e69d837824fa47874669e0e2bba05b6f31f97",
+      "reason_counts": {},
+      "repair_tickers": 0,
+      "universe_count": 183
+    },
+    {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": 0,
+      "calendar_health": "ok",
+      "lookback_days": 15,
+      "missing_ticker_days": 190,
+      "observation_health": "ok",
+      "partial_ticker_days": 0,
+      "preview_sha256": "151280a4a07ea1913d95cfed3a14d2bdc95dbd27703a8443d174ac75f28a9b09",
+      "reason_counts": {
+        "before_first_local_bar": 32
+      },
+      "repair_tickers": 32,
+      "universe_count": 183
+    },
+    {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": 0,
+      "calendar_health": "ok",
+      "lookback_days": 120,
+      "missing_ticker_days": 2702,
+      "observation_health": "ok",
+      "partial_ticker_days": 438,
+      "preview_sha256": "b64c03d58311208198729cdbe2d313d906996164f4a4fdde90b268cbc33aff1f",
+      "reason_counts": {
+        "before_first_local_bar": 36,
+        "partial_observations": 147
+      },
+      "repair_tickers": 183,
+      "universe_count": 183
+    }
+  ],
+  "price_writes": 0,
+  "provider_calls": 0
+}

@@ -1,0 +1,25 @@
+{
+  "app_restarted": false,
+  "at": "2026-09-05T10:33:44+00:00",
+  "automation_enabled": false,
+  "completed_targets": 0,
+  "directory_provider_codes": [
+    "listing_directory_schema_mismatch"
+  ],
+  "http_status_counts": {
+    "200": 4
+  },
+  "ibkr_requests": 0,
+  "minimum_observed_massive_spacing_seconds": null,
+  "observed_requests": {
+    "eodhd": 2,
+    "nasdaq": 2
+  },
+  "price_writes": 0,
+  "results": [],
+  "stopped_code": "check_directories_incomplete",
+  "terminal_dispositions_applied": 0,
+  "total_requests": 4,
+  "unchanged_domain_tables": 26,
+  "universe_preserved": 186
+}

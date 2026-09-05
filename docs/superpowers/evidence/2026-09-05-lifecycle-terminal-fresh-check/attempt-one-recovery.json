@@ -1,0 +1,69 @@
+{
+  "first_attempt_at": "2026-09-05T10:17:18+00:00",
+  "new_provider_calls": 0,
+  "original_attempt_receipts_modified": false,
+  "original_harness_recorded_the_parser_code": false,
+  "parser_code_commit": "f1f2e72e",
+  "parser_source_sha256": "a5cac783761ab02fdf344a0640eb4a12b96412b594cf6847bf4e5b21e6c12674",
+  "reconstructed_parser_failure": {
+    "code": "listing_directory_schema_mismatch",
+    "frames": [
+      {
+        "function": "<module>",
+        "line": 47
+      },
+      {
+        "function": "parse_nasdaq_directories",
+        "line": 443
+      },
+      {
+        "function": "_parse_nasdaq_snapshot",
+        "line": 421
+      },
+      {
+        "function": "_parse_nasdaq_component",
+        "line": 342
+      },
+      {
+        "function": "_file_creation",
+        "line": 297
+      }
+    ]
+  },
+  "recovered_input_bindings": [
+    {
+      "body_sha256": "491337a821469a830093aca740849358982960c46f0192537f5de898f59e9200",
+      "bytes": 347010,
+      "matches_both_attempts": true,
+      "provider": "nasdaq",
+      "request": 1
+    },
+    {
+      "body_sha256": "0e7be707f683443160a78e85139d8af18f786270c9ed82de8402d1d72538a319",
+      "bytes": 538961,
+      "matches_both_attempts": true,
+      "provider": "nasdaq",
+      "request": 2
+    },
+    {
+      "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "bytes": 2,
+      "matches_both_attempts": true,
+      "provider": "eodhd",
+      "request": 3
+    },
+    {
+      "body_sha256": "523255c1afb30f49783d50c936f1cc7037f67d3e84a5998da2cffc77b8c487e9",
+      "bytes": 411,
+      "matches_both_attempts": true,
+      "provider": "eodhd",
+      "request": 4
+    }
+  ],
+  "recovery_basis": "later complete bodies match all four original byte counts and SHA-256 digests",
+  "unchanged_dependencies": {
+    "data_sources/lifecycle_provider_census_transport.py": "320e94c5ebdbf75f932842712fe5f324513e5f2b4318aa3af5fcb475f4aca916",
+    "data_sources/listing_authority_transport.py": "80626143e6dfbdca25cbf4d06c71ac880d2d457eee6ce37fa779499c7ed05344",
+    "src/security_lifecycle_provider_scan.py": "c363a92364e433356e26ef75983619bd7f9ab5e1360e1bab7129d0691dd1a60e"
+  }
+}

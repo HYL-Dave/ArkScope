@@ -1,0 +1,200 @@
+{
+  "code_commit": "a6475044a6c198b22cb900e50df7b7c35a1f3554",
+  "commit_created_after_live_check_with_same_content": true,
+  "executed_parser_sha256": "3e9359057685dfdc9421ec73f65a56f1ae4df7ea802bb412494d71a32e7cbeeb",
+  "executed_remainder_harness_sha256": "707e10e7a8908d8d9a88e5bf697f010dd479a7e357ad407dbb2cdf194e432862",
+  "frontend_changed": false,
+  "frontend_rerun_this_turn": false,
+  "mutations": {
+    "claim": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 4,
+      "failed_owners": [
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[terminal]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[rename]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[404]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[429]"
+      ],
+      "passed": 137,
+      "report_file": "arkscope-terminal-replay-mutation-claim.xml",
+      "sha256": "20e1354ed8a3b672a5a992bb3f965140857438a89dc06da372dda8727f0f2c1d",
+      "skipped": 0
+    },
+    "digest": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 1,
+      "failed_owners": [
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_bad_replay_material_stops_before_credential_lookup_or_dispatch[body-resume_response_digest_mismatch]"
+      ],
+      "passed": 140,
+      "report_file": "arkscope-terminal-replay-mutation-digest.xml",
+      "sha256": "41c17922750f8360def1b55ba3fb334b8c9b29b389d930909870f77df9ef2b38",
+      "skipped": 0
+    },
+    "footer": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 7,
+      "failed_owners": [
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_accepts_its_seven_field_footer_without_changing_rows",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_saved_response_replay_uses_real_parsers_without_network_or_credentials",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_claim_is_exclusive_even_with_a_different_destination",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[terminal]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[rename]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[404]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[429]"
+      ],
+      "passed": 134,
+      "report_file": "arkscope-terminal-replay-mutation-footer.xml",
+      "sha256": "3cb5e86e1c6822be6835a5db797a5073d369f1f52f8a26f26a15e858a3e894df",
+      "skipped": 0
+    },
+    "preferred": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 3,
+      "failed_owners": [
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock[PFD$]",
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock[PFD$A]",
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock[PFD$Z]"
+      ],
+      "passed": 138,
+      "report_file": "arkscope-terminal-replay-mutation-preferred.xml",
+      "sha256": "60e6586a203abb75095dd6132ddb33691987dee9495b0162d37645f4b257b293",
+      "skipped": 0
+    },
+    "test-exchange": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 7,
+      "failed_owners": [
+        "tests.test_security_lifecycle_listing_evidence::test_unknown_exchange_on_explicit_test_issue_is_excluded_not_a_live_listing",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_saved_response_replay_uses_real_parsers_without_network_or_credentials",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_claim_is_exclusive_even_with_a_different_destination",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[terminal]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[rename]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[404]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check::test_resume_runs_real_scanner_and_store_with_no_directory_http_or_automatic_disposition[429]"
+      ],
+      "passed": 134,
+      "report_file": "arkscope-terminal-replay-mutation-test-exchange.xml",
+      "sha256": "2ec40cbcdeff330dc7a31d34a37cc749cdf8eb285fd0e928b073c93534728e57",
+      "skipped": 0
+    }
+  },
+  "reports": {
+    "backend": {
+      "collected": 5888,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 5876,
+      "report_file": "arkscope-terminal-directory-final-backend.xml",
+      "sha256": "5607e1f70394633a8585bf64f5bc9001da9236a07aed031333ab4e33dc8799d4",
+      "skipped": 12
+    },
+    "final_seal_focus": {
+      "collected": 163,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 163,
+      "report_file": "arkscope-terminal-final-seal-focus-complete.xml",
+      "sha256": "03ddd8914f3d1b80dc43cdfd6e524b3abc0d0f17b80c914d8b88d210f2c5b9c4",
+      "skipped": 0
+    },
+    "listing_provider_terminal_focus": {
+      "collected": 348,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 348,
+      "report_file": "arkscope-nasdaq-live-shapes-focused.xml",
+      "sha256": "c392b856bd79929f7c608bda3bea5b5126dbc8cec2c9a018df8c2dd2c525441a",
+      "skipped": 0
+    },
+    "mutation_baseline": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 141,
+      "report_file": "arkscope-terminal-replay-mutations-baseline.xml",
+      "sha256": "2317510a55bb93731a350d398b92c076713b12d9c2563e90feebeaf170398986",
+      "skipped": 0
+    },
+    "mutation_restored": {
+      "collected": 141,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 141,
+      "report_file": "arkscope-terminal-replay-mutations-restored.xml",
+      "sha256": "9a5a6253936c42d71da797e549b33b877de2b26811d4c01d6fc669daa0ee81e1",
+      "skipped": 0
+    },
+    "parser_red": {
+      "collected": 99,
+      "errors": 0,
+      "failed": 5,
+      "failed_owners": [
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_accepts_its_seven_field_footer_without_changing_rows",
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock[PFD$]",
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock[PFD$A]",
+        "tests.test_security_lifecycle_listing_evidence::test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock[PFD$Z]",
+        "tests.test_security_lifecycle_listing_evidence::test_unknown_exchange_on_explicit_test_issue_is_excluded_not_a_live_listing"
+      ],
+      "passed": 94,
+      "report_file": "arkscope-nasdaq-live-shapes-red.xml",
+      "sha256": "28615e3aa9276690453dd42b32a0e78625a3dfa59c971f16bb70918159ec9894",
+      "skipped": 0
+    },
+    "rehearsal_boundary_green": {
+      "collected": 22,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 22,
+      "report_file": "arkscope-terminal-rehearsal-boundary-green.xml",
+      "sha256": "92bd010a910a9354cb1b623123bdc50e30892b4142c203bbb963b77ed7b7731e",
+      "skipped": 0
+    },
+    "rehearsal_boundary_red": {
+      "collected": 22,
+      "errors": 0,
+      "failed": 4,
+      "failed_owners": [
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_rehearse_attended::test_rehearsal_sqlite_gate_accepts_native_path_encoding_without_widening_scope[copy-True]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_rehearse_attended::test_rehearsal_sqlite_gate_accepts_native_path_encoding_without_widening_scope[profile_readonly-True]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_rehearse_attended::test_rehearsal_sqlite_gate_accepts_native_path_encoding_without_widening_scope[market_readonly-True]",
+        "docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_rehearse_attended::test_rehearsal_sqlite_gate_accepts_native_path_encoding_without_widening_scope[sa_readonly-True]"
+      ],
+      "passed": 18,
+      "report_file": "arkscope-terminal-rehearsal-boundary-red.xml",
+      "sha256": "34534952cecc24e762dfc3ff551f6d9450a5e99466c4f62b729882f484851737",
+      "skipped": 0
+    },
+    "remainder_harness": {
+      "collected": 23,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 23,
+      "report_file": "arkscope-terminal-remainder-harness.xml",
+      "sha256": "e43c151061d4c38e9ff722f1eadf9d62c69f28bdbaf1c3f8f51e5a6736e8a01e",
+      "skipped": 0
+    },
+    "v2_harness_before_execution": {
+      "collected": 19,
+      "errors": 0,
+      "failed": 0,
+      "failed_owners": [],
+      "passed": 19,
+      "report_file": "arkscope-terminal-fresh-check-v2-pre-execution.xml",
+      "sha256": "6fbaa07a20f18ac63025fbdee87352e67a4fff3fdd58aa17c9e02dc9bc4c2407",
+      "skipped": 0
+    }
+  }
+}

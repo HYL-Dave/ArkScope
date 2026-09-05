@@ -1,0 +1,20 @@
+{
+  "at": "2026-09-05T10:33:44+00:00",
+  "bindings": {
+    "authorization.json": "57c1e3b655e641d7ab92e10ec96a71b2c5c874225fa0f2b7b9721b55b1c1ca93",
+    "fresh-check-summary.json": "ec0184c0401bdd962090b48275c84dc627c1b1c20b3732b0807873e345de366f",
+    "private-request-01.body": "491337a821469a830093aca740849358982960c46f0192537f5de898f59e9200",
+    "private-request-02.body": "0e7be707f683443160a78e85139d8af18f786270c9ed82de8402d1d72538a319",
+    "private-request-03.body": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "private-request-04.body": "523255c1afb30f49783d50c936f1cc7037f67d3e84a5998da2cffc77b8c487e9",
+    "request-01-outcome.json": "c4b8b318af1a249149df0d24162bfee0a558b1afbe72deb55f0fa80ae0f7a39f",
+    "request-01-reserved.json": "b9994c8c8ca7c12cf4344bcc9180b641f498ad675a271a40e94bad28b05ea88a",
+    "request-02-outcome.json": "4e4c92da083e09d3bf5fea8b1d30f505407affb8fed74929a6323ea2203492f4",
+    "request-02-reserved.json": "61aee10fb92f51da64bdd56c47a664304e1a3fdec86eb22551e8edf87b544979",
+    "request-03-outcome.json": "08b069d73dbbd0f283cbe28ae900944440e684493dd2e7985fdafac71574df24",
+    "request-03-reserved.json": "5fc40d0778db95c53732c74ff268fde45fe28c79a61c72cfc50f3c474da04a52",
+    "request-04-outcome.json": "4ce5ab90cf531aae1d774905f749912aabf85e98a75facbd921076abe57cc2b6",
+    "request-04-reserved.json": "e2d526736d4a2812a580c7369b7e045621a51697f5b0b90ad3f89c788cce73b6"
+  },
+  "source_sha256": "de10df11951b5f74f908bc3cb490aed373aa6b7d564117662da8e6781ff73169"
+}

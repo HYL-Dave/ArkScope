@@ -1,0 +1,36 @@
+{
+  "body_sha256": {
+    "nasdaq": "491337a821469a830093aca740849358982960c46f0192537f5de898f59e9200",
+    "other": "0e7be707f683443160a78e85139d8af18f786270c9ed82de8402d1d72538a319"
+  },
+  "nasdaq_source_rows": 5592,
+  "other_footer_fields": 7,
+  "other_header_fields": 8,
+  "other_preferred_identifier_rows": 384,
+  "other_source_rows": 7596,
+  "positive_controls": {
+    "AAPL": [
+      "active"
+    ],
+    "SMCI": [
+      "active"
+    ]
+  },
+  "provider_requests_for_replay": 0,
+  "recorded_at": "2026-09-05T10:33:44+00:00",
+  "target_lookup": {
+    "ARCH": [
+      "not_found",
+      "not_found"
+    ],
+    "LTHM": [
+      "not_found",
+      "not_found"
+    ],
+    "TA": [
+      "not_found",
+      "not_found"
+    ]
+  },
+  "unsupported_exchange_test_rows": 1
+}

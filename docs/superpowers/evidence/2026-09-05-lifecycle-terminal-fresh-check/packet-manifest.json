@@ -1,0 +1,70 @@
+[
+  {
+    "file": "README.md",
+    "sha256": "64f3b52877a73503abda88d65def2cb27c842726866d6c4e88ac555ef4cb8b74"
+  },
+  {
+    "file": "attempt-one-recovery.json",
+    "sha256": "7f5483410ab373675152092df70236fef71b3b9cce2c3b5b7a985044557d6bd1"
+  },
+  {
+    "file": "directory-attempt-2.json",
+    "sha256": "ec0184c0401bdd962090b48275c84dc627c1b1c20b3732b0807873e345de366f"
+  },
+  {
+    "file": "directory-diagnostics.json",
+    "sha256": "a29012aa1d38951980fb4b81ef19a86af6e7a6085e4157c4b2ceae9a9fecd7f5"
+  },
+  {
+    "file": "fresh-check-summary.json",
+    "sha256": "edfe5c2b154e34db884132e719de39cd9d384f8085903b9288ac6bb8c47b0d2a"
+  },
+  {
+    "file": "price-repair-readonly-summary.json",
+    "sha256": "99e67fed1ebfa9b5a719e56bd454f818602a1fa9e69b9795eb0a78aba8ec061d"
+  },
+  {
+    "file": "production-state.json",
+    "sha256": "113bb94f8a1222f33a8b96e77c85df1817ed80392d56a9a3d6727dbf4b860f45"
+  },
+  {
+    "file": "rehearsal-summary.json",
+    "sha256": "7837953f1d5109a66f26ca9fc19e06e06618e46bca79184157b2740b09455175"
+  },
+  {
+    "file": "replay-binding.json",
+    "sha256": "895c9e4e7616feeade7f1a92e4f64297ecd8aad7915401cbe5e9ed3aa4461007"
+  },
+  {
+    "file": "request-observations.json",
+    "sha256": "a434da43679e1aa0c1362551b2f5cafc6d8f2867a642a56c4b7d52d158c9a61e"
+  },
+  {
+    "file": "scripts/rehearse_attended.py",
+    "sha256": "65093d0941cfe5eb8699c439bb0093a0d2a71dbff1ba4ea9172ef2ef81097376"
+  },
+  {
+    "file": "scripts/resume_check.py",
+    "sha256": "707e10e7a8908d8d9a88e5bf697f010dd479a7e357ad407dbb2cdf194e432862"
+  },
+  {
+    "file": "scripts/test_rehearse_attended.py",
+    "sha256": "80e0e12f0ef00a03c41d285cc65bc00a85a52a3fba725177fae65f2317a5df80"
+  },
+  {
+    "file": "scripts/test_resume_check.py",
+    "sha256": "f0cb20f4c72feb2906a183486e73966199ad9155159c0f7efd5901a22d0948a5"
+  },
+  {
+    "file": "secret-scan.json",
+    "sha256": "56ac5c95c0ff9d190956e647ff929ac63300cbd71cf10feafe2052e5072122be"
+  },
+  {
+    "file": "source-manifest.json",
+    "sha256": "5cab33d694294637073b9a5de711905474d9ddfd7b35c56f6cfdd70e7187ab77"
+  },
+  {
+    "file": "verification.json",
+    "sha256": "404dc934178a0d331aee394e1974040c7347b20e48124ee736d7fcafbcafcc77"
+  }
+]

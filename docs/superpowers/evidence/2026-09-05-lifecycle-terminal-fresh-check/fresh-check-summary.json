@@ -1,0 +1,72 @@
+{
+  "app_restarted": false,
+  "at": "2026-09-05T10:42:27+00:00",
+  "authorization_requests_including_saved_directories": 16,
+  "automation_enabled": false,
+  "completed_targets": 3,
+  "directory_observed_at": "2026-09-05T10:33:44+00:00",
+  "http_status_counts": {
+    "200": 9,
+    "404": 3
+  },
+  "ibkr_requests": 0,
+  "minimum_observed_massive_spacing_seconds": 12.501830212771893,
+  "new_http_requests": 12,
+  "observed_new_requests": {
+    "massive": 12
+  },
+  "price_writes": 0,
+  "replay_source_sha256": "de10df11951b5f74f908bc3cb490aed373aa6b7d564117662da8e6781ff73169",
+  "results": [
+    {
+      "attended_review_available": true,
+      "effective_date": "2025-01-15",
+      "evidence_count": 6,
+      "persisted_sha256": "7729cc1bd228128bb6ea59a35ae072dfd641cd4a9eaaae1f52fd37c3d1d9a426",
+      "provider_codes": [
+        "massive_not_found"
+      ],
+      "reasons": [
+        "successor_check_unavailable"
+      ],
+      "state": "unresolved",
+      "ticker": "ARCH"
+    },
+    {
+      "attended_review_available": true,
+      "effective_date": "2024-01-05",
+      "evidence_count": 6,
+      "persisted_sha256": "d11ed244665ddb8cd59b13a07d213f6e4f0793f094c487f505c8e2b4cd12d0b2",
+      "provider_codes": [
+        "massive_not_found"
+      ],
+      "reasons": [
+        "successor_check_unavailable"
+      ],
+      "state": "unresolved",
+      "ticker": "LTHM"
+    },
+    {
+      "attended_review_available": true,
+      "effective_date": "2023-05-16",
+      "evidence_count": 6,
+      "persisted_sha256": "7cb187c970695f59d4cfcc07b366038578e1dbad96ba3619a4393ba20b31f616",
+      "provider_codes": [
+        "massive_not_found"
+      ],
+      "reasons": [
+        "successor_check_unavailable"
+      ],
+      "state": "unresolved",
+      "ticker": "TA"
+    }
+  ],
+  "reused_directory_responses": {
+    "eodhd": 2,
+    "nasdaq": 2
+  },
+  "stopped_code": null,
+  "terminal_dispositions_applied": 0,
+  "unchanged_domain_tables": 26,
+  "universe_preserved": 186
+}

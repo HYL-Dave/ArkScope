@@ -1,0 +1,25 @@
+{
+  "app_ports_free": true,
+  "apply_profile_transitions": false,
+  "automation_enabled": false,
+  "counts": {
+    "sa_tracking_bindings": 105,
+    "sa_tracking_events": 105,
+    "sa_tracking_memberships": 105,
+    "security_lifecycle_provider_checks": 3,
+    "ticker_identity_transitions": 0
+  },
+  "domain_table_count": 26,
+  "foreign_key_violations": 0,
+  "integrity": "ok",
+  "provider_check_digests": {
+    "ARCH": "7729cc1bd228128bb6ea59a35ae072dfd641cd4a9eaaae1f52fd37c3d1d9a426",
+    "LTHM": "d11ed244665ddb8cd59b13a07d213f6e4f0793f094c487f505c8e2b4cd12d0b2",
+    "TA": "7cb187c970695f59d4cfcc07b366038578e1dbad96ba3619a4393ba20b31f616"
+  },
+  "removed_memberships": 0,
+  "schema": "v4",
+  "targets_former_only": true,
+  "universe_count": 186,
+  "verified_at": "2026-09-05T11:00:02+00:00"
+}
