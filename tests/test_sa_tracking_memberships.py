@@ -136,3 +136,55 @@ def test_sync_projection_detects_unapplied_sa_observations_without_writing(store
     store.remove(store.list_memberships()[0]["membership_id"], at=AT)
     assert store.synchronization_status(changed) == "current"
     assert store.active_sources() == {}
+
+
+def test_dual_source_pick_is_admitted_without_discarding_current_membership(store):
+    row = {**observation(1, "BOTH"), "current_observed": True}
+    store.reconcile((row,), at=AT)
+    assert store.active_sources() == {
+        "sa_alpha_picks_current": {"BOTH"}, "sa_alpha_picks_former": {"BOTH"},
+    }
+    assert {(item["portfolio_status"], item["state"]) for item in store.list_memberships()} == {
+        ("current", "tracking"), ("closed", "tracking"),
+    }
+    with sqlite3.connect(store.path) as conn:
+        assert conn.execute("SELECT count(*) FROM sa_tracking_memberships").fetchone()[0] == 1
+
+
+def test_former_tombstone_preserves_existing_current_but_cannot_reactivate_it_later(store):
+    both = {**observation(1, "BOTH"), "current_observed": True}
+    store.reconcile((both,), at=AT, bootstrap_actor="attended_user")
+    member_id = store.list_memberships()[0]["membership_id"]
+    store.remove(member_id, at=AT)
+    store.reconcile((both,), at=AT)
+    assert store.active_sources() == {"sa_alpha_picks_current": {"BOTH"}}
+    assert {(item["portfolio_status"], item["state"]) for item in store.list_memberships()} == {
+        ("current", "tracking"), ("closed", "removed"),
+    }
+    store.reconcile((observation(1, "BOTH"),), at=AT)
+    assert store.active_sources() == {}
+    store.reconcile((both,), at=AT, bootstrap_actor="attended_user")
+    store.reconcile(({**both, "lineage_id": 2, "ticker": "NEW"},), at=AT, identity_links={"BOTH": "NEW"})
+    assert store.active_sources(identity_links={"BOTH": "NEW"}) == {}
+    store.restore(member_id, at=AT)
+    store.reconcile((both,), at=AT)
+    assert store.active_sources() == {
+        "sa_alpha_picks_current": {"BOTH"}, "sa_alpha_picks_former": {"BOTH"},
+    }
+
+
+@pytest.mark.parametrize("bad", (None, 0, 1, "true", [], {}))
+def test_current_observation_flag_is_boolean_not_truthy(store, bad):
+    with pytest.raises(ValueError, match="tracking_observation"):
+        store.reconcile(({**observation(1, "BAD"), "current_observed": bad},), at=AT)
+    assert store.list_memberships() == []
+
+
+def test_old_closed_observation_does_not_remove_newer_current_source(store):
+    both = {**observation(1, "BOTH"), "current_observed": True}
+    store.reconcile((both,), at=AT, bootstrap_actor="attended_user")
+    old = {**observation(1, "BOTH"), "observed_at": "2026-09-04T01:00:00Z"}
+    store.reconcile((old,), at=AT)
+    assert store.active_sources() == {
+        "sa_alpha_picks_current": {"BOTH"}, "sa_alpha_picks_former": {"BOTH"},
+    }

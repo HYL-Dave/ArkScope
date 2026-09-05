@@ -118,6 +118,36 @@ def test_a_new_open_position_vetoes_even_an_approved_provider_terminal(tmp_path)
     assert "portfolio_open" in c["sources"]()["OLD"]
 
 
+@pytest.mark.parametrize("former_removed", (False, True))
+def test_terminal_suppresses_dual_current_source_and_reverse_restores_exact_intent(tmp_path, former_removed):
+    c = setup_workflow(tmp_path)
+    both = {**c["observed"], "current_observed": True}
+    c["tracking"].reconcile((both,), at=NOW)
+    if former_removed:
+        member_id = c["tracking"].list_memberships()[0]["membership_id"]
+        c["tracking"].remove(member_id, at=NOW)
+    before = c["sources"]()
+    assert "sa_alpha_picks_current" in before["OLD"]
+    options = TransitionOptions(execute_on=c["ended"])
+    preview = c["service"].preview_case(c["case_id"], options=options)
+    assert preview["eligible"], preview["block_reasons"]
+    approved = c["service"].approve_case(c["case_id"], options=options,
+        preview_sha256=preview["preview_sha256"], before_write=lambda: None)
+    result = c["service"].execute_transition(approved["transition_id"],
+        preview_sha256=preview["preview_sha256"], before_write=lambda: None)
+    assert result["status"] == "applied"
+    assert c["tracking"].active_sources() == {}
+    c["tracking"].reconcile((both,), at=NOW)
+    assert c["tracking"].active_sources() == {}
+    with sqlite3.connect(c["profile"]) as conn:
+        transitions = TickerIdentityTransitionStore(conn, clock=lambda: NOW)
+        readiness = transitions.reverse_readiness(approved["transition_id"])
+        assert readiness["reversible"], readiness
+        reversed_result = transitions.reverse(approved["transition_id"], trigger="attended_user")
+        assert reversed_result["status"] == "reversed"
+    assert c["sources"]() == before
+
+
 @pytest.mark.parametrize("event_available", (True, False))
 def test_actual_worker_and_transition_service_require_proof_before_automatic_retirement(tmp_path, monkeypatch, event_available):
     from contextlib import contextmanager

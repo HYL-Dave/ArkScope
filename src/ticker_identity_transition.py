@@ -690,7 +690,7 @@ def _restore_affected_snapshot(
     for row in rows.get("sa_tracking_memberships", ()):
         conn.execute(
             "UPDATE sa_tracking_memberships SET portfolio_status=:portfolio_status, accepted_at=:accepted_at, "
-            "removed_at=:removed_at, reason=:reason, updated_at=:updated_at WHERE membership_id=:membership_id",
+            "removed_at=:removed_at, current_tracking=:current_tracking, reason=:reason, updated_at=:updated_at WHERE membership_id=:membership_id",
             row,
         )
 
@@ -2130,8 +2130,8 @@ class TickerIdentityTransitionStore:
 
             for member in effects.get("sa_tracking_memberships", ()):
                 cursor = self.conn.execute(
-                    "UPDATE sa_tracking_memberships SET removed_at=?, reason='terminal_delisting', updated_at=? "
-                    "WHERE membership_id=? AND removed_at IS NULL AND accepted_at IS NOT NULL",
+                    "UPDATE sa_tracking_memberships SET removed_at=?, current_tracking=0, reason='terminal_delisting', updated_at=? "
+                    "WHERE membership_id=? AND (removed_at IS NULL OR current_tracking=1) AND accepted_at IS NOT NULL",
                     (now, now, member["membership_id"]),
                 )
                 if cursor.rowcount != 1:

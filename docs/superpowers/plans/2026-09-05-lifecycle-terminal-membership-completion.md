@@ -14,8 +14,10 @@ and explain/repair price coverage before requesting another manual test.
 - [x] Coverage separates absent historical data from contract and collection failures.
 - [x] Production-shaped offline rehearsal including ARCH/LTHM/TA.
 - [x] Browser rehearsal: English/Traditional Chinese, desktop/mobile, temporary SQLite only.
-- [ ] Review exact production cutover, outstanding provider reads and any backfill.
-- [ ] Authorized production migration, attended historical treatment, fresh checks and price repair.
+- [x] Read-only production preflight and explicitly authorized stop/backup/install/19-request check.
+- [x] Backup rehearsal preserves the exact universe and Current/Former overlap.
+- [ ] Authorized V4/membership production installation and fresh three-case checks.
+- [ ] Separately authorized attended historical treatment and price repair.
 - [ ] Verify production receipts/universe/coverage before asking for user hand testing.
 
 ## Invariants
@@ -26,6 +28,11 @@ Keep same-security renames attended until the separate automation gate passes.
 Keep existing source history and applied activity; use the transition service,
 including its open-position and state-digest guards. Removing a Former membership
 must survive refresh/bootstrap/aliasing without removing manual/portfolio sources.
+Current and Former are overlapping source memberships, not mutually exclusive
+pick states. A partial close may leave both sources active. Removing Former
+preserves an already-active Current source, but cannot reactivate it after it
+ceases. A terminal transition stops both, and governed reversal restores their
+exact prior intent, including an earlier Former removal.
 
 The prior census is evidence, not an installation. New schema/production changes
 must have backup, exact preflight, idempotent commands and a verifiable receipt.
@@ -44,6 +51,15 @@ separate SA-observation digest, and an atomic migration/bootstrap. Both automati
 switches must be valid and false before backup or write. Changes to those switches
 invalidate approval; unrelated credential fields are neither selected nor logged.
 Do not merge and restart against V3 without the separately approved cutover.
+
+The first authorized private backup rehearsal caught a closed-wins projection
+defect before production mutation. Six lineages have both source states; four
+tickers would have lost their Current source even though the 186-ticker set was
+unchanged. The corrected membership schema stores Current independently. The
+second rehearsal preserves all 186 tickers and every source edge. This amends the
+not-yet-installed membership schema, not an already-deployed schema version.
+The former offline packet remains a historical snapshot; its original test and
+source hashes are not retroactively claimed to verify this amendment.
 
 The prior ARCH/LTHM/TA census did not establish an exhaustive successor history:
 its ticker-event requests returned 404. Those observations cannot authorize an

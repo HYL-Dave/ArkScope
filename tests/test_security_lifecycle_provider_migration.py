@@ -8,6 +8,44 @@ from src.profile_state import ProfileStateStore
 from src.security_lifecycle_schema import create_v3_profile_schema, verify_profile_connection
 
 
+def test_cutover_preserves_dual_source_lineage_from_real_capture_rows(tmp_path):
+    from src import sa_capture_store
+    from src.active_universe import build_active_universe_snapshot
+    from src.portfolio_state import PortfolioStore
+    from src.sa_tracking_memberships import read_sa_tracking_observations
+    from src.security_lifecycle_provider_migration import preview_provider_cutover, apply_provider_cutover
+    from tests.test_sa_capture_store import _pick
+
+    profile, sa = tmp_path / "profile.db", tmp_path / "sa.db"
+    ProfileStateStore(profile)
+    PortfolioStore(profile)
+    with sqlite3.connect(profile) as conn:
+        create_v3_profile_schema(conn)
+    conn = sa_capture_store.connect(str(sa))
+    try:
+        _pick(conn, "BOTH", "current")
+        _pick(conn, "BOTH", "closed", closed="2026-08-01")
+        _pick(conn, "BOTH", "closed", closed="2026-08-15")
+        _pick(conn, "CURRENT", "current")
+        _pick(conn, "FORMER", "closed", closed="2026-08-20")
+        conn.execute("UPDATE sa_alpha_picks SET last_seen_snapshot='2026-09-05T01:00:00Z'")
+        conn.commit()
+    finally:
+        conn.close()
+    before = build_active_universe_snapshot(profile_db=profile, sa_db=sa)
+    rows = read_sa_tracking_observations(sa)
+    assert len(rows) == 3
+    dual = next(row for row in rows if row["ticker"] == "BOTH")
+    assert dual["portfolio_status"] == "closed"
+    assert dual.get("current_observed") is True
+    preview = preview_provider_cutover(profile, sa)
+    apply_provider_cutover(profile, sa, backup_path=tmp_path / "backup.db",
+                           cutover_sha256=preview["cutover_sha256"], at="2026-09-05T01:01:00Z", app_stopped=True)
+    after = build_active_universe_snapshot(profile_db=profile, sa_db=sa)
+    assert after.tickers == before.tickers
+    assert after.sources_by_ticker == before.sources_by_ticker
+
+
 def test_provider_upgrade_preserves_old_rows_and_has_create_only_backup(tmp_path):
     from src.security_lifecycle_provider_migration import preflight_provider_upgrade, upgrade_provider_authority
 
