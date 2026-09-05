@@ -22,6 +22,7 @@ _SCHEMA = (
         portfolio_status TEXT NOT NULL CHECK (portfolio_status IN ('current', 'closed')),
         accepted_at TEXT,
         removed_at TEXT,
+        current_tracking INTEGER NOT NULL CHECK (current_tracking IN (0, 1)),
         reason TEXT NOT NULL CHECK (reason IN (
             'current_observed', 'bootstrap_accepted', 'capture_gap',
             'identity_ambiguous', 'related_security', 'user_removed',
@@ -81,16 +82,18 @@ def _observation(row: Mapping[str, object]) -> dict:
         picked = row["picked_date"]
         status = row["portfolio_status"]
         observed = row["observed_at"]
+        current = row.get("current_observed", status == "current")
         if (
             type(lineage) is not int or lineage <= 0
             or not isinstance(ticker, str) or len(ticker) > 20
             or _TICKER.fullmatch(ticker) is None
             or not isinstance(picked, str) or date.fromisoformat(picked).isoformat() != picked
             or status not in {"current", "closed"} or not isinstance(observed, str)
+            or type(current) is not bool or (status == "current" and not current)
         ):
             raise ValueError
         return {"lineage_id": lineage, "ticker": ticker, "picked_date": picked,
-                "portfolio_status": status, "observed_at": _instant(observed)}
+                "portfolio_status": status, "current_observed": current, "observed_at": _instant(observed)}
     except (KeyError, TypeError, ValueError):
         raise ValueError("tracking_observation") from None
 
@@ -120,8 +123,13 @@ def read_sa_tracking_observations(path: str | Path) -> tuple[dict, ...]:
         previous = by_lineage.get(row["lineage_id"])
         if previous and (previous["ticker"], previous["picked_date"]) != (row["ticker"], row["picked_date"]):
             raise ValueError("tracking_lineage_conflict")
-        if previous is None or row["portfolio_status"] == "closed":
-            by_lineage[row["lineage_id"]] = row
+        if previous is not None:
+            # A pick can have closed portions and a remaining current position.
+            row = {**row,
+                   "portfolio_status": "closed" if "closed" in {previous["portfolio_status"], row["portfolio_status"]} else "current",
+                   "current_observed": previous["current_observed"] or row["current_observed"],
+                   "observed_at": max(previous["observed_at"], row["observed_at"])}
+        by_lineage[row["lineage_id"]] = row
     return tuple(by_lineage.values())
 
 
@@ -201,6 +209,8 @@ class SaTrackingMembershipStore:
         relations = set(related_securities)
         previous_factory = conn.row_factory
         conn.row_factory = sqlite3.Row
+        current_rows: dict[str, list[dict]] = {}
+        previous_observed: dict[str, str] = {}
         try:
             for row in rows:
                 binding = conn.execute("SELECT * FROM sa_tracking_bindings WHERE lineage_id=?", (row["lineage_id"],)).fetchone()
@@ -214,16 +224,20 @@ class SaTrackingMembershipStore:
                 if member_id is None:
                     ambiguous = len(matches) > 1
                     related = any((value["ticker"], row["ticker"]) in relations for value in members)
-                    admitted = not ambiguous and not related and (bootstrap_actor is not None or row["portfolio_status"] == "current")
+                    admitted = not ambiguous and not related and (bootstrap_actor is not None or row["current_observed"])
                     reason = ("identity_ambiguous" if ambiguous else "related_security" if related else
                               "bootstrap_accepted" if bootstrap_actor else "current_observed" if admitted else "capture_gap")
                     member_id = "sat_" + uuid4().hex
                     conn.execute(
-                        "INSERT INTO sa_tracking_memberships VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)",
-                        (member_id, row["ticker"], row["picked_date"], row["portfolio_status"], now if admitted else None, reason, now, now),
+                        "INSERT INTO sa_tracking_memberships VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)",
+                        (member_id, row["ticker"], row["picked_date"], row["portfolio_status"], now if admitted else None, int(row["current_observed"]), reason, now, now),
                     )
                     SaTrackingMembershipStore._event(conn, member_id, "admitted" if admitted else "candidate", bootstrap_actor or "sa_observation", now, row)
                     created = True
+                if member_id not in previous_observed:
+                    previous_observed[member_id] = conn.execute(
+                        "SELECT COALESCE(MAX(observed_at), '') FROM sa_tracking_bindings WHERE membership_id=?", (member_id,)
+                    ).fetchone()[0]
                 if binding is None:
                     conn.execute("INSERT INTO sa_tracking_bindings VALUES (?, ?, ?, ?, ?, ?)",
                                  (row["lineage_id"], member_id, row["ticker"], row["picked_date"], _digest(row), row["observed_at"]))
@@ -234,10 +248,24 @@ class SaTrackingMembershipStore:
                                  (_digest(row), row["observed_at"], row["lineage_id"]))
                 else:
                     continue
+                current_rows.setdefault(member_id, []).append(row)
                 member = conn.execute("SELECT * FROM sa_tracking_memberships WHERE membership_id=?", (member_id,)).fetchone()
                 if row["portfolio_status"] == "closed" and member["portfolio_status"] != "closed":
                     conn.execute("UPDATE sa_tracking_memberships SET portfolio_status='closed', updated_at=? WHERE membership_id=?", (now, member_id))
                     SaTrackingMembershipStore._event(conn, member_id, "former", "sa_observation", now, row)
+            for member_id, observed in current_rows.items():
+                if max(row["observed_at"] for row in observed) < previous_observed[member_id]:
+                    continue
+                member = conn.execute("SELECT * FROM sa_tracking_memberships WHERE membership_id=?", (member_id,)).fetchone()
+                # Removing Former does not stop an already-current source, but
+                # a later observation cannot reactivate a removed membership.
+                current = int(any(row["current_observed"] for row in observed)
+                              and (member["removed_at"] is None or member["current_tracking"])
+                              and member["reason"] != "terminal_delisting")
+                if current != member["current_tracking"]:
+                    conn.execute("UPDATE sa_tracking_memberships SET current_tracking=?, updated_at=? WHERE membership_id=?", (current, now, member_id))
+                    SaTrackingMembershipStore._event(conn, member_id, "bound", "sa_observation", now,
+                                                    {"current_tracking": bool(current), "observations": observed})
         finally:
             conn.row_factory = previous_factory
 
@@ -245,9 +273,13 @@ class SaTrackingMembershipStore:
     def project(conn: sqlite3.Connection, *, identity_links: Mapping[str, str] | None = None) -> dict[str, set[str]]:
         links = identity_links or {}
         result: dict[str, set[str]] = {}
-        for ticker, status in conn.execute("SELECT ticker, portfolio_status FROM sa_tracking_memberships WHERE accepted_at IS NOT NULL AND removed_at IS NULL"):
-            source = "sa_alpha_picks_current" if status == "current" else "sa_alpha_picks_former"
-            result.setdefault(source, set()).add(_identity(ticker, links))
+        for ticker, status, removed, current in conn.execute(
+            "SELECT ticker, portfolio_status, removed_at, current_tracking FROM sa_tracking_memberships WHERE accepted_at IS NOT NULL"
+        ):
+            if current:
+                result.setdefault("sa_alpha_picks_current", set()).add(_identity(ticker, links))
+            if status == "closed" and removed is None:
+                result.setdefault("sa_alpha_picks_former", set()).add(_identity(ticker, links))
         return result
 
     def active_sources(self, *, identity_links: Mapping[str, str] | None = None) -> dict[str, set[str]]:
@@ -266,13 +298,18 @@ class SaTrackingMembershipStore:
         with self._connection() as conn:
             from src.active_universe import _read_identity_links
             links = _read_identity_links(conn)
-            return [
-                {"membership_id": row["membership_id"], "ticker": _identity(row["ticker"], links),
-                 "picked_date": row["picked_date"], "portfolio_status": row["portfolio_status"],
-                 "state": "removed" if row["removed_at"] else "tracking" if row["accepted_at"] else "candidate",
-                 "reason": row["reason"], "accepted_at": row["accepted_at"], "removed_at": row["removed_at"]}
-                for row in conn.execute("SELECT * FROM sa_tracking_memberships ORDER BY ticker, picked_date")
-            ]
+            result = []
+            for row in conn.execute("SELECT * FROM sa_tracking_memberships ORDER BY ticker, picked_date"):
+                item = {"membership_id": row["membership_id"], "ticker": _identity(row["ticker"], links),
+                        "picked_date": row["picked_date"], "portfolio_status": row["portfolio_status"],
+                        "state": "removed" if row["removed_at"] else "tracking" if row["accepted_at"] else "candidate",
+                        "reason": row["reason"], "accepted_at": row["accepted_at"], "removed_at": row["removed_at"]}
+                result.append(item)
+                if row["portfolio_status"] == "closed" and row["current_tracking"]:
+                    result.append({**item, "portfolio_status": "current", "removed_at": None,
+                                   "state": "tracking" if row["accepted_at"] else "candidate",
+                                   "reason": "current_observed" if row["accepted_at"] else row["reason"]})
+            return result
 
     def _command(self, member_id: str, action: str, *, at: str) -> None:
         now = _instant(at)
@@ -318,7 +355,7 @@ def terminal_tracking_memberships(conn: sqlite3.Connection, ticker: str) -> list
     links = {}
     if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ticker_identity_links'").fetchone():
         links = dict(conn.execute("SELECT source_ticker, successor_ticker FROM ticker_identity_links WHERE reversed_at IS NULL"))
-    cursor = conn.execute("SELECT * FROM sa_tracking_memberships WHERE accepted_at IS NOT NULL AND removed_at IS NULL ORDER BY membership_id")
+    cursor = conn.execute("SELECT * FROM sa_tracking_memberships WHERE accepted_at IS NOT NULL AND (removed_at IS NULL OR current_tracking=1) ORDER BY membership_id")
     names = [column[0] for column in cursor.description]
     return [dict(zip(names, row)) for row in cursor if _identity(row[names.index("ticker")], links) == ticker]
 

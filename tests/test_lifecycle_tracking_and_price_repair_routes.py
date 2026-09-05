@@ -57,6 +57,31 @@ def test_former_routes_are_source_scoped_gated_and_get_is_pure(client, monkeypat
     assert http.post(f"/profile/alpha-picks-tracking/{member_id}", json={"action": "remove", "ticker": "LIVE"}).status_code == 422
 
 
+def test_dual_source_route_keeps_current_visible_after_former_removal(client, monkeypatch):
+    http, profile_store = client
+    with sqlite3.connect(profile_store.db_path) as conn:
+        SaTrackingMembershipStore.install(conn)
+    tracking = SaTrackingMembershipStore(profile_store.db_path)
+    row = {"lineage_id": 1, "ticker": "BOTH", "picked_date": "2025-01-01", "portfolio_status": "closed",
+           "current_observed": True, "observed_at": "2026-09-05T01:00:00Z"}
+    tracking.reconcile((row,), at=row["observed_at"])
+    monkeypatch.setattr(profile, "require_profile_state_write", lambda *args: None)
+    before = http.get("/profile/alpha-picks-tracking").json()["memberships"]
+    assert {(item["portfolio_status"], item["state"]) for item in before} == {
+        ("current", "tracking"), ("closed", "tracking"),
+    }
+    member_id = next(item["membership_id"] for item in before if item["portfolio_status"] == "closed")
+    assert http.post(f"/profile/alpha-picks-tracking/{member_id}", json={"action": "remove"}).status_code == 200
+    after = http.get("/profile/alpha-picks-tracking").json()["memberships"]
+    assert {(item["portfolio_status"], item["state"]) for item in after} == {
+        ("current", "tracking"), ("closed", "removed"),
+    }
+    current = next(item for item in after if item["portfolio_status"] == "current")
+    assert current["removed_at"] is None
+    assert current["reason"] == "current_observed"
+    assert tracking.active_sources() == {"sa_alpha_picks_current": {"BOTH"}}
+
+
 def test_repair_route_requires_fresh_preview_and_both_permissions_before_dispatch(client, monkeypatch):
     http, _ = client
     current = [coverage()]

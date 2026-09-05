@@ -31,6 +31,20 @@ it("rejects absent and malformed membership arrays rather than crashing during r
   }
 });
 
+it.each([false, true])("keeps the Current view independent of a shared Former membership (removed=%s)", async (removed) => {
+  const current = { ...membership, portfolio_status: "current" as const, reason: "current_observed" as const };
+  const former = removed ? { ...membership, state: "removed" as const, reason: "user_removed" as const, removed_at: "2026-09-05T02:00:00Z" } : membership;
+  const payload = parseAlphaTracking({ available: true, sync_status: "current", memberships: [former, current] });
+  api.getAlphaTracking.mockResolvedValue(payload);
+  await act(async () => root.render(<AlphaTrackingPanel status="current" onOpenTicker={vi.fn()} onChanged={vi.fn()} />));
+  expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(host.querySelector("tbody")?.textContent).toContain("OLD");
+  expect(host.querySelector('[aria-label="Stop Former tracking OLD"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Restore tracking OLD"]')).toBeNull();
+  await act(async () => root.render(<AlphaTrackingPanel status="closed" onOpenTicker={vi.fn()} onChanged={vi.fn()} />));
+  expect(host.querySelectorAll("tbody tr")).toHaveLength(removed ? 0 : 1);
+});
+
 it("shows pending SA reconciliation without claiming the saved tracking choices were lost", async () => {
   api.getAlphaTracking.mockResolvedValue({ available: true, memberships: [membership], sync_status: "pending" });
   await act(async () => root.render(<AlphaTrackingPanel status="closed" onOpenTicker={vi.fn()} onChanged={vi.fn()} />));

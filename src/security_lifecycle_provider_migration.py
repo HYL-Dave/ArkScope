@@ -140,7 +140,9 @@ def _cutover_preview(profile_path, observations):
     observation_digest = hashlib.sha256(json.dumps(observations, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     payload = {"profile": profile, "observations_sha256": observation_digest,
                "lineage_count": len(observations), "current_count": sum(row["portfolio_status"] == "current" for row in observations),
-               "former_count": sum(row["portfolio_status"] == "closed" for row in observations)}
+               "former_count": sum(row["portfolio_status"] == "closed" for row in observations),
+               "current_observed_count": sum(row.get("current_observed", row["portfolio_status"] == "current") for row in observations),
+               "dual_source_count": sum(row["portfolio_status"] == "closed" and row.get("current_observed", False) for row in observations)}
     return {**payload, "cutover_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
 
 
