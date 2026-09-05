@@ -1340,11 +1340,11 @@ def test_listing_evidence_uses_exact_canonical_excerpt_bytes_and_cited_spans() -
     assert len(result.evidence) == 1
     evidence = result.evidence[0]
     assert evidence.excerpt == (
-        '{"authority":"nasdaq_trader","delisted_utc":null,'
-        '"directory":"nasdaq_listed","issuer_cik":null,'
+        '{"authority":"nasdaq_trader","composite_figi":null,"delisted_utc":null,'
+        '"directory":"nasdaq_listed","expected_active_state":true,"issuer_cik":null,'
         '"listing_status":"active","market":"stocks",'
         '"primary_exchange":"XNAS","provider_last_updated_utc":null,'
-        '"security_type":null,"source_as_of":"2026-08-28",'
+        '"security_type":null,"snapshot_complete":true,"source_as_of":"2026-08-28",'
         '"ticker":"AAPL"}'
     )
     encoded = evidence.excerpt.encode()

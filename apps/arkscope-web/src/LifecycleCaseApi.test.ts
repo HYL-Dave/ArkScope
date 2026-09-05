@@ -186,6 +186,9 @@ describe("security lifecycle case API", () => {
 
   it.each([
     ["proposals", { ...CASE_DETAIL, proposals: {} }],
+    ["current blockers", { ...CASE_DETAIL, current_blockers: {} }],
+    ["null current blockers", { ...CASE_DETAIL, current_blockers: null }],
+    ["invalid current blocker", { ...CASE_DETAIL, current_blockers: [{}] }],
     ["active_sources", { ...CASE_DETAIL, active_sources: "manual_lists" }],
     ["observation items", {
       ...CASE_DETAIL,
@@ -197,6 +200,20 @@ describe("security lifecycle case API", () => {
     await expect(getSecurityLifecycleCase("slc_blbd")).rejects.toThrow(
       "security_lifecycle_case_contract",
     );
+  });
+
+  it("keeps current listing diagnostics closed and accepts their absence in older responses", async () => {
+    const blocker = {
+      blocker_code: "listing_status_unresolved", retryable: false,
+      operator_detail: { code: "listing_checks", missing_checks: ["continuation"],
+        provider_issues: [{ provider: "massive", reason: "not_found" }], manual_review_required: true },
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+      ...CASE_DETAIL, current_blockers: [{ ...blocker, context_json: "internal", internal_id: "private" }],
+    })));
+    expect((await getSecurityLifecycleCase("slc_blbd")).current_blockers).toEqual([blocker]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(CASE_DETAIL)));
+    expect((await getSecurityLifecycleCase("slc_blbd")).current_blockers).toEqual([]);
   });
 
   it("loads historical arrays only through the closed audit contract", async () => {

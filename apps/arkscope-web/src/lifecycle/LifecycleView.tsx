@@ -43,6 +43,7 @@ import {
   type SecurityLifecycleDispositionReason,
   type SecurityLifecycleAssessment,
   type SecurityLifecycleAutomationProgress,
+  type SecurityLifecycleAutomationRun,
   type SecurityLifecycleAutomationStage,
   type SecurityLifecycleAutomationStatusResponse,
   type SecurityLifecycleAutomationFact,
@@ -223,6 +224,8 @@ function secAdmissionReasonLabel(
       return t(($) => $.lifecycle.secAdmission.reasons.identityBindingMissing);
     case "regulator_screening_incomplete":
       return t(($) => $.lifecycle.secAdmission.reasons.regulatorScreeningIncomplete);
+    case "regulator_monitor_only":
+      return t(($) => $.lifecycle.secAdmission.reasons.regulatorMonitorOnly);
     case "unknown_form":
       return t(($) => $.lifecycle.secAdmission.reasons.unknownForm);
   }
@@ -302,6 +305,13 @@ function transitionBlockLabels(
   t: TFunction<"explore">,
 ): Record<TickerIdentityTransitionBlockReason, string> {
   return {
+    listing_authority_required: t(($) => $.lifecycle.transition.blockers.listingAuthorityRequired),
+    provider_listing_check_required: t(($) => $.lifecycle.transition.blockers.providerCheckRequired),
+    provider_listing_check_stale: t(($) => $.lifecycle.transition.blockers.providerCheckStale),
+    provider_listing_check_changed: t(($) => $.lifecycle.transition.blockers.providerCheckChanged),
+    provider_terminal_not_confirmed: t(($) => $.lifecycle.transition.blockers.terminalNotConfirmed),
+    provider_legacy_event_review: t(($) => $.lifecycle.transition.blockers.legacyReview),
+    provider_continuation_review: t(($) => $.lifecycle.transition.blockers.continuationReview),
     successor_missing: t(($) => $.lifecycle.transition.blockers.successorMissing),
     successor_not_distinct: t(($) => $.lifecycle.transition.blockers.successorNotDistinct),
     outcome_not_executable: t(($) => $.lifecycle.transition.blockers.outcomeNotExecutable),
@@ -441,6 +451,10 @@ function TransitionEffectsSummary({
           {item.facet}: {item.value} · <span className="mono">{item.ticker}</span>
         </p>
       ))}
+      {(preview.effects.sa_tracking_memberships ?? []).map((member) => <p key={member.membership_id}>
+        <strong>{t(($) => $.lifecycle.transition.fields.saMemberships)}</strong>
+        {": "}{member.ticker} · {member.picked_date}
+      </p>)}
       {preview.caveats.length > 0 ? (
         <div>
           <strong>{t(($) => $.lifecycle.transition.fields.caveats)}</strong>
@@ -705,6 +719,12 @@ function factValue(value: unknown): string {
   }
 }
 
+function automationBlockerDescription(blocker: SecurityLifecycleAutomationRun["blockers"][number], locale: LifecycleLocale): string {
+  const label = lifecycleAutomationBlockerLabel(blocker.blocker_code, locale);
+  const detail = lifecycleAutomationOperatorDetailLabel(blocker.operator_detail, locale);
+  return detail ? [label, detail].join(": ") : label;
+}
+
 function AutomationTruth({
   audit,
   locale,
@@ -750,23 +770,11 @@ function AutomationTruth({
               <dd className="mono">{run.policy_version}</dd>
             </div>
           </dl>
-          {blockers.map((blocker) => {
-            const blockerLabel = lifecycleAutomationBlockerLabel(
-              blocker.blocker_code,
-              locale,
-            );
-            const operatorDetail = lifecycleAutomationOperatorDetailLabel(
-              blocker.operator_detail,
-              locale,
-            );
-            return (
+          {blockers.map((blocker) => (
               <p className="lifecycle-blocker" key={blocker.blocker_code}>
-                {operatorDetail
-                  ? [blockerLabel, operatorDetail].join(": ")
-                  : blockerLabel}
+                {automationBlockerDescription(blocker, locale)}
               </p>
-            );
-          })}
+          ))}
         </>
       ) : null}
       {facts.length > 0 ? (
@@ -1185,6 +1193,15 @@ function ProseEvidenceItem({
 
 function EvidenceItem(props: EvidenceItemProps) {
   if (props.evidence.source_family === "listing_authority") {
+    if (props.evidence.kind === "ticker_event_snapshot") {
+      const evidence = props.evidence;
+      return <details><summary>{props.t(($) => $.lifecycle.tickerEvents)} · {evidence.ticker_event.candidate_ticker}</summary>
+        {evidence.ticker_event.events.map((row) => <p key={`${row.source_ticker}-${row.effective_date}`}>
+          {row.source_ticker} → {row.successor_ticker} · {row.effective_date}
+        </p>)}
+        {safeEvidenceUrl(evidence.source_url) && <a href={safeEvidenceUrl(evidence.source_url)!} target="_blank" rel="noreferrer">{props.t(($) => $.lifecycle.actions.openEvidence)}</a>}
+      </details>;
+    }
     if (
       props.evidence.kind !== "listing_directory_snapshot"
       || !props.evidence.listing
@@ -1855,7 +1872,7 @@ export function LifecycleView({
   const currentEvidence = useMemo(
     () => (audit?.evidence ?? []).filter(
       (item) => ACTIVE_SOURCE_FAMILIES.includes(item.source_family)
-        && (item.source_family !== "listing_authority" || Boolean(item.listing)),
+        && (item.source_family !== "listing_authority" || item.kind === "ticker_event_snapshot" || Boolean(item.listing)),
     ),
     [audit?.evidence],
   );
@@ -2264,14 +2281,14 @@ export function LifecycleView({
                   ].filter(Boolean).join(" · ") || t(($) => $.lifecycle.states.notAvailable)}</dd>
                 </div>
                 <div>
-                  <dt>{t(($) => $.lifecycle.primary.secFiling)}</dt>
+                  <dt>{detail.observation?.filing_form === "LISTING_STATUS" ? t(($) => $.lifecycle.eventKinds.listingStatusReview) : t(($) => $.lifecycle.primary.secFiling)}</dt>
                   <dd>{detail.observation ? <>
                     <span>{[
-                      detail.observation.filing_form,
+                      detail.observation.filing_form === "LISTING_STATUS" ? null : detail.observation.filing_form,
                       detail.observation.filing_date,
                       detail.observation.filing_items.join(", "),
                     ].filter(Boolean).join(" · ")}</span>
-                    {safeEvidenceUrl(detail.observation.evidence_url) ? <>
+                    {detail.observation.filing_form !== "LISTING_STATUS" && safeEvidenceUrl(detail.observation.evidence_url) ? <>
                       <span aria-hidden="true"> · </span>
                       <a
                         className="lifecycle-evidence-link"
@@ -2289,9 +2306,9 @@ export function LifecycleView({
                 <div>
                   <dt>{t(($) => $.lifecycle.primary.corroboration)}</dt>
                   <dd className="lifecycle-corroboration-list">
-                    <span>{CORROBORATION_PROVIDER_LABELS.regulator} · {detail.corroboration.regulator
+                    {detail.observation?.filing_form !== "LISTING_STATUS" && <span>{CORROBORATION_PROVIDER_LABELS.regulator} · {detail.corroboration.regulator
                       ? lifecycleSourceFamilyStateLabel(detail.corroboration.regulator, locale)
-                      : t(($) => $.lifecycle.states.notChecked)}</span>
+                      : t(($) => $.lifecycle.states.notChecked)}</span>}
                     <span>{CORROBORATION_PROVIDER_LABELS.nasdaq_trader} · {detail.corroboration.nasdaq_trader
                       ? lifecycleListingStatusLabel(
                         detail.corroboration.nasdaq_trader.listing_status,
@@ -2304,14 +2321,18 @@ export function LifecycleView({
                         locale,
                       )
                       : t(($) => $.lifecycle.states.notChecked)}</span>
-                    <span>{CORROBORATION_PROVIDER_LABELS.ibkr} · {detail.corroboration.ibkr
+                    {detail.corroboration.eodhd && <span>{lifecycleListingAuthorityLabel("eodhd", locale)} · {lifecycleListingStatusLabel(detail.corroboration.eodhd.listing_status, locale)}</span>}
+                    {detail.observation?.filing_form !== "LISTING_STATUS" && <span>{CORROBORATION_PROVIDER_LABELS.ibkr} · {detail.corroboration.ibkr
                       ? lifecycleSourceFamilyStateLabel(detail.corroboration.ibkr, locale)
-                      : t(($) => $.lifecycle.states.notChecked)}</span>
+                      : t(($) => $.lifecycle.states.notChecked)}</span>}
                   </dd>
                 </div>
                 <div>
                   <dt>{t(($) => $.lifecycle.primary.missingAndNextCheck)}</dt>
                   <dd>
+                    {(detail.current_blockers ?? []).map((blocker) => (
+                      <p className="lifecycle-blocker" key={blocker.blocker_code}>{automationBlockerDescription(blocker, locale)}</p>
+                    ))}
                     <LifecycleDispositionReasonText
                       reason={detail.disposition_reason}
                       dispositionAsOf={detail.disposition_as_of}
@@ -2654,7 +2675,7 @@ export function LifecycleView({
                         setCiteObservation(event.target.checked);
                       }}
                     />
-                    {t(($) => $.lifecycle.sections.source)} · {detail.observation?.filing_form}
+                    {t(($) => $.lifecycle.sections.source)} · {detail.observation?.filing_form === "LISTING_STATUS" ? t(($) => $.lifecycle.eventKinds.listingStatusReview) : detail.observation?.filing_form}
                   </label>
                   {evidenceCitations.map((item) => (
                     <label className="lifecycle-citation" key={item.evidence_id}>
@@ -2670,7 +2691,9 @@ export function LifecycleView({
                             : current.filter((id) => id !== item.evidence_id));
                         }}
                       />
-                      {item.source_family === "listing_authority"
+                      {item.source_family === "listing_authority" && item.kind === "ticker_event_snapshot"
+                        ? [t(($) => $.lifecycle.tickerEvents), item.ticker_event.candidate_ticker].join(" · ")
+                        : item.source_family === "listing_authority"
                         ? [
                           lifecycleListingAuthorityLabel(item.listing.authority, locale),
                           item.listing.candidate_ticker,

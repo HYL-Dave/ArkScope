@@ -11,8 +11,9 @@ from typing import Any, Literal
 from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
 
 
-AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v4"
+AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v5"
 RULE_VERSIONS = {
+    "lifecycle.provider_listing_status": "1",
     "lifecycle.insufficient_identity_facts": "1",
     "lifecycle.ma_review": "1",
     "lifecycle.no_identity_change": "1",
@@ -843,6 +844,11 @@ def evaluate_automation_decision(
 
     raw_evidence = tuple(evidence)
     raw_facts = tuple(facts)
+    if case.get("source") == "listing_authority":
+        from src.security_lifecycle_provider_authority import evaluate_provider_decision
+
+        return evaluate_provider_decision(case=case, evidence=raw_evidence, current_date=current_date,
+                                          active_sources=active_sources, transition_preview=transition_preview)
     listing_issues = listing_authority_conflict_codes(
         case=case,
         evidence=raw_evidence,

@@ -95,6 +95,27 @@ const explore = {
     toolCount: "{{count}} tools",
     watchlistAsOf: "Watchlist as of",
   },
+  alphaTracking: {
+    syncPending: "Recent SA observations are not yet reflected in local tracking.",
+    syncUnavailable: "SA synchronization status is unavailable. Saved tracking choices are retained.",
+    commandForTicker: "{{command}} {{ticker}}",
+    source: "Tracking source", custom: "Manual lists", current: "Current Alpha Picks", former: "Former Alpha Picks",
+    ticker: "Ticker", pickedDate: "Pick date", state: "Tracking", reason: "Reason", actions: "Actions",
+    refresh: "Refresh local memberships", failed: "The latest tracking state is unavailable. Refresh it before confirming the outcome.",
+    unavailable: "Tracking membership migration is required.", empty: "No matching memberships.",
+    states: { tracking: "Tracking", removed: "Removed", candidate: "Needs confirmation" },
+    commands: { remove: "Stop Former tracking", restore: "Restore tracking", accept: "Accept membership" },
+    confirm: {
+      remove: "Stop the Former Alpha Picks source for {{ticker}}. SA sync and ticker changes will not restore it. Other lists and holdings are unchanged.",
+      restore: "Restore the Former Alpha Picks source for {{ticker}} and resume its price and news collection.",
+      accept: "Accept this SA pick for {{ticker}} as a separate tracking membership. Existing history and holdings will not be moved.",
+    },
+    reasons: {
+      current_observed: "Current SA pick", bootstrap_accepted: "Accepted historical membership", capture_gap: "No previously accepted membership",
+      identity_ambiguous: "Membership identity is ambiguous", related_security: "Related-security identity needs confirmation",
+      user_removed: "Removed by you", user_restored: "Restored by you", user_accepted: "Accepted by you", terminal_delisting: "Confirmed delisting; reversal belongs to the lifecycle event",
+    },
+  },
   watchlist: {
     listSummary: "{{kind}} · {{count}} active",
     noteCount: {
@@ -223,6 +244,7 @@ const explore = {
     listsRemoved: "Legacy lists removed: {{count}}",
   },
   lifecycle: {
+    tickerEvents: "Ticker history",
     title: "Security event investigation",
     aria: "Security event investigation",
     workflow: {
@@ -265,6 +287,7 @@ const explore = {
         noMaterialTrackedSecurityFact: "No material tracked-security fact found",
         identityBindingMissing: "The filing is not tied to the tracked security",
         regulatorScreeningIncomplete: "SEC screening did not complete",
+        regulatorMonitorOnly: "SEC reminder only; listing authorities govern tracking changes",
         unknownForm: "Unrecognized filing form; review required",
       },
     },
@@ -593,6 +616,7 @@ const explore = {
     },
     listingEvidence: {
       authorities: {
+        eodhd: "EODHD",
         nasdaqTrader: "Nasdaq Trader",
         massive: "Massive",
       },
@@ -677,6 +701,14 @@ const explore = {
       transitionApprovalUnavailable: "Transition approval is temporarily unavailable; revalidation is scheduled",
     },
     automationOperatorDetails: {
+      listingChecks: {
+        providerIssue: "{{provider}}: {{issue}}",
+        manualReview: "Ticker history is unavailable; an explicit delisting review is required before stopping collection",
+        checks: { delisting: "Explicit dated delisting is missing", stocks: "Current exchange trading is not excluded", otc: "OTC continuation is not excluded",
+          eodhd: "EODHD delisting confirmation is missing", nasdaq: "Both current Nasdaq directories are required", identity: "Stable security identity is missing",
+          continuation: "Same-security continuation is not confirmed or excluded", freshness: "Listing checks have expired", source_conflict: "An active listing conflicts with delisting", integrity: "Listing evidence is incomplete or invalid" },
+        issues: { credential_missing: "API key missing", rate_limited: "Request rate limited", access_denied: "Access denied", unavailable: "Source unavailable", mapping_required: "Exact symbol mapping required", not_found: "History not available" },
+      },
       candidateBudgetExceeded: "{{candidateCount}} candidates exceed the IBKR query limit of {{queryLimit}}. IBKR was not contacted.",
     },
     citationKinds: {
@@ -734,6 +766,7 @@ const explore = {
         watchlistMembershipAdded: "watchlist memberships added",
         watchlistMembershipArchived: "watchlist memberships archived",
         watchlistMembershipReactivated: "watchlist memberships reactivated",
+        saMembershipSuppressed: "local Alpha Picks memberships stopped",
       },
     },
     eventKinds: {
@@ -760,6 +793,13 @@ const explore = {
         reversed: "Reversed",
       },
       blockers: {
+        listingAuthorityRequired: "SEC is a reminder; current listing evidence is required to change tracking",
+        providerCheckRequired: "A current provider listing check is required",
+        providerCheckStale: "The provider listing check has expired",
+        providerCheckChanged: "Provider listing evidence changed after review",
+        terminalNotConfirmed: "Terminal delisting has not been established",
+        legacyReview: "A historical delisting requires an attended review",
+        continuationReview: "Same-security continuation requires an attended review",
         successorMissing: "Successor ticker is required",
         successorNotDistinct: "Successor ticker must differ from the current ticker",
         outcomeNotExecutable: "The accepted outcome does not support an automatic tracking transition",
@@ -782,7 +822,7 @@ const explore = {
         successorHasLaterTransition: "A later transition starts from the successor ticker",
       },
       caveats: {
-        providerOwnedSourcesRetained: "Seeking Alpha tracking stays with the provider-owned source",
+        providerOwnedSourcesRetained: "Seeking Alpha's source history is retained; local collection follows the effects shown here",
         portfolioPositionRetained: "The old broker position remains on {{ticker}}",
         successorAlreadyTracked: "The successor is already tracked in at least one destination",
       },
@@ -791,6 +831,7 @@ const explore = {
         status: "Transition status",
         executeOn: "Scheduled date",
         watchlists: "Manual lists",
+        saMemberships: "Stop local Alpha Picks membership (only explicit restore or transition reversal can resume it)",
         legacySeed: "Imported legacy settings",
         tags: "Editable tags",
         priority: "Priority",

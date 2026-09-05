@@ -400,7 +400,7 @@ describe("local storage panels", () => {
       "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
     );
     expect(storage!.textContent).toContain(
-      "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
+      "覆蓋診斷為唯讀；補抓須另行確認。",
     );
     expect(storage!.textContent).toContain("美國上市股票代理範圍");
     expect(storage!.textContent).toContain("正規交易時段（RTH）");
@@ -651,7 +651,7 @@ describe("local storage panels", () => {
       "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",
     );
     expect(storage.textContent).toContain(
-      "Read-only diagnostic; does not start a repair or supply planner work.",
+      "Coverage is read-only. Backfill requires separate confirmation.",
     );
     expect(Array.from(storage.querySelectorAll("table"), (table) =>
       Array.from(table.querySelectorAll("th"), (node) => node.textContent)))

@@ -104,6 +104,7 @@ _REASONS = frozenset(
         "profile_store_unavailable",
         "automation_scheduler_failed",
         "execution_lock_unavailable",
+        "provider_scan_budget_unavailable",
     }
 )
 _RETRYABLE_BLOCKERS = frozenset(
@@ -620,6 +621,7 @@ def _transition_preview(
             case=case,
             request=request,
             sources=sources,
+            at=_clock(),
         )
 
 
@@ -1234,6 +1236,11 @@ def _load_evidence(
     stage_callback: Callable[[LifecycleAutomationStage], None] | None = None,
 ) -> LifecycleAutomationEvidenceBundle:
     del mode
+    if case.get("source") == "listing_authority":
+        from src.security_lifecycle_provider_store import ProviderCheckStore
+        if stage_callback is not None:
+            stage_callback("listing")
+        return ProviderCheckStore(_profile_path()).bundle(case, at=at)
     from data_sources.sec_transport import SecTransport
     from src.security_lifecycle_sec_evidence import collect_sec_evidence
 
@@ -1855,6 +1862,22 @@ def _run_owned_automation_batch(
     if not isinstance(execution_limits, LifecycleAutomationExecutionLimits):
         raise TypeError("execution_limits")
     try:
+        from src.sa_tracking_memberships import SaTrackingMembershipStore
+        with sqlite3.connect(f"{_profile_path().resolve().as_uri()}?mode=ro", uri=True) as conn:
+            provider_authority_installed = SaTrackingMembershipStore.installed(conn)
+        if provider_authority_installed:
+            from src.security_lifecycle_provider_scan import run_provider_scan
+            target_ticker = None
+            if target_case_id is not None:
+                target = next((case for case in _load_cases() if case["case_id"] == target_case_id), None)
+                if target is not None and target["source"] == "listing_authority":
+                    target_ticker = str(target["ticker"])
+            if target_case_id is None or target_ticker is not None:
+                # Legacy canary limits authorize SEC/listing/IBKR, not this new
+                # independent scan (up to Massive 5 + EODHD 2 + Nasdaq 2).
+                if execution_limits != _PRODUCTION_EXECUTION_LIMITS:
+                    return security_lifecycle_automation_failure("provider_scan_budget_unavailable")
+                run_provider_scan(profile_path=_profile_path(), tickers=tuple(_load_sources()), at=at, target_ticker=target_ticker)
         listing_context = (
             _listing_authority_session(at=at)
             if execution_limits == _PRODUCTION_EXECUTION_LIMITS

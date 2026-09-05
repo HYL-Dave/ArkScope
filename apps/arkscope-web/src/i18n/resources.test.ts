@@ -94,7 +94,8 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 458,
+      lifecycle: 488,
+      alphaTracking: 34,
       news: 45,
       tickerDetail: 89,
       aiCard: 67,
@@ -264,7 +265,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(858);
+      expect(flattened.size, `${locale}.explore`).toBe(922);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -523,7 +524,7 @@ describe("bundled i18n resources", () => {
         schedule: "IBKR 股價",
         coverage: "交易日 / 價格覆蓋",
         coverageDescription: "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
-        coverageReadOnly: "唯讀診斷；不會啟動修復，也不會產生 planner 工作。",
+        coverageReadOnly: "覆蓋診斷為唯讀；補抓須另行確認。",
         coverageMarketScope: "美國上市股票代理範圍",
         coverageSession: "正規交易時段（RTH）",
         storedFundamentals: "已儲存的 SEC 基本面",
@@ -573,7 +574,7 @@ describe("bundled i18n resources", () => {
         schedule: "IBKR Prices",
         coverage: "Trading-day / Price Coverage",
         coverageDescription: "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",
-        coverageReadOnly: "Read-only diagnostic; does not start a repair or supply planner work.",
+        coverageReadOnly: "Coverage is read-only. Backfill requires separate confirmation.",
         coverageMarketScope: "US-listed equity proxy",
         coverageSession: "Regular trading hours (RTH)",
         storedFundamentals: "Stored SEC Fundamentals",
@@ -727,14 +728,20 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 75,
       shell: 37,
-      settings: 852,
+      settings: 877,
       research: 207,
-      explore: 858,
+      explore: 922,
       portfolio: 374,
       system: 24,
     } as const;
 
     const expectedCoveragePaths = [
+      ...[
+        "scope", "preview", "gaps", "ticker", "reason", "firstBar", "missingDates", "none",
+        "beforeFirst", "noHistory", "missing", "partialBars", "confirmTitle", "confirm", "close",
+        "nothingToRepair", "consequence", "blocked", "accepted", "succeeded", "partial", "failed",
+        "skipped", "unconfirmed", "error",
+      ].map((path) => `repair.${path}`),
       "title",
       "description",
       "readOnly",
@@ -798,7 +805,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2427);
+      expect(total, `${locale}.total`).toBe(2516);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1172,6 +1179,12 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      ...[
+        "scope", "preview", "gaps", "ticker", "reason", "firstBar", "missingDates", "none",
+        "beforeFirst", "noHistory", "missing", "partialBars", "confirmTitle", "confirm", "close",
+        "nothingToRepair", "consequence", "blocked", "accepted", "succeeded", "partial", "failed",
+        "skipped", "unconfirmed", "error",
+      ].map((path) => `dataStorage.coverage.repair.${path}`),
       "workspace.routes.effortRequired",
       "workspace.routes.modelRetired",
       "models.route.effortRequired",

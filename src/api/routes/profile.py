@@ -22,10 +22,11 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
+import sqlite3
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dependencies import get_dal, get_profile_store
 from src.api.permissions import require_profile_state_write
@@ -601,6 +602,72 @@ def delete_ticker_note(
 
 class HiddenBody(BaseModel):
     hidden: bool = True
+
+
+def _sa_tracking_store(store: ProfileStateStore):
+    from src.sa_tracking_memberships import SaTrackingMembershipStore
+
+    return SaTrackingMembershipStore(store.db_path)
+
+
+@router.get("/profile/alpha-picks-tracking")
+def alpha_picks_tracking(store: ProfileStateStore = Depends(get_profile_store)):
+    try:
+        tracking = _sa_tracking_store(store)
+        memberships = tracking.list_memberships()
+        from src import sa_capture_store
+        from src.sa_tracking_memberships import read_sa_tracking_observations
+        try:
+            sync_status = tracking.synchronization_status(read_sa_tracking_observations(sa_capture_store.resolve_sa_db_path()))
+        except (ValueError, sqlite3.Error, OSError):
+            sync_status = "unavailable"
+        return {"available": True, "memberships": memberships, "sync_status": sync_status}
+    except ValueError as exc:
+        if str(exc) == "tracking_schema_absent":
+            return {"available": False, "memberships": []}
+        raise HTTPException(status_code=503, detail={"code": "tracking_store_unavailable"}) from None
+    except (sqlite3.Error, OSError):
+        raise HTTPException(status_code=503, detail={"code": "tracking_store_unavailable"}) from None
+
+
+@router.post("/profile/alpha-picks-tracking/refresh")
+def refresh_alpha_picks_tracking(store: ProfileStateStore = Depends(get_profile_store)):
+    from src import sa_capture_store
+    from src.sa_tracking_memberships import reconcile_sa_tracking
+
+    require_profile_state_write("refresh_alpha_picks_tracking", {})
+    try:
+        available = reconcile_sa_tracking(profile_db=store.db_path, sa_db=sa_capture_store.resolve_sa_db_path(), at=_utcnow())
+        if not available:
+            raise ValueError("tracking_schema_absent")
+        return alpha_picks_tracking(store)
+    except (ValueError, sqlite3.Error, OSError):
+        raise HTTPException(status_code=503, detail={"code": "tracking_store_unavailable"}) from None
+
+
+class TrackingCommandBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    action: Literal["remove", "restore", "accept"]
+
+
+@router.post("/profile/alpha-picks-tracking/{membership_id}")
+def command_alpha_picks_tracking(
+    membership_id: str,
+    body: TrackingCommandBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    require_profile_state_write("alpha_picks_tracking", {"membership_id": membership_id, "action": body.action})
+    try:
+        tracking = _sa_tracking_store(store)
+        getattr(tracking, body.action)(membership_id, at=_utcnow())
+        return {"ok": True}
+    except ValueError as exc:
+        code = str(exc)
+        if code in {"tracking_membership_not_found", "membership_restore_required", "former_membership_required", "terminal_transition_reversal_required"}:
+            raise HTTPException(status_code=409, detail={"code": code}) from None
+        raise HTTPException(status_code=503, detail={"code": "tracking_store_unavailable"}) from None
+    except (sqlite3.Error, OSError):
+        raise HTTPException(status_code=503, detail={"code": "tracking_store_unavailable"}) from None
 
 
 @router.post("/profile/tickers/{ticker}/hidden")

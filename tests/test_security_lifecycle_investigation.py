@@ -1389,6 +1389,18 @@ def test_non_continuation_outcomes_never_emit_symbol_remap(tmp_path, outcomes):
         conn.close()
 
 
+@pytest.mark.parametrize("outcome", ["acquisition_cash", "acquisition_stock", "acquisition_mixed", "acquisition_terms_unknown"])
+def test_acquisition_alone_keeps_price_and_news_tracking(outcome):
+    from src.security_lifecycle_investigation import derive_action_proposal_specs
+
+    proposals = derive_action_proposal_specs(
+        case={"ticker": "TARGET"},
+        assessment={"relevance": "direct_tracked_security", "outcomes": [outcome], "successor_ticker": "BUYER"},
+        sources=("manual_lists", "sa_alpha_picks_former"),
+    )
+    assert {row["action_type"] for row in proposals} == {"notify", "keep_tracking"}
+
+
 def test_same_symbol_venue_transfer_proposes_notify_and_keep_tracking(tmp_path):
     conn, store, case_id = _context(tmp_path)
     try:

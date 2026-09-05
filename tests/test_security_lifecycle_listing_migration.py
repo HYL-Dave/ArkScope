@@ -515,7 +515,7 @@ def test_v2_to_v3_preserves_every_existing_cell_and_adds_no_listing_rows(tmp_pat
         migrate_listing_authority_schema,
         preflight_listing_authority_migration,
     )
-    from src.security_lifecycle_schema import verify_profile_schema
+    from src.security_lifecycle_schema import verify_v3_profile_schema as verify_profile_schema
 
     source = _seeded_v2_profile(tmp_path)
     lifecycle_tables = _lifecycle_tables()

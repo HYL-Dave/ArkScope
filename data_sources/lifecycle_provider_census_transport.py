@@ -234,6 +234,7 @@ class MassiveTickerEventsResult:
     source_locator: str
     response_sha256: str
     response_bytes: int
+    latest_ticker: str | None = None
 
 
 @dataclass(frozen=True)
@@ -417,7 +418,7 @@ def _parse_eodhd_codes(body: bytes, requested: set[str]) -> tuple[str, ...]:
 
 
 class LifecycleProviderCensusTransport:
-    """Fail-closed HTTP boundary kept outside all production scheduling paths."""
+    """Bounded HTTP boundary shared by shadow census and provider listing scans."""
 
     def __init__(self, *, session: requests.Session) -> None:
         self._session = session
@@ -770,6 +771,7 @@ class LifecycleProviderCensusTransport:
             source_locator=request_url,
             response_sha256=hashlib.sha256(payload.body).hexdigest(),
             response_bytes=len(payload.body),
+            latest_ticker=timeline[-1][1] if timeline else None,
         )
 
     def fetch_eodhd_symbol_sets(

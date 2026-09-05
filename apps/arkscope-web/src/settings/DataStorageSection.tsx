@@ -44,6 +44,7 @@ import {
   type SettingsReadCache,
 } from "./settingsReadCache";
 import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
+import { PriceCoverageRepair } from "./PriceCoverageRepair";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
@@ -702,6 +703,7 @@ function TradingDayCoveragePanel({
               {label}
             </p>
           ))}
+          <PriceCoverageRepair coverage={cov} t={t} onCompleted={() => void load(true)} />
           {developerMode ? (
             <DeveloperDiagnostics
               diagnostics={coverageDeveloperDiagnostics(cov)}

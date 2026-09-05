@@ -378,8 +378,11 @@ def test_reader_assigns_rows_by_utc_session_window_not_date_prefix(
         if statement.lstrip().lower().startswith("select")
         and " from prices" in statement.lower()
     ]
-    assert len(prices_queries) == 1
-    prices_query = prices_queries[0]
+    assert len(prices_queries) == 2
+    history_queries = [query for query in prices_queries if "min(datetime)" in query.lower()]
+    assert len(history_queries) == 1
+    prices_query = next(query for query in prices_queries if query not in history_queries)
+    assert statements.count("BEGIN") == 1
     assert "substr(" not in prices_query.lower()
     assert "upper(" not in prices_query.lower()
     assert "trim(" not in prices_query.lower()

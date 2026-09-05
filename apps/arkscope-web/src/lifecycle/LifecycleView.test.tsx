@@ -2237,6 +2237,24 @@ describe("Lifecycle workflow", () => {
     expect(document.body.textContent).toContain("sec-symbol");
   });
 
+  it("shows the current missing listing check before opening the audit", async () => {
+    apiMocks.getSecurityLifecycleCase.mockResolvedValue(detail({
+      current_assessment: null,
+      disposition_reason: "ambiguous_event",
+      current_blockers: [{
+        blocker_code: "listing_status_unresolved", retryable: false,
+        operator_detail: { code: "listing_checks", missing_checks: ["continuation"],
+          provider_issues: [{ provider: "massive", reason: "not_found" }], manual_review_required: true },
+      }],
+    }));
+    await mountLifecycle();
+    const primary = document.body.querySelector("[data-testid='lifecycle-primary-summary']");
+    expect(primary?.textContent).toContain("Same-security continuation is not confirmed or excluded");
+    expect(primary?.textContent).toContain("an explicit delisting review is required");
+    expect(primary?.textContent).not.toContain("Automatic checking failed");
+    expect(apiMocks.getSecurityLifecycleCaseAudit).not.toHaveBeenCalled();
+  });
+
   it("reuses a loaded audit when its disclosure is closed and reopened", async () => {
     await mountLifecycle();
 
@@ -2531,7 +2549,7 @@ describe("Lifecycle workflow", () => {
       "high",
       "low",
       "The old broker position remains on QBTS",
-      "Seeking Alpha tracking stays with the provider-owned source",
+      "Seeking Alpha's source history is retained; local collection follows the effects shown here",
       "Historical notes, evidence, prices, and filings are not rewritten",
     ]) expect(dialog!.textContent).toContain(value);
     expect(dialog!.querySelectorAll('input[type="radio"]')).toHaveLength(2);
@@ -2628,7 +2646,7 @@ describe("Lifecycle workflow", () => {
 
       expect(document.body.textContent).toContain("The old broker position remains on QBTS");
       expect(document.body.textContent).toContain(
-        "Seeking Alpha tracking stays with the provider-owned source",
+        "Seeking Alpha's source history is retained; local collection follows the effects shown here",
       );
     },
   );
@@ -2673,7 +2691,7 @@ describe("Lifecycle workflow", () => {
     await mountLifecycle();
     expect(document.body.textContent).toContain("The old broker position remains on QBTS");
     expect(document.body.textContent).toContain(
-      "Seeking Alpha tracking stays with the provider-owned source",
+      "Seeking Alpha's source history is retained; local collection follows the effects shown here",
     );
     expect(document.body.textContent).toContain(
       "Historical notes, evidence, prices, and filings are not rewritten",

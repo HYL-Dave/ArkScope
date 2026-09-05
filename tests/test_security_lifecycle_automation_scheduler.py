@@ -1452,7 +1452,8 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
     def profile_connection():
         yield marker
 
-    def build_preflight(conn, *, case, request, sources):
+    def build_preflight(conn, *, case, request, sources, at):
+        assert at == "2026-08-25T12:00:00Z"
         calls.append(("preview", conn, case, request, sources))
         return {
             "eligible": True,
@@ -1479,6 +1480,7 @@ def test_scheduler_uses_real_provider_free_transition_preflight_and_approver(
             captured_worker.update(kwargs)
 
     monkeypatch.setattr(scheduler, "_profile_connection", profile_connection)
+    monkeypatch.setattr(scheduler, "_clock", lambda: "2026-08-25T12:00:00Z")
     monkeypatch.setattr(
         ticker_identity_transition,
         "build_automation_transition_preflight",
@@ -6715,3 +6717,25 @@ def test_owned_canary_batch_threads_one_limits_object_to_every_case(monkeypatch)
         ("listing", "2026-08-31T00:00:00Z", limits),
         ("case", "slc_canary", limits),
     ]
+
+
+def test_legacy_canary_budget_cannot_start_the_new_provider_scan(tmp_path, monkeypatch):
+    from src.sa_tracking_memberships import SaTrackingMembershipStore
+    from src import security_lifecycle_provider_scan
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+
+    profile = tmp_path / "profile.db"
+    with sqlite3.connect(profile) as conn:
+        SaTrackingMembershipStore.install(conn)
+    called = []
+    monkeypatch.setattr(scheduler, "_profile_path", lambda: profile)
+    monkeypatch.setattr(scheduler, "_load_sources", lambda: {"OLD": ("sa_alpha_picks_former",)})
+    monkeypatch.setattr(security_lifecycle_provider_scan, "run_provider_scan", lambda **kwargs: called.append(kwargs))
+    result = scheduler._run_owned_automation_batch(
+        limit=1, at="2026-09-05T01:00:00Z", execution_owner_id="legacy-canary",
+        transition_mutation_allowed=lambda: False,
+        execution_limits=scheduler.LifecycleAutomationExecutionLimits.canary(),
+    )
+    assert called == []
+    assert result["reason"] == "provider_scan_budget_unavailable"
+    assert result["status"] == "unavailable"

@@ -21,7 +21,7 @@ def _listing_locator(**overrides):
         "adapter": "massive_reference",
         "authority": "massive",
         "directory": None,
-        "candidate_ticker": "B",
+        "candidate_ticker": "EA",
         "expected_active_state": True,
         "listing_status": "active",
         "market": "stocks",
@@ -350,7 +350,7 @@ def test_accept_assessment_route_keeps_action_execution_out_of_scope(tmp_path, m
         assert payload["assessment"]["status"] == "accepted"
         assert payload["assessment"]["acceptance_authority"] == "human"
         assert {item["action_type"] for item in payload["proposals"]} == {
-            "archive_manual_memberships",
+            "keep_tracking",
             "notify",
         }
         assert all(item["status"] == "proposed" for item in payload["proposals"])
@@ -463,7 +463,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 193
+    assert len(rows) == 198
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",
@@ -1575,7 +1575,7 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
             "listing": {
                 "authority": "massive",
                 "directory": None,
-                "candidate_ticker": "B",
+                "candidate_ticker": "EA",
                 "listing_status": "active",
                 "market": "stocks",
                 "primary_exchange": "XNAS",

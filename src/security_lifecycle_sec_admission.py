@@ -21,6 +21,7 @@ SecAdmissionReason = Literal[
     "identity_binding_missing",
     "regulator_screening_incomplete",
     "unknown_form",
+    "regulator_monitor_only",
 ]
 
 SEC_ADMISSION_STATES = frozenset(
@@ -36,6 +37,7 @@ SEC_ADMISSION_REASONS = frozenset(
         "identity_binding_missing",
         "regulator_screening_incomplete",
         "unknown_form",
+        "regulator_monitor_only",
     }
 )
 

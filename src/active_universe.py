@@ -254,6 +254,16 @@ def _read_profile_sources(
             "SELECT ticker FROM ticker_meta WHERE hidden_at IS NOT NULL"
         ).fetchall()
         identity_links = _read_identity_links(conn)
+        from src.sa_tracking_memberships import SaTrackingMembershipStore
+
+        try:
+            accepted_sa = (
+                SaTrackingMembershipStore.project(conn, identity_links=identity_links)
+                if SaTrackingMembershipStore.installed(conn)
+                else None
+            )
+        except ValueError as exc:
+            raise _IdentityLinksInvalid from exc
     finally:
         conn.close()
 
@@ -280,6 +290,8 @@ def _read_profile_sources(
         "portfolio_open": portfolio,
         "legacy_config_seed": legacy,
     }
+    if accepted_sa is not None:
+        memberships.update({key: accepted_sa.get(key, set()) for key in SA_SOURCE_SCOPES})
     warnings = {
         "manual_lists": _count_warnings(invalid_symbol_count=manual_invalid),
         "portfolio_open": _count_warnings(
@@ -433,7 +445,10 @@ def build_active_universe_snapshot(
             sa_path,
             now=generated_at,
         )
-        source_memberships.update(sa_memberships)
+        source_memberships.update({
+            key: source_memberships.get(key, values)
+            for key, values in sa_memberships.items()
+        })
         source_status.update(sa_statuses)
     except FileNotFoundError as exc:
         source_reasons.update(

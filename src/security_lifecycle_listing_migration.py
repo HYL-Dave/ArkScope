@@ -14,11 +14,11 @@ import tempfile
 
 from src.security_lifecycle_schema import (
     LifecycleSchemaMismatch,
-    PROFILE_INDEX_SQL,
-    PROFILE_TABLE_SQL,
+    V3_PROFILE_INDEX_SQL as PROFILE_INDEX_SQL,
+    V3_PROFILE_TABLE_SQL as PROFILE_TABLE_SQL,
     V2_PROFILE_INDEX_SQL,
     V2_PROFILE_TABLE_SQL,
-    verify_profile_connection,
+    verify_v3_profile_connection as verify_profile_connection,
     verify_v2_profile_connection,
 )
 from src.ticker_identity_schema import (

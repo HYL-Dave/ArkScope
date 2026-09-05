@@ -28,6 +28,8 @@ import {
 } from "./explore/explorePresentation";
 import type { NavigationTarget } from "./shell/navigation";
 import { TagChips } from "./tags";
+import { AlphaTrackingPanel } from "./AlphaTrackingPanel";
+import { Tabs } from "./ui/Tabs";
 
 // One normalized row the table renders. The single source is the universe
 // (profile-state substrate); the aggregate view is the union of active
@@ -82,6 +84,7 @@ export function WatchlistView({
   onNavigateTarget: (target: NavigationTarget) => void;
 }) {
   const { t } = useTranslation("explore");
+  const [trackingSource, setTrackingSource] = useState<"custom" | "current" | "closed">("custom");
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null); // null = all custom lists
   const [defaultListId, setDefaultListId] = useState<number | null>(null);
@@ -427,7 +430,7 @@ export function WatchlistView({
     <main className="main">
       <div className="surface-head">
         <h2 className="surface-title">{t(($) => $.watchlist.title)}</h2>
-        <span className="muted">
+        {trackingSource === "custom" && <span className="muted">
           {title} · {rows.length === 1
             ? t(($) => $.watchlist.renderedTickerCount.one, { count: rows.length })
             : t(($) => $.watchlist.renderedTickerCount.other, { count: rows.length })}
@@ -443,17 +446,17 @@ export function WatchlistView({
             <> {t(($) => $.watchlist.archivedCount, { count: archivedCount })}</>
           )}
           {asOf && <> {t(($) => $.watchlist.asOf, { value: asOf })}</>}
-        </span>
+        </span>}
         <span className="spacer" />
         {err && <span className="refresh-err">{t(($) => $.watchlist.error)}</span>}
-        <button className={`btn-ghost ${showArchived ? "on" : ""}`} onClick={() => setShowArchived((v) => !v)}>
+        {trackingSource === "custom" && <><button className={`btn-ghost ${showArchived ? "on" : ""}`} onClick={() => setShowArchived((v) => !v)}>
           {showArchived
             ? t(($) => $.watchlist.archivedBadge)
             : t(($) => $.watchlist.showArchived)}
         </button>
         <button className="btn-ghost" onClick={() => void reloadAfterMutation()} disabled={refreshing}>
           {refreshing ? "↻ …" : t(($) => $.watchlist.refresh)}
-        </button>
+        </button></>}
       </div>
 
       {err && (
@@ -468,7 +471,8 @@ export function WatchlistView({
         />
       )}
 
-      <div className="wl-layout">
+      <Tabs ariaLabel={t(($) => $.alphaTracking.source)} value={trackingSource} onValueChange={setTrackingSource} items={[
+        { value: "custom", label: t(($) => $.alphaTracking.custom), panel: <div className="wl-layout">
         <aside className="wl-rail">
           <button
             className={`wl-railitem ${selectedId === null ? "active" : ""}`}
@@ -701,7 +705,10 @@ export function WatchlistView({
             </>
           )}
         </div>
-      </div>
+      </div>},
+        { value: "current", label: t(($) => $.alphaTracking.current), panel: <AlphaTrackingPanel status="current" onOpenTicker={onOpenTicker} onChanged={() => void reloadAfterMutation()} /> },
+        { value: "closed", label: t(($) => $.alphaTracking.former), panel: <AlphaTrackingPanel status="closed" onOpenTicker={onOpenTicker} onChanged={() => void reloadAfterMutation()} /> },
+      ]} />
     </main>
   );
 }

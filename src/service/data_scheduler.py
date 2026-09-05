@@ -303,7 +303,9 @@ _MACRO_SCHEDULE_SOURCES = (
 )
 
 
-def _record_result(result: Dict[str, Any]) -> Dict[str, Any]:
+def _record_result(result: Dict[str, Any], *, price_repair_id: str | None = None) -> Dict[str, Any]:
+    if price_repair_id is not None:
+        result = {**result, "price_repair_id": price_repair_id}
     with _LAST_RESULT_LOCK:
         _LAST_RESULT[result.get("source", "?")] = {
             **result, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
@@ -1034,7 +1036,10 @@ def _classify_news_write_mode(mode: object) -> NewsExecutionMode:
 
 
 def run_source(source: str, trigger_source: str = "scheduler", *,
-               tickers: Optional[List[str]] = None) -> Dict[str, Any]:
+               tickers: Optional[List[str]] = None,
+               price_lookback_days: int | None = None,
+               price_as_of_date: str | None = None,
+               price_repair_id: str | None = None) -> Dict[str, Any]:
     """Execute one direct-local source with durable state and telemetry.
 
     Same-source overlap skips rather than queues across both threads and
@@ -1044,6 +1049,17 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     d = SOURCES.get(source)
     if d is None:
         return {"source": source, "status": "unknown_source"}
+    if price_lookback_days is not None:
+        from datetime import date
+        if (source != "ibkr_prices" or type(price_lookback_days) is not int or not 1 <= price_lookback_days <= 120
+                or not tickers or not isinstance(price_as_of_date, str)):
+            return _record_result({"source": source, "status": "failed", "code": "price_repair_request_invalid"}, price_repair_id=price_repair_id)
+        try:
+            date.fromisoformat(price_as_of_date)
+            if not set(tickers).issubset(_resolve_price_scope()):
+                raise ValueError("price_repair_scope_changed")
+        except Exception:
+            return _record_result({"source": source, "status": "skipped", "reason": "price_repair_scope_changed"}, price_repair_id=price_repair_id)
 
     news_route = None
     news_execution_mode: Optional[NewsExecutionMode] = None
@@ -1064,17 +1080,17 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     if not d.writes_macro_db:
         preflight_failure = _provider_preflight_failure(source)
         if preflight_failure is not None:
-            return _record_result(preflight_failure)
+            return _record_result(preflight_failure, price_repair_id=price_repair_id)
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
         return _record_result(
-            {"source": source, "status": "skipped", "reason": "already running"})
+            {"source": source, "status": "skipped", "reason": "already running"}, price_repair_id=price_repair_id)
     flock = _SOURCE_FLOCKS[source]
     if not flock.acquire():  # cross-process twin: the CLI may be running this source
         lock.release()
         return _record_result({"source": source, "status": "skipped",
-                               "reason": "already running in another process"})
+                               "reason": "already running in another process"}, price_repair_id=price_repair_id)
 
     macro_writer_context = None
     macro_writer_lease = None
@@ -1158,13 +1174,24 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             ibkr_held = _IBKR_LOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
             if not ibkr_held:
                 return _record_result({"source": source, "status": "skipped",
-                                       "reason": "IBKR gateway busy (lock timeout)"})
+                                       "reason": "IBKR gateway busy (lock timeout)"}, price_repair_id=price_repair_id)
             # cross-process Gateway serialization (one TWS/Gateway session total)
             ibkr_flock_held = _IBKR_FLOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
             if not ibkr_flock_held:
                 return _record_result(
                     {"source": source, "status": "skipped",
-                     "reason": "IBKR gateway busy in another process (lock timeout)"})
+                     "reason": "IBKR gateway busy in another process (lock timeout)"}, price_repair_id=price_repair_id)
+
+        if price_lookback_days is not None:
+            try:
+                repair_scope_current = set(tickers).issubset(_resolve_price_scope())
+            except Exception:
+                repair_scope_current = False
+            if not repair_scope_current:
+                return _record_result(
+                    {"source": source, "status": "skipped", "reason": "price_repair_scope_changed"},
+                    price_repair_id=price_repair_id,
+                )
 
         # v1.2 (v1.2a fix): durable run-start recorded ONLY after all skip-only gates pass
         # (per-source + IBKR locks). A lock-busy skip returns above WITHOUT marking durable
@@ -1190,6 +1217,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             logger.debug(f"scheduler telemetry unavailable: {e}")
 
         result: Dict[str, Any] = {"source": source}
+        if price_repair_id is not None:
+            result["price_repair_id"] = price_repair_id
         ok = True
         error: Optional[str] = None
         writer_continuation = None
@@ -1331,9 +1360,29 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     "ibkr",
                     "--gateway-lock-held",
                 ]
+                if price_lookback_days is not None:
+                    argv.extend(["--lookback-days", str(price_lookback_days), "--as-of-date", price_as_of_date, "--no-provider-fallback"])
                 step = _run_sanitized_prices_worker_subprocess(argv)
                 result["collect"] = step["payload"]
                 price_status = step["payload"]["status"]
+                if price_lookback_days is not None and step["returncode"] == 0:
+                    from src.market_coverage.repair import repair_coverage_available
+                    from src.market_coverage.service import TradingDayCoverageService
+                    from src.market_data_admin import resolve_market_db_path
+                    from datetime import date, time
+                    from zoneinfo import ZoneInfo
+                    eastern = ZoneInfo("America/New_York")
+                    verification_time = min(datetime.now(eastern), datetime.combine(
+                        date.fromisoformat(price_as_of_date), time.max, tzinfo=eastern))
+                    coverage = TradingDayCoverageService(db_path=resolve_market_db_path(), clock=lambda: verification_time).get_coverage(
+                        universe=scope, lookback_days=price_lookback_days, interval="15min")
+                    remaining = [row.ticker for row in coverage.history_gaps]
+                    result["price_repair"] = {"lookback_days": price_lookback_days, "as_of_date": price_as_of_date,
+                                              "remaining_tickers": remaining, "observation_health": coverage.observation_health.status.value,
+                                              "calendar_health": coverage.calendar_health.status.value}
+                    if remaining or not repair_coverage_available(coverage):
+                        price_partial = True
+                        price_audit_error = "price_coverage_incomplete_after_repair"
                 if price_status == "partial" and step["returncode"] == 0:
                     price_partial = True
                     price_audit_error = "price_collection_partial"
@@ -1617,6 +1666,13 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     for testability; ``fire`` defaults to a thread-offloaded run_source."""
     now = now or datetime.now(timezone.utc)
     fired = []
+    try:
+        from src.app_records_store import resolve_profile_state_db_path
+        from src.sa_capture_store import resolve_sa_db_path
+        from src.sa_tracking_memberships import reconcile_sa_tracking
+        reconcile_sa_tracking(profile_db=resolve_profile_state_db_path(None), sa_db=resolve_sa_db_path(), at=now.isoformat())
+    except Exception as exc:
+        logger.warning("SA tracking reconciliation failed code=%s", type(exc).__name__)
     try:
         automation_state = _security_lifecycle_automation_config_state()
         if _security_lifecycle_automation_is_due(automation_state, now=now):

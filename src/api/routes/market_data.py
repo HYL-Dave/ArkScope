@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dependencies import get_profile_store
 from src.api.permissions import require_db_write, require_profile_state_write
@@ -137,6 +137,45 @@ def validate_route():
     """Reject unsupported bulk validation requests."""
     require_db_write("market_validate", {"db": resolve_market_db_path()})
     raise _unavailable_market_admin_http_error("validate_route")
+
+
+@router.get("/market-data/price-repair/preview")
+def price_repair_preview(lookback_days: int = Query(10, ge=1, le=120)):
+    from src.market_coverage.repair import preview_price_repair
+    try:
+        return preview_price_repair(market_data_trading_days(lookback_days=lookback_days, interval="15min"))
+    except ValueError:
+        raise HTTPException(status_code=409, detail={"code": "price_coverage_unavailable"}) from None
+
+
+class PriceRepairRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lookback_days: int = Field(ge=1, le=120, strict=True)
+    preview_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+@router.post("/market-data/price-repair")
+def price_repair(body: PriceRepairRequest):
+    from src.market_coverage.repair import validate_price_repair
+    from src.service.data_scheduler import run_source
+    import threading
+    import uuid
+
+    require_db_write("price_coverage_repair", {"lookback_days": body.lookback_days})
+    require_profile_state_write("price_coverage_repair", {})
+    try:
+        plan = validate_price_repair(market_data_trading_days(lookback_days=body.lookback_days, interval="15min"), body.preview_sha256)
+    except ValueError as exc:
+        code = "price_repair_preview_changed" if str(exc) == "price_repair_preview_changed" else "price_coverage_unavailable"
+        raise HTTPException(status_code=409, detail={"code": code}) from None
+    if not plan["tickers"]:
+        return {"status": "nothing_to_repair", "tickers": []}
+    repair_id = uuid.uuid4().hex
+    threading.Thread(target=run_source, args=("ibkr_prices", "api"), kwargs={
+        "tickers": plan["tickers"], "price_lookback_days": body.lookback_days, "price_as_of_date": plan["as_of_date"],
+        "price_repair_id": repair_id,
+    }, daemon=True).start()
+    return {"status": "accepted", "tickers": plan["tickers"], "repair_id": repair_id}
 
 
 def _unavailable_market_admin_http_error(operation: str) -> HTTPException:

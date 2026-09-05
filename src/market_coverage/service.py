@@ -23,6 +23,7 @@ from .models import (
     CoverageDayReason,
     CoverageDayStatus,
     CoverageDayV2,
+    CoverageHistoryGapV2,
     CoverageObservationHealthV2,
     DayCoverage,
     ObservationHealth,
@@ -130,6 +131,35 @@ def _observation_unavailable(market_date: date) -> DayCoverage:
         ticker_coverages=None,
         unmatched_rth_row_count=None,
     )
+
+
+def _history_gaps(days, observations, now_et):
+    first_bars = dict(observations.first_local_bars)
+    issues = {row.ticker: row.reason_code for row in reversed(observations.provider_errors)}
+    missing, partial = {}, {}
+    for day in days:
+        if (day.session_close_at_utc is None or datetime.fromisoformat(day.session_close_at_utc) > now_et
+                or day.coverage_status in {CoverageDayStatus.IN_PROGRESS, CoverageDayStatus.NON_TRADING}
+                or (day.coverage_status is CoverageDayStatus.UNKNOWN and day.status_reason_code is not CoverageDayReason.NO_OBSERVATIONS)):
+            continue
+        absent = observations.canonical_universe if day.status_reason_code is CoverageDayReason.NO_OBSERVATIONS else day.unknown_tickers
+        for ticker in absent:
+            missing.setdefault(ticker, []).append(day.date)
+        for row in day.partial_tickers:
+            partial.setdefault(row.ticker, []).append(day.date)
+    result = []
+    for ticker in sorted(missing.keys() | partial.keys()):
+        absent = sorted(missing.get(ticker, []))
+        thin = sorted(partial.get(ticker, []))
+        first = first_bars.get(ticker)
+        first_date = first.astimezone(_EASTERN).date().isoformat() if first else None
+        reason = "no_local_history" if first is None else (
+            "before_first_local_bar" if absent and not thin and all(day < first_date for day in absent)
+            else "missing_observations" if absent else "partial_observations"
+        )
+        result.append(CoverageHistoryGapV2(ticker=ticker, reason=reason, first_local_bar_at=first.isoformat() if first else None,
+                                           missing_dates=absent, partial_dates=thin, provider_issue_reason=issues.get(ticker)))
+    return result
 
 
 def _project_day(
@@ -289,6 +319,7 @@ class TradingDayCoverageService:
             ),
             days=days,
             provider_errors=list(observation_result.provider_errors),
+            history_gaps=_history_gaps(days, observation_result, now_et),
         )
 
     def _classify_days(

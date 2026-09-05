@@ -899,7 +899,7 @@ def test_current_policy_retries_a_failed_run_without_deleting_v1_history():
         at=_LATER,
     )
 
-    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v4"
+    assert AUTOMATION_POLICY_VERSION == "trusted-lifecycle-automation-v5"
     assert _reserve(
         kernel,
         case_id,

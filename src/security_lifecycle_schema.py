@@ -319,6 +319,14 @@ PROFILE_INDEX_SQL = {
     """,
 }
 
+PROFILE_TRIGGER_SQL = {
+    f"security_lifecycle_provider_checks_no_{action}": f"""
+        CREATE TRIGGER security_lifecycle_provider_checks_no_{action}
+        BEFORE {action.upper()} ON security_lifecycle_provider_checks
+        BEGIN SELECT RAISE(ABORT, 'provider_checks_append_only'); END
+    """ for action in ("update", "delete")
+}
+
 
 # V1 is the exact post-investigation/pre-automation authority. Keep these
 # literal objects available for migration and rollback verification.
@@ -722,6 +730,54 @@ PROFILE_TABLE_SQL = {
 }
 
 
+V3_PROFILE_TABLE_SQL = dict(PROFILE_TABLE_SQL)
+V3_PROFILE_INDEX_SQL = dict(PROFILE_INDEX_SQL)
+V3_EVIDENCE_ADAPTERS = EVIDENCE_ADAPTERS
+V3_EVIDENCE_KINDS = EVIDENCE_KINDS
+EVIDENCE_ADAPTERS = V3_EVIDENCE_ADAPTERS | {"eodhd_symbol_directory", "massive_ticker_events"}
+EVIDENCE_KINDS = V3_EVIDENCE_KINDS | {"ticker_event_snapshot"}
+
+# Derive the new CHECKs from immutable, code-owned V3 DDL, never from database SQL.
+_V4_EVIDENCE_SQL = V3_PROFILE_TABLE_SQL["security_lifecycle_evidence"].replace(
+    _quoted(V3_EVIDENCE_ADAPTERS), _quoted(EVIDENCE_ADAPTERS)
+).replace(_quoted(V3_EVIDENCE_KINDS), _quoted(EVIDENCE_KINDS)).replace(
+    "adapter IN ('massive_reference','nasdaq_symbol_directory')",
+    "adapter IN ('massive_reference','nasdaq_symbol_directory','eodhd_symbol_directory')",
+).replace(
+    "OR (adapter = 'hosted_search'",
+    "OR (adapter = 'massive_ticker_events' AND source_family = 'listing_authority' "
+    "AND kind = 'ticker_event_snapshot' AND run_id IS NULL AND automation_run_id IS NOT NULL "
+    "AND source_document_sha256 IS NOT NULL AND source_locator_json IS NOT NULL) "
+    "OR (adapter = 'hosted_search'",
+)
+PROFILE_TABLE_SQL = {
+    **V3_PROFILE_TABLE_SQL,
+    "security_lifecycle_evidence": _V4_EVIDENCE_SQL,
+    "security_lifecycle_provider_checks": """
+        CREATE TABLE security_lifecycle_provider_checks (
+            check_id TEXT PRIMARY KEY,
+            ticker TEXT NOT NULL CHECK (length(ticker) BETWEEN 1 AND 20),
+            observed_at TEXT NOT NULL,
+            observation_json TEXT NOT NULL CHECK (json_valid(observation_json)),
+            evidence_json TEXT NOT NULL CHECK (json_valid(evidence_json) AND length(evidence_json) <= 131072),
+            diagnostics_json TEXT NOT NULL CHECK (json_valid(diagnostics_json)),
+            blockers_json TEXT NOT NULL CHECK (json_valid(blockers_json)),
+            state TEXT NOT NULL CHECK (state IN ('active','terminal','continuation','unresolved')),
+            content_sha256 TEXT NOT NULL CHECK (length(content_sha256) = 64),
+            created_at TEXT NOT NULL,
+            UNIQUE(ticker, content_sha256)
+        )
+    """,
+}
+PROFILE_INDEX_SQL = {
+    **V3_PROFILE_INDEX_SQL,
+    "idx_security_lifecycle_provider_checks_ticker": """
+        CREATE INDEX idx_security_lifecycle_provider_checks_ticker
+        ON security_lifecycle_provider_checks(ticker, observed_at DESC)
+    """,
+}
+
+
 def _execute_schema(conn: sqlite3.Connection, tables: dict[str, str], indexes: dict[str, str]) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     with conn:
@@ -729,6 +785,9 @@ def _execute_schema(conn: sqlite3.Connection, tables: dict[str, str], indexes: d
             conn.execute(statement)
         for statement in indexes.values():
             conn.execute(statement)
+        if "security_lifecycle_provider_checks" in tables:
+            for statement in PROFILE_TRIGGER_SQL.values():
+                conn.execute(statement)
 
 
 def create_market_schema(conn: sqlite3.Connection) -> None:
@@ -745,6 +804,10 @@ def create_v1_profile_schema(conn: sqlite3.Connection) -> None:
 
 def create_v2_profile_schema(conn: sqlite3.Connection) -> None:
     _execute_schema(conn, V2_PROFILE_TABLE_SQL, V2_PROFILE_INDEX_SQL)
+
+
+def create_v3_profile_schema(conn: sqlite3.Connection) -> None:
+    _execute_schema(conn, V3_PROFILE_TABLE_SQL, V3_PROFILE_INDEX_SQL)
 
 
 def _normalize_sql(value: str) -> str:
@@ -789,6 +852,11 @@ def _verify_connection(
     for name, expected in indexes.items():
         if _normalize_sql(actual_indexes[name]) != _normalize_sql(expected):
             raise LifecycleSchemaMismatch(f"lifecycle index mismatch: {name}")
+    if "security_lifecycle_provider_checks" in tables:
+        actual_triggers = dict(conn.execute("SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'security_lifecycle_provider_checks_%'"))
+        if ({name: _normalize_sql(sql) for name, sql in actual_triggers.items()}
+                != {name: _normalize_sql(sql) for name, sql in PROFILE_TRIGGER_SQL.items()}):
+            raise LifecycleSchemaMismatch("provider check receipt triggers mismatch")
     if conn.execute("PRAGMA foreign_key_check").fetchall():
         raise LifecycleSchemaMismatch("lifecycle foreign key mismatch")
 
@@ -799,6 +867,10 @@ def verify_market_connection(conn: sqlite3.Connection) -> None:
 
 def verify_profile_connection(conn: sqlite3.Connection) -> None:
     _verify_connection(conn, PROFILE_TABLE_SQL, PROFILE_INDEX_SQL)
+
+
+def verify_v3_profile_connection(conn: sqlite3.Connection) -> None:
+    _verify_connection(conn, V3_PROFILE_TABLE_SQL, V3_PROFILE_INDEX_SQL)
 
 
 def verify_v1_profile_connection(conn: sqlite3.Connection) -> None:
@@ -831,6 +903,10 @@ def verify_market_schema(path: str | Path) -> None:
 
 def verify_profile_schema(path: str | Path) -> None:
     _verify_path(path, verify_profile_connection)
+
+
+def verify_v3_profile_schema(path: str | Path) -> None:
+    _verify_path(path, verify_v3_profile_connection)
 
 
 def assert_lifecycle_writes_available(profile_conn: sqlite3.Connection | None) -> None:

@@ -284,7 +284,7 @@ def _run_is_current(
     ) == _current_input_evidence_set_sha256(case)
 
 
-def _latest_run(case: Mapping[str, object]) -> Mapping[str, object] | None:
+def current_automation_run(case: Mapping[str, object]) -> Mapping[str, object] | None:
     runs = _rows(case.get("automation_runs", ()), "automation_runs")
     return next((run for run in runs if _run_is_current(case, run)), None)
 
@@ -571,7 +571,7 @@ def project_lifecycle_disposition(
     case: Mapping[str, object],
 ) -> LifecycleDispositionProjection:
     case = _mapping(case, "lifecycle_case")
-    run = _latest_run(case)
+    run = current_automation_run(case)
     blockers = tuple(
         blocker
         for blocker in _blockers(run)
@@ -736,7 +736,7 @@ def project_lifecycle_disposition(
                     "attention",
                     "nonretryable_provider_failure",
                 )
-            elif "sec_evidence_insufficient" in blocker_codes:
+            elif blocker_codes & {"sec_evidence_insufficient", "listing_status_unresolved"}:
                 disposition, bucket, reason = (
                     "exception_required",
                     "attention",

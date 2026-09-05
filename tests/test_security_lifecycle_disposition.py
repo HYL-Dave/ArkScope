@@ -19,6 +19,7 @@ from src.security_lifecycle_disposition import (
     project_lifecycle_disposition,
 )
 from src.security_lifecycle_schema import AUTOMATION_BLOCKER_CODES
+from src.security_lifecycle_provider_diagnostics import LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES
 from src.service.security_lifecycle_automation_runtime import (
     LIFECYCLE_AUTOMATION_STAGE_ORDER,
     LifecycleAutomationStage,
@@ -173,6 +174,7 @@ def test_backend_and_frontend_lifecycle_vocabularies_have_exact_parity():
         "blocker_codes": frozenset(AUTOMATION_BLOCKER_CODES),
         "automation_triggers": frozenset(get_args(LifecycleAutomationTrigger)),
         "source_family_states": frozenset(SOURCE_FAMILY_STATES),
+        "listing_checks": LISTING_CHECK_NAMES, "listing_providers": LISTING_PROVIDER_NAMES, "listing_issues": LISTING_PROVIDER_ISSUES,
     }
     frontend_authorities = _typescript_compiler_authorities(
         _FRONTEND_API_SOURCE,
@@ -223,6 +225,14 @@ def test_backend_and_frontend_lifecycle_vocabularies_have_exact_parity():
             },
         },
     )
+    frontend_authorities.update(_typescript_compiler_authorities(
+        _ROOT / "apps/arkscope-web/src/lifecycle/listingContract.ts",
+        {
+            "listing_checks": {"kind": "array", "name": "LISTING_CHECK_NAMES"},
+            "listing_providers": {"kind": "array", "name": "LISTING_PROVIDER_NAMES"},
+            "listing_issues": {"kind": "array", "name": "LISTING_PROVIDER_ISSUES"},
+        },
+    ))
     frontend = {name: frontend_authorities[name] for name in backend}
 
     assert backend["automation_stages"] == frozenset(
