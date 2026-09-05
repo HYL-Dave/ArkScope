@@ -115,6 +115,49 @@ def test_nasdaq_parser_preserves_matching_component_and_per_file_hashes() -> Non
     assert snapshot.lookup("DOESNOTEXIST")[1].source_url == OTHER_LISTED_URL
 
 
+def test_nasdaq_parser_accepts_published_footer_with_empty_delimited_columns():
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    # Nasdaq's Symbol Directory Definitions puts mmddyyyyHH:MM in field one.
+    def published(name):
+        lines = _fixture(name).splitlines()
+        lines[-1] = b"File Creation Time: 0828202617:03" + b"|" * 7
+        return b"\n".join(lines) + b"\n"
+    nasdaq, other = published("nasdaqlisted.txt"), published("otherlisted.txt")
+    snapshot = parse_nasdaq_directories(nasdaq_bytes=nasdaq, other_bytes=other, retrieved_at=_AT)
+    assert snapshot.lookup("AAPL")[0].listing_status == "active"
+    assert snapshot.lookup("IBM")[0].listing_status == "active"
+    absent = snapshot.lookup("ARCH")
+    assert [row.listing_status for row in absent] == ["not_found", "not_found"]
+    assert [row.source_document_sha256 for row in absent] == [hashlib.sha256(nasdaq).hexdigest(), hashlib.sha256(other).hexdigest()]
+    assert {row.source_as_of for row in absent} == {"2026-08-28"}
+
+
+@pytest.mark.parametrize("footer", (
+    b"File Creation Time: 0828202617:03||||||",
+    b"File Creation Time: 0828202617:03||||||||",
+    b"File Creation Time: 0828202617:03|ignored||||||",
+    b"File Creation Time: 0828202625:03|||||||",
+    b"File Creation Time: 0230202617:03|||||||",
+    b"File Creation Time: 0828202617:03:00|||||||",
+))
+def test_published_nasdaq_footer_still_requires_exact_shape_and_valid_time(footer):
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+    lines = _fixture("nasdaqlisted.txt").splitlines()
+    lines[-1] = footer
+    _assert_failure("listing_directory_schema_mismatch", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=b"\n".join(lines) + b"\n", other_bytes=_fixture("otherlisted.txt"), retrieved_at=_AT))
+
+
+@pytest.mark.parametrize("stamp", ("0827202617:03", "0829202617:03"))
+def test_published_nasdaq_footer_still_rejects_stale_and_future_dates(stamp):
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+    lines = _fixture("nasdaqlisted.txt").splitlines()
+    lines[-1] = ("File Creation Time: " + stamp + "|" * 7).encode()
+    _assert_failure("listing_directory_stale", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=b"\n".join(lines) + b"\n", other_bytes=_fixture("otherlisted.txt"), retrieved_at=_AT))
+
+
 @pytest.mark.parametrize("component", ("nasdaqlisted.txt", "otherlisted.txt"))
 def test_nasdaq_parser_rejects_a_component_with_zero_source_rows(component) -> None:
     from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
