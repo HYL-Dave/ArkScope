@@ -16,7 +16,8 @@ and explain/repair price coverage before requesting another manual test.
 - [x] Browser rehearsal: English/Traditional Chinese, desktop/mobile, temporary SQLite only.
 - [x] Read-only production preflight and explicitly authorized stop/backup/install/19-request check.
 - [x] Backup rehearsal preserves the exact universe and Current/Former overlap.
-- [ ] Authorized V4/membership production installation and fresh three-case checks.
+- [x] Authorized V4/membership production installation, exact source preservation and idempotence.
+- [ ] Fresh three-case checks: attempt 1 stopped at directory parsing after four HTTP requests.
 - [ ] Separately authorized attended historical treatment and price repair.
 - [ ] Verify production receipts/universe/coverage before asking for user hand testing.
 
@@ -60,6 +61,19 @@ second rehearsal preserves all 186 tickers and every source edge. This amends th
 not-yet-installed membership schema, not an already-deployed schema version.
 The former offline packet remains a historical snapshot; its original test and
 source hashes are not retroactively claimed to verify this amendment.
+
+Production V4/membership installation is now complete with private backup and
+all source edges preserved. A later SA timestamp-only update invalidated an older
+preview and was handled by a fresh rehearsal/digest, not a weakened guard.
+The first new provider check made two Nasdaq and two EODHD requests, all HTTP 200,
+but directory parsing rejected the material before any Massive request. Its
+maintenance harness failed to preserve the parser code and response bodies;
+this limits diagnosis of that particular attempt and is documented in the new
+cutover packet. An independently reproduced official Nasdaq footer mismatch is
+repaired, and the new harness preserves bounded private replay data plus typed
+codes. An additional two Nasdaq and two EODHD reads were requested, not assumed
+authorized; the original 15 Massive requests remain unused. No terminal treatment
+or price backfill is complete merely because installation succeeded.
 
 The prior ARCH/LTHM/TA census did not establish an exhaustive successor history:
 its ticker-event requests returned 404. Those observations cannot authorize an

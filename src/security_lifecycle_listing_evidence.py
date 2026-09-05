@@ -55,6 +55,7 @@ _RFC3339_TIMESTAMP = re.compile(
     r"(?P<timezone>[Zz]|[+-]\d{2}:\d{2})$"
 )
 _FOOTER = re.compile(r"^File Creation Time: (\d{8})\|(\d{6})$")
+_PUBLISHED_FOOTER = re.compile(r"^File Creation Time: (\d{8})(\d{2}:\d{2})$")
 _NASDAQ_HEADER = (
     "Symbol",
     "Security Name",
@@ -291,14 +292,17 @@ def _decode_nasdaq(body: object) -> list[str]:
     return lines
 
 
-def _file_creation(footer: str, *, retrieved_at: str) -> tuple[str, str, str]:
-    match = _FOOTER.fullmatch(footer)
+def _file_creation(footer: str, *, retrieved_at: str, column_count: int) -> tuple[str, str, str]:
+    fields = footer.split("|")
+    published = len(fields) == column_count and not any(fields[1:])
+    # Keep the prior adapter encoding readable for sealed historical evidence.
+    match = _PUBLISHED_FOOTER.fullmatch(fields[0]) if published else _FOOTER.fullmatch(footer)
     if match is None:
         raise _nasdaq_failure()
     created: datetime | None = None
     invalid = False
     try:
-        created = datetime.strptime("".join(match.groups()), "%m%d%Y%H%M%S")
+        created = datetime.strptime("".join(match.groups()), "%m%d%Y%H:%M" if published else "%m%d%Y%H%M%S")
     except ValueError:
         invalid = True
     if invalid or created is None:
@@ -340,7 +344,7 @@ def _parse_nasdaq_component(
     if not source_rows or len(source_rows) > MAX_NASDAQ_DIRECTORY_ROWS:
         raise _nasdaq_failure()
     source_as_of, file_created_at, normalized_retrieved_at = _file_creation(
-        lines[-1], retrieved_at=retrieved_at
+        lines[-1], retrieved_at=retrieved_at, column_count=len(expected_header)
     )
 
     parsed_rows: dict[str, tuple[str | None, str | None]] = {}
