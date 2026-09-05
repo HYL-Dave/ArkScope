@@ -1,0 +1,334 @@
+[
+  {
+    "file": "apps/arkscope-web/src/AlphaTrackingPanel.test.tsx",
+    "sha256": "5af8d2c8fcd0affea8aac802e1a53c4b3776737256a39c219a3e1c99ab298b46"
+  },
+  {
+    "file": "apps/arkscope-web/src/AlphaTrackingPanel.tsx",
+    "sha256": "8e6163e51c655cbbb763a670040e22805ec3cb986f5893cf4a43163ad296fc76"
+  },
+  {
+    "file": "apps/arkscope-web/src/LifecycleCaseApi.test.ts",
+    "sha256": "5d49bf7b3bb3fcac4e7e119aacd43b9cf301d4c46e8e840eb37e225edb523c29"
+  },
+  {
+    "file": "apps/arkscope-web/src/SettingsLocalStorage.test.ts",
+    "sha256": "1570c30bd9e4869d76330f16f48fee7cb5c9cf025a8c972fe51b370626374788"
+  },
+  {
+    "file": "apps/arkscope-web/src/Watchlist.tsx",
+    "sha256": "ff111cb659eb6f23fc90851ca2652d89e9616e08dd486861c145feea882d5746"
+  },
+  {
+    "file": "apps/arkscope-web/src/api.ts",
+    "sha256": "67a585fc8bf5e7327272ffa32cd789dc551913b4d2812bba198279ec6f25151a"
+  },
+  {
+    "file": "apps/arkscope-web/src/i18n/resources.test.ts",
+    "sha256": "b7d46c58c86774c1c5a8376136ffcb0f991ecc183019d9842f23665b6f0d789b"
+  },
+  {
+    "file": "apps/arkscope-web/src/i18n/resources/en/explore.ts",
+    "sha256": "d4569e17a1e8e5c1b43bb4c32a0176e6b7d1ff58826aaff7bb4d085ccd34293d"
+  },
+  {
+    "file": "apps/arkscope-web/src/i18n/resources/en/settings.ts",
+    "sha256": "84f0f86a07cc9872c292b01dc55d8e1f5689a3681875ed215292273168bc33ca"
+  },
+  {
+    "file": "apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts",
+    "sha256": "2d2146608df51fc68a8b75ff9ede7dd48e08192d85496436cf40c9cd51ac5e53"
+  },
+  {
+    "file": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts",
+    "sha256": "2376104ea6acb201dc001cffd75017e35e63159821986846dd5c024fa877610d"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/LifecycleActivityBand.tsx",
+    "sha256": "445a2d3da48b9e7baf3b18c11664a6d36d4da2371c4693e2b0a0e8b8f38d178a"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx",
+    "sha256": "55d5174db35468cff4b9eb3eb1b9ffd02362c68e979c00c8b8fb97864ecbee9c"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/LifecycleView.tsx",
+    "sha256": "84d58b76bf9d818f6fca0c82dfd8bb09540a99f8823d2166a3096af0e7226118"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/lifecyclePresentation.test.ts",
+    "sha256": "debdfaf9bbf08c89f2cc9aec2398b4c74804a4e5d011f12e8b2f60532855c7cc"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/lifecyclePresentation.ts",
+    "sha256": "b74e30e467e9378252c0a68c935a0bb5dc9f11e0cd45bf0e4963a5dab9906550"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/listingContract.ts",
+    "sha256": "1ad7a07ee2aed4f4d18c691d3e81ba079f052844f0c5a427a5dfff4544bfc133"
+  },
+  {
+    "file": "apps/arkscope-web/src/lifecycle/tickerIdentityPresentation.test.ts",
+    "sha256": "dd3647e64981a634f9158cf2fa59b2f18e8b26e40ff20020236bc8cdbeb24428"
+  },
+  {
+    "file": "apps/arkscope-web/src/settings/DataStorageSection.tsx",
+    "sha256": "5037cd27be1dbee6c97744d17ab42c316f421c79fbde9d4056cd801837a62518"
+  },
+  {
+    "file": "apps/arkscope-web/src/settings/PriceCoverageRepair.test.tsx",
+    "sha256": "aa80a583827ea34b3bcd0b4fd324b85a4f35b6b57d8313dd2cb320b653a2c3d8"
+  },
+  {
+    "file": "apps/arkscope-web/src/settings/PriceCoverageRepair.tsx",
+    "sha256": "7fae0a63097506338e2f1e384b0a4b3edaa77e813d499cd90145fef7b7d53a80"
+  },
+  {
+    "file": "data_sources/lifecycle_provider_census_transport.py",
+    "sha256": "320e94c5ebdbf75f932842712fe5f324513e5f2b4318aa3af5fcb475f4aca916"
+  },
+  {
+    "file": "docs/design/PROJECT_PRIORITY_MAP.md",
+    "sha256": "72bb176c137e477573312d86df7ad986d3d28e410c89ce60ebd67e444d7f2f4f"
+  },
+  {
+    "file": "docs/superpowers/plans/2026-09-05-lifecycle-terminal-membership-completion.md",
+    "sha256": "4d4e047569b521721145b918dc5d67eb5d9d09b51991444b528f6e2f661ac15f"
+  },
+  {
+    "file": "src/active_universe.py",
+    "sha256": "b83aafd801b2f2461fb293c031c4060129307f7ca87a4ac727b1a88678c220fe"
+  },
+  {
+    "file": "src/api/routes/market_data.py",
+    "sha256": "13e9d71b9d9ec6f85b95ca94bd58bea64c070920817607ff88fa0957157bc452"
+  },
+  {
+    "file": "src/api/routes/profile.py",
+    "sha256": "2828c7933b86c134eda5efba46c0f6d4d84c6ce7a7d96dcbefef7cb58317ab50"
+  },
+  {
+    "file": "src/market_coverage/models.py",
+    "sha256": "23e138635440a31d1ddcf1f2bc45cedc2a929306ad13f170d21bfe79f1e2fbac"
+  },
+  {
+    "file": "src/market_coverage/observations.py",
+    "sha256": "a349a88f9c74c3f9e5fe43a77b2d8fc186db34c829c1d629b80fcc6a59f2c94d"
+  },
+  {
+    "file": "src/market_coverage/repair.py",
+    "sha256": "982ff799450c3c7b39242928c56fee1384999d61501304e3f97196dc577f9f1c"
+  },
+  {
+    "file": "src/market_coverage/service.py",
+    "sha256": "e59df6f0541f9e1e8137729a661c89cd63b76a2b2d8c8b3e2fde68ffa3264d76"
+  },
+  {
+    "file": "src/market_data_direct.py",
+    "sha256": "96588ee015f357bdcf98d1fc1e272cc732b4624d8c54d532b924d92eb87f8a37"
+  },
+  {
+    "file": "src/prices_runtime.py",
+    "sha256": "e21a9399d49eb23c7574445a7d559175eae4f1743a40d4fc1f48b2720b4686f4"
+  },
+  {
+    "file": "src/sa_tracking_memberships.py",
+    "sha256": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4"
+  },
+  {
+    "file": "src/security_lifecycle_decision_policy.py",
+    "sha256": "015f1c1882593cd02e8f83fc8d13baeb45a3e8906bb2ddfeb507083a740de25c"
+  },
+  {
+    "file": "src/security_lifecycle_disposition.py",
+    "sha256": "03b4f65363d80b3b701076866aac2687de4e5cd9297846a0b045ae58e025e1ef"
+  },
+  {
+    "file": "src/security_lifecycle_fact_kernel.py",
+    "sha256": "80b288df47356f623c514c10e28ff247ed7bda54911e15839bc6d7f3372adf5b"
+  },
+  {
+    "file": "src/security_lifecycle_investigation.py",
+    "sha256": "689283d5d81cffc1fb1f0e23c8988e5d012c806ee871f9dca459a7940527cc2b"
+  },
+  {
+    "file": "src/security_lifecycle_listing_evidence.py",
+    "sha256": "9aa2be8eb8d925eaf0b617060d46d4ea3cde7d755808664709e231cf45290582"
+  },
+  {
+    "file": "src/security_lifecycle_listing_migration.py",
+    "sha256": "9c4f7f4a616bd6e54db9c6bba039d5466d9565a027dea2bdd99ffe905e84506a"
+  },
+  {
+    "file": "src/security_lifecycle_provider_authority.py",
+    "sha256": "f4b68647b8c0e2a4b44802ba52cd5873dc0b40d5aa2305bf3da62593e15c6531"
+  },
+  {
+    "file": "src/security_lifecycle_provider_census_credentials.py",
+    "sha256": "3fa10e0ef695196e23d4d9211338d7ab2f483aee62f83fd825ef04becbeae8bd"
+  },
+  {
+    "file": "src/security_lifecycle_provider_diagnostics.py",
+    "sha256": "e4ec9adb980b4ba48d374e05d0b66c59a47af811859b66ced62ae7eb6e8fc2fe"
+  },
+  {
+    "file": "src/security_lifecycle_provider_migration.py",
+    "sha256": "b891f9e1e48ec3afada55624aa5c6c0267e153be37f8caedf1cc759534e1274a"
+  },
+  {
+    "file": "src/security_lifecycle_provider_scan.py",
+    "sha256": "c363a92364e433356e26ef75983619bd7f9ab5e1360e1bab7129d0691dd1a60e"
+  },
+  {
+    "file": "src/security_lifecycle_provider_store.py",
+    "sha256": "a69e1303e8e982696c3a4f57f40e203d5494550b86384a31e80ebaa697a3cb0e"
+  },
+  {
+    "file": "src/security_lifecycle_schema.py",
+    "sha256": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8"
+  },
+  {
+    "file": "src/security_lifecycle_sec_admission.py",
+    "sha256": "3f71c4344931e241a10f3e02cd20bf690da77ac666dc8aa73b787f5c7996ddf0"
+  },
+  {
+    "file": "src/service/data_scheduler.py",
+    "sha256": "e320fae23c453094f3000b40040b8933f9b713087ce10b14d335889bb6ef0a85"
+  },
+  {
+    "file": "src/service/security_lifecycle_automation_scheduler.py",
+    "sha256": "929f9d141a6b0d82202cf1baf84bf18b71087df99125c614fb3c2d3e2c46548e"
+  },
+  {
+    "file": "src/ticker_identity_service.py",
+    "sha256": "2841ac01816b3e48630fc27777a4a19fe1b0b08a47a5391a36c0405de5ee8030"
+  },
+  {
+    "file": "src/ticker_identity_transition.py",
+    "sha256": "f2d188ede1c54dc46eb29f62a03aee1b2fdba1a570c6d0a6406867dad290bdb4"
+  },
+  {
+    "file": "src/tools/security_lifecycle_tools.py",
+    "sha256": "ed2f1933c6e5441d71774bce8d980563cb1e94ab18f2c086215488cab5d3fe50"
+  },
+  {
+    "file": "tests/test_active_universe.py",
+    "sha256": "8e9bb82af38c4ef1ca789d1916344963639ec50b81d1f4c6568124b49ce639a8"
+  },
+  {
+    "file": "tests/test_api.py",
+    "sha256": "44a352ef0947109328b51a9e74c9010d2bf58638b81e8e7c3e7f0b8b56e18529"
+  },
+  {
+    "file": "tests/test_data_scheduler.py",
+    "sha256": "c04446eb155ac701cb55653c45901933e268a6e2b2b3dee2ae377669b7e72105"
+  },
+  {
+    "file": "tests/test_lifecycle_tracking_and_price_repair_routes.py",
+    "sha256": "8bc58234db29805cd22f5d53cb5eefa4599699c7443e8d691a0848a21988fc35"
+  },
+  {
+    "file": "tests/test_market_coverage_observations.py",
+    "sha256": "a0013f4f8af7aae0d6ca483ef46a223c0ad11afae8581c5c324118bc27ee048d"
+  },
+  {
+    "file": "tests/test_price_coverage_history_gaps.py",
+    "sha256": "0bc9adb7a3a87d64275b0501933749aeaa0768777e04fd00ff0c5852d521edf2"
+  },
+  {
+    "file": "tests/test_price_coverage_repair.py",
+    "sha256": "94ff4a4b6666e32cbbe4fc62e8471afbc6e9cd2031f482ff3681da47a29acead"
+  },
+  {
+    "file": "tests/test_price_coverage_repair_workflow.py",
+    "sha256": "8495c871909081f34f727437167f70bc926d8d69b51a06728f3b9a2c69450ebc"
+  },
+  {
+    "file": "tests/test_sa_tracking_memberships.py",
+    "sha256": "ff52073fc0c444d7e4b417a7dc7bf00bf16310d5c1c37a586599d243bfd8b2a6"
+  },
+  {
+    "file": "tests/test_security_lifecycle_automation_scheduler.py",
+    "sha256": "9f03c94db2ecad837023b8052d38584ed72d05c84033e94445dd101d417e3dc6"
+  },
+  {
+    "file": "tests/test_security_lifecycle_automation_schema.py",
+    "sha256": "aaf75a7fa20870da6579c817db278d21dbb08c8742e124711747d5821d3ad264"
+  },
+  {
+    "file": "tests/test_security_lifecycle_automation_worker.py",
+    "sha256": "e1662a8e50de369fddbd20e176fd562a3c6f6679ac33630f2c3f1da36947ad2e"
+  },
+  {
+    "file": "tests/test_security_lifecycle_decision_policy.py",
+    "sha256": "53f939137cb80ccaebf5a5acc37fa389ce3e472fa1c2f48c93142e9ec28dbe54"
+  },
+  {
+    "file": "tests/test_security_lifecycle_disposition.py",
+    "sha256": "f955fb50bfdfd5016f0b7ade8b8c760200122fe38df42f7a6c0265ed94d485ca"
+  },
+  {
+    "file": "tests/test_security_lifecycle_fact_kernel.py",
+    "sha256": "d12fa4effbec3cf3777f0b0b49f4f83b19959167e6226a1ec503adeec27e413e"
+  },
+  {
+    "file": "tests/test_security_lifecycle_investigation.py",
+    "sha256": "beb51aee3cb2e448fbcc707c509273e527315971d765afaa191efd72b5f76d20"
+  },
+  {
+    "file": "tests/test_security_lifecycle_listing_evidence.py",
+    "sha256": "949918b6101df709d3445ade69d649e3c83115063ce8c5b9ddd3d7a014a7835a"
+  },
+  {
+    "file": "tests/test_security_lifecycle_listing_migration.py",
+    "sha256": "ee569d4c429f5167c7536f4903918578e6eafcfd0f575623bf0d893c13ca4b18"
+  },
+  {
+    "file": "tests/test_security_lifecycle_provider_authority.py",
+    "sha256": "dfc533ba3cc9ec84a9191653c1828610fbabc1ed87bb4a4dead09c6d0abe8272"
+  },
+  {
+    "file": "tests/test_security_lifecycle_provider_diagnostics.py",
+    "sha256": "89436ce65680659c6c24a8ed55f20714571f93dcfaea085c6707734f1f8cc6ba"
+  },
+  {
+    "file": "tests/test_security_lifecycle_provider_migration.py",
+    "sha256": "e6c223dc9b851a156d4e4f565bd0b32b9a21413456af75de8287f09f4e335d4c"
+  },
+  {
+    "file": "tests/test_security_lifecycle_provider_scan.py",
+    "sha256": "935090e195a05dcda6d0210be05d2311bd7cfa156b40c04435b09ccabbc91845"
+  },
+  {
+    "file": "tests/test_security_lifecycle_provider_store.py",
+    "sha256": "c97d8e638ce271f3a540fba816ab1ba606ffb55bb4d3545b0bbec9cd1796dcfa"
+  },
+  {
+    "file": "tests/test_security_lifecycle_routes.py",
+    "sha256": "2d16066de6adeab41ecea24538bcaab7bad35379f3621469b88fe2e58890c736"
+  },
+  {
+    "file": "tests/test_security_lifecycle_schema.py",
+    "sha256": "27b0431afe65aedec982353c4c837d0a6e24e943b0fba7f5c0e9e6e80ba40f35"
+  },
+  {
+    "file": "tests/test_security_lifecycle_terminal_workflow.py",
+    "sha256": "ae5afe6b03bab97e2eafa1a0f7e1b1be64ead7ef83b36f0937376322ecf52f34"
+  },
+  {
+    "file": "tests/test_security_lifecycle_tools.py",
+    "sha256": "065b9591c12cd2917e430789e17946aef38805587d0d53ab69f40a824c74ea50"
+  },
+  {
+    "file": "tests/test_ticker_identity_transition.py",
+    "sha256": "94253419fda85dd142ddc2d9b616cea740c7bb6d927d19e9d3da279e52f5ebb5"
+  },
+  {
+    "file": "tests/test_trading_day_coverage.py",
+    "sha256": "235468ff52aa4bf9bf664e7801be709175c1572cc0e32296746828a863254a0f"
+  },
+  {
+    "file": "tests/typescript_vocabulary_authority.cjs",
+    "sha256": "ad56c508155a52ec295aff82c5f2571b7d165156eb6f11e49fa76bb728bf0dfb"
+  }
+]

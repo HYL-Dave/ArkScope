@@ -1,0 +1,36 @@
+{
+  "at": "2026-09-05T10:17:02+00:00",
+  "automation": {
+    "apply_profile_transitions": false,
+    "enabled": false,
+    "valid": true
+  },
+  "backup_sha256": "ed9ba71373a70e08134042e297e52fd505db0b58eb24e8d2618bc4d9db77467e",
+  "changed": true,
+  "cutover_sha256": "7eaa743a914c2544a705ca5a7c7cdc66195ca193a1755ad898d28d6d90953597",
+  "existing_domain_tables_preserved": 23,
+  "idempotence_verified": true,
+  "membership": {
+    "actors": {
+      "attended_user": 105
+    },
+    "bindings": 105,
+    "current_tracking_count": 52,
+    "dual_source_count": 6,
+    "events": 105,
+    "foreign_key_violations": 0,
+    "integrity": "ok",
+    "memberships": 105,
+    "removed_memberships": 0,
+    "statuses": {
+      "closed": 59,
+      "current": 46
+    }
+  },
+  "post_profile_sha256": "5966fadeb830d09cd9e0dde83215402d3867b3d5e0b27e17192894c0129c1efe",
+  "price_writes": 0,
+  "provider_requests": 0,
+  "schema_version": "v4",
+  "terminal_dispositions_applied": 0,
+  "universe_preserved": 186
+}

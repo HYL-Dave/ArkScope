@@ -1,0 +1,58 @@
+[
+  {
+    "attempts": 1,
+    "body_complete": true,
+    "elapsed_ms": 1067,
+    "identity": "nasdaqlisted.txt",
+    "kind": "directory",
+    "provider": "nasdaq",
+    "read_bytes": 347010,
+    "request": 1,
+    "reserved_at": "2026-09-05T10:17:18+00:00",
+    "response_sha256": "491337a821469a830093aca740849358982960c46f0192537f5de898f59e9200",
+    "status_code": 200,
+    "target": null
+  },
+  {
+    "attempts": 1,
+    "body_complete": true,
+    "elapsed_ms": 334,
+    "identity": "otherlisted.txt",
+    "kind": "directory",
+    "provider": "nasdaq",
+    "read_bytes": 538961,
+    "request": 2,
+    "reserved_at": "2026-09-05T10:17:19+00:00",
+    "response_sha256": "0e7be707f683443160a78e85139d8af18f786270c9ed82de8402d1d72538a319",
+    "status_code": 200,
+    "target": null
+  },
+  {
+    "attempts": 1,
+    "body_complete": true,
+    "elapsed_ms": 1008,
+    "identity": "0",
+    "kind": "directory",
+    "provider": "eodhd",
+    "read_bytes": 2,
+    "request": 3,
+    "reserved_at": "2026-09-05T10:17:19+00:00",
+    "response_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "status_code": 200,
+    "target": null
+  },
+  {
+    "attempts": 1,
+    "body_complete": true,
+    "elapsed_ms": 304,
+    "identity": "1",
+    "kind": "directory",
+    "provider": "eodhd",
+    "read_bytes": 411,
+    "request": 4,
+    "reserved_at": "2026-09-05T10:17:20+00:00",
+    "response_sha256": "523255c1afb30f49783d50c936f1cc7037f67d3e84a5998da2cffc77b8c487e9",
+    "status_code": 200,
+    "target": null
+  }
+]

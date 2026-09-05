@@ -1,0 +1,50 @@
+[
+  {
+    "file": "README.md",
+    "sha256": "db337e8eff9929890eea9710865e0756d53e729f43a6c475b8cf5b9c7285cf33"
+  },
+  {
+    "file": "fresh-check-attempt-1.json",
+    "sha256": "16d63e210bfebcad9c591192cb8169522add16849d3d52d8cb9a81dbeda13bc3"
+  },
+  {
+    "file": "installation.json",
+    "sha256": "d2917aaedd9263a151327ae72d138eb7d6495d70679cc44f2afe1937084bad37"
+  },
+  {
+    "file": "rehearsal.json",
+    "sha256": "404a5726e12ceab55b32cb83a6ab555cae4ba40c9f1ab9f16cd9593010d16a7c"
+  },
+  {
+    "file": "request-observations.json",
+    "sha256": "6b031800235953f25bd6cd2474b3677aa1c7fed896b678a4399802db3cdbf0e5"
+  },
+  {
+    "file": "scripts/fresh_check_v1.py",
+    "sha256": "98b8eb7eb2d4b1e329e8b44160ae6b345b586dfca1b3c8b95fabf2879d420752"
+  },
+  {
+    "file": "scripts/fresh_check_v1_tests.py",
+    "sha256": "800ea6c18c5309b73c6bb007cd747253e5b2e893e177a57d7a9f188c58a95e8c"
+  },
+  {
+    "file": "scripts/fresh_check_v2.py",
+    "sha256": "f49a233dbfbecbb3c8325067cf0f8ae3bbc41d09100275b831fa30855153ca9f"
+  },
+  {
+    "file": "scripts/fresh_check_v2_tests.py",
+    "sha256": "1aa75cb864fe95bf28be8df9dc12ab4b747e43433b8981b8d2478058fd6d06e1"
+  },
+  {
+    "file": "scripts/install.py",
+    "sha256": "b4b76018c4d7cdd01518bf2ec777251e6866e6400cbbb6d7bed03edd3c2fdaca"
+  },
+  {
+    "file": "source-manifest.json",
+    "sha256": "38adde331badb2c9d71f8040b3e40d5aca8e55d67fb4874d1383d680fdeadf1a"
+  },
+  {
+    "file": "verification.json",
+    "sha256": "4aa66ccaf737e4c92fa3ef260f8a8bb24916968c1244e6befce1a040f7eb8527"
+  }
+]

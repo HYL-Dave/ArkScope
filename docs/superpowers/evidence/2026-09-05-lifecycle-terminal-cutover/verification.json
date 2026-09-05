@@ -1,0 +1,193 @@
+{
+  "additional_directory_requests_authorized": false,
+  "app_restarted": false,
+  "backend": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 5856,
+    "report_sha256": "40eaadbbdb4a4a4a3bc81a3b45ae3ab6f72a13b534d1ffa482bbeb845d576ebb",
+    "skipped": 12,
+    "tests": 5868
+  },
+  "code_commit": "a6c2fa1b45ecc79ff4c760f927ad1b170390bab9",
+  "dual_source_backend": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 5847,
+    "report_sha256": "b38645bca6668f93e825e023e9cac704c1e6d28812da267f521e7ab8f0cad105",
+    "skipped": 12,
+    "tests": 5859
+  },
+  "dual_source_focus": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 112,
+    "report_sha256": "7b8888e2556c58aef18d80c0d69557b9ad4b60d338f29e90233d0ad15a53cabb",
+    "skipped": 0,
+    "tests": 112
+  },
+  "dual_source_red": {
+    "errors": 0,
+    "failed_owners": [
+      "tests.test_security_lifecycle_provider_migration::test_cutover_preserves_dual_source_lineage_from_real_capture_rows"
+    ],
+    "failures": 1,
+    "passed": 0,
+    "report_sha256": "3c51ce90bfb4d667d4abf76f528ad0cfdb271e4cce4274982406b95598e4f22e",
+    "skipped": 0,
+    "tests": 1
+  },
+  "footer_focus": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 323,
+    "report_sha256": "23d6e878dd2ecc00bfcf2dca9eb7eed26ae092f397f77ea9c54f2e3ddd2f8232",
+    "skipped": 0,
+    "tests": 323
+  },
+  "footer_mutations": {
+    "baseline": {
+      "errors": 0,
+      "failed_owners": [],
+      "failures": 0,
+      "passed": 174,
+      "report_sha256": "f890c2829ad05678b5122f7a54c669ca53091fe6f94c1576146b2d89859ba379",
+      "skipped": 0,
+      "tests": 174
+    },
+    "columns": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_listing_evidence::test_published_nasdaq_footer_still_requires_exact_shape_and_valid_time[File Creation Time: 0828202617:03||||||]",
+        "tests.test_security_lifecycle_listing_evidence::test_published_nasdaq_footer_still_requires_exact_shape_and_valid_time[File Creation Time: 0828202617:03||||||||]"
+      ],
+      "failures": 2,
+      "passed": 172,
+      "report_sha256": "0175afc79692a7b79a5dd95ae70895d7daca05dadba0089bbaf7c58815a8ede7",
+      "skipped": 0,
+      "tests": 174
+    },
+    "format": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_listing_evidence::test_nasdaq_parser_accepts_published_footer_with_empty_delimited_columns",
+        "tests.test_security_lifecycle_listing_evidence::test_published_nasdaq_footer_still_rejects_stale_and_future_dates[0827202617:03]",
+        "tests.test_security_lifecycle_listing_evidence::test_published_nasdaq_footer_still_rejects_stale_and_future_dates[0829202617:03]"
+      ],
+      "failures": 3,
+      "passed": 171,
+      "report_sha256": "47f10d0f7217cb8c005cb9b8a6dd4b381f7e948f8f4d25b1f84d7593a2e3964f",
+      "skipped": 0,
+      "tests": 174
+    },
+    "restored": {
+      "errors": 0,
+      "failed_owners": [],
+      "failures": 0,
+      "passed": 174,
+      "report_sha256": "7a9b1c4720a779c201f96fb880cf1a698a3da2ad980bcab98cd351d7187d4f8f",
+      "skipped": 0,
+      "tests": 174
+    }
+  },
+  "footer_red": {
+    "errors": 0,
+    "failed_owners": [
+      "tests.test_security_lifecycle_listing_evidence::test_nasdaq_parser_accepts_published_footer_with_empty_delimited_columns",
+      "tests.test_security_lifecycle_listing_evidence::test_published_nasdaq_footer_still_rejects_stale_and_future_dates[0827202617:03]",
+      "tests.test_security_lifecycle_listing_evidence::test_published_nasdaq_footer_still_rejects_stale_and_future_dates[0829202617:03]"
+    ],
+    "failures": 3,
+    "passed": 6,
+    "report_sha256": "c6f5d4f0b8ecd80b39c33a6900837590e14fe124dc48402cff0d70fca81a5ae9",
+    "skipped": 0,
+    "tests": 9
+  },
+  "frontend": {
+    "failed": 0,
+    "files": 111,
+    "passed": 1395,
+    "pending": 0,
+    "report_sha256": "baab461fcd5caff75375b16d3d3af2d9fb0cde01752ae4add1346c7ac6c5abcf"
+  },
+  "harness_v1": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 16,
+    "report_sha256": "bde7f2b01f37b984023435d32d46f1c5f9b3945973a7cfa03a88128481f74575",
+    "skipped": 0,
+    "tests": 16
+  },
+  "harness_v2": {
+    "errors": 0,
+    "failed_owners": [],
+    "failures": 0,
+    "passed": 19,
+    "report_sha256": "d4d6c3e19c3f848ac5859c4497e646e55de8b0b1de438477a139caa9ff018832",
+    "skipped": 0,
+    "tests": 19
+  },
+  "ibkr_backfill_performed": false,
+  "mutations": {
+    "aggregate": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_provider_migration::test_cutover_preserves_dual_source_lineage_from_real_capture_rows"
+      ],
+      "failures": 1,
+      "passed": 111,
+      "report_sha256": "d44f0dac1088f232f7448ee1060cc17826ea5baf88e7a20c657b2d4a9f6ea8b1",
+      "skipped": 0,
+      "tests": 112
+    },
+    "baseline-current": {
+      "errors": 0,
+      "failed_owners": [],
+      "failures": 0,
+      "passed": 112,
+      "report_sha256": "3af945139e19e56238f9b03ff2a469523ca32f7c6e28102c24e05444efa372b4",
+      "skipped": 0,
+      "tests": 112
+    },
+    "restored": {
+      "errors": 0,
+      "failed_owners": [],
+      "failures": 0,
+      "passed": 112,
+      "report_sha256": "ef2aa64186308f931685bcda91a5c2b584312c206fc581d480bffa779420b015",
+      "skipped": 0,
+      "tests": 112
+    },
+    "terminal": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_security_lifecycle_terminal_workflow::test_terminal_suppresses_dual_current_source_and_reverse_restores_exact_intent[False]",
+        "tests.test_security_lifecycle_terminal_workflow::test_terminal_suppresses_dual_current_source_and_reverse_restores_exact_intent[True]"
+      ],
+      "failures": 2,
+      "passed": 110,
+      "report_sha256": "f38b192cdab9052228f36c6261b1a07128421ee9b34e732d2909ecae90517f57",
+      "skipped": 0,
+      "tests": 112
+    },
+    "tombstone": {
+      "errors": 0,
+      "failed_owners": [
+        "tests.test_sa_tracking_memberships::test_former_tombstone_preserves_existing_current_but_cannot_reactivate_it_later"
+      ],
+      "failures": 1,
+      "passed": 111,
+      "report_sha256": "f9533b85ea444c1a228667f55710b251696c8e3cc51aebdfd6930efb33e841bb",
+      "skipped": 0,
+      "tests": 112
+    }
+  },
+  "pushed": false,
+  "status": "production_installed_fresh_provider_check_incomplete",
+  "terminal_disposition_applied": false
+}
