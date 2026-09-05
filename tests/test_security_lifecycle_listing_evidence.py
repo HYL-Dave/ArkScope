@@ -158,6 +158,97 @@ def test_published_nasdaq_footer_still_rejects_stale_and_future_dates(stamp):
         nasdaq_bytes=b"\n".join(lines) + b"\n", other_bytes=_fixture("otherlisted.txt"), retrieved_at=_AT))
 
 
+def test_other_listed_accepts_its_seven_field_footer_without_changing_rows():
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    lines = _fixture("otherlisted.txt").splitlines()
+    lines[-1] = b"File Creation Time: 0828202617:03||||||"
+    other = b"\n".join(lines) + b"\n"
+    snapshot = parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=other, retrieved_at=_AT)
+    assert snapshot.lookup("IBM")[0].listing_status == "active"
+    assert [row.listing_status for row in snapshot.lookup("ARCH")] == ["not_found", "not_found"]
+    assert snapshot.other_listed.source_document_sha256 == hashlib.sha256(other).hexdigest()
+    assert snapshot.other_listed.file_created_at == "2026-08-28T17:03:00"
+
+
+@pytest.mark.parametrize("footer", (
+    b"File Creation Time: 0828202617:03|||||",
+    b"File Creation Time: 0828202617:03||||||||",
+    b"File Creation Time: 0828202617:03|ignored|||||",
+    b"File Creation Time: 0828202625:03||||||",
+))
+def test_other_listed_footer_extension_still_rejects_invalid_shape(footer):
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    lines = _fixture("otherlisted.txt").splitlines()
+    lines[-1] = footer
+    _assert_failure("listing_directory_schema_mismatch", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=b"\n".join(lines) + b"\n", retrieved_at=_AT))
+
+
+@pytest.mark.parametrize("symbol", ("PFD$", "PFD$A", "PFD$Z"))
+def test_other_listed_preferred_symbol_is_preserved_and_never_becomes_common_stock(symbol):
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    lines = _fixture("otherlisted.txt").splitlines()
+    lines.insert(1, f"{symbol}|Preferred fixture|N|PFDpA|N|100|N|PFD-A".encode())
+    other = b"\n".join(lines) + b"\n"
+    snapshot = parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=other, retrieved_at=_AT)
+    assert symbol in snapshot.other_listed.symbols
+    assert symbol in snapshot.other_listed.rows
+    assert snapshot.lookup("IBM")[0].listing_status == "active"
+    for ticker in ("PFD", "PFDA", "PFD.A", "PFD-A"):
+        assert [row.listing_status for row in snapshot.lookup(ticker)] == ["not_found", "not_found"]
+    _assert_failure("listing_status_unresolved", lambda: snapshot.lookup(symbol))
+
+    # A provider-specific identifier remains subject to duplicate detection.
+    lines.insert(1, lines[1])
+    _assert_failure("listing_directory_schema_mismatch", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=b"\n".join(lines) + b"\n", retrieved_at=_AT))
+
+
+@pytest.mark.parametrize("symbol", ("$A", "PFD$$A", "PFD$AA", "PFD$1", "PFD*", "PFD@"))
+def test_other_listed_does_not_admit_arbitrary_symbol_punctuation(symbol):
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    other = _fixture("otherlisted.txt").replace(b"IBM|", symbol.encode() + b"|", 1)
+    _assert_failure("listing_directory_schema_mismatch", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=other, retrieved_at=_AT))
+
+
+def test_act_preferred_symbol_grammar_does_not_expand_nasdaq_symbol_grammar():
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    nasdaq = _fixture("nasdaqlisted.txt").replace(b"AAPL|", b"PFD$A|", 1)
+    _assert_failure("listing_directory_schema_mismatch", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=nasdaq, other_bytes=_fixture("otherlisted.txt"), retrieved_at=_AT))
+
+
+def test_unknown_exchange_on_explicit_test_issue_is_excluded_not_a_live_listing():
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    lines = _fixture("otherlisted.txt").splitlines()
+    lines.insert(1, b"TESTM|Test fixture|M|TESTM|N|100|Y|TESTM")
+    snapshot = parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=b"\n".join(lines) + b"\n", retrieved_at=_AT)
+    assert "TESTM" in snapshot.other_listed.symbols
+    assert "TESTM" not in snapshot.other_listed.rows
+    assert [row.listing_status for row in snapshot.lookup("TESTM")] == ["not_found", "not_found"]
+    assert snapshot.lookup("IBM")[0].primary_exchange == "XNYS"
+
+
+@pytest.mark.parametrize(("exchange", "test_issue"), (("M", "N"), ("?", "Y"), ("MM", "Y"), ("", "Y")))
+def test_unknown_exchange_exception_never_applies_to_live_or_malformed_issues(exchange, test_issue):
+    from src.security_lifecycle_listing_evidence import parse_nasdaq_directories
+
+    lines = _fixture("otherlisted.txt").splitlines()
+    lines.insert(1, f"TESTM|Test fixture|{exchange}|TESTM|N|100|{test_issue}|TESTM".encode())
+    _assert_failure("listing_directory_schema_mismatch", lambda: parse_nasdaq_directories(
+        nasdaq_bytes=_fixture("nasdaqlisted.txt"), other_bytes=b"\n".join(lines) + b"\n", retrieved_at=_AT))
+
+
 @pytest.mark.parametrize("component", ("nasdaqlisted.txt", "otherlisted.txt"))
 def test_nasdaq_parser_rejects_a_component_with_zero_source_rows(component) -> None:
     from src.security_lifecycle_listing_evidence import parse_nasdaq_directories

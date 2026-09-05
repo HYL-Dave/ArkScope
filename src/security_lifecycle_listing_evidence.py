@@ -45,6 +45,7 @@ MAX_NASDAQ_DIRECTORY_ROWS = 100_000
 _ADAPTER_VERSION = "listing-authority-v1"
 _RULE_VERSION = "1"
 _TICKER = re.compile(r"^[A-Z][A-Z0-9.-]{0,15}$")
+_ACT_PREFERRED_SYMBOL = re.compile(r"^[A-Z][A-Z0-9]{0,4}\$[A-Z]?$")
 _CIK = re.compile(r"^\d{10}$")
 _FIGI = re.compile(r"^BBG[A-Z0-9]{9}$")
 _EXCHANGE = re.compile(r"^[A-Z][A-Z0-9]{1,11}$")
@@ -76,6 +77,8 @@ _OTHER_HEADER = (
     "Test Issue",
     "NASDAQ Symbol",
 )
+# Other Listed's documented and observed footer predates its eighth data field.
+_NASDAQ_FOOTER_COLUMNS = {"nasdaq_listed": (8,), "other_listed": (7, 8)}
 _NASDAQ_MARKET_CATEGORIES = frozenset({"Q", "G", "S"})
 _NASDAQ_FINANCIAL_STATUSES = frozenset({"C", "D", "E", "G", "H", "J", "K", "N", "Q"})
 _OTHER_EXCHANGES = {
@@ -292,9 +295,9 @@ def _decode_nasdaq(body: object) -> list[str]:
     return lines
 
 
-def _file_creation(footer: str, *, retrieved_at: str, column_count: int) -> tuple[str, str, str]:
+def _file_creation(footer: str, *, retrieved_at: str, column_counts: tuple[int, ...]) -> tuple[str, str, str]:
     fields = footer.split("|")
-    published = len(fields) == column_count and not any(fields[1:])
+    published = len(fields) in column_counts and not any(fields[1:])
     # Keep the prior adapter encoding readable for sealed historical evidence.
     match = _PUBLISHED_FOOTER.fullmatch(fields[0]) if published else _FOOTER.fullmatch(footer)
     if match is None:
@@ -344,7 +347,7 @@ def _parse_nasdaq_component(
     if not source_rows or len(source_rows) > MAX_NASDAQ_DIRECTORY_ROWS:
         raise _nasdaq_failure()
     source_as_of, file_created_at, normalized_retrieved_at = _file_creation(
-        lines[-1], retrieved_at=retrieved_at, column_count=len(expected_header)
+        lines[-1], retrieved_at=retrieved_at, column_counts=_NASDAQ_FOOTER_COLUMNS[directory]
     )
 
     parsed_rows: dict[str, tuple[str | None, str | None]] = {}
@@ -356,7 +359,13 @@ def _parse_nasdaq_component(
         invalid_ticker = False
         ticker = ""
         try:
-            ticker = _normalized_ticker(fields[0])
+            candidate = fields[0].strip().upper()
+            # ACT's preferred suffix is an opaque provider ID, never a common-stock alias.
+            ticker = (
+                candidate
+                if directory == "other_listed" and _ACT_PREFERRED_SYMBOL.fullmatch(candidate)
+                else _normalized_ticker(fields[0])
+            )
         except ListingEvidenceFailure:
             invalid_ticker = True
         if invalid_ticker:
@@ -390,7 +399,8 @@ def _parse_nasdaq_component(
         else:
             exchange, cqs_symbol, etf, round_lot, test_issue, nasdaq_symbol = fields[2:]
             if (
-                exchange not in _OTHER_EXCHANGES
+                re.fullmatch(r"[A-Z]", exchange) is None
+                or (test_issue == "N" and exchange not in _OTHER_EXCHANGES)
                 or not cqs_symbol.strip()
                 or not nasdaq_symbol.strip()
                 or etf not in {"Y", "N"}
@@ -399,6 +409,7 @@ def _parse_nasdaq_component(
                 or test_issue not in {"Y", "N"}
             ):
                 raise _nasdaq_failure()
+            # Test issues do not assert a live venue, even for a new exchange code.
             if test_issue == "N":
                 security_type = "ETF" if etf == "Y" else None
                 parsed_rows[ticker] = (_OTHER_EXCHANGES[exchange], security_type)
