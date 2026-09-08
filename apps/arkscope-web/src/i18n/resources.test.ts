@@ -735,7 +735,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 75,
       shell: 37,
-      settings: 910,
+      settings: 918,
       research: 207,
       explore: 1337,
       portfolio: 374,
@@ -801,6 +801,9 @@ describe("bundled i18n resources", () => {
       "drilldown.providerIssues",
       "drilldown.securityDefinition",
       "drilldown.priceUnresolvedReview",
+      "drilldown.providerAttemptFailed",
+      "drilldown.issueRecordedAt",
+      "drilldown.issueTimeUnknown",
       "drilldown.sessionWindow",
     ].map((path) => `dataStorage.coverage.${path}`).sort();
 
@@ -818,7 +821,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2964);
+      expect(total, `${locale}.total`).toBe(2972);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1192,6 +1195,21 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      "workspace.routes.savedRefreshFailed",
+      "workspace.routes.saveUnknown",
+      "workspace.routes.saveSuperseded",
+      "workspace.routes.saveRejected",
+      "workspace.routes.readSavedState",
+      "dataStorage.coverage.drilldown.providerAttemptFailed",
+      "dataStorage.coverage.drilldown.issueRecordedAt",
+      "dataStorage.coverage.drilldown.issueTimeUnknown",
+      "dataStorage.lifecycle.summary.diagnostics",
+      "dataStorage.lifecycle.automation.schedule",
+      "dataStorage.lifecycle.automation.scheduleLabels.scheduled",
+      "dataStorage.lifecycle.automation.scheduleLabels.due",
+      "dataStorage.lifecycle.automation.scheduleLabels.disabled",
+      "dataStorage.lifecycle.automation.scheduleLabels.invalid",
+      "dataStorage.lifecycle.automation.advancedSettings",
       "models.tasks.lifecycleInvestigation.label",
       "models.tasks.lifecycleInvestigation.description",
       "models.test.connectionAndFormat",
@@ -1289,8 +1307,6 @@ describe("bundled i18n resources", () => {
       "dataSources.schedule.sources.secCorporateActions.label",
       "dataSources.schedule.sources.secCorporateActions.description",
       "dataStorage.lifecycle.title",
-      "dataStorage.lifecycle.description",
-      "dataStorage.lifecycle.handoff",
       "dataStorage.lifecycle.openWorkflow",
       "dataStorage.lifecycle.summary.activeCases",
       "dataStorage.lifecycle.summary.sourceMissing",
@@ -1310,8 +1326,6 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.automation.lastAttempt",
       "dataStorage.lifecycle.automation.nextScheduled",
       "dataStorage.lifecycle.automation.notScheduled",
-      "dataStorage.lifecycle.automation.providers",
-      "dataStorage.lifecycle.automation.providerSummary",
       "dataStorage.lifecycle.automation.noResult",
       "dataStorage.lifecycle.automation.resultSummary",
       "dataStorage.lifecycle.automation.incidentCases_one",
@@ -1343,6 +1357,9 @@ describe("bundled i18n resources", () => {
       "models.catalog.selectEffort",
     ]);
     const retiredSettingsPaths = [
+      "providers.discovery.useForSynthesis",
+      "providers.discovery.useForTranslation",
+      "providers.discovery.directIdAllowed",
       "dataStorage.update.title",
       "dataStorage.update.never",
       "dataStorage.update.succeeded",

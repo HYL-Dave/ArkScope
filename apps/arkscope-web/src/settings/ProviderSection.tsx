@@ -21,7 +21,6 @@ import {
   type ModelCatalog,
   type ModelDiscoveryResult,
   type ModelProvider,
-  type ModelTask,
   type OAuthLifecycleState,
   type OAuthRateLimitSnapshot,
   type OAuthRateLimitStatus,
@@ -246,7 +245,6 @@ export function ProviderSection({
   onOpenDiscovery = () => {},
   onCloseDiscovery = () => {},
   discoveryReturnFocusRef,
-  onUseModel,
   settingsReadCache,
   onNavigationGuardChange,
   developerMode = false,
@@ -261,7 +259,6 @@ export function ProviderSection({
   onOpenDiscovery?: (provider: ModelProvider) => void;
   onCloseDiscovery?: () => void;
   discoveryReturnFocusRef?: RefObject<HTMLElement | null>;
-  onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
   settingsReadCache: SettingsReadCache;
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   developerMode?: boolean;
@@ -685,8 +682,6 @@ export function ProviderSection({
                   <h2>{provider}</h2>
                   <p className="muted">
                     {t(($) => $.providers.discovery.modelCount, { count: models.length })}
-                    {" · "}
-                    {t(($) => $.providers.discovery.directIdAllowed)}
                   </p>
                 </div>
                 <span className={`key-pill ${pill.ok ? "ok" : "missing"}`}>
@@ -958,10 +953,6 @@ export function ProviderSection({
             result={panelState.result}
             authMode={panelCredential?.auth_type ?? null}
             credentialLabel={panelCredential?.label ?? null}
-            onUse={(model, task) => {
-              onCloseDiscovery();
-              onUseModel(discoveryPanelProvider, model, task);
-            }}
             onRelogin={
               discoveryPanelProvider === "openai" && panelState.result.credential_id
                 ? () => {
@@ -1518,7 +1509,6 @@ export function DiscoveryResultView({
   authMode,
   credentialLabel,
   onClose,
-  onUse,
   onRelogin,
   reloginBusy,
   developerMode = false,
@@ -1527,7 +1517,6 @@ export function DiscoveryResultView({
   authMode: ProviderCredential["auth_type"] | null;
   credentialLabel: string | null;
   onClose?: () => void;
-  onUse: (model: string, task: ModelTask) => void;
   // S3: when the failure is machine-classified as reauth_required, offer the
   // in-place re-login right where the error is shown. Optional (old sites OK).
   onRelogin?: () => void;
@@ -1603,8 +1592,6 @@ export function DiscoveryResultView({
       <div className="discovery-models">
         {models.map((model) => {
           const taskRouteTasks = model.task_route_tasks;
-          const canUseForSynthesis = taskRouteTasks?.includes("card_synthesis") ?? true;
-          const canUseForTranslation = taskRouteTasks?.includes("card_translation") ?? true;
           return (
             <div className="model-discovery-row" key={model.id}>
               <div className="model-discovery-copy">
@@ -1629,26 +1616,13 @@ export function DiscoveryResultView({
                   </span>
                 ) : null}
               </div>
-              <div className="model-discovery-actions">
-                {canUseForSynthesis ? (
-                  <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_synthesis")}>
-                    {t(($) => $.providers.discovery.useForSynthesis)}
-                  </button>
-                ) : null}
-                {canUseForTranslation ? (
-                  <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_translation")}>
-                    {t(($) => $.providers.discovery.useForTranslation)}
-                  </button>
-                ) : null}
-              </div>
             </div>
           );
         })}
       </div>
       <p className="muted tiny">
         {t(($) => $.providers.discovery.modelCount, { count: models.length })}
-        {" / "}{result.models.length}{" · "}
-        {t(($) => $.providers.discovery.directIdAllowed)}
+        {" / "}{result.models.length}
       </p>
     </div>
   );

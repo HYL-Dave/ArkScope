@@ -1211,8 +1211,6 @@ def update_model_routes(
             "model_route_update",
             {"task": task, "provider": provider, "model": model, "effort": effort},
         )
-        # Atomic upsert — provider/model/effort land together, never half-applied.
-        route_store.set(task, provider, model, effort)
         saved[task] = TaskRoute(
             task=task,
             provider=provider,
@@ -1222,6 +1220,7 @@ def update_model_routes(
             custom=capability_for(model) is None,
             warning=" ".join(warnings) or None,
         )
+    route_store.set_many([(task, provider, model, effort) for task, provider, model, effort, _ in prepared])
     return {"routes": {k: v.model_dump() for k, v in saved.items()}}
 
 

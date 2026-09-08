@@ -9,6 +9,7 @@ effort are written together so a save can never leave a half-applied route, and
 from __future__ import annotations
 
 import pytest
+import sqlite3
 
 from src.model_route_store import ModelRouteRow, ModelRouteStore
 
@@ -62,3 +63,29 @@ def test_schema_idempotent_across_instances(tmp_path):
     ModelRouteStore(db).set("ai_research", "openai", "gpt-5.4-mini", "low")
     # a second instance on the same DB must not error on CREATE and must see the row
     assert ModelRouteStore(db).get("ai_research").model == "gpt-5.4-mini"
+
+
+def test_batch_save_rolls_back_every_route_when_a_later_write_fails(store):
+    store.set("card_synthesis", "anthropic", "claude-sonnet-5", "high")
+    before = store.get_all()
+    with sqlite3.connect(store._db_path) as conn:
+        conn.execute("""CREATE TRIGGER reject_investigation BEFORE INSERT ON model_route
+            WHEN NEW.task = 'lifecycle_investigation'
+            BEGIN SELECT RAISE(ABORT, 'synthetic later-row failure'); END""")
+    with pytest.raises(sqlite3.IntegrityError, match="synthetic later-row failure"):
+        store.set_many([
+            ("card_synthesis", "anthropic", "claude-sonnet-5", "xhigh"),
+            ("lifecycle_investigation", "anthropic", "claude-sonnet-5", "xhigh"),
+        ])
+    assert store.get_all() == before
+
+
+def test_batch_save_commits_all_requested_routes_and_leaves_other_tasks_untouched(store):
+    other = store.set("card_translation", "openai", "gpt-5.3-codex-spark", "xhigh")
+    saved = store.set_many([
+        ("card_synthesis", "anthropic", "claude-sonnet-5", "high"),
+        ("lifecycle_investigation", "anthropic", "claude-sonnet-5", "xhigh"),
+    ])
+    assert len(saved) == 2
+    assert all(store.get(row.task) == row for row in saved)
+    assert store.get("card_translation") == other

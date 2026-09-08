@@ -45,14 +45,13 @@ describe("DiscoveryResultView localization", () => {
         authMode: "chatgpt_oauth",
         credentialLabel: "TS_Codex",
         onClose: vi.fn(),
-        onUse: vi.fn(),
       }));
     });
 
     expect(host.textContent).toContain("List models");
     expect(host.textContent).toContain("Search models");
-    expect(host.textContent).toContain("Use for synthesis");
-    expect(host.textContent).toContain("Use for translation");
+    expect(host.textContent).not.toContain("Use for synthesis");
+    expect(host.textContent).not.toContain("Use for translation");
     expect(host.textContent).toContain("gpt-5.4-mini");
     expect(host.textContent).toContain("TS_Codex");
     expect(host.textContent).toContain("chatgpt_oauth");
@@ -78,7 +77,6 @@ describe("DiscoveryResultView localization", () => {
         authMode: "chatgpt_oauth",
         credentialLabel: "Sub",
         onClose: vi.fn(),
-        onUse: vi.fn(),
         onRelogin: vi.fn(),
         developerMode: false,
       }));
@@ -112,7 +110,6 @@ describe("DiscoveryResultView", () => {
           authMode: "chatgpt_oauth",
           credentialLabel: "TS_Codex",
           onClose,
-          onUse: vi.fn(),
         }),
       );
     });
@@ -152,7 +149,6 @@ describe("DiscoveryResultView reauth affordance (S3 credential lifecycle)", () =
           authMode: "chatgpt_oauth",
           credentialLabel: "Sub",
           onClose: vi.fn(),
-          onUse: vi.fn(),
           ...extra,
         }),
       );

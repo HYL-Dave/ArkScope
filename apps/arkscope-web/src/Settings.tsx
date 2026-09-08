@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Download, Menu, Save, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Download, Menu, RefreshCw, Save, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { InvestigationRuntimeSection } from "./settings/InvestigationRuntimeSection";
 import {
+  ApiError,
   discoverModels,
   deleteModelRoute,
   exportModelRoutes,
@@ -34,10 +35,13 @@ import {
 import { runDiscoveryAndRefreshCatalog } from "./modelSelect";
 import {
   blockedRouteSaves,
+  modelReasonLabel,
   providerContexts,
+  routesSemanticallyEqual,
+  type ModelCommonT,
   type TaskTestSnapshot,
 } from "./modelRoutingUx";
-import { effortOptionsForModel, taskRouteBlocker } from "./researchModels";
+import { taskRouteBlocker } from "./researchModels";
 import { InvestorProfilePanel } from "./InvestorProfilePanel";
 import type {
   NavigationRequest,
@@ -131,10 +135,43 @@ type SettingsNavigationIntent = {
   kind: "manual_group" | "exact_anchor";
 };
 
+type RouteSaveRequest = Partial<Record<ModelTask, Pick<TaskRoute, "provider" | "model" | "effort">>>;
+
+function confirmedSavedRoutes(value: unknown, requested: RouteSaveRequest): Partial<Record<ModelTask, TaskRoute>> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidates = value as Record<string, unknown>;
+  const confirmed: Partial<Record<ModelTask, TaskRoute>> = {};
+  for (const task of Object.keys(requested) as ModelTask[]) {
+    const candidate = candidates[task];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+    const row = candidate as Record<string, unknown>;
+    const expected = requested[task]!;
+    if (row.task !== task || row.source !== "db"
+      || row.provider !== expected.provider || row.model !== expected.model || row.effort !== expected.effort
+      || typeof row.custom !== "boolean" || (row.warning !== null && typeof row.warning !== "string")) return null;
+    confirmed[task] = {
+      task, ...expected, source: "db", custom: row.custom, warning: row.warning,
+    };
+  }
+  return Object.keys(confirmed).length ? confirmed : null;
+}
+
+// Only localized, reviewed reason codes may reach product copy, never raw API diagnostics.
+const ROUTE_SAVE_REASONS = new Set([
+  "missing_active_credential", "task_auth_mode_unsupported", "model_auth_unverified",
+  "model_entitlement_unverified", "task_capability_missing", "model_not_visible",
+  "model_not_in_registry", "discovery_unavailable", "reauth_required", "model_task_unsupported",
+  "model_output_limit_unknown", "version_incompatible", "model_retired",
+  "subscription_plan_required", "subscription_plan_unverified",
+]);
+
 type SettingsRouteOutcome =
   | { kind: "save_succeeded" }
+  | { kind: "save_refresh_failed" }
+  | { kind: "save_unknown" }
+  | { kind: "save_superseded" }
   | { kind: "missing_model"; task: ModelTask }
-  | { kind: "save_failed" }
+  | { kind: "save_failed"; reason?: string }
   | { kind: "import_succeeded"; imported: number; skipped: number }
   | { kind: "import_failed" }
   | { kind: "export_succeeded"; exported: number; cleared: number }
@@ -143,7 +180,7 @@ type SettingsRouteOutcome =
   | { kind: "reset_failed" };
 
 type SettingsRouteOutcomePresentation = {
-  tone: "ok" | "error";
+  tone: "ok" | "error" | "warning";
   message: string;
 };
 
@@ -164,10 +201,17 @@ function unreachableRouteOutcome(outcome: never): never {
 function settingsRouteOutcomePresentation(
   outcome: SettingsRouteOutcome,
   t: SettingsT,
+  commonT: ModelCommonT,
 ): SettingsRouteOutcomePresentation {
   switch (outcome.kind) {
     case "save_succeeded":
       return { tone: "ok", message: t(($) => $.workspace.routes.saved) };
+    case "save_refresh_failed":
+      return { tone: "warning", message: t(($) => $.workspace.routes.savedRefreshFailed) };
+    case "save_unknown":
+      return { tone: "warning", message: t(($) => $.workspace.routes.saveUnknown) };
+    case "save_superseded":
+      return { tone: "warning", message: t(($) => $.workspace.routes.saveSuperseded) };
     case "missing_model":
       return {
         tone: "error",
@@ -176,7 +220,12 @@ function settingsRouteOutcomePresentation(
         }),
       };
     case "save_failed":
-      return { tone: "error", message: t(($) => $.workspace.routes.saveFailed) };
+      return {
+        tone: "error",
+        message: outcome.reason
+          ? t(($) => $.workspace.routes.saveRejected, { reason: modelReasonLabel(outcome.reason, commonT) })
+          : t(($) => $.workspace.routes.saveFailed),
+      };
     case "import_succeeded":
       return {
         tone: "ok",
@@ -287,6 +336,7 @@ export function SettingsView({
   onNavigateTarget = () => {},
 }: SettingsViewProps) {
   const { t } = useTranslation("settings");
+  const { t: commonT } = useTranslation("common");
   const cacheRef = useRef<SettingsReadCache | null>(null);
   if (cacheRef.current === null) {
     cacheRef.current = settingsReadCache ?? createSettingsReadCache();
@@ -309,6 +359,15 @@ export function SettingsView({
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [routeOutcome, setRouteOutcome] = useState<SettingsRouteOutcome | null>(null);
+  const routeOutcomePresentation = routeOutcome
+    ? settingsRouteOutcomePresentation(routeOutcome, t, commonT)
+    : null;
+  const pendingRouteSave = useRef<{
+    routes: RouteSaveRequest;
+    baseline: ModelCatalog["routes"];
+    editedTasks: Set<ModelTask>;
+    acknowledged: boolean;
+  } | null>(null);
   const [runtimeOutcome, setRuntimeOutcome] = useState<SettingsRuntimeOutcome | null>(null);
   const [activeGroup, setActiveGroup] = useState<SettingsGroupId>(() => readActiveSettingsGroup());
   const [section, setSection] = useState<SettingsLocationId>(() => firstSettingsAnchor(activeGroup));
@@ -634,8 +693,10 @@ export function SettingsView({
     setRouteOutcome(null);
     setRuntimeOutcome(null);
     try {
-      const routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string; effort: string }>> = {};
-      for (const task of catalog.tasks) {
+      const routes: RouteSaveRequest = {};
+      const changedTasks = catalog.tasks.filter((task) => !routesSemanticallyEqual(draft[task.id], catalog.routes[task.id]));
+      // An explicit save of unchanged defaults still persists them; edits touch only their own tasks.
+      for (const task of changedTasks.length ? changedTasks : catalog.tasks) {
         const row = draft[task.id];
         if (!row || !row.model.trim()) {
           setRouteOutcome({ kind: "missing_model", task: task.id });
@@ -644,15 +705,72 @@ export function SettingsView({
         if (taskRouteBlocker(catalog, row, task.id)) return;
         routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort.trim() };
       }
-      await saveModelRoutes(routes);
+      pendingRouteSave.current = { routes, baseline: { ...catalog.routes }, editedTasks: new Set(), acknowledged: false };
+      try {
+        const result = await saveModelRoutes(routes);
+        const confirmed = confirmedSavedRoutes(result?.routes, routes);
+        if (confirmed) {
+          pendingRouteSave.current.acknowledged = true;
+          applyRouteReceipt(confirmed, routes);
+        }
+      } catch (error) {
+        if (error instanceof ApiError && [400, 401, 403, 404, 409, 422].includes(error.status)) {
+          pendingRouteSave.current = null;
+          setRouteOutcome({ kind: "save_failed", reason: error.code && ROUTE_SAVE_REASONS.has(error.code) ? error.code : undefined });
+          return;
+        }
+        // A missing response does not prove that the write failed. Read back; never retry the PUT.
+      }
+      await checkRouteSave();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function applyRouteReceipt(routes: Partial<Record<ModelTask, TaskRoute>>, requested: RouteSaveRequest) {
+    setCatalog((current) => current ? { ...current, routes: { ...current.routes, ...routes } } : current);
+    setDraft((current) => {
+      const next = { ...current };
+      for (const task of Object.keys(routes) as ModelTask[]) {
+        if (!pendingRouteSave.current?.editedTasks.has(task) && routesSemanticallyEqual(current[task], requested[task])) {
+          next[task] = fromRoutes(routes)[task];
+        }
+      }
+      return next;
+    });
+    setTestState({});
+  }
+
+  async function checkRouteSave() {
+    const pending = pendingRouteSave.current;
+    if (!pending) return;
+    setSaving(true);
+    try {
       const refreshed = await fetchCatalogAfterMutation();
+      const confirmed = confirmedSavedRoutes(refreshed.routes, pending.routes);
+      if (confirmed) pending.acknowledged = true;
+      const baseline = pending.baseline;
+      const acknowledged = pending.acknowledged;
+      const currentRoutes = fromRoutes(refreshed.routes);
       setCatalog(refreshed);
-      setDraft(fromRoutes(refreshed.routes));
+      setDraft((current) => {
+        const next = { ...current };
+        for (const task of Object.keys(currentRoutes) as ModelTask[]) {
+          if (pending.routes[task] && !acknowledged) continue;
+          if (!pending.editedTasks.has(task) && (
+            routesSemanticallyEqual(current[task], baseline[task])
+            || (acknowledged && routesSemanticallyEqual(current[task], pending.routes[task]))
+          )) next[task] = currentRoutes[task];
+        }
+        return next;
+      });
+      pending.baseline = { ...refreshed.routes };
       setTestState({});
       await onRuntimeChanged();
-      setRouteOutcome({ kind: "save_succeeded" });
+      setRouteOutcome({ kind: confirmed ? "save_succeeded" : acknowledged ? "save_superseded" : "save_unknown" });
+      if (acknowledged) pendingRouteSave.current = null;
     } catch {
-      setRouteOutcome({ kind: "save_failed" });
+      setRouteOutcome({ kind: pending.acknowledged ? "save_refresh_failed" : "save_unknown" });
     } finally {
       setSaving(false);
     }
@@ -867,11 +985,6 @@ export function SettingsView({
           }}
           onOpenDiscovery={openDiscoveryPanel}
           onCloseDiscovery={() => setDiscoveryPanelOpen(false)}
-          onUseModel={(provider, model, task) => {
-            invalidateTaskTest(task);
-            onDraftForTask(setDraft, catalog, task, provider, model);
-            revealSection("models");
-          }}
           onNavigationGuardChange={setProviderGuard}
         />
       );
@@ -895,6 +1008,20 @@ export function SettingsView({
                   : t(($) => $.actions.save)}
               </Button>
             </div>
+            {routeOutcomePresentation ? (
+              <div role={routeOutcomePresentation.tone === "error" ? "alert" : "status"}>
+                <p className={routeOutcomePresentation.tone === "error" ? "error-text"
+                  : routeOutcomePresentation.tone === "warning" ? "warn-text" : "ok-text"}>
+                  {routeOutcomePresentation.message}
+                </p>
+                {routeOutcomePresentation.tone === "warning" && pendingRouteSave.current ? (
+                  <Button size="compact" tone="secondary" icon={<RefreshCw size={15} />}
+                    disabled={saving} onClick={() => void checkRouteSave()}>
+                    {t(($) => $.workspace.routes.readSavedState)}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {routeSaveBlocks.length > 0 ? (
               <div id="route-save-blocked">
                 {(["missing_active_credential", "effort_required", "model_retired"] as const)
@@ -947,7 +1074,16 @@ export function SettingsView({
             modelsByProvider={modelsByProvider}
             testState={testState}
             developerMode={developerMode}
-            onDraft={setDraft}
+            onDraft={(update) => {
+              const pending = pendingRouteSave.current;
+              setDraft((current) => {
+                const next = typeof update === "function" ? update(current) : update;
+                for (const task of Object.keys(next) as ModelTask[]) {
+                  if (!routesSemanticallyEqual(next[task], current[task])) pending?.editedTasks.add(task);
+                }
+                return next;
+              });
+            }}
             onTest={async (task) => {
             const row = draft[task];
             if (!row || !row.model.trim() || taskRouteBlocker(catalog, row, task)) return;
@@ -1126,9 +1262,6 @@ export function SettingsView({
       ),
     };
   });
-  const routeOutcomePresentation = routeOutcome
-    ? settingsRouteOutcomePresentation(routeOutcome, t)
-    : null;
   const runtimeOutcomePresentation = runtimeOutcome
     ? settingsRuntimeOutcomePresentation(runtimeOutcome, t)
     : null;
@@ -1147,14 +1280,8 @@ export function SettingsView({
         />
       </div>
 
-      {routeOutcomePresentation?.tone === "error" ? (
-        <p className="error-text">{routeOutcomePresentation.message}</p>
-      ) : null}
       {runtimeOutcomePresentation?.tone === "error" ? (
         <p className="error-text">{runtimeOutcomePresentation.message}</p>
-      ) : null}
-      {routeOutcomePresentation?.tone === "ok" ? (
-        <p className="ok-text">{routeOutcomePresentation.message}</p>
       ) : null}
       {runtimeOutcomePresentation?.tone === "ok" ? (
         <p className="ok-text">{runtimeOutcomePresentation.message}</p>
@@ -1226,7 +1353,7 @@ export function SettingsView({
 
 // ---- Data Sources: provider health + per-source app-owned scheduling (3e) ----
 
-function fromRoutes(routes: ModelCatalog["routes"]): Partial<Record<ModelTask, DraftRoute>> {
+function fromRoutes(routes: Partial<Record<ModelTask, TaskRoute>>): Partial<Record<ModelTask, DraftRoute>> {
   const out: Partial<Record<ModelTask, DraftRoute>> = {};
   for (const [key, route] of Object.entries(routes)) {
     const task = key as ModelTask;
@@ -1238,24 +1365,4 @@ function fromRoutes(routes: ModelCatalog["routes"]): Partial<Record<ModelTask, D
     };
   }
   return out;
-}
-
-export function onDraftForTask(
-  setDraft: Dispatch<SetStateAction<Partial<Record<ModelTask, DraftRoute>>>>,
-  catalog: ModelCatalog,
-  task: ModelTask,
-  provider: ModelProvider,
-  model: string,
-) {
-  setDraft((prev) => {
-    const previousEffort = prev[task]?.effort.trim() ?? "";
-    const effort = effortOptionsForModel(catalog, provider, model)
-      .some((option) => option.id === previousEffort)
-      ? previousEffort
-      : "";
-    return {
-      ...prev,
-      [task]: { provider, model, effort, custom: true },
-    };
-  });
 }

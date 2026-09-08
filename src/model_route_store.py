@@ -98,22 +98,27 @@ class ModelRouteStore:
 
     def set(self, task: str, provider: str, model: str, effort: str = "default") -> ModelRouteRow:
         """Atomic upsert of the whole route — provider/model/effort always land together."""
+        return self.set_many([(task, provider, model, effort)])[0]
+
+    def set_many(self, routes: list[tuple[str, str, str, str]]) -> list[ModelRouteRow]:
+        """Commit a Settings save as one transaction, including all requested tasks."""
         now = _now()
-        effort = (effort or "default").strip() or "default"
+        rows = [ModelRouteRow(task, provider, model, (effort or "default").strip() or "default", now)
+                for task, provider, model, effort in routes]
         conn = self._connect()
         try:
-            conn.execute(
-                "INSERT INTO model_route (task, provider, model, effort, updated_at) "
-                "VALUES (?, ?, ?, ?, ?) "
-                "ON CONFLICT(task) DO UPDATE SET "
-                "provider = excluded.provider, model = excluded.model, "
-                "effort = excluded.effort, updated_at = excluded.updated_at",
-                (task, provider, model, effort, now),
-            )
-            conn.commit()
+            with conn:
+                conn.executemany(
+                    "INSERT INTO model_route (task, provider, model, effort, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?) "
+                    "ON CONFLICT(task) DO UPDATE SET "
+                    "provider = excluded.provider, model = excluded.model, "
+                    "effort = excluded.effort, updated_at = excluded.updated_at",
+                    [(row.task, row.provider, row.model, row.effort, row.updated_at) for row in rows],
+                )
         finally:
             conn.close()
-        return ModelRouteRow(task=task, provider=provider, model=model, effort=effort, updated_at=now)
+        return rows
 
     def delete(self, task: str) -> bool:
         """Remove a task's route (resolution falls back to yaml/default). Idempotent."""

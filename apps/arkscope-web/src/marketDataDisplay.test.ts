@@ -348,7 +348,7 @@ describe("coverageStatusLabel", () => {
     });
   });
 
-  it("separates security review signals from generic provider issues", () => {
+  it("reports last-attempt issues without speculating about delisting", () => {
     const labels = displayFunction<(
       issues: Array<{
         ticker: string;
@@ -384,10 +384,21 @@ describe("coverageStatusLabel", () => {
     ];
 
     expect(labels(issues, zhT)).toEqual([
-      "IBKR 無法解析 1 個標的的合約：EA。可能是下市、代號異動或合約設定不完整；請先確認標的狀態。",
-      "1 個標的在完成交易日仍無價格：LCID。可能是停牌、下市或資料來源暫時缺資料；系統不會自動移除。",
-      "供應商問題：1",
+      "IBKR 上次未取得 1 個標的的唯一合約：EA。這不是下市判定。 最近錯誤記錄：時間未知。",
+      "1 個標的在完成交易日仍無價格：LCID。這不是下市判定。 最近錯誤記錄：時間未知。",
+      "IBKR 上次查詢失敗：AAPL（1）。 最近錯誤記錄：時間未知。",
     ]);
+  });
+
+  it("uses the recorded provider error time, not the coverage report time", () => {
+    const labels = marketDataDisplay.coverageProviderIssueLabels([{
+      ticker: "ZETA", interval: "15min", reason_code: "provider_request_failed",
+      last_error: "SECRET transport error", updated_at: "2026-09-08T04:00:00Z",
+    }], zhT);
+    expect(labels[0]).toContain("ZETA");
+    expect(labels[0]).toContain("09-08 12:00 Asia/Taipei");
+    expect(labels[0]).not.toContain("SECRET");
+    expect(marketDataDisplay.coverageProviderIssueLabels([], zhT)).toEqual([]);
   });
 });
 

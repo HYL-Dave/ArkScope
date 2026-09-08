@@ -117,6 +117,8 @@ def raw_source(recent):
     from data_sources.ibkr_source import IBKRDataSource
     from ib_insync import Stock
     class Raw:
+        RaiseRequestErrors = False
+
         def __init__(self):
             self.calls = []
         def isConnected(self):

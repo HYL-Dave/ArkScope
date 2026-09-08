@@ -766,7 +766,8 @@ describe("local storage panels", () => {
     expect(host!.textContent).not.toContain("增量更新失敗");
     expect(host!.textContent).toContain("市場資料庫無法讀取");
     expect(host!.textContent).toContain("觀測資料無法使用");
-    expect(host!.textContent).toContain("供應商問題：1");
+    expect(host!.textContent).toContain("IBKR 上次查詢失敗：AAPL（1）");
+    expect(host!.textContent).toContain("07-20 11:00 Asia/Taipei");
     expect(host!.textContent).not.toContain(syncDiagnostic);
     expect(host!.textContent).not.toContain(providerDiagnostic);
     for (const ticker of unknownTickers) expect(host!.textContent).not.toContain(ticker);
@@ -931,7 +932,8 @@ describe("local storage panels", () => {
       expect(storage!.textContent).not.toContain(ticker);
     }
     expect(storage!.textContent).toContain("格線外的正規交易時段資料列：2");
-    expect(storage!.textContent).toContain("供應商問題：1");
+    expect(storage!.textContent).toContain("IBKR 上次查詢失敗：AAPL（1）");
+    expect(storage!.textContent).toContain("07-25 04:05 Asia/Taipei");
     expect(storage!.textContent).not.toContain(rawProviderDetail);
     act(() => disclosure.click());
     expect(disclosure.getAttribute("aria-expanded")).toBe("false");

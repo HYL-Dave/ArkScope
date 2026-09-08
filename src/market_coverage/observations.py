@@ -24,7 +24,7 @@ from .models import (
 _REQUIRED_PRICE_COLUMNS = frozenset({"ticker", "datetime", "interval"})
 _TICKER_ALIAS_COLUMNS = frozenset({"alias", "canonical"})
 _PROVIDER_SYNC_COLUMNS = frozenset(
-    {"ticker", "interval", "last_error", "updated_at"}
+    {"provider", "ticker", "interval", "last_error", "updated_at"}
 )
 _STORED_UTC_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S+0000"
 
@@ -292,8 +292,8 @@ def _read_provider_errors(
         "typeof(updated_at), CAST(updated_at AS BLOB) "
         "FROM provider_sync_meta "
         f"WHERE ticker IN ({placeholders}) "
-        "AND interval = ? AND last_error IS NOT NULL",
-        (*stored_tickers, interval),
+        "AND interval = ? AND provider = ? AND last_error IS NOT NULL",
+        (*stored_tickers, interval, "ibkr"),
     ):
         try:
             if (
@@ -355,6 +355,9 @@ def _read_provider_errors(
                         ProviderSyncIssueReason.PRICE_DATA_UNRESOLVED
                     ),
                     "ibkr_historical_data_request_failed": (
+                        ProviderSyncIssueReason.PROVIDER_REQUEST_FAILED
+                    ),
+                    "ibkr_contract_qualification_failed": (
                         ProviderSyncIssueReason.PROVIDER_REQUEST_FAILED
                     ),
                 }.get(raw_error, ProviderSyncIssueReason.UNKNOWN),

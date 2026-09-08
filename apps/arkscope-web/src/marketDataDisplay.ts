@@ -20,6 +20,7 @@ import {
   scheduleBodyBacklogCopy,
 } from "./settings/settingsBackendCopy";
 import type { SettingsT } from "./settings/settingsCopy";
+import { formatSystemTimestamp } from "./timeDisplay";
 
 export function providerHealthStatusLabel<T extends {
   id: string;
@@ -307,6 +308,14 @@ function issueTickerList(issues: ProviderSyncIssue[]): string {
     : visible.join(", ");
 }
 
+function recordedIssueLabel(message: string, issues: ProviderSyncIssue[], t: SettingsT): string {
+  const timestamps = issues.map((issue) => issue.updated_at ? Date.parse(issue.updated_at) : NaN);
+  const time = timestamps.every(Number.isFinite)
+    ? formatSystemTimestamp(new Date(Math.max(...timestamps)).toISOString())
+    : t(($) => $.dataStorage.coverage.drilldown.issueTimeUnknown);
+  return t(($) => $.dataStorage.coverage.drilldown.issueRecordedAt, { message, time });
+}
+
 export function coverageProviderIssueLabels(
   issues: ProviderSyncIssue[],
   t: SettingsT,
@@ -317,24 +326,26 @@ export function coverageProviderIssueLabels(
   const unresolved = issues.filter(
     (issue) => issue.reason_code === "price_data_unresolved",
   );
-  const otherCount = issues.length - securityDefinition.length - unresolved.length;
+  const other = issues.filter((issue) => issue.reason_code !== "security_definition_unavailable"
+    && issue.reason_code !== "price_data_unresolved");
   const labels: string[] = [];
   if (securityDefinition.length > 0) {
-    labels.push(t(($) => $.dataStorage.coverage.drilldown.securityDefinition, {
+    labels.push(recordedIssueLabel(t(($) => $.dataStorage.coverage.drilldown.securityDefinition, {
       count: securityDefinition.length,
       tickers: issueTickerList(securityDefinition),
-    }));
+    }), securityDefinition, t));
   }
   if (unresolved.length > 0) {
-    labels.push(t(($) => $.dataStorage.coverage.drilldown.priceUnresolvedReview, {
+    labels.push(recordedIssueLabel(t(($) => $.dataStorage.coverage.drilldown.priceUnresolvedReview, {
       count: unresolved.length,
       tickers: issueTickerList(unresolved),
-    }));
+    }), unresolved, t));
   }
-  if (otherCount > 0) {
-    labels.push(t(($) => $.dataStorage.coverage.drilldown.providerIssues, {
-      count: otherCount,
-    }));
+  if (other.length > 0) {
+    labels.push(recordedIssueLabel(t(($) => $.dataStorage.coverage.drilldown.providerAttemptFailed, {
+      count: other.length,
+      tickers: issueTickerList(other),
+    }), other, t));
   }
   return labels;
 }
