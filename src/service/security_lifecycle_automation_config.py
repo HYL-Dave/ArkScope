@@ -73,8 +73,12 @@ class SecurityLifecycleAutomationConfigState:
 
     @property
     def effective_apply_profile_transitions(self) -> bool:
+        # Preserve legacy flags, but a disabled schedule cannot authorize
+        # unattended mutations. Attended approvals have their own authority.
         return bool(
-            self.valid and self.config and self.config.apply_profile_transitions
+            self.effective_background_enabled
+            and self.config
+            and self.config.apply_profile_transitions
         )
 
 

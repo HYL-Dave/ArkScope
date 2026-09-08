@@ -99,19 +99,21 @@ def test_routing_seed_flags_pin_exact_current_membership():
     assert routing == {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-6-astra",
     }
 
 
 def test_picker_visibility_matches_the_ruling():
     vis = {c.id: c.picker_visibility for c in all_models()}
     for current in ("claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
-                    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+                    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra"):
         assert vis[current] == "default", current
     assert vis["gpt-5.3-codex-spark"] == "advanced"
     for pinned in (set(vis) - {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.3-codex-spark",
+        "gpt-6-astra",
     }):
         assert vis[pinned] == "pinned_only", pinned
 
@@ -119,6 +121,7 @@ def test_picker_visibility_matches_the_ruling():
 def test_default_picker_models_helper():
     assert {c.id for c in default_picker_models("openai")} == {
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-6-astra",
     }
     assert {c.id for c in default_picker_models("anthropic")} == {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
@@ -379,6 +382,7 @@ def test_routing_view_keeps_exact_membership_and_capability_facts():
     assert {m.id for m in ROUTING_VIEW} == {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-6-astra",
     }
     assert is_seed_model("openai", "gpt-5.6-luna")
 
@@ -437,7 +441,7 @@ def test_new_generation_entries_present_with_task0_facts():
 
 def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
     opus5 = capability_for("claude-opus-5")
-    assert len(all_models()) == 20
+    assert len(all_models()) == 21
     assert opus5.provider == "anthropic"
     assert opus5.context_limit == 1_000_000 and opus5.max_output == 128_000
     assert opus5.thinking_mode == "adaptive_default_on"
@@ -452,7 +456,7 @@ def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
 def test_known_retired_models_keep_capabilities_but_leave_new_task_routes():
     current = {"claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
                "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-               "gpt-5.3-codex-spark"}
+               "gpt-5.3-codex-spark", "gpt-6-astra"}
     retired = {cap.id for cap in all_models()} - current
     assert len(retired) == 13
     for model_id in retired:

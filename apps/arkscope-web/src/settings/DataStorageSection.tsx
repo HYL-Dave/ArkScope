@@ -482,19 +482,51 @@ function SecurityLifecyclePanel({
             >
               {config ? (
                 <>
-                  <label className="ds-toggle lifecycle-automation-toggle">
-                    <input
-                      type="checkbox"
-                      aria-label={t(($) => $.dataStorage.lifecycle.automation.backgroundEnabled)}
-                      checked={config.enabled}
-                      disabled={automationDisabled}
-                      onChange={(event) => void saveAutomationConfig({
-                        ...config,
-                        enabled: event.target.checked,
-                      })}
-                    />
-                    <span>{t(($) => $.dataStorage.lifecycle.automation.backgroundEnabled)}</span>
-                  </label>
+                  <fieldset
+                    className="lifecycle-automation-mode"
+                    role="radiogroup"
+                    aria-label={t(($) => $.dataStorage.lifecycle.automation.mode)}
+                  >
+                    <legend>{t(($) => $.dataStorage.lifecycle.automation.mode)}</legend>
+                    <div className="lifecycle-automation-modes">
+                      {([
+                        ["off", t(($) => $.dataStorage.lifecycle.automation.modes.off)],
+                        ["check_only", t(($) => $.dataStorage.lifecycle.automation.modes.check_only)],
+                        ["automatic", t(($) => $.dataStorage.lifecycle.automation.modes.automatic)],
+                      ] as const).map(([mode, label]) => (
+                        <label key={mode}>
+                          <input
+                            type="radio"
+                            name="lifecycle-automation-mode"
+                            value={mode}
+                            checked={mode === (!config.enabled ? "off" : config.apply_profile_transitions ? "automatic" : "check_only")}
+                            disabled={automationDisabled}
+                            onClick={() => {
+                              // An already-checked Off radio does not emit onChange.
+                              if (mode === "off" && !config.enabled && config.apply_profile_transitions) {
+                                void saveAutomationConfig({
+                                  ...config,
+                                  enabled: false,
+                                  apply_profile_transitions: false,
+                                });
+                              }
+                            }}
+                            onChange={() => void saveAutomationConfig({
+                              ...config,
+                              enabled: mode !== "off",
+                              apply_profile_transitions: mode === "automatic",
+                            })}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  {!config.enabled && config.apply_profile_transitions ? (
+                    <p className="warn-text tiny" role="status" data-automation-state="legacy_conflict">
+                      {t(($) => $.dataStorage.lifecycle.automation.legacyConflict)}
+                    </p>
+                  ) : null}
                   <details className="lifecycle-automation-advanced">
                     <summary>{t(($) => $.dataStorage.lifecycle.automation.advancedSettings)}</summary>
                     <div className="lifecycle-automation-fields">
@@ -509,7 +541,8 @@ function SecurityLifecyclePanel({
                             interval_minutes: Number(event.target.value),
                           })}
                         >
-                          {[5, 15, 30, 60, 360, 1440].map((minutes) => (
+                          {Array.from(new Set([5, 15, 30, 60, 360, 1440, config.interval_minutes]))
+                            .sort((a, b) => a - b).map((minutes) => (
                             <option value={minutes} key={minutes}>
                               {t(($) => $.dataStorage.lifecycle.automation.intervalMinutes, {
                                 count: minutes,
@@ -517,39 +550,6 @@ function SecurityLifecyclePanel({
                             </option>
                           ))}
                         </select>
-                      </label>
-                      <label className="lifecycle-automation-field">
-                        <span>{t(($) => $.dataStorage.lifecycle.automation.batchSize)}</span>
-                        <select
-                          aria-label={t(($) => $.dataStorage.lifecycle.automation.batchSize)}
-                          value={config.batch_limit}
-                          disabled={automationDisabled}
-                          onChange={(event) => void saveAutomationConfig({
-                            ...config,
-                            batch_limit: event.target.value === "1" ? 1 : 2,
-                          })}
-                        >
-                          {([1, 2] as const).map((limit) => (
-                            <option value={limit} key={limit}>
-                              {t(($) => $.dataStorage.lifecycle.automation.batchOption, {
-                                count: limit,
-                              })}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="ds-toggle lifecycle-automation-toggle">
-                        <input
-                          type="checkbox"
-                          aria-label={t(($) => $.dataStorage.lifecycle.automation.applyTransitions)}
-                          checked={config.apply_profile_transitions}
-                          disabled={automationDisabled}
-                          onChange={(event) => void saveAutomationConfig({
-                            ...config,
-                            apply_profile_transitions: event.target.checked,
-                          })}
-                        />
-                        <span>{t(($) => $.dataStorage.lifecycle.automation.applyTransitions)}</span>
                       </label>
                     </div>
                   </details>

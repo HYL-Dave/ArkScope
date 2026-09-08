@@ -18,8 +18,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import date
 from typing import Any, Literal, Optional
 
+from jsonschema import Draft202012Validator, ValidationError
 from pydantic import BaseModel, Field
 from anthropic import APITimeoutError as AnthropicAPITimeoutError
 from openai import APITimeoutError as OpenAIAPITimeoutError
@@ -91,6 +93,10 @@ def _require_task_route(
     )
     if detail is not None:
         raise ValueError(detail)
+
+
+class ModelStructuredOutputInvalid(ValueError):
+    """A model response did not satisfy the requested output schema."""
 
 
 class ModelExecutionTimeout(RuntimeError):
@@ -398,6 +404,61 @@ def _synthesize_anthropic(
         raise
 
 
+def _openai_responses_output(
+    client: Any, *, model: str, system: str, user: str, name: str,
+    description: str, schema: dict[str, Any], effort: str, max_tokens: int,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if effort != "default":
+        kwargs["reasoning"] = {"effort": effort}
+    response = client.responses.create(
+        model=model,
+        input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        tools=[{
+            "type": "function", "name": name, "description": description,
+            # Keep the existing optional-field contract; do not normalize it.
+            "parameters": schema, "strict": False,
+        }],
+        tool_choice={"type": "function", "name": name},
+        parallel_tool_calls=False,
+        store=False,
+        max_output_tokens=max_tokens,
+        **kwargs,
+    )
+    if response.status != "completed" or response.error is not None:
+        raise RuntimeError("OpenAI structured output did not complete")
+    requested = capability_for(model)
+    model_matches = response.model == model
+    # An unpinned canonical ID may resolve to a dated snapshot. An explicit
+    # snapshot may not change, and capability-prefix matches are not receipts.
+    if (not model_matches and requested is not None and model == requested.id
+            and isinstance(response.model, str) and response.model.startswith(model + "-")):
+        suffix = response.model.removeprefix(model + "-")
+        try:
+            model_matches = date.fromisoformat(suffix).isoformat() == suffix
+        except ValueError:
+            pass
+    if not model_matches:
+        raise RuntimeError("OpenAI structured output returned a different model")
+    calls = []
+    for item in response.output:
+        if item.type == "reasoning":
+            continue
+        if item.type != "function_call" or item.name != name or item.status != "completed":
+            raise RuntimeError("OpenAI structured output returned an unexpected output item")
+        calls.append(item)
+    if len(calls) != 1:
+        raise RuntimeError("OpenAI structured output requires exactly one output tool call")
+    payload = json.loads(calls[0].arguments)
+    if not isinstance(payload, dict):
+        raise ValueError("OpenAI structured output must be an object")
+    try:
+        Draft202012Validator(schema).validate(payload)
+    except ValidationError:
+        raise ModelStructuredOutputInvalid("structured_output_invalid") from None
+    return payload
+
+
 def _synthesize_openai(
     packet: EvidencePacket,
     model: str,
@@ -431,6 +492,13 @@ def _synthesize_openai(
             max_retries=0,
         )
         try:
+            capability = capability_for(model)
+            if capability is not None and capability.requires_responses_for_tools:
+                return CardSynthesis(**_openai_responses_output(
+                    client, model=model, system=_SYSTEM_PROMPT, user=user_message,
+                    name=_TOOL_NAME, description="Emit the structured result card.",
+                    schema=_CARD_TOOL_SCHEMA, effort=selected_effort, max_tokens=_MAX_TOKENS,
+                ))
             resp = client.chat.completions.create(
                 model=model,
                 max_completion_tokens=_MAX_TOKENS,
@@ -652,8 +720,8 @@ _TRANSLATABLE_FIELDS = (
 )
 
 
-class TextTranslationOutputInvalid(ValueError):
-    """The fixed one-field translation response did not match its contract."""
+class TextTranslationOutputInvalid(ModelStructuredOutputInvalid):
+    """A translated text or card response did not match its contract."""
 
 
 def translation_harness(provider: Provider, model: str | None = None) -> str:
@@ -843,6 +911,12 @@ def translate_card(
     else:
         raise ValueError(f"unknown provider: {provider}")
 
+    # Validate the returned fields before merging; otherwise an empty/partial
+    # translation inherits the original prose and masquerades as success.
+    try:
+        Draft202012Validator(schema).validate(translated)
+    except ValidationError:
+        raise TextTranslationOutputInvalid("translation_output_invalid") from None
     out = dict(card)
     for k, v in translated.items():
         if k in _TRANSLATABLE_FIELDS:
@@ -964,6 +1038,13 @@ def _translate_openai(
             max_retries=0,
         )
         try:
+            capability = capability_for(model)
+            if capability is not None and capability.requires_responses_for_tools:
+                return _openai_responses_output(
+                    client, model=model, system=system, user=user,
+                    name="emit_translation", description=f"Emit the {target} translation of the given fields.",
+                    schema=schema, effort=selected_effort, max_tokens=4096,
+                )
             resp = client.chat.completions.create(
                 model=model,
                 max_completion_tokens=4096,

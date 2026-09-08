@@ -1090,6 +1090,67 @@ table.wl tbody tr.archived td {
   gap: 8px;
   min-width: 0;
 }
+.lifecycle-automation-mode {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.lifecycle-automation-mode legend {
+  margin-bottom: 5px;
+  padding: 0;
+}
+.lifecycle-automation-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  min-width: 0;
+  max-width: 560px;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+}
+.lifecycle-automation-modes label {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.lifecycle-automation-modes input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.lifecycle-automation-modes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.lifecycle-automation-modes input:checked + span {
+  border-color: rgba(88, 166, 255, 0.6);
+  background: rgba(88, 166, 255, 0.12);
+  color: var(--fg);
+}
+.lifecycle-automation-modes input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.lifecycle-automation-modes input:disabled + span {
+  opacity: 0.55;
+  cursor: default;
+}
 .lifecycle-automation-controls .lifecycle-automation-toggle {
   display: flex;
   align-items: center;

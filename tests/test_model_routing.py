@@ -80,6 +80,7 @@ def test_catalog_exposes_canonical_current_and_retired_model_policy():
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.3-codex-spark",
+        "gpt-6-astra",
     }
     assert len(policy.retired_model_ids) == 13
     assert "claude-fable-5" in policy.retired_model_ids

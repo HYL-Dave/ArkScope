@@ -735,7 +735,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 75,
       shell: 37,
-      settings: 918,
+      settings: 919,
       research: 207,
       explore: 1337,
       portfolio: 374,
@@ -821,7 +821,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2972);
+      expect(total, `${locale}.total`).toBe(2973);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1311,12 +1311,13 @@ describe("bundled i18n resources", () => {
       "dataStorage.lifecycle.summary.activeCases",
       "dataStorage.lifecycle.summary.sourceMissing",
       "dataStorage.lifecycle.automation.title",
-      "dataStorage.lifecycle.automation.backgroundEnabled",
+      "dataStorage.lifecycle.automation.mode",
+      "dataStorage.lifecycle.automation.modes.off",
+      "dataStorage.lifecycle.automation.modes.check_only",
+      "dataStorage.lifecycle.automation.modes.automatic",
+      "dataStorage.lifecycle.automation.legacyConflict",
       "dataStorage.lifecycle.automation.interval",
       "dataStorage.lifecycle.automation.intervalMinutes",
-      "dataStorage.lifecycle.automation.batchSize",
-      "dataStorage.lifecycle.automation.batchOption",
-      "dataStorage.lifecycle.automation.applyTransitions",
       "dataStorage.lifecycle.automation.runDue",
       "dataStorage.lifecycle.automation.runningCommand",
       "dataStorage.lifecycle.automation.invalidConfig",

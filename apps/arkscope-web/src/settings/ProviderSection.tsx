@@ -680,9 +680,6 @@ export function ProviderSection({
               <div className="settings-panel-head">
                 <div>
                   <h2>{provider}</h2>
-                  <p className="muted">
-                    {t(($) => $.providers.discovery.modelCount, { count: models.length })}
-                  </p>
                 </div>
                 <span className={`key-pill ${pill.ok ? "ok" : "missing"}`}>
                   {pill.label}
@@ -1620,10 +1617,6 @@ export function DiscoveryResultView({
           );
         })}
       </div>
-      <p className="muted tiny">
-        {t(($) => $.providers.discovery.modelCount, { count: models.length })}
-        {" / "}{result.models.length}
-      </p>
     </div>
   );
 }

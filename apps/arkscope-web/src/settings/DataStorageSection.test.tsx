@@ -1,5 +1,8 @@
 /** @vitest-environment jsdom */
 import React from "react";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import i18n from "i18next";
@@ -13,6 +16,8 @@ import type {
   TradingDayCoverage,
 } from "../api";
 import { createSettingsReadCache } from "./settingsReadCache";
+
+const stylesCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -194,10 +199,22 @@ async function renderSection(
   await flush();
 }
 
-function checkbox(label: string): HTMLInputElement {
-  const input = host!.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
-  if (!input) throw new Error(`missing checkbox: ${label}`);
-  return input;
+async function changeMode(value: string, label = "Automation mode") {
+  await act(async () => {
+    const input = modeGroup(label).querySelector<HTMLInputElement>(`input[value="${value}"]`);
+    expect(input).not.toBeNull();
+    input!.click();
+  });
+}
+
+function modeGroup(label = "Automation mode"): HTMLElement {
+  const group = host!.querySelector<HTMLElement>(`[role="radiogroup"][aria-label="${label}"]`);
+  expect(group).not.toBeNull();
+  return group!;
+}
+
+function selectedMode(label = "Automation mode") {
+  return modeGroup(label).querySelector<HTMLInputElement>('input[type="radio"]:checked')?.value;
 }
 
 function select(label: string): HTMLSelectElement {
@@ -253,6 +270,166 @@ afterEach(() => {
 });
 
 describe("DataStorageSection lifecycle automation controls", () => {
+  it.each([
+    { language: "en" as const, label: "Automation mode", apply: true },
+    { language: "en" as const, label: "Automation mode", apply: false },
+    { language: "zh-Hant" as const, label: "自動化模式", apply: true },
+    { language: "zh-Hant" as const, label: "自動化模式", apply: false },
+  ])("clicking checked Off in $language normalizes only a legacy apply=$apply conflict", async ({ language, label, apply }) => {
+    controls.automationStatus = status({
+      current_progress: [],
+      config: { ...CONFIG, enabled: false, apply_profile_transitions: apply, batch_limit: 1 },
+    });
+    await renderSection(language);
+    expect(selectedMode(label)).toBe("off");
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    const off = modeGroup(label).querySelector<HTMLInputElement>('input[value="off"]')!;
+    const offLabel = off.labels![0].querySelector<HTMLElement>("span")!;
+
+    // Click the visible label so native activation reaches the already-checked radio.
+    await act(async () => offLabel.click());
+    await flush();
+
+    const writes = apply ? 1 : 0;
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledTimes(writes);
+    if (apply) {
+      expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledExactlyOnceWith({
+        ...CONFIG, enabled: false, apply_profile_transitions: false, batch_limit: 1,
+      });
+    }
+    expect(selectedMode(label)).toBe("off");
+    expect(lifecyclePanel().querySelector('[data-automation-state="legacy_conflict"]')).toBeNull();
+
+    await act(async () => offLabel.click());
+    await flush();
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledTimes(writes);
+
+    for (const [index, mode] of ["check_only", "automatic", "off"].entries()) {
+      await changeMode(mode, label);
+      await flush();
+      expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledTimes(writes + index + 1);
+      expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
+        ...CONFIG, enabled: mode !== "off", apply_profile_transitions: mode === "automatic", batch_limit: 1,
+      });
+    }
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "zh-Hant"] as const)("keeps equal bounded mode tracks and wrapping labels in %s", async (language) => {
+    controls.automationStatus = status({ current_progress: [] });
+    const style = document.createElement("style");
+    style.textContent = stylesCss;
+    document.head.append(style);
+    try {
+      await renderSection(language);
+      const tracks = lifecyclePanel().querySelector<HTMLElement>(".lifecycle-automation-modes");
+      expect(tracks).not.toBeNull();
+      for (const width of [280, 560]) {
+        host!.style.width = `${width}px`;
+        expect(getComputedStyle(tracks!).gridTemplateColumns).toBe("repeat(3, minmax(0, 1fr))");
+        expect(getComputedStyle(tracks!).minWidth).toBe("0px");
+        expect(getComputedStyle(tracks!).maxWidth).toBe("560px");
+        for (const label of tracks!.querySelectorAll("label")) {
+          expect(getComputedStyle(label).minWidth).toBe("0px");
+          const copy = label.querySelector("span")!;
+          expect(getComputedStyle(copy).whiteSpace).toBe("normal");
+          expect(getComputedStyle(copy).overflowWrap).toBe("anywhere");
+        }
+      }
+    } finally {
+      style.remove();
+    }
+  });
+
+  it.each([
+    { language: "en" as const, label: "Automation mode", labels: ["Off", "Check only", "Automatic (verified delistings only)"], interval: "Check interval" },
+    { language: "zh-Hant" as const, label: "自動化模式", labels: ["關閉", "僅檢查", "自動（僅限已驗證下市）"], interval: "檢查間隔" },
+  ])("offers mutually exclusive native mode radios in $language and retains the interval select", async ({ language, label, labels, interval }) => {
+    controls.automationStatus = status({ current_progress: [] });
+    await renderSection(language);
+    const group = modeGroup(label);
+    const radios = Array.from(group.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    expect(radios).toHaveLength(3);
+    expect(new Set(radios.map((radio) => radio.name)).size).toBe(1);
+    expect(radios[0].name).not.toBe("");
+    expect(radios.map((radio) => radio.labels?.[0]?.textContent)).toEqual(labels);
+    expect(radios.filter((radio) => radio.checked).map((radio) => radio.value)).toEqual(["check_only"]);
+    expect(host!.querySelector(`select[aria-label="${label}"]`)).toBeNull();
+    await changeMode("automatic", label);
+    await flush();
+    expect(radios.filter((radio) => radio.checked).map((radio) => radio.value)).toEqual(["automatic"]);
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledExactlyOnceWith({
+      ...CONFIG, apply_profile_transitions: true,
+    });
+    await changeMode("automatic", label);
+    await flush();
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledOnce();
+    await expandAutomationSettings();
+    expect(select(interval).value).toBe("30");
+  });
+
+  it.each([
+    { enabled: false, apply: false, mode: "off" },
+    { enabled: true, apply: false, mode: "check_only" },
+    { enabled: true, apply: true, mode: "automatic" },
+    { enabled: false, apply: true, mode: "off" },
+  ])("projects legacy $enabled/$apply without writing or escalating", async ({ enabled, apply, mode }) => {
+    controls.automationStatus = status({
+      current_progress: [],
+      config: { ...CONFIG, enabled, apply_profile_transitions: apply, batch_limit: 1 },
+    });
+    await renderSection("en");
+    expect(selectedMode()).toBe(mode);
+    expect(Array.from(modeGroup().querySelectorAll<HTMLInputElement>('input[type="radio"]')).map((option) => option.value))
+      .toEqual(["off", "check_only", "automatic"]);
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    const warning = lifecyclePanel().querySelector('[data-automation-state="legacy_conflict"]');
+    if (!enabled && apply) {
+      expect(warning?.textContent).toContain("Automatic changes are blocked");
+      expect(warning?.closest("details")).toBeNull();
+    } else {
+      expect(warning).toBeNull();
+    }
+    for (const [next, nextEnabled, nextApply] of [
+      ["automatic", true, true],
+      ["check_only", true, false],
+      ["off", false, false],
+    ] as const) {
+      const alreadySelected = selectedMode() === next;
+      await changeMode(next);
+      await flush();
+      if (!alreadySelected) {
+        expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
+          enabled: nextEnabled, apply_profile_transitions: nextApply,
+          interval_minutes: 30, batch_limit: 1,
+        });
+      }
+      expect(selectedMode()).toBe(next);
+      expect(lifecyclePanel().querySelector('[data-automation-state="legacy_conflict"]')).toBeNull();
+    }
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+  });
+
+  it("preserves an unusual interval and conflicting legacy flags on interval-only edits", async () => {
+    controls.automationStatus = status({
+      current_progress: [],
+      config: { enabled: false, apply_profile_transitions: true, interval_minutes: 17, batch_limit: 1 },
+    });
+    await renderSection("en");
+    await expandAutomationSettings();
+    expect(select("Check interval").value).toBe("17");
+    await act(async () => {
+      const interval = select("Check interval");
+      interval.value = "60";
+      interval.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
+      enabled: false, apply_profile_transitions: true, interval_minutes: 60, batch_limit: 1,
+    });
+    expect(lifecyclePanel().querySelector('[data-automation-state="legacy_conflict"]')).not.toBeNull();
+  });
+
   it("opens the fifteen-day coverage window and preserves an explicit longer choice", async () => {
     await renderSection("en");
     expect(getTradingDayCoverage).toHaveBeenCalledWith(15, "15min");
@@ -286,7 +463,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(lifecyclePanel().textContent?.match(/No completed run yet/g)).toHaveLength(1);
     expect(lifecyclePanel().querySelector(`[data-automation-schedule="${scheduleStatus}"]`))
       .not.toBeNull();
-    expect(checkbox("Background automation").checked).toBe(enabled);
+    expect(selectedMode()).toBe(enabled ? "check_only" : "off");
     expect(button("Run due cases now").disabled).toBe(false);
     expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
     expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
@@ -313,7 +490,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     await renderSection("en");
 
     expect(lifecyclePanel().querySelector('[data-automation-schedule="invalid"]')).not.toBeNull();
-    expect(checkbox("Background automation").checked).toBe(true);
+    expect(selectedMode()).toBe("check_only");
     expect(button("Run due cases now").disabled).toBe(false);
     expect(lifecyclePanel().textContent).toContain("1 processed");
   });
@@ -329,16 +506,15 @@ describe("DataStorageSection lifecycle automation controls", () => {
     const advanced = select("Check interval").closest("details");
     expect(advanced).not.toBeNull();
     expect(advanced!.open).toBe(false);
-    expect(checkbox("Background automation").closest("details")).toBeNull();
-    expect(checkbox("Apply security changes automatically").closest("details")).toBe(advanced);
-    expect(select("Cases per batch").closest("details")).toBe(advanced);
+    expect(modeGroup().closest("details")).toBeNull();
+    expect(lifecyclePanel().querySelector('input[type="checkbox"]')).toBeNull();
+    expect(host!.querySelector('select[aria-label="Cases per batch"]')).toBeNull();
     expect(button("Run due cases now").closest("details")).toBeNull();
 
     await expandAutomationSettings();
 
     expect(select("Check interval").value).toBe("30");
-    expect(select("Cases per batch").value).toBe("2");
-    expect(checkbox("Apply security changes automatically").checked).toBe(true);
+    expect(selectedMode()).toBe("automatic");
     expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
     expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
   });
@@ -455,7 +631,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     });
     await renderSection();
 
-    await act(async () => checkbox("背景自動判定").click());
+    await changeMode("off", "自動化模式");
     await flush();
 
     expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledOnce();
@@ -478,7 +654,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
 
-    await act(async () => checkbox("背景自動判定").click());
+    await changeMode("off", "自動化模式");
     await flush();
     expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
       ...CONFIG,
@@ -498,25 +674,12 @@ describe("DataStorageSection lifecycle automation controls", () => {
       interval_minutes: 60,
     });
 
-    const batch = select("每批案件數");
-    await act(async () => {
-      batch.value = "1";
-      batch.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await changeMode("automatic", "自動化模式");
     await flush();
     expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
-      ...CONFIG,
-      enabled: false,
+      enabled: true,
       interval_minutes: 60,
-      batch_limit: 1,
-    });
-
-    await act(async () => checkbox("自動套用標的變更").click());
-    await flush();
-    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
-      enabled: false,
-      interval_minutes: 60,
-      batch_limit: 1,
+      batch_limit: 2,
       apply_profile_transitions: true,
     });
 
@@ -551,7 +714,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     await renderSection("en");
     await expandAutomationSettings();
 
-    await act(async () => checkbox("Background automation").click());
+    await changeMode("off");
 
     expect(lifecycleWriteControls()).toHaveLength(5);
     expect(lifecycleWriteControls().every((control) => control.disabled)).toBe(true);
@@ -575,7 +738,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     await flush();
 
     expect(lifecycleWriteControls().every((control) => !control.disabled)).toBe(true);
-    expect(checkbox("Background automation").checked).toBe(false);
+    expect(selectedMode()).toBe("off");
     await act(async () => button("Run due cases now").click());
     await flush();
     expect(runDueSecurityLifecycleAutomation).toHaveBeenCalledOnce();
@@ -591,7 +754,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     });
     await renderSection("en");
 
-    expect(checkbox("Background automation").checked).toBe(false);
+    expect(selectedMode()).toBe("off");
     expect(button("Run due cases now").disabled).toBe(true);
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
     expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
@@ -715,9 +878,9 @@ describe("DataStorageSection lifecycle automation controls", () => {
 
     await renderSection("en");
 
-    expect(host!.textContent).toContain("Background automation");
+    expect(host!.textContent).toContain("Automation mode");
     expect(host!.textContent).toContain("Run due cases now");
-    expect(host!.textContent).toContain("Apply security changes automatically");
+    expect(host!.textContent).toContain("Automatic (verified delistings only)");
     expect(lifecyclePanel().textContent).not.toContain("SEC · Nasdaq / Massive · IBKR when needed");
   });
 });

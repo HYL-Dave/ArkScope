@@ -949,6 +949,10 @@ def test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_
             APPLY_PROFILE_TRANSITIONS_KEY,
             "true",
         )
+        assert mutation_allowed() is False
+        context["settings_store"].set_setting(
+            "security_lifecycle.automation.enabled", "true",
+        )
         assert mutation_allowed() is True
     finally:
         context["profile_conn"].close()
