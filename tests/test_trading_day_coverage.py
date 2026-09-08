@@ -128,12 +128,12 @@ def _create_market_db(
         if provider_issues:
             conn.execute(
                 "CREATE TABLE provider_sync_meta ("
-                "ticker TEXT NOT NULL, interval TEXT NOT NULL, "
+                "provider TEXT NOT NULL, ticker TEXT NOT NULL, interval TEXT NOT NULL, "
                 "last_error TEXT, updated_at TEXT)"
             )
             conn.executemany(
                 "INSERT INTO provider_sync_meta "
-                "(ticker, interval, last_error, updated_at) VALUES (?, ?, ?, ?)",
+                "(provider, ticker, interval, last_error, updated_at) VALUES ('ibkr', ?, ?, ?, ?)",
                 provider_issues,
             )
         conn.commit()

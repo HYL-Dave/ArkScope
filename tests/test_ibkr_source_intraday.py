@@ -7,6 +7,8 @@ from data_sources import ibkr_source
 
 
 class _FakeIB:
+    RaiseRequestErrors = False
+
     def __init__(self, *, qualified=True, history_error=None):
         self.calls = []
         self.qualified = qualified

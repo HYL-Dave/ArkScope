@@ -965,6 +965,21 @@ table.wl tbody tr.archived td {
   margin: 0 0 4px;
   font-size: 18px;
 }
+.settings-coverage-head {
+  flex-wrap: wrap;
+}
+.settings-coverage-head > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.settings-coverage-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
 .settings-section-head > .btn-ghost {
   align-self: flex-start;
   flex-shrink: 0;
@@ -988,45 +1003,142 @@ table.wl tbody tr.archived td {
   margin: 0 0 4px;
   font-size: 16px;
 }
+.lifecycle-settings {
+  min-width: 0;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.lifecycle-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+.lifecycle-settings-header h2 {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.lifecycle-settings-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.lifecycle-settings-actions .ui-button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.lifecycle-settings-actions .ui-icon-button {
+  flex: 0 0 var(--control-height-compact);
+  width: var(--control-height-compact);
+}
+.lifecycle-settings-actions .ui-button-icon {
+  flex-shrink: 0;
+}
+.lifecycle-settings-actions .lifecycle-automation-run {
+  width: auto;
+}
 .lifecycle-automation-settings {
   display: grid;
-  gap: 12px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  gap: 10px;
+  min-width: 0;
 }
 .lifecycle-automation-settings h3 {
   margin: 0;
   font-size: 14px;
 }
 .lifecycle-automation-status {
-  grid-template-columns: minmax(130px, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(110px, 180px) minmax(0, 1fr);
   gap: 6px 16px;
+  margin: 0;
 }
+.lifecycle-automation-status dt,
 .lifecycle-automation-status dd {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 .lifecycle-automation-status [data-automation-state="incident"],
-.lifecycle-automation-status [data-automation-state="failed"] {
+.lifecycle-automation-status [data-automation-state="failed"],
+.lifecycle-automation-status [data-automation-state="invalid"],
+.lifecycle-automation-status [data-automation-schedule="invalid"] {
   color: var(--bad);
 }
 .lifecycle-automation-status [data-automation-state="running"] {
   color: var(--accent);
 }
-.lifecycle-automation-status [data-automation-state="success"] {
+.lifecycle-automation-status [data-automation-schedule="scheduled"],
+.lifecycle-automation-status [data-automation-schedule="due"] {
   color: var(--ok);
 }
+.lifecycle-automation-status [data-automation-schedule="disabled"] {
+  color: var(--muted);
+}
+.lifecycle-automation-notices {
+  display: grid;
+  gap: 4px;
+}
 .lifecycle-automation-controls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.lifecycle-automation-controls .lifecycle-automation-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--control-height-compact);
+  margin: 0;
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.lifecycle-automation-toggle input {
+  flex-shrink: 0;
+  margin: 0;
+}
+.lifecycle-automation-advanced,
+.lifecycle-settings-diagnostics {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  font-size: 12px;
+}
+.lifecycle-automation-advanced > summary,
+.lifecycle-settings-diagnostics > summary {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 0;
+  color: var(--muted);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.lifecycle-automation-advanced > summary:focus-visible,
+.lifecycle-settings-diagnostics > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.lifecycle-automation-advanced:not([open]) > .lifecycle-automation-fields,
+.lifecycle-settings-diagnostics:not([open]) > :not(summary) {
+  display: none;
+}
+.lifecycle-automation-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
   gap: 10px 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  max-width: 560px;
+  margin-top: 8px;
 }
-.lifecycle-automation-toggle {
-  min-height: 34px;
-  margin-left: 0;
+.lifecycle-automation-fields > .lifecycle-automation-toggle {
+  grid-column: 1 / -1;
 }
 .lifecycle-automation-field {
   display: grid;
@@ -1037,7 +1149,8 @@ table.wl tbody tr.archived td {
 }
 .lifecycle-automation-field select {
   width: 100%;
-  min-height: 34px;
+  min-width: 0;
+  min-height: var(--control-height-compact);
   padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1045,19 +1158,14 @@ table.wl tbody tr.archived td {
   color: var(--fg);
   font: inherit;
 }
-.lifecycle-automation-segmented {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
+.lifecycle-settings-diagnostics {
+  margin-top: 8px;
 }
-.lifecycle-automation-segmented .ui-button {
-  width: 100%;
-  min-width: 0;
+.lifecycle-settings-diagnostics > .ds-kv {
+  margin-top: 8px;
 }
-.lifecycle-automation-run,
 .lifecycle-automation-invalid {
-  grid-column: 1 / -1;
-  justify-self: start;
+  margin: 0;
 }
 .field {
   display: flex;
@@ -1524,7 +1632,7 @@ table.wl tbody tr.archived td {
 }
 .model-discovery-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   align-items: center;
   border: 1px solid var(--border);
@@ -1540,18 +1648,12 @@ table.wl tbody tr.archived td {
   gap: 4px;
 }
 .model-discovery-id {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
-.model-discovery-efforts,
-.model-discovery-actions {
+.model-discovery-efforts {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-.model-discovery-actions {
-  justify-content: flex-end;
 }
 .model-discovery-efforts > span {
   padding: 1px 5px;
@@ -1562,14 +1664,6 @@ table.wl tbody tr.archived td {
 .model-discovery-efforts > .is-default {
   border-color: var(--accent);
   color: var(--fg);
-}
-@media (max-width: 900px) {
-  .model-discovery-row {
-    grid-template-columns: 1fr;
-  }
-  .model-discovery-actions {
-    justify-content: flex-start;
-  }
 }
 .test-status {
   color: var(--muted);
@@ -2663,19 +2757,12 @@ table.lifecycle-current-table time { font-size: 11.5px; font-variant-numeric: ta
 }
 
 @media (max-width: 600px) {
-  .lifecycle-automation-status,
-  .lifecycle-automation-controls {
+  .lifecycle-automation-status {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 6px 12px;
+  }
+  .lifecycle-automation-fields {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .lifecycle-automation-status dt {
-    margin-top: 4px;
-  }
-  .lifecycle-automation-run,
-  .lifecycle-automation-invalid {
-    grid-column: 1;
-  }
-  .lifecycle-automation-run {
-    width: 100%;
   }
   .lifecycle-head > .spacer {
     display: none;

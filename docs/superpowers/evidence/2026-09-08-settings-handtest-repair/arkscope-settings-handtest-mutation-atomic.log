@@ -1,0 +1,56 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_batch_save_rolls_back_every_route_when_a_later_write_fails ________
+
+store = <src.model_route_store.ModelRouteStore object at 0x7fb098b039a0>
+
+    def test_batch_save_rolls_back_every_route_when_a_later_write_fails(store):
+        store.set("card_synthesis", "anthropic", "claude-sonnet-5", "high")
+        before = store.get_all()
+        with sqlite3.connect(store._db_path) as conn:
+            conn.execute("""CREATE TRIGGER reject_investigation BEFORE INSERT ON model_route
+                WHEN NEW.task = 'lifecycle_investigation'
+                BEGIN SELECT RAISE(ABORT, 'synthetic later-row failure'); END""")
+        with pytest.raises(sqlite3.IntegrityError, match="synthetic later-row failure"):
+            store.set_many([
+                ("card_synthesis", "anthropic", "claude-sonnet-5", "xhigh"),
+                ("lifecycle_investigation", "anthropic", "claude-sonnet-5", "xhigh"),
+            ])
+>       assert store.get_all() == before
+E       AssertionError: assert {'card_synthe...29:06+00:00')} == {'card_synthe...29:06+00:00')}
+E
+E         Differing items:
+E         {'card_synthesis': ModelRouteRow(task='card_synthesis', provider='anthropic', model='claude-sonnet-5', effort='xhigh', updated_at='2026-09-08T06:29:06+00:00')} != {'card_synthesis': ModelRouteRow(task='card_synthesis', provider='anthropic', model='claude-sonnet-5', effort='high', updated_at='2026-09-08T06:29:06+00:00')}
+E         Use -v to get more diff
+
+tests/test_model_route_store.py:80: AssertionError
+________ test_multi_task_route_save_api_rolls_back_on_late_sql_failure _________
+
+stores = (<src.model_credentials.CredentialStore object at 0x7fb098b839d0>, <src.model_route_store.ModelRouteStore object at 0x7fb098b839a0>)
+
+    def test_multi_task_route_save_api_rolls_back_on_late_sql_failure(stores):
+        credentials, routes = stores
+        routes.set("card_synthesis", "anthropic", "claude-sonnet-5", "high")
+        before = routes.get_all()
+        with sqlite3.connect(credentials.db_path) as conn:
+            conn.execute("""CREATE TRIGGER reject_route BEFORE INSERT ON model_route
+                WHEN NEW.task = 'lifecycle_investigation'
+                BEGIN SELECT RAISE(ABORT, 'synthetic route failure'); END""")
+        request = config_routes.ModelRoutesUpdate.model_validate({"routes": {
+            "card_synthesis": {"provider": "anthropic", "model": "claude-sonnet-5", "effort": "xhigh"},
+            TASK: {"provider": "anthropic", "model": "claude-sonnet-5", "effort": "xhigh"},
+        }})
+        with pytest.raises(sqlite3.IntegrityError, match="synthetic route failure"):
+            config_routes.update_model_routes(request, store=credentials)
+>       assert routes.get_all() == before
+E       AssertionError: assert {'card_synthe...29:06+00:00')} == {'card_synthe...29:06+00:00')}
+E
+E         Differing items:
+E         {'card_synthesis': ModelRouteRow(task='card_synthesis', provider='anthropic', model='claude-sonnet-5', effort='xhigh', updated_at='2026-09-08T06:29:06+00:00')} != {'card_synthesis': ModelRouteRow(task='card_synthesis', provider='anthropic', model='claude-sonnet-5', effort='high', updated_at='2026-09-08T06:29:06+00:00')}
+E         Use -v to get more diff
+
+tests/test_lifecycle_investigation_routing.py:125: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_model_route_store.py::test_batch_save_rolls_back_every_route_when_a_later_write_fails
+FAILED tests/test_lifecycle_investigation_routing.py::test_multi_task_route_save_api_rolls_back_on_late_sql_failure
+2 failed in 1.07s

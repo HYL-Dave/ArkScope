@@ -1,0 +1,258 @@
+[
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      1280,
+      960
+    ],
+    "requests": [
+      [
+        "GET",
+        "/__mock/security-lifecycle/cases"
+      ],
+      [
+        "GET",
+        "/__mock/security-lifecycle/automation"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/trading-days"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/status"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/price-repair/operations"
+      ],
+      [
+        "GET",
+        "/__mock/schedule"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "PUT",
+        "/__mock/config/model-routes"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ]
+    ],
+    "layout_checks": [
+      {
+        "mode": "lifecycle-and-coverage",
+        "overflow": []
+      },
+      {
+        "mode": "discovery",
+        "overflow": []
+      },
+      {
+        "mode": "model-save",
+        "overflow": []
+      }
+    ],
+    "errors": []
+  },
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      390,
+      844
+    ],
+    "requests": [
+      [
+        "GET",
+        "/__mock/security-lifecycle/cases"
+      ],
+      [
+        "GET",
+        "/__mock/security-lifecycle/automation"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/trading-days"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/status"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/price-repair/operations"
+      ],
+      [
+        "GET",
+        "/__mock/schedule"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "PUT",
+        "/__mock/config/model-routes"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ]
+    ],
+    "layout_checks": [
+      {
+        "mode": "lifecycle-and-coverage",
+        "overflow": []
+      },
+      {
+        "mode": "discovery",
+        "overflow": []
+      },
+      {
+        "mode": "model-save",
+        "overflow": []
+      }
+    ],
+    "errors": []
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      1280,
+      960
+    ],
+    "requests": [
+      [
+        "GET",
+        "/__mock/security-lifecycle/cases"
+      ],
+      [
+        "GET",
+        "/__mock/security-lifecycle/automation"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/trading-days"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/status"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/price-repair/operations"
+      ],
+      [
+        "GET",
+        "/__mock/schedule"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "PUT",
+        "/__mock/config/model-routes"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ]
+    ],
+    "layout_checks": [
+      {
+        "mode": "lifecycle-and-coverage",
+        "overflow": []
+      },
+      {
+        "mode": "discovery",
+        "overflow": []
+      },
+      {
+        "mode": "model-save",
+        "overflow": []
+      }
+    ],
+    "errors": []
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      390,
+      844
+    ],
+    "requests": [
+      [
+        "GET",
+        "/__mock/security-lifecycle/cases"
+      ],
+      [
+        "GET",
+        "/__mock/security-lifecycle/automation"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/trading-days"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/status"
+      ],
+      [
+        "GET",
+        "/__mock/market-data/price-repair/operations"
+      ],
+      [
+        "GET",
+        "/__mock/schedule"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "PUT",
+        "/__mock/config/model-routes"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ],
+      [
+        "GET",
+        "/__mock/config/model-catalog"
+      ]
+    ],
+    "layout_checks": [
+      {
+        "mode": "lifecycle-and-coverage",
+        "overflow": []
+      },
+      {
+        "mode": "discovery",
+        "overflow": []
+      },
+      {
+        "mode": "model-save",
+        "overflow": []
+      }
+    ],
+    "errors": []
+  }
+]

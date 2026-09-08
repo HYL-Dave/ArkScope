@@ -207,7 +207,8 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { createSettingsReadCache } from "./settings/settingsReadCache";
-import { SettingsView, onDraftForTask, type SettingsViewProps } from "./Settings";
+import { SettingsView, type SettingsViewProps } from "./Settings";
+import { ApiError } from "./api";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -314,6 +315,189 @@ async function click(element: HTMLElement) {
 }
 
 describe("Settings model route save gate", () => {
+  async function investigationDraft(onRuntimeChanged = vi.fn(async () => undefined)) {
+    const value = structuredClone(catalogWithSparkTranslation());
+    value.routes.card_translation = { ...taskRoute("card_translation", "openai", "gpt-5.3-codex-spark"), effort: "xhigh" };
+    value.tasks.push({ id: "lifecycle_investigation", label: "Lifecycle Investigation", description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5" });
+    value.routes.lifecycle_investigation = { ...taskRoute("lifecycle_investigation", "anthropic", "claude-sonnet-5"), effort: "high", source: "default" };
+    value.effective!.providers!.anthropic = { credential_id: "local:8", auth_mode: "claude_code_oauth", label: "Claude subscription" };
+    value.effective!.tasks.lifecycle_investigation = structuredClone(value.effective!.tasks.card_translation!);
+    controls.catalogOverride = value;
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(React.createElement(TestSettingsView, {
+      runtime: null, developerMode: false, onRuntimeChanged,
+    })));
+    await flush();
+    const effort = host.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-lifecycle_investigation-task-label model-route-lifecycle_investigation-effort-label"]',
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(effort, "xhigh");
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "儲存")!;
+    expect(save.disabled).toBe(false);
+    return { value, effort, save };
+  }
+
+  function acknowledgeInvestigation(value: ModelCatalog) {
+    const row = { ...value.routes.lifecycle_investigation!, effort: "xhigh", source: "db" as const };
+    value.routes.lifecycle_investigation = row;
+    return { routes: { lifecycle_investigation: row } };
+  }
+
+  it("saves only the edited investigation route and preserves its xhigh receipt when catalog refresh fails", async () => {
+    const { value, effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockImplementationOnce(async () => {
+      const receipt = acknowledgeInvestigation(value);
+      controls.catalogError = new Error("synthetic catalog read failure");
+      return receipt;
+    });
+    await click(save);
+    expect(controls.saveModelRoutes).toHaveBeenCalledExactlyOnceWith({ lifecycle_investigation: {
+      provider: "anthropic", model: "claude-sonnet-5", effort: "xhigh",
+    } });
+    expect(host!.textContent).toContain("已儲存，但狀態更新失敗");
+    expect(host!.textContent).not.toContain("無法儲存任務路由");
+    expect(effort.value).toBe("xhigh");
+    expect(host!.querySelector('[data-testid="route-lifecycle_investigation"]')!.textContent).toContain("DB");
+    controls.catalogError = null;
+    await click(Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "重新讀取儲存狀態")!);
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+    expect(host!.textContent).not.toContain("狀態更新失敗");
+    expect(effort.value).toBe("xhigh");
+  });
+
+  it("confirms a lost write response through readback without a second PUT", async () => {
+    const { value, effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockImplementationOnce(async () => {
+      acknowledgeInvestigation(value);
+      throw new TypeError("synthetic lost response");
+    });
+    await click(save);
+    expect(host!.textContent).toContain("模型路由已儲存");
+    expect(effort.value).toBe("xhigh");
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+  });
+
+  it("does not report a confirmed write as failed when the runtime refresh rejects", async () => {
+    const onRuntimeChanged = vi.fn(async () => undefined).mockRejectedValueOnce(new Error("synthetic runtime read failure"));
+    const { value, effort, save } = await investigationDraft(onRuntimeChanged);
+    controls.saveModelRoutes.mockImplementationOnce(async () => acknowledgeInvestigation(value));
+    await click(save);
+    expect(host!.textContent).toContain("已儲存，但狀態更新失敗");
+    expect(effort.value).toBe("xhigh");
+    await click(Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "重新讀取儲存狀態")!);
+    expect(host!.textContent).toContain("模型路由已儲存");
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+    expect(onRuntimeChanged).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["high", "medium"])("preserves a new %s draft edited while the previous xhigh write is pending", async (nextEffort) => {
+    const { value, effort, save } = await investigationDraft();
+    let resolveWrite!: (result: ReturnType<typeof acknowledgeInvestigation>) => void;
+    controls.saveModelRoutes.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+    await click(save);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(effort, nextEffort);
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => { resolveWrite(acknowledgeInvestigation(value)); });
+    await flush();
+    expect(effort.value).toBe(nextEffort);
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+    await click(save);
+    expect(controls.saveModelRoutes.mock.calls[1][0]).toEqual({ lifecycle_investigation: {
+      provider: "anthropic", model: "claude-sonnet-5", effort: nextEffort,
+    } });
+  });
+
+  it("keeps an unanswered write unknown and the draft intact when readback cannot confirm it", async () => {
+    const { effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockRejectedValueOnce(new TypeError("synthetic lost response"));
+    await click(save);
+    expect(host!.textContent).toContain("尚無法確認是否已儲存");
+    expect(host!.textContent).not.toContain("模型路由已儲存");
+    expect(effort.value).toBe("xhigh");
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["model_entitlement_unverified", "尚未確認"],
+    ["subscription_plan_required", "需要 ChatGPT Pro 方案"],
+    ["subscription_plan_unverified", "尚未確認 ChatGPT 方案"],
+    ["unreviewed_SECRET_code", "無法儲存任務路由"],
+  ])("shows the reviewed %s rejection without leaking raw diagnostics or losing the draft", async (code, label) => {
+    const { effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockRejectedValueOnce(new ApiError(
+      "SECRET synthetic rejection", "/config/model-routes", 400, code, "SECRET",
+    ));
+    const reads = controls.getModelCatalog.mock.calls.length;
+    await click(save);
+    expect(host!.textContent).toContain(label);
+    expect(host!.textContent).not.toContain("SECRET");
+    expect(effort.value).toBe("xhigh");
+    expect(controls.getModelCatalog).toHaveBeenCalledTimes(reads);
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+  });
+
+  it("adopts newer untouched Spark settings without sending them in the next investigation save", async () => {
+    const { value, effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockImplementationOnce(async () => {
+      const receipt = acknowledgeInvestigation(value);
+      value.routes.card_translation = { ...value.routes.card_translation, effort: "low" };
+      return receipt;
+    });
+    await click(save);
+    const sparkEffort = host!.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-effort-label"]',
+    )!;
+    expect(sparkEffort.value).toBe("low");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(effort, "medium");
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await click(save);
+    expect(Object.keys(controls.saveModelRoutes.mock.calls[1][0])).toEqual(["lifecycle_investigation"]);
+  });
+
+  it("shows the current fallback after an acknowledged write was superseded", async () => {
+    const { value, effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockImplementationOnce(async () => {
+      const receipt = acknowledgeInvestigation(value);
+      value.routes.lifecycle_investigation = { ...value.routes.lifecycle_investigation!, effort: "high", source: "default" };
+      return receipt;
+    });
+    await click(save);
+    expect(effort.value).toBe("high");
+    expect(host!.querySelector('[data-testid="route-lifecycle_investigation"]')!.textContent).toContain("內建預設");
+    expect(host!.textContent).toContain("目前生效設定已不同");
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+  });
+
+  it("does not mistake malformed receipts or matching fallback values for a DB acknowledgement", async () => {
+    const { value, effort, save } = await investigationDraft();
+    controls.saveModelRoutes.mockImplementationOnce(async () => {
+      value.routes.lifecycle_investigation = { ...value.routes.lifecycle_investigation!, effort: "xhigh", source: "default" };
+      return { routes: { lifecycle_investigation: { ...value.routes.lifecycle_investigation, source: "db", custom: "false" } } };
+    });
+    await click(save);
+    expect(host!.textContent).toContain("尚無法確認是否已儲存");
+    expect(effort.value).toBe("xhigh");
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+    value.routes.lifecycle_investigation = { ...value.routes.lifecycle_investigation!, effort: "high" };
+    await click(Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "重新讀取儲存狀態")!);
+    expect(effort.value).toBe("xhigh");
+    expect(host!.textContent).toContain("尚無法確認是否已儲存");
+    expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+  });
+
   it("saves an exact discovered Spark route using its per-task effort facts", async () => {
     controls.catalogOverride = catalogWithSparkTranslation();
     host = document.createElement("div");
@@ -361,63 +545,6 @@ describe("Settings model route save gate", () => {
         effort: "xhigh",
       },
     }));
-  });
-
-  it.each(["default", "none"])(
-    "clears a hydrated %s effort when Provider discovery selects a model",
-    (legacyEffort) => {
-      const updates: Array<Partial<Record<ModelTask, { effort: string; model: string }>>> = [];
-      onDraftForTask(
-        (updater) => {
-          if (typeof updater !== "function") throw new Error("expected a draft updater");
-          updates.push(updater({
-            card_synthesis: {
-              provider: "openai",
-              model: "gpt-5.6-luna",
-              effort: legacyEffort,
-              custom: false,
-            },
-          }));
-        },
-        catalog,
-        "card_synthesis",
-        "openai",
-        "gpt-discovered",
-      );
-
-      expect(updates.at(-1)?.card_synthesis).toMatchObject({
-        model: "gpt-discovered",
-        effort: "",
-        custom: true,
-      });
-    },
-  );
-
-  it("retains a supported real effort when Provider discovery selects a model", () => {
-    const updates: Array<Partial<Record<ModelTask, { effort: string; model: string }>>> = [];
-    onDraftForTask(
-      (updater) => {
-        if (typeof updater !== "function") throw new Error("expected a draft updater");
-        updates.push(updater({
-          card_synthesis: {
-            provider: "openai",
-            model: "gpt-5.6-luna",
-            effort: "high",
-            custom: false,
-          },
-        }));
-      },
-      catalog,
-      "card_synthesis",
-      "openai",
-      "gpt-discovered",
-    );
-
-    expect(updates.at(-1)?.card_synthesis).toMatchObject({
-      model: "gpt-discovered",
-      effort: "high",
-      custom: true,
-    });
   });
 
   it("keeps retired provenance selected while enabling same-provider recovery", async () => {
@@ -484,7 +611,7 @@ describe("Settings model route save gate", () => {
   });
 
   it.each(["default", "none"])(
-    "keeps the discovered Provider route incomplete after a hydrated %s effort",
+    "keeps model and legacy %s effort unchanged when discovery is viewed",
     async (legacyEffort) => {
       const credential: ProviderCredential = {
         id: "local:7",
@@ -535,11 +662,13 @@ describe("Settings model route save gate", () => {
         .find((row) => row.textContent?.includes(credential.label))!;
       await click(Array.from(credentialRow.querySelectorAll<HTMLButtonElement>("button"))
         .find((button) => button.textContent?.trim() === "列模型")!);
-      await click(Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
-        .find((button) => button.textContent?.trim() === "用於生成")!);
+      expect(document.body.querySelectorAll(".model-discovery-row button")).toHaveLength(0);
+      expect(document.body.textContent).toContain("gpt-discovered");
 
       const route = host.querySelector('[data-testid="route-card_synthesis"]')!;
-      const customModel = route.querySelector<HTMLInputElement>("input")!;
+      const model = route.querySelector<HTMLSelectElement>(
+        '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-model-label"]',
+      )!;
       const effort = route.querySelector<HTMLSelectElement>(
         '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-effort-label"]',
       )!;
@@ -548,7 +677,7 @@ describe("Settings model route save gate", () => {
       const save = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
         .find((button) => button.textContent?.trim() === "儲存")!;
 
-      expect(customModel.value).toBe("gpt-discovered");
+      expect(model.value).toBe("gpt-5.6-luna");
       expect(effort.value).toBe("");
       expect(taskTest.disabled).toBe(true);
       expect(save.disabled).toBe(true);
@@ -1018,7 +1147,7 @@ describe("Settings model route save gate", () => {
       customModel.dispatchEvent(new Event("input", { bubbles: true }));
     });
     controls.saveModelRoutes.mockRejectedValueOnce(
-      new Error("PLANTED ROUTE SAVE TRANSPORT DETAIL"),
+      new ApiError("PLANTED ROUTE SAVE TRANSPORT DETAIL", "/config/model-routes", 400, null, null),
     );
     await click(save);
 

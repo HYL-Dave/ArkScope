@@ -26,6 +26,7 @@ import math
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
+from functools import partial
 
 try:
     from ib_insync import (
@@ -101,6 +102,13 @@ class IBKRSecurityDefinitionUnavailable(IBKRPriceDataError):
 
     def __init__(self):
         super().__init__("security_definition_unavailable")
+
+
+class IBKRContractQualificationFailed(IBKRPriceDataError):
+    """Contract qualification failed without establishing an unknown contract."""
+
+    def __init__(self):
+        super().__init__("ibkr_contract_qualification_failed")
 
 
 class IBKRHistoricalDataRequestFailed(IBKRPriceDataError):
@@ -997,6 +1005,27 @@ class IBKRDataSource(BaseDataSource):
             logger.error(f"Error fetching intraday data for {ticker}: {e}")
             return []
 
+    def _price_request(self, phase, operation, *args, **kwargs):
+        # Price workers own a dedicated, sequential IB connection. Scope strict
+        # errors to the actual dispatch, not journal cache reads or other sources.
+        ib = self._ib
+        previous_raise_request_errors = ib.RaiseRequestErrors
+        ib.RaiseRequestErrors = True
+        failure = (IBKRContractQualificationFailed if phase == "qualification"
+                   else IBKRHistoricalDataRequestFailed)
+        try:
+            return operation(*args, **kwargs)
+        except IBKRPriceDataError:
+            raise
+        except RequestError as exc:
+            if phase == "qualification" and exc.code == 200:
+                raise IBKRSecurityDefinitionUnavailable() from exc
+            raise failure() from exc
+        except Exception as exc:
+            raise failure() from exc
+        finally:
+            ib.RaiseRequestErrors = previous_raise_request_errors
+
     def fetch_historical_intraday(
         self,
         tickers: List[str],
@@ -1037,6 +1066,8 @@ class IBKRDataSource(BaseDataSource):
         elif not self._connected or not self._ib or not self._ib.isConnected():
             raise IBKRPriceDataError("ibkr_gateway_unavailable")
 
+        qualify = partial(self._price_request, "qualification", self._ib.qualifyContracts)
+        history = partial(self._price_request, "history", self._ib.reqHistoricalData)
         for ticker in tickers:
             logger.info(f"Fetching historical {interval} data for {ticker}")
             result[ticker] = []
@@ -1044,25 +1075,27 @@ class IBKRDataSource(BaseDataSource):
             for chunk_start, chunk_end in historical_intraday_chunks(start_date, end_date, interval):
                 logger.info(f"  Chunk: {chunk_start} to {chunk_end}")
 
+                phase = "qualification"
                 try:
                     self._rate_limit_wait()
 
                     contract = self._create_contract(ticker)
                     context = {"ticker": ticker, "start": chunk_start.isoformat(), "end": chunk_end.isoformat(),
                                "interval": interval, "extended": include_extended}
-                    qualified = (self._ib.qualifyContracts(contract) if request_runner is None else
-                                 request_runner("qualification", context, self._ib.qualifyContracts, (contract,), {}))
+                    qualified = (qualify(contract) if request_runner is None else
+                                 request_runner("qualification", context, qualify, (contract,), {}))
                     if not qualified:
                         raise IBKRSecurityDefinitionUnavailable()
                     contract = qualified[0]
 
+                    phase = "history"
                     duration_days = (chunk_end - chunk_start).days + 1
                     end_datetime = _ibkr_equity_end_of_day(chunk_end)
 
                     options = dict(endDateTime=end_datetime, durationStr=f"{duration_days} D", barSizeSetting=interval,
                                    whatToShow='TRADES', useRTH=not include_extended, formatDate=1)
-                    bars = (self._ib.reqHistoricalData(contract, **options) if request_runner is None else
-                            request_runner("history", context, self._ib.reqHistoricalData, (contract,), options))
+                    bars = (history(contract, **options) if request_runner is None else
+                            request_runner("history", context, history, (contract,), options))
                     result[ticker].extend(historical_intraday_bars(ticker, bars, start_date, end_date))
 
                     logger.info(f"    Retrieved {len(bars)} bars for chunk")
@@ -1071,6 +1104,8 @@ class IBKRDataSource(BaseDataSource):
                     raise
                 except Exception as e:
                     logger.error(f"  Error in chunk {chunk_start}-{chunk_end}: {e}")
+                    if phase == "qualification":
+                        raise IBKRContractQualificationFailed() from e
                     raise IBKRHistoricalDataRequestFailed() from e
 
             logger.info(f"  Total: {len(result[ticker])} bars for {ticker}")

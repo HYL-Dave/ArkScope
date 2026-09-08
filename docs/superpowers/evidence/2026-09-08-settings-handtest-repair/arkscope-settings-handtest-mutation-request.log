@@ -1,0 +1,68 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_qualification_request_error_is_not_an_unknown_contract[False] ______
+
+offline_source = (<IBKRDataSource source_name='Interactive Brokers'>, ['qualification'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff525fc45b0>
+strict = False
+
+    @pytest.mark.parametrize("strict", [False, True])
+    def test_qualification_request_error_is_not_an_unknown_contract(
+        offline_source, monkeypatch, strict,
+    ):
+        source, calls = offline_source
+        source._ib.RaiseRequestErrors = strict
+
+        def rejected(req_id, contract):
+            calls.append("qualification")
+            source._ib.wrapper.error(req_id, 321, "PRIVATE_PROVIDER_TEXT", "")
+
+        monkeypatch.setattr(source._ib.client, "reqContractDetails", rejected)
+        with pytest.raises(ibkr_source.IBKRPriceDataError) as caught:
+            fetch(source)
+
+>       assert caught.value.error_code == "ibkr_contract_qualification_failed"
+E       AssertionError: assert 'security_def...n_unavailable' == 'ibkr_contrac...cation_failed'
+E
+E         - ibkr_contract_qualification_failed
+E         + security_definition_unavailable
+
+tests/test_ibkr_price_request_diagnostics.py:74: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    ib_insync.wrapper:wrapper.py:1113 Error 321, reqId 0: PRIVATE_PROVIDER_TEXT, contract: Stock(symbol='LIVE', exchange='SMART', currency='USD')
+WARNING  ib_insync.ib:ib.py:1803 Unknown contract: Stock(symbol='LIVE', exchange='SMART', currency='USD')
+______ test_qualification_request_error_is_not_an_unknown_contract[True] _______
+
+offline_source = (<IBKRDataSource source_name='Interactive Brokers'>, ['qualification'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff51678db70>
+strict = True
+
+    @pytest.mark.parametrize("strict", [False, True])
+    def test_qualification_request_error_is_not_an_unknown_contract(
+        offline_source, monkeypatch, strict,
+    ):
+        source, calls = offline_source
+        source._ib.RaiseRequestErrors = strict
+
+        def rejected(req_id, contract):
+            calls.append("qualification")
+            source._ib.wrapper.error(req_id, 321, "PRIVATE_PROVIDER_TEXT", "")
+
+        monkeypatch.setattr(source._ib.client, "reqContractDetails", rejected)
+        with pytest.raises(ibkr_source.IBKRPriceDataError) as caught:
+            fetch(source)
+
+>       assert caught.value.error_code == "ibkr_contract_qualification_failed"
+E       AssertionError: assert 'security_def...n_unavailable' == 'ibkr_contrac...cation_failed'
+E
+E         - ibkr_contract_qualification_failed
+E         + security_definition_unavailable
+
+tests/test_ibkr_price_request_diagnostics.py:74: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    ib_insync.wrapper:wrapper.py:1113 Error 321, reqId 0: PRIVATE_PROVIDER_TEXT, contract: Stock(symbol='LIVE', exchange='SMART', currency='USD')
+WARNING  ib_insync.ib:ib.py:1803 Unknown contract: Stock(symbol='LIVE', exchange='SMART', currency='USD')
+=========================== short test summary info ============================
+FAILED tests/test_ibkr_price_request_diagnostics.py::test_qualification_request_error_is_not_an_unknown_contract[False]
+FAILED tests/test_ibkr_price_request_diagnostics.py::test_qualification_request_error_is_not_an_unknown_contract[True]
+2 failed in 0.16s

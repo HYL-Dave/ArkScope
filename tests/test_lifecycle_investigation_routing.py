@@ -1,6 +1,7 @@
 """Independent task route owners; all configuration lives in temporary profiles."""
 
 from dataclasses import replace
+import sqlite3
 from types import SimpleNamespace
 from typing import get_args
 
@@ -90,6 +91,38 @@ def test_investigation_route_save_reset_and_other_tasks_are_independent(stores):
     assert reset["route"]["model"] == "claude-sonnet-5"
     assert reset["route"]["effort"] == "high"
     assert routes.get("ai_research").effort == "low"
+
+
+@pytest.mark.parametrize("auth_mode", ["api_key", "claude_code_oauth"])
+def test_investigation_xhigh_save_reads_back_without_revalidating_unchanged_spark(stores, monkeypatch, auth_mode):
+    credentials, routes = stores
+    spark = routes.set("card_translation", "openai", "gpt-5.3-codex-spark", "xhigh")
+    monkeypatch.setattr(config_routes, "_active_auth_mode", lambda *args: auth_mode)
+    monkeypatch.setattr(config_routes, "resolve_active_credential", lambda *args, **kwargs: pytest.fail("unchanged Spark must not require entitlement lookup"))
+    request = config_routes.ModelRoutesUpdate.model_validate({"routes": {
+        TASK: {"provider": "anthropic", "model": "claude-sonnet-5", "effort": "xhigh"},
+    }})
+    saved = config_routes.update_model_routes(request, store=credentials)
+    assert saved["routes"][TASK]["effort"] == "xhigh"
+    assert config.task_route(TASK, route_store=routes).effort == "xhigh"
+    assert routes.get("card_translation") == spark
+
+
+def test_multi_task_route_save_api_rolls_back_on_late_sql_failure(stores):
+    credentials, routes = stores
+    routes.set("card_synthesis", "anthropic", "claude-sonnet-5", "high")
+    before = routes.get_all()
+    with sqlite3.connect(credentials.db_path) as conn:
+        conn.execute("""CREATE TRIGGER reject_route BEFORE INSERT ON model_route
+            WHEN NEW.task = 'lifecycle_investigation'
+            BEGIN SELECT RAISE(ABORT, 'synthetic route failure'); END""")
+    request = config_routes.ModelRoutesUpdate.model_validate({"routes": {
+        "card_synthesis": {"provider": "anthropic", "model": "claude-sonnet-5", "effort": "xhigh"},
+        TASK: {"provider": "anthropic", "model": "claude-sonnet-5", "effort": "xhigh"},
+    }})
+    with pytest.raises(sqlite3.IntegrityError, match="synthetic route failure"):
+        config_routes.update_model_routes(request, store=credentials)
+    assert routes.get_all() == before
 
 
 def test_investigation_does_not_borrow_research_or_generic_model_defaults(stores, monkeypatch):

@@ -480,6 +480,17 @@ describe("Settings workspace", () => {
   });
 
   it("renders English Settings workspace tabs directory and section copy", async () => {
+    const route: TaskRoute = { task: "card_synthesis", provider: "anthropic", model: "claude-sonnet-5",
+      effort: "high", source: "db", custom: false, warning: null };
+    mocks.getModelCatalog.mockResolvedValue({
+      ...emptyCatalog,
+      tasks: [{ id: "card_synthesis", label: "AI Card Synthesis", description: "", default_provider: "anthropic", recommended_model: route.model }],
+      routes: { card_synthesis: route },
+      models: [{ id: route.model, provider: route.provider, label: route.model, quality: "frontier", speed: "medium", cost_tier: "medium",
+        supports_structured_output: true, supports_tool_calling: true, effort_options: ["high"], recommended_for: [], source_url: "", verified_at: "", notes: "" }],
+      effort_options: { anthropic: [{ id: "high", provider: "anthropic", label: "high", description: "", applies_to_card_tasks: true }], openai: [] },
+    });
+    mocks.saveModelRoutes.mockResolvedValue({ routes: { card_synthesis: route } });
     await act(async () => { await i18n.changeLanguage("en"); });
     await renderSettings();
 
@@ -562,8 +573,11 @@ describe("Settings workspace", () => {
     expect(tab.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab);
     expect(host!.querySelector("h1")?.textContent).toBe("Settings");
-    expect(host!.querySelector(".ok-text")).toBe(routeResult);
-    expect(routeResult.textContent).toBe(
+    // Route feedback belongs to Models, not an unrelated filtered section.
+    expect(host!.querySelector(".ok-text")).toBeNull();
+    await setSearch("");
+    await click(tabWithText("AI and Models"));
+    expect(host!.querySelector('[data-settings-anchor="models"] .ok-text')?.textContent).toBe(
       "Imported task routes from the profile file into the profile DB. Imported: 2; skipped as incomplete or inconsistent: 1.",
     );
     expect(mocks.getModelCatalog).toHaveBeenCalledTimes(catalogCalls);

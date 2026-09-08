@@ -158,6 +158,7 @@ vi.mock("../api", async (importOriginal) => {
 import {
   getSecurityLifecycleAutomationStatus,
   getTradingDayCoverage,
+  listSecurityLifecycleCases,
   runDueSecurityLifecycleAutomation,
   updateSecurityLifecycleAutomationConfig,
 } from "../api";
@@ -174,7 +175,10 @@ async function flush() {
   });
 }
 
-async function renderSection(language: "en" | "zh-Hant" = "zh-Hant") {
+async function renderSection(
+  language: "en" | "zh-Hant" = "zh-Hant",
+  onNavigateTarget = vi.fn(),
+) {
   await i18n.changeLanguage(language);
   host = document.createElement("div");
   document.body.append(host);
@@ -183,7 +187,7 @@ async function renderSection(language: "en" | "zh-Hant" = "zh-Hant") {
     root!.render(
       <DataStorageSection
         settingsReadCache={createSettingsReadCache()}
-        onNavigateTarget={vi.fn()}
+        onNavigateTarget={onNavigateTarget}
       />,
     );
   });
@@ -207,6 +211,30 @@ function button(label: string): HTMLButtonElement {
     .find((candidate) => candidate.textContent?.includes(label));
   if (!value) throw new Error(`missing button: ${label}`);
   return value;
+}
+
+function lifecyclePanel(): HTMLElement {
+  return host!.querySelector<HTMLElement>('[data-settings-location="security_lifecycle"]')!;
+}
+
+function lifecycleWriteControls() {
+  return Array.from(lifecyclePanel().querySelectorAll<
+    HTMLInputElement | HTMLSelectElement | HTMLButtonElement
+  >(
+    '[data-testid="lifecycle-automation-controls"] input, '
+    + '[data-testid="lifecycle-automation-controls"] select, '
+    + '[data-testid="lifecycle-automation-controls"] button, '
+    + '.lifecycle-automation-run',
+  ));
+}
+
+async function expandAutomationSettings() {
+  const details = lifecyclePanel().querySelector<HTMLDetailsElement>(
+    ".lifecycle-automation-advanced",
+  );
+  expect(details).not.toBeNull();
+  await act(async () => details!.querySelector("summary")!.click());
+  expect(details!.open).toBe(true);
 }
 
 beforeEach(() => {
@@ -235,6 +263,182 @@ describe("DataStorageSection lifecycle automation controls", () => {
     await flush();
     expect(getTradingDayCoverage).toHaveBeenLastCalledWith(30, "15min");
   });
+
+  it.each([
+    { enabled: true, scheduleStatus: "due" as const },
+    { enabled: false, scheduleStatus: "disabled" as const },
+  ])("separates a $scheduleStatus schedule from an absent first result", async ({ enabled, scheduleStatus }) => {
+    controls.automationStatus = status({
+      config: { ...CONFIG, enabled },
+      current_progress: [],
+      telemetry_status: "absent",
+      last_status: null,
+      last_result: null,
+      schedule: {
+        status: scheduleStatus,
+        last_attempt_at: null,
+        next_scheduled_at: enabled ? "2026-08-31T05:25:00Z" : null,
+      },
+    });
+
+    await renderSection("en");
+
+    expect(lifecyclePanel().textContent?.match(/No completed run yet/g)).toHaveLength(1);
+    expect(lifecyclePanel().querySelector(`[data-automation-schedule="${scheduleStatus}"]`))
+      .not.toBeNull();
+    expect(checkbox("Background automation").checked).toBe(enabled);
+    expect(button("Run due cases now").disabled).toBe(false);
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+  });
+
+  it("keeps a completed run separate from the enabled schedule", async () => {
+    controls.automationStatus = status({ current_progress: [] });
+
+    await renderSection("en");
+
+    const schedule = lifecyclePanel().querySelector('[data-automation-schedule="scheduled"]');
+    expect(schedule).not.toBeNull();
+    expect(schedule!.textContent).not.toContain("Completed");
+    expect(lifecyclePanel().textContent).toContain("1 processed");
+    expect(lifecyclePanel().textContent).toContain("1 accepted");
+  });
+
+  it("shows invalid schedule health without changing enabled config or write admission", async () => {
+    controls.automationStatus = status({
+      current_progress: [],
+      schedule: { status: "invalid", last_attempt_at: null, next_scheduled_at: null },
+    });
+
+    await renderSection("en");
+
+    expect(lifecyclePanel().querySelector('[data-automation-schedule="invalid"]')).not.toBeNull();
+    expect(checkbox("Background automation").checked).toBe(true);
+    expect(button("Run due cases now").disabled).toBe(false);
+    expect(lifecyclePanel().textContent).toContain("1 processed");
+  });
+
+  it("keeps advanced controls collapsed without changing their persisted values", async () => {
+    controls.automationStatus = status({
+      current_progress: [],
+      config: { ...CONFIG, apply_profile_transitions: true },
+    });
+
+    await renderSection("en");
+
+    const advanced = select("Check interval").closest("details");
+    expect(advanced).not.toBeNull();
+    expect(advanced!.open).toBe(false);
+    expect(checkbox("Background automation").closest("details")).toBeNull();
+    expect(checkbox("Apply security changes automatically").closest("details")).toBe(advanced);
+    expect(select("Cases per batch").closest("details")).toBe(advanced);
+    expect(button("Run due cases now").closest("details")).toBeNull();
+
+    await expandAutomationSettings();
+
+    expect(select("Check interval").value).toBe("30");
+    expect(select("Cases per batch").value).toBe("2");
+    expect(checkbox("Apply security changes automatically").checked).toBe(true);
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+  });
+
+  it("keeps raw observation counts in non-actionable diagnostics below the controls", async () => {
+    await renderSection("en");
+
+    const observedLabel = Array.from(lifecyclePanel().querySelectorAll("dt"))
+      .find((item) => item.textContent === "Cases with source observations");
+    const diagnostics = observedLabel?.closest("details");
+    expect(diagnostics).not.toBeNull();
+    expect(diagnostics).toBeDefined();
+    expect(diagnostics!.open).toBe(false);
+    expect(observedLabel!.nextElementSibling?.textContent).toBe("9");
+    expect(diagnostics!.textContent).toContain("Cases missing source observations");
+    expect(diagnostics!.querySelector("button, a, input")).toBeNull();
+    expect(button("Run due cases now").compareDocumentPosition(diagnostics!))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("keeps compact navigation and refresh available without dispatching automation", async () => {
+    const onNavigateTarget = vi.fn();
+    await renderSection("en", onNavigateTarget);
+
+    const navigate = button("Open investigation in Universe");
+    const refresh = lifecyclePanel().querySelector<HTMLButtonElement>('button[aria-label="Reload status"]');
+    expect(refresh).not.toBeNull();
+    expect(navigate.classList.contains("ui-button-primary")).toBe(true);
+    expect(navigate.closest("details")).toBeNull();
+    for (const command of [navigate, refresh!, button("Run due cases now")]) {
+      expect(command.classList.contains("ui-button-compact")).toBe(true);
+      expect(command.querySelector("svg")).not.toBeNull();
+    }
+    expect(button("Run due cases now").disabled).toBe(true);
+    expect(navigate.disabled).toBe(false);
+    expect(refresh!.disabled).toBe(false);
+
+    await act(async () => navigate.click());
+    expect(onNavigateTarget).toHaveBeenCalledExactlyOnceWith({ kind: "universe_lifecycle" });
+    await act(async () => refresh!.click());
+    await flush();
+
+    expect(listSecurityLifecycleCases).toHaveBeenCalledTimes(2);
+    expect(listSecurityLifecycleCases).toHaveBeenLastCalledWith({ limit: 1 });
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+  });
+
+  it("does not hide scheduler incidents, case incidents, running, or invalid telemetry when scheduling is disabled", async () => {
+    controls.automationStatus = status({
+      config: { ...CONFIG, enabled: false },
+      schedule: { status: "disabled", last_attempt_at: null, next_scheduled_at: null },
+      telemetry_status: "invalid",
+      active_incident: {
+        scheduler_failure: { reason: "automation_scheduler_failed" },
+        case_failures: { slc_case_2: { run_id: "slar_failed", recovery: "new_attempt" } },
+      },
+    });
+
+    await renderSection("en");
+
+    expect(lifecyclePanel().querySelector('[data-automation-schedule="disabled"]')).not.toBeNull();
+    for (const message of [
+      "Scheduler failure remains unresolved",
+      "1 execution failure remains unresolved",
+      "Running",
+      "Status unavailable",
+    ]) {
+      const notice = Array.from(lifecyclePanel().querySelectorAll("[data-automation-state]"))
+        .find((element) => element.textContent === message);
+      expect(notice, message).toBeDefined();
+      expect(notice!.closest("details"), message).toBeNull();
+    }
+    expect(lifecyclePanel().textContent).toContain("Listing directories");
+    expect(lifecycleWriteControls().length).toBeGreaterThan(0);
+    expect(lifecycleWriteControls().every((control) => control.disabled)).toBe(true);
+  });
+
+  it.each([
+    { lastStatus: "failed" as const, label: "Failed" },
+    { lastStatus: "unavailable" as const, label: "Unavailable" },
+    { lastStatus: "not_installed" as const, label: "Not installed" },
+  ])("keeps a $lastStatus last attempt visible when scheduling is disabled", async ({ lastStatus, label }) => {
+    controls.automationStatus = status({
+      config: { ...CONFIG, enabled: false },
+      schedule: { status: "disabled", last_attempt_at: null, next_scheduled_at: null },
+      current_progress: [],
+      last_status: lastStatus,
+    });
+
+    await renderSection("en");
+
+    expect(lifecyclePanel().querySelector('[data-automation-schedule="disabled"]')).not.toBeNull();
+    const notice = lifecyclePanel().querySelector(`[data-automation-state="${lastStatus}"]`);
+    expect(notice?.textContent).toBe(label);
+    expect(notice?.closest("details")).toBeNull();
+    expect(button("Run due cases now").disabled).toBe(false);
+  });
+
   it("reloads the complete schedule after each config save", async () => {
     controls.automationStatus = status({ current_progress: [] });
     vi.mocked(updateSecurityLifecycleAutomationConfig).mockImplementationOnce(async (config) => {
@@ -257,6 +461,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledOnce();
     expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
     expect(host!.textContent).toContain("未排程");
+    expect(lifecyclePanel().querySelector('[data-automation-schedule="disabled"]')).not.toBeNull();
   });
 
   it("shows real progress and sends complete config from each control shape", async () => {
@@ -265,7 +470,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
 
     expect(host!.textContent).toContain("目前階段");
     expect(host!.textContent).toContain("上市名錄");
-    expect(host!.textContent).toContain("SEC · Nasdaq / Massive · IBKR（必要時）");
+    expect(lifecyclePanel().textContent).not.toContain("SEC · Nasdaq / Massive · IBKR（必要時）");
     expect(host!.textContent).toContain("2026-08-31");
 
     controls.automationStatus = status({ current_progress: [] });
@@ -280,6 +485,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
       enabled: false,
     });
 
+    await expandAutomationSettings();
     const interval = select("檢查間隔");
     await act(async () => {
       interval.value = "60";
@@ -292,7 +498,11 @@ describe("DataStorageSection lifecycle automation controls", () => {
       interval_minutes: 60,
     });
 
-    await act(async () => button("每批 1 件").click());
+    const batch = select("每批案件數");
+    await act(async () => {
+      batch.value = "1";
+      batch.dispatchEvent(new Event("change", { bubbles: true }));
+    });
     await flush();
     expect(updateSecurityLifecycleAutomationConfig).toHaveBeenLastCalledWith({
       ...CONFIG,
@@ -332,6 +542,72 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(host!.querySelector('[data-automation-state="success"]')).toBeNull();
   });
 
+  it("keeps every write gated while config is saving and admits the next manual run after it settles", async () => {
+    controls.automationStatus = status({ current_progress: [] });
+    let finishSave!: (value: { config_status: "valid"; config: SecurityLifecycleAutomationConfig }) => void;
+    vi.mocked(updateSecurityLifecycleAutomationConfig).mockImplementationOnce(() => new Promise((resolve) => {
+      finishSave = resolve;
+    }));
+    await renderSection("en");
+    await expandAutomationSettings();
+
+    await act(async () => checkbox("Background automation").click());
+
+    expect(lifecycleWriteControls()).toHaveLength(5);
+    expect(lifecycleWriteControls().every((control) => control.disabled)).toBe(true);
+    expect(button("Open investigation in Universe").disabled).toBe(false);
+    await act(async () => button("Run due cases now").click());
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+    expect(updateSecurityLifecycleAutomationConfig).toHaveBeenCalledExactlyOnceWith({
+      ...CONFIG,
+      enabled: false,
+    });
+
+    controls.automationStatus = status({
+      current_progress: [],
+      config: { ...CONFIG, enabled: false },
+      schedule: { status: "disabled", last_attempt_at: null, next_scheduled_at: null },
+    });
+    await act(async () => finishSave({
+      config_status: "valid",
+      config: { ...CONFIG, enabled: false },
+    }));
+    await flush();
+
+    expect(lifecycleWriteControls().every((control) => !control.disabled)).toBe(true);
+    expect(checkbox("Background automation").checked).toBe(false);
+    await act(async () => button("Run due cases now").click());
+    await flush();
+    expect(runDueSecurityLifecycleAutomation).toHaveBeenCalledOnce();
+  });
+
+  it("continues polling a running attempt when scheduling is disabled", async () => {
+    vi.useFakeTimers();
+    controls.automationStatus = status({
+      config: { ...CONFIG, enabled: false },
+      schedule: { status: "disabled", last_attempt_at: null, next_scheduled_at: null },
+      current_progress: [],
+      last_status: "running",
+    });
+    await renderSection("en");
+
+    expect(checkbox("Background automation").checked).toBe(false);
+    expect(button("Run due cases now").disabled).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
+
+    controls.automationStatus = { ...controls.automationStatus!, last_status: "succeeded" };
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(3);
+    expect(lifecyclePanel().querySelector('[data-automation-state="running"]')).toBeNull();
+    expect(button("Run due cases now").disabled).toBe(false);
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(3);
+  });
+
   it("keeps write controls disabled while a started run has durable running status", async () => {
     controls.automationStatus = status({
       last_status: "succeeded",
@@ -349,14 +625,8 @@ describe("DataStorageSection lifecycle automation controls", () => {
 
     expect(runDueSecurityLifecycleAutomation).toHaveBeenCalledOnce();
     expect(getSecurityLifecycleAutomationStatus).toHaveBeenCalledTimes(2);
-    const runningControls = host!.querySelectorAll<HTMLElement>(
-      '[data-testid="lifecycle-automation-controls"] input, '
-      + '[data-testid="lifecycle-automation-controls"] select, '
-      + '[data-testid="lifecycle-automation-controls"] button',
-    );
-    expect(Array.from(runningControls).every((control) => (
-      (control as HTMLInputElement | HTMLSelectElement | HTMLButtonElement).disabled
-    ))).toBe(true);
+    expect(lifecycleWriteControls().length).toBeGreaterThan(0);
+    expect(lifecycleWriteControls().every((control) => control.disabled)).toBe(true);
 
     controls.automationStatus = status({
       last_status: "succeeded",
@@ -404,7 +674,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(button("立即檢查到期案件").disabled).toBe(false);
   });
 
-  it("shows durable running ahead of stale invalid telemetry", async () => {
+  it("keeps durable running visible alongside invalid telemetry", async () => {
     controls.automationStatus = status({
       telemetry_status: "invalid",
       last_status: "running",
@@ -415,13 +685,14 @@ describe("DataStorageSection lifecycle automation controls", () => {
 
     expect(host!.querySelector('[data-automation-state="running"]')?.textContent)
       .toBe("Running");
-    expect(host!.querySelector('[data-automation-state="invalid"]')).toBeNull();
+    expect(host!.querySelector('[data-automation-state="invalid"]')?.textContent)
+      .toBe("Status unavailable");
     expect(button("Run due cases now").disabled).toBe(true);
   });
 
-  it("disables all write controls when stored automation config is invalid", async () => {
+  it.each([false, true])("disables all write controls for invalid config with running=$0", async (running) => {
     controls.automationStatus = {
-      ...status(),
+      ...status({ current_progress: [], last_status: running ? "running" : "succeeded" }),
       config_status: "invalid",
       config: null,
       invalid_keys: ["security_lifecycle.automation.batch_limit"],
@@ -431,15 +702,12 @@ describe("DataStorageSection lifecycle automation controls", () => {
     await renderSection();
 
     expect(host!.textContent).toContain("自動化設定需要修正");
-    const writeControls = host!.querySelectorAll<HTMLElement>(
-      '[data-testid="lifecycle-automation-controls"] input, '
-      + '[data-testid="lifecycle-automation-controls"] select, '
-      + '[data-testid="lifecycle-automation-controls"] button',
-    );
-    expect(writeControls.length).toBeGreaterThan(0);
-    expect(Array.from(writeControls).every((control) => (
-      (control as HTMLInputElement | HTMLSelectElement | HTMLButtonElement).disabled
-    ))).toBe(true);
+    expect(lifecycleWriteControls().length).toBeGreaterThan(0);
+    expect(lifecycleWriteControls().every((control) => control.disabled)).toBe(true);
+    expect(lifecyclePanel().querySelector('input[type="checkbox"]')).toBeNull();
+    await act(async () => button("立即檢查到期案件").click());
+    expect(updateSecurityLifecycleAutomationConfig).not.toHaveBeenCalled();
+    expect(runDueSecurityLifecycleAutomation).not.toHaveBeenCalled();
   });
 
   it("renders the same control authority in English", async () => {
@@ -450,6 +718,6 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(host!.textContent).toContain("Background automation");
     expect(host!.textContent).toContain("Run due cases now");
     expect(host!.textContent).toContain("Apply security changes automatically");
-    expect(host!.textContent).toContain("SEC · Nasdaq / Massive · IBKR when needed");
+    expect(lifecyclePanel().textContent).not.toContain("SEC · Nasdaq / Massive · IBKR when needed");
   });
 });

@@ -181,7 +181,6 @@ function renderSection(extra: Record<string, unknown> = {}) {
     onRefresh: vi.fn().mockResolvedValue(undefined),
     onDiscover: vi.fn().mockResolvedValue(undefined),
     onClearDiscovery: vi.fn(),
-    onUseModel: vi.fn(),
     ...extra,
   } as React.ComponentProps<typeof ProviderSection>;
   act(() => {
@@ -199,7 +198,6 @@ function renderDiscovery(result: ModelDiscoveryResult, onUse = vi.fn()) {
       authMode: "chatgpt_oauth",
       credentialLabel: "ChatGPT subscription Pro",
       onClose: vi.fn(),
-      onUse,
     }));
   });
   return onUse;
@@ -616,7 +614,7 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     expect(onUse).not.toHaveBeenCalled();
   });
 
-  it("keeps explicit reviewed task-route actions available", () => {
+  it("keeps discovery read-only even when a model supports every task", () => {
     const onUse = vi.fn();
     renderDiscovery({
       provider: "openai",
@@ -632,7 +630,7 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
         effort_options: ["low", "medium", "high", "xhigh"],
         default_effort: "high",
         input_modalities: ["text", "image"],
-        task_route_tasks: ["card_synthesis", "card_translation", "ai_research"],
+        task_route_tasks: ["card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"],
       }],
     } as ModelDiscoveryResult, onUse);
 
@@ -640,10 +638,12 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
       .find((button) => button.textContent === "用於生成");
     const translation = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent === "用於翻譯");
-    expect(synthesis).toBeDefined();
-    expect(translation).toBeDefined();
-    act(() => synthesis!.click());
-    expect(onUse).toHaveBeenCalledWith("gpt-5.6-sol", "card_synthesis");
+    expect(synthesis).toBeUndefined();
+    expect(translation).toBeUndefined();
+    expect(host!.querySelectorAll(".model-discovery-row button")).toHaveLength(0);
+    expect(host!.textContent).toContain("gpt-5.6-sol");
+    expect(host!.textContent).toContain("high · 預設");
+    expect(onUse).not.toHaveBeenCalled();
   });
 
   it("renders_retained_account_usage_immediately_and_revalidates_with_cached_GET_only", async () => {

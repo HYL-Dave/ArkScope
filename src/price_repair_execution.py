@@ -39,7 +39,7 @@ _CONTRACT_FIELDS = ("conId", "symbol", "secType", "exchange", "primaryExchange",
 _PLAN_FIELDS = {"version", "market_db", "coverage_at", "preview", "windows", "slots", "requests", "request_budget", "pacing_seconds", "plan_sha256"}
 _TICKER = re.compile(r"[A-Z0-9][A-Z0-9 ._-]{0,11}")
 _RESUMABLE_ERRORS = {"price_repair_dispatch_unknown", "ibkr_historical_data_request_failed", "security_definition_unavailable",
-                     "price_repair_response_invalid", "price_repair_scope_changed", "ibkr_gateway_unavailable"}
+                     "ibkr_contract_qualification_failed", "price_repair_response_invalid", "price_repair_scope_changed", "ibkr_gateway_unavailable"}
 
 
 def _json(value):
@@ -355,6 +355,9 @@ class RepairJournal:
         code, data = None, None
         try:
             raw = operation(*args, **kwargs)
+        except IBKRPriceDataError as exc:
+            code = (exc.error_code if exc.error_code in _RESUMABLE_ERRORS
+                    else "ibkr_historical_data_request_failed")
         except Exception:
             code = "ibkr_historical_data_request_failed"
         else:

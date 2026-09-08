@@ -288,10 +288,10 @@ def test_optional_provider_diagnostic_corruption_is_quarantined_and_source_prese
     try:
         conn.execute(
             "CREATE TABLE provider_sync_meta ("
-            "ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
+            "provider TEXT, ticker TEXT, interval TEXT, last_error TEXT, updated_at TEXT)"
         )
         conn.executemany(
-            "INSERT INTO provider_sync_meta VALUES (?, ?, ?, ?)",
+            "INSERT INTO provider_sync_meta VALUES ('ibkr', ?, ?, ?, ?)",
             (
                 ("AAA", "15min", "", "now"),
                 ("AAA", "15min", "  contract unavailable  ", "later"),
@@ -299,7 +299,7 @@ def test_optional_provider_diagnostic_corruption_is_quarantined_and_source_prese
         )
         conn.execute(
             "INSERT INTO provider_sync_meta VALUES "
-            "('AAA', '15min', CAST(X'80' AS TEXT), 'invalid-utf8')"
+            "('ibkr', 'AAA', '15min', CAST(X'80' AS TEXT), 'invalid-utf8')"
         )
         conn.commit()
     finally:

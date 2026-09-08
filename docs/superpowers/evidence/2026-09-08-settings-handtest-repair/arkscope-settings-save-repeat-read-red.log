@@ -1,0 +1,121 @@
+
+ RUN  v4.1.8 /tmp/arkscope-tracking-history-provenance/apps/arkscope-web
+
+stdout | src/SettingsModelRouting.test.ts > Settings model route save gate > does not mistake malformed receipts or matching fallback values for a DB acknowledgement
+i18next: languageChanged zh-Hant
+
+stdout | src/SettingsModelRouting.test.ts > Settings model route save gate > does not mistake malformed receipts or matching fallback values for a DB acknowledgement
+i18next: languageChanged zh-Hant
+
+stdout | src/SettingsModelRouting.test.ts > Settings model route save gate > does not mistake malformed receipts or matching fallback values for a DB acknowledgement
+i18next: languageChanged zh-Hant
+
+stdout | src/SettingsModelRouting.test.ts
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+ ❯ src/SettingsModelRouting.test.ts (38 tests | 1 failed | 37 skipped) 226ms
+     × does not mistake malformed receipts or matching fallback values for a DB acknowledgement 224ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/SettingsModelRouting.test.ts > Settings model route save gate > does not mistake malformed receipts or matching fallback values for a DB acknowledgement
+AssertionError: expected 'high' to be 'xhigh' // Object.is equality
+
+Expected: "xhigh"
+Received: "high"
+
+ ❯ src/SettingsModelRouting.test.ts:496:26
+    494|     await click(Array.from(host!.querySelectorAll<HTMLButtonElement>("…
+    495|       .find((button) => button.textContent?.trim() === "重新讀取儲存狀態")!);
+    496|     expect(effort.value).toBe("xhigh");
+       |                          ^
+    497|     expect(host!.textContent).toContain("尚無法確認是否已儲存");
+    498|     expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  14:31:26
+   Duration  1.75s (transform 690ms, setup 223ms, import 694ms, tests 226ms, environment 505ms)

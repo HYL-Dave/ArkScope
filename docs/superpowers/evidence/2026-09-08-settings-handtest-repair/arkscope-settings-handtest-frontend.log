@@ -1,0 +1,8 @@
+
+ RUN  v4.1.8 /tmp/arkscope-tracking-history-provenance/apps/arkscope-web
+
+
+ Test Files  124 passed (124)
+      Tests  1685 passed (1685)
+   Start at  14:31:56
+   Duration  11.56s (transform 69.44s, setup 35.53s, import 87.15s, tests 68.81s, environment 73.10s)
