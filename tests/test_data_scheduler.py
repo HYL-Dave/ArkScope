@@ -450,7 +450,7 @@ def test_lifecycle_automation_uses_durable_five_minute_clock_and_batch_limit(
     ]
 
 
-def test_lifecycle_analysis_and_profile_mutation_are_independent_controls(
+def test_legacy_disabled_auto_apply_blocks_automation_but_keeps_attended_runner(
     monkeypatch,
 ):
     from src.service.security_lifecycle_automation_config import (
@@ -495,8 +495,72 @@ def test_lifecycle_analysis_and_profile_mutation_are_independent_controls(
 
     assert automation_calls == []
     mutation_allowed = transition_calls[0].pop("transition_mutation_allowed")
-    assert mutation_allowed() is True
-    assert transition_calls == [{"now": _NOW, "allow_automation_approved": True}]
+    assert mutation_allowed() is False
+    assert transition_calls == [{"now": _NOW, "allow_automation_approved": False}]
+
+
+@pytest.mark.parametrize(
+    ("enabled", "apply", "expected_status"),
+    [
+        ("false", "false", "approved"),
+        ("false", "true", "approved"),
+        ("true", "false", "approved"),
+        ("true", "true", "applied"),
+    ],
+)
+@pytest.mark.parametrize("authority", ["automation_policy", "attended_user"])
+def test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control(
+    tmp_path, monkeypatch, enabled, apply, expected_status, authority,
+):
+    from src.security_lifecycle_decision_policy import (
+        AUTOMATION_POLICY_VERSION,
+        RULE_VERSIONS,
+    )
+    from src.service import ticker_identity_scheduler
+    from src.service.security_lifecycle_automation_config import (
+        APPLY_PROFILE_TRANSITIONS_KEY,
+    )
+    from tests.test_ticker_identity_scheduler import _build_due_context
+
+    service, profile_path, transition_id = _build_due_context(tmp_path)
+    if authority == "automation_policy":
+        # A legacy approval already exists; this does not authorize new renames.
+        rule_id = "lifecycle.simple_symbol_continuation"
+        with sqlite3.connect(profile_path) as conn:
+            conn.execute(
+                "UPDATE ticker_identity_transitions SET approval_authority=?,"
+                "automation_policy_version=?,rule_id=?,rule_version=? "
+                "WHERE transition_id=?",
+                (authority, AUTOMATION_POLICY_VERSION, rule_id,
+                 RULE_VERSIONS[rule_id], transition_id),
+            )
+    else:
+        expected_status = "applied"
+    ds._store().update_settings({
+        ENABLED_KEY: enabled,
+        APPLY_PROFILE_TRANSITIONS_KEY: apply,
+    })
+    monkeypatch.setattr(ticker_identity_scheduler, "_service", lambda: service)
+    monkeypatch.setattr(
+        ticker_identity_scheduler, "require_profile_state_write", lambda *_args: None,
+    )
+    monkeypatch.setattr("src.sa_tracking_memberships.reconcile_sa_tracking", lambda **_kwargs: None)
+
+    ds.tick_once(datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc), fire=lambda _source: None)
+
+    with sqlite3.connect(profile_path) as conn:
+        assert conn.execute(
+            "SELECT status FROM ticker_identity_transitions WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == (expected_status,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_links WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == (1 if expected_status == "applied" else 0,)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM ticker_identity_transition_attempts WHERE transition_id=?",
+            (transition_id,),
+        ).fetchone() == (1 if expected_status == "applied" else 0,)
 
 
 def test_malformed_lifecycle_config_disables_analysis_and_mutation(monkeypatch):

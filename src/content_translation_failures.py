@@ -8,7 +8,7 @@ from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.auth_drivers.subscription_structured_output import (
     SubscriptionStructuredOutputError,
 )
-from src.card_synthesis import ModelExecutionTimeout, TextTranslationOutputInvalid
+from src.card_synthesis import ModelExecutionTimeout, ModelStructuredOutputInvalid
 
 
 TRANSLATION_FAILURE_CODES = frozenset(
@@ -46,7 +46,7 @@ def classify_content_translation_failure(
 
     if isinstance(exc, (ModelExecutionTimeout, TimeoutError)):
         return ContentTranslationFailure("translation_timeout", True)
-    if isinstance(exc, TextTranslationOutputInvalid):
+    if isinstance(exc, ModelStructuredOutputInvalid):
         return ContentTranslationFailure("translation_output_invalid", False)
     if isinstance(exc, MissingCredentialError):
         return ContentTranslationFailure("translation_credential_missing", False)

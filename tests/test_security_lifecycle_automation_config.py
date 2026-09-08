@@ -142,14 +142,28 @@ def test_all_malformed_keys_are_reported_in_stable_sorted_order_and_fail_closed(
     assert state.effective_apply_profile_transitions is False
 
 
-def test_valid_disabled_background_does_not_disable_explicit_mutation_authority():
+@pytest.mark.parametrize(
+    ("enabled", "apply", "background", "mutation"),
+    [
+        ("false", "false", False, False),
+        ("true", "false", True, False),
+        ("true", "true", True, True),
+        ("false", "true", False, False),
+    ],
+)
+def test_legacy_settings_are_preserved_but_only_automatic_authorizes_mutation(
+    enabled, apply, background, mutation,
+):
+    stored = {ENABLED_KEY: enabled, APPLY_PROFILE_TRANSITIONS_KEY: apply}
     state = parse_security_lifecycle_automation_config(
-        {ENABLED_KEY: "false", APPLY_PROFILE_TRANSITIONS_KEY: "true"}
+        stored
     )
 
     assert state.valid is True
-    assert state.effective_background_enabled is False
-    assert state.effective_apply_profile_transitions is True
+    assert state.effective_background_enabled is background
+    assert state.effective_apply_profile_transitions is mutation
+    serialized = serialize_security_lifecycle_automation_config(state.config)
+    assert {key: serialized[key] for key in stored} == stored
 
 
 def test_config_and_state_are_immutable_and_serialize_canonically():

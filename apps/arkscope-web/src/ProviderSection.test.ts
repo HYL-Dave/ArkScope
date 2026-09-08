@@ -286,6 +286,14 @@ async function waitFor(pred: () => boolean, timeoutMs = 3000) {
 }
 
 describe("ProviderSection localization", () => {
+  it("omits provider-return counts from registry headers while retaining credential status", async () => {
+    await i18n.changeLanguage("en");
+    renderSection();
+    expect(providerCard("openai").querySelector(".settings-panel-head")!.textContent)
+      .not.toContain("models returned by the provider");
+    expect(providerCard("openai").querySelector(".key-pill")!.textContent).toBeTruthy();
+  });
+
   it("renders English Provider OAuth and credential setup without changing active work", async () => {
     renderSection();
     const anthropic = providerCard("anthropic");
@@ -583,6 +591,31 @@ describe("ProviderSection Settings navigation guard", () => {
 });
 
 describe("ProviderSection OAuth lifecycle and account usage truth", () => {
+  it("filters discovery rows without redundant counts and retains source and error status", async () => {
+    await i18n.changeLanguage("en");
+    renderDiscovery({
+      provider: "openai", credential_id: "local:7", status: "error",
+      error: "unavailable", source_url: "https://example.com/models",
+      models: ["alpha", "beta"].map((id) => ({
+        id, provider: "openai", label: id, source: "provider_api",
+      })),
+    } as ModelDiscoveryResult);
+    const source = host!.querySelector(".source-badge")!.textContent;
+    const error = host!.querySelector(".warn-text")!.textContent;
+    expect(source).toBeTruthy();
+    expect(error).toBeTruthy();
+    expect(host!.querySelectorAll(".model-discovery-row")).toHaveLength(2);
+    expect(host!.textContent).not.toContain("models returned by the provider");
+    await act(async () => changeInput(host!.querySelector(".discovery-filter input")!, "alpha"));
+    expect(host!.querySelectorAll(".model-discovery-row")).toHaveLength(1);
+    expect(host!.querySelector(".model-discovery-id")!.textContent).toBe("alpha");
+    expect(host!.textContent).not.toContain("models returned by the provider");
+    expect(host!.querySelector(".source-badge")!.textContent).toBe(source);
+    expect(host!.querySelector(".warn-text")!.textContent).toBe(error);
+    expect(host!.querySelector<HTMLAnchorElement>('.discovery-head a')!.href)
+      .toBe("https://example.com/models");
+  });
+
   it("shows subscription model efforts without offering unsupported task-route actions", () => {
     const onUse = vi.fn();
     renderDiscovery({

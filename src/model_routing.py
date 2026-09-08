@@ -207,7 +207,7 @@ EFFORT_OPTIONS: dict[Provider, list[EffortOption]] = {
             id="max",
             provider="openai",
             label="Max",
-            description="Maximum reasoning effort; currently supported by GPT-5.6 models.",
+            description="Maximum reasoning effort when supported by the selected model.",
         ),
     ],
     "anthropic": [

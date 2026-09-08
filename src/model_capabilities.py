@@ -78,6 +78,7 @@ class ModelCapability:
     max_output: int | None
     supports_structured_output: bool = True
     supports_tool_calling: bool = True
+    requires_responses_for_tools: bool = False
     runtime_ready: bool = True
     # False means the registry entry exists only to preserve/display historical
     # provenance. It is stronger than task_route_status: every new execution
@@ -257,6 +258,20 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         notes="ChatGPT Pro research preview; exact-id Content Translation route "
               "through the bundled Codex app-server only. Provider maximum "
               "output is not published.",
+    ),
+    ModelCapability(
+        id="gpt-6-astra", provider="openai", label="GPT-6 Astra",
+        picker_visibility="default", thinking_mode="none",
+        effort_options=("low", "medium", "high", "xhigh", "max"),
+        supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        requires_responses_for_tools=True,
+        task_route_status="current", in_routing_seed=True,
+        quality="frontier", speed="medium", cost_tier="high",
+        source_url="https://developers.openai.com/api/docs/models/gpt-6-astra",
+        verified_at="2026-09-08",
+        notes="Tool calls require Responses API. No none/minimal effort or "
+              "sampling parameters. Existing task defaults remain unchanged.",
     ),
     ModelCapability(
         id="gpt-5.6-sol", provider="openai", label="GPT-5.6 Sol",

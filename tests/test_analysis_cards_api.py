@@ -315,6 +315,55 @@ def test_list_hides_archived_by_default(store, stub_generation):
     assert any(c["run_id"] == rid for c in list_cards(store=store)["cards"])
 
 
+@pytest.mark.parametrize("provider,model", [
+    ("openai", "gpt-6-astra"),
+    ("openai", "gpt-5.6-luna"),
+    ("anthropic", "claude-sonnet-5"),
+])
+def test_invalid_translation_output_keeps_typed_route_error_without_caching(
+    store, stub_generation, monkeypatch, provider, model,
+):
+    import httpx
+    from openai import OpenAI
+    from src import card_synthesis as cs
+    from src.auth_drivers.live_resolver import LiveAuthResolution
+
+    rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
+    selected = SimpleNamespace(provider=provider, model=model, effort="low")
+    monkeypatch.setattr(routes, "task_route", lambda _: selected)
+    monkeypatch.setattr(cs, "task_route", lambda _: selected)
+    monkeypatch.setattr(cs, "ensure_env_loaded", lambda: None)
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda _: LiveAuthResolution(
+        provider=provider, source="db_api_key", credential_id="local:test"))
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        assert request.url.path == "/v1/responses"
+        return httpx.Response(200, json={
+            "id": "resp_test", "object": "response", "created_at": 1,
+            "model": model, "status": "completed", "error": None,
+            "output": [{"type": "function_call", "id": "fc_test", "call_id": "call_test",
+                        "status": "completed", "name": "emit_translation", "arguments": "{}"}],
+        })
+
+    with OpenAI(api_key="test-not-a-credential", http_client=httpx.Client(transport=httpx.MockTransport(handler))) as client:
+        if model == "gpt-6-astra":
+            monkeypatch.setattr("src.auth_drivers.live_resolver.live_openai_client", lambda: client)
+        else:
+            monkeypatch.setattr(cs, "_translate_" + provider, lambda *a, **kw: {})
+        with pytest.raises(HTTPException) as caught:
+            translate_card_route(rid, TranslateBody(lang="zh-Hant"), store=store)
+
+    assert caught.value.status_code == 502
+    assert caught.value.detail == {
+        "code": "translation_output_invalid", "retryable": False,
+        "provider": provider, "model": model, "harness": provider + "_sdk",
+    }
+    assert len(requests) == (1 if model == "gpt-6-astra" else 0)
+    assert store.get(rid).translations is None
+
+
 def test_save_promotes_to_report(store, stub_generation, monkeypatch):
     rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
     monkeypatch.setattr(routes, "save_report",
