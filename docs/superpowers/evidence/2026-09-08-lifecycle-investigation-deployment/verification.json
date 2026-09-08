@@ -1,0 +1,44 @@
+{
+  "app_started": false,
+  "merged_backend": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 7114,
+    "sha256": "76ad8768b07642b89c77aeafd1a49c108f0212050e2c3657fae3ffe78de00450",
+    "skipped": 12,
+    "total": 7126
+  },
+  "merged_build": "passed",
+  "merged_frontend": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 1633,
+    "sha256": "2f6236cbd9c44d99ffb7a1a4ed54e2a15cedf95eeea7185f0fabee1ffe61134f",
+    "skipped": 0,
+    "total": 1633
+  },
+  "premerge_backend": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 7114,
+    "sha256": "98e81c1ac46e4d19f332ab84bd9ce469a4f9479814ae005ba2ec3e6def9d40de",
+    "skipped": 12,
+    "total": 7126
+  },
+  "premerge_build": "passed",
+  "premerge_frontend": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 1633,
+    "sha256": "7701cb7dff837b7fde7e898d12e9e92e57956fa2255c3cb6344016b15376e386",
+    "skipped": 0,
+    "total": 1633
+  },
+  "provider_calls_in_deployment": 0,
+  "push_performed": false,
+  "pytest_command": "/home/hyl/.virtualenvs/llm_app/bin/pytest -q tests -o faulthandler_timeout=120 --junitxml=<report>",
+  "runtime_source_commit": "609227c528b1b4bac643a17d5b1d0e741d63e7d2",
+  "test_timeout_widened": false,
+  "typecheck": "passed_in_both_builds",
+  "vitest_command": "npm test -- --maxWorkers=1 --reporter=default --reporter=junit --outputFile=<report> --silent=true"
+}

@@ -1,0 +1,139 @@
+{
+  "encrypted_source_blob_matches": [
+    "data_sources/DATA_SOURCES_EVALUATION.md",
+    "data_sources/IBKR_INVESTOR_DATA_VALUE.md",
+    "data_sources/PAID_SUBSCRIPTION_EVALUATION.md"
+  ],
+  "historical_source_only_manifests": [
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-policy/files.sha256.json"
+  ],
+  "no_runtime_changes_since_product_commit": true,
+  "packet_manifests": {
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-disposition/files.sha256.json": {
+      "files": 8,
+      "seal_sha256": "972d635d9277bd153709cb58300b05197a4d619a2c0dae3041a58f1e67faa6ea"
+    },
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-readonly/files.sha256.json": {
+      "files": 9,
+      "seal_sha256": "310b48ca0a9b78def3a96c9d3d2007376c0933e0c5292e79a28aba99f4e05956"
+    },
+    "docs/superpowers/evidence/2026-09-06-lifecycle-action-review/files.sha256.json": {
+      "files": 21,
+      "seal_sha256": "a213433de8ba262208439ad800255ec2ee45c22d510cc6196af444ab747fbd45"
+    },
+    "docs/superpowers/evidence/2026-09-06-lifecycle-current-review/files.sha256.json": {
+      "files": 145,
+      "seal_sha256": "940223b9427c9f9122307aa5c4c39eda8ba23aaf01e6a6a71c23508729950bbe"
+    },
+    "docs/superpowers/evidence/2026-09-06-lifecycle-population-reconciliation/files.sha256.json": {
+      "files": 15,
+      "seal_sha256": "5c4f702e5689cf3bd6166dd8f9c30791bb0674e4dabca5dd833e6656a50f300d"
+    },
+    "docs/superpowers/evidence/2026-09-06-lifecycle-target-scoped-disposition/files.sha256.json": {
+      "files": 8,
+      "seal_sha256": "958248e6b5f8e5ed29d9ddfb9b8fdb8c2bcd3f22fccd78dcacf6a231cb3c3de2"
+    },
+    "docs/superpowers/evidence/2026-09-06-price-window-and-repair-ui/files.sha256.json": {
+      "files": 48,
+      "seal_sha256": "be2d8514000b77f0a1573e0ef4f972157b274b3b0156a0b00536b02db11d9c64"
+    },
+    "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/files.sha256.json": {
+      "files": 18,
+      "seal_sha256": "af64fad39be64409e382abdd98a2120329086d73bc412fb61571b6dc17d17275"
+    },
+    "docs/superpowers/evidence/2026-09-06-recent-price-repair/files.sha256.json": {
+      "files": 13,
+      "seal_sha256": "3dcfa0fa12ff534e41a499b866b4ea5637e12795228777535595be94fa63dbe9"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-attended-source-gaps/files.sha256.json": {
+      "files": 447,
+      "seal_sha256": "8c8f00075554c62cb8969901825a7aedf13c88356af6a109a5b1cc8a7c6dd1cc"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-attended-write-concurrency/files.sha256.json": {
+      "files": 307,
+      "seal_sha256": "1c4564f7d59261deb2fdb710fa421e90e5541be1b55df482774bbec1cc26e0e4"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/files.sha256.json": {
+      "files": 205,
+      "seal_sha256": "2806a7cab50e1bd021e84b254944f13ca2030fb8eeb99d9bb6769ac0e8dbd16d"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-source-context/files.sha256.json": {
+      "files": 227,
+      "seal_sha256": "52e68716d4117886934a56eff69376235851da85d9f0bb25659e13a0584f064f"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-source-priority-capacity/files.sha256.json": {
+      "files": 1462,
+      "seal_sha256": "be780d0a00164f47db561b16ee47c0f1d1c318b9a0ffb3091e252b191bbd32c3"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-instrument-scoping/admission/files.sha256.json": {
+      "files": 270,
+      "seal_sha256": "05a81e10133bbd66fe14b42fed636d4b2cd6f629cef4c379dda43000ce7d7781"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-instrument-scoping/failed-original-analysis-r1/files.sha256.json": {
+      "files": 5,
+      "seal_sha256": "ff1ed46b26e044e60cf8d199d7e2014669a58a429b551c9a20c03af7c877ab4d"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-instrument-scoping/files.sha256.json": {
+      "files": 330,
+      "seal_sha256": "6129d26288cba6089c2040c35a5b9c273da8de4b239c941683d19e8f3c90e257"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-instrument-scoping/live-r1/files.sha256.json": {
+      "files": 7,
+      "seal_sha256": "bcdb7581d9447177ad386e7c85d2b4eea73b6c1d59a472d590ff86504d7a5ab1"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-instrument-scoping/public-original-followup/files.sha256.json": {
+      "files": 6,
+      "seal_sha256": "a76271c27e134771184b0d739c1dbafaaf09f841b8a8ee86122eaf9f9984f2e4"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/files.sha256.json": {
+      "files": 105,
+      "seal_sha256": "f26fe21ed1e7d908b17c0dc48ca4de6f67751ec1afa5a9f8c7b30d701ca5109e"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-runtime/files.sha256.json": {
+      "files": 240,
+      "seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/files.sha256.json": {
+      "files": 108,
+      "seal_sha256": "70db6a06341e77128a402c443ad44d007a6138270e552c63a51bb8e836392d05"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/failed-live-r1/files.sha256.json": {
+      "files": 12,
+      "seal_sha256": "a7df8829579c6069ae4b5b2136f825864aead543b6a5caf1ee20b170c9d50093"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/failed-renewed-r3/files.sha256.json": {
+      "files": 12,
+      "seal_sha256": "79711c3a3a147242f748b58cc765ab7cf5d3a0dca2335296f4100b02648c2422"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/host-rejected-replay-r2/files.sha256.json": {
+      "files": 4,
+      "seal_sha256": "3baa4ea61a1ca1ff918689a5b4e75166f42615a0438ff62eee6509ebd8cf23ac"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/json-analysis-admission/files.sha256.json": {
+      "files": 174,
+      "seal_sha256": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/live-json-analysis/files.sha256.json": {
+      "files": 13,
+      "seal_sha256": "c44fa6670430620747f3a5d85bcffc5220555b49afd0a068052e635a3dd5510b"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/prompt-admission/files.sha256.json": {
+      "files": 75,
+      "seal_sha256": "2cd4bcf60f5a9fcd4f60d91402a29bcca90e2a15c9d2bd76c1a67a61c4cb1752"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/turns-admission/files.sha256.json": {
+      "files": 102,
+      "seal_sha256": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4"
+    },
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage/files.sha256.json": {
+      "files": 426,
+      "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+    },
+    "docs/superpowers/evidence/2026-09-08-lifecycle-investigation/completion-r1/files.sha256.json": {
+      "files": 445,
+      "seal_sha256": "edd5df6177d5a4c67f9157eecde3423987d7be59a188403d3e1fbc883c8892ba"
+    }
+  },
+  "source_byte_matches": 1089,
+  "verified_head": "fb561297e9968c157fff65e231357077d5a14c0c"
+}

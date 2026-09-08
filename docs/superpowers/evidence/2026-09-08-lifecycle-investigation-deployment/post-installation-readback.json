@@ -1,0 +1,38 @@
+{
+  "all_original_schema_and_rows_unchanged": true,
+  "app_restarted": false,
+  "backup_directory_permissions": "0700",
+  "backup_permissions": "0600",
+  "backup_readback_matches_preview": true,
+  "backup_sha256": "8ff6e0608b50140aed5a7886a1db74e10f20ac536803ae75130232d267995fb1",
+  "cutover_active": true,
+  "foreign_key_violations": 0,
+  "integrity_check": "ok",
+  "legacy_cases_retained": 39,
+  "legacy_ingress": {
+    "observations": 0,
+    "reason": "legacy_lifecycle_intake_retired",
+    "status": "retired"
+  },
+  "legacy_rows_deleted": 0,
+  "new_investigation_jobs": 0,
+  "new_tables": [
+    "lifecycle_investigation_acceptances",
+    "lifecycle_investigation_calls",
+    "lifecycle_investigation_installation",
+    "lifecycle_investigation_jobs",
+    "lifecycle_investigation_results",
+    "lifecycle_investigation_runtime",
+    "lifecycle_investigation_sources",
+    "lifecycle_investigation_steps"
+  ],
+  "original_content_hashes": {
+    "rows_sha256": "ef07f72d6f0a628b3949221480e7d3252d79850379320298897434a5f4133085",
+    "schema_sha256": "a6b18f3a049d5830a2d99c0c4872064c9d86237ef9b625fb883a8762cacade4e"
+  },
+  "original_rows": 72471,
+  "original_tables": 71,
+  "provider_calls": 0,
+  "schema_version": 2,
+  "tracking_actions_applied": 0
+}

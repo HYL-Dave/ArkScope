@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "9e54919384de76a625a8e3cf85219b4e46e7fea7f4dd4f2075d634e7d8e7c020",
+    "build-artifacts.json": "f151b46db6005ad044bfd362e6567c8fb5ad47fec4ebbc43b48d7ee317933fb0",
+    "deployment-secret-scan.json": "18d48e89e478fa7ac508a12a7ab62cbb79e7c5977dd94ca7cf85f5c8c77bee2b",
+    "ignored-sealed-secret-scan.json": "ebe2100c66833c41efdca12442ae4bfac39aa57ef82c61e6292bfb70c077d769",
+    "installation-final-preview.json": "52e90a9c5390971a48608ddf174b649de5d3f72e930419f089f40a839c367d3f",
+    "installation-preview.json": "52e90a9c5390971a48608ddf174b649de5d3f72e930419f089f40a839c367d3f",
+    "installation-receipt.json": "f1c0494cc172853e876ee0658f7802f5b910200f8cae6225ac31c9fb206174a3",
+    "legacy-retirement-readback.json": "6091475170757efcbd3097fcca5451a0eb82442cd2724ba1e01fcd0c9c60e2cc",
+    "merged-backend.xml": "76ad8768b07642b89c77aeafd1a49c108f0212050e2c3657fae3ffe78de00450",
+    "merged-frontend.xml": "2f6236cbd9c44d99ffb7a1a4ed54e2a15cedf95eeea7185f0fabee1ffe61134f",
+    "merged-integrity.json": "07e504882fa411d4b2dd4394012c777e6a7cbc8575e686404245f2f158741a9e",
+    "post-installation-readback.json": "75d90c82ea3f4740ca04bdb163b5d55c918d7e71b5dcd525ba1c3d12b19fafbd",
+    "premerge-backend.xml": "98e81c1ac46e4d19f332ab84bd9ce469a4f9479814ae005ba2ec3e6def9d40de",
+    "premerge-frontend.xml": "7701cb7dff837b7fde7e898d12e9e92e57956fa2255c3cb6344016b15376e386",
+    "secret-shape-scan.json": "2925e0fdac4daa9c7f38db726e91196ac5c63194e3aecb0c08eca389821b4345",
+    "verification.json": "9e4cb1406434721f7cd9bd83e589a9bd48b8ac3a6b52a0ab33d6950461b6c4f0"
+  }
+}

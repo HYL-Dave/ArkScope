@@ -1,0 +1,10 @@
+{
+  "legacy_rows_physically_deleted": 0,
+  "new_view_case_driven": false,
+  "persisted_cases_by_source": {
+    "listing_authority": 3,
+    "sec_edgar": 36
+  },
+  "sec_cases_excluded_from_legacy_queue_by_cutover": 36,
+  "sec_cases_with_transition_dependency": 0
+}

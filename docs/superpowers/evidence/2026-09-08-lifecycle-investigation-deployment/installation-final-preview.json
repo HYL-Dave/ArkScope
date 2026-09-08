@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "installed": false,
+  "target_schema_sha256": "f1cf50b161bcdc88b15afd9505fe007dfde79e5e30b6d40f3c2d49902acddd0a",
+  "schema_sha256": "a6b18f3a049d5830a2d99c0c4872064c9d86237ef9b625fb883a8762cacade4e",
+  "rows_sha256": "ef07f72d6f0a628b3949221480e7d3252d79850379320298897434a5f4133085",
+  "approval_sha256": "2c988de70632cb427aeddd6fcf13cf6f254c466bda38e83ff9bb03af0768adf2"
+}

@@ -1,0 +1,7 @@
+{
+  "approval_sha256": "2c988de70632cb427aeddd6fcf13cf6f254c466bda38e83ff9bb03af0768adf2",
+  "backup_sha256": "8ff6e0608b50140aed5a7886a1db74e10f20ac536803ae75130232d267995fb1",
+  "changed": true,
+  "installed_at": "2026-09-08T03:43:40.849487+00:00",
+  "target_schema_sha256": "f1cf50b161bcdc88b15afd9505fe007dfde79e5e30b6d40f3c2d49902acddd0a"
+}

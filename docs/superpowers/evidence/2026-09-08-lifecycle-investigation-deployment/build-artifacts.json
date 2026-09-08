@@ -1,0 +1,10 @@
+{
+  "command": "npm run build",
+  "files": {
+    "assets/index-BfkwA-uo.js": "6b6a310154564038cd5aa10c399564e75fefec15e7c4b45a825129e1e8c694c7",
+    "assets/index-ClWAbiJC.css": "87e694b3c7ddf425353d92225eb925cbf309cfd9ada7d9ebff041179c4a59089",
+    "index.html": "1674a1d6d258a01f88936d14d12a6e5f3320c42824a73d86890220c1730f5fdc"
+  },
+  "main_and_feature_outputs_identical": true,
+  "typecheck_in_command": true
+}
