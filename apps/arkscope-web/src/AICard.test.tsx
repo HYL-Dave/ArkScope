@@ -466,7 +466,6 @@ describe("AI Card localization", () => {
     );
     expect(apiMocks.generateCard).toHaveBeenCalledWith(TICKER, {
       question: SOURCE_QUESTION,
-      provider: "anthropic",
       news_days: 21,
       max_news: 12,
       assistant_stance: "strict_risk_control",
@@ -923,10 +922,90 @@ describe("AI Card localization", () => {
     expect(host!.querySelector('[role="dialog"]')).toBe(dialog);
     expect(apiMocks.generateCard).toHaveBeenCalledWith(TICKER, {
       question: "SOURCE IN-FLIGHT QUESTION",
-      provider: "anthropic",
       news_days: 44,
       max_news: 24,
       assistant_stance: "growth_opportunity",
     }, undefined);
+  });
+});
+
+describe("card execution sources and explicit retranslation", () => {
+  const original = { provider: "openai", model: "gpt-5.6-luna", effort: "xhigh", auth_mode: "api_key" };
+  const translated = { provider: "openai", model: "gpt-5.3-codex-spark", effort: "high", auth_mode: "chatgpt_oauth" };
+
+  it.each(["en", "zh-Hant"] as const)("shows distinct cached translation and original receipts in %s", async (locale) => {
+    await switchLocale(locale);
+    apiMocks.getCard.mockResolvedValue({ ...CARD_DETAIL, execution_receipt: original });
+    apiMocks.translateCard.mockResolvedValue({ ...TRANSLATION_RESULT, cached: true, execution_receipt: translated });
+    await mount(<CardModal runId={RUN_ID} developerMode={false} onClose={vi.fn()} onNavigateTarget={vi.fn()} />);
+    expect(apiMocks.translateCard).not.toHaveBeenCalled();
+    expect(host!.querySelector('[data-execution-source="original"]')?.textContent).toContain("openai · gpt-5.6-luna");
+    await click(buttonByText("繁中"));
+    const originalLine = host!.querySelector('[data-execution-source="original"]')?.textContent;
+    const translationLine = host!.querySelector('[data-execution-source="translation"]')?.textContent;
+    expect(originalLine).toContain("xhigh");
+    expect(originalLine).toContain("API key");
+    expect(translationLine).toContain("gpt-5.3-codex-spark");
+    expect(translationLine).toContain("high");
+    expect(translationLine).toContain(locale === "en" ? "ChatGPT subscription sign-in" : "ChatGPT 訂閱登入");
+    expect(translationLine).not.toContain("gpt-5.6-luna");
+    await click(buttonByText("EN"));
+    await click(buttonByText("繁中"));
+    expect(apiMocks.translateCard).toHaveBeenCalledExactlyOnceWith(RUN_ID, "zh-Hant", undefined);
+  });
+
+  it("keeps old translation and receipt pending and on refresh failure, then retries explicitly", async () => {
+    await switchLocale("en");
+    const pending = deferred<typeof TRANSLATION_RESULT>();
+    apiMocks.translateCard.mockResolvedValueOnce({ ...TRANSLATION_RESULT, execution_receipt: translated })
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce({ ...TRANSLATION_RESULT, card: card({ conclusion: "REFRESHED" }), execution_receipt: original });
+    await mountCardView();
+    await click(buttonByText("繁中"));
+    const refresh = host!.querySelector<HTMLButtonElement>('button[aria-label="Retranslate"]');
+    expect(refresh).not.toBeNull();
+    await click(refresh!);
+    expect(refresh!.disabled).toBe(true);
+    expect(buttonByText("繁中").disabled).toBe(true);
+    expect(host!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
+    expect(host!.querySelector('[data-execution-source="translation"]')?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(apiMocks.translateCard).toHaveBeenLastCalledWith(RUN_ID, "zh-Hant", undefined, { refresh: true });
+    await act(async () => { pending.reject(structuredError("translation_auth_rejected")); await pending.promise.catch(() => undefined); });
+    expect(host!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
+    expect(host!.querySelector('[data-execution-source="translation"]')?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(host!.querySelector('[role="alert"]')).not.toBeNull();
+    expect(host!.textContent).not.toContain("sk-private");
+    await click(buttonByText("EN"));
+    await click(buttonByText("繁中"));
+    expect(apiMocks.translateCard).toHaveBeenCalledTimes(2);
+    await click(buttonByText("Retry"));
+    expect(apiMocks.translateCard).toHaveBeenLastCalledWith(RUN_ID, "zh-Hant", undefined, { refresh: true });
+    expect(host!.querySelector(".cardview-concl")?.textContent).toBe("REFRESHED");
+    expect(host!.querySelector('[data-execution-source="translation"]')?.textContent).toContain("gpt-5.6-luna");
+    expect(host!.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("renders legacy translation fields as unknown without borrowing the original receipt", async () => {
+    await switchLocale("en");
+    apiMocks.getCard.mockResolvedValue({ ...CARD_DETAIL, execution_receipt: original });
+    apiMocks.translateCard.mockResolvedValue({ ...TRANSLATION_RESULT, execution_receipt: { provider: null, model: null, effort: null, auth_mode: null } });
+    await mount(<CardModal runId={RUN_ID} developerMode={false} onClose={vi.fn()} onNavigateTarget={vi.fn()} />);
+    await click(buttonByText("繁中"));
+    const source = host!.querySelector('[data-execution-source="translation"]')?.textContent;
+    expect(source?.match(/Unknown/g)).toHaveLength(4);
+    expect(source).not.toContain("gpt-5.6-luna");
+  });
+
+  it("keeps the original for an explicit empty-prose no-op without claiming a translation source", async () => {
+    await switchLocale("en");
+    apiMocks.translateCard.mockResolvedValue({ run_id: RUN_ID, lang: "zh-Hant", cached: false, card: { ticker: TICKER }, execution_receipt: null, no_op: true });
+    await mountCardView();
+    await click(buttonByText("繁中"));
+    expect(host!.querySelector(".cardview-concl")?.textContent).toBe(SOURCE_CONCLUSION);
+    expect(host!.textContent).toContain("No text to translate");
+    expect(host!.querySelector('[data-execution-source="translation"]')).toBeNull();
+    await click(buttonByText("EN"));
+    await click(buttonByText("繁中"));
+    expect(apiMocks.translateCard).toHaveBeenCalledTimes(1);
   });
 });

@@ -1216,6 +1216,9 @@ const explore = {
     },
   },
   aiCard: {
+    retranslate: "重新翻譯",
+    retranslating: "重新翻譯中...",
+    translationNoOp: "沒有可翻譯的文字",
     tickerCardLabel: "{{ticker}} AI 卡片",
     cardLabel: "AI 卡片",
     savedAsReport: "已存為報告",

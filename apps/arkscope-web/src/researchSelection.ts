@@ -148,49 +148,25 @@ function blocked(
   };
 }
 
-function defaultResearchSelection(): ExplicitResearchTuple {
-  return { provider: "openai", model: "gpt-5.6-luna", effort: "xhigh" };
-}
-
 export function resolveResearchSelection({
   catalog,
-  hasActiveThread,
-  threadSelection,
   userSelection = null,
-  preferenceStorage = defaultStorage(),
   sdkAvailability,
 }: {
   catalog: ModelCatalog;
-  hasActiveThread: boolean;
-  threadSelection: ResearchTuple | null | undefined;
+  // Legacy callers may supply these, but neither history nor global preferences authorize a run.
+  hasActiveThread?: boolean;
+  threadSelection?: ResearchTuple | null;
   userSelection?: ExplicitResearchTuple | null;
   preferenceStorage?: StorageReader | null;
   sdkAvailability?: Partial<Record<ModelProvider, boolean>>;
 }): ResearchSelectionResult {
-  let tuple: ResearchTuple | null = normalizeExplicitTuple(userSelection);
+  let tuple: ResearchTuple | null = normalizeTuple(userSelection);
   let provenance: ResearchSelectionProvenance | null = tuple ? "user" : null;
 
-  if (!tuple && hasActiveThread && threadSelection === undefined) {
-    return {
-      state: "needs_selection",
-      tuple: null,
-      provenance: null,
-      reasonCode: null,
-      authMode: null,
-      quotaKind: null,
-    };
-  }
-  if (!tuple && hasActiveThread && threadSelection) {
-    tuple = normalizeTuple(threadSelection);
-    provenance = "thread";
-  }
-  if (!tuple && !hasActiveThread) {
-    tuple = readExplicitResearchSelection(preferenceStorage);
-    if (tuple) provenance = "explicit";
-  }
-  if (!tuple) {
-    tuple = defaultResearchSelection();
-    provenance = "explicit";
+  if (!userSelection) {
+    tuple = normalizeTuple(catalog.routes.ai_research);
+    provenance = tuple ? "settings" : null;
   }
   if (!tuple || !provenance) {
     return {

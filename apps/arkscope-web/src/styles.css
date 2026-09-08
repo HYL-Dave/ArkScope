@@ -694,11 +694,13 @@ table.wl tbody tr.archived td {
 }
 .aicard-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 .aicard-q {
   flex: 1;
+  min-width: min(100%, 220px);
   background: var(--panel2);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -746,9 +748,34 @@ table.wl tbody tr.archived td {
 }
 .cardview-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+.aicard-actions > button,
+.cardview-head > button,
+.cardview-head > .lang-toggle {
+  flex-shrink: 0;
+}
+.cardview-head .lang-toggle .btn-ghost:last-child {
+  min-width: 100px;
+}
+.modal-card .ui-inline-alert {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.modal-card .ui-inline-alert > .ui-status-badge,
+.modal-card .ui-inline-alert > .ui-inline-alert-action {
+  justify-self: start;
+}
+.modal-card .ui-inline-alert > .ui-status-badge {
+  white-space: normal;
+}
+.modal-card .ui-inline-alert > .ui-inline-alert-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .cardview-q {
   margin: 0 0 4px;
@@ -3972,7 +3999,7 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
 .investigation-targets option { padding: 7px 10px; }
 .investigation-panel { min-width: 0; border-left: 1px solid var(--border); padding-left: 24px; }
 .investigation-panel p, .investigation-panel a, .investigation-panel li, .investigation-panel dd { overflow-wrap: anywhere; }
-.investigation-execution { color: var(--muted); }
+.execution-source { margin: 4px 0; line-height: 1.5; overflow-wrap: anywhere; }
 .investigation-result, .investigation-review { padding: 18px 0; border-top: 1px solid var(--border); margin-top: 18px; }
 .investigation-result h4, .investigation-review h4 { font-size: 16px; margin: 0 0 10px; }
 .investigation-conclusion { line-height: 1.7; white-space: pre-wrap; }

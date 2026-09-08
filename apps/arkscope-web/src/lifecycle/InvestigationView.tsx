@@ -10,6 +10,7 @@ import { getInvestigationTargets, getInvestigationPreflight, latestInvestigation
 import type { NavigationTarget } from "../shell/navigation";
 import { Button, IconButton } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { ExecutionSource } from "../ExecutionSource";
 import { LifecycleActivityBand, type LifecycleActivityItem } from "./LifecycleActivityBand";
 import { investigationCopy, investigationReason } from "./investigationPresentation";
 import { currentReviewCopy } from "./currentReviewPresentation";
@@ -205,7 +206,7 @@ function InvestigationPanel({ ticker, locale, revision, onChanged }: { ticker: s
     } catch (e) { if (mounted.current) { setError(errorCode(e)); setPacket(null); } }
     finally { lock.current = false; if (mounted.current) { setBusy(false); setDialog(null); } }
   }
-  const identity = run?.target ?? preflight?.target, selected = run?.execution ?? preflight?.execution;
+  const identity = run?.target ?? preflight?.target;
   const groups = packet ? Object.entries(packet.effects.watchlists).flatMap(([kind, rows]) => rows.map(row => `${web.effects[kind as keyof typeof web.effects]} / ${row.list_name}: ${row.ticker}`))
     .concat((packet.effects.sa_tracking_memberships ?? []).map(row => `${current.affectedMemberships}: ${row.ticker} (${row.picked_date})`))
     .concat(Object.entries(packet.effects.legacy_config_seed).flatMap(([kind, rows]) => rows.map(row => `${web.effects[kind as keyof typeof web.effects]} / ${row.source_key}: ${row.ticker}`)))
@@ -219,7 +220,7 @@ function InvestigationPanel({ ticker, locale, revision, onChanged }: { ticker: s
     <ListingSources ticker={ticker} locale={locale} revision={revision} onChanged={onChanged} disabled={busy || active || preflight?.reason === "target_not_tracked"}
       onReview={digest => void preview({}, digest)} />
     {preflight && !preflight.available && <p>{investigationReason(preflight.reason, locale)}</p>}
-    {selected && <p className="tiny investigation-execution">{selected.model} · {web.auth[selected.auth_mode]} · {selected.effort}</p>}
+    {run && <ExecutionSource source="previous" receipt={run.execution} />}
     <div className="lifecycle-commands">{active ? <Button icon={<Square size={14} />} disabled={busy || run.cancel_requested} onClick={() => void stop()}>{copy.stop}</Button>
       : <Button tone="primary" icon={<Search size={15} />} disabled={busy || loading || !preflight?.available} onClick={e => { opener.current = e.currentTarget; setDialog("start"); }}>{run ? copy.rerun : copy.start}</Button>}
       {run && <span role="status">{copy.status[run.status]}{active && <> / {copy.phases[run.phase as keyof typeof copy.phases] ?? copy.phaseUnknown}</>}</span>}</div>
@@ -275,7 +276,7 @@ function InvestigationPanel({ ticker, locale, revision, onChanged }: { ticker: s
     </section>}
     <ConfirmDialog open={dialog !== null} title={dialogTitle} confirmLabel={dialog === "start" ? copy.start : current.confirm}
       busy={busy} tone={dialog === "start" ? "primary" : "danger"} onCancel={() => setDialog(null)} onConfirm={() => void submit()} returnFocusRef={opener}
-      consequence={dialog === "start" ? <><p>{preflight?.credential_label} / {preflight?.execution?.model}</p>
+      consequence={dialog === "start" ? <><ExecutionSource source="next" receipt={preflight?.execution} />
         <p>{copy.budget.replace("{models}", String(preflight?.limits?.model_submissions)).replace("{searches}", String(preflight?.limits?.web_actions)).replace("{reads}", String(preflight?.limits?.source_reads))}</p>
         <p>{copy.policy}</p><p>{copy.inBackground}</p>{preflight?.limits?.search_enforcement === "observed" && <p>{copy.nativeObserved}</p>}</>
         : <><p>{packet?.finding.impact_summary}</p><p>{packet?.action === "symbol_continuation" ? current.renameEffect : current.removeEffect}</p><ul>{groups.map((g, i) => <li key={i}>{g}</li>)}</ul><p>{current.preserved}</p></>} />

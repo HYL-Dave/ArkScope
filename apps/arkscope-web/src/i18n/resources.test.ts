@@ -98,7 +98,7 @@ describe("bundled i18n resources", () => {
       alphaTracking: 34,
       news: 45,
       tickerDetail: 89,
-      aiCard: 67,
+      aiCard: 70,
       tags: 7,
     } as const;
     const expectedCountCopy = {
@@ -265,7 +265,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(1337);
+      expect(flattened.size, `${locale}.explore`).toBe(1340);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -733,11 +733,11 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 75,
+      common: 82,
       shell: 37,
       settings: 919,
       research: 207,
-      explore: 1337,
+      explore: 1340,
       portfolio: 374,
       system: 24,
     } as const;
@@ -821,7 +821,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2973);
+      expect(total, `${locale}.total`).toBe(2983);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(

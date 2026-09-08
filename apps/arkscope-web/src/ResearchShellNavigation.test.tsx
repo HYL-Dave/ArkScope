@@ -579,7 +579,7 @@ describe("Research shell navigation", () => {
     ))).toBe(true));
   });
 
-  it("keeps selection failures fail-closed and lets the user retry", async () => {
+  it("preserves thread load errors but does not require historical selection to use Settings", async () => {
     const transientFetch = stubResearchFetch({
       threads: [thread("thread-a", "Thread A")],
       exactResponses: { "transient-thread": json({ detail: "temporary failure" }, 500) },
@@ -611,26 +611,12 @@ describe("Research shell navigation", () => {
     expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread A");
     expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("thread-a");
 
-    const retry = await vi.waitFor(() => {
-      const button = Array.from(host!.querySelectorAll("button"))
-        .find((candidate) => candidate.textContent?.trim() === "重新確認模型");
-      expect(button).toBeDefined();
-      return button as HTMLButtonElement;
-    });
-    expect(host!.textContent).toContain("無法確認此對話上次使用的模型");
-    const send = Array.from(host!.querySelectorAll("button"))
-      .find((candidate) => candidate.textContent?.trim() === "送出") as HTMLButtonElement;
-    expect(send.disabled).toBe(true);
-
-    await click(retry);
-    await vi.waitFor(() => {
-      expect(host!.textContent).not.toContain("無法確認此對話上次使用的模型");
-      expect(host!.textContent).toContain("研究模型：openai · gpt-5.6-luna · high");
-    });
+    expect(host!.textContent).not.toContain("無法確認此對話上次使用的模型");
+    expect(host!.textContent).toContain("研究模型：openai · gpt-5.6-luna · high");
     const selectionCalls = fetchMock.mock.calls.filter(([input]) => (
       new URL(String(input)).pathname === "/research/threads/thread-a/selection"
     ));
-    expect(selectionCalls).toHaveLength(2);
+    expect(selectionCalls).toHaveLength(0);
   });
 
   it("reports a created run before replay and reports the terminal replay DTO", async () => {
@@ -653,13 +639,11 @@ describe("Research shell navigation", () => {
     const selectionCall = fetchMock.mock.calls.find(([input]) => (
       new URL(String(input)).pathname === "/research/threads/thread-a/selection"
     ));
-    expect(selectionCall?.[1]).toEqual(expect.objectContaining({
-      signal: expect.any(AbortSignal),
-    }));
+    expect(selectionCall).toBeUndefined();
     let openAiRoute: HTMLButtonElement | undefined;
     await vi.waitFor(() => {
-      openAiRoute = Array.from(host!.querySelectorAll("button"))
-        .find((candidate) => candidate.textContent?.includes("OpenAI / gpt-5.6-luna"));
+      openAiRoute = Array.from(host!.querySelectorAll<HTMLButtonElement>(".research-providerbar button"))
+        .find((candidate) => candidate.textContent?.includes("OpenAI"));
       expect(openAiRoute).toBeDefined();
     });
     await click(openAiRoute!);

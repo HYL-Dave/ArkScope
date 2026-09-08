@@ -59,6 +59,23 @@ it("shows unavailable setup with an exit to Settings without launching", async (
   expect(navigate).toHaveBeenCalledWith({ kind: "settings_section", section: "models" });
   expect(mocks.startInvestigation).not.toHaveBeenCalled();
 });
+it.each(["en", "zh-Hant"])("separates historical source from the full next-run preflight in %s", async locale => {
+  await i18n.changeLanguage(locale);
+  mocks.latestInvestigation.mockResolvedValue({ ...(await mocks.getInvestigation()), status: "succeeded", phase: "finished",
+    execution: { provider: "openai", model: "gpt-5.4-mini", effort: "low", auth_mode: "api_key" } });
+  await act(async () => root.render(<LifecycleView initialTicker="TA" />));
+  const previous = host.querySelector('[data-execution-source="previous"]');
+  expect(previous?.textContent).toContain("openai · gpt-5.4-mini");
+  expect(previous?.textContent).toContain("low");
+  expect(previous?.textContent).toContain("API key");
+  await act(async () => button(locale === "en" ? "Investigate again" : "重新調查").click());
+  const next = document.querySelector('[role="dialog"] [data-execution-source="next"]')?.textContent;
+  expect(next).toContain("anthropic · claude-sonnet-5");
+  expect(next).toContain("high");
+  expect(next).toContain(locale === "en" ? "Claude subscription sign-in" : "Claude 訂閱登入");
+  expect(next).not.toContain("gpt-5.4-mini");
+  expect(mocks.startInvestigation).not.toHaveBeenCalled();
+});
 it("provider checking is separately confirmed and never launches an LLM", async () => {
   await act(async () => root.render(<LifecycleView initialTicker="TA" />));
   expect(mocks.checkInvestigationProviders).not.toHaveBeenCalled();
