@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="65" skipped="0" tests="132" time="8.455" timestamp="2026-09-08T20:28:24.402031+08:00" hostname="ais"><testcase classname="tests.test_data_scheduler" name="test_synthetic_provider_config_does_not_inherit_file_provenance[MASSIVE_API_KEY]" time="0.249"><failure message="AssertionError: assert 'config/.env' == 'env'&#10;  &#10;  - env&#10;  + config/.env">tests/test_data_scheduler.py:160: in test_synthetic_provider_config_does_not_inherit_file_provenance
+    assert effective_source(env_var) == "env"
+E   AssertionError: assert 'config/.env' == 'env'
+E     
+E     - env
+E     + config/.env</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_synthetic_provider_config_does_not_inherit_file_provenance[FINNHUB_API_KEY]" time="0.062"><failure message="AssertionError: assert 'config/.env' == 'env'&#10;  &#10;  - env&#10;  + config/.env">tests/test_data_scheduler.py:160: in test_synthetic_provider_config_does_not_inherit_file_provenance
+    assert effective_source(env_var) == "env"
+E   AssertionError: assert 'config/.env' == 'env'
+E     
+E     - env
+E     + config/.env</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_synthetic_provider_config_does_not_inherit_file_provenance[IBKR_HOST]" time="0.026"><failure message="AssertionError: assert 'config/.env' == 'env'&#10;  &#10;  - env&#10;  + config/.env">tests/test_data_scheduler.py:160: in test_synthetic_provider_config_does_not_inherit_file_provenance
+    assert effective_source(env_var) == "env"
+E   AssertionError: assert 'config/.env' == 'env'
+E     
+E     - env
+E     + config/.env</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_synthetic_provider_config_does_not_inherit_file_provenance[IBKR_PORT]" time="0.023"><failure message="AssertionError: assert 'config/.env' == 'env'&#10;  &#10;  - env&#10;  + config/.env">tests/test_data_scheduler.py:160: in test_synthetic_provider_config_does_not_inherit_file_provenance
+    assert effective_source(env_var) == "env"
+E   AssertionError: assert 'config/.env' == 'env'
+E     
+E     - env
+E     + config/.env</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_synthetic_provider_config_does_not_inherit_file_provenance[IBKR_CLIENT_ID]" time="0.024"><failure message="AssertionError: assert 'config/.env' == 'env'&#10;  &#10;  - env&#10;  + config/.env">tests/test_data_scheduler.py:160: in test_synthetic_provider_config_does_not_inherit_file_provenance
+    assert effective_source(env_var) == "env"
+E   AssertionError: assert 'config/.env' == 'env'
+E     
+E     - env
+E     + config/.env</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_defaults_everything_disabled" time="0.031" /><testcase classname="tests.test_data_scheduler" name="test_no_active_runtime_source_uses_migrate_to_supabase_sync" time="0.023" /><testcase classname="tests.test_data_scheduler" name="test_scheduler_runtime_no_longer_references_migrate_to_supabase_script" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_scheduler_source_defs_have_no_legacy_collector_plumbing" time="0.023" /><testcase classname="tests.test_data_scheduler" name="test_status_snapshot_provider_fetch_tracks_live_fetch_paths" time="0.031" /><testcase classname="tests.test_data_scheduler" name="test_set_config_roundtrip_and_clamp" time="0.035" /><testcase classname="tests.test_data_scheduler" name="test_set_config_unknown_source" time="0.023" /><testcase classname="tests.test_data_scheduler" name="test_is_due_matrix" time="0.034" /><testcase classname="tests.test_data_scheduler" name="test_tick_fires_only_enabled_and_due" time="0.039" /><testcase classname="tests.test_data_scheduler" name="test_empty_profile_settings_snapshot_never_makes_lifecycle_automation_due" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_tick_uses_the_lock_owned_lifecycle_run_and_record_boundary" time="0.035" /><testcase classname="tests.test_data_scheduler" name="test_tick_runs_due_ticker_transitions_before_provider_dispatch" time="0.043" /><testcase classname="tests.test_data_scheduler" name="test_tick_runs_lifecycle_automation_before_transitions_and_provider_dispatch" time="0.040" /><testcase classname="tests.test_data_scheduler" name="test_lifecycle_automation_uses_durable_five_minute_clock_and_batch_limit" time="0.058" /><testcase classname="tests.test_data_scheduler" name="test_legacy_disabled_auto_apply_blocks_automation_but_keeps_attended_runner" time="0.035" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[automation_policy-false-false-approved]" time="0.244" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[automation_policy-false-true-approved]" time="0.127" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[automation_policy-true-false-approved]" time="0.131" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[automation_policy-true-true-applied]" time="0.144" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[attended_user-false-false-approved]" time="0.150" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[attended_user-false-true-approved]" time="0.146" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[attended_user-true-false-approved]" time="0.149" /><testcase classname="tests.test_data_scheduler" name="test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[attended_user-true-true-applied]" time="0.147" /><testcase classname="tests.test_data_scheduler" name="test_malformed_lifecycle_config_disables_analysis_and_mutation" time="0.037" /><testcase classname="tests.test_data_scheduler" name="test_profile_mutation_authority_distinguishes_disabled_from_unavailable" time="0.024" /><testcase classname="tests.test_data_scheduler" name="test_tick_records_typed_transition_failure_when_authority_read_is_unavailable" time="0.032" /><testcase classname="tests.test_data_scheduler" name="test_tick_rereads_mutation_authority_after_lifecycle_analysis" time="0.040" /><testcase classname="tests.test_data_scheduler" name="test_tick_records_lifecycle_automation_failure_and_continues" time="0.041" /><testcase classname="tests.test_data_scheduler" name="test_tick_deduplicates_ticker_transition_failure_and_records_recovery" time="0.072" /><testcase classname="tests.test_data_scheduler" name="test_tick_records_sanitized_unexpected_ticker_runner_failure_and_continues" time="0.046" /><testcase classname="tests.test_data_scheduler" name="test_tick_records_non_mapping_ticker_runner_result_as_failed_witness[None]" time="0.048" /><testcase classname="tests.test_data_scheduler" name="test_tick_records_non_mapping_ticker_runner_result_as_failed_witness[runner_result1]" time="0.048" /><testcase classname="tests.test_data_scheduler" name="test_tick_once_defers_extra_market_writers" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_startup_burst_defers_all_extra_market_writers" time="0.027" /><testcase classname="tests.test_data_scheduler" name="test_market_writer_backpressure_is_not_failed" time="0.028" /><testcase classname="tests.test_data_scheduler" name="test_run_source_provider_config_missing_returns_not_configured" time="0.179" /><testcase classname="tests.test_data_scheduler" name="test_polygon_news_keeps_its_source_id_but_uses_massive_config_authority" time="0.064" /><testcase classname="tests.test_data_scheduler" name="test_normalized_massive_provider_missing_key_names_only_canonical_bridge" time="0.029" /><testcase classname="tests.test_data_scheduler" name="test_run_source_news_direct_when_use_local_news_on" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1106: in test_run_source_news_direct_when_use_local_news_on
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_news_write_mode_classifier_is_exhaustive_for_current_modes" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_telemetry" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_normalized_news_route_calls_writer_under_market_lock[polygon_news-polygon-src.collectors.polygon_news-CollectionConfig-PolygonNewsCollector-PolygonNormalizedProvider]" time="0.030"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1372: in test_normalized_news_route_calls_writer_under_market_lock
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_news_route_calls_writer_under_market_lock[finnhub_news-finnhub-src.collectors.finnhub_news-FinnhubConfig-FinnhubNewsCollector-FinnhubNormalizedProvider]" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1372: in test_normalized_news_route_calls_writer_under_market_lock
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_news_route_preserves_writer_partial_continuation" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:1460: in test_normalized_news_route_preserves_writer_partial_continuation
+    assert res["status"] == "partial"
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_news_scheduler_skips_pending_continuation" time="0.031"><failure message="AssertionError: assert 'not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured">tests/test_data_scheduler.py:1498: in test_normalized_news_scheduler_skips_pending_continuation
+    assert res["status"] == "skipped"
+E   AssertionError: assert 'not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_legacy_local_news_route_runs_despite_stale_normalized_continuation" time="0.030"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1543: in test_legacy_local_news_route_runs_despite_stale_normalized_continuation
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_blocked_news_route_fails_despite_stale_normalized_continuation" time="0.032"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:1585: in test_blocked_news_route_fails_despite_stale_normalized_continuation
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_it" time="0.030"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1632: in test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_it
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_manual_normalized_body_continuation_does_not_require_active_scope" time="0.031"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1686: in test_manual_normalized_body_continuation_does_not_require_active_scope
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_failed_manual_normalized_continuation_preserves_pending" time="0.031"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:1728: in test_failed_manual_normalized_continuation_preserves_pending
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_news_partial_without_continuation_stays_partial" time="0.041"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:1796: in test_normalized_news_partial_without_continuation_stays_partial
+    assert res["status"] == "partial"
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_local_news_route_keeps_single_direct_writer" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1836: in test_local_news_route_keeps_single_direct_writer
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_ibkr_news_route_launches_isolated_worker" time="0.028"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1881: in test_normalized_ibkr_news_route_launches_isolated_worker
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_current_news_route_launches_normalized_worker" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1929: in test_current_news_route_launches_normalized_worker
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailable" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:1970: in test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailable
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_ibkr_news_fails_closed_when_local_route_state_cannot_be_read" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:1999: in test_ibkr_news_fails_closed_when_local_route_state_cannot_be_read
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial" time="0.024"><failure message="assert 0 == 1&#10; +  where 0 = len([])">tests/test_data_scheduler.py:2039: in test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial
+    assert len(subprocess_calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_ibkr_worker_failure_hides_raw_child_stderr" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2089: in test_normalized_ibkr_worker_failure_hides_raw_child_stderr
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_normalized_ibkr_worker_invalid_stdout_is_generic_failure" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2120: in test_normalized_ibkr_worker_invalid_stdout_is_generic_failure
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror" time="0.024"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2141: in test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_post_exit_blocked_news_route_fails_closed_and_records_failure" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2166: in test_post_exit_blocked_news_route_fails_closed_and_records_failure
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_adapter_failure_short_circuits" time="0.024"><failure message="AssertionError: assert ('not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured)">tests/test_data_scheduler.py:2184: in test_run_source_adapter_failure_short_circuits
+    assert res["status"] == "failed" and "FINNHUB_API_KEY" in res["error"]
+E   AssertionError: assert ('not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_default_ibkr_legacy_news_route_does_not_launch_collector" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2198: in test_default_ibkr_legacy_news_route_does_not_launch_collector
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_skips_when_already_running" time="0.026"><failure message="AssertionError: assert ('not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured)">tests/test_data_scheduler.py:2208: in test_run_source_skips_when_already_running
+    assert res["status"] == "skipped" and "already running" in res["reason"]
+E   AssertionError: assert ('not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_ibkr_sources_serialize_behind_gateway_lock" time="0.024"><failure message="AssertionError: assert ('not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured)">tests/test_data_scheduler.py:2218: in test_ibkr_sources_serialize_behind_gateway_lock
+    assert res["status"] == "skipped" and "IBKR" in res["reason"]
+E   AssertionError: assert ('not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_price_scope_required" time="0.026"><failure message="AssertionError: assert ('not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured)">tests/test_data_scheduler.py:2274: in test_price_scope_required
+    assert res["status"] == "failed" and "scope" in res["error"]
+E   AssertionError: assert ('not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_never_raises" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2300: in test_run_source_never_raises
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_skips_when_running_in_another_process" time="0.025"><failure message="AssertionError: assert ('not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured)">tests/test_data_scheduler.py:2323: in test_run_source_skips_when_running_in_another_process
+    assert res["status"] == "skipped" and "another process" in res["reason"]
+E   AssertionError: assert ('not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_ibkr_gateway_serializes_across_processes" time="0.024"><failure message="AssertionError: assert ('not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured)">tests/test_data_scheduler.py:2335: in test_ibkr_gateway_serializes_across_processes
+    assert res["status"] == "skipped" and "another process" in res["reason"]
+E   AssertionError: assert ('not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_releases_file_locks" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:2345: in test_run_source_releases_file_locks
+    assert ds.run_source("polygon_news")["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_missing_scheduler_state_uses_local_job_history_without_early_fire" time="0.040" /><testcase classname="tests.test_data_scheduler" name="test_get_schedule_snapshot_shape" time="0.047" /><testcase classname="tests.test_data_scheduler" name="test_schedule_status_exposes_current_news_route_metadata" time="0.031" /><testcase classname="tests.test_data_scheduler" name="test_put_schedule_validates" time="0.031" /><testcase classname="tests.test_data_scheduler" name="test_run_now_fires_background_and_skips_running" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_adapter_gets_universe_tickers_and_progress" time="0.024"><failure message="AssertionError: assert ('not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured)">tests/test_data_scheduler.py:2493: in test_adapter_gets_universe_tickers_and_progress
+    assert res["status"] == "succeeded" and res["ticker_count"] == 2
+E   AssertionError: assert ('not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_adapter_universe_unavailable_fails_loud" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2548: in test_adapter_universe_unavailable_fails_loud
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_explicit_tickers_reaches_active_adapter_without_mirror_controls" time="0.025"><failure message="AssertionError: assert ('not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured)">tests/test_data_scheduler.py:2583: in test_run_source_explicit_tickers_reaches_active_adapter_without_mirror_controls
+    assert res["status"] == "succeeded" and res["ticker_count"] == 2
+E   AssertionError: assert ('not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_schedule_routes_reject_removed_source_ids_before_writes_or_provider_work" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_last_result_surfaces_skips_in_snapshot" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured">tests/test_data_scheduler.py:2616: in test_last_result_surfaces_skips_in_snapshot
+    assert res["status"] == "skipped"
+E   AssertionError: assert 'not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_p0c1_ibkr_prices_runs_prices_worker_subprocess" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:2653: in test_p0c1_ibkr_prices_runs_prices_worker_subprocess
+    assert res["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_tick_invokes_membership_reconciliation_with_the_real_keyword_only_contract" time="0.035" /><testcase classname="tests.test_data_scheduler" name="test_price_repair_scope_change_is_reported_without_provider_dispatch" time="0.031" /><testcase classname="tests.test_data_scheduler" name="test_price_repair_rechecks_membership_after_waiting_for_gateway" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured">tests/test_data_scheduler.py:2690: in test_price_repair_rechecks_membership_after_waiting_for_gateway
+    assert result["status"] == "skipped"
+E   AssertionError: assert 'not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_price_repair_verifies_the_approved_window_and_persists_its_identity[True-remaining0]" time="0.129"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:2732: in test_price_repair_verifies_the_approved_window_and_persists_its_identity
+    assert result["status"] == ("partial" if remaining or not calendar_available else "succeeded")
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_price_repair_verifies_the_approved_window_and_persists_its_identity[True-remaining1]" time="0.030"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:2732: in test_price_repair_verifies_the_approved_window_and_persists_its_identity
+    assert result["status"] == ("partial" if remaining or not calendar_available else "succeeded")
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_price_repair_verifies_the_approved_window_and_persists_its_identity[False-remaining0]" time="0.032"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:2732: in test_price_repair_verifies_the_approved_window_and_persists_its_identity
+    assert result["status"] == ("partial" if remaining or not calendar_available else "succeeded")
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_price_repair_verifies_the_approved_window_and_persists_its_identity[False-remaining1]" time="0.031"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:2732: in test_price_repair_verifies_the_approved_window_and_persists_its_identity
+    assert result["status"] == ("partial" if remaining or not calendar_available else "succeeded")
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording[price_repair_integrity]" time="0.027"><failure message="KeyError: 'error'">tests/test_data_scheduler.py:2746: in test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording
+    assert result["error"] == error_code
+E   KeyError: 'error'</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording[price_repair_not_prepared]" time="0.025"><failure message="KeyError: 'error'">tests/test_data_scheduler.py:2746: in test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording
+    assert result["error"] == error_code
+E   KeyError: 'error'</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording[price_repair_plan_changed]" time="0.026"><failure message="KeyError: 'error'">tests/test_data_scheduler.py:2746: in test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording
+    assert result["error"] == error_code
+E   KeyError: 'error'</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_scheduler_repair_readback_is_bound_to_prepared_clock_and_measured_plan[False]" time="0.031"><failure message="AssertionError: assert 'not_configured' == 'succeeded'&#10;  &#10;  - succeeded&#10;  + not_configured">tests/test_data_scheduler.py:2781: in test_scheduler_repair_readback_is_bound_to_prepared_clock_and_measured_plan
+    assert result["status"] == "succeeded"
+E   AssertionError: assert 'not_configured' == 'succeeded'
+E     
+E     - succeeded
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_scheduler_repair_readback_is_bound_to_prepared_clock_and_measured_plan[True]" time="0.030"><failure message="AssertionError: assert ('not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured)">tests/test_data_scheduler.py:2778: in test_scheduler_repair_readback_is_bound_to_prepared_clock_and_measured_plan
+    assert result["status"] == "failed" and result["error"] == "price_repair_plan_changed"
+E   AssertionError: assert ('not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:2801: in test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation
+    assert result["status"] == "partial"
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_prices_failed_payload_persists_failed_without_partial" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2828: in test_prices_failed_payload_persists_failed_without_partial
+    assert result["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_prices_gateway_failure_persists_typed_diagnostic" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2857: in test_prices_gateway_failure_persists_typed_diagnostic
+    assert result["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_prices_success_clears_prior_partial_and_preserves_audit_history" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:2883: in test_prices_success_clears_prior_partial_and_preserves_audit_history
+    assert ds.run_source("ibkr_prices")["status"] == "partial"
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_price_partial_projection_does_not_change_normalized_news_audit_status" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'partial'&#10;  &#10;  - partial&#10;  + not_configured">tests/test_data_scheduler.py:2908: in test_price_partial_projection_does_not_change_normalized_news_audit_status
+    assert result["status"] == "partial"
+E   AssertionError: assert 'not_configured' == 'partial'
+E     
+E     - partial
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_persists_attempt_and_outcome_to_local_state" time="0.027"><failure message="assert None is not None">tests/test_data_scheduler.py:2924: in test_run_source_persists_attempt_and_outcome_to_local_state
+    assert row is not None
+E   assert None is not None</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_run_source_failure_persists_error_locally" time="0.026"><failure message="AssertionError: assert 'not_configured' == 'failed'&#10;  &#10;  - failed&#10;  + not_configured">tests/test_data_scheduler.py:2935: in test_run_source_failure_persists_error_locally
+    assert res["status"] == "failed"
+E   AssertionError: assert 'not_configured' == 'failed'
+E     
+E     - failed
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_skip_does_not_overwrite_durable_outcome" time="0.026"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_data_scheduler.py:2948: in test_skip_does_not_overwrite_durable_outcome
+    assert ds._state_store().get("polygon_news")["last_error"] == "real failure"[:200] or \
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_prices_worker_retryable_lock_busy_is_skip_not_failure" time="0.025"><failure message="AssertionError: assert 'not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured">tests/test_data_scheduler.py:2979: in test_prices_worker_retryable_lock_busy_is_skip_not_failure
+    assert res["status"] == "skipped"
+E   AssertionError: assert 'not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_seed_last_attempts_from_local_state" time="0.027" /><testcase classname="tests.test_data_scheduler" name="test_ibkr_lock_skip_does_not_leave_durable_running" time="0.031"><failure message="AssertionError: assert ('not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured)">tests/test_data_scheduler.py:3011: in test_ibkr_lock_skip_does_not_leave_durable_running
+    assert res["status"] == "skipped" and "IBKR gateway busy" in res["reason"]
+E   AssertionError: assert ('not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured)</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_status_snapshot_marks_stale_running_durable_state" time="0.035" /><testcase classname="tests.test_data_scheduler" name="test_reconcile_interrupted_runtime_state_marks_local_running_rows" time="0.044" /><testcase classname="tests.test_data_scheduler" name="test_lifecycle_startup_reconciliation_failure_replaces_running_telemetry" time="0.032" /><testcase classname="tests.test_data_scheduler" name="test_startup_fallback_never_writes_a_foreign_blob_to_the_lifecycle_source" time="0.035" /><testcase classname="tests.test_data_scheduler" name="test_v14a_status_snapshot_no_create_on_fresh_db" time="0.031" /><testcase classname="tests.test_data_scheduler" name="test_sanitized_ibkr_news_worker_timeout_returns_failed_payload" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_sanitized_ibkr_news_worker_parser_preserves_gateway_unavailable_code" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_run_source_refuses_provider_work_when_provider_config_setup_required" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_prices_worker_stdout_parse_preserves_retryable_and_counts" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_prices_worker_stdout_parser_preserves_allowlisted_gateway_code" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_prices_worker_stdout_parser_preserves_partial_truth_and_bounded_tickers" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_prices_worker_stdout_parser_rejects_malformed_partial_payloads" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_normalized_news_lock_busy_is_retryable_skip" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured">tests/test_data_scheduler.py:3355: in test_normalized_news_lock_busy_is_retryable_skip
+    assert res["status"] == "skipped"
+E   AssertionError: assert 'not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_scheduler_passes_market_lock_factory_to_normalized_news_writer" time="0.026" /><testcase classname="tests.test_data_scheduler" name="test_ibkr_news_worker_stdout_parse_preserves_retryable_lock_busy" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure" time="0.027"><failure message="AssertionError: assert 'not_configured' == 'skipped'&#10;  &#10;  - skipped&#10;  + not_configured">tests/test_data_scheduler.py:3477: in test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure
+    assert res["status"] == "skipped"
+E   AssertionError: assert 'not_configured' == 'skipped'
+E     
+E     - skipped
+E     + not_configured</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_worker_stdout_parse_preserves_retry_legs_and_body_backlog" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_worker_stdout_parser_rejects_malformed_body_backlog_values" time="0.027" /><testcase classname="tests.test_data_scheduler" name="test_worker_stdout_parse_preserves_entitlement_block_count" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_worker_stdout_parser_rejects_malformed_entitlement_block_count" time="0.025" /><testcase classname="tests.test_data_scheduler" name="test_ibkr_success_persists_scheduled_backlog_without_partial" time="0.027"><failure message="KeyError: 'argv'">tests/test_data_scheduler.py:3663: in test_ibkr_success_persists_scheduled_backlog_without_partial
+    result, argv = _run_ibkr_worker_payload(monkeypatch, payload)
+tests/test_data_scheduler.py:3642: in _run_ibkr_worker_payload
+    return result, seen["argv"]
+E   KeyError: 'argv'</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_ibkr_retry_failure_persists_partial_without_manual_continuation" time="0.025"><failure message="KeyError: 'argv'">tests/test_data_scheduler.py:3694: in test_ibkr_retry_failure_persists_partial_without_manual_continuation
+    result, _ = _run_ibkr_worker_payload(monkeypatch, payload)
+tests/test_data_scheduler.py:3642: in _run_ibkr_worker_payload
+    return result, seen["argv"]
+E   KeyError: 'argv'</failure></testcase><testcase classname="tests.test_data_scheduler" name="test_ibkr_backlog_unavailable_is_partial_without_fake_zero" time="0.030"><failure message="KeyError: 'argv'">tests/test_data_scheduler.py:3714: in test_ibkr_backlog_unavailable_is_partial_without_fake_zero
+    result, _ = _run_ibkr_worker_payload(monkeypatch, payload)
+tests/test_data_scheduler.py:3642: in _run_ibkr_worker_payload
+    return result, seen["argv"]
+E   KeyError: 'argv'</failure></testcase></testsuite></testsuites>
