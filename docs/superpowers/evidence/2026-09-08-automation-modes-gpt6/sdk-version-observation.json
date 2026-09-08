@@ -1,0 +1,13 @@
+{
+  "observed": {
+    "distribution": "0.2.152",
+    "module": "0.2.152",
+    "cli_metadata": "2.1.259",
+    "cli_probe": "2.1.259"
+  },
+  "reviewed": {
+    "sdk": "0.2.151",
+    "cli": "2.1.258"
+  },
+  "provider_requests": 0
+}

@@ -1,0 +1,13 @@
+
+> arkscope-web@0.0.1 test
+> vitest run --run
+
+
+ RUN  v4.1.8 /tmp/arkscope-tracking-history-provenance/apps/arkscope-web
+
+
+ Test Files  124 passed (124)
+      Tests  1700 passed (1700)
+   Start at  16:56:37
+   Duration  11.87s (transform 73.28s, setup 34.06s, import 90.08s, tests 73.25s, environment 78.02s)
+

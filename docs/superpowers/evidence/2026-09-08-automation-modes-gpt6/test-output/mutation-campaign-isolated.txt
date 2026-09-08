@@ -1,0 +1,332 @@
+{"stage": "completion_gate"}
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+............................FF.......................................... [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-synthesis] _
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    with _install_api(monkeypatch, handler), pytest.raises((RuntimeError, ValueError)):
+E   Failed: DID NOT RAISE any of (<class 'RuntimeError'>, <class 'ValueError'>)
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-translation] _
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    with _install_api(monkeypatch, handler), pytest.raises((RuntimeError, ValueError)):
+E   Failed: DID NOT RAISE any of (<class 'RuntimeError'>, <class 'ValueError'>)
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-translation]
+2 failed, 1042 passed, 1 warning in 55.91s
+{"stage": "completion_gate", "exit_code": 0}
+{"stage": "model_receipt"}
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+..........................................FF...........FFFFF............ [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-synthesis] _
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    with _install_api(monkeypatch, handler), pytest.raises((RuntimeError, ValueError)):
+E   Failed: DID NOT RAISE any of (<class 'RuntimeError'>, <class 'ValueError'>)
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-translation] _
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    with _install_api(monkeypatch, handler), pytest.raises((RuntimeError, ValueError)):
+E   Failed: DID NOT RAISE any of (<class 'RuntimeError'>, <class 'ValueError'>)
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-unreviewed] _
+tests/test_gpt6_admission.py:235: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-2026-99-99] _
+tests/test_gpt6_admission.py:235: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08] _
+tests/test_gpt6_admission.py:235: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra-2026-09-09] _
+tests/test_gpt6_admission.py:235: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra] _
+tests/test_gpt6_admission.py:235: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-unreviewed]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-2026-99-99]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra-2026-09-09]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra]
+7 failed, 1037 passed, 1 warning in 50.91s
+{"stage": "model_receipt", "exit_code": 0}
+{"stage": "translation_shape"}
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+..........FF............................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+...............................................................FFFF..... [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna] _
+tests/test_analysis_cards_api.py:355: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    with pytest.raises(HTTPException) as caught:
+E   Failed: DID NOT RAISE <class 'fastapi.exceptions.HTTPException'>
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5] _
+tests/test_analysis_cards_api.py:355: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    with pytest.raises(HTTPException) as caught:
+E   Failed: DID NOT RAISE <class 'fastapi.exceptions.HTTPException'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-openai] _
+tests/test_gpt6_admission.py:260: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-anthropic] _
+tests/test_gpt6_admission.py:260: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-openai] _
+tests/test_gpt6_admission.py:260: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-anthropic] _
+tests/test_gpt6_admission.py:260: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-openai]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-anthropic]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-openai]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-anthropic]
+6 failed, 1038 passed, 1 warning in 50.10s
+{"stage": "translation_shape", "exit_code": 0}
+{"stage": "disabled_mutation"}
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+........................................................................ [  6%]
+.................................................F.F.................... [ 13%]
+........................................................................ [ 20%]
+........................................................................ [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+................................................F....................... [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+..................................................F..................... [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_legacy_disabled_auto_apply_blocks_automation_but_keeps_attended_runner __
+tests/test_data_scheduler.py:498: in test_legacy_disabled_auto_apply_blocks_automation_but_keeps_attended_runner
+    assert mutation_allowed() is False
+E   assert True is False
+E    +  where True = <function _security_lifecycle_profile_mutation_allowed at 0x799f175c4820>()
+_ test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[automation_policy-false-true-approved] _
+tests/test_data_scheduler.py:552: in test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control
+    assert conn.execute(
+E   AssertionError: assert ('applied',) == ('approved',)
+E     
+E     At index 0 diff: 'applied' != 'approved'
+E     Use -v to get more diff
+_ test_legacy_settings_are_preserved_but_only_automatic_authorizes_mutation[false-true-False-False] _
+tests/test_security_lifecycle_automation_config.py:164: in test_legacy_settings_are_preserved_but_only_automatic_authorizes_mutation
+    assert state.effective_apply_profile_transitions is mutation
+E   assert True is False
+E    +  where True = SecurityLifecycleAutomationConfigState(config=SecurityLifecycleAutomationConfig(enabled=False, interval_minutes=5, batch_limit=2, apply_profile_transitions=True), invalid_keys=()).effective_apply_profile_transitions
+_ test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_gate _
+tests/test_security_lifecycle_routes.py:952: in test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_gate
+    assert mutation_allowed() is False
+E   assert True is False
+E    +  where True = <function _live_transition_mutation_authority.<locals>.allowed at 0x799f0569bac0>()
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_data_scheduler.py::test_legacy_disabled_auto_apply_blocks_automation_but_keeps_attended_runner
+FAILED tests/test_data_scheduler.py::test_tick_modes_gate_persisted_due_transitions_with_automatic_positive_control[automation_policy-false-true-approved]
+FAILED tests/test_security_lifecycle_automation_config.py::test_legacy_settings_are_preserved_but_only_automatic_authorizes_mutation[false-true-False-False]
+FAILED tests/test_security_lifecycle_routes.py::test_manual_run_bypasses_disabled_schedule_but_uses_batch_and_live_mutation_gate
+4 failed, 1040 passed, 1 warning in 51.79s
+{"stage": "disabled_mutation", "exit_code": 0}
+{"stage": "output_classification"}
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+.........FFF............................................................ [  6%]
+.................F...................................................... [ 13%]
+........................................................................ [ 20%]
+............................................................FFF......... [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-6-astra] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...'openai', ...} == {'code': 'tra...'openai', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...'openai', ...} == {'code': 'tra...'openai', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...thropic', ...} == {'code': 'tra...thropic', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_translation_failures_are_closed_and_safe[exc2-translation_output_invalid-False] _
+tests/test_content_translation_failures.py:118: in test_translation_failures_are_closed_and_safe
+    assert (got.code, got.retryable) == (code, retryable)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload0] ___
+tests/test_gpt6_admission.py:248: in test_astra_structured_output_must_satisfy_the_requested_schema
+    assert (failure.code, failure.retryable) == ("translation_output_invalid", False)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload1] ___
+tests/test_gpt6_admission.py:248: in test_astra_structured_output_must_satisfy_the_requested_schema
+    assert (failure.code, failure.retryable) == ("translation_output_invalid", False)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload2] ___
+tests/test_gpt6_admission.py:248: in test_astra_structured_output_must_satisfy_the_requested_schema
+    assert (failure.code, failure.retryable) == ("translation_output_invalid", False)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-6-astra]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5]
+FAILED tests/test_content_translation_failures.py::test_translation_failures_are_closed_and_safe[exc2-translation_output_invalid-False]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload0]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload1]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload2]
+7 failed, 1037 passed, 1 warning in 50.62s
+{"stage": "output_classification", "exit_code": 0}
+{"stage": "baseline"}
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+........................................................................ [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1044 passed, 1 warning in 49.47s
+{"stage": "baseline", "exit_code": 0}

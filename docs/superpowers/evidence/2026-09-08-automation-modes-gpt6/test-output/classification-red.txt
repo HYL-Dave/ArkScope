@@ -1,0 +1,67 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload0] ___
+tests/test_gpt6_admission.py:248: in test_astra_structured_output_must_satisfy_the_requested_schema
+    assert (failure.code, failure.retryable) == ("translation_output_invalid", False)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload1] ___
+tests/test_gpt6_admission.py:248: in test_astra_structured_output_must_satisfy_the_requested_schema
+    assert (failure.code, failure.retryable) == ("translation_output_invalid", False)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload2] ___
+tests/test_gpt6_admission.py:248: in test_astra_structured_output_must_satisfy_the_requested_schema
+    assert (failure.code, failure.retryable) == ("translation_output_invalid", False)
+E   AssertionError: assert ('translation..._error', True) == ('translation...valid', False)
+E     
+E     At index 0 diff: 'translation_provider_error' != 'translation_output_invalid'
+E     Use -v to get more diff
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-6-astra] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...'openai', ...} == {'code': 'tra...'openai', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...'openai', ...} == {'code': 'tra...'openai', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...thropic', ...} == {'code': 'tra...thropic', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+=========================== short test summary info ============================
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload0]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload1]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload2]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-6-astra]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5]
+6 failed, 65 deselected in 3.06s

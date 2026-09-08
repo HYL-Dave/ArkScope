@@ -1,0 +1,34 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+............................FF.......................................... [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-synthesis] _
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    with _install_api(monkeypatch, handler), pytest.raises((RuntimeError, ValueError)):
+E   Failed: DID NOT RAISE any of (<class 'RuntimeError'>, <class 'ValueError'>)
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-translation] _
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    with _install_api(monkeypatch, handler), pytest.raises((RuntimeError, ValueError)):
+E   Failed: DID NOT RAISE any of (<class 'RuntimeError'>, <class 'ValueError'>)
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-translation]
+2 failed, 1042 passed, 1 warning in 50.89s

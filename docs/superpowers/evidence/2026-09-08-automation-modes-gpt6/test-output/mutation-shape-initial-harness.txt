@@ -1,0 +1,433 @@
+.........FFF.....................................FF..F..F..F..F..F..F..F [  6%]
+..F..................................................................... [ 13%]
+........................................................................ [ 20%]
+...............................................................FFFF..... [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+........................................................................ [ 55%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-6-astra] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...'openai', ...} == {'code': 'tra...'openai', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...'openai', ...} == {'code': 'tra...'openai', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5] _
+tests/test_analysis_cards_api.py:359: in test_invalid_translation_output_keeps_typed_route_error_without_caching
+    assert caught.value.detail == {
+E   AssertionError: assert {'code': 'tra...thropic', ...} == {'code': 'tra...thropic', ...}
+E     
+E     Omitting 3 identical items, use -vv to show
+E     Differing items:
+E     {'code': 'translation_provider_error'} != {'code': 'translation_output_invalid'}
+E     {'retryable': True} != {'retryable': False}
+E     Use -v to get more diff
+------------------------------ Captured log call -------------------------------
+WARNING  src.api.routes.analysis_cards:analysis_cards.py:315 Card translate failed for run 1 (translation_provider_error)
+_ test_translation_provider_override_uses_explicit_task_effort[translate_card-openai-gpt-5.6-luna] _
+tests/test_card_synthesis.py:686: in test_translation_provider_override_uses_explicit_task_effort
+    result = cs.translate_card(
+<in-memory-mutation>:63: in translate_card
+    ???
+src/card_synthesis.py:1083: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1048: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1141: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   openai.BadRequestError: Error code: 400 - {'error': {'message': "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", 'type': 'invalid_request_error', 'param': 'reasoning_effort', 'code': None}}
+_ test_translation_provider_override_uses_explicit_task_effort[translate_card-anthropic-claude-sonnet-5] _
+tests/test_card_synthesis.py:686: in test_translation_provider_override_uses_explicit_task_effort
+    result = cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna--detail0-translate_card] _
+tests/test_card_synthesis.py:758: in test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch
+    _invoke_fixed_task_seam(cs, seam, provider=provider)
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna-default-detail1-translate_card] _
+tests/test_card_synthesis.py:758: in test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch
+    _invoke_fixed_task_seam(cs, seam, provider=provider)
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna-none-detail2-translate_card] _
+tests/test_card_synthesis.py:758: in test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch
+    _invoke_fixed_task_seam(cs, seam, provider=provider)
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna-future-detail3-translate_card] _
+tests/test_card_synthesis.py:758: in test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch
+    _invoke_fixed_task_seam(cs, seam, provider=provider)
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-claude-sonnet-5-high-detail4-translate_card] _
+tests/test_card_synthesis.py:758: in test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch
+    _invoke_fixed_task_seam(cs, seam, provider=provider)
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.4-mini-2026-08-01-high-detail5-translate_card] _
+tests/test_card_synthesis.py:758: in test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch
+    _invoke_fixed_task_seam(cs, seam, provider=provider)
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_dispatch_current_and_custom_explicit_routes[gpt-5.6-luna-translate_card] _
+tests/test_card_synthesis.py:800: in test_fixed_task_seams_dispatch_current_and_custom_explicit_routes
+    _invoke_fixed_task_seam(cs, seam, provider="openai")
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_fixed_task_seams_dispatch_current_and_custom_explicit_routes[gpt-7-custom-translate_card] _
+tests/test_card_synthesis.py:800: in test_fixed_task_seams_dispatch_current_and_custom_explicit_routes
+    _invoke_fixed_task_seam(cs, seam, provider="openai")
+tests/test_card_synthesis.py:709: in _invoke_fixed_task_seam
+    return cs.translate_card(
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-openai] _
+tests/test_gpt6_admission.py:261: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    cs.translate_card(card, provider=provider, model=model, model_timeout_s=30)
+<in-memory-mutation>:63: in translate_card
+    ???
+src/card_synthesis.py:1083: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1048: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1141: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   openai.BadRequestError: Error code: 400 - {'error': {'message': "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", 'type': 'invalid_request_error', 'param': 'reasoning_effort', 'code': None}}
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-anthropic] _
+tests/test_gpt6_admission.py:261: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    cs.translate_card(card, provider=provider, model=model, model_timeout_s=30)
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-openai] _
+tests/test_gpt6_admission.py:261: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    cs.translate_card(card, provider=provider, model=model, model_timeout_s=30)
+<in-memory-mutation>:63: in translate_card
+    ???
+src/card_synthesis.py:1083: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1048: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1141: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   openai.BadRequestError: Error code: 400 - {'error': {'message': "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", 'type': 'invalid_request_error', 'param': 'reasoning_effort', 'code': None}}
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-anthropic] _
+tests/test_gpt6_admission.py:261: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    cs.translate_card(card, provider=provider, model=model, model_timeout_s=30)
+<in-memory-mutation>:52: in translate_card
+    ???
+src/card_synthesis.py:997: in _translate_anthropic
+    return run_once(effort)
+src/card_synthesis.py:964: in run_once
+    resp = client.messages.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_utils/_utils.py:294: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/resources/messages/messages.py:980: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1507: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1133: in request
+    response, prepared = self._attempt_request(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:1273: in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:542: in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_base_client.py:489: in _build_headers
+    self._validate_headers(headers, omitted)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/anthropic/_client.py:411: in _validate_headers
+    raise TypeError(
+E   TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-6-astra]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[openai-gpt-5.6-luna]
+FAILED tests/test_analysis_cards_api.py::test_invalid_translation_output_keeps_typed_route_error_without_caching[anthropic-claude-sonnet-5]
+FAILED tests/test_card_synthesis.py::test_translation_provider_override_uses_explicit_task_effort[translate_card-openai-gpt-5.6-luna]
+FAILED tests/test_card_synthesis.py::test_translation_provider_override_uses_explicit_task_effort[translate_card-anthropic-claude-sonnet-5]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna--detail0-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna-default-detail1-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna-none-detail2-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.6-luna-future-detail3-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-claude-sonnet-5-high-detail4-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispatch[openai-gpt-5.4-mini-2026-08-01-high-detail5-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_dispatch_current_and_custom_explicit_routes[gpt-5.6-luna-translate_card]
+FAILED tests/test_card_synthesis.py::test_fixed_task_seams_dispatch_current_and_custom_explicit_routes[gpt-7-custom-translate_card]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-openai]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-anthropic]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-openai]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-anthropic]
+17 failed, 1027 passed, 1 warning in 55.56s

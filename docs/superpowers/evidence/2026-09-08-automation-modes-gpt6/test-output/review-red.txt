@@ -1,0 +1,59 @@
+FFFFFFFFFFF                                                              [100%]
+=================================== FAILURES ===================================
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-unreviewed] _
+tests/test_gpt6_admission.py:234: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-2026-99-99] _
+tests/test_gpt6_admission.py:234: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra-2026-09-09] _
+tests/test_gpt6_admission.py:234: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+_ test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra] _
+tests/test_gpt6_admission.py:234: in test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(RuntimeError, match="different model"):
+E   Failed: DID NOT RAISE <class 'RuntimeError'>
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload0] ___
+tests/test_gpt6_admission.py:242: in test_astra_structured_output_must_satisfy_the_requested_schema
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(ValueError, match="output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload1] ___
+tests/test_gpt6_admission.py:242: in test_astra_structured_output_must_satisfy_the_requested_schema
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(ValueError, match="output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+___ test_astra_structured_output_must_satisfy_the_requested_schema[payload2] ___
+tests/test_gpt6_admission.py:242: in test_astra_structured_output_must_satisfy_the_requested_schema
+    with _install_api(monkeypatch, lambda _: httpx.Response(200, json=response)), pytest.raises(ValueError, match="output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-openai] _
+tests/test_gpt6_admission.py:255: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-anthropic] _
+tests/test_gpt6_admission.py:255: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-openai] _
+tests/test_gpt6_admission.py:255: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-anthropic] _
+tests/test_gpt6_admission.py:255: in test_card_translation_cannot_report_success_by_merging_incomplete_output
+    with pytest.raises(ValueError, match="translation_output_invalid"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+=========================== short test summary info ============================
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-unreviewed]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-gpt-6-astra-2026-99-99]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra-2026-09-09]
+FAILED tests/test_gpt6_admission.py::test_astra_model_receipt_rejects_variants_and_explicit_snapshot_substitution[gpt-6-astra-2026-09-08-gpt-6-astra]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload0]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload1]
+FAILED tests/test_gpt6_admission.py::test_astra_structured_output_must_satisfy_the_requested_schema[payload2]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-openai]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload0-anthropic]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-openai]
+FAILED tests/test_gpt6_admission.py::test_card_translation_cannot_report_success_by_merging_incomplete_output[payload1-anthropic]
+11 failed, 37 deselected in 2.36s

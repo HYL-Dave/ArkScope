@@ -1,0 +1,5 @@
+
+> arkscope-web@0.0.1 check:i18n-literals
+> node scripts/i18n/visible-literal-scanner.mjs check
+
+{"candidateCount":37,"signatureCount":20,"debtSignatureCount":0,"allowlistCount":20,"migratedScopes":["src/**"]}

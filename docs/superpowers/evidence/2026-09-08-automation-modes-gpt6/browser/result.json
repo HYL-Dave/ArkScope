@@ -1,0 +1,234 @@
+[
+  {
+    "locale": "en",
+    "viewport": [
+      1280,
+      960
+    ],
+    "writes": [
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/config/model-routes",
+        "body": {
+          "routes": {
+            "card_translation": {
+              "provider": "openai",
+              "model": "gpt-6-astra",
+              "effort": "max"
+            }
+          }
+        }
+      }
+    ],
+    "errors": []
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      390,
+      844
+    ],
+    "writes": [
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/config/model-routes",
+        "body": {
+          "routes": {
+            "card_translation": {
+              "provider": "openai",
+              "model": "gpt-6-astra",
+              "effort": "max"
+            }
+          }
+        }
+      }
+    ],
+    "errors": []
+  },
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      1280,
+      960
+    ],
+    "writes": [
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/config/model-routes",
+        "body": {
+          "routes": {
+            "card_translation": {
+              "provider": "openai",
+              "model": "gpt-6-astra",
+              "effort": "max"
+            }
+          }
+        }
+      }
+    ],
+    "errors": []
+  },
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      390,
+      844
+    ],
+    "writes": [
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": true,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": true
+        }
+      },
+      {
+        "path": "/security-lifecycle/automation",
+        "body": {
+          "enabled": false,
+          "interval_minutes": 5,
+          "batch_limit": 2,
+          "apply_profile_transitions": false
+        }
+      },
+      {
+        "path": "/config/model-routes",
+        "body": {
+          "routes": {
+            "card_translation": {
+              "provider": "openai",
+              "model": "gpt-6-astra",
+              "effort": "max"
+            }
+          }
+        }
+      }
+    ],
+    "errors": []
+  }
+]

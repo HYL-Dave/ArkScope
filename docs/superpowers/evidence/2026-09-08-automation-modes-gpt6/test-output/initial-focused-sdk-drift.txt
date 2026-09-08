@@ -1,0 +1,157 @@
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+...............................F........................................ [ 50%]
+........................................................................ [ 67%]
+........................................................................ [ 83%]
+..........................................FF....FFFFF.FF.F..FF.......    [100%]
+=================================== FAILURES ===================================
+_______ test_catalog_exposes_canonical_current_and_retired_model_policy ________
+tests/test_model_routing.py:79: in test_catalog_exposes_canonical_current_and_retired_model_policy
+    assert set(policy.current_model_ids) == {
+E   AssertionError: assert {'claude-fabl...5.6-sol', ...} == {'claude-fabl...5.6-sol', ...}
+E     
+E     Extra items in the left set:
+E     'gpt-6-astra'
+E     Use -v to get more diff
+______ test_claude_oauth_structured_output_uses_locked_agent_sdk_options _______
+src/auth_drivers/subscription_structured_output.py:701: in run_subscription_structured_output
+    asyncio.get_running_loop()
+E   RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+src/auth_drivers/subscription_structured_output.py:468: in _claude_structured_output_async
+    runtime = require_reviewed_claude_agent_runtime()
+src/auth_drivers/claude_agent_sdk_runtime.py:259: in require_reviewed_claude_agent_runtime
+    raise ClaudeAgentSdkRuntimeIncompatible(
+E   src.auth_drivers.claude_agent_sdk_runtime.ClaudeAgentSdkRuntimeIncompatible: The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).
+
+The above exception was the direct cause of the following exception:
+tests/test_subscription_structured_output.py:321: in test_claude_oauth_structured_output_uses_locked_agent_sdk_options
+    result = mod.run_subscription_structured_output(
+src/auth_drivers/subscription_structured_output.py:703: in run_subscription_structured_output
+    return asyncio.run(
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/auth_drivers/subscription_structured_output.py:670: in run_subscription_structured_output_async
+    return await _claude_structured_output_async(
+src/auth_drivers/subscription_structured_output.py:470: in _claude_structured_output_async
+    raise SubscriptionStructuredOutputError(
+E   src.auth_drivers.subscription_structured_output.SubscriptionStructuredOutputError: The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).
+___________ test_claude_reaps_exact_owned_subprocess_after_sdk_close ___________
+src/auth_drivers/subscription_structured_output.py:701: in run_subscription_structured_output
+    asyncio.get_running_loop()
+E   RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+src/auth_drivers/subscription_structured_output.py:468: in _claude_structured_output_async
+    runtime = require_reviewed_claude_agent_runtime()
+src/auth_drivers/claude_agent_sdk_runtime.py:259: in require_reviewed_claude_agent_runtime
+    raise ClaudeAgentSdkRuntimeIncompatible(
+E   src.auth_drivers.claude_agent_sdk_runtime.ClaudeAgentSdkRuntimeIncompatible: The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).
+
+The above exception was the direct cause of the following exception:
+tests/test_subscription_structured_output.py:417: in test_claude_reaps_exact_owned_subprocess_after_sdk_close
+    result = mod.run_subscription_structured_output(
+src/auth_drivers/subscription_structured_output.py:703: in run_subscription_structured_output
+    return asyncio.run(
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/auth_drivers/subscription_structured_output.py:670: in run_subscription_structured_output_async
+    return await _claude_structured_output_async(
+src/auth_drivers/subscription_structured_output.py:470: in _claude_structured_output_async
+    raise SubscriptionStructuredOutputError(
+E   src.auth_drivers.subscription_structured_output.SubscriptionStructuredOutputError: The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).
+________ test_claude_oauth_missing_token_is_reauth_and_never_starts_sdk ________
+tests/test_subscription_structured_output.py:587: in test_claude_oauth_missing_token_is_reauth_and_never_starts_sdk
+    assert caught.value.code == "reauth_required"
+E   AssertionError: assert 'provider_call_failed' == 'reauth_required'
+E     
+E     - reauth_required
+E     + provider_call_failed
+________ test_claude_oauth_expired_token_is_reauth_and_never_starts_sdk ________
+tests/test_subscription_structured_output.py:624: in test_claude_oauth_expired_token_is_reauth_and_never_starts_sdk
+    assert caught.value.code == "reauth_required"
+E   AssertionError: assert 'provider_call_failed' == 'reauth_required'
+E     
+E     - reauth_required
+E     + provider_call_failed
+____________ test_claude_oauth_rejects_non_subscription_auth_source ____________
+tests/test_subscription_structured_output.py:665: in test_claude_oauth_rejects_non_subscription_auth_source
+    assert "refusing to bill" in str(caught.value)
+E   AssertionError: assert 'refusing to bill' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+E    +    where SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') = <ExceptionInfo SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') tblen=6>.value
+________ test_claude_oauth_rejects_missing_auth_source_evidence[data0] _________
+tests/test_subscription_structured_output.py:705: in test_claude_oauth_rejects_missing_auth_source_evidence
+    assert "auth source evidence" in str(caught.value)
+E   AssertionError: assert 'auth source evidence' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+E    +    where SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') = <ExceptionInfo SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') tblen=6>.value
+________ test_claude_oauth_rejects_missing_auth_source_evidence[data1] _________
+tests/test_subscription_structured_output.py:705: in test_claude_oauth_rejects_missing_auth_source_evidence
+    assert "auth source evidence" in str(caught.value)
+E   AssertionError: assert 'auth source evidence' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+E    +    where SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') = <ExceptionInfo SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') tblen=6>.value
+________ test_claude_oauth_allows_only_internal_structured_output_tool _________
+tests/test_subscription_structured_output.py:785: in test_claude_oauth_allows_only_internal_structured_output_tool
+    assert "unexpected tool" in str(caught.value)
+E   AssertionError: assert 'unexpected tool' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+E    +    where SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') = <ExceptionInfo SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') tblen=6>.value
+_________ test_claude_oauth_requires_init_auth_evidence_before_result __________
+tests/test_subscription_structured_output.py:821: in test_claude_oauth_requires_init_auth_evidence_before_result
+    assert "auth source" in str(caught.value)
+E   AssertionError: assert 'auth source' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+E    +    where SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') = <ExceptionInfo SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).') tblen=6>.value
+___________ test_claude_async_adapter_runs_without_a_second_executor ___________
+src/auth_drivers/subscription_structured_output.py:468: in _claude_structured_output_async
+    runtime = require_reviewed_claude_agent_runtime()
+src/auth_drivers/claude_agent_sdk_runtime.py:259: in require_reviewed_claude_agent_runtime
+    raise ClaudeAgentSdkRuntimeIncompatible(
+E   src.auth_drivers.claude_agent_sdk_runtime.ClaudeAgentSdkRuntimeIncompatible: The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).
+
+The above exception was the direct cause of the following exception:
+tests/test_subscription_structured_output.py:880: in test_claude_async_adapter_runs_without_a_second_executor
+    assert asyncio.run(invoke_from_async_host()) == {"ok": True}
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+tests/test_subscription_structured_output.py:866: in invoke_from_async_host
+    return await mod.run_subscription_structured_output_async(
+src/auth_drivers/subscription_structured_output.py:670: in run_subscription_structured_output_async
+    return await _claude_structured_output_async(
+src/auth_drivers/subscription_structured_output.py:470: in _claude_structured_output_async
+    raise SubscriptionStructuredOutputError(
+E   src.auth_drivers.subscription_structured_output.SubscriptionStructuredOutputError: The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).
+___________ test_claude_token_store_preflight_is_inside_the_deadline ___________
+tests/test_subscription_structured_output.py:1035: in test_claude_token_store_preflight_is_inside_the_deadline
+    assert "preflight timed out" in str(error)
+E   AssertionError: assert 'preflight timed out' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+___________ test_claude_timeout_waits_for_bounded_subprocess_cleanup ___________
+tests/test_subscription_structured_output.py:1088: in test_claude_timeout_waits_for_bounded_subprocess_cleanup
+    assert "timed out" in str(error)
+E   AssertionError: assert 'timed out' in 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'
+E    +  where 'The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).' = str(SubscriptionStructuredOutputError('The installed Claude Agent SDK runtime is not reviewed for ArkScope (expected SDK 0.2.151 and CLI 2.1.258).'))
+=========================== short test summary info ============================
+FAILED tests/test_model_routing.py::test_catalog_exposes_canonical_current_and_retired_model_policy
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_structured_output_uses_locked_agent_sdk_options
+FAILED tests/test_subscription_structured_output.py::test_claude_reaps_exact_owned_subprocess_after_sdk_close
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_missing_token_is_reauth_and_never_starts_sdk
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_expired_token_is_reauth_and_never_starts_sdk
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_rejects_non_subscription_auth_source
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_rejects_missing_auth_source_evidence[data0]
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_rejects_missing_auth_source_evidence[data1]
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_allows_only_internal_structured_output_tool
+FAILED tests/test_subscription_structured_output.py::test_claude_oauth_requires_init_auth_evidence_before_result
+FAILED tests/test_subscription_structured_output.py::test_claude_async_adapter_runs_without_a_second_executor
+FAILED tests/test_subscription_structured_output.py::test_claude_token_store_preflight_is_inside_the_deadline
+FAILED tests/test_subscription_structured_output.py::test_claude_timeout_waits_for_bounded_subprocess_cleanup
+13 failed, 416 passed in 9.63s

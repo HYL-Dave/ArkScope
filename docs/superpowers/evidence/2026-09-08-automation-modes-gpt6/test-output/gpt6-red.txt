@@ -1,0 +1,554 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFFFF....                                         [100%]
+=================================== FAILURES ===================================
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_synthesis-api_key] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_synthesis-chatgpt_oauth] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_translation-api_key] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_translation-chatgpt_oauth] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[ai_research-api_key] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[ai_research-chatgpt_oauth] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[lifecycle_investigation-api_key] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[lifecycle_investigation-chatgpt_oauth] _
+tests/test_gpt6_admission.py:27: in test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults
+    assert capability_for(MODEL) is not None
+E   AssertionError: assert None is not None
+E    +  where None = capability_for('gpt-6-astra')
+_ test_astra_fixed_tasks_use_responses_with_one_forced_output_and_preserve_input[synthesis] _
+tests/test_gpt6_admission.py:76: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:80: in test_astra_fixed_tasks_use_responses_with_one_forced_output_and_preserve_input
+    result = _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_fixed_tasks_use_responses_with_one_forced_output_and_preserve_input[translation] _
+tests/test_gpt6_admission.py:76: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:80: in test_astra_fixed_tasks_use_responses_with_one_forced_output_and_preserve_input
+    result = _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[refusal-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[refusal-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[no_call-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[no_call-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[wrong_call-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[wrong_call-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[two_calls-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[two_calls-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[non_object-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[non_object-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[malformed-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[malformed-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-synthesis] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:46: in _invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:469: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:434: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-translation] _
+tests/test_gpt6_admission.py:125: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_gpt6_admission.py:129: in test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback
+    _invoke(operation)
+tests/test_gpt6_admission.py:50: in _invoke
+    return cs._translate_openai(model, "Translate the input.", "Revenue rose.", TRANSLATION_SCHEMA,
+src/card_synthesis.py:1002: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:967: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.
+_ test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_source[synthesis] _
+tests/test_gpt6_admission.py:144: in test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_source
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+_ test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_source[translation] _
+tests/test_gpt6_admission.py:144: in test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_source
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+=========================== short test summary info ============================
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_synthesis-api_key]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_synthesis-chatgpt_oauth]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_translation-api_key]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[card_translation-chatgpt_oauth]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[ai_research-api_key]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[ai_research-chatgpt_oauth]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[lifecycle_investigation-api_key]
+FAILED tests/test_gpt6_admission.py::test_astra_task_admission_exposes_supported_efforts_without_replacing_defaults[lifecycle_investigation-chatgpt_oauth]
+FAILED tests/test_gpt6_admission.py::test_astra_fixed_tasks_use_responses_with_one_forced_output_and_preserve_input[synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_fixed_tasks_use_responses_with_one_forced_output_and_preserve_input[translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[incomplete-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[refusal-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[refusal-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[no_call-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[no_call-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[wrong_call-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[wrong_call-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[two_calls-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[two_calls-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[non_object-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[non_object-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[malformed-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[malformed-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_invalid_output_is_rejected_without_retry_or_transport_fallback[other_model-translation]
+FAILED tests/test_gpt6_admission.py::test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_source[synthesis]
+FAILED tests/test_gpt6_admission.py::test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_source[translation]
+28 failed, 4 passed in 3.73s

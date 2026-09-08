@@ -1,0 +1,126 @@
+
+> arkscope-web@0.0.1 test
+> vitest run --silent=true
+
+
+ RUN  v4.1.8 /tmp/arkscope-tracking-history-provenance/apps/arkscope-web
+
+dynamic translation key: src/settings/DataStorageSection.tsx:506 ($) => $.dataStorage.lifecycle.automation.modes[mode]
+stdout | src/i18n/foundationBoundaries.test.ts > I18N-0 foundation boundaries > closes remaining localization with global src scope and exact empty-debt arithmetic
+i18next: languageChanged zh-Hant
+
+stdout | src/i18n/foundationBoundaries.test.ts
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+ ❯ src/i18n/foundationBoundaries.test.ts (11 tests | 1 failed) 901ms
+     × closes remaining localization with global src scope and exact empty-debt arithmetic 855ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/i18n/foundationBoundaries.test.ts > I18N-0 foundation boundaries > closes remaining localization with global src scope and exact empty-debt arithmetic
+Error: Command failed: /home/hyl/.nvm/versions/node/v22.14.0/bin/node scripts/i18n/visible-literal-scanner.mjs check
+dynamic translation key: src/settings/DataStorageSection.tsx:506 ($) => $.dataStorage.lifecycle.automation.modes[mode]
+
+ ❯ src/i18n/foundationBoundaries.test.ts:237:31
+    235|
+    236|   it("closes remaining localization with global src scope and exact em…
+    237|     const report = JSON.parse(execFileSync(
+       |                               ^
+    238|       process.execPath,
+    239|       ["scripts/i18n/visible-literal-scanner.mjs", "check"],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 123 passed (124)
+      Tests  1 failed | 1695 passed (1696)
+   Start at  16:45:17
+   Duration  11.89s (transform 72.85s, setup 37.92s, import 89.69s, tests 71.66s, environment 75.03s)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /tmp/arkscope-tracking-history-provenance/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /tmp/arkscope-tracking-history-provenance/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run --silent=true
