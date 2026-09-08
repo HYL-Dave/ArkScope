@@ -369,12 +369,11 @@ class TestAnthropicStream:
         # max_tokens = model max output (fallback)
         assert call_kwargs.kwargs.get("max_tokens") == 64000
 
-    def test_no_effort_for_unsupported_model(self, mock_deps):
-        """Effort is not sent for models that don't support it."""
+    def test_custom_model_forwards_exact_requested_effort(self, mock_deps):
+        """Unregistered custom models receive the exact requested effort."""
         mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
-        # Non-Opus model doesn't support effort
         self._collect_events(
             run_query_stream(
                 "Test", model="claude-nova-1-20260501",
@@ -382,7 +381,26 @@ class TestAnthropicStream:
             )
         )
 
+        mock_deps["client"].messages.stream.assert_called_once()
         call_kwargs = mock_deps["client"].messages.stream.call_args
+        assert call_kwargs.kwargs["model"] == "claude-nova-1-20260501"
+        assert call_kwargs.kwargs["output_config"] == {"effort": "medium"}
+
+    def test_no_effort_for_known_model_without_effort_support(self, mock_deps):
+        """The registry models Haiku 4.5 as having no effort support."""
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+        self._collect_events(
+            run_query_stream(
+                "Test", model="claude-haiku-4-5",
+                dal=MagicMock(), effort="medium",
+            )
+        )
+
+        mock_deps["client"].messages.stream.assert_called_once()
+        call_kwargs = mock_deps["client"].messages.stream.call_args
+        assert call_kwargs.kwargs["model"] == "claude-haiku-4-5"
         assert "output_config" not in call_kwargs.kwargs
 
 
