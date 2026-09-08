@@ -751,6 +751,71 @@ def _proposal_state(
     return proposal_ids, blockers
 
 
+def build_transition_effects(
+    conn: sqlite3.Connection,
+    *,
+    source_ticker: str,
+    successor_ticker: str | None,
+    transition_kind: str | None,
+    sources: Iterable[str] | None,
+    options: TransitionOptions,
+) -> dict:
+    """Project target-owned effects without granting assessment or write authority."""
+
+    blockers: list[str] = []
+    active_sources = sorted({str(source or "").strip() for source in sources or () if str(source or "").strip()})
+    if transition_kind is not None:
+        if sources is None:
+            blockers.append("source_context_unavailable")
+        elif not active_sources:
+            blockers.append("no_active_tracking_source")
+    if transition_kind is None:
+        watchlists = {"add": [], "archive": [], "reactivate": [], "unchanged": []}
+        legacy = {"add": [], "archive": [], "reactivate": [], "unchanged": []}
+        tags: list[dict] = []
+    else:
+        successor = successor_ticker if transition_kind == "symbol_continuation" else None
+        watchlists = _watchlist_effects(conn, source_ticker=source_ticker, successor_ticker=successor)
+        legacy = _legacy_effects(conn, source_ticker=source_ticker, successor_ticker=successor)
+        tags = _editable_tags_to_copy(conn, source_ticker=source_ticker, successor_ticker=successor)
+    priority, suppression, meta_blockers = _meta_state(conn, source_ticker=source_ticker,
+        successor_ticker=successor_ticker, options=options, transition_kind=transition_kind)
+    blockers.extend(meta_blockers)
+    portfolio_open = "portfolio_open" in active_sources
+    if transition_kind == "terminal_delisting" and portfolio_open:
+        blockers.append("portfolio_position_open")
+    suppression["hide_source"] = bool(
+        transition_kind in {"symbol_continuation", "terminal_delisting"}
+        and not suppression["source_hidden"]
+        and not portfolio_open
+    )
+    provider_owned_sources = sorted(source for source in active_sources if source not in _PROFILE_SOURCE_KEYS)
+    caveats: list[str] = []
+    if provider_owned_sources:
+        caveats.append("provider_owned_sources_retained")
+    if transition_kind == "symbol_continuation" and portfolio_open:
+        caveats.append("portfolio_position_retained")
+    if watchlists["unchanged"] or legacy["unchanged"]:
+        caveats.append("successor_already_tracked")
+    result = {
+        "active_sources": active_sources,
+        "block_reasons": sorted(set(blockers)),
+        "caveats": sorted(caveats),
+        "effects": {"editable_tags_to_copy": tags, "legacy_config_seed": legacy,
+                    "priority": priority, "suppression": suppression, "watchlists": watchlists},
+        "provider_owned_sources": provider_owned_sources,
+        "profile_state_sha256": _profile_dependency_sha256(conn, source_ticker=source_ticker, successor_ticker=successor_ticker),
+    }
+    from src.sa_tracking_memberships import SaTrackingMembershipStore, terminal_tracking_memberships
+
+    if SaTrackingMembershipStore.installed(conn):
+        result["effects"]["sa_tracking_memberships"] = (
+            terminal_tracking_memberships(conn, source_ticker)
+            if transition_kind == "terminal_delisting" and not portfolio_open else []
+        )
+    return result
+
+
 def build_transition_preview(
     conn: sqlite3.Connection,
     *,
@@ -761,6 +826,7 @@ def build_transition_preview(
     sources: Iterable[str] | None,
     options: TransitionOptions,
     at: str | None = None,
+    web_read=None,
 ) -> dict:
     """Return an immutable, canonical projection of every owned profile effect."""
 
@@ -783,8 +849,6 @@ def build_transition_preview(
     blockers: list[str] = []
     transition_kind: str | None = None
     from src.sa_tracking_memberships import SaTrackingMembershipStore
-    if SaTrackingMembershipStore.installed(conn) and case.get("source") != "listing_authority":
-        blockers.append("listing_authority_required")
     if "symbol_changed" in outcomes and outcomes <= _SYMBOL_OUTCOMES:
         if successor_ticker is None:
             blockers.append("successor_missing")
@@ -797,7 +861,14 @@ def build_transition_preview(
     else:
         blockers.append("outcome_not_executable")
 
-    if SaTrackingMembershipStore.installed(conn) and case.get("source") == "listing_authority" and transition_kind is not None:
+    from src.lifecycle_web_review import web_transition_guard
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+        transition_kind=transition_kind, successor_ticker=successor_ticker, at=at or _utc_now(), web_read=web_read)
+    if web_blockers is not None:
+        blockers.extend(web_blockers)
+    elif SaTrackingMembershipStore.installed(conn) and case.get("source") != "listing_authority":
+        blockers.append("listing_authority_required")
+    elif SaTrackingMembershipStore.installed(conn) and transition_kind is not None:
         from src.security_lifecycle_provider_authority import provider_transition_guard
         blockers.extend(provider_transition_guard(conn, ticker=source_ticker, observation_fingerprint_sha256=observation_fingerprint,
             transition_kind=transition_kind, successor_ticker=successor_ticker, effective_date=assessment.get("effective_date"),
@@ -826,21 +897,6 @@ def build_transition_preview(
     if transition_kind is not None and date_blocker is not None:
         blockers.append(date_blocker)
 
-    if sources is None:
-        active_sources: list[str] = []
-        if transition_kind is not None:
-            blockers.append("source_context_unavailable")
-    else:
-        active_sources = sorted(
-            {
-                text
-                for source in sources
-                if (text := str(source or "").strip())
-            }
-        )
-        if transition_kind is not None and not active_sources:
-            blockers.append("no_active_tracking_source")
-
     current_assessment_fingerprint = assessment_fingerprint(assessment)
     proposal_ids, proposal_blockers = _proposal_state(
         case_id=case_id,
@@ -853,98 +909,26 @@ def build_transition_preview(
     )
     blockers.extend(proposal_blockers)
 
-    if transition_kind is None:
-        watchlists = {"add": [], "archive": [], "reactivate": [], "unchanged": []}
-        legacy = {"add": [], "archive": [], "reactivate": [], "unchanged": []}
-        tags: list[dict] = []
-    else:
-        watchlists = _watchlist_effects(
-            conn,
-            source_ticker=source_ticker,
-            successor_ticker=(
-                successor_ticker if transition_kind == "symbol_continuation" else None
-            ),
-        )
-        legacy = _legacy_effects(
-            conn,
-            source_ticker=source_ticker,
-            successor_ticker=(
-                successor_ticker if transition_kind == "symbol_continuation" else None
-            ),
-        )
-        tags = _editable_tags_to_copy(
-            conn,
-            source_ticker=source_ticker,
-            successor_ticker=(
-                successor_ticker if transition_kind == "symbol_continuation" else None
-            ),
-        )
-
-    priority, suppression, meta_blockers = _meta_state(
-        conn,
-        source_ticker=source_ticker,
-        successor_ticker=successor_ticker,
-        options=options,
-        transition_kind=transition_kind,
-    )
-    blockers.extend(meta_blockers)
-    portfolio_open = "portfolio_open" in active_sources
-    if transition_kind == "terminal_delisting" and portfolio_open:
-        blockers.append("portfolio_position_open")
-    suppression["hide_source"] = bool(
-        transition_kind in {"symbol_continuation", "terminal_delisting"}
-        and not suppression["source_hidden"]
-        and not portfolio_open
-    )
-
-    provider_owned_sources = sorted(
-        source for source in active_sources if source not in _PROFILE_SOURCE_KEYS
-    )
-    caveats: list[str] = []
-    if provider_owned_sources:
-        caveats.append("provider_owned_sources_retained")
-    if transition_kind == "symbol_continuation" and portfolio_open:
-        caveats.append("portfolio_position_retained")
-    if watchlists["unchanged"] or legacy["unchanged"]:
-        caveats.append("successor_already_tracked")
+    projection = build_transition_effects(conn, source_ticker=source_ticker, successor_ticker=successor_ticker,
+        transition_kind=transition_kind, sources=sources, options=options)
+    blockers.extend(projection["block_reasons"])
 
     payload = {
-        "active_sources": active_sources,
+        **projection,
         "assessment_fingerprint_sha256": current_assessment_fingerprint,
         "assessment_id": assessment_id,
         "block_reasons": sorted(set(blockers)),
         "case_id": case_id,
-        "caveats": sorted(caveats),
-        "effects": {
-            "editable_tags_to_copy": tags,
-            "legacy_config_seed": legacy,
-            "priority": priority,
-            "suppression": suppression,
-            "watchlists": watchlists,
-        },
         "eligible": transition_kind is not None and not blockers,
         "evidence_set_sha256": evidence_fingerprint,
         "execute_on": execute_on,
         "observation_fingerprint_sha256": observation_fingerprint,
         "outcomes": sorted(outcomes),
         "proposal_ids": proposal_ids,
-        "provider_owned_sources": provider_owned_sources,
-        "profile_state_sha256": _profile_dependency_sha256(
-            conn,
-            source_ticker=source_ticker,
-            successor_ticker=successor_ticker,
-        ),
         "source_ticker": source_ticker,
         "successor_ticker": successor_ticker,
         "transition_kind": transition_kind,
     }
-    from src.sa_tracking_memberships import SaTrackingMembershipStore, terminal_tracking_memberships
-
-    if SaTrackingMembershipStore.installed(conn):
-        payload["effects"]["sa_tracking_memberships"] = (
-            terminal_tracking_memberships(conn, source_ticker)
-            if transition_kind == "terminal_delisting" and not portfolio_open else []
-        )
     payload["preview_sha256"] = profile_snapshot_sha256(payload)
     return payload
 
@@ -1461,9 +1445,18 @@ class TickerIdentityTransitionStore:
             raise RuntimeError("caller_transaction_open")
         self.conn.execute("BEGIN IMMEDIATE")
 
-    def _provider_guard(self, preview, *, at, automation):
+    def _provider_guard(self, preview, *, at, automation, web_read=None):
         from src.sa_tracking_memberships import SaTrackingMembershipStore
         from src.security_lifecycle_provider_authority import provider_transition_guard
+        from src.lifecycle_web_review import acceptance_for, web_transition_guard
+        identity = str(preview.get("assessment_id") or "")
+        if identity.startswith("sla_web_") or acceptance_for(self.conn, identity) is not None:
+            from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
+            assessment = SecurityLifecycleInvestigationStore(self.conn).get_assessment(identity)
+            return web_transition_guard(self.conn, assessment=assessment,
+                observation_sha256=preview["observation_fingerprint_sha256"], transition_kind=preview["transition_kind"],
+                successor_ticker=preview.get("successor_ticker"), at=at, automation=automation,
+                confirmation=preview.get("review_confirmation"), require_confirmation=True, web_read=web_read)
         if not SaTrackingMembershipStore.installed(self.conn):
             return ()
         authority = self.conn.execute("SELECT c.source,a.acceptance_authority,a.effective_date FROM security_lifecycle_cases c "
@@ -1515,6 +1508,8 @@ class TickerIdentityTransitionStore:
         preview: Mapping[str, object],
         approved_preview_sha256: str,
         automation: bool,
+        _caller_transaction: bool = False,
+        web_read=None,
     ) -> dict:
         kind, execute_on = self._validate_preview(preview, approved_preview_sha256)
         case_id = str(preview.get("case_id") or "")
@@ -1560,9 +1555,13 @@ class TickerIdentityTransitionStore:
         rule_version: str | None = None
         decision_provenance = current_assessment_fingerprint
 
-        self._begin()
+        if _caller_transaction:
+            if not self.conn.in_transaction:
+                raise RuntimeError("caller_transaction_required")
+        else:
+            self._begin()
         try:
-            if self._provider_guard(preview, at=now, automation=automation):
+            if self._provider_guard(preview, at=now, automation=automation, web_read=web_read):
                 raise ValueError("preview_changed")
             if not _assessment_authority_matches(
                 self.conn,
@@ -1604,8 +1603,12 @@ class TickerIdentityTransitionStore:
             if row is not None:
                 existing = self._row(cursor, row)
                 transition_id = str(existing["transition_id"])
+                if ("review_confirmation" in self.get(transition_id)["approved_preview"]
+                        and "review_confirmation" not in preview):
+                    raise ValueError("review_confirmation_command_required")
                 if existing["approved_preview_sha256"] == digest:
-                    self.conn.commit()
+                    if not _caller_transaction:
+                        self.conn.commit()
                     return self.get(transition_id)
                 if existing["status"] not in {"approved", "needs_review"}:
                     raise ValueError("transition_not_reapprovable")
@@ -1680,7 +1683,8 @@ class TickerIdentityTransitionStore:
                         decision_provenance,
                     ),
                 )
-            self.conn.commit()
+            if not _caller_transaction:
+                self.conn.commit()
         except Exception:
             self.conn.rollback()
             raise
@@ -1692,6 +1696,8 @@ class TickerIdentityTransitionStore:
         preview: Mapping[str, object],
         approved_preview_sha256: str,
     ) -> dict:
+        if "review_confirmation" in preview:
+            raise ValueError("review_confirmation_command_required")
         return self._approve(
             preview=preview,
             approved_preview_sha256=approved_preview_sha256,
@@ -1704,6 +1710,8 @@ class TickerIdentityTransitionStore:
         preview: Mapping[str, object],
         approved_preview_sha256: str,
     ) -> dict:
+        if "review_confirmation" in preview:
+            raise ValueError("review_confirmation_command_required")
         return self._approve(
             preview=preview,
             approved_preview_sha256=approved_preview_sha256,
@@ -1875,6 +1883,8 @@ class TickerIdentityTransitionStore:
         current_preview: Mapping[str, object] | None,
         expected_preview_sha256: str,
         trigger: str,
+        _caller_transaction: bool = False,
+        web_read=None,
     ) -> dict:
         if trigger not in ATTEMPT_TRIGGERS:
             raise ValueError("trigger")
@@ -1882,11 +1892,21 @@ class TickerIdentityTransitionStore:
             "preview_digest", expected_preview_sha256
         )
         now = self._clock()
-        self._begin()
+        if _caller_transaction:
+            if not self.conn.in_transaction:
+                raise RuntimeError("caller_transaction_required")
+        else:
+            self._begin()
         try:
             transition = self._get(transition_id)
             if transition is None:
                 raise KeyError("transition_not_found")
+            if "review_confirmation" in transition["approved_preview"]:
+                if not _caller_transaction:
+                    raise ValueError("review_confirmation_command_required")
+                from src.security_lifecycle_review import confirmation_for
+
+                confirmation_for(transition)
             if transition["approved_preview_sha256"] != expected_digest:
                 raise ValueError("request_preview_changed")
             if transition["status"] == "applied":
@@ -1902,7 +1922,8 @@ class TickerIdentityTransitionStore:
                     at=now,
                 )
                 self._step("attempt_receipt")
-                self.conn.commit()
+                if not _caller_transaction:
+                    self.conn.commit()
                 return {
                     "attempt_id": attempt_id,
                     "block_reasons": [],
@@ -1922,7 +1943,8 @@ class TickerIdentityTransitionStore:
                     at=now,
                     mark_needs_review=False,
                 )
-                self.conn.commit()
+                if not _caller_transaction:
+                    self.conn.commit()
                 result["transition"] = self.get(transition_id)
                 return result
 
@@ -1946,7 +1968,8 @@ class TickerIdentityTransitionStore:
                         at=now,
                         mark_needs_review=True,
                     )
-                    self.conn.commit()
+                    if not _caller_transaction:
+                        self.conn.commit()
                     result["transition"] = self.get(transition_id)
                     return result
 
@@ -1959,7 +1982,8 @@ class TickerIdentityTransitionStore:
                     at=now,
                     mark_needs_review=True,
                 )
-                self.conn.commit()
+                if not _caller_transaction:
+                    self.conn.commit()
                 result["transition"] = self.get(transition_id)
                 return result
 
@@ -1997,7 +2021,7 @@ class TickerIdentityTransitionStore:
                     transition["approved_assessment_fingerprint_sha256"]
                 ),
             )
-            provider_blockers = self._provider_guard(current_preview, at=now, automation=transition["approval_authority"] == "automation_policy")
+            provider_blockers = self._provider_guard(current_preview, at=now, automation=transition["approval_authority"] == "automation_policy", web_read=web_read)
             if (
                 not current_preview_valid
                 or current_digest != transition["approved_preview_sha256"]
@@ -2013,7 +2037,8 @@ class TickerIdentityTransitionStore:
                     at=now,
                     mark_needs_review=True,
                 )
-                self.conn.commit()
+                if not _caller_transaction:
+                    self.conn.commit()
                 result["transition"] = self.get(transition_id)
                 return result
 
@@ -2193,7 +2218,8 @@ class TickerIdentityTransitionStore:
                 at=now,
             )
             self._step("activity_receipt")
-            self.conn.commit()
+            if not _caller_transaction:
+                self.conn.commit()
         except Exception:
             self.conn.rollback()
             raise

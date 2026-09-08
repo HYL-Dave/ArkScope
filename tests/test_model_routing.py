@@ -53,7 +53,7 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     assert by_id["gpt-5.6-luna"]["effort_options"] == [
         "none", "low", "medium", "high", "xhigh", "max",
     ]
-    assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research"}
+    assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"}
     translation = next(
         task for task in res["tasks"] if task["id"] == "card_translation"
     )

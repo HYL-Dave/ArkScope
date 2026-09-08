@@ -486,13 +486,13 @@ def test_catalog_registry_and_both_generic_bridges_expose_exact_lifecycle_schema
         _configure(monkeypatch, market_path, profile_path)
         registry = create_default_registry()
         expected = {
-            "list_security_lifecycle_cases": [
+            "list_security_lifecycle_reviews": [
                 "ticker",
-                "workflow_state",
-                "source_presence",
+                "view",
                 "limit",
+                "offset",
             ],
-            "get_security_lifecycle_case": ["case_id"],
+            "get_security_lifecycle_review": ["review_id"],
         }
         for name, parameters in expected.items():
             tool = registry.get(name)
@@ -1045,7 +1045,7 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     from src.auth_drivers.chatgpt_oauth_driver import _RESEARCH_READONLY_TOOLS as openai
     from src.auth_drivers.claude_code_sdk_driver import _RESEARCH_READONLY_TOOLS as anthropic
 
-    expected = {"list_security_lifecycle_cases", "get_security_lifecycle_case"}
+    expected = {"list_security_lifecycle_reviews", "get_security_lifecycle_review"}
     assert expected <= openai
     assert expected <= anthropic
     assert len(openai) == 15

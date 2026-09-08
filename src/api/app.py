@@ -154,6 +154,10 @@ async def lifespan(app: FastAPI):
     logger.info("ArkScope API ready — DAL and registry initialize lazily")
     yield
     # Shutdown
+    from .routes.lifecycle_web import shutdown_web_controller
+    await asyncio.to_thread(shutdown_web_controller)
+    from .routes.lifecycle_investigation import shutdown_controller
+    await asyncio.to_thread(shutdown_controller)
     scheduler_tasks = tuple(
         task for task in (sched_task, portfolio_sched_task) if task is not None
     )
@@ -198,6 +202,8 @@ def create_app() -> FastAPI:
     from .routes.consensus import router as consensus_router
     from .routes.market_data import router as market_data_router
     from .routes.security_lifecycle import router as security_lifecycle_router
+    from .routes.lifecycle_web import router as lifecycle_web_router
+    from .routes.lifecycle_investigation import router as lifecycle_investigation_router
     from .routes.ticker_identity import router as ticker_identity_router
     from .routes.schedule import router as schedule_router
     from .routes.providers_config import router as providers_config_router
@@ -225,6 +231,8 @@ def create_app() -> FastAPI:
     app.include_router(consensus_router)
     app.include_router(market_data_router)
     app.include_router(security_lifecycle_router)
+    app.include_router(lifecycle_web_router)
+    app.include_router(lifecycle_investigation_router)
     app.include_router(ticker_identity_router)
     app.include_router(schedule_router)
     app.include_router(providers_config_router)

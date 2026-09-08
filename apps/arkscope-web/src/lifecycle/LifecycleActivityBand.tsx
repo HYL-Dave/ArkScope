@@ -68,7 +68,7 @@ function activityChangeLabels(
   };
 }
 
-function transitionBlockLabels(
+export function transitionBlockLabels(
   t: TFunction<"explore">,
 ): Record<TickerIdentityTransitionBlockReason, string> {
   return {

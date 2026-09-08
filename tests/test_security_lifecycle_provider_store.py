@@ -9,6 +9,30 @@ from tests.test_security_lifecycle_provider_authority import NOW as AT, events, 
 from src.security_lifecycle_listing_evidence import _evidence
 
 
+def test_always_active_provider_check_has_no_case_observation(tmp_path):
+    from src.security_lifecycle_provider_store import ProviderCheckStore
+    from tests.test_security_lifecycle_provider_authority import record
+
+    profile, _ = _paths(tmp_path)
+    store = ProviderCheckStore(profile)
+    store.record(ticker="OLD", at=AT, evidence=(_evidence(record("massive_reference", "active")),), diagnostics={})
+    assert store.latest()["OLD"]["state"] == "active"
+    assert store.observations() == []
+
+
+def test_recovered_provider_check_retains_latest_active_observation(tmp_path):
+    from src.security_lifecycle_provider_store import ProviderCheckStore
+    from tests.test_security_lifecycle_provider_authority import record
+
+    profile, _ = _paths(tmp_path)
+    store = ProviderCheckStore(profile)
+    store.record(ticker="OLD", at=AT, evidence=(), diagnostics={})
+    store.record(ticker="OLD", at="2026-09-05T01:01:00Z", evidence=(_evidence(record("massive_reference", "active")),), diagnostics={})
+    latest = store.latest()["OLD"]
+    assert latest["state"] == "active"
+    assert store.observations() == [latest["observation"]]
+
+
 def _paths(tmp_path):
     profile, market = tmp_path / "profile.db", tmp_path / "market.db"
     with sqlite3.connect(profile) as conn:

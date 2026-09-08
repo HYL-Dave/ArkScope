@@ -1234,11 +1234,11 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             },
         },
         {
-            "name": "list_security_lifecycle_cases",
+            "name": "list_security_lifecycle_reviews",
             "description": (
-                "List local security-lifecycle cases and their current workflow "
-                "state. Reads local observation and investigation evidence only; "
-                "performs no provider request or write."
+                "List current tracking exceptions or history with collection state, "
+                "listing/continuation findings, source checks and next actions. "
+                "Healthy listings are summarized; no provider request or write."
             ),
             "input_schema": {
                 "type": "object",
@@ -1247,48 +1247,35 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                         "type": "string",
                         "description": "Optional ticker filter.",
                     },
-                    "workflow_state": {
+                    "view": {
                         "type": "string",
-                        "enum": [
-                            "unresolved",
-                            "investigating",
-                            "evidence_ready",
-                            "reviewed_inconclusive",
-                            "resolved",
-                        ],
-                        "description": "Optional derived workflow-state filter.",
-                    },
-                    "source_presence": {
-                        "type": "string",
-                        "enum": ["present", "source_missing"],
-                        "description": (
-                            "Observation presence filter (default present)."
-                        ),
+                        "enum": ["attention", "history"],
+                        "description": "Review view (default attention).",
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum cases to return (1-200, default 50).",
+                        "description": "Maximum reviews to return (1-200, default 50).",
                     },
+                    "offset": {"type": "integer", "description": "Pagination offset (default 0)."},
                 },
                 "required": [],
             },
         },
         {
-            "name": "get_security_lifecycle_case",
+            "name": "get_security_lifecycle_review",
             "description": (
-                "Read one local security-lifecycle case with source observation, "
-                "evidence, assessments, acknowledgements, and inert proposals. "
-                "Performs no provider request or write."
+                "Read the operator's current review by review_id, with source checks "
+                "and actual application state. Reading grants no consent. No provider or write."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "case_id": {
+                    "review_id": {
                         "type": "string",
-                        "description": "Security-lifecycle case ID.",
+                        "description": "Security-lifecycle review ID from the review list.",
                     },
                 },
-                "required": ["case_id"],
+                "required": ["review_id"],
             },
         },
     ])
@@ -1417,8 +1404,8 @@ def execute_tool(
     from src.tools.freshness import check_data_freshness
     from src.tools.data_coverage_tools import get_ticker_data_coverage
     from src.tools.security_lifecycle_tools import (
-        get_security_lifecycle_case,
-        list_security_lifecycle_cases,
+        get_security_lifecycle_review,
+        list_security_lifecycle_reviews,
     )
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
@@ -1659,14 +1646,14 @@ def execute_tool(
             ticker=tool_input["ticker"],
             target_date=tool_input.get("target_date"),
         ),
-        "list_security_lifecycle_cases": lambda: list_security_lifecycle_cases(
+        "list_security_lifecycle_reviews": lambda: list_security_lifecycle_reviews(
             ticker=tool_input.get("ticker"),
-            workflow_state=tool_input.get("workflow_state"),
-            source_presence=tool_input.get("source_presence", "present"),
+            view=tool_input.get("view", "attention"),
             limit=tool_input.get("limit", 50),
+            offset=tool_input.get("offset", 0),
         ),
-        "get_security_lifecycle_case": lambda: get_security_lifecycle_case(
-            case_id=tool_input["case_id"],
+        "get_security_lifecycle_review": lambda: get_security_lifecycle_review(
+            review_id=tool_input["review_id"],
         ),
         # SA Alpha Picks (Phase 11c)
         "get_sa_alpha_picks": lambda: get_sa_alpha_picks(

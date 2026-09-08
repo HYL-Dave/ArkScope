@@ -17,6 +17,7 @@ def client(tmp_path, monkeypatch):
     from src import sa_capture_store
     monkeypatch.setattr(sa_capture_store, "resolve_sa_db_path", lambda: tmp_path / "sa.db")
     store = ProfileStateStore(tmp_path / "profile.db")
+    monkeypatch.setattr(market_data, "resolve_market_db_path", lambda: str(tmp_path / "market.db"))
     app = FastAPI()
     app.include_router(profile.router)
     app.include_router(market_data.router)

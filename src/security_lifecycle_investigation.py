@@ -875,8 +875,12 @@ class SecurityLifecycleInvestigationStore:
         rule_id: str | None = None,
         rule_version: str | None = None,
         decision_provenance_sha256: str | None = None,
+        _caller_transaction: bool = False,
     ) -> str:
+        from contextlib import nullcontext
         self._assert_write()
+        if _caller_transaction and not self.conn.in_transaction:
+            raise RuntimeError("caller_transaction_required")
         identity = self._case_identity_for_write(case_id, case_identity)
         if relevance not in ASSESSMENT_RELEVANCE:
             raise ValueError("relevance")
@@ -964,7 +968,7 @@ class SecurityLifecycleInvestigationStore:
             ).fetchone()[0]
         )
         assessment_id = self._new_id("sla")
-        with self.conn:
+        with (nullcontext() if _caller_transaction else self.conn):
             if identity is not None:
                 self._upsert_case_row(case_id, identity, at=at)
             self.conn.execute(
@@ -1137,17 +1141,17 @@ class SecurityLifecycleInvestigationStore:
             return "automation_run_not_current"
         return None
 
-    def accept_assessment(
+    def validate_assessment_acceptance(
         self,
         assessment_id: str,
         *,
         observation_fingerprint_sha256: str,
         acceptance_authority: str,
         at: str,
+        allow_accepted: bool = False,
     ) -> dict:
-        self._assert_write()
         assessment = self.get_assessment(assessment_id)
-        if assessment["status"] != "draft":
+        if assessment["status"] != "draft" and not (allow_accepted and assessment["status"] == "accepted"):
             raise ValueError("assessment_not_draft")
         if assessment["author"] not in ASSESSMENT_AUTHORS:
             raise ValueError("author")
@@ -1190,7 +1194,25 @@ class SecurityLifecycleInvestigationStore:
             assessment["case_id"]
         ):
             raise ValueError("stale_assessment")
-        with self.conn:
+        return assessment
+
+    def accept_assessment(
+        self,
+        assessment_id: str,
+        *,
+        observation_fingerprint_sha256: str,
+        acceptance_authority: str,
+        at: str,
+        _caller_transaction: bool = False,
+    ) -> dict:
+        from contextlib import nullcontext
+
+        self._assert_write()
+        if _caller_transaction and not self.conn.in_transaction:
+            raise RuntimeError("caller_transaction_required")
+        assessment = self.validate_assessment_acceptance(assessment_id,
+            observation_fingerprint_sha256=observation_fingerprint_sha256, acceptance_authority=acceptance_authority, at=at)
+        with nullcontext() if _caller_transaction else self.conn:
             self.conn.execute(
                 "UPDATE security_lifecycle_assessments SET status='superseded',"
                 "superseded_at=? WHERE case_id=? AND status='accepted'",
@@ -1395,8 +1417,13 @@ class SecurityLifecycleInvestigationStore:
         observation_fingerprint_sha256: str,
         sources_by_ticker: Mapping[str, Iterable[str]] | None,
         at: str,
+        _caller_transaction: bool = False,
     ) -> dict:
+        from contextlib import nullcontext
+
         self._assert_write()
+        if _caller_transaction and not self.conn.in_transaction:
+            raise RuntimeError("caller_transaction_required")
         case = self._case_row(case_id)
         assessment = self._current_accepted_assessment(
             case_id,
@@ -1442,7 +1469,7 @@ class SecurityLifecycleInvestigationStore:
             ).fetchone()
             if existing is None:
                 proposal_id = self._new_id("slp")
-                with self.conn:
+                with nullcontext() if _caller_transaction else self.conn:
                     self.conn.execute(
                         "INSERT INTO security_lifecycle_action_proposals "
                         "(proposal_id,case_id,assessment_id,action_type,status,"
@@ -1929,7 +1956,7 @@ def _read_profile(
 ) -> tuple[list[dict], dict[str, dict]]:
     if not path.is_file():
         return [], {}
-    conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
         if not _component_tables(conn):
@@ -2005,8 +2032,16 @@ def _read_profile(
 
 
 def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dict:
+    from src.lifecycle_investigation.retirement import cutover_active, retained_action_cases
+    retired = cutover_active(profile_db_path)
+    retained = set()
+    if retired:
+        with sqlite3.connect(Path(profile_db_path).resolve().as_uri() + "?mode=ro", uri=True) as conn:
+            retained = retained_action_cases(conn)
     try:
         observations = read_market_observations(market_db_path, limit=None)
+        if retired:
+            observations = [row for row in observations if row["source"] != "sec_edgar" or case_id_for(row["source"], row["source_ref"], row["ticker"]) in retained]
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("market") from None
     try:
@@ -2045,6 +2080,8 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("profile") from None
     for case in profile_cases:
+        if retired and case["source"] == "sec_edgar" and case["case_id"] not in retained:
+            continue
         by_case.setdefault(
             case["case_id"],
             {

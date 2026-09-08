@@ -55,11 +55,13 @@ export function UniverseView({
   const { t } = useTranslation("explore");
   const [activeTab, setActiveTab] = useState<"inventory" | "lifecycle">("inventory");
   const [caseId, setCaseId] = useState<string | null>(null);
+  const [investigationTicker, setInvestigationTicker] = useState<string | null>(null);
 
   useEffect(() => {
     if (!navigationRequest) return;
     setActiveTab("lifecycle");
     setCaseId(navigationRequest.target.caseId ?? null);
+    setInvestigationTicker(navigationRequest.target.ticker ?? null);
     onNavigationConsumed?.(navigationRequest.sequence);
   }, [navigationRequest, onNavigationConsumed]);
 
@@ -81,6 +83,7 @@ export function UniverseView({
             panel: (
               <LifecycleView
                 initialCaseId={caseId}
+                initialTicker={investigationTicker}
                 onNavigate={inventoryProps.onNavigateTarget}
                 runtime={runtime}
               />

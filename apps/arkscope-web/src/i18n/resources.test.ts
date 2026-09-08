@@ -94,7 +94,7 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 488,
+      lifecycle: 748,
       alphaTracking: 34,
       news: 45,
       tickerDetail: 89,
@@ -265,7 +265,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(922);
+      expect(flattened.size, `${locale}.explore`).toBe(1301);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -728,9 +728,9 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 75,
       shell: 37,
-      settings: 877,
+      settings: 910,
       research: 207,
-      explore: 922,
+      explore: 1301,
       portfolio: 374,
       system: 24,
     } as const;
@@ -741,6 +741,12 @@ describe("bundled i18n resources", () => {
         "beforeFirst", "noHistory", "missing", "partialBars", "confirmTitle", "confirm", "close",
         "nothingToRepair", "consequence", "blocked", "accepted", "succeeded", "partial", "failed",
         "skipped", "unconfirmed", "error",
+        "historyTitle", "refreshHistory", "historyEmpty", "historyReadError", "historyComplete",
+        "historyIncomplete", "historyBlocked", "historyUnavailable", "historyWindow", "requestsSent",
+        "responsesReceived", "requestsUnanswered", "remainingDays", "unconfirmedRequests", "responseIncomplete",
+        "scopeChanged", "coverageUnavailable", "journalUnavailable", "collectionRunning", "collectionUnknown",
+        "resume", "resumeTitle", "confirmResume", "resumeScope", "cacheOnlyResume", "resumeBudget",
+        "historyPage", "previousPage", "nextPage",
       ].map((path) => `repair.${path}`),
       "title",
       "description",
@@ -805,7 +811,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2516);
+      expect(total, `${locale}.total`).toBe(2928);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1179,11 +1185,21 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      "models.tasks.lifecycleInvestigation.label",
+      "models.tasks.lifecycleInvestigation.description",
+      "models.test.connectionAndFormat",
+      "models.test.connectionAndFormatSucceeded",
       ...[
         "scope", "preview", "gaps", "ticker", "reason", "firstBar", "missingDates", "none",
         "beforeFirst", "noHistory", "missing", "partialBars", "confirmTitle", "confirm", "close",
         "nothingToRepair", "consequence", "blocked", "accepted", "succeeded", "partial", "failed",
         "skipped", "unconfirmed", "error",
+        "historyTitle", "refreshHistory", "historyEmpty", "historyReadError", "historyComplete",
+        "historyIncomplete", "historyBlocked", "historyUnavailable", "historyWindow", "requestsSent",
+        "responsesReceived", "requestsUnanswered", "remainingDays", "unconfirmedRequests", "responseIncomplete",
+        "scopeChanged", "coverageUnavailable", "journalUnavailable", "collectionRunning", "collectionUnknown",
+        "resume", "resumeTitle", "confirmResume", "resumeScope", "cacheOnlyResume", "resumeBudget",
+        "historyPage", "previousPage", "nextPage",
       ].map((path) => `dataStorage.coverage.repair.${path}`),
       "workspace.routes.effortRequired",
       "workspace.routes.modelRetired",

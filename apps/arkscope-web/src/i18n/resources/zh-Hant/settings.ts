@@ -86,7 +86,7 @@ const settings = {
       models: {
         title: "模型與任務路由",
         description: "依任務選擇模型、provider 與推理強度。",
-        searchAliases: "model|models|模型|任務|路由|routing|effort|task routing|reasoning effort",
+        searchAliases: "model|models|模型|任務|路由|routing|effort|task routing|reasoning effort|標的事件調查|改名|下市|lifecycle investigation|listing status",
       },
       fixedTaskRuntime: {
         title: "固定 AI 任務執行限制",
@@ -159,6 +159,10 @@ const settings = {
       aiResearch: {
         label: "AI 研究",
         description: "執行多步驟 AI 研究工作。",
+      },
+      lifecycleInvestigation: {
+        label: "標的事件調查",
+        description: "上市狀態、代號與生效日期。",
       },
     },
     route: {
@@ -242,6 +246,8 @@ const settings = {
       },
     },
     test: {
+      connectionAndFormat: "連線與格式測試",
+      connectionAndFormatSucceeded: "連線與格式檢查通過",
       run: "實際測試",
       running: "實際測試中…",
       succeeded: "實際測試通過",
@@ -821,6 +827,23 @@ const settings = {
         skipped: "補抓未開始：追蹤範圍已變更或已有收集工作執行中。",
         unconfirmed: "尚無法確認補抓結果，請先查看收集紀錄再發起下一次請求。",
         error: "無法確認價格補抓請求，請先更新覆蓋與收集狀態再重試。",
+        historyTitle: "補抓紀錄", refreshHistory: "重新整理補抓狀態", historyEmpty: "尚無補抓紀錄。",
+        historyReadError: "無法讀取補抓紀錄，目前顯示的紀錄可能已過時。",
+        historyComplete: "價格覆蓋完整", historyIncomplete: "價格仍有缺漏", historyBlocked: "追蹤範圍已變更", historyUnavailable: "無法確認狀態",
+        historyWindow: "{{count}} 個標的／以 {{date}} 為基準回溯 {{days}} 個日曆天",
+        requestsSent: "已送出請求：{{count}}／{{total}}", responsesReceived: "已收到回應：{{count}}／{{total}}", requestsUnanswered: "尚無回應紀錄：{{count}}",
+        remainingDays: "完全缺少：{{missing}} 個標的日／部分缺少：{{partial}} 個標的日",
+        unconfirmedRequests: "部分請求結果尚未確認，不會重送這些請求。",
+        responseIncomplete: "已儲存的回應不足以補齊剩餘缺口；新的請求需重新預覽並確認。",
+        scopeChanged: "原範圍有標的已停止追蹤，這筆補抓不能續作。",
+        coverageUnavailable: "目前無法驗證本機價格覆蓋。", journalUnavailable: "無法讀取已儲存的請求紀錄，或紀錄未通過驗證。",
+        collectionRunning: "IBKR 價格收集中，暫停啟動新的補抓。",
+        collectionUnknown: "無法確認目前是否正在收集，請先重新整理狀態再補抓。",
+        resume: "繼續補抓", resumeTitle: "繼續既有補抓", confirmResume: "確認續作",
+        resumeScope: "繼續原先截至 {{date}}、共 {{days}} 天的 {{count}} 個標的範圍，不覆寫既有價格。",
+        cacheOnlyResume: "不新增 provider 請求，只將已儲存的回應補入剩餘缺口。",
+        resumeBudget: "最多新增 {{count}} 次 IBKR 請求，不重送已發出的請求，也不改用其他 provider。",
+        historyPage: "第 {{start}}-{{end}} 筆，共 {{total}} 筆", previousPage: "較新的補抓", nextPage: "較舊的補抓",
       },
       title: "交易日 / 價格覆蓋",
       description: "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",

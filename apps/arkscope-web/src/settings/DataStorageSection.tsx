@@ -7,6 +7,7 @@ import {
   Play,
 } from "lucide-react";
 import {
+  DEFAULT_PRICE_LOOKBACK_DAYS,
   getSecurityLifecycleAutomationStatus,
   getMarketDataStatus,
   listSecurityLifecycleCases,
@@ -563,13 +564,13 @@ function TradingDayCoveragePanel({
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
   const [cov, setCov] = useState<TradingDayCoverage | null>(() => {
-    const inspected = settingsReadCache.inspect<TradingDayCoverage>(tradingDayCoverageKey(10));
+    const inspected = settingsReadCache.inspect<TradingDayCoverage>(tradingDayCoverageKey(DEFAULT_PRICE_LOOKBACK_DAYS));
     return inspected.status === "missing" ? null : inspected.value;
   });
   const [err, setErr] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [lookback, setLookback] = useState(10);
+  const [lookback, setLookback] = useState(DEFAULT_PRICE_LOOKBACK_DAYS);
   const requestSequenceRef = useRef(0);
 
   const load = useCallback(async (force = false) => {

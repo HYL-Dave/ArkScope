@@ -44,6 +44,7 @@ from src.model_credentials import (
 )
 from src.model_routing import (
     Provider,
+    TASK_IDS,
     TaskId,
     TaskRoute,
     catalog,
@@ -64,7 +65,7 @@ router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
 
 # The per-task model routes this surface manages (matches model_routing.TaskId).
-_ROUTE_TASKS = ("card_synthesis", "card_translation", "ai_research")
+_ROUTE_TASKS = TASK_IDS
 _SPARK_MODEL_ID = "gpt-5.3-codex-spark"
 
 
@@ -349,6 +350,7 @@ def runtime_config(
         "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
         "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
         "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
+        "lifecycle_investigation": task_route("lifecycle_investigation", route_store=route_store).model_dump(),
         "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
         "fixed_task_runtime": {
             task: settings.model_dump()

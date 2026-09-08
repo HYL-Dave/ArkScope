@@ -6,6 +6,8 @@ import json
 import re
 from typing import Any
 
+from src.price_defaults import DEFAULT_PRICE_LOOKBACK_DAYS
+
 
 MAX_ERROR_LEN = 240
 _PRICE_RESULT_STATUSES = frozenset({"succeeded", "partial", "failed"})
@@ -17,7 +19,10 @@ _PRICE_COUNT_FIELDS = (
     "unresolved_after_fetch_count",
 )
 _SAFE_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9 ._-]{0,11}$")
-_SAFE_ERROR_CODES = frozenset({"ibkr_gateway_unavailable"})
+_SAFE_ERROR_CODES = frozenset({"ibkr_gateway_unavailable", "price_repair_not_prepared", "price_repair_integrity",
+                               "price_repair_plan_changed", "price_repair_scope_changed", "price_repair_clock_changed",
+                               "price_repair_unplanned_request", "price_repair_unmetered_response", "price_repair_budget_exhausted",
+                               "price_coverage_unavailable"})
 
 
 def _provider_arg(value: str) -> str:
@@ -31,7 +36,7 @@ def _provider_arg(value: str) -> str:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ArkScope direct-local prices worker")
     parser.add_argument("--tickers", required=True)
-    parser.add_argument("--lookback-days", type=int, default=5)
+    parser.add_argument("--lookback-days", type=int, default=DEFAULT_PRICE_LOOKBACK_DAYS)
     parser.add_argument(
         "--provider",
         type=_provider_arg,
@@ -41,6 +46,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gateway-lock-held", action="store_true")
     parser.add_argument("--no-provider-fallback", action="store_true")
     parser.add_argument("--as-of-date", type=date.fromisoformat)
+    parser.add_argument("--repair-id")
     return parser.parse_args(argv)
 
 
@@ -69,6 +75,25 @@ def _ticker_ids(value: Any, field: str) -> list[str]:
     if any(not _SAFE_TICKER.fullmatch(item) for item in result):
         raise ValueError(f"invalid {field}")
     return result
+
+
+def sanitize_repair_execution(execution: Any) -> dict[str, Any]:
+    fields = {"plan_sha256", "request_budget", "requests_total", "requests_this_execution", "retry", "fallback"}
+    if not isinstance(execution, dict) or set(execution) != fields:
+        raise ValueError("invalid repair_execution")
+    if not isinstance(execution["plan_sha256"], str) or re.fullmatch(r"[a-f0-9]{64}", execution["plan_sha256"]) is None:
+        raise ValueError("invalid repair_execution")
+    budget = execution["request_budget"]
+    if not isinstance(budget, dict) or set(budget) != {"qualification", "history", "total"}:
+        raise ValueError("invalid repair_execution")
+    for key, value in budget.items():
+        _nonnegative_int(value, key)
+    total = _nonnegative_int(execution["requests_total"], "requests_total")
+    current = _nonnegative_int(execution["requests_this_execution"], "requests_this_execution")
+    if (not current <= total <= budget["total"] or budget["total"] != budget["qualification"] + budget["history"]
+            or execution["retry"] is not False or execution["fallback"] is not False):
+        raise ValueError("invalid repair_execution")
+    return {**execution, "request_budget": dict(budget)}
 
 
 def sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -105,7 +130,7 @@ def sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
     )
     if scanned <= 0 or status != expected:
         raise ValueError("status does not match price collection facts")
-    return {
+    payload = {
         "status": status,
         "provider": provider,
         **counts,
@@ -113,6 +138,9 @@ def sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "error_tickers": error_tickers[:25],
         "unresolved_after_fetch_tickers": unresolved[:25],
     }
+    if "repair_execution" in result:
+        payload["repair_execution"] = sanitize_repair_execution(result["repair_execution"])
+    return payload
 
 
 def sanitize_error(exc: BaseException) -> dict[str, Any]:
@@ -138,7 +166,16 @@ def _run_worker(
     gateway_lock_held: bool,
     no_provider_fallback: bool = False,
     as_of_date: date | None = None,
+    repair_id: str | None = None,
 ) -> dict[str, Any]:
+    if repair_id is not None:
+        from src.price_repair_execution import prepared_repair_request, execute_price_repair
+        from src.universe_scope import resolve_active_universe
+        plan, directory = prepared_repair_request(
+            repair_id=repair_id, tickers=tickers, lookback_days=lookback_days, provider=provider,
+            no_provider_fallback=no_provider_fallback, as_of_date=as_of_date)
+        return execute_price_repair(plan, directory, active_scope=resolve_active_universe,
+                                    acquire_gateway_lock=not gateway_lock_held)
     from src.market_data_direct import backfill_prices_direct
 
     options = {}
@@ -158,12 +195,18 @@ def _run_worker(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
+        if args.repair_id is not None:
+            from src.price_repair_execution import prepared_repair_request
+            prepared_repair_request(repair_id=args.repair_id, tickers=args.tickers, lookback_days=args.lookback_days,
+                                    provider=args.provider, no_provider_fallback=args.no_provider_fallback, as_of_date=args.as_of_date)
         _apply_provider_config()
         options = {}
         if args.no_provider_fallback:
             options["no_provider_fallback"] = True
         if args.as_of_date is not None:
             options["as_of_date"] = args.as_of_date
+        if args.repair_id is not None:
+            options["repair_id"] = args.repair_id
         result = _run_worker(
             tickers=args.tickers,
             lookback_days=args.lookback_days,

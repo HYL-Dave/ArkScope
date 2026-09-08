@@ -10,7 +10,10 @@ def coverage(*, tickers=("NEW",), reason=None):
     return SimpleNamespace(
         generated_at_et="2026-09-05T09:00:00-04:00", interval="15min", lookback_days=15,
         observation_health=SimpleNamespace(status="ok"),
-        calendar_health=SimpleNamespace(status="ok"), days=[],
+        calendar_health=SimpleNamespace(status="ok"),
+        days=[SimpleNamespace(date=day, status_reason_code=None, session_open_at_utc=f"{day}T13:30:00+00:00",
+                              session_close_at_utc=f"{day}T20:00:00+00:00", expected_slot_count=26)
+              for day in ("2026-08-24", "2026-08-25")],
         history_gaps=[CoverageHistoryGapV2(ticker=ticker, reason="no_local_history", first_local_bar_at=None,
                          missing_dates=["2026-08-24"], partial_dates=["2026-08-25"], provider_issue_reason=reason) for ticker in tickers],
     )

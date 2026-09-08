@@ -280,6 +280,10 @@ def run_incremental(
     observed_at: Optional[str] = None,
     start_date: Optional[str] = None,
 ) -> dict:
+    from src.lifecycle_investigation.retirement import cutover_active
+    profile_path = Path(os.environ.get("ARKSCOPE_PROFILE_DB") or Path(__file__).resolve().parents[2] / "data" / "profile_state.db")
+    if cutover_active(profile_path):
+        return {"status": "retired", "reason": "legacy_lifecycle_intake_retired", "observations": 0}
     tickers = tuple(
         dict.fromkeys(
             ticker.strip().upper()

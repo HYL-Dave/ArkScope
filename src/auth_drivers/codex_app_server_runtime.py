@@ -81,15 +81,19 @@ def closed_codex_config_overrides() -> dict[str, bool | str]:
     return dict(_CLOSED_CONFIG_ITEMS)
 
 
-def _config_cli_value(value: bool | str) -> str:
+def _config_cli_value(value: bool | str | int) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return json.dumps(value, ensure_ascii=True)
 
 
-def _app_server_command(runtime: CodexAppServerRuntime) -> list[str]:
+def _app_server_command(runtime: CodexAppServerRuntime, purpose: str | None = None) -> list[str]:
+    items = _CLOSED_CONFIG_ITEMS
+    if purpose is not None:
+        from src.auth_drivers.codex_web_policy import web_codex_configuration
+        items = tuple(web_codex_configuration(purpose).items())
     command = [str(runtime.launcher)]
-    for key, value in _CLOSED_CONFIG_ITEMS:
+    for key, value in items:
         command.extend(("-c", f"{key}={_config_cli_value(value)}"))
     command.extend(("app-server", "--strict-config", "--stdio"))
     return command
@@ -374,6 +378,7 @@ class CodexJsonlSession:
         max_request_bytes: int,
         max_stdout_bytes: int,
         max_stderr_bytes: int,
+        poll_check: Callable[[], None] | None = None,
     ):
         if process.stdin is None or process.stdout is None or process.stderr is None:
             raise _fail("adapter_unavailable")
@@ -382,6 +387,7 @@ class CodexJsonlSession:
         self.stdout = process.stdout
         self.stderr = process.stderr
         self.deadline = deadline
+        self.poll_check = poll_check
         self.allowed_notifications = allowed_notifications
         self.rejected_notifications = dict(rejected_notifications or {})
         self.max_request_bytes = max_request_bytes
@@ -393,12 +399,19 @@ class CodexJsonlSession:
         self._messages: deque[dict[str, Any]] = deque()
         self._notifications: deque[dict[str, Any]] = deque()
         self.selector = selectors.DefaultSelector()
+        self.write_selector = None
+        if poll_check is not None:
+            os.set_blocking(self.stdin.fileno(), False)
+            self.write_selector = selectors.DefaultSelector()
+            self.write_selector.register(self.stdin, selectors.EVENT_WRITE)
         for stream, label in ((self.stdout, "stdout"), (self.stderr, "stderr")):
             os.set_blocking(stream.fileno(), False)
             self.selector.register(stream, selectors.EVENT_READ, data=label)
 
     def close(self) -> None:
         self.selector.close()
+        if self.write_selector is not None:
+            self.write_selector.close()
 
     def notify(self, method: str, params: dict[str, Any] | None = None) -> None:
         self._write({"method": method, "params": params or {}})
@@ -425,6 +438,8 @@ class CodexJsonlSession:
             return response["result"]
 
     def next_notification(self) -> dict[str, Any]:
+        if self.poll_check is not None:
+            self.poll_check()
         if self._notifications:
             return self._notifications.popleft()
         message = self._next_message()
@@ -437,20 +452,39 @@ class CodexJsonlSession:
             encoded = json.dumps(message, separators=(",", ":")).encode("utf-8") + b"\n"
             if len(encoded) > self.max_request_bytes:
                 raise _fail("protocol_resource_exhausted")
-            self.stdin.write(encoded)
-            self.stdin.flush()
+            if self.poll_check is None:
+                self.stdin.write(encoded)
+                self.stdin.flush()
+            else:
+                pending = memoryview(encoded)
+                while pending:
+                    self.poll_check()
+                    if not self.write_selector.select(min(0.05, _remaining(self.deadline))):
+                        continue
+                    try:
+                        written = os.write(self.stdin.fileno(), pending[:16384])
+                    except BlockingIOError:
+                        continue
+                    if written <= 0:
+                        raise _fail("transport_error")
+                    pending = pending[written:]
         except (BrokenPipeError, OSError):
             raise _fail("transport_error") from None
 
     def _next_message(self) -> dict[str, Any]:
         while True:
+            if self.poll_check is not None:
+                self.poll_check()
             if self._messages:
                 return self._messages.popleft()
             self._decode_buffered_lines()
             if self._messages:
                 continue
-            events = self.selector.select(_remaining(self.deadline))
+            wait = _remaining(self.deadline)
+            events = self.selector.select(min(0.05, wait) if self.poll_check is not None else wait)
             if not events:
+                if self.poll_check is not None:
+                    continue
                 raise _fail("timeout")
             for key, _ in events:
                 stream = key.fileobj
@@ -552,8 +586,17 @@ def run_authenticated_codex_operation(
     max_request_bytes: int = _DEFAULT_MAX_REQUEST_BYTES,
     max_stdout_bytes: int = _DEFAULT_MAX_STDOUT_BYTES,
     max_stderr_bytes: int = _DEFAULT_MAX_STDERR_BYTES,
+    purpose: str | None = None,
+    poll_check: Callable[[], None] | None = None,
 ) -> tuple[CodexAuthenticatedContext, _T]:
     """Run one isolated authenticated operation and always reap its process."""
+    if purpose is not None:
+        from src.auth_drivers.codex_web_policy import web_codex_configuration
+        web_codex_configuration(purpose)
+    if poll_check is not None:
+        if not callable(poll_check):
+            raise _fail("adapter_unavailable")
+        poll_check()
     runtime = resolve_codex_app_server_runtime(
         executable=executable,
         timeout_seconds=timeout_seconds,
@@ -583,9 +626,11 @@ def run_authenticated_codex_operation(
         )
         _require_shebang_interpreter(runtime.target, environment)
         _verify_version(runtime, environment, deadline)
+        if poll_check is not None:
+            poll_check()
         try:
             process = subprocess.Popen(
-                _app_server_command(runtime),
+                _app_server_command(runtime, purpose),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -605,6 +650,7 @@ def run_authenticated_codex_operation(
                 max_request_bytes=runtime.max_request_bytes,
                 max_stdout_bytes=runtime.max_stdout_bytes,
                 max_stderr_bytes=runtime.max_stderr_bytes,
+                poll_check=poll_check,
             )
             initialized = session.request(
                 1,

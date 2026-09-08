@@ -58,6 +58,7 @@ from src.market_sessions import (
     normalize_now_et as _norm_now_et,
 )
 from src.tools.data_coverage_tools import _market_day_status
+from src.price_defaults import DEFAULT_PRICE_LOOKBACK_DAYS
 
 logger = logging.getLogger(__name__)
 
@@ -537,7 +538,7 @@ def _derive_price_collection_status(tickers_scanned: int, issue_count: int) -> s
 def backfill_prices_direct(
     tickers_arg: Optional[str] = None,
     interval: str = "15min",
-    lookback_days: int = 5,
+    lookback_days: int = DEFAULT_PRICE_LOOKBACK_DAYS,
     provider: str = "ibkr",
     db_path: Optional[str] = None,
     progress_cb=None,

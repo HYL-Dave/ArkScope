@@ -29,9 +29,10 @@ from src.model_capabilities import (
     model_execution_admission_detail,
 )
 from src.model_discovery_cache import ModelDiscoveryCache
+from src.model_routing import TASK_IDS
 
 _CARD_TASKS = ("card_synthesis", "card_translation")
-_TASKS = ("card_synthesis", "card_translation", "ai_research")
+_TASKS = TASK_IDS
 _PROVIDERS = ("openai", "anthropic")
 
 
@@ -52,7 +53,7 @@ def task_capability_ok(task: str, capability: ModelCapability) -> bool:
         return False
     if capability.execution_adapter != "provider_native":
         return task == "card_translation" and capability.supports_structured_output
-    if task in _CARD_TASKS:
+    if task in (*_CARD_TASKS, "lifecycle_investigation"):
         return capability.supports_tool_calling and capability.supports_structured_output
     if task == "ai_research":
         return capability.supports_tool_calling
@@ -62,7 +63,7 @@ def task_capability_ok(task: str, capability: ModelCapability) -> bool:
 def _task_auth_mode_ok(task: str, provider: str, auth_mode: str | None) -> bool:
     if auth_mode is None:
         return False
-    if task in _CARD_TASKS:
+    if task in (*_CARD_TASKS, "lifecycle_investigation"):
         return (
             auth_mode == "api_key"
             or (provider == "openai" and auth_mode == "chatgpt_oauth")
@@ -124,7 +125,7 @@ def _model_eligibility(
     if provider_reason is not None:
         return False, provider_reason
     if capability is None:
-        return True, "model_not_in_registry"
+        return task != "lifecycle_investigation", "model_not_in_registry"
     execution_detail = model_execution_admission_detail(
         capability.id,
         task=task,

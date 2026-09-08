@@ -90,6 +90,9 @@ export function TickerDetailView({
           {t(($) => $.tickerDetail.backToWatchlist)}
         </button>
         <span className="mono strong detailpage-ticker">{ticker}</span>
+        <button className="btn-ghost" onClick={() => onNavigateTarget({ kind: "universe_lifecycle", ticker })}>
+          {t(($) => $.investigation.title)}
+        </button>
         {state?.priority && <span className={`badge p-${state.priority}`}>{state.priority}</span>}
         {state?.archived && (
           <span className="tag-archived">{t(($) => $.tickerDetail.archived)}</span>

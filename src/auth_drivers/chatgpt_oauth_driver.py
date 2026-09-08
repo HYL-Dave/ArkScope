@@ -61,8 +61,8 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
         "get_fundamentals_analysis",
         "get_sec_filings",
         "get_economic_calendar",
-        "get_security_lifecycle_case",
-        "list_security_lifecycle_cases",
+        "get_security_lifecycle_review",
+        "list_security_lifecycle_reviews",
     }
 )
 
@@ -75,6 +75,7 @@ def _subscription_catalog_adapter():
 def _task_route_tasks(model: str, *, plan_type: str | None = None) -> list[str]:
     from src.model_capabilities import capability_for
     from src.model_effective import task_auth_executable
+    from src.model_routing import TASK_IDS
 
     capability = capability_for(model)
     if capability is None or capability.task_route_status != "current":
@@ -83,7 +84,7 @@ def _task_route_tasks(model: str, *, plan_type: str | None = None) -> list[str]:
         return []
     return [
         task
-        for task in ("card_synthesis", "card_translation", "ai_research")
+        for task in TASK_IDS
         if task_auth_executable(
             task,
             "openai",

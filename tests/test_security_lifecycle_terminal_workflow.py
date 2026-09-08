@@ -1,6 +1,7 @@
 """Real profile transactions, source projection and later SA observations."""
 
 from dataclasses import replace
+import socket
 import sqlite3
 
 import pytest
@@ -17,6 +18,15 @@ from src.ticker_identity_schema import create_ticker_identity_schema
 from src.ticker_identity_service import TickerIdentityService
 from src.ticker_identity_transition import TransitionOptions, TickerIdentityTransitionStore
 from tests.test_security_lifecycle_provider_authority import NOW, record, terminal_records, events
+
+
+@pytest.fixture(autouse=True)
+def deny_network(monkeypatch):
+    def denied(*args, **kwargs):
+        raise AssertionError("terminal_workflow_must_not_use_network")
+    monkeypatch.setattr(socket, "create_connection", denied)
+    monkeypatch.setattr(socket.socket, "connect", denied)
+    monkeypatch.setattr(socket.socket, "connect_ex", denied)
 
 
 def setup_workflow(tmp_path, *, ticker="OLD", ended="2025-01-15", event_available=True, assess=True):
@@ -70,18 +80,70 @@ def setup_workflow(tmp_path, *, ticker="OLD", ended="2025-01-15", event_availabl
 
 
 @pytest.mark.parametrize("ticker,ended", [("ARCH", "2025-01-15"), ("LTHM", "2024-01-05"), ("TA", "2023-05-16")])
-def test_reviewed_legacy_delisting_stops_shared_scope_and_sa_sync_cannot_resurrect(tmp_path, ticker, ended):
-    c = setup_workflow(tmp_path, ticker=ticker, ended=ended, event_available=False)
+def test_reviewed_legacy_delisting_stops_shared_scope_and_sa_sync_cannot_resurrect(tmp_path, monkeypatch, ticker, ended):
+    from src.collectors import finnhub_news, polygon_news
+    from src.service import data_scheduler
+    from src.sa_tracking_memberships import reconcile_sa_tracking
+    from src.tools.backends.sa_capture_backend import SACaptureBackend
+    from tests.test_market_data_direct import _live_shaped_db
+    c = setup_workflow(tmp_path, ticker=ticker, ended=ended, event_available=False, assess=False)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(c["profile"]))
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(c["sa"]))
+    _live_shaped_db(c["market"], news_rows=[(1, ticker), (2, "LIVE")])
+    with sqlite3.connect(c["market"]) as conn:
+        conn.execute("UPDATE prices SET ticker=?", (ticker,))
+        prices = conn.execute("SELECT * FROM prices ORDER BY ticker,datetime").fetchall()
+        news = conn.execute("SELECT * FROM news ORDER BY id").fetchall()
+    backend = SACaptureBackend(sa_db=str(c["sa"]), market_db=str(c["market"]), base_path=tmp_path)
+    pick = {"symbol": ticker, "picked_date": "2023-01-01", "closed_date": ended}
+    assert backend.apply_sa_refresh("closed", [pick], NOW, NOW) == 1
+    assert reconcile_sa_tracking(profile_db=c["profile"], sa_db=c["sa"], at=NOW)
+    with sqlite3.connect(c["sa"]) as conn:
+        sa_history = tuple(conn.iterdump())
+    with sqlite3.connect(c["profile"]) as conn:
+        other_members = conn.execute("SELECT * FROM watchlist_memberships WHERE ticker='LIVE'").fetchall()
     assert ticker in c["sources"]()
+    result = workflow_worker(c, monkeypatch, mutation_allowed=False).run(limit=1, mode="live")
+    assert result["failed"] == 0, result
+    with sqlite3.connect(c["profile"]) as conn:
+        investigation = SecurityLifecycleInvestigationStore(conn)
+        assessment = investigation.list_assessments(c["case_id"])[0]
+        assert assessment["outcomes"] == ["listing_ended"]
+        assert assessment["effective_date"] == ended
+        assert assessment["status"] == ("draft" if ended < "2025-01-01" else "accepted")
+        if assessment["status"] == "draft":
+            investigation.accept_assessment(assessment["assessment_id"],
+                observation_fingerprint_sha256=assessment["observation_fingerprint_sha256"], acceptance_authority="human", at=NOW)
+            investigation.generate_action_proposals(case_id=c["case_id"],
+                observation_fingerprint_sha256=assessment["observation_fingerprint_sha256"], sources_by_ticker=c["sources"](), at=NOW)
     preview = c["service"].preview_case(c["case_id"], options=TransitionOptions(execute_on=ended))
     assert preview["eligible"], preview["block_reasons"]
     approved = c["service"].approve_case(c["case_id"], options=TransitionOptions(execute_on=ended), preview_sha256=preview["preview_sha256"], before_write=lambda: None)
     applied = c["service"].execute_transition(approved["transition_id"], preview_sha256=preview["preview_sha256"], before_write=lambda: None)
     assert applied["status"] == "applied"
     assert ticker not in c["sources"]()
-    c["tracking"].reconcile([{**c["observed"], "observed_at": "2026-09-06T01:00:00Z"}], at="2026-09-06T01:00:00Z", bootstrap_actor="attended_user")
-    assert ticker not in c["sources"]()
     with sqlite3.connect(c["profile"]) as conn:
+        applied_events = conn.execute("SELECT * FROM sa_tracking_events ORDER BY event_id").fetchall()
+    repeated = c["service"].execute_transition(approved["transition_id"], preview_sha256=preview["preview_sha256"], before_write=lambda: None)
+    assert repeated["status"] == "already_applied"
+    with sqlite3.connect(c["profile"]) as conn:
+        assert conn.execute("SELECT * FROM sa_tracking_events ORDER BY event_id").fetchall() == applied_events
+    with sqlite3.connect(c["sa"]) as conn:
+        assert tuple(conn.iterdump()) == sa_history
+    for at in ("2026-09-06T01:00:00Z", "2026-09-07T01:00:00Z"):
+        assert backend.apply_sa_refresh("closed", [pick], at, at) == 1
+        assert reconcile_sa_tracking(profile_db=c["profile"], sa_db=c["sa"], at=at)
+        assert c["sources"]() == {"LIVE": ("manual_lists",)}
+        assert data_scheduler._resolve_price_scope() == ["LIVE"]
+        assert polygon_news.load_tickers(scope="active-universe") == ["LIVE"]
+        assert finnhub_news.load_tickers(scope="active-universe") == ["LIVE"]
+    assert ProfileStateStore(c["profile"]).get_ticker(ticker).lists == []
+    assert ProfileStateStore(c["profile"]).get_ticker("LIVE").lists == ["Manual"]
+    with sqlite3.connect(c["market"]) as conn:
+        assert conn.execute("SELECT * FROM prices ORDER BY ticker,datetime").fetchall() == prices
+        assert conn.execute("SELECT * FROM news ORDER BY id").fetchall() == news
+    with sqlite3.connect(c["profile"]) as conn:
+        assert conn.execute("SELECT * FROM watchlist_memberships WHERE ticker='LIVE'").fetchall() == other_members
         assert conn.execute("SELECT count(*) FROM ticker_identity_links").fetchone()[0] == 0
         assert conn.execute("SELECT action,actor FROM sa_tracking_events ORDER BY event_id DESC LIMIT 1").fetchone() == ("remove", "lifecycle_transition")
         assert conn.execute("SELECT count(*) FROM watchlist_memberships WHERE ticker=?", (ticker,)).fetchone()[0] == 1
@@ -102,6 +164,26 @@ def test_even_a_replayed_preview_cannot_apply_after_listing_authority_changes(tm
         result = store.apply(approved["transition_id"], current_preview=preview, expected_preview_sha256=preview["preview_sha256"], trigger="attended_user")
     assert result["status"] == "blocked"
     assert "OLD" in c["sources"]()
+
+
+@pytest.mark.parametrize("change", ["membership", "new_observation"])
+def test_offered_retirement_rejects_changes_after_approval(tmp_path, monkeypatch, change):
+    c = setup_workflow(tmp_path, event_available=False, assess=False)
+    assert workflow_worker(c, monkeypatch, mutation_allowed=False).run(limit=1, mode="live")["accepted"] == 1
+    options = TransitionOptions(execute_on=c["ended"])
+    preview = c["service"].preview_case(c["case_id"], options=options)
+    approved = c["service"].approve_case(c["case_id"], options=options, preview_sha256=preview["preview_sha256"], before_write=lambda: None)
+    if change == "membership":
+        ProfileStateStore(c["profile"]).import_lists([{"name": "New list", "kind": "custom", "tickers": ["OLD"]}])
+    else:
+        c["checks"].record(ticker="OLD", at="2026-09-05T01:01:00Z", evidence=c["material"], diagnostics={})
+        c["now"][0] = "2026-09-05T01:01:00Z"
+    result = c["service"].execute_transition(approved["transition_id"], preview_sha256=preview["preview_sha256"], before_write=lambda: None)
+    assert result["status"] == "blocked"
+    assert "OLD" in c["sources"]()
+    with sqlite3.connect(c["profile"]) as conn:
+        assert conn.execute("SELECT count(*) FROM sa_tracking_events WHERE action='remove'").fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM ticker_identity_links").fetchone()[0] == 0
 
 
 def test_a_new_open_position_vetoes_even_an_approved_provider_terminal(tmp_path):
@@ -148,13 +230,10 @@ def test_terminal_suppresses_dual_current_source_and_reverse_restores_exact_inte
     assert c["sources"]() == before
 
 
-@pytest.mark.parametrize("event_available", (True, False))
-def test_actual_worker_and_transition_service_require_proof_before_automatic_retirement(tmp_path, monkeypatch, event_available):
+def workflow_worker(c, monkeypatch, *, mutation_allowed=True):
     from contextlib import contextmanager
     from src.security_lifecycle_automation_worker import LifecycleAutomationWorker
-    from src.security_lifecycle_investigation import compose_security_lifecycle
     from src.service import security_lifecycle_automation_scheduler as scheduler
-    c = setup_workflow(tmp_path, event_available=event_available, assess=False)
     monkeypatch.setattr(scheduler, "_profile_path", lambda: c["profile"])
     monkeypatch.setattr(scheduler, "_market_path", lambda: c["market"])
     monkeypatch.setattr(scheduler, "_load_sources", c["sources"])
@@ -166,37 +245,36 @@ def test_actual_worker_and_transition_service_require_proof_before_automatic_ret
     monkeypatch.setattr(scheduler, "_profile_connection", connection)
     def evidence(case, **kwargs):
         return c["checks"].bundle(case, at=kwargs["at"])
-    worker = LifecycleAutomationWorker(
+    return LifecycleAutomationWorker(
         case_loader=scheduler._load_cases,
         profile_connection=connection, evidence_loader=evidence, source_loader=c["sources"],
         transition_preview=scheduler._transition_preview, transition_approver=scheduler._transition_approver,
-        transition_mutation_allowed=lambda: True, clock=lambda: NOW, execution_owner_id="integration-worker")
+        transition_mutation_allowed=lambda: mutation_allowed, clock=lambda: NOW, execution_owner_id="integration-worker")
+
+
+@pytest.mark.parametrize("event_available", (True, False))
+@pytest.mark.parametrize("mutation_allowed", (True, False))
+def test_no_timeline_listing_retirement_reaches_decision_proposal_and_preview(tmp_path, monkeypatch, event_available, mutation_allowed):
+    c = setup_workflow(tmp_path, event_available=event_available, assess=False)
+    worker = workflow_worker(c, monkeypatch, mutation_allowed=mutation_allowed)
     result = worker.run(limit=1, mode="live")
     with sqlite3.connect(c["profile"]) as conn:
         conn.row_factory = sqlite3.Row
         transitions = [dict(row) for row in conn.execute("SELECT * FROM ticker_identity_transitions")]
     assert result["failed"] == 0, result
-    if not event_available:
+    assert result["accepted"] == 1, result
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+    detail = SecurityLifecycleReadService(
+        market_db_path=str(c["market"]), profile_db_path=str(c["profile"]), source_loader=c["sources"],
+    ).get_case_detail(c["case_id"])
+    assert detail["current_blockers"] == []
+    assert detail["current_assessment"]["outcomes"] == ["listing_ended"]
+    assert any(row["action_type"] == "notify" for row in detail["proposals"])
+    if not mutation_allowed:
         assert transitions == []
         assert "OLD" in c["sources"]()
-        from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
-        detail = SecurityLifecycleReadService(
-            market_db_path=str(c["market"]), profile_db_path=str(c["profile"]), source_loader=c["sources"],
-        ).get_case_detail(c["case_id"])
-        assert detail["disposition_reason"] == "ambiguous_event"
-        assert detail["current_blockers"] == [{
-            "blocker_code": "listing_status_unresolved", "retryable": False,
-            "operator_detail": {"code": "listing_checks", "missing_checks": ["continuation"],
-                                "provider_issues": [{"provider": "massive", "reason": "not_found"}],
-                                "manual_review_required": True},
-        }]
-        c["checks"].record(ticker="OLD", at="2026-09-05T01:01:00Z", evidence=[_evidence(record("massive_reference", "active"))], diagnostics={})
-        updated = SecurityLifecycleReadService(
-            market_db_path=str(c["market"]), profile_db_path=str(c["profile"]), source_loader=c["sources"],
-        ).get_case_detail(c["case_id"])
-        assert updated["current_blockers"] == []
+        assert c["service"].preview_case(c["case_id"], options=TransitionOptions(execute_on=c["ended"]))["eligible"]
         return
-    assert result["accepted"] == 1, result
     assert len(transitions) == 1, result
     transition = transitions[0]
     assert transition["approval_authority"] == "automation_policy"

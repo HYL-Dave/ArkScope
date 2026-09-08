@@ -1,6 +1,8 @@
 /** @vitest-environment jsdom */
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,11 +13,13 @@ const apiMocks = vi.hoisted(() => ({
   getProfileLists: vi.fn(),
   getUniverse: vi.fn(),
   importUniverse: vi.fn(),
-  getSecurityLifecycleCase: vi.fn(),
+  getCurrentLifecycleReview: vi.fn(),
+  getSecurityLifecycleAutomationStatus: vi.fn(),
   getSecurityLifecycleCaseAudit: vi.fn(),
-  listSecurityLifecycleCases: vi.fn(),
+  listCurrentLifecycleReviews: vi.fn(),
   setTickerHidden: vi.fn(),
   translateSecurityLifecycleEvidence: vi.fn(),
+  getInvestigationTargets: vi.fn(), getInvestigationPreflight: vi.fn(), latestInvestigation: vi.fn(), getInvestigationProviders: vi.fn(), getInvestigationActions: vi.fn(),
 }));
 
 vi.mock("./api", async (importOriginal) => {
@@ -24,6 +28,11 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { UniverseView } from "./Universe";
+
+const currentFixture = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../tests/fixtures/lifecycle_current_v1.json"), "utf8"));
+const currentReview = { ...currentFixture.attention.items[0], review_id: "slpr-qbts", case_ids: ["slc-qbts"], ticker: "QBTS",
+  issuer_name: "D-Wave Quantum Inc.", source_checks: [],
+  next_action: { ...currentFixture.attention.items[0].next_action, case_id: "slc-qbts" } };
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -293,95 +302,23 @@ function requestCounts(): Record<RequestName, number> {
 }
 
 beforeEach(async () => {
+  apiMocks.getInvestigationTargets.mockResolvedValue([{ ticker: "QBTS" }]);
+  apiMocks.getInvestigationPreflight.mockResolvedValue({ ticker: "QBTS", available: false, reason: "selected_credential_unavailable", target: null, execution: null });
+  apiMocks.latestInvestigation.mockResolvedValue(null);
+  apiMocks.getInvestigationProviders.mockResolvedValue({ ticker: "QBTS", observations: { observed_at: null, listings: [], gaps: [] } });
+  apiMocks.getInvestigationActions.mockResolvedValue([]);
   await i18n.changeLanguage("zh-Hant");
   document.documentElement.lang = "zh-Hant";
   apiMocks.getProfileLists.mockReset().mockResolvedValue({ lists: LISTS });
   apiMocks.getUniverse.mockReset().mockResolvedValue(UNIVERSE);
-  apiMocks.listSecurityLifecycleCases.mockReset().mockResolvedValue({
-    cases: [{
-      case_id: "slc-qbts",
-      source: "sec_edgar",
-      source_ref: "qbts-ref",
-      ticker: "QBTS",
-      source_presence: "present",
-      workflow_state: "unresolved",
-      issuer_name: "D-Wave Quantum Inc.",
-      filing_date: "2026-07-24",
-      kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
-      current_assessment: null,
-      current_acknowledgement: null,
-      active_sources: ["manual_lists"],
-      source_context: "available",
-      components: {},
-      investigation_run_count: 0,
-      automation_run_count: 0,
-      automation_fact_count: 0,
-      automation_tier: null,
-      action_readiness: null,
-      disposition: "not_confirmed_yet",
-      queue_bucket: "monitoring",
-      disposition_reason: "awaiting_initial_automation",
-      last_checked_at: null,
-      next_check_at: null,
-      source_family_status: { regulator: "present" },
-      evidence_count: 0,
-      assessment_count: 0,
-      acknowledgement_count: 0,
-      proposal_count: 0,
-    }],
-    count: 1,
-    queue_counts: { attention: 0, monitoring: 1, history: 0 },
-    data_integrity: { source_missing_count: 0 },
+  apiMocks.listCurrentLifecycleReviews.mockReset().mockResolvedValue({
+    ...currentFixture.attention, items: [currentReview], counts: { attention: 1, history: 0 }, page: { offset: 0, limit: 50, total: 1 },
   });
-  apiMocks.getSecurityLifecycleCase.mockReset().mockResolvedValue({
-    case_id: "slc-qbts",
-    source: "sec_edgar",
-    source_ref: "qbts-ref",
-    ticker: "QBTS",
-    source_presence: "present",
-    workflow_state: "unresolved",
-    issuer_name: "D-Wave Quantum Inc.",
-    filing_date: "2026-07-24",
-    kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
-    current_assessment: null,
-    current_acknowledgement: null,
-    active_sources: ["manual_lists"],
-    source_context: "available",
-    components: {},
-    investigation_run_count: 0,
-    automation_run_count: 0,
-    automation_fact_count: 0,
-    automation_tier: null,
-    action_readiness: null,
-    disposition: "not_confirmed_yet",
-    queue_bucket: "monitoring",
-    disposition_reason: "awaiting_initial_automation",
-    disposition_as_of: null,
-    last_checked_at: null,
-    next_check_at: null,
-    source_family_status: { regulator: "present" },
-    evidence_count: 0,
-    assessment_count: 0,
-    acknowledgement_count: 0,
-    proposal_count: 0,
-    sec_admission: null,
-    observation: {
-      ticker: "QBTS",
-      issuer_name: "D-Wave Quantum Inc.",
-      filing_date: "2026-07-24",
-      filing_form: "25-NSE",
-      filing_items: [],
-      evidence_url: "https://www.sec.gov/Archives/example/qbts.htm",
-      kinds: [{ event_type: "listing_removal_notice", effective_date: null }],
-    },
-    corroboration: {
-      regulator: "present",
-      nasdaq_trader: null,
-      massive: null,
-      ibkr: null,
-    },
-    proposals: [],
-    ticker_transition: null,
+  apiMocks.getCurrentLifecycleReview.mockReset().mockResolvedValue({ version: 1, as_of: currentFixture.attention.as_of, item: currentReview });
+  apiMocks.getSecurityLifecycleAutomationStatus.mockReset().mockResolvedValue({
+    config_status: "valid", config: { enabled: false, interval_minutes: 5, batch_limit: 2, apply_profile_transitions: false },
+    schedule: { status: "disabled", last_attempt_at: null, next_scheduled_at: null }, telemetry_status: "absent",
+    last_status: null, last_result: null, active_incident: null, latest_failed_runs: [], current_progress: [],
   });
   apiMocks.getSecurityLifecycleCaseAudit.mockReset().mockResolvedValue({
     case_id: "slc-qbts",
@@ -715,61 +652,35 @@ describe("Universe localization", () => {
     await click(buttonByText("標的事件調查", tabs!));
     await waitForText("QBTS");
     expect(host!.textContent).toContain("標的事件調查");
-    expect(host!.querySelectorAll('main[aria-label="標的事件調查"]')).toHaveLength(1);
+    expect(host!.querySelectorAll('section[aria-label="標的事件調查"]')).toHaveLength(1);
   });
 
-  it("opens an exact lifecycle case navigation target and preserves it across locale switch", async () => {
+  it("opens an exact investigation ticker and preserves it across locale switch without a legacy case", async () => {
     const target = {
       sequence: 41,
-      target: { kind: "universe_lifecycle", caseId: "slc-qbts" },
+      target: { kind: "universe_lifecycle", ticker: "QBTS" },
     } as unknown as NavigationRequest;
     await mountUniverse({ navigationRequest: target });
-    await waitForText("D-Wave Quantum Inc.");
-    const drawer = document.body.querySelector('[role="dialog"]');
+    await waitForText("QBTS");
     const selected = host!.querySelector('[role="tab"][aria-selected="true"]');
     expect(selected?.textContent).toContain("標的事件調查");
-    expect(drawer?.textContent).toContain("QBTS");
+    expect(host!.querySelector('.investigation-panel h3')?.textContent).toBe("QBTS");
+    expect(apiMocks.getCurrentLifecycleReview).not.toHaveBeenCalled();
 
     await switchLocale("en");
-    expect(document.body.querySelector('[role="dialog"]')).toBe(drawer);
+    expect(host!.querySelector('.investigation-panel h3')?.textContent).toBe("QBTS");
     expect(host!.querySelector('[role="tab"][aria-selected="true"]')?.textContent)
       .toContain("Security event investigation");
   });
 
-  it("forwards the exact Models Settings target from lifecycle translation recovery", async () => {
+  it("forwards the exact Models Settings target from independent investigation setup", async () => {
     const onNavigateTarget = vi.fn();
-    apiMocks.getSecurityLifecycleCaseAudit.mockResolvedValueOnce({
-      ...(await apiMocks.getSecurityLifecycleCaseAudit()),
-      evidence: [{
-        evidence_id: "evidence-sec",
-        source_family: "regulator",
-        kind: "regulator_excerpt",
-        excerpt: "Official issuer source text.",
-        source_url: "https://www.sec.gov/Archives/example/qbts.htm",
-        content_sha256: "a".repeat(64),
-        title: "Issuer notice",
-        publisher: "SEC",
-        source_published_at: "2026-07-24T12:00:00Z",
-        translations: [],
-        created_at: "2026-07-24T12:00:00Z",
-      }],
-    });
     await mountUniverse({ onNavigateTarget });
     await click(buttonByText("標的事件調查", host!.querySelector('[role="tablist"]')!));
     await waitForText("QBTS");
-    await click(buttonByText("QBTS"));
-    const auditDisclosure = document.body.querySelector<HTMLDetailsElement>(
-      "details.lifecycle-audit-details",
-    );
-    if (!auditDisclosure) throw new Error("missing lifecycle audit disclosure");
-    await click(auditDisclosure.querySelector("summary")!);
-    await waitForBodyText("Issuer notice");
-    await click(buttonByText("翻譯證據", document.body));
-    const recovery = document.body.querySelector<HTMLButtonElement>(
-      "[data-action='open-content-translation-settings']",
-    );
-    expect(recovery).not.toBeNull();
-    await click(recovery!);
+    const settings = host!.querySelector<HTMLButtonElement>('.investigation-heading button[aria-label="調查設定"]');
+    expect(settings).not.toBeNull();
+    await click(settings!);
     expect(onNavigateTarget).toHaveBeenCalledWith({
       kind: "settings_section",
       section: "models",

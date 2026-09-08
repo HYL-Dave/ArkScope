@@ -278,7 +278,7 @@ def read_market_observations(
     path = Path(db_path)
     if not path.is_file():
         return []
-    conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
         verify_market_connection(conn)

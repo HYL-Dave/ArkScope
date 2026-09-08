@@ -114,6 +114,27 @@ def _ibkr_equity_end_of_day(trade_date: date) -> str:
     return f"{trade_date:%Y%m%d} 23:59:59 {_IBKR_EQUITY_TIME_ZONE}"
 
 
+def historical_intraday_chunks(start_date: date, end_date: date, interval: str = '15 mins'):
+    """The same inclusive chunk plan is used by execution and bounded repair."""
+    max_days = {'1 min': 10, '5 mins': 30, '15 mins': 60, '30 mins': 120, '1 hour': 365}.get(interval, 60)
+    chunk_start = start_date
+    while chunk_start <= end_date:
+        chunk_end = min(chunk_start + timedelta(days=max_days), end_date)
+        yield chunk_start, chunk_end
+        chunk_start = chunk_end + timedelta(days=1)
+
+
+def historical_intraday_bars(ticker, bars, start_date, end_date):
+    for bar in bars:
+        at = bar.date
+        if isinstance(at, date) and not isinstance(at, datetime):
+            at = datetime.combine(at, datetime.min.time())
+        if start_date <= at.date() <= end_date:
+            yield IntradayBar(ticker=ticker, datetime=at, open=bar.open, high=bar.high,
+                              low=bar.low, close=bar.close, volume=int(bar.volume),
+                              wap=getattr(bar, 'wap', None), bar_count=getattr(bar, 'barCount', None))
+
+
 @dataclass
 class IntradayBar:
     """Intraday bar data structure."""
@@ -983,6 +1004,8 @@ class IBKRDataSource(BaseDataSource):
         end_date: Optional[date] = None,
         interval: str = '15 mins',
         include_extended: bool = False,
+        *,
+        request_runner=None,
     ) -> Dict[str, List[IntradayBar]]:
         """
         Fetch historical intraday data for multiple days.
@@ -1007,40 +1030,28 @@ class IBKRDataSource(BaseDataSource):
         if end_date is None:
             end_date = date.today()
 
-        # Determine chunk size based on interval
-        # IBKR historical data limits vary by bar size
-        interval_to_max_days = {
-            '1 min': 10,
-            '5 mins': 30,
-            '15 mins': 60,
-            '30 mins': 120,
-            '1 hour': 365,
-        }
-        max_days_per_chunk = interval_to_max_days.get(interval, 60)
-
         result: Dict[str, List[IntradayBar]] = {}
 
-        self._ensure_connected()
+        if request_runner is None:
+            self._ensure_connected()
+        elif not self._connected or not self._ib or not self._ib.isConnected():
+            raise IBKRPriceDataError("ibkr_gateway_unavailable")
 
         for ticker in tickers:
             logger.info(f"Fetching historical {interval} data for {ticker}")
             result[ticker] = []
 
-            # Process in chunks
-            chunk_start = start_date
-            while chunk_start <= end_date:
-                chunk_end = min(
-                    chunk_start + timedelta(days=max_days_per_chunk),
-                    end_date
-                )
-
+            for chunk_start, chunk_end in historical_intraday_chunks(start_date, end_date, interval):
                 logger.info(f"  Chunk: {chunk_start} to {chunk_end}")
 
                 try:
                     self._rate_limit_wait()
 
                     contract = self._create_contract(ticker)
-                    qualified = self._ib.qualifyContracts(contract)
+                    context = {"ticker": ticker, "start": chunk_start.isoformat(), "end": chunk_end.isoformat(),
+                               "interval": interval, "extended": include_extended}
+                    qualified = (self._ib.qualifyContracts(contract) if request_runner is None else
+                                 request_runner("qualification", context, self._ib.qualifyContracts, (contract,), {}))
                     if not qualified:
                         raise IBKRSecurityDefinitionUnavailable()
                     contract = qualified[0]
@@ -1048,34 +1059,11 @@ class IBKRDataSource(BaseDataSource):
                     duration_days = (chunk_end - chunk_start).days + 1
                     end_datetime = _ibkr_equity_end_of_day(chunk_end)
 
-                    bars = self._ib.reqHistoricalData(
-                        contract,
-                        endDateTime=end_datetime,
-                        durationStr=f"{duration_days} D",
-                        barSizeSetting=interval,
-                        whatToShow='TRADES',
-                        useRTH=not include_extended,
-                        formatDate=1,
-                    )
-
-                    for bar in bars:
-                        bar_datetime = bar.date
-                        if isinstance(bar_datetime, date) and not isinstance(bar_datetime, datetime):
-                            bar_datetime = datetime.combine(bar_datetime, datetime.min.time())
-
-                        # Filter by actual date range
-                        if start_date <= bar_datetime.date() <= end_date:
-                            result[ticker].append(IntradayBar(
-                                ticker=ticker,
-                                datetime=bar_datetime,
-                                open=bar.open,
-                                high=bar.high,
-                                low=bar.low,
-                                close=bar.close,
-                                volume=int(bar.volume),
-                                wap=getattr(bar, 'wap', None),
-                                bar_count=getattr(bar, 'barCount', None),
-                            ))
+                    options = dict(endDateTime=end_datetime, durationStr=f"{duration_days} D", barSizeSetting=interval,
+                                   whatToShow='TRADES', useRTH=not include_extended, formatDate=1)
+                    bars = (self._ib.reqHistoricalData(contract, **options) if request_runner is None else
+                            request_runner("history", context, self._ib.reqHistoricalData, (contract,), options))
+                    result[ticker].extend(historical_intraday_bars(ticker, bars, start_date, end_date))
 
                     logger.info(f"    Retrieved {len(bars)} bars for chunk")
 
@@ -1084,8 +1072,6 @@ class IBKRDataSource(BaseDataSource):
                 except Exception as e:
                     logger.error(f"  Error in chunk {chunk_start}-{chunk_end}: {e}")
                     raise IBKRHistoricalDataRequestFailed() from e
-
-                chunk_start = chunk_end + timedelta(days=1)
 
             logger.info(f"  Total: {len(result[ticker])} bars for {ticker}")
 

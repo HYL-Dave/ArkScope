@@ -252,6 +252,11 @@ _PUBLIC_TRANSITION_FIELDS = (
     "activity_count",
     "unacknowledged_activity_count",
 )
+_PUBLIC_TRANSITION_PREVIEW_FIELDS = (
+    "active_sources", "assessment_fingerprint_sha256", "assessment_id", "block_reasons", "case_id", "caveats",
+    "eligible", "evidence_set_sha256", "execute_on", "observation_fingerprint_sha256", "outcomes", "preview_sha256",
+    "profile_state_sha256", "proposal_ids", "provider_owned_sources", "source_ticker", "successor_ticker", "transition_kind",
+)
 
 
 def _nullable_listing_text(value: object, pattern: re.Pattern[str]) -> bool:
@@ -502,12 +507,50 @@ def _project_proposal(row: Mapping[str, object]) -> dict[str, object]:
     return _closed_fields(row, _PUBLIC_PROPOSAL_FIELDS)
 
 
+def _project_transition_preview(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        raise ValueError("transition_approved_preview")
+    projected = _closed_fields(value, _PUBLIC_TRANSITION_PREVIEW_FIELDS)
+    if "effects" in value:
+        effects = value["effects"]
+        if not isinstance(effects, Mapping):
+            raise ValueError("transition_effects")
+        public_effects = {}
+        for name, fields in (
+            ("watchlists", ("list_id", "list_name", "position", "ticker")),
+            ("legacy_config_seed", ("source_key", "ticker")),
+        ):
+            if name in effects:
+                public_effects[name] = {
+                    action: [_closed_fields(row, fields) for row in effects[name][action]]
+                    for action in ("add", "archive", "reactivate", "unchanged")
+                }
+        for name, fields in (
+            ("editable_tags_to_copy", ("facet", "source", "ticker", "value")),
+            ("sa_tracking_memberships", ("membership_id", "ticker", "picked_date", "portfolio_status")),
+        ):
+            if name in effects:
+                public_effects[name] = [_closed_fields(row, fields) for row in effects[name]]
+        for name, fields in (
+            ("priority", ("resolution", "result_value", "source_value", "successor_value", "write_successor")),
+            ("suppression", ("hide_source", "source_hidden", "successor_hidden", "unhide_successor")),
+        ):
+            if name in effects:
+                public_effects[name] = _closed_fields(effects[name], fields)
+        projected["effects"] = public_effects
+    return projected
+
+
 def _project_transition(value: object) -> dict[str, object] | None:
     if value is None:
         return None
     if not isinstance(value, Mapping):
         raise ValueError("ticker_transition")
-    return _closed_fields(value, _PUBLIC_TRANSITION_FIELDS)
+    projected = _closed_fields(value, _PUBLIC_TRANSITION_FIELDS)
+    if "approved_preview" in projected:
+        # The stored hash binds the complete private receipt, not this DTO.
+        projected["approved_preview"] = _project_transition_preview(projected["approved_preview"])
+    return projected
 
 
 def _project_audit_evidence(row: Mapping[str, object]) -> dict[str, object]:
@@ -754,7 +797,7 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
     conn: sqlite3.Connection | None = None
     try:
         path = Path(profile_db_path)
-        conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
         if not identity_schema_present(conn):
             return {}
         verify_ticker_identity_connection(conn)
@@ -846,6 +889,7 @@ def _ticker_transitions_by_case(profile_db_path: str) -> dict[str, dict]:
 
 def _provider_neutral_case(case: Mapping[str, object]) -> dict:
     item = project_active_security_lifecycle_case(case)
+    item["ticker_transition"] = _project_transition(item.get("ticker_transition"))
     histories = {
         "investigation_runs": [],
         "automation_runs": [],
@@ -979,6 +1023,22 @@ class SecurityLifecycleReadService:
 
     def sources_by_ticker(self) -> Mapping[str, Iterable[str]] | None:
         return self._source_loader()
+
+    def population_manifest(self, *, at: str) -> dict:
+        """Internal dry run; no global source lookup or action authorization."""
+        from src.security_lifecycle_population import read_population_manifest
+
+        return read_population_manifest(self.market_db_path, self.profile_db_path, at=at)
+
+    def list_current_reviews(self, *, at=None, view="attention", ticker=None, case_id=None, limit=50, offset=0) -> dict:
+        from src.security_lifecycle_current import list_current_reviews
+
+        return list_current_reviews(self, at=at, view=view, ticker=ticker, case_id=case_id, limit=limit, offset=offset)
+
+    def get_current_review(self, review_id: str, *, at=None) -> dict:
+        from src.security_lifecycle_current import get_current_review
+
+        return get_current_review(self, review_id, at=at)
 
     def _cases(self) -> list[dict]:
         _store_exists(self.market_db_path, "market")
@@ -1262,10 +1322,38 @@ def get_security_lifecycle_case(case_id: str) -> dict:
     return {"status": "ok", "case": _provider_neutral_case(case)}
 
 
+def list_security_lifecycle_reviews(ticker=None, view="attention", limit=50, offset=0) -> dict:
+    """Current collection, listing and continuation truth; no provider or write."""
+    from src.security_lifecycle_population import LifecyclePopulationUnavailable
+
+    service = SecurityLifecycleReadService(market_db_path=resolve_market_db_path(), profile_db_path=_profile_db_path())
+    try:
+        return {"status": "ok", **service.list_current_reviews(ticker=ticker, view=view, limit=limit, offset=offset)}
+    except LifecyclePopulationUnavailable:
+        return {"status": "unavailable", "error": {"code": "lifecycle_current_unavailable"}}
+    except ValueError:
+        return {"status": "unavailable", "error": {"code": "current_review_filter"}}
+
+
+def get_security_lifecycle_review(review_id: str) -> dict:
+    """Read the same current review shown to the operator, never grant consent."""
+    from src.security_lifecycle_population import LifecyclePopulationUnavailable
+
+    service = SecurityLifecycleReadService(market_db_path=resolve_market_db_path(), profile_db_path=_profile_db_path())
+    try:
+        return {"status": "ok", **service.get_current_review(review_id)}
+    except LifecyclePopulationUnavailable:
+        return {"status": "unavailable", "error": {"code": "lifecycle_current_unavailable"}}
+    except KeyError:
+        return {"status": "unavailable", "error": {"code": "current_review_not_found"}}
+
+
 __all__ = [
     "SecurityLifecycleReadService",
     "get_security_lifecycle_case",
     "list_security_lifecycle_cases",
+    "get_security_lifecycle_review",
+    "list_security_lifecycle_reviews",
     "project_active_security_lifecycle_case",
     "project_security_lifecycle_case_audit",
     "project_security_lifecycle_case_detail",

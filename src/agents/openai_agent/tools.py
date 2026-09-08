@@ -108,8 +108,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     from src.tools.freshness import check_data_freshness as _check_data_freshness
     from src.tools.data_coverage_tools import get_ticker_data_coverage as _get_ticker_data_coverage
     from src.tools.security_lifecycle_tools import (
-        get_security_lifecycle_case as _get_security_lifecycle_case,
-        list_security_lifecycle_cases as _list_security_lifecycle_cases,
+        get_security_lifecycle_review as _get_security_lifecycle_review,
+        list_security_lifecycle_reviews as _list_security_lifecycle_reviews,
     )
     from src.tools.sa_tools import (
         get_sa_alpha_picks as _get_sa_alpha_picks,
@@ -1077,34 +1077,26 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
 
     @function_tool
-    def tool_list_security_lifecycle_cases(
+    def tool_list_security_lifecycle_reviews(
         ticker: Optional[str] = None,
-        workflow_state: Optional[
-            Literal[
-                "unresolved",
-                "investigating",
-                "evidence_ready",
-                "reviewed_inconclusive",
-                "resolved",
-            ]
-        ] = None,
-        source_presence: Literal["present", "source_missing"] = "present",
+        view: Literal["attention", "history"] = "attention",
         limit: int = 50,
+        offset: int = 0,
     ) -> str:
-        """List local security-lifecycle cases without provider access or writes."""
-        result = _list_security_lifecycle_cases(
+        """List current tracking exceptions or history, source checks and actions. No provider or write."""
+        result = _list_security_lifecycle_reviews(
             ticker=ticker,
-            workflow_state=workflow_state,
-            source_presence=source_presence,
+            view=view,
             limit=limit,
+            offset=offset,
         )
-        return _serialize_result(result, "list_security_lifecycle_cases")
+        return _serialize_result(result, "list_security_lifecycle_reviews")
 
     @function_tool
-    def tool_get_security_lifecycle_case(case_id: str) -> str:
-        """Read one local security-lifecycle case without provider access or writes."""
-        result = _get_security_lifecycle_case(case_id=case_id)
-        return _serialize_result(result, "get_security_lifecycle_case")
+    def tool_get_security_lifecycle_review(review_id: str) -> str:
+        """Read one operator review with source checks and actual application state. No provider or write."""
+        result = _get_security_lifecycle_review(review_id=review_id)
+        return _serialize_result(result, "get_security_lifecycle_review")
 
     # Return all tools as a list
     tools = [
@@ -1148,8 +1140,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_scan_alerts,
         tool_check_data_freshness,
         tool_get_ticker_data_coverage,
-        tool_list_security_lifecycle_cases,
-        tool_get_security_lifecycle_case,
+        tool_list_security_lifecycle_reviews,
+        tool_get_security_lifecycle_review,
         tool_get_sa_alpha_picks,
         tool_get_sa_pick_detail,
         tool_refresh_sa_alpha_picks,

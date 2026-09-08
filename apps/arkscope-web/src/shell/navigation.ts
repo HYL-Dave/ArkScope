@@ -69,7 +69,7 @@ export type NavigationTarget =
   | { kind: "view"; view: ShellView }
   | { kind: "ticker"; ticker: string }
   | { kind: "research_thread"; threadId: string; runId?: string }
-  | { kind: "universe_lifecycle"; caseId?: string }
+  | { kind: "universe_lifecycle"; caseId?: string; ticker?: string }
   | { kind: "settings_section"; section: EnabledSettingsSection };
 
 export interface NavigationRequest<T extends NavigationTarget = NavigationTarget> {

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import sqlite3
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path as PathParam, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dependencies import get_profile_store
@@ -24,6 +26,7 @@ from src.market_coverage.models import TradingDayCoverageV2
 from src.market_coverage.service import TradingDayCoverageService
 from src.news_sync_status import overlay_news_sync_status
 from src.profile_state import ProfileStateStore
+from src.price_defaults import DEFAULT_PRICE_LOOKBACK_DAYS
 
 router = APIRouter(tags=["market-data"])
 
@@ -108,7 +111,7 @@ def market_data_coverage(ticker: str):
     response_model=TradingDayCoverageV2,
 )
 def market_data_trading_days(
-    lookback_days: int = Query(10, ge=1, le=120),
+    lookback_days: int = Query(DEFAULT_PRICE_LOOKBACK_DAYS, ge=1, le=120),
     interval: Literal["15min"] = Query("15min"),
 ) -> TradingDayCoverageV2:
     """Return read-only RTH session truth for the current active universe.
@@ -140,12 +143,26 @@ def validate_route():
 
 
 @router.get("/market-data/price-repair/preview")
-def price_repair_preview(lookback_days: int = Query(10, ge=1, le=120)):
+def price_repair_preview(lookback_days: int = Query(DEFAULT_PRICE_LOOKBACK_DAYS, ge=1, le=120)):
     from src.market_coverage.repair import preview_price_repair
     try:
         return preview_price_repair(market_data_trading_days(lookback_days=lookback_days, interval="15min"))
     except ValueError:
         raise HTTPException(status_code=409, detail={"code": "price_coverage_unavailable"}) from None
+
+
+@router.get("/market-data/price-repair/operations")
+def price_repair_operations(limit: int = Query(5, ge=1, le=20), offset: int = Query(0, ge=0)):
+    from src.active_universe import ActiveUniverseUnavailable
+    from src.price_repair_status import list_price_repairs
+    from src.price_repair_execution import PriceRepairError
+    from src.universe_scope import resolve_active_universe
+    try:
+        return list_price_repairs(resolve_market_db_path(), universe=resolve_active_universe(), limit=limit, offset=offset)
+    except ActiveUniverseUnavailable as exc:
+        raise HTTPException(503, detail=exc.as_dict()) from None
+    except (PriceRepairError, OSError, ValueError):
+        raise HTTPException(503, detail={"code": "price_repair_status_unavailable"}) from None
 
 
 class PriceRepairRequest(BaseModel):
@@ -154,9 +171,21 @@ class PriceRepairRequest(BaseModel):
     preview_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+@router.get("/market-data/price-repair/{repair_id}")
+def price_repair_operation(repair_id: str = PathParam(pattern=r"^[a-f0-9]{32}$")):
+    from src.active_universe import ActiveUniverseUnavailable
+    from src.price_repair_status import price_repair_status
+    from src.universe_scope import resolve_active_universe
+    try:
+        return price_repair_status(resolve_market_db_path(), repair_id, universe=resolve_active_universe())
+    except ActiveUniverseUnavailable as exc:
+        raise HTTPException(503, detail=exc.as_dict()) from None
+
+
 @router.post("/market-data/price-repair")
 def price_repair(body: PriceRepairRequest):
     from src.market_coverage.repair import validate_price_repair
+    from src.price_repair_execution import build_repair_plan, RepairJournal, repair_directory, PriceRepairError
     from src.service.data_scheduler import run_source
     import threading
     import uuid
@@ -164,15 +193,54 @@ def price_repair(body: PriceRepairRequest):
     require_db_write("price_coverage_repair", {"lookback_days": body.lookback_days})
     require_profile_state_write("price_coverage_repair", {})
     try:
-        plan = validate_price_repair(market_data_trading_days(lookback_days=body.lookback_days, interval="15min"), body.preview_sha256)
+        coverage = market_data_trading_days(lookback_days=body.lookback_days, interval="15min")
+        plan = validate_price_repair(coverage, body.preview_sha256)
     except ValueError as exc:
         code = "price_repair_preview_changed" if str(exc) == "price_repair_preview_changed" else "price_coverage_unavailable"
         raise HTTPException(status_code=409, detail={"code": code}) from None
     if not plan["tickers"]:
         return {"status": "nothing_to_repair", "tickers": []}
     repair_id = uuid.uuid4().hex
+    try:
+        prepared = build_repair_plan(coverage, resolve_market_db_path())
+        journal = RepairJournal(repair_directory(resolve_market_db_path(), repair_id), prepared)
+        journal.close()
+    except (PriceRepairError, OSError, sqlite3.Error):
+        raise HTTPException(409, {"code": "price_repair_preparation_failed"}) from None
     threading.Thread(target=run_source, args=("ibkr_prices", "api"), kwargs={
         "tickers": plan["tickers"], "price_lookback_days": body.lookback_days, "price_as_of_date": plan["as_of_date"],
+        "price_repair_id": repair_id,
+    }, daemon=True).start()
+    return {"status": "accepted", "tickers": plan["tickers"], "repair_id": repair_id}
+
+
+@router.post("/market-data/price-repair/{repair_id}/resume")
+def resume_price_repair(repair_id: str):
+    from src.active_universe import ActiveUniverseUnavailable
+    from src.price_repair_execution import load_repair_plan, repair_directory, PriceRepairError
+    from src.price_repair_status import price_repair_status
+    from src.service.data_scheduler import run_source
+    from src.universe_scope import resolve_active_universe
+    import threading
+
+    require_db_write("price_coverage_repair", {"repair_id": repair_id})
+    require_profile_state_write("price_coverage_repair", {})
+    try:
+        prepared = load_repair_plan(repair_directory(resolve_market_db_path(), repair_id))
+        if prepared["market_db"] != str(Path(resolve_market_db_path()).resolve()):
+            raise PriceRepairError("price_repair_plan_changed")
+        state = price_repair_status(resolve_market_db_path(), repair_id, universe=resolve_active_universe())
+        if state["state"] == "complete":
+            return {"status": "nothing_to_repair", "tickers": []}
+        if not state["resume"]["available"]:
+            raise PriceRepairError("price_repair_resume_unavailable")
+    except ActiveUniverseUnavailable as exc:
+        raise HTTPException(503, detail=exc.as_dict()) from None
+    except (PriceRepairError, OSError):
+        raise HTTPException(409, {"code": "price_repair_resume_unavailable"}) from None
+    plan = prepared["preview"]
+    threading.Thread(target=run_source, args=("ibkr_prices", "api"), kwargs={
+        "tickers": plan["tickers"], "price_lookback_days": plan["lookback_days"], "price_as_of_date": plan["as_of_date"],
         "price_repair_id": repair_id,
     }, daemon=True).start()
     return {"status": "accepted", "tickers": plan["tickers"], "repair_id": repair_id}

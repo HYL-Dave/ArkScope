@@ -858,6 +858,8 @@ def _parse_price_ticker_ids(value: Any) -> Optional[List[str]]:
 def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
     """Allowlist parse for src.prices_runtime stdout (the news-worker parser strips
     the prices fields, which killed retryable-skip classification and telemetry)."""
+    from src.prices_runtime import _SAFE_ERROR_CODES, sanitize_repair_execution
+
     try:
         raw = json.loads(stdout or "")
     except (TypeError, ValueError):
@@ -877,7 +879,7 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
         error_code = raw.get("error_code")
         if (
             error_code is not None
-            and error_code not in _PROVIDER_WORKER_ERROR_CODES
+            and error_code not in _SAFE_ERROR_CODES
         ):
             return None
         payload = {
@@ -935,7 +937,7 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
     )
     if scanned <= 0 or status != expected:
         return None
-    return {
+    payload = {
         "status": status,
         "provider": provider,
         **counts,
@@ -945,6 +947,12 @@ def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any
         "error": "",
         "retryable": False,
     }
+    if "repair_execution" in raw:
+        try:
+            payload["repair_execution"] = sanitize_repair_execution(raw["repair_execution"])
+        except ValueError:
+            return None
+    return payload
 
 
 def _run_sanitized_prices_worker_subprocess(argv: List[str]) -> Dict[str, Any]:
@@ -966,8 +974,10 @@ def _run_sanitized_prices_worker_subprocess(argv: List[str]) -> Dict[str, Any]:
 
 
 def _sanitized_prices_worker_failure_message(payload: Dict[str, Any]) -> str:
+    from src.prices_runtime import _SAFE_ERROR_CODES
+
     error_code = payload.get("error_code")
-    if error_code in _PROVIDER_WORKER_ERROR_CODES:
+    if error_code in _SAFE_ERROR_CODES:
         return str(error_code)
     error = str(payload.get("error") or "").strip()
     if error:
@@ -1362,6 +1372,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 ]
                 if price_lookback_days is not None:
                     argv.extend(["--lookback-days", str(price_lookback_days), "--as-of-date", price_as_of_date, "--no-provider-fallback"])
+                    if price_repair_id is not None:
+                        argv.extend(["--repair-id", price_repair_id])
                 step = _run_sanitized_prices_worker_subprocess(argv)
                 result["collect"] = step["payload"]
                 price_status = step["payload"]["status"]
@@ -1374,6 +1386,24 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     eastern = ZoneInfo("America/New_York")
                     verification_time = min(datetime.now(eastern), datetime.combine(
                         date.fromisoformat(price_as_of_date), time.max, tzinfo=eastern))
+                    if price_repair_id is not None:
+                        from src.price_repair_execution import prepared_repair_request, RepairJournal, PriceRepairError
+                        from src.prices_runtime import sanitize_repair_execution
+                        prepared, directory = prepared_repair_request(
+                            repair_id=price_repair_id, tickers=",".join(scope), lookback_days=price_lookback_days,
+                            provider="ibkr", no_provider_fallback=True, as_of_date=date.fromisoformat(price_as_of_date))
+                        try:
+                            report = sanitize_repair_execution(step["payload"].get("repair_execution"))
+                        except ValueError:
+                            raise PriceRepairError("price_repair_plan_changed") from None
+                        journal = RepairJournal(directory, prepared)
+                        try:
+                            if (report["plan_sha256"] != prepared["plan_sha256"] or report["request_budget"] != prepared["request_budget"]
+                                    or report["requests_total"] != journal.count()):
+                                raise PriceRepairError("price_repair_plan_changed")
+                        finally:
+                            journal.close()
+                        verification_time = datetime.fromisoformat(prepared["coverage_at"])
                     coverage = TradingDayCoverageService(db_path=resolve_market_db_path(), clock=lambda: verification_time).get_coverage(
                         universe=scope, lookback_days=price_lookback_days, interval="15min")
                     remaining = [row.ticker for row in coverage.history_gaps]
@@ -1395,10 +1425,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                             "skip_kind": "skipped_lock_busy",
                         })
                     else:
+                        from src.prices_runtime import _SAFE_ERROR_CODES
                         error_code = step["payload"].get("error_code")
                         raise RuntimeError(
                             str(error_code)
-                            if error_code in _PROVIDER_WORKER_ERROR_CODES
+                            if error_code in _SAFE_ERROR_CODES
                             else "price_collection_failed"
                         )
                 elif price_status != "succeeded" or step["returncode"] != 0:

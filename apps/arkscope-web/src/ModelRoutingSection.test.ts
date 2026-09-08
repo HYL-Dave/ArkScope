@@ -177,6 +177,104 @@ function expectNoKnownTaskId(value: string | null | undefined) {
   expect(value ?? "").not.toMatch(/ai_research|card_synthesis|card_translation/);
 }
 
+function investigationCatalog(): ModelCatalog {
+  const cat = catalog();
+  cat.tasks.push({ id: "lifecycle_investigation", label: "DO NOT RENDER BACKEND LABEL",
+    description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5", supports_custom_models: false });
+  cat.routes.lifecycle_investigation = route({ task: "lifecycle_investigation",
+    provider: "anthropic", model: "claude-sonnet-5", effort: "high" });
+  cat.effective = {
+    providers: { anthropic: { credential_id: "local:9", auth_mode: "claude_code_oauth", label: "Selected subscription" } },
+    tasks: { lifecycle_investigation: {
+      verified: [], advanced: [], cache_state: "seed_only", discovered_at: null,
+      providers: { anthropic: { executable: true, reason_code: null, cache_state: "seed_only",
+        discovered_at: null, models: [{ id: "claude-sonnet-5", label: "Claude Sonnet 5",
+          status: "seed", eligible: true, reason_code: null, visible_to_credential: null,
+          thinking_mode: "adaptive_default_on" }] } },
+    } },
+  };
+  return cat;
+}
+
+describe("independent lifecycle investigation routing", () => {
+  it.each([
+    ["zh-Hant", "標的事件調查", "連線與格式測試"],
+    ["en", "Lifecycle Investigation", "Test connection and format"],
+  ])("has its own localized route and bounded test in %s", async (locale, label, testLabel) => {
+    await i18n.changeLanguage(locale);
+    const cat = investigationCatalog();
+    const onTest = vi.fn(async () => {});
+    const onDraft = vi.fn();
+    const draft = {
+      ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+      lifecycle_investigation: { provider: "anthropic", model: "claude-sonnet-5", effort: "high", custom: false },
+    };
+    render(vi.fn(), cat, onDraft, { draft, onTest });
+    const card = host!.querySelector('[data-testid="route-lifecycle_investigation"]')!;
+    expect(card.querySelector("h2")!.textContent).toBe(label);
+    expect(card.textContent).not.toContain("DO NOT RENDER");
+    expect(card.textContent).not.toContain("lifecycle_investigation");
+    expect(card.querySelector(".model-custom-toggle")).toBeNull();
+    expect(onTest).not.toHaveBeenCalled();
+    const effort = labelledControl(card, "effort") as HTMLSelectElement;
+    act(() => {
+      effort.value = "max";
+      effort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const update = onDraft.mock.calls[0][0](draft);
+    expect(update.ai_research).toEqual(draft.ai_research);
+    expect(update.lifecycle_investigation.effort).toBe("max");
+    const test = Array.from(card.querySelectorAll("button")).find((button) => button.textContent === testLabel)!;
+    expect(test).toBeDefined();
+    expect(test.disabled).toBe(false);
+    await act(async () => { test.click(); });
+    expect(onTest).toHaveBeenCalledExactlyOnceWith("lifecycle_investigation");
+  });
+
+  it.each(["absent", "explicitly_rejected"])("does not promote an %s retained investigation model", (shape) => {
+    const cat = investigationCatalog();
+    const model = "claude-unknown-custom";
+    cat.routes.lifecycle_investigation = route({ task: "lifecycle_investigation", provider: "anthropic",
+      model, effort: "high", custom: true });
+    if (shape === "explicitly_rejected") {
+      cat.effective!.tasks.lifecycle_investigation!.providers!.anthropic!.models.push({
+        id: model, label: model, status: "route", visible_to_credential: false,
+        eligible: false, reason_code: "model_not_in_registry", thinking_mode: "none",
+      });
+    }
+    const onTest = vi.fn();
+    render(vi.fn(), cat, undefined, { onTest, draft: {
+      lifecycle_investigation: { provider: "anthropic", model, effort: "high", custom: true },
+    } });
+    const card = host!.querySelector('[data-testid="route-lifecycle_investigation"]')!;
+    const select = labelledControl(card, "model") as HTMLSelectElement;
+    expect(select.value).toBe(model);
+    expect(select.selectedOptions[0].disabled).toBe(true);
+    expect(card.querySelector(".model-custom-toggle")).toBeNull();
+    const test = Array.from(card.querySelectorAll("button")).find((button) => button.textContent === "連線與格式測試")!;
+    expect(test.disabled).toBe(true);
+    act(() => test.click());
+    expect(onTest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["zh-Hant", "連線與格式檢查通過"],
+    ["en", "Connection and format check passed"],
+  ])("does not call a schema check a full investigation success in %s", async (locale, label) => {
+    await i18n.changeLanguage(locale);
+    const cat = investigationCatalog();
+    const snapshot = { task: "lifecycle_investigation", provider: "anthropic", model: "claude-sonnet-5",
+      effort: "high", credential_id: "local:9" };
+    render(vi.fn(), cat, undefined, {
+      draft: { lifecycle_investigation: { ...snapshot, custom: false } },
+      testState: { lifecycle_investigation: { loading: false, snapshot, stale: false,
+        result: { ...snapshot, auth_mode: "claude_code_oauth", status: "ok", error_code: null,
+          latency_ms: 12, tested_at: "2026-09-07T00:00:00Z", fallback_effort: null, warning: null } } },
+    });
+    expect(host!.querySelector('[data-testid="route-lifecycle_investigation"] .test-status strong')!.textContent).toBe(label);
+  });
+});
+
 describe("ModelRoutingSection reset affordance", () => {
   it("shows '重設為 fallback' ONLY for a DB-authoritative route", async () => {
     render();
@@ -421,11 +519,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(terra.disabled).toBe(true);
     expect(terra.textContent).toContain("缺少任務能力");
     expect(terra.getAttribute("title")).toBeNull();
-    expect(card.textContent).toContain("不可選：缺少任務能力");
-    const modelLimitHelp = card.querySelector("p.field-help")!;
-    expect(modelLimitHelp.getAttribute("aria-label")).toBeNull();
-    expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
-    expectNoKnownTaskId(modelLimitHelp.textContent);
+    // Another model's rejection must not describe the selected, eligible Luna.
+    expect(card.querySelector(".field > p.field-help")).toBeNull();
     expect(Array.from(select.options).find((option) => option.value === "gpt-5.6-sol")?.textContent)
       .toContain("進階");
     const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
@@ -857,10 +952,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       "effort",
       "AI Research Effort",
     ) as HTMLSelectElement;
-    const modelLimitHelp = research.querySelector("p.field-help")!;
-    expect(modelLimitHelp.getAttribute("aria-label")).toBeNull();
-    expect(modelLimitHelp.getAttribute("aria-labelledby")).toBeNull();
-    expectNoKnownTaskId(modelLimitHelp.textContent);
+    expect(research.querySelector(".field > p.field-help")).toBeNull();
     expect(Array.from(effort.options).map((option) => option.textContent)).toContain("low");
     expect(research.textContent).not.toContain("Low reasoning effort.");
     expect(research.textContent).toContain(
