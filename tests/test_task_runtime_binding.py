@@ -918,3 +918,139 @@ def test_schedule_key_echo_never_logs_raw_exception_context(isolated, monkeypatc
     assert "fixture-selected-alpha" not in caplog.text
     assert "[REDACTED]" in caplog.text
     assert all(not record.exc_info for record in caplog.records if record.name.startswith("src."))
+
+
+@pytest.fixture
+def enabled_local_sdk_tracing(isolated, monkeypatch):
+    from agents.tracing import TracingProcessor, get_trace_provider, set_trace_provider
+    from agents.tracing.processors import BackendSpanExporter
+    from agents.tracing.provider import DefaultTraceProvider
+
+    class MemoryProcessor(TracingProcessor):
+        def __init__(self):
+            self.traces = []
+            self.spans = []
+
+        def on_trace_start(self, trace):
+            pass
+
+        def on_trace_end(self, trace):
+            self.traces.append(trace.export())
+
+        def on_span_start(self, span):
+            pass
+
+        def on_span_end(self, span):
+            record = span.export()
+            if span.span_data.type == "response":
+                # ResponseSpanData.export() omits these fields even when they
+                # contain sensitive data. Inspect the live processor boundary.
+                record["input"] = span.span_data.input
+                response = span.span_data.response
+                record["response"] = response.model_dump(mode="json") if response is not None else None
+            # Snapshot before ArkScope's outer exception handlers can run.
+            self.spans.append(json.loads(json.dumps(record)))
+
+        def shutdown(self):
+            pass
+
+        def force_flush(self):
+            pass
+
+    export_attempts = []
+    monkeypatch.setattr(BackendSpanExporter, "export", lambda *args, **kwargs: export_attempts.append(1))
+    monkeypatch.delenv("OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA", raising=False)
+    previous = get_trace_provider()
+    provider = DefaultTraceProvider()
+    memory = MemoryProcessor()
+    provider.set_processors([memory])
+    provider.set_disabled(False)
+    set_trace_provider(provider)
+    try:
+        yield memory
+    finally:
+        provider.shutdown()
+        set_trace_provider(previous)
+        assert export_attempts == []
+
+
+@pytest.mark.parametrize("entrypoint", ["async", "sync", "stream", "child", "cross_provider_child"])
+@pytest.mark.parametrize("outcome", ["key_echo", "success"])
+def test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata(
+    isolated, monkeypatch, bound_sdk_wire, enabled_local_sdk_tracing, caplog, entrypoint, outcome,
+):
+    from agents.tracing import trace
+    from src.agents.openai_agent import agent as oa
+    from src.agents.shared.subagent import dispatch_subagent
+    from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth, current_runtime_auth
+
+    add_key(isolated.credentials, "openai", "fixture-selected-alpha")
+    parent_provider = "anthropic" if entrypoint == "cross_provider_child" else "openai"
+    if parent_provider == "anthropic":
+        add_key(isolated.credentials, "anthropic", "fixture-parent-bravo")
+    parent = capture_runtime_auth(parent_provider)
+    is_child = entrypoint in ("child", "cross_provider_child")
+    model = "gpt-5.6-terra" if is_child else "gpt-5.6-luna"
+    monkeypatch.setattr(cfg, "get_agent_config", lambda: cfg.AgentConfig(
+        web_openai_search=False, subagent_models={"code_analyst": "gpt-5.6-terra"}))
+    if outcome == "key_echo":
+        bound_sdk_wire.error = "rejected fixture-selected-alpha"
+
+    async def collect():
+        return [event async for event in oa.run_query_stream("q", model=model, dal=object())]
+
+    with activate_runtime_auth(parent), trace(
+        "task1-native-runtime", group_id="fixture-group", metadata={"owner": "task-1"},
+    ):
+        if is_child:
+            result = dispatch_subagent("code_analyst", "q", dal=object())
+            assert current_runtime_auth(parent_provider) is parent
+            detail = result["error"]
+        elif entrypoint == "stream":
+            terminal = asyncio.run(collect())[-1]
+            result = terminal.data
+            detail = result.get("error")
+        else:
+            try:
+                result = (asyncio.run(oa.run_query("q", model=model, dal=object())) if entrypoint == "async"
+                          else oa.run_query_sync("q", model=model, dal=object()))
+                detail = None
+            except RuntimeError as exc:
+                assert outcome == "key_echo"
+                detail = str(exc)
+
+    assert len(bound_sdk_wire.requests) == 1
+    request = bound_sdk_wire.requests[0]
+    assert request.headers["authorization"] == "Bearer fixture-selected-alpha"
+    assert json.loads(request.content)["model"] == model
+    memory = enabled_local_sdk_tracing
+    assert len(memory.traces) == 1
+    recorded_trace = memory.traces[0]
+    assert recorded_trace["workflow_name"] == "task1-native-runtime"
+    assert recorded_trace["metadata"] == {"owner": "task-1"}
+    assert recorded_trace["group_id"] == "fixture-group"
+    assert recorded_trace["id"].startswith("trace_")
+    assert memory.spans
+    assert all(span["trace_id"] == recorded_trace["id"] for span in memory.spans)
+    assert all(span["started_at"] and span["ended_at"] for span in memory.spans)
+    response_spans = [span for span in memory.spans if span["span_data"]["type"] == "response"]
+    agent_spans = [span for span in memory.spans if span["span_data"]["type"] == "agent"]
+    assert len(response_spans) == len(agent_spans) == 1
+    response = response_spans[0]
+    agent = agent_spans[0]
+    assert agent["span_data"]["name"] == ("ArkScope Subagent: code_analyst" if is_child else "ArkScope Assistant")
+    assert response["parent_id"] is not None
+    assert "fixture-selected-alpha" not in json.dumps({"traces": memory.traces, "spans": memory.spans})
+    assert response["input"] is None and response["response"] is None
+    if outcome == "key_echo":
+        assert response["error"] == {
+            "message": "Error getting response", "data": {"error": "Error details are redacted."},
+        }
+        assert_private_failures(isolated, caplog, detail)
+    else:
+        assert detail is None
+        assert (result["answer"], result["model"], result["provider"]) == ("OK", model, "openai")
+        assert result["token_usage"]["total_tokens"] == 3
+        assert response["error"] is None
+        usage = response["span_data"]["usage"]
+        assert (usage["input_tokens"], usage["output_tokens"], usage["total_tokens"]) == (2, 1, 3)
