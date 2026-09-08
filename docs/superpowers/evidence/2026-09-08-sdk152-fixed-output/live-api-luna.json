@@ -1,0 +1,25 @@
+{
+  "started_at": "2026-09-08T09:58:58.370547+00:00",
+  "channel": "api_key",
+  "requested_model": "gpt-5.6-luna",
+  "effort": "low",
+  "status": "passed",
+  "requests": [
+    {
+      "method": "POST",
+      "host": "api.openai.com",
+      "path": "/v1/responses",
+      "http_status": 200
+    }
+  ],
+  "request_budget": 1,
+  "profile_writes": false,
+  "token_writes": false,
+  "observed_model": "gpt-5.6-luna",
+  "usage": {
+    "input_tokens": 141,
+    "output_tokens": 21,
+    "total_tokens": 162
+  },
+  "elapsed_s": 2.746
+}

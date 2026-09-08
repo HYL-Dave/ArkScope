@@ -156,6 +156,8 @@ def test_live_session_binds_adversarial_sources_to_actual_sdk_paths(monkeypatch)
     async def fake_query(*, prompt, options):
         cwd = Path(options.cwd)
         config = Path(options.env["CLAUDE_CONFIG_DIR"])
+        assert options.model == gate.LIVE_MODEL
+        assert options.fallback_model is None
         observed.update(
             {
                 "project_memory": (cwd / "CLAUDE.md").is_file(),
@@ -191,6 +193,55 @@ def test_live_session_binds_adversarial_sources_to_actual_sdk_paths(monkeypatch)
         "user_settings": True,
     }
     assert result["passed"] is True
+    assert result["observed_model"] == gate.LIVE_MODEL
+
+
+@pytest.mark.parametrize("session_name", ("allowed_mcp", "locked_surface"))
+@pytest.mark.parametrize("assistant_model", ("claude-unrequested-model", None))
+def test_each_live_session_rejects_unrequested_or_unobserved_assistant_model(
+    monkeypatch, session_name, assistant_model
+):
+    from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, TextBlock
+    from tests.live import sdk_driver_smoke as gate
+
+    async def fake_query(*, prompt, options):
+        yield SystemMessage(
+            subtype="init",
+            data={
+                "apiKeySource": "none",
+                "tools": list(spec.expected_tools),
+                "mcp_servers": [
+                    {"name": name, "status": "connected"}
+                    for name in spec.expected_servers
+                ],
+            },
+        )
+        if assistant_model is not None:
+            yield AssistantMessage(
+                content=[TextBlock("done")],
+                model=assistant_model,
+            )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="test-session",
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    monkeypatch.setattr(gate, "query", fake_query)
+    spec = next(row for row in gate.SESSION_SPECS if row.name == session_name)
+
+    with pytest.raises(gate.LiveGateError, match="model"):
+        asyncio.run(
+            gate._run_live_session(
+                spec,
+                token="setup-token",
+                cli_path=Path("/bin/true"),
+            )
+        )
 
 
 def test_evidence_contract_rejects_raw_prose_or_secret_fields():
@@ -199,14 +250,15 @@ def test_evidence_contract_rejects_raw_prose_or_secret_fields():
     evidence = gate.build_evidence(
         sessions_started=2,
         runtime={
-            "sdk_version": "0.2.151",
-            "cli_version": "2.1.258",
+            "sdk_version": "0.2.152",
+            "cli_version": "2.1.259",
             "cli_sha256": "a" * 64,
         },
         sessions=(
             {
                 "name": "allowed_mcp",
                 "passed": True,
+                "observed_model": gate.LIVE_MODEL,
                 "api_key_source": "none",
                 "tools": ["mcp__ark__admission_probe"],
                 "mcp_servers": [{"name": "ark", "status": "connected"}],
@@ -222,6 +274,7 @@ def test_evidence_contract_rejects_raw_prose_or_secret_fields():
             {
                 "name": "locked_surface",
                 "passed": True,
+                "observed_model": gate.LIVE_MODEL,
                 "api_key_source": "none",
                 "tools": [],
                 "mcp_servers": [],
@@ -242,6 +295,10 @@ def test_evidence_contract_rejects_raw_prose_or_secret_fields():
     assert evidence["sessions_started"] == 2
     assert evidence["application_retries"] == 0
     assert evidence["fallback_model"] is None
+    assert [row["observed_model"] for row in evidence["sessions"]] == [
+        gate.LIVE_MODEL,
+        gate.LIVE_MODEL,
+    ]
     assert "prompt" not in repr(evidence).lower()
     assert "answer" not in repr(evidence).lower()
 
@@ -268,3 +325,16 @@ def test_evidence_contract_rejects_raw_prose_or_secret_fields():
     }
     with pytest.raises(gate.LiveGateError, match="session contract"):
         gate.validate_evidence(bad_auth)
+
+    for session_index in range(2):
+        bad_model_sessions = [dict(row) for row in evidence["sessions"]]
+        bad_model_sessions[session_index]["observed_model"] = "claude-unrequested-model"
+        with pytest.raises(gate.LiveGateError, match="session contract"):
+            gate.validate_evidence(
+                {**evidence, "sessions": bad_model_sessions}
+            )
+
+    missing_model_sessions = [dict(row) for row in evidence["sessions"]]
+    del missing_model_sessions[0]["observed_model"]
+    with pytest.raises(gate.LiveGateError, match="session evidence fields"):
+        gate.validate_evidence({**evidence, "sessions": missing_model_sessions})

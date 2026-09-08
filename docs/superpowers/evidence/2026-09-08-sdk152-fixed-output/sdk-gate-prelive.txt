@@ -1,0 +1,4 @@
+{"interfaces": ["lo"], "external_probe": "ENETUNREACH", "inherited_credentials": false}
+........................................................................ [ 71%]
+.............................                                            [100%]
+101 passed in 1.83s
