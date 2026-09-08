@@ -147,15 +147,14 @@ def test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_s
 
 
 @pytest.mark.parametrize("operation", ["synthesis", "translation"])
-def test_custom_fixed_tasks_retain_the_existing_chat_completions_path(monkeypatch, operation):
+def test_custom_fixed_tasks_use_responses_without_rewriting_model_id(monkeypatch, operation):
     requests = []
 
     def handler(request):
         requests.append(request)
-        assert request.url.path == "/v1/chat/completions"
-        return httpx.Response(200, json={"choices": [{"message": {"tool_calls": [{"type": "function", "id": "call_test",
-            "function": {"name": "emit_result_card" if operation == "synthesis" else "emit_translation",
-                         "arguments": json.dumps(_payload(operation))}}]}}]})
+        assert request.url.path == "/v1/responses"
+        assert json.loads(request.content)["model"] == "custom-chat-model"
+        return httpx.Response(200, json=_response(operation, model="custom-chat-model"))
 
     with _install_api(monkeypatch, handler):
         result = _invoke(operation, "custom-chat-model")

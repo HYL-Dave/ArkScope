@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import date
 from typing import Any, Literal, Optional
 
 from jsonschema import Draft202012Validator, ValidationError
@@ -30,6 +29,7 @@ from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.evidence_packet import EvidencePacket
+from src import openai_response_validation
 from src.model_capabilities import (
     capability_for,
     model_auth_admission_detail,
@@ -425,23 +425,7 @@ def _openai_responses_output(
         max_output_tokens=max_tokens,
         **kwargs,
     )
-    if response.status != "completed" or response.error is not None:
-        raise RuntimeError("OpenAI structured output did not complete")
-    requested = capability_for(model)
-    unpinned = requested is not None and model in (requested.id, *requested.aliases)
-    canonical = requested.id if unpinned else model
-    model_matches = response.model in (model, canonical)
-    # Only reviewed official aliases may resolve to their canonical model. An
-    # explicit snapshot may not change; prefix matches alone are not receipts.
-    if (not model_matches and unpinned
-            and isinstance(response.model, str) and response.model.startswith(canonical + "-")):
-        suffix = response.model.removeprefix(canonical + "-")
-        try:
-            model_matches = date.fromisoformat(suffix).isoformat() == suffix
-        except ValueError:
-            pass
-    if not model_matches:
-        raise RuntimeError("OpenAI structured output returned a different model")
+    openai_response_validation.require_completed_response(response, model)
     calls = []
     for item in response.output:
         if item.type == "reasoning":
@@ -485,42 +469,17 @@ def _synthesize_openai(
         )
         if subscription_payload is not None:
             return CardSynthesis(**subscription_payload)
-        kwargs: dict[str, Any] = {}
-        if selected_effort != "default":
-            kwargs["reasoning_effort"] = selected_effort
         from src.auth_drivers.live_resolver import live_openai_client
         client = live_openai_client().with_options(
             timeout=model_timeout_s,
             max_retries=0,
         )
         try:
-            capability = capability_for(model)
-            if capability is not None and capability.uses_responses_for_tools:
-                return CardSynthesis(**_openai_responses_output(
-                    client, model=model, system=_SYSTEM_PROMPT, user=user_message,
-                    name=_TOOL_NAME, description="Emit the structured result card.",
-                    schema=_CARD_TOOL_SCHEMA, effort=selected_effort, max_tokens=_MAX_TOKENS,
-                ))
-            resp = client.chat.completions.create(
-                model=model,
-                max_completion_tokens=_MAX_TOKENS,
-                messages=[
-                    {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": _TOOL_NAME,
-                            "description": "Emit the structured §2 result card.",
-                            "parameters": _CARD_TOOL_SCHEMA,
-                        },
-                    }
-                ],
-                tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
-                **kwargs,
-            )
+            return CardSynthesis(**_openai_responses_output(
+                client, model=model, system=_SYSTEM_PROMPT, user=user_message,
+                name=_TOOL_NAME, description="Emit the structured result card.",
+                schema=_CARD_TOOL_SCHEMA, effort=selected_effort, max_tokens=_MAX_TOKENS,
+            ))
         except OpenAIAPITimeoutError as exc:
             raise ModelExecutionTimeout(
                 provider="openai",
@@ -528,12 +487,6 @@ def _synthesize_openai(
                 effort=selected_effort,
                 effective_seconds=model_timeout_s,
             ) from exc
-        msg = resp.choices[0].message
-        tool_calls = getattr(msg, "tool_calls", None) or []
-        for tc in tool_calls:
-            if tc.function.name == _TOOL_NAME:
-                return CardSynthesis(**json.loads(tc.function.arguments))
-        raise RuntimeError("OpenAI synthesis did not return the emit_result_card tool call")
 
     try:
         return run_once(effort), {"effort": effort}
@@ -1031,41 +984,16 @@ def _translate_openai(
         )
         if subscription_payload is not None:
             return subscription_payload
-        kwargs: dict[str, Any] = {}
-        if selected_effort != "default":
-            kwargs["reasoning_effort"] = selected_effort
         from src.auth_drivers.live_resolver import live_openai_client
         client = live_openai_client().with_options(
             timeout=model_timeout_s,
             max_retries=0,
         )
         try:
-            capability = capability_for(model)
-            if capability is not None and capability.uses_responses_for_tools:
-                return _openai_responses_output(
-                    client, model=model, system=system, user=user,
-                    name="emit_translation", description=f"Emit the {target} translation of the given fields.",
-                    schema=schema, effort=selected_effort, max_tokens=4096,
-                )
-            resp = client.chat.completions.create(
-                model=model,
-                max_completion_tokens=4096,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "emit_translation",
-                            "description": f"Emit the {target} translation of the given fields.",
-                            "parameters": schema,
-                        },
-                    }
-                ],
-                tool_choice={"type": "function", "function": {"name": "emit_translation"}},
-                **kwargs,
+            return _openai_responses_output(
+                client, model=model, system=system, user=user,
+                name="emit_translation", description=f"Emit the {target} translation of the given fields.",
+                schema=schema, effort=selected_effort, max_tokens=4096,
             )
         except OpenAIAPITimeoutError as exc:
             raise ModelExecutionTimeout(
@@ -1074,12 +1002,6 @@ def _translate_openai(
                 effort=selected_effort,
                 effective_seconds=model_timeout_s,
             ) from exc
-        msg = resp.choices[0].message
-        tool_calls = getattr(msg, "tool_calls", None) or []
-        for tc in tool_calls:
-            if tc.function.name == "emit_translation":
-                return json.loads(tc.function.arguments)
-        raise RuntimeError("OpenAI translation did not return emit_translation")
 
     try:
         return run_once(effort)
