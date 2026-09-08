@@ -25,10 +25,12 @@ from pydantic import BaseModel, Field
 from anthropic import APITimeoutError as AnthropicAPITimeoutError
 from openai import APITimeoutError as OpenAIAPITimeoutError
 
-from src.agents.config import get_agent_config, task_route
+from src.agents.config import task_route
 from src.env_keys import ensure_env_loaded
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.evidence_packet import EvidencePacket
+from src.card_execution import CardExecution, CardExecutionAdmissionError, capture_card_execution
+from src.auth_drivers.runtime_binding import activate_runtime_auth, current_runtime_auth
 from src import openai_response_validation
 from src.model_capabilities import (
     capability_for,
@@ -92,7 +94,7 @@ def _require_task_route(
         plan_type=plan_type,
     )
     if detail is not None:
-        raise ValueError(detail)
+        raise CardExecutionAdmissionError(detail)
 
 
 class ModelStructuredOutputInvalid(ValueError):
@@ -262,24 +264,26 @@ def _subscription_structured_output_if_active(
             plan_type=None,
         )
         if execution_detail is not None:
-            raise ValueError(execution_detail)
+            raise CardExecutionAdmissionError(execution_detail)
         return None
     if not resolution.credential_id:
         raise RuntimeError(f"{provider} subscription credential has no id")
     auth_mode = "chatgpt_oauth" if provider == "openai" else "claude_code_oauth"
     detail = model_auth_admission_detail(model, auth_mode)
     if detail is not None:
-        raise ValueError(detail)
+        raise CardExecutionAdmissionError(detail)
     from src.auth_drivers.subscription_structured_output import (
         run_subscription_structured_output,
     )
 
     try:
+        binding = current_runtime_auth(provider)
         return run_subscription_structured_output(
             task=task,
             provider=provider,
             auth_mode=auth_mode,
             credential_id=resolution.credential_id,
+            token_store=binding.token_store if binding is not None else None,
             model=model,
             system=system,
             user=user,
@@ -561,46 +565,37 @@ def synthesize_card(
     *,
     now_iso: str,
     model_timeout_s: float,
-    provider: Provider = "anthropic",
+    provider: Optional[Provider] = None,
     model: Optional[str] = None,
     question: Optional[str] = None,
     horizon: Optional[str] = None,
     personalization_context: str = "",
+    execution: CardExecution | None = None,
 ) -> tuple[ResultCard, dict]:
     """Synthesize a validated ResultCard from an objective EvidencePacket.
 
     Returns ``(card, meta)`` where ``meta`` carries provider/model for the run
     record. Raises on provider failure or malformed output (validated by Pydantic).
     """
-    ensure_env_loaded()
+    if execution is None:
+        ensure_env_loaded()
+        execution = capture_card_execution(
+            "card_synthesis", task_route("card_synthesis"), provider=provider, model=model,
+        )
+    if execution.task != "card_synthesis":
+        raise ValueError("card_execution_task_mismatch")
+    provider, model, effort = execution.provider, execution.model, execution.effort
     # Off = byte-identical INTERNAL call shape too: pass the kwarg only when
     # non-empty so strict test fakes of _synthesize_* stay valid (house rule).
     _pctx = {"personalization_context": personalization_context} if personalization_context else {}
-    route = task_route("card_synthesis")
-    if provider == "anthropic":
-        model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
-        effort = route.effort if route.provider == "anthropic" else "high"
+    with activate_runtime_auth(execution.auth):
         _require_task_route("card_synthesis", provider, model, effort)
-        synth, effort_meta = _synthesize_anthropic(
-            packet,
-            model,
-            effort,
+        synthesize = _synthesize_anthropic if provider == "anthropic" else _synthesize_openai
+        synth, effort_meta = synthesize(
+            packet, model, effort,
             model_timeout_s=model_timeout_s,
             **_pctx,
         )
-    elif provider == "openai":
-        model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
-        effort = route.effort if route.provider == "openai" else "high"
-        _require_task_route("card_synthesis", provider, model, effort)
-        synth, effort_meta = _synthesize_openai(
-            packet,
-            model,
-            effort,
-            model_timeout_s=model_timeout_s,
-            **_pctx,
-        )
-    else:
-        raise ValueError(f"unknown provider: {provider}")
     card = _merge_to_card(
         packet, synth, now_iso=now_iso, question=question, horizon=horizon
     )
@@ -675,6 +670,10 @@ _TRANSLATABLE_FIELDS = (
 )
 
 
+def card_has_translatable_prose(card: dict) -> bool:
+    return any(card.get(k) not in (None, "", []) for k in _TRANSLATABLE_FIELDS)
+
+
 class TextTranslationOutputInvalid(ModelStructuredOutputInvalid):
     """A translated text or card response did not match its contract."""
 
@@ -707,6 +706,7 @@ def translate_text(
     lang: str,
     provider: Optional[Provider] = None,
     model: Optional[str] = None,
+    execution: CardExecution | None = None,
 ) -> dict[str, str]:
     """Translate one bounded source excerpt with the fixed card-translation route."""
 
@@ -719,10 +719,12 @@ def translate_text(
     ):
         raise ValueError("translation_source_text")
 
-    ensure_env_loaded()
-    route = task_route("card_translation")
-    provider = provider or route.provider
-    model = model or route.model
+    if execution is None:
+        ensure_env_loaded()
+        execution = capture_card_execution(
+            "card_translation", task_route("card_translation"), provider=provider, model=model,
+        )
+    provider, model = execution.provider, execution.model
     target = _TEXT_TRANSLATION_LANG_NAMES[lang]
     schema = {
         "type": "object",
@@ -745,35 +747,12 @@ def translate_text(
         ensure_ascii=False,
         separators=(",", ":"),
     )
-    effort = route.effort if provider == route.provider else "medium"
-    if provider not in ("anthropic", "openai"):
-        raise ValueError(f"unknown provider: {provider}")
-    _require_task_route("card_translation", provider, model, effort)
-    harness = translation_harness(provider, model)
-
-    if provider == "anthropic":
-        translated = _translate_anthropic(
-            model,
-            system,
-            user,
-            schema,
-            target,
-            effort,
-            subscription_system=subscription_system,
-            model_timeout_s=model_timeout_s,
+    with activate_runtime_auth(execution.auth):
+        harness = translation_harness(provider, model)
+        translated = _dispatch_translation(
+            execution, system, user, schema, target,
+            subscription_system=subscription_system, model_timeout_s=model_timeout_s,
         )
-    elif provider == "openai":
-        translated = _translate_openai(
-            model,
-            system,
-            user,
-            schema,
-            target,
-            effort,
-            model_timeout_s=model_timeout_s,
-        )
-    else:
-        raise ValueError(f"unknown provider: {provider}")
 
     if not isinstance(translated, dict) or set(translated) != {"translated_text"}:
         raise TextTranslationOutputInvalid("translation_output_invalid")
@@ -799,6 +778,7 @@ def translate_card(
     lang: str = "zh-Hant",
     provider: Optional[Provider] = None,
     model: Optional[str] = None,
+    execution: CardExecution | None = None,
 ) -> dict:
     """Translate a card's natural-language fields into ``lang``; return a full card dict.
 
@@ -806,10 +786,13 @@ def translate_card(
     confidence_level, traceability and metadata are preserved unchanged. A forced
     tool guarantees the structure (and list item counts) survive.
     """
-    ensure_env_loaded()
-    route = task_route("card_translation")
-    provider = provider or route.provider
-    model = model or route.model
+    if not card_has_translatable_prose(card):
+        return dict(card)
+    if execution is None:
+        ensure_env_loaded()
+        execution = capture_card_execution(
+            "card_translation", task_route("card_translation"), provider=provider, model=model,
+        )
     target = _LANG_NAMES.get(lang, lang)
 
     payload = {k: card.get(k) for k in _TRANSLATABLE_FIELDS if card.get(k) not in (None, "", [])}
@@ -838,33 +821,11 @@ def translate_card(
     )
     user = json.dumps(payload, ensure_ascii=False, indent=2)
 
-    effort = route.effort if provider == route.provider else "medium"
-    if provider not in ("anthropic", "openai"):
-        raise ValueError(f"unknown provider: {provider}")
-    _require_task_route("card_translation", provider, model, effort)
-    if provider == "anthropic":
-        translated = _translate_anthropic(
-            model,
-            system,
-            user,
-            schema,
-            target,
-            effort,
-            subscription_system=subscription_system,
-            model_timeout_s=model_timeout_s,
+    with activate_runtime_auth(execution.auth):
+        translated = _dispatch_translation(
+            execution, system, user, schema, target,
+            subscription_system=subscription_system, model_timeout_s=model_timeout_s,
         )
-    elif provider == "openai":
-        translated = _translate_openai(
-            model,
-            system,
-            user,
-            schema,
-            target,
-            effort,
-            model_timeout_s=model_timeout_s,
-        )
-    else:
-        raise ValueError(f"unknown provider: {provider}")
 
     # Validate the returned fields before merging; otherwise an empty/partial
     # translation inherits the original prose and masquerades as success.
@@ -878,6 +839,24 @@ def translate_card(
             out[k] = v
     _validate_translation(card, out)
     return out
+
+
+def _dispatch_translation(
+    execution: CardExecution, system: str, user: str, schema: dict, target: str,
+    *, subscription_system: str, model_timeout_s: float,
+) -> dict:
+    if execution.task != "card_translation":
+        raise ValueError("card_execution_task_mismatch")
+    provider, model, effort = execution.provider, execution.model, execution.effort
+    _require_task_route("card_translation", provider, model, effort)
+    if provider == "anthropic":
+        return _translate_anthropic(
+            model, system, user, schema, target, effort,
+            subscription_system=subscription_system, model_timeout_s=model_timeout_s,
+        )
+    return _translate_openai(
+        model, system, user, schema, target, effort, model_timeout_s=model_timeout_s,
+    )
 
 
 def _translate_anthropic(

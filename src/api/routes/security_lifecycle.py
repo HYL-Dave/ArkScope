@@ -26,6 +26,8 @@ from src.api.dependencies import (
 from src.api.permissions import require_db_write, require_profile_state_write
 from src.agents.config import task_route
 from src.card_synthesis import translate_text, translation_harness
+from src.card_execution import capture_card_execution
+from src.auth_drivers.runtime_binding import activate_runtime_auth
 from src.content_translation_failures import classify_content_translation_failure
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.security_lifecycle_disposition import LIFECYCLE_QUEUE_BUCKETS
@@ -316,7 +318,9 @@ def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResul
             raise ValueError("translation_route_provider")
         if not model or len(model) > 160 or "\0" in model:
             raise ValueError("translation_route_model")
-        harness = translation_harness(provider, model)
+        execution = capture_card_execution("card_translation", route)
+        with activate_runtime_auth(execution.auth):
+            harness = translation_harness(provider, model)
         runtime = resolve_fixed_task_runtime("card_translation")
     except Exception:
         raise EvidenceTranslationFailure(
@@ -334,6 +338,7 @@ def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResul
             model_timeout_s=runtime.model_timeout_s,
             provider=provider,
             model=model,
+            execution=execution,
         )
     except EvidenceTranslationFailure:
         raise

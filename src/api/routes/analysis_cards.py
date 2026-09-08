@@ -25,9 +25,15 @@ from src.agents.config import get_agent_config, task_route
 from src.api.dependencies import get_card_store, get_dal
 from src.api.permissions import require_db_write
 from src.card_runs import CardRun, CardRunStore
+from src.card_execution import CardExecutionAdmissionError, ExecutionReceipt, capture_card_execution
+from src.auth_drivers.runtime_binding import (
+    RuntimeAuthUnavailable, activate_runtime_auth, sanitize_runtime_error,
+)
+from src.model_routing import ModelRouteUnavailable
 from src.card_synthesis import (
     ModelExecutionTimeout,
     confidence_to_score,
+    card_has_translatable_prose,
     render_card_markdown,
     synthesize_card,
     translate_card,
@@ -71,10 +77,22 @@ class ArchiveBody(BaseModel):
 
 class TranslateBody(BaseModel):
     lang: str = "zh-Hant"
+    refresh: bool = False
 
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _capture_execution(task: str, *, provider: str | None = None):
+    try:
+        return capture_card_execution(task, task_route(task), provider=provider)
+    except ModelRouteUnavailable:
+        raise HTTPException(status_code=503, detail={"code": "model_route_unavailable"}) from None
+    except RuntimeAuthUnavailable:
+        raise HTTPException(status_code=503, detail={"code": "runtime_auth_unavailable"}) from None
+    except CardExecutionAdmissionError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from None
 
 
 def _summary(run: CardRun) -> dict:
@@ -89,6 +107,7 @@ def _summary(run: CardRun) -> dict:
         "status": run.status,
         "provider": run.provider,
         "model": run.model,
+        "execution_receipt": run.execution_receipt.model_dump(),
         "generated_at": run.generated_at,
         "saved_report_id": run.saved_report_id,
         "conclusion": card.get("conclusion"),
@@ -105,11 +124,10 @@ def generate_card(
     store: CardRunStore = Depends(get_card_store),
 ):
     """Generate a §2 card: gather objective evidence → synthesize → cache the run."""
-    route = task_route("card_synthesis")
-    provider = (body.provider or route.provider).lower()
-    if provider not in _VALID_PROVIDERS:
-        raise HTTPException(status_code=400, detail=f"unknown provider: {provider}")
-    model = route.model if provider == route.provider else None
+    if body.provider and body.provider.lower() not in _VALID_PROVIDERS:
+        raise HTTPException(status_code=400, detail="unknown provider")
+    execution = _capture_execution("card_synthesis", provider=body.provider)
+    provider, model = execution.provider, execution.model
     # Validate before evidence work, then sample at the synthesis boundary.
     validate_assistant_stance(body.assistant_stance)
     runtime = resolve_fixed_task_runtime("card_synthesis")
@@ -148,17 +166,21 @@ def generate_card(
             now_iso=now,
             provider=provider,  # type: ignore[arg-type]
             model=model,
+            execution=execution,
             question=body.question,
             horizon=body.horizon,
             model_timeout_s=runtime.model_timeout_s,
             **_pctx,
         )
     except ModelExecutionTimeout as exc:
-        logger.warning("Card synthesis timed out for %s: %s", ticker, exc)
-        raise HTTPException(status_code=502, detail=exc.detail("card_synthesis"))
+        logger.warning("Card synthesis timed out for %s: %s", ticker, sanitize_runtime_error(exc, binding=execution.auth))
+        raise HTTPException(status_code=502, detail=exc.detail("card_synthesis")) from None
+    except CardExecutionAdmissionError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from None
     except Exception as exc:
-        logger.warning("Card synthesis failed for %s: %s", ticker, exc)
-        raise HTTPException(status_code=502, detail=f"synthesis failed: {exc}")
+        detail = sanitize_runtime_error(exc, binding=execution.auth)
+        logger.warning("Card synthesis failed for %s: %s", ticker, detail)
+        raise HTTPException(status_code=502, detail=f"synthesis failed: {detail}") from None
 
     require_db_write(
         "card_generate", {"ticker": packet.ticker, "provider": provider}
@@ -169,8 +191,7 @@ def generate_card(
         evidence_packet=packet.model_dump(),
         question=body.question,
         horizon=body.horizon,
-        provider=meta["provider"],
-        model=meta["model"],
+        execution_receipt=execution.receipt,
         as_of=now,
         generated_at=now,
         personalization=personalization,
@@ -180,7 +201,8 @@ def generate_card(
         "status": run.status,
         "provider": run.provider,
         "model": run.model,
-        "effort": meta.get("effort"),
+        "execution_receipt": run.execution_receipt.model_dump(),
+        "effort": run.execution_receipt.effort,
         "fallback_effort": meta.get("fallback_effort"),
         "warning": meta.get("warning"),
         "generated_at": run.generated_at,
@@ -221,6 +243,7 @@ def get_card(
         "status": run.status,
         "provider": run.provider,
         "model": run.model,
+        "execution_receipt": run.execution_receipt.model_dump(),
         "generated_at": run.generated_at,
         "as_of": run.as_of,
         "saved_report_id": run.saved_report_id,
@@ -292,12 +315,17 @@ def translate_card_route(
     if lang not in _ALLOWED_LANGS:
         raise HTTPException(status_code=400, detail=f"unsupported lang: {lang}")
     cached = (run.translations or {}).get(lang)
-    if cached:
-        return {"run_id": run_id, "lang": lang, "card": cached, "cached": True}
-    route = task_route("card_translation")
-    provider = route.provider
-    model = route.model
-    harness = translation_harness(provider, model)
+    if cached and not body.refresh:
+        receipt = run.translation_receipts.get(lang, ExecutionReceipt())
+        return {"run_id": run_id, "lang": lang, "card": cached, "cached": True,
+                "execution_receipt": receipt.model_dump()}
+    if not card_has_translatable_prose(run.result_card):
+        return {"run_id": run_id, "lang": lang, "card": run.result_card, "cached": False,
+                "no_op": True, "execution_receipt": None}
+    execution = _capture_execution("card_translation")
+    provider, model = execution.provider, execution.model
+    with activate_runtime_auth(execution.auth):
+        harness = translation_harness(provider, model)
     runtime = resolve_fixed_task_runtime("card_translation")
     # Gate BEFORE spending tokens, so a future permission engine can deny pre-LLM.
     require_db_write("card_translate", {"run_id": run_id, "lang": lang})
@@ -306,10 +334,13 @@ def translate_card_route(
             run.result_card,
             lang=lang,
             model_timeout_s=runtime.model_timeout_s,
+            execution=execution,
         )
     except ModelExecutionTimeout as exc:
-        logger.warning("Card translate timed out for run %s: %s", run_id, exc)
-        raise HTTPException(status_code=502, detail=exc.detail("card_translation"))
+        logger.warning("Card translate timed out for run %s: %s", run_id, sanitize_runtime_error(exc, binding=execution.auth))
+        raise HTTPException(status_code=502, detail=exc.detail("card_translation")) from None
+    except CardExecutionAdmissionError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from None
     except Exception as exc:
         failure = classify_content_translation_failure(exc)
         logger.warning(
@@ -326,9 +357,10 @@ def translate_card_route(
                 "model": model,
                 "harness": harness,
             },
-        )
-    store.set_translation(run_id, lang, translated)
-    return {"run_id": run_id, "lang": lang, "card": translated, "cached": False}
+        ) from None
+    store.set_translation(run_id, lang, translated, execution_receipt=execution.receipt)
+    return {"run_id": run_id, "lang": lang, "card": translated, "cached": False,
+            "execution_receipt": execution.receipt.model_dump()}
 
 
 @router.post("/analysis/cards/{run_id}/archive")
