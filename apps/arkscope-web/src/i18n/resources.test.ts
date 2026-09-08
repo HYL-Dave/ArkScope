@@ -94,7 +94,7 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 748,
+      lifecycle: 784,
       alphaTracking: 34,
       news: 45,
       tickerDetail: 89,
@@ -265,7 +265,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(1301);
+      expect(flattened.size, `${locale}.explore`).toBe(1337);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -292,6 +292,13 @@ describe("bundled i18n resources", () => {
         "lifecycle.states.llmDerived",
         "lifecycle.trackingSources.saAlphaPicksFormer",
         "lifecycle.translation.viewMode",
+        "lifecycle.activity.scheduledDate",
+        "lifecycle.activity.decision.details",
+        "lifecycle.activity.decision.noLlm",
+        "lifecycle.activity.decision.methods.llm_investigation",
+        "lifecycle.activity.decision.gaps.record_invalid",
+        "lifecycle.activity.decision.gaps.model_missing",
+        "lifecycle.activity.decision.gaps.legacy_assessment_unsealed",
         "news.marketSearchSummary",
         "news.seekingAlphaSearchSummary",
         "news.loadMoreProgress",
@@ -730,7 +737,7 @@ describe("bundled i18n resources", () => {
       shell: 37,
       settings: 910,
       research: 207,
-      explore: 1301,
+      explore: 1337,
       portfolio: 374,
       system: 24,
     } as const;
@@ -811,7 +818,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2928);
+      expect(total, `${locale}.total`).toBe(2964);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(

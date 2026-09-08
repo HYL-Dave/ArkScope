@@ -228,6 +228,8 @@ class TickerIdentityService:
         limit: int,
         unacknowledged_only: bool = False,
     ) -> dict:
+        from src.ticker_identity_history import project_decision
+
         with self._profile_connection(write=False) as conn:
             conn.execute("BEGIN")
             store = self._store(conn)
@@ -236,15 +238,19 @@ class TickerIdentityService:
                 unacknowledged_only=unacknowledged_only,
             )
             readiness_by_transition = {}
+            decisions = {}
             for item in result["items"]:
                 transition_id = item["transition_id"]
                 if transition_id not in readiness_by_transition:
+                    transition = store.get(transition_id)
+                    decisions[transition_id] = project_decision(conn, transition)
                     readiness = {"reversible": False, "block_reasons": []}
-                    if store.get(transition_id)["status"] == "applied":
+                    if transition["status"] == "applied":
                         current = store.reverse_readiness(transition_id)
                         readiness = {key: current[key] for key in ("reversible", "block_reasons")}
                     readiness_by_transition[transition_id] = readiness
                 item["reverse_readiness"] = readiness_by_transition[transition_id]
+                item["decision"] = decisions[transition_id]
             return result
 
     def acknowledge_transition_activity(
@@ -253,6 +259,8 @@ class TickerIdentityService:
         *,
         before_write: Callable[[], None],
     ) -> dict:
+        from src.ticker_identity_history import project_decision
+
         with self._profile_connection(write=True) as conn:
             store = self._store(conn)
             store.get_activity(activity_id)
@@ -260,7 +268,9 @@ class TickerIdentityService:
             at = self._clock() if self._clock is not None else datetime.now(
                 timezone.utc
             ).isoformat(timespec="seconds").replace("+00:00", "Z")
-            return store.acknowledge_activity(activity_id, at=at)
+            item = store.acknowledge_activity(activity_id, at=at)
+            item["decision"] = project_decision(conn, store.get(item["transition_id"]))
+            return item
 
     def approve_case(
         self,

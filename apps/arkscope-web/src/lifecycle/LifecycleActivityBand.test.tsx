@@ -3,6 +3,8 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { withTestUiLocale } from "../test/testUiLocale";
 
@@ -10,6 +12,7 @@ import { withTestUiLocale } from "../test/testUiLocale";
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const ACTIVITY_MODULE = "./LifecycleActivityBand";
+const decisions = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../../tests/fixtures/ticker_history_decisions_v1.json"), "utf8"));
 
 const APPLIED_ACTIVITY = {
   activity_id: "activity-applied",
@@ -82,6 +85,84 @@ afterEach(() => {
 });
 
 describe("Lifecycle transition activity", () => {
+  it.each(["en", "zh-Hant"])("shows legacy reason, evidence and approval without inventing LLM use or non-use (%s)", async (locale) => {
+    await i18n.changeLanguage(locale);
+    const commands = await mountActivity([{ ...APPLIED_ACTIVITY, rule_id: null, rule_version: null,
+      successor_ticker: null, decision: decisions.provider }]);
+    const article = document.querySelector("article")!;
+    expect(article.textContent).toContain(decisions.provider.summary);
+    const overview = article.querySelector(".lifecycle-decision-overview")!;
+    expect(overview?.textContent).toContain("Massive / EODHD / Nasdaq");
+    expect(overview?.textContent).not.toContain(locale === "en" ? "No LLM used" : "未使用 LLM");
+    expect(overview?.textContent).toContain(locale === "en" ? "Approved by user" : "由使用者核准");
+    expect(overview?.textContent).toContain(decisions.provider.limitations[0]);
+    expect(overview?.textContent).toContain(locale === "en" ? "Legacy assessment details were not sealed" : "舊版評估資訊未另行封存");
+    const details = article.querySelector("details")!;
+    expect(details).not.toBeNull();
+    expect(details.open).toBe(false);
+    await act(async () => details.querySelector("summary")!.click());
+    expect(details.open).toBe(true);
+    expect(details.querySelectorAll('a[href="https://example.com/status"]')).toHaveLength(6);
+    expect(details.textContent).toContain(locale === "en" ? "Not in this directory" : "未列於此名錄");
+    expect(commands.onAcknowledge).not.toHaveBeenCalled();
+    expect(commands.onReverse).not.toHaveBeenCalled();
+    expect(article.textContent).not.toContain("a".repeat(64));
+  });
+
+  it("can identify a sealed provider-only review as using no LLM", async () => {
+    await mountActivity([{ ...APPLIED_ACTIVITY, rule_id: null, rule_version: null, successor_ticker: null,
+      decision: { ...decisions.provider, gaps: [] } }]);
+    expect(document.querySelector(".lifecycle-decision-overview")?.textContent).toContain("No LLM used");
+  });
+
+  it.each(["en", "zh-Hant"])("distinguishes the LLM from its news source and the human approver (%s)", async (locale) => {
+    await i18n.changeLanguage(locale);
+    await mountActivity([{ ...APPLIED_ACTIVITY, rule_id: null, rule_version: null, successor_ticker: null, decision: decisions.llm }]);
+    const overview = document.querySelector(".lifecycle-decision-overview")!;
+    expect(overview?.textContent).toContain("The common stock no longer trades.");
+    expect(overview?.textContent).toContain("Anthropic");
+    expect(overview?.textContent).toContain("claude-sonnet-5");
+    expect(overview?.textContent).toContain(locale === "en" ? "Claude subscription" : "Claude 訂閱");
+    expect(overview?.textContent).toContain("Issuer");
+    expect(overview?.textContent).toContain(locale === "en" ? "Approved by user" : "由使用者核准");
+    expect(overview?.textContent).not.toContain(locale === "en" ? "No LLM used" : "未使用 LLM");
+    expect(document.querySelector("details")?.textContent).toContain(locale === "en" ? "Collected news" : "已收集新聞");
+  });
+
+  it("does not label an execution date as the unknown event date", async () => {
+    await mountActivity([{ ...APPLIED_ACTIVITY, decision: { ...decisions.llm, event_date: null,
+      limitations: ["The exact event date was not established."], source_gaps: [{ url: "https://other.example/notice", reason: "source_http_error" }] } }]);
+    expect(document.body.textContent).toContain("Event date not recorded");
+    expect(document.body.textContent).toContain("Scheduled action date: 2026-08-25");
+    expect(document.body.textContent).not.toContain("Effective date: 2026-08-25");
+    expect(document.body.textContent).toContain("The exact event date was not established.");
+    expect(document.querySelector('a[href="https://other.example/notice"]')).not.toBeNull();
+  });
+
+  it("keeps old history usable while explicitly showing absent provenance", async () => {
+    await mountActivity([APPLIED_ACTIVITY]);
+    expect(document.body.textContent).toContain("Decision details were not recorded");
+    expect(document.body.textContent).not.toContain("No LLM used");
+    expect(document.body.textContent).toContain("Reverse tracking change");
+  });
+
+  it("does not misreport an unrecorded LLM identity as no LLM use", async () => {
+    await mountActivity([{ ...APPLIED_ACTIVITY, decision: { ...decisions.llm, model: null, gaps: ["model_missing"] } }]);
+    const overview = document.querySelector(".lifecycle-decision-overview")!;
+    expect(overview.textContent).toContain("LLM investigation");
+    expect(overview.textContent).not.toContain("No LLM used");
+    expect(overview.textContent).not.toContain("claude-sonnet-5");
+    expect(overview.textContent).toContain("model");
+  });
+
+  it("separates automatic approval from the evidence providers", async () => {
+    await mountActivity([{ ...APPLIED_ACTIVITY, decision: { ...decisions.provider, method: "rule_engine", approval_authority: "automation_policy" } }]);
+    const overview = document.querySelector(".lifecycle-decision-overview")!;
+    expect(overview.textContent).toContain("Massive / EODHD / Nasdaq");
+    expect(overview.textContent).toContain("Approved by automation policy");
+    expect(overview.textContent).not.toContain("Approved by user");
+  });
+
   it("renders unacknowledged automatic activity before history without implicit acknowledgement", async () => {
     const onAcknowledge = vi.fn();
     await mountActivity([
