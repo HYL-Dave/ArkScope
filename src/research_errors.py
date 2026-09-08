@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from src.auth_drivers.probe_harness import redact
+from src.auth_drivers.runtime_binding import RuntimeAuthBinding, sanitize_runtime_error
 
 
 RESEARCH_ERROR_CODES = frozenset(
@@ -43,9 +43,9 @@ class ResearchFailure:
     detail: str
 
 
-def sanitize_research_detail(value: Any) -> str:
+def sanitize_research_detail(value: Any, *, binding: RuntimeAuthBinding | None = None) -> str:
     """Return the bounded, redacted detail allowed in durable/public state."""
-    return redact(value)[:500]
+    return sanitize_runtime_error(value, binding=binding)
 
 
 def public_research_error_code(value: Any) -> str | None:
@@ -96,13 +96,14 @@ def classify_research_failure(
     value: Any,
     *,
     explicit_code: Any = None,
+    binding: RuntimeAuthBinding | None = None,
 ) -> ResearchFailure:
     """Classify only reviewed types/shapes; unknown prose stays generic."""
     try:
         shape = value if isinstance(value, str) else str(value)
     except Exception:  # a hostile __str__ is never allowed to escape
         shape = ""
-    detail = sanitize_research_detail(value) or "research run failed"
+    detail = sanitize_research_detail(value, binding=binding) or "research run failed"
     code = public_research_error_code(explicit_code)
     if code is None:
         code = (

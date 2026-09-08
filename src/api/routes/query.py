@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from src.api.personalization import resolve_personalization as _resolve_personalization
 from src.auth_drivers.runtime_binding import (
-    activate_runtime_auth, capture_runtime_auth, current_runtime_auth,
+    activate_runtime_auth, capture_runtime_auth, current_runtime_auth, sanitize_runtime_error,
 )
 from src.model_capabilities import (
     client_compaction_admission_detail,
@@ -558,6 +558,12 @@ async def query_agent_stream(
 
                 async for event in stream:
                     etype = getattr(event.type, "value", event.type)
+                    if etype == "error":
+                        event.data = {
+                            key: sanitize_runtime_error(value, binding=auth_binding)
+                            if key in ("error", "message", "detail") else value
+                            for key, value in event.data.items()
+                        }
                     if etype == "done":
                         # SSE and persistence carry the same injected trace.
                         event.data["personalization"] = dict(personalization)
@@ -571,9 +577,9 @@ async def query_agent_stream(
                     yield event.to_sse()
         except Exception as e:
             from src.agents.shared.events import AgentEvent, EventType
-            logger.error(f"Stream error: {e}")
-            error_content = str(e)
-            yield AgentEvent(EventType.error, {"message": str(e)}).to_sse()
+            error_content = sanitize_runtime_error(e, binding=auth_binding)
+            logger.error("Stream error: %s", error_content)
+            yield AgentEvent(EventType.error, {"message": error_content}).to_sse()
         finally:
             # Persist the terminal turn. done → assistant; a non-done terminal
             # (agent error / stream exception) → an is_error turn so reload never

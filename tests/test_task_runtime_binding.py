@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import httpx
@@ -592,3 +593,328 @@ def test_unbound_openai_constructor_does_not_reread_captured_env(isolated, monke
         assert client.api_key == "test-env-captured"
     finally:
         asyncio.run(client.close())
+
+
+@pytest.fixture
+def bound_sdk_wire(monkeypatch, isolated):
+    """Real sync/async SDK clients, with only the HTTP boundary replaced."""
+    import anthropic
+    import openai
+
+    requests, clients = [], []
+    state = SimpleNamespace(error=None, requests=requests)
+
+    def reply(request):
+        requests.append(request)
+        body = json.loads(request.content)
+        if state.error:
+            return httpx2.Response(400, json={"type": "error", "error": {
+                "type": "invalid_request_error", "message": state.error,
+            }})
+        if "responses" in request.url.path:
+            return httpx2.Response(200, json=response_json(body["model"]))
+        if body.get("stream"):
+            return httpx2.Response(200, text=anthropic_sse(body["model"]),
+                                   headers={"content-type": "text/event-stream"})
+        return httpx2.Response(200, json={"id": "msg_fixture", "type": "message", "role": "assistant",
+            "model": body["model"], "content": [{"type": "text", "text": "OK"}],
+            "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
+
+    def factory(cls, asynchronous):
+        def construct(**kwargs):
+            transport = httpx2.MockTransport(reply)
+            http_client = httpx2.AsyncClient(transport=transport) if asynchronous else httpx2.Client(transport=transport)
+            kwargs.setdefault("max_retries", 0)
+            client = cls(**kwargs, http_client=http_client)
+            clients.append((client, asynchronous))
+            return client
+        return construct
+
+    for module, name in [(openai, "OpenAI"), (anthropic, "Anthropic")]:
+        for asynchronous in (False, True):
+            attr = f"Async{name}" if asynchronous else name
+            monkeypatch.setattr(module, attr, factory(getattr(module, attr), asynchronous))
+    yield state
+    for client, asynchronous in clients:
+        if asynchronous:
+            asyncio.run(client.close())
+        else:
+            client.close()
+
+
+@pytest.mark.parametrize("provider,model,host", [
+    ("openai", "gpt-5.6-luna", "api.openai.com"),
+    ("anthropic", "claude-sonnet-5", "api.anthropic.com"),
+])
+@pytest.mark.parametrize("consumer", ["sync", "async", "model_probe"])
+def test_bound_wire_ignores_late_auth_headers_and_host(
+    isolated, monkeypatch, bound_sdk_wire, provider, model, host, consumer,
+):
+    from src.auth_drivers.runtime_binding import capture_runtime_auth
+    from src.api.routes import config_routes as cr
+
+    cred = add_key(isolated.credentials, provider, "fixture-selected-alpha")
+    binding = capture_runtime_auth(provider)
+    monkeypatch.setenv(f"{provider.upper()}_BASE_URL", "https://alternate.invalid/v1")
+    monkeypatch.setenv(f"{provider.upper()}_CUSTOM_HEADERS", "\n".join([
+        "Authorization: Bearer fixture-alternate-bravo", "aUtHoRiZaTiOn: Bearer fixture-alternate-charlie",
+        "X-Api-Key: fixture-alternate-bravo", "x-api-KEY: fixture-alternate-charlie", "X-Fixture: retained",
+    ]))
+    if consumer == "model_probe":
+        result = cr.run_provider_model_test(cr.ModelTestRequest(provider=provider, model=model,
+            effort="high", credential_id=f"local:{cred.id}"), store=isolated.credentials)
+        assert result["status"] == "ok"
+    else:
+        client = binding.api_client(asynchronous=consumer == "async")
+        kwargs = dict(model=model)
+        if provider == "openai":
+            call = client.responses.create
+            kwargs.update(input="OK", max_output_tokens=16)
+        else:
+            call = client.messages.create
+            kwargs.update(messages=[{"role": "user", "content": "OK"}], max_tokens=16)
+        result = call(**kwargs)
+        if consumer == "async":
+            asyncio.run(result)
+    assert len(bound_sdk_wire.requests) == 1
+    request = bound_sdk_wire.requests[0]
+    expected_auth = ("Bearer fixture-selected-alpha" if provider == "openai" else None)
+    expected_key = "fixture-selected-alpha" if provider == "anthropic" else None
+    assert (request.url.host, request.headers.get("authorization"), request.headers.get("x-api-key")) == (
+        host, expected_auth, expected_key,
+    )
+    assert request.headers["x-fixture"] == "retained"
+    assert json.loads(request.content)["model"] == model
+
+
+def assert_private_failures(isolated, caplog, public, secret="fixture-selected-alpha"):
+    scratchpad = "\n".join(path.read_text() for path in (isolated.path / "scratchpad").rglob("*.jsonl"))
+    history = "\n".join(path.read_text() for path in (isolated.path / "chat_history").rglob("*.jsonl"))
+    assert secret not in public
+    assert secret not in caplog.text
+    assert secret not in scratchpad + history
+    assert all(not record.exc_info for record in caplog.records if record.name.startswith("src."))
+    assert "[REDACTED]" in public
+
+
+@pytest.mark.parametrize("provider,model", [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")])
+def test_model_probe_key_echo_is_redacted_before_api_serialization(
+    isolated, bound_sdk_wire, caplog, provider, model,
+):
+    from src.api.routes import config_routes as cr
+
+    cred = add_key(isolated.credentials, provider, "fixture-selected-alpha")
+    bound_sdk_wire.error = "rejected fixture-selected-alpha " + "detail " * 300
+    result = cr.run_provider_model_test(cr.ModelTestRequest(provider=provider, model=model,
+        effort="high", credential_id=f"local:{cred.id}"), store=isolated.credentials)
+    assert result["status"] == "error" and result["fallback_effort"] is None
+    assert len(bound_sdk_wire.requests) == 1
+    assert_private_failures(isolated, caplog, json.dumps(result))
+    assert len(result["error"]) <= 500
+
+
+@pytest.mark.parametrize("entrypoint", ["openai_stream", "openai_async", "openai_sync", "anthropic_stream", "anthropic_sync"])
+@pytest.mark.parametrize("bound", [True, False])
+def test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors(
+    isolated, bound_sdk_wire, caplog, entrypoint, bound,
+):
+    from src.agents.openai_agent import agent as oa
+    from src.agents.anthropic_agent import agent as aa
+    from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth
+
+    provider = entrypoint.split("_")[0]
+    add_key(isolated.credentials, provider, "fixture-selected-alpha")
+    binding = capture_runtime_auth(provider)
+    if bound:
+        add_key(isolated.credentials, provider, "fixture-replacement-bravo")
+    bound_sdk_wire.error = "rejected fixture-selected-alpha " + "detail " * 300
+
+    async def collect():
+        stream = (oa.run_query_stream("q", model="gpt-5.6-luna", dal=object()) if provider == "openai"
+                  else aa.run_query_stream("q", model="claude-sonnet-5", dal=object()))
+        return [event async for event in stream]
+
+    with activate_runtime_auth(binding) if bound else nullcontext():
+        if entrypoint.endswith("stream"):
+            events = asyncio.run(collect())
+            error = next(event for event in events if event.type.value == "error")
+            public = error.to_sse()
+            detail = error.data["error"]
+        else:
+            with pytest.raises(Exception) as caught:
+                if entrypoint == "openai_async":
+                    asyncio.run(oa.run_query("q", model="gpt-5.6-luna", dal=object()))
+                elif entrypoint == "openai_sync":
+                    oa.run_query_sync("q", model="gpt-5.6-luna", dal=object())
+                else:
+                    aa.run_query("q", model="claude-sonnet-5", dal=object())
+            public = detail = str(caught.value)
+            assert caught.value.__suppress_context__ or caught.value.__context__ is None
+    assert len(bound_sdk_wire.requests) == 1
+    assert_private_failures(isolated, caplog, public)
+    assert len(detail) <= 500
+
+
+@pytest.mark.parametrize("parent_provider,child_provider", [
+    ("openai", "openai"), ("anthropic", "openai"), ("openai", "anthropic"), ("anthropic", "anthropic"),
+])
+def test_child_key_echo_is_redacted_after_parent_context_restoration(
+    isolated, monkeypatch, bound_sdk_wire, caplog, parent_provider, child_provider,
+):
+    from src.agents.shared.subagent import dispatch_subagent
+    from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth, current_runtime_auth
+
+    add_key(isolated.credentials, parent_provider, "fixture-parent-bravo")
+    add_key(isolated.credentials, child_provider, "fixture-selected-alpha")
+    parent = capture_runtime_auth(parent_provider)
+    model = "gpt-5.6-terra" if child_provider == "openai" else "claude-sonnet-5"
+    monkeypatch.setattr(cfg, "get_agent_config", lambda: cfg.AgentConfig(
+        web_openai_search=False, subagent_models={"code_analyst": model}))
+    bound_sdk_wire.error = "rejected fixture-selected-alpha " + "detail " * 300
+    with activate_runtime_auth(parent):
+        result = dispatch_subagent("code_analyst", "q", dal=object())
+        assert current_runtime_auth(parent_provider) is parent
+    assert len(bound_sdk_wire.requests) == 1
+    assert result["answer"] == "" and result["model"] == model
+    assert_private_failures(isolated, caplog, json.dumps(result))
+    assert len(result["error"]) <= 500
+
+
+@pytest.mark.parametrize("boundary", ["legacy", "managed"])
+@pytest.mark.parametrize("failure_kind", ["event", "exception"])
+def test_research_key_echo_redacted_before_sse_and_persistence(
+    isolated, monkeypatch, caplog, boundary, failure_kind,
+):
+    from src.agents.shared.events import AgentEvent, EventType
+
+    add_key(isolated.credentials, "openai", "fixture-selected-alpha")
+    scheduled = {}
+    monkeypatch.setattr(research, "schedule_research_run", lambda **kw: scheduled.update(kw))
+
+    async def stream(**kwargs):
+        detail = "rejected fixture-selected-alpha " + "detail " * 300
+        if failure_kind == "exception":
+            raise TimeoutError(detail)
+        yield AgentEvent(EventType.error, {"error": detail, "message": detail, "code": "model_timeout"})
+
+    monkeypatch.setattr(query, "_research_provider_stream", stream)
+
+    async def drive():
+        if boundary == "legacy":
+            response = await query.query_agent_stream(query.QueryRequest(question="q", provider="openai",
+                model="gpt-5.6-luna", effort="high", thread_id="private-errors"), dal=object(), store=isolated.threads)
+            add_key(isolated.credentials, "openai", "fixture-replacement-bravo")
+            return "".join([chunk async for chunk in response.body_iterator])
+        await research.create_research_run(research.ResearchRunCreate(question="q", provider="openai"),
+            dal=object(), thread_store=isolated.threads, run_store=isolated.runs)
+        add_key(isolated.credentials, "openai", "fixture-replacement-bravo")
+        await execute_research_run(**scheduled)
+        run = isolated.runs.get_run(scheduled["run_id"])
+        assert run.error_code == "model_timeout"
+        return json.dumps(research._run_dict(run))
+
+    public = asyncio.run(drive())
+    assert_private_failures(isolated, caplog, public)
+    with isolated.runs._connect() as conn:
+        persisted = "\n".join(line for line in conn.iterdump() if 'INSERT INTO "research_' in line)
+    assert "fixture-selected-alpha" not in persisted
+
+
+def test_runtime_error_redacts_exact_key_before_length_bound(isolated):
+    from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth
+    from src.research_errors import sanitize_research_detail
+
+    add_key(isolated.credentials, "openai", "fixture-selected-alpha")
+    with activate_runtime_auth(capture_runtime_auth("openai")):
+        detail = sanitize_research_detail("x " * 246 + "fixture-selected-alpha" + " tail" * 100)
+    assert detail == "x " * 246 + "[REDACTE"
+
+
+@pytest.mark.parametrize("provider,model", [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")])
+@pytest.mark.parametrize("consumer", ["sync", "async", "model_probe"])
+def test_client_construction_key_echo_is_private(isolated, monkeypatch, caplog, provider, model, consumer):
+    from src.auth_drivers.runtime_binding import capture_runtime_auth
+    from src.api.routes import config_routes as cr
+
+    cred = add_key(isolated.credentials, provider, "fixture-selected-alpha")
+    binding = capture_runtime_auth(provider)
+
+    def reject(**kwargs):
+        raise ValueError("rejected fixture-selected-alpha " + "detail " * 300)
+
+    name = "OpenAI" if provider == "openai" else "Anthropic"
+    monkeypatch.setattr(f"{provider}.{name}", reject)
+    monkeypatch.setattr(f"{provider}.Async{name}", reject)
+    if consumer == "model_probe":
+        result = cr.run_provider_model_test(cr.ModelTestRequest(provider=provider, model=model,
+            effort="high", credential_id=f"local:{cred.id}"), store=isolated.credentials)
+        assert result["status"] == "error"
+        detail = result["error"]
+    else:
+        with pytest.raises(ValueError) as caught:
+            binding.api_client(asynchronous=consumer == "async")
+        detail = str(caught.value)
+        assert caught.value.__suppress_context__ or caught.value.__context__ is None
+    assert_private_failures(isolated, caplog, detail)
+    assert len(detail) <= 500
+
+
+@pytest.mark.parametrize("entrypoint", ["stream", "async", "sync"])
+def test_openai_retry_key_echo_is_private_without_changing_retry_policy(
+    isolated, monkeypatch, bound_sdk_wire, caplog, entrypoint,
+):
+    from src.agents.openai_agent import agent as oa
+    from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth
+
+    add_key(isolated.credentials, "openai", "fixture-selected-alpha")
+    calls = []
+
+    def run(*args, **kwargs):
+        calls.append(1)
+        raise RuntimeError("No tool output found: fixture-selected-alpha " + "detail " * 300)
+
+    async def run_async(*args, **kwargs):
+        return run(*args, **kwargs)
+
+    monkeypatch.setattr("agents.Runner.run", run_async)
+    monkeypatch.setattr("agents.Runner.run_sync", run)
+
+    async def collect():
+        return [event async for event in oa.run_query_stream("q", model="gpt-5.6-luna", dal=object())]
+
+    with activate_runtime_auth(capture_runtime_auth("openai")):
+        if entrypoint == "stream":
+            public = asyncio.run(collect())[-1].data["error"]
+        else:
+            with pytest.raises(Exception) as caught:
+                if entrypoint == "async":
+                    asyncio.run(oa.run_query("q", model="gpt-5.6-luna", dal=object()))
+                else:
+                    oa.run_query_sync("q", model="gpt-5.6-luna", dal=object())
+            public = str(caught.value)
+    assert calls == [1, 1]
+    assert_private_failures(isolated, caplog, public)
+
+
+@pytest.mark.parametrize("persistence_fails", [False, True])
+def test_schedule_key_echo_never_logs_raw_exception_context(isolated, monkeypatch, caplog, persistence_fails):
+    add_key(isolated.credentials, "openai", "fixture-selected-alpha")
+
+    def reject(**kwargs):
+        raise RuntimeError("handoff rejected fixture-selected-alpha " + "detail " * 300)
+
+    monkeypatch.setattr(research, "schedule_research_run", reject)
+    if persistence_fails:
+        monkeypatch.setattr(isolated.runs, "fail_queued_run_handoff", reject)
+
+    async def drive():
+        with pytest.raises(HTTPException) as caught:
+            await research.create_research_run(research.ResearchRunCreate(question="q", provider="openai"),
+                dal=object(), thread_store=isolated.threads, run_store=isolated.runs)
+        assert caught.value.status_code == 503
+        assert "fixture-selected-alpha" not in str(caught.value.detail)
+
+    asyncio.run(drive())
+    assert "fixture-selected-alpha" not in caplog.text
+    assert "[REDACTED]" in caplog.text
+    assert all(not record.exc_info for record in caplog.records if record.name.startswith("src."))

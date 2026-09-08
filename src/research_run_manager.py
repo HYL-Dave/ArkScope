@@ -195,7 +195,7 @@ async def execute_research_run(
             logger.exception("failed to persist atomic cancellation for research run %s", run_id)
         raise
     except Exception as exc:  # noqa: BLE001 — terminal error, not route crash
-        failure = classify_research_failure(exc)
+        failure = classify_research_failure(exc, binding=auth_binding)
         logger.error(
             "research run %s failed (%s): %s",
             run_id,

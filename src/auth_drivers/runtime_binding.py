@@ -9,11 +9,43 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
 
+from src.auth_drivers.probe_harness import redact
 from src.model_credentials import CredentialStore
 
 
 class RuntimeAuthUnavailable(ValueError):
     """Bounded failure: selected auth cannot be replaced with current Settings."""
+
+
+def api_key_client_options(provider: str, api_key: str) -> dict[str, Any]:
+    """Ephemeral SDK options: pin API-key auth and its standard destination."""
+    if provider == "openai":
+        from openai import omit
+
+        base_url = "https://api.openai.com/v1"
+        auth_headers = {"Authorization": f"Bearer {api_key}", "X-Api-Key": omit}
+    elif provider == "anthropic":
+        from anthropic import omit
+
+        base_url = "https://api.anthropic.com"
+        auth_headers = {"Authorization": omit, "X-Api-Key": api_key}
+    else:
+        raise RuntimeAuthUnavailable("runtime_auth_unavailable")
+    # SDKs merge ambient headers case-sensitively before building HTTP headers.
+    # Override every spelling, including the other provider's auth channel.
+    by_name = {name.lower(): value for name, value in auth_headers.items()}
+    headers = {}
+    for line in os.environ.get(f"{provider.upper()}_CUSTOM_HEADERS", "").splitlines():
+        name, separator, _ = line.partition(":")
+        name = name.strip()
+        # OpenAI removes all ambient Authorization spellings when explicitly
+        # pinned; adding them back would produce duplicate wire headers.
+        if provider == "openai" and name.lower() == "authorization":
+            continue
+        if separator and name.lower() in by_name:
+            headers[name] = by_name[name.lower()]
+    headers.update(auth_headers)
+    return {"api_key": api_key, "base_url": base_url, "default_headers": headers}
 
 
 @dataclass(frozen=True)
@@ -38,7 +70,7 @@ class RuntimeAuthBinding:
         )
 
     def api_client(self, *, asynchronous: bool = False):
-        """Explicit per-execution SDK client; never consult env after capture."""
+        """Per-execution SDK client with pinned API-key auth and destination."""
         if self.auth_mode != "api_key" or not self._api_key:
             raise RuntimeAuthUnavailable("runtime_auth_unavailable")
         if self.provider == "openai":
@@ -49,10 +81,32 @@ class RuntimeAuthBinding:
             from anthropic import AsyncAnthropic, Anthropic
 
             client = AsyncAnthropic if asynchronous else Anthropic
-        return client(api_key=self._api_key)
+        try:
+            return client(**api_key_client_options(self.provider, self._api_key))
+        except Exception as exc:
+            raise RuntimeAuthUnavailable(sanitize_runtime_error(exc, binding=self)) from None
 
 
 _CURRENT: ContextVar[RuntimeAuthBinding | None] = ContextVar("runtime_auth", default=None)
+
+
+def sanitize_runtime_error(
+    value: Any, *, binding: RuntimeAuthBinding | None = None, api_key: str | None = None,
+) -> str:
+    """Redact before truncating or emitting; never re-resolve a credential.
+
+    Pass the captured binding after activation exits (not the restored parent).
+    A direct probe/client can instead supply its already-selected API key.
+    """
+    binding = binding if binding is not None else _CURRENT.get()
+    try:
+        detail = value if isinstance(value, str) else str(value) if value is not None else ""
+    except Exception:
+        return "unavailable error detail"
+    for secret in (binding._api_key if binding is not None else None, api_key):
+        if isinstance(secret, str) and secret:
+            detail = detail.replace(secret, "[REDACTED]")
+    return redact(detail)[:500]
 
 
 def current_runtime_auth(provider: str) -> RuntimeAuthBinding | None:
