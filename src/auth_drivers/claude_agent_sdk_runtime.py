@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Mapping
 
 
-REVIEWED_CLAUDE_AGENT_SDK_VERSION = "0.2.151"
-REVIEWED_CLAUDE_CLI_VERSION = "2.1.258"
+REVIEWED_CLAUDE_AGENT_SDK_VERSION = "0.2.152"
+REVIEWED_CLAUDE_CLI_VERSION = "2.1.259"
 
 # Sources that can outrank or reroute setup-token authentication in the child.
 CLAUDE_INHERITED_AUTH_ENV = (

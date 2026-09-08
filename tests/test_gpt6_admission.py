@@ -147,7 +147,7 @@ def test_astra_provider_rejection_does_not_retry_change_effort_or_bill_another_s
 
 
 @pytest.mark.parametrize("operation", ["synthesis", "translation"])
-def test_luna_fixed_tasks_retain_the_existing_chat_completions_path(monkeypatch, operation):
+def test_custom_fixed_tasks_retain_the_existing_chat_completions_path(monkeypatch, operation):
     requests = []
 
     def handler(request):
@@ -158,7 +158,7 @@ def test_luna_fixed_tasks_retain_the_existing_chat_completions_path(monkeypatch,
                          "arguments": json.dumps(_payload(operation))}}]}}]})
 
     with _install_api(monkeypatch, handler):
-        result = _invoke(operation, "gpt-5.6-luna")
+        result = _invoke(operation, "custom-chat-model")
     assert len(requests) == 1
     assert all(result[key] == value for key, value in _payload(operation).items())
 

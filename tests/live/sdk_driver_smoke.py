@@ -77,6 +77,7 @@ _SESSION_EVIDENCE_FIELDS = frozenset(
     {
         "name",
         "passed",
+        "observed_model",
         "api_key_source",
         "tools",
         "mcp_servers",
@@ -344,6 +345,7 @@ async def _run_live_session(
         parent_environment["OPENAI_API_KEY"] = "not-a-real-key-live-admission"
         options = ClaudeAgentOptions(
             model=LIVE_MODEL,
+            fallback_model=None,
             system_prompt="Follow the request exactly and finish promptly.",
             mcp_servers=servers,
             allowed_tools=allowed_tools,
@@ -366,6 +368,7 @@ async def _run_live_session(
         init_rows: list[dict[str, Any]] = []
         tool_calls: list[str] = []
         ambient_instruction_observed = False
+        observed_model: str | None = None
         result: ResultMessage | None = None
         try:
             async for message in query(prompt=_prompt(spec, paths), options=options):
@@ -378,6 +381,11 @@ async def _run_live_session(
                         )
                     )
                 elif isinstance(message, AssistantMessage):
+                    if message.model != LIVE_MODEL:
+                        raise LiveGateError(
+                            "Claude assistant model differs from the requested live model"
+                        )
+                    observed_model = message.model
                     for block in message.content or []:
                         if isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
                             tool_calls.append(str(block.name))
@@ -401,6 +409,8 @@ async def _run_live_session(
             raise LiveGateError("exactly one Claude init frame was not observed")
         if result is None or result.is_error or result.subtype == "error":
             raise LiveGateError("Claude session did not return one successful result")
+        if observed_model is None:
+            raise LiveGateError("Claude assistant model was not observed")
         if not isinstance(result.num_turns, int) or not (
             1 <= result.num_turns <= MAX_TURNS_PER_SESSION
         ):
@@ -426,6 +436,7 @@ async def _run_live_session(
         return {
             "name": spec.name,
             "passed": True,
+            "observed_model": observed_model,
             **init,
             "tool_calls": tool_calls,
             "probe_call_count": probe_calls,
@@ -485,6 +496,7 @@ def validate_evidence(evidence: Mapping[str, Any]) -> None:
         if (
             row.get("name") != spec.name
             or row.get("passed") is not True
+            or row.get("observed_model") != LIVE_MODEL
             or row.get("api_key_source") != "none"
             or row.get("tools") != expected_tools
             or row.get("mcp_servers") != expected_servers

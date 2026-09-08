@@ -428,12 +428,14 @@ def _openai_responses_output(
     if response.status != "completed" or response.error is not None:
         raise RuntimeError("OpenAI structured output did not complete")
     requested = capability_for(model)
-    model_matches = response.model == model
-    # An unpinned canonical ID may resolve to a dated snapshot. An explicit
-    # snapshot may not change, and capability-prefix matches are not receipts.
-    if (not model_matches and requested is not None and model == requested.id
-            and isinstance(response.model, str) and response.model.startswith(model + "-")):
-        suffix = response.model.removeprefix(model + "-")
+    unpinned = requested is not None and model in (requested.id, *requested.aliases)
+    canonical = requested.id if unpinned else model
+    model_matches = response.model in (model, canonical)
+    # Only reviewed official aliases may resolve to their canonical model. An
+    # explicit snapshot may not change; prefix matches alone are not receipts.
+    if (not model_matches and unpinned
+            and isinstance(response.model, str) and response.model.startswith(canonical + "-")):
+        suffix = response.model.removeprefix(canonical + "-")
         try:
             model_matches = date.fromisoformat(suffix).isoformat() == suffix
         except ValueError:
@@ -493,7 +495,7 @@ def _synthesize_openai(
         )
         try:
             capability = capability_for(model)
-            if capability is not None and capability.requires_responses_for_tools:
+            if capability is not None and capability.uses_responses_for_tools:
                 return CardSynthesis(**_openai_responses_output(
                     client, model=model, system=_SYSTEM_PROMPT, user=user_message,
                     name=_TOOL_NAME, description="Emit the structured result card.",
@@ -1039,7 +1041,7 @@ def _translate_openai(
         )
         try:
             capability = capability_for(model)
-            if capability is not None and capability.requires_responses_for_tools:
+            if capability is not None and capability.uses_responses_for_tools:
                 return _openai_responses_output(
                     client, model=model, system=system, user=user,
                     name="emit_translation", description=f"Emit the {target} translation of the given fields.",

@@ -10,18 +10,21 @@ def _clear_runtime_cache(mod) -> None:
     mod.require_reviewed_claude_agent_runtime.cache_clear()
 
 
-def test_reviewed_claude_runtime_matches_requirement_and_installed_bundle():
+def test_reviewed_claude_runtime_admits_sdk_0_2_152_with_cli_2_1_259():
     from src.auth_drivers import claude_agent_sdk_runtime as mod
+
+    assert mod.REVIEWED_CLAUDE_AGENT_SDK_VERSION == "0.2.152"
+    assert mod.REVIEWED_CLAUDE_CLI_VERSION == "2.1.259"
 
     _clear_runtime_cache(mod)
     runtime = mod.require_reviewed_claude_agent_runtime()
 
     requirement = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text()
-    assert f"claude-agent-sdk=={mod.REVIEWED_CLAUDE_AGENT_SDK_VERSION}" in requirement
-    assert runtime.sdk_version == mod.REVIEWED_CLAUDE_AGENT_SDK_VERSION
-    assert runtime.sdk_module_version == mod.REVIEWED_CLAUDE_AGENT_SDK_VERSION
-    assert runtime.cli_metadata_version == mod.REVIEWED_CLAUDE_CLI_VERSION
-    assert runtime.cli_binary_version == mod.REVIEWED_CLAUDE_CLI_VERSION
+    assert "claude-agent-sdk==0.2.152" in requirement
+    assert runtime.sdk_version == "0.2.152"
+    assert runtime.sdk_module_version == "0.2.152"
+    assert runtime.cli_metadata_version == "2.1.259"
+    assert runtime.cli_binary_version == "2.1.259"
     assert runtime.cli_path.is_file()
     assert runtime.cli_path.parent.name == "_bundled"
 
@@ -29,10 +32,10 @@ def test_reviewed_claude_runtime_matches_requirement_and_installed_bundle():
 @pytest.mark.parametrize(
     ("seam", "value"),
     (
-        ("_distribution_version", "0.2.152"),
-        ("_sdk_module_version", "0.2.152"),
-        ("_cli_metadata_version", "2.1.259"),
-        ("_probe_cli_version", "2.1.259"),
+        ("_distribution_version", "0.2.151"),
+        ("_sdk_module_version", "0.2.151"),
+        ("_cli_metadata_version", "2.1.258"),
+        ("_probe_cli_version", "2.1.258"),
     ),
 )
 def test_reviewed_claude_runtime_rejects_each_version_drift(
@@ -156,8 +159,8 @@ def test_current_runtime_admission_and_publication_boundary_are_documented():
     ).read_text()
     priority_map = (root / "docs/design/PROJECT_PRIORITY_MAP.md").read_text()
 
-    assert "claude-agent-sdk==0.2.151" in admission
-    assert "Claude Code CLI 2.1.258" in admission
+    assert "claude-agent-sdk==0.2.152" in admission
+    assert "Claude Code CLI 2.1.259" in admission
     assert "apiKeySource == \"none\"" in admission
     assert "PreToolUse" in admission and "not part of the shipped path" in admission
     assert "operator-local self-use" in admission
