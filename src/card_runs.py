@@ -18,10 +18,12 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+from src.card_execution import ExecutionReceipt
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ai_card_runs (
@@ -45,6 +47,22 @@ CREATE TABLE IF NOT EXISTS ai_card_runs (
 
 CREATE INDEX IF NOT EXISTS idx_card_runs_ticker ON ai_card_runs(ticker);
 CREATE INDEX IF NOT EXISTS idx_card_runs_status ON ai_card_runs(status);
+
+CREATE TABLE IF NOT EXISTS ai_card_execution_receipts (
+    run_id INTEGER PRIMARY KEY REFERENCES ai_card_runs(id),
+    provider TEXT, model TEXT, effort TEXT, auth_mode TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ai_card_translation_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES ai_card_runs(id),
+    lang TEXT NOT NULL,
+    card_json TEXT NOT NULL,
+    provider TEXT, model TEXT, effort TEXT, auth_mode TEXT,
+    created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_card_translation_versions
+    ON ai_card_translation_versions(run_id, lang, id);
 """
 
 VALID_STATUS = ("generated", "saved", "archived", "deleted")
@@ -76,6 +94,8 @@ class CardRun:
     expires_at: Optional[str]
     translations: Optional[dict] = None  # {lang: translated result_card dict}
     personalization: Optional[dict] = None  # Track A run trace (profile/stance/skills)
+    execution_receipt: ExecutionReceipt = field(default_factory=ExecutionReceipt)
+    translation_receipts: dict[str, ExecutionReceipt] = field(default_factory=dict)
 
 
 class CardRunStore:
@@ -126,7 +146,24 @@ class CardRunStore:
             conn.commit()
 
     @staticmethod
-    def _row(r: sqlite3.Row) -> CardRun:
+    def _row(conn: sqlite3.Connection, r: sqlite3.Row) -> CardRun:
+        receipt_row = conn.execute(
+            "SELECT provider, model, effort, auth_mode FROM ai_card_execution_receipts WHERE run_id = ?",
+            (r["id"],),
+        ).fetchone()
+        receipt = ExecutionReceipt(**dict(receipt_row)) if receipt_row else ExecutionReceipt(
+            provider=r["provider"], model=r["model"],
+        )
+        translation_receipts = {
+            row["lang"]: ExecutionReceipt(
+                provider=row["provider"], model=row["model"], effort=row["effort"], auth_mode=row["auth_mode"],
+            )
+            for row in conn.execute(
+                "SELECT v.* FROM ai_card_translation_versions v JOIN "
+                "(SELECT lang, MAX(id) AS id FROM ai_card_translation_versions WHERE run_id = ? GROUP BY lang) latest "
+                "ON v.id = latest.id", (r["id"],),
+            )
+        }
         return CardRun(
             id=r["id"],
             ticker=r["ticker"],
@@ -142,6 +179,8 @@ class CardRunStore:
             status=r["status"],
             saved_report_id=r["saved_report_id"],
             expires_at=r["expires_at"],
+            execution_receipt=receipt,
+            translation_receipts=translation_receipts,
             translations=json.loads(r["translations_json"])
             if r["translations_json"]
             else None,
@@ -171,11 +210,16 @@ class CardRunStore:
         as_of: Optional[str] = None,
         generated_at: Optional[str] = None,
         personalization: Optional[dict] = None,
+        execution_receipt: ExecutionReceipt | None = None,
     ) -> CardRun:
         t = _norm(ticker)
         if not t:
             raise ValueError("ticker is required")
         gen = generated_at or _now()
+        if execution_receipt is not None:
+            if not isinstance(execution_receipt, ExecutionReceipt):
+                raise ValueError("execution_receipt_invalid")
+            provider, model = execution_receipt.provider, execution_receipt.model
         p = personalization or {}
         with self._write_lock, self._connect() as conn:
             cur = conn.execute(
@@ -207,8 +251,15 @@ class CardRunStore:
                     p.get("context_snapshot"),
                 ),
             )
-            conn.commit()
             run_id = cur.lastrowid
+            if execution_receipt is not None:
+                conn.execute(
+                    "INSERT INTO ai_card_execution_receipts (run_id, provider, model, effort, auth_mode) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (run_id, execution_receipt.provider, execution_receipt.model,
+                     execution_receipt.effort, execution_receipt.auth_mode),
+                )
+            conn.commit()
         got = self.get(run_id)
         assert got is not None
         return got
@@ -252,8 +303,10 @@ class CardRunStore:
 
     def get(self, run_id: int) -> Optional[CardRun]:
         with self._connect() as conn:
+            # One read snapshot for the compatible output and its side-table receipt.
+            conn.execute("BEGIN")
             r = conn.execute("SELECT * FROM ai_card_runs WHERE id = ?", (run_id,)).fetchone()
-        return self._row(r) if r else None
+            return self._row(conn, r) if r else None
 
     def recent(
         self,
@@ -273,29 +326,70 @@ class CardRunStore:
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit)
         with self._connect() as conn:
+            conn.execute("BEGIN")
             rows = conn.execute(
                 f"SELECT * FROM ai_card_runs {where} ORDER BY generated_at DESC, id DESC LIMIT ?",
                 params,
             ).fetchall()
-        return [self._row(r) for r in rows]
+            return [self._row(conn, r) for r in rows]
 
     # --- translations (on-demand, cached) --------------------------------
 
-    def set_translation(self, run_id: int, lang: str, card: dict) -> None:
-        """Cache a per-language translated card on the run (merged by lang)."""
+    def set_translation(
+        self, run_id: int, lang: str, card: dict, *,
+        execution_receipt: ExecutionReceipt | None = None,
+    ) -> None:
+        """Append a successful output/receipt and update the legacy cache atomically."""
+        receipt = execution_receipt if execution_receipt is not None else ExecutionReceipt()
+        if not isinstance(receipt, ExecutionReceipt):
+            raise ValueError("execution_receipt_invalid")
         with self._write_lock, self._connect() as conn:
+            # Serialize read/merge/write across different store instances too.
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT translations_json FROM ai_card_runs WHERE id = ?", (run_id,)
             ).fetchone()
             if row is None:
                 return
             current = json.loads(row["translations_json"]) if row["translations_json"] else {}
+            if lang in current and not conn.execute(
+                "SELECT 1 FROM ai_card_translation_versions WHERE run_id = ? AND lang = ? LIMIT 1",
+                (run_id, lang),
+            ).fetchone():
+                # An old cache has no known route or execution time. Preserve it
+                # before the first refresh, without inventing provenance.
+                conn.execute(
+                    "INSERT INTO ai_card_translation_versions (run_id, lang, card_json) VALUES (?, ?, ?)",
+                    (run_id, lang, json.dumps(current[lang])),
+                )
+            conn.execute(
+                "INSERT INTO ai_card_translation_versions "
+                "(run_id, lang, card_json, provider, model, effort, auth_mode, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (run_id, lang, json.dumps(card), receipt.provider, receipt.model,
+                 receipt.effort, receipt.auth_mode, _now()),
+            )
             current[lang] = card
             conn.execute(
                 "UPDATE ai_card_runs SET translations_json = ? WHERE id = ?",
                 (json.dumps(current), run_id),
             )
             conn.commit()
+
+    def translation_versions(self, run_id: int, lang: str) -> list[dict]:
+        """Successful versions in oldest-first order; no current Settings lookup."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM ai_card_translation_versions WHERE run_id = ? AND lang = ? ORDER BY id",
+                (run_id, lang),
+            ).fetchall()
+        return [{
+            "version_id": row["id"], "card": json.loads(row["card_json"]),
+            "created_at": row["created_at"],
+            "execution_receipt": ExecutionReceipt(
+                provider=row["provider"], model=row["model"], effort=row["effort"], auth_mode=row["auth_mode"],
+            ).model_dump(),
+        } for row in rows]
 
     def get_translation(self, run_id: int, lang: str) -> Optional[dict]:
         run = self.get(run_id)

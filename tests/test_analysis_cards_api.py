@@ -58,6 +58,8 @@ def store(tmp_path):
 
 @pytest.fixture(autouse=True)
 def fixed_task_runtime(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "synthetic-card-anthropic-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-card-openai-key")
     monkeypatch.setattr(
         routes,
         "resolve_fixed_task_runtime",
@@ -100,9 +102,10 @@ def test_translate_caches_and_returns(store, stub_generation, monkeypatch):
     rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
     calls = {"n": 0}
 
-    def fake_translate(card, *, lang="zh-Hant", model=None, model_timeout_s):
+    def fake_translate(card, *, lang="zh-Hant", model=None, model_timeout_s, execution):
         calls["n"] += 1
         assert model_timeout_s == 900.0
+        assert execution.task == "card_translation"
         return {**card, "conclusion": "繁中結論"}
 
     monkeypatch.setattr(routes, "translate_card", fake_translate)
