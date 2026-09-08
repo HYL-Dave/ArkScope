@@ -13,6 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.personalization import resolve_personalization as _resolve_personalization
+from src.auth_drivers.runtime_binding import (
+    activate_runtime_auth, capture_runtime_auth, current_runtime_auth,
+)
 from src.model_capabilities import (
     client_compaction_admission_detail,
     model_auth_admission_detail,
@@ -103,14 +106,15 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
     from src.tools.registry import ToolRegistry
 
     runtime = resolve_research_runtime()
-    cred = CredentialStore().get(credential_id)
+    binding = current_runtime_auth("anthropic")
+    cred = binding.credential() if binding is not None else CredentialStore().get(credential_id)
     registry = ToolRegistry()
     registry.register_all()
     driver = build_driver(
         provider="anthropic",
         auth_mode="claude_code_oauth",
         credential=cred,
-        token_store=get_token_store(),
+        token_store=binding.token_store if binding is not None else get_token_store(),
         registry=registry,
         dal=dal,
         max_turns=runtime.max_tool_calls,
@@ -163,14 +167,15 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
     from src.agents.config import get_agent_config
     config = get_agent_config()
     runtime = resolve_research_runtime()
-    cred = CredentialStore().get(credential_id)
+    binding = current_runtime_auth("openai")
+    cred = binding.credential() if binding is not None else CredentialStore().get(credential_id)
     registry = ToolRegistry()
     registry.register_all()
     driver = build_driver(
         provider="openai",
         auth_mode="chatgpt_oauth",
         credential=cred,
-        token_store=get_token_store(),
+        token_store=binding.token_store if binding is not None else get_token_store(),
         registry=registry,
         dal=dal,
         max_turns=runtime.max_tool_calls,
@@ -500,7 +505,9 @@ async def query_agent_stream(
     """
     provider = request.provider.lower()
     res_model, res_effort = _resolve_query_task_route(request, provider)
-    _require_live_model_auth(provider, res_model)
+    auth_binding = capture_runtime_auth(provider)
+    with activate_runtime_auth(auth_binding):
+        _require_live_model_auth(provider, res_model)
     _require_client_compaction_compatibility(provider, res_model)
     # Track A: validate the stance override + resolve profile context BEFORE the
     # stream starts, so an invalid value is a clean 400 (not a mid-stream error).
@@ -538,30 +545,30 @@ async def query_agent_stream(
         error_content: Optional[str] = None  # set on a non-done terminal (MUST-FIX 2)
         t0 = _time.monotonic()
         try:
-            stream = _research_provider_stream(
-                provider=provider,
-                question=agent_question,
-                model=res_model,
-                effort=res_effort,
-                dal=dal,
-                history=history,
-                personalization_context=personalization_context,
-            )
+            with activate_runtime_auth(auth_binding):
+                stream = _research_provider_stream(
+                    provider=provider,
+                    question=agent_question,
+                    model=res_model,
+                    effort=res_effort,
+                    dal=dal,
+                    history=history,
+                    personalization_context=personalization_context,
+                )
 
-            async for event in stream:
-                etype = getattr(event.type, "value", event.type)
-                if etype == "done":
-                    # Track A: the SSE consumer sees the SAME trace that gets
-                    # persisted — and only for the context actually injected.
-                    event.data["personalization"] = dict(personalization)
-                if persist:
-                    if etype in ("tool_start", "tool_end"):
-                        collected.append((etype, event.data))
-                    elif etype == "done":
-                        done_data = event.data
-                    elif etype == "error":
-                        error_content = event.data.get("error") or event.data.get("message")
-                yield event.to_sse()
+                async for event in stream:
+                    etype = getattr(event.type, "value", event.type)
+                    if etype == "done":
+                        # SSE and persistence carry the same injected trace.
+                        event.data["personalization"] = dict(personalization)
+                    if persist:
+                        if etype in ("tool_start", "tool_end"):
+                            collected.append((etype, event.data))
+                        elif etype == "done":
+                            done_data = event.data
+                        elif etype == "error":
+                            error_content = event.data.get("error") or event.data.get("message")
+                    yield event.to_sse()
         except Exception as e:
             from src.agents.shared.events import AgentEvent, EventType
             logger.error(f"Stream error: {e}")

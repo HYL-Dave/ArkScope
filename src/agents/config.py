@@ -479,16 +479,12 @@ def _default_route_store():
 
 def _db_route(task: str, route_store):
     """The app-managed route for ``task`` from the profile DB (a single atomic row),
-    or None if no route was saved. Older tasks retain their legacy DB-error
-    fallback; Lifecycle Investigation must not change billing on a read error."""
+    or None if no route was saved. A read failure must not change execution."""
     try:
         store = route_store if route_store is not None else _default_route_store()
         return store.get(task)
     except Exception:
-        if task == "lifecycle_investigation":
-            raise ModelRouteUnavailable() from None
-        logger.warning("model_route DB read failed for task %r; using yaml/default", task, exc_info=True)
-        return None
+        raise ModelRouteUnavailable() from None
 
 
 def task_route(task: TaskId, *, route_store=None) -> TaskRoute:

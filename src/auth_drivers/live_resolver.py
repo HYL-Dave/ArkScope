@@ -24,6 +24,7 @@ from agents import set_default_openai_client  # SDK process-global default clien
 
 from src.auth_drivers.factory import build_driver
 from src.model_credentials import CredentialStore
+from src.auth_drivers.runtime_binding import current_runtime_auth
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,9 @@ def _active(provider: str, store: CredentialStore):
 
 def resolve_live_auth(provider: str, *, store: Optional[CredentialStore] = None) -> LiveAuthResolution:
     """Classify the active credential for the live loop (no client built here)."""
+    binding = current_runtime_auth(provider)
+    if binding is not None:
+        return LiveAuthResolution(binding.provider, binding.source, binding.credential_id)
     store = store or CredentialStore()
     active = _active(provider, store)
     if active is not None and active.auth_type == "api_key" and active.secret:
@@ -110,6 +114,11 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     """
     from anthropic import Anthropic
 
+    binding = current_runtime_auth("anthropic")
+    if binding is not None:
+        if binding.auth_mode != "api_key":
+            raise SubscriptionDriverNotWiredError(_ANTHROPIC_OAUTH_FAILCLOSED_MSG)
+        return binding.api_client()
     store = store or CredentialStore()
     res = resolve_live_auth("anthropic", store=store)
     if res.source == "db_api_key":
@@ -128,6 +137,11 @@ def live_openai_client(*, store: Optional[CredentialStore] = None) -> Any:
     env key); no active credential → env fallback (bare ``OpenAI()``)."""
     from openai import OpenAI
 
+    binding = current_runtime_auth("openai")
+    if binding is not None:
+        if binding.auth_mode != "api_key":
+            raise SubscriptionDriverNotWiredError(_OPENAI_OAUTH_FAILCLOSED_MSG)
+        return binding.api_client()
     store = store or CredentialStore()
     res = resolve_live_auth("openai", store=store)
     if res.source == "db_api_key":
@@ -138,6 +152,29 @@ def live_openai_client(*, store: Optional[CredentialStore] = None) -> Any:
         raise SubscriptionDriverNotWiredError(_OPENAI_OAUTH_FAILCLOSED_MSG)
     _signal_fallback(res)
     return OpenAI()  # genuinely no active credential → env fallback (OPENAI_API_KEY)
+
+
+def live_openai_async_client(*, store: Optional[CredentialStore] = None) -> Any:
+    """Per-agent client, never the Agents SDK process-global default."""
+    from openai import AsyncOpenAI
+    from src.auth_drivers.runtime_binding import RuntimeAuthUnavailable, capture_runtime_auth
+
+    binding = current_runtime_auth("openai")
+    if binding is not None:
+        if binding.auth_mode != "api_key":
+            raise SubscriptionDriverNotWiredError(_OPENAI_OAUTH_FAILCLOSED_MSG)
+        return binding.api_client(asynchronous=True)
+    binding = capture_runtime_auth("openai", store=store)
+    if binding.source == "oauth_driver_unwired":
+        raise SubscriptionDriverNotWiredError(_OPENAI_OAUTH_FAILCLOSED_MSG)
+    try:
+        return binding.api_client(asynchronous=True)
+    except RuntimeAuthUnavailable:
+        if binding.source != "env_fallback":
+            raise
+        # Preserve unbound agent construction without a key, without using a
+        # stale process-global client or re-reading a replacement env key.
+        return AsyncOpenAI(api_key="ARKSCOPE-NO-OPENAI-CREDENTIAL")
 
 
 def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> LiveAuthResolution:

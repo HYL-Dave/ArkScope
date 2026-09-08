@@ -368,10 +368,14 @@ def dispatch_subagent(
     )
 
     try:
-        if provider == "openai":
-            result = _run_openai_subagent(config, subagent_input, dal)
-        else:
-            result = _run_anthropic_subagent(config, subagent_input, dal)
+        from src.auth_drivers.runtime_binding import activate_runtime_auth, capture_child_runtime_auth
+
+        child_auth = capture_child_runtime_auth(provider)
+        with activate_runtime_auth(child_auth):
+            if provider == "openai":
+                result = _run_openai_subagent(config, subagent_input, dal)
+            else:
+                result = _run_anthropic_subagent(config, subagent_input, dal)
 
         return {
             "subagent": subagent_name,
@@ -527,8 +531,9 @@ def _run_openai_subagent(
     dal: Any,
 ) -> Dict[str, Any]:
     """Run a subagent using the OpenAI Agents SDK (Runner.run_sync)."""
-    from agents import Agent, ModelSettings, Runner
+    from agents import Agent, ModelSettings, OpenAIResponsesModel, Runner
     from openai.types.shared import Reasoning
+    from src.auth_drivers.live_resolver import live_openai_async_client
 
     from ..config import get_agent_config
     from ..openai_agent.agent import _get_openai_max_output
@@ -551,7 +556,7 @@ def _run_openai_subagent(
     agent = Agent(
         name=f"ArkScope Subagent: {config.name}",
         instructions=config.system_prompt,
-        model=config.model,
+        model=OpenAIResponsesModel(model=config.model, openai_client=live_openai_async_client()),
         tools=tools,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=effort),

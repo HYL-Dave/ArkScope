@@ -14,6 +14,18 @@ from src.auth_drivers.live_resolver import LiveAuthResolution
 from src.agents.shared.events import AgentEvent, EventType
 from src.research_runs import ResearchRunStore
 from src.research_threads import ResearchThreadStore
+from src.auth_drivers.runtime_binding import RuntimeAuthBinding
+from src.research_run_manager import execute_research_run as _execute_with_auth
+
+
+async def _execute_test_run(**kwargs):
+    """Supply synthetic auth to the executor's injected-stream contract tests."""
+    run = kwargs["run_store"].get_run(kwargs["run_id"])
+    kwargs["auth_binding"] = RuntimeAuthBinding(
+        run.provider, "db_api_key", run.auth_mode or "api_key", run.credential_id,
+        _api_key="test-executor-key",
+    )
+    return await _execute_with_auth(**kwargs)
 
 
 @pytest.fixture()
@@ -189,7 +201,7 @@ def test_reconcile_interrupted_marks_orphaned_runs_terminal(stores):
 
 
 def test_execute_run_records_events_and_persists_assistant(stores):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     thread_store.ensure_thread(id="t1", title="q")
@@ -223,7 +235,7 @@ def test_execute_run_records_events_and_persists_assistant(stores):
 
 
 def test_execute_run_error_event_persists_error_assistant(stores):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     thread_store.ensure_thread(id="t1", title="q")
@@ -909,7 +921,7 @@ def test_shared_research_dispatch_rejects_fable_5_1_oauth_before_driver(
 
 
 def test_explicit_error_code_survives_event_run_and_linked_message(stores):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     _seed_run(run_store, thread_store, thread_id="explicit", run_id="explicit-run")
@@ -940,7 +952,7 @@ def test_explicit_error_code_survives_event_run_and_linked_message(stores):
 
 
 def test_unknown_exception_is_typed_redacted_and_bounded(stores):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     _seed_run(run_store, thread_store, thread_id="unknown", run_id="unknown-run")
@@ -985,7 +997,7 @@ def test_unknown_exception_is_typed_redacted_and_bounded(stores):
 
 
 def test_timeout_causes_and_owned_event_shapes_are_model_timeout(stores):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     cases = [
@@ -1097,7 +1109,7 @@ def test_timeout_causes_and_owned_event_shapes_are_model_timeout(stores):
 
 
 def test_max_turn_shapes_are_typed_without_fuzzy_near_misses(stores):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
     from src.research_threads import MAX_TOOL_CALLS_SENTINEL
 
     run_store, thread_store = stores
@@ -1366,7 +1378,7 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
     from src import research_run_manager as run_manager
 
     run_store, thread_store = stores
-    original_execute_research_run = run_manager.execute_research_run
+    original_execute_research_run = _execute_test_run
     profile_store = _tracka_profile(tmp_path, monkeypatch, enabled=True)
     profile_store.save(
         {
@@ -1688,7 +1700,7 @@ def test_research_run_persists_prompt_assembly_trace_and_exact_context_before_st
 def test_research_run_context_snapshot_distinguishes_legacy_null_from_disabled_empty(
     tmp_path, monkeypatch
 ):
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     db = tmp_path / "legacy_research.db"
     with sqlite3.connect(db) as conn:
@@ -1874,7 +1886,7 @@ def test_create_run_stores_stance_and_rejects_invalid(stores, tmp_path, monkeypa
 def test_execute_run_injects_context_and_persists_trace(stores, tmp_path, monkeypatch):
     import asyncio
 
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     _tracka_profile(tmp_path, monkeypatch, enabled=True)
@@ -1911,7 +1923,7 @@ def test_execute_run_injects_context_and_persists_trace(stores, tmp_path, monkey
 def test_execute_run_off_omits_personalization_kwarg(stores, tmp_path, monkeypatch):
     import asyncio
 
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     _tracka_profile(tmp_path, monkeypatch, enabled=False)
@@ -1942,7 +1954,7 @@ def test_execute_run_off_omits_personalization_kwarg(stores, tmp_path, monkeypat
 def test_cancelled_run_persists_personalization_trace(stores, tmp_path, monkeypatch):
     import asyncio
 
-    from src.research_run_manager import execute_research_run
+    execute_research_run = _execute_test_run
 
     run_store, thread_store = stores
     _tracka_profile(tmp_path, monkeypatch, enabled=True)

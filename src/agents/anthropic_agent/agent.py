@@ -363,7 +363,7 @@ async def run_query_stream(
     api_kwargs: Dict[str, Any] = {}
 
     effective_effort = effort if effort is not None else config.anthropic_effort
-    if effective_effort and _supports_effort(model_name):
+    if effective_effort and (_supports_effort(model_name) or capability_for(model_name) is None):
         api_kwargs["output_config"] = {"effort": effective_effort}
 
     thinking_on = thinking if thinking is not None else config.anthropic_thinking

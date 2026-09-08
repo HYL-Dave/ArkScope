@@ -1087,14 +1087,9 @@ def run_provider_model_test(
     detail = model_execution_admission_detail(model)
     if detail is not None:
         raise HTTPException(status_code=400, detail=detail)
-    effort = body.effort.strip() or "default"
-    warning = None
+    effort = body.effort.strip()
     if not is_valid_effort(body.provider, effort, model=model):
-        warning = (
-            f"Requested effort '{effort}' is not known for provider '{body.provider}'; "
-            "testing with provider default."
-        )
-        effort = "default"
+        raise HTTPException(status_code=400, detail={"code": "effort_not_supported", "field": "effort"})
     result = test_model(
         body.provider,
         model,
@@ -1102,8 +1097,6 @@ def run_provider_model_test(
         credential_id=body.credential_id,
         store=store,
     ).model_dump()
-    if warning:
-        result["warning"] = f"{warning} {result.get('warning') or ''}".strip()
     return result
 
 
