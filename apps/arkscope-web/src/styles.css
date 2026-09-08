@@ -2453,6 +2453,31 @@ table.lifecycle-current-table time { font-size: 11.5px; font-variant-numeric: ta
   margin: 5px 0;
   overflow-wrap: anywhere;
 }
+.lifecycle-decision-overview { margin: 10px 0; min-width: 0; }
+.lifecycle-history-summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+.lifecycle-decision-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.lifecycle-decision-meta dt, .lifecycle-decision-notes { color: var(--muted); }
+.lifecycle-decision-meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.lifecycle-decision-notes { font-size: 12px; }
+.lifecycle-decision-details { margin: 10px 0; border-top: 1px solid var(--border); padding-top: 8px; }
+.lifecycle-decision-details > summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+.lifecycle-decision-details a { color: var(--accent); overflow-wrap: anywhere; }
+.lifecycle-decision-details a svg { margin-left: 4px; vertical-align: middle; }
+.lifecycle-decision-details p { white-space: pre-wrap; }
+.lifecycle-decision-sources { padding-left: 18px; font-size: 12px; }
+.lifecycle-decision-sources li { margin: 10px 0; overflow-wrap: anywhere; }
 .lifecycle-evidence-group + .lifecycle-evidence-group,
 .lifecycle-fact-group + .lifecycle-fact-group {
   margin-top: 12px;

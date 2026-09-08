@@ -1,5 +1,5 @@
 import { LISTING_CHECK_NAMES, LISTING_PROVIDER_ISSUES, LISTING_PROVIDER_NAMES } from "./listingContract";
-import type { TickerIdentityTransitionBlockReason } from "../api";
+import type { TickerIdentityHistoryDecision, TickerIdentityTransitionBlockReason } from "../api";
 import { parseWebRun, parseWebSourceGaps } from "./webContract";
 
 export const CURRENT_REVIEW_REASONS = [
@@ -191,6 +191,41 @@ export function parseLifecycleReviewConfirmation(value: unknown) {
 }
 export type LifecycleReviewConfirmation = ReturnType<typeof parseLifecycleReviewConfirmation>;
 
+function historyUrl(value: unknown) {
+  const raw = url(value), parsed = new URL(raw);
+  if (parsed.protocol !== "https:" || Array.from(parsed.searchParams.keys()).some((key) =>
+    ["token", "key", "secret", "signature", "credential", "authorization"].some((part) => key.toLowerCase().includes(part)))) return invalidCurrentPayload();
+  return raw;
+}
+
+function parseHistoryDecision(value: unknown): TickerIdentityHistoryDecision {
+  const row = object(value);
+  const result = {
+    summary: nullable(row.summary, text), impact: nullable(row.impact, text),
+    method: choice(row.method, ["provider_review", "manual_review", "rule_engine", "llm_investigation", "unknown"]),
+    approval_authority: choice(row.approval_authority, ["attended_user", "automation_policy"]),
+    event_date: nullable(row.event_date, day), observed_at: nullable(row.observed_at, timestamp),
+    model: nullable(row.model, (value) => { const r = object(value); return {
+      provider: choice(r.provider, ["openai", "anthropic"]), auth_mode: choice(r.auth_mode, ["api_key", "chatgpt_oauth", "claude_code_oauth"]), model: text(r.model),
+    }; }),
+    sources: array(row.sources, (value) => { const r = object(value); return {
+      name: nullable(r.name, text), url: nullable(r.url, historyUrl), title: nullable(r.title, text),
+      published_at: nullable(r.published_at, text), observed_at: nullable(r.observed_at, timestamp),
+      kind: choice(r.kind, ["listing_snapshot", "ticker_events", "document", "local_news", "manual"]),
+      ticker: nullable(r.ticker, text), listing_status: nullable(r.listing_status, (x) => choice(x, ["active", "inactive", "not_found", "unverified"])), market: nullable(r.market, text),
+    }; }),
+    limitations: array(row.limitations, text),
+    source_gaps: array(row.source_gaps, (value) => { const r = object(value); return { url: nullable(r.url, historyUrl), reason: text(r.reason) }; }),
+    gaps: array(row.gaps, (x) => choice(x, ["assessment_missing", "record_invalid", "sources_missing", "model_missing", "source_link_omitted", "legacy_assessment_unsealed"])),
+  };
+  if (result.model && (result.method !== "llm_investigation"
+      || (result.model.auth_mode === "chatgpt_oauth" && result.model.provider !== "openai")
+      || (result.model.auth_mode === "claude_code_oauth" && result.model.provider !== "anthropic"))) return invalidCurrentPayload();
+  if ((result.method === "llm_investigation" && !result.model && !result.gaps.includes("model_missing"))
+      || (result.summary === null && !result.gaps.length)) return invalidCurrentPayload();
+  return result;
+}
+
 export function parseCurrentActivity(value: unknown) {
   const row = object(value);
   const result = {
@@ -205,6 +240,7 @@ export function parseCurrentActivity(value: unknown) {
     provider_owned_retained: sources(row.provider_owned_retained), state_sha256: digest(row.state_sha256),
     rule_id: nullable(row.rule_id, text), rule_version: nullable(row.rule_version, text), decision_provenance_sha256: digest(row.decision_provenance_sha256),
     occurred_at: timestamp(row.occurred_at), acknowledged_at: nullable(row.acknowledged_at, timestamp), created_at: timestamp(row.created_at),
+    ...("decision" in row ? { decision: parseHistoryDecision(row.decision) } : {}),
     ...("reverse_readiness" in row ? { reverse_readiness: nullable(row.reverse_readiness, (value) => {
       const r = object(value);
       return { reversible: bool(r.reversible), block_reasons: unique(r.block_reasons) as TickerIdentityTransitionBlockReason[] };

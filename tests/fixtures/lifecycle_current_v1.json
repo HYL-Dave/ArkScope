@@ -400,6 +400,88 @@
         "reverse_readiness": {
           "reversible": true,
           "block_reasons": []
+        },
+        "decision": {
+          "summary": "Reviewed explicit delisting with current trading checks; no acquirer alias is authorized.",
+          "impact": "Stop collection, preserve history.",
+          "method": "provider_review",
+          "approval_authority": "attended_user",
+          "event_date": "2023-05-16",
+          "observed_at": "2026-09-05T01:00:00Z",
+          "model": null,
+          "sources": [
+            {
+              "name": "Massive",
+              "url": "https://example.com/status",
+              "title": "Massive exact ticker reference lookup",
+              "published_at": null,
+              "observed_at": "2026-09-05T01:00:00Z",
+              "kind": "listing_snapshot",
+              "ticker": "OLD",
+              "listing_status": "inactive",
+              "market": "stocks"
+            },
+            {
+              "name": "Massive",
+              "url": "https://example.com/status",
+              "title": "Massive exact ticker reference lookup",
+              "published_at": null,
+              "observed_at": "2026-09-05T01:00:00Z",
+              "kind": "listing_snapshot",
+              "ticker": "OLD",
+              "listing_status": "not_found",
+              "market": "stocks"
+            },
+            {
+              "name": "Massive",
+              "url": "https://example.com/status",
+              "title": "Massive exact ticker reference lookup",
+              "published_at": null,
+              "observed_at": "2026-09-05T01:00:00Z",
+              "kind": "listing_snapshot",
+              "ticker": "OLD",
+              "listing_status": "not_found",
+              "market": "otc"
+            },
+            {
+              "name": "EODHD",
+              "url": "https://example.com/status",
+              "title": "EODHD exact symbol status lookup",
+              "published_at": null,
+              "observed_at": "2026-09-05T01:00:00Z",
+              "kind": "listing_snapshot",
+              "ticker": "OLD",
+              "listing_status": "inactive",
+              "market": "stocks"
+            },
+            {
+              "name": "Nasdaq",
+              "url": "https://example.com/status",
+              "title": "Nasdaq Trader nasdaq_listed exact symbol lookup",
+              "published_at": null,
+              "observed_at": "2026-09-05T01:00:00Z",
+              "kind": "listing_snapshot",
+              "ticker": "OLD",
+              "listing_status": "not_found",
+              "market": "stocks"
+            },
+            {
+              "name": "Nasdaq",
+              "url": "https://example.com/status",
+              "title": "Nasdaq Trader other_listed exact symbol lookup",
+              "published_at": null,
+              "observed_at": "2026-09-05T01:00:00Z",
+              "kind": "listing_snapshot",
+              "ticker": "OLD",
+              "listing_status": "not_found",
+              "market": "stocks"
+            }
+          ],
+          "limitations": [
+            "Listing sources confirm that the old listing stopped trading. Continuation could not be checked; this does not prove that no successor exists."
+          ],
+          "source_gaps": [],
+          "gaps": []
         }
       }
     ],

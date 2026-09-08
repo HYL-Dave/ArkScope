@@ -7,9 +7,47 @@ import { parseCurrentReviewDetail } from "./currentReviewContract";
 import { webRunFixture } from "./webFixtures";
 
 const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../../tests/fixtures/lifecycle_current_v1.json"), "utf8"));
+const decisions = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../../tests/fixtures/ticker_history_decisions_v1.json"), "utf8"));
 const page = fixture.attention;
 const row = page.items[0];
 afterEach(() => vi.unstubAllGlobals());
+
+it("keeps a legacy activity with absent decision metadata readable", async () => {
+  const { decision, ...legacy } = fixture.activity.items[0];
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...fixture.activity, items: [legacy] }))));
+  const result = await api.listTickerIdentityTransitionActivity();
+  expect(result.items[0]).toEqual(legacy);
+  expect(result.items[0]).not.toHaveProperty("decision");
+});
+
+it.each(["September 1, 2026", "Sep 1, 2026 08:30 ET"])("preserves recorded publisher-date text without rejecting the entire feed (%s)", async (published_at) => {
+  const decision = { ...decisions.llm, sources: decisions.llm.sources.map((row: object) => ({ ...row, published_at })) };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...fixture.activity, items: [{ ...fixture.activity.items[0], decision }] }))));
+  expect((await api.listTickerIdentityTransitionActivity()).items[0].decision).toEqual(decision);
+});
+
+it.each(["provider", "llm"])("preserves the backend-owned historical explanation without private material (%s)", async (lane) => {
+  const decision = decisions[lane];
+  const withPrivate = { ...decision, credential_id: "private", sources: decision.sources.map((row: object) => ({ ...row, source_locator_json: "private" })),
+    model: decision.model && { ...decision.model, remote_id: "private" } };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...fixture.activity,
+    items: [{ ...fixture.activity.items[0], decision: withPrivate }] }))));
+  const result = await api.listTickerIdentityTransitionActivity();
+  expect(result.items[0]).toHaveProperty("decision", decision);
+});
+
+it.each([null, {}, { ...decisions.llm, sources: null }, { ...decisions.llm, model: {} },
+  { ...decisions.llm, source_gaps: {} }, { ...decisions.llm, limitations: "missing" },
+  { ...decisions.llm, gaps: ["future_unknown"] }, { ...decisions.llm, event_date: "2026-02-30" },
+  { ...decisions.llm, approval_authority: "llm" }, { ...decisions.llm, method: "provider_review" },
+  { ...decisions.llm, model: { provider: "openai", auth_mode: "claude_code_oauth", model: "wrong" } },
+  { ...decisions.llm, sources: [{ ...decisions.llm.sources[0], url: "javascript:alert(1)" }] },
+  { ...decisions.llm, sources: [{ ...decisions.llm.sources[0], url: "https://example.com/?apiKey=private" }] },
+])("rejects malformed present decision metadata, not as absent historical data (%j)", async (decision) => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...fixture.activity,
+    items: [{ ...fixture.activity.items[0], decision }] }))));
+  await expect(api.listTickerIdentityTransitionActivity()).rejects.toThrow("lifecycle_current_payload_invalid");
+});
 
 it("keeps validated Web findings in current detail but rejects malformed or cross-case journals", () => {
   const old = { version: 1, as_of: page.as_of, item: row };

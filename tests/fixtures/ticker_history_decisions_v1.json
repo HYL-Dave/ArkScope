@@ -1,0 +1,35 @@
+{
+  "provider": {
+    "summary": "Reviewed explicit delisting with current trading checks; no acquirer alias is authorized.",
+    "impact": "Stop collection, preserve history.",
+    "method": "provider_review",
+    "approval_authority": "attended_user",
+    "event_date": "2025-01-15",
+    "observed_at": "2026-09-05T01:00:00Z",
+    "model": null,
+    "sources": [
+      {"name": "Massive", "url": "https://example.com/status", "title": "Massive exact ticker reference lookup", "published_at": null, "observed_at": "2026-09-05T01:00:00Z", "kind": "listing_snapshot", "ticker": "OLD", "listing_status": "inactive", "market": "stocks"},
+      {"name": "Massive", "url": "https://example.com/status", "title": "Massive exact ticker reference lookup", "published_at": null, "observed_at": "2026-09-05T01:00:00Z", "kind": "listing_snapshot", "ticker": "OLD", "listing_status": "not_found", "market": "stocks"},
+      {"name": "Massive", "url": "https://example.com/status", "title": "Massive exact ticker reference lookup", "published_at": null, "observed_at": "2026-09-05T01:00:00Z", "kind": "listing_snapshot", "ticker": "OLD", "listing_status": "not_found", "market": "otc"},
+      {"name": "EODHD", "url": "https://example.com/status", "title": "EODHD exact symbol status lookup", "published_at": null, "observed_at": "2026-09-05T01:00:00Z", "kind": "listing_snapshot", "ticker": "OLD", "listing_status": "inactive", "market": "stocks"},
+      {"name": "Nasdaq", "url": "https://example.com/status", "title": "Nasdaq Trader nasdaq_listed exact symbol lookup", "published_at": null, "observed_at": "2026-09-05T01:00:00Z", "kind": "listing_snapshot", "ticker": "OLD", "listing_status": "not_found", "market": "stocks"},
+      {"name": "Nasdaq", "url": "https://example.com/status", "title": "Nasdaq Trader other_listed exact symbol lookup", "published_at": null, "observed_at": "2026-09-05T01:00:00Z", "kind": "listing_snapshot", "ticker": "OLD", "listing_status": "not_found", "market": "stocks"}
+    ],
+    "limitations": ["Listing sources confirm that the old listing stopped trading. Continuation could not be checked; this does not prove that no successor exists."],
+    "source_gaps": [],
+    "gaps": ["legacy_assessment_unsealed"]
+  },
+  "llm": {
+    "summary": "The common stock no longer trades.",
+    "impact": "The common stock no longer trades.",
+    "method": "llm_investigation",
+    "approval_authority": "attended_user",
+    "event_date": "2026-09-01",
+    "observed_at": "2026-09-08T01:00:00Z",
+    "model": {"provider": "anthropic", "auth_mode": "claude_code_oauth", "model": "claude-sonnet-5"},
+    "sources": [{"name": "Issuer", "url": "https://issuer.example/notice", "title": "OLD listing notice", "published_at": "September 1, 2026", "observed_at": "2026-09-08T01:00:00Z", "kind": "local_news", "ticker": null, "listing_status": null, "market": null}],
+    "limitations": [],
+    "source_gaps": [],
+    "gaps": []
+  }
+}

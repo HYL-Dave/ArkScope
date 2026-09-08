@@ -10,6 +10,7 @@ import type {
   TickerIdentityTransitionBlockReason,
 } from "../api";
 import { Button } from "../ui/Button";
+import { TrackingDecision } from "./TrackingDecision";
 import {
   lifecycleTrackingSourceLabel,
   type LifecycleLocale,
@@ -156,8 +157,8 @@ function ActivityRow({
           : t(($) => $.lifecycle.states.unacknowledged)}</span>
       </div>
       <p className="mono strong">{route}</p>
-      <p>{tickerTransitionActivityTypeLabel(item.activity_type, typeLabels, unknown)}</p>
-      <p>{t(($) => $.lifecycle.activity.effectiveDate, { date: item.effective_date })}</p>
+      <TrackingDecision decision={item.decision} locale={locale} />
+      <p>{t(($) => $.lifecycle.activity.scheduledDate, { date: item.effective_date })}</p>
       <p>{t(($) => $.lifecycle.activity.occurredAt, { time: item.occurred_at })}</p>
       {item.user_owned_changes.map((change) => (
         <p key={change.change_type}>{change.count} {tickerTransitionActivityChangeLabel(

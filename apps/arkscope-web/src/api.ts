@@ -3044,6 +3044,25 @@ export interface TickerIdentityReverseReadiness {
   block_reasons: TickerIdentityTransitionBlockReason[];
 }
 
+export interface TickerIdentityHistoryDecision {
+  summary: string | null;
+  impact: string | null;
+  method: "provider_review" | "manual_review" | "rule_engine" | "llm_investigation" | "unknown";
+  approval_authority: "attended_user" | "automation_policy";
+  event_date: string | null;
+  observed_at: string | null;
+  model: { provider: "openai" | "anthropic"; auth_mode: "api_key" | "chatgpt_oauth" | "claude_code_oauth"; model: string } | null;
+  sources: Array<{
+    name: string | null; url: string | null; title: string | null;
+    published_at: string | null; observed_at: string | null;
+    kind: "listing_snapshot" | "ticker_events" | "document" | "local_news" | "manual";
+    ticker: string | null; listing_status: "active" | "inactive" | "not_found" | "unverified" | null; market: string | null;
+  }>;
+  limitations: string[];
+  source_gaps: Array<{ url: string | null; reason: string }>;
+  gaps: Array<"assessment_missing" | "record_invalid" | "sources_missing" | "model_missing" | "source_link_omitted" | "legacy_assessment_unsealed">;
+}
+
 export interface TickerIdentityTransitionActivity {
   activity_id: string;
   transition_id: string;
@@ -3065,6 +3084,7 @@ export interface TickerIdentityTransitionActivity {
   acknowledged_at: string | null;
   created_at: string;
   reverse_readiness?: TickerIdentityReverseReadiness | null;
+  decision?: TickerIdentityHistoryDecision;
 }
 
 export interface TickerIdentityTransitionActivityResponse {
