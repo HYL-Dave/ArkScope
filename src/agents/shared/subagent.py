@@ -535,7 +535,7 @@ def _run_openai_subagent(
     dal: Any,
 ) -> Dict[str, Any]:
     """Run a subagent using the OpenAI Agents SDK (Runner.run_sync)."""
-    from agents import Agent, ModelSettings, OpenAIResponsesModel, Runner
+    from agents import Agent, ModelSettings, OpenAIResponsesModel, RunConfig, Runner
     from openai.types.shared import Reasoning
     from src.auth_drivers.live_resolver import live_openai_async_client
 
@@ -573,6 +573,7 @@ def _run_openai_subagent(
         input=question,
         max_turns=config.max_turns,
         auto_previous_response_id=True,
+        run_config=RunConfig(trace_include_sensitive_data=False),
     )
 
     # Extract tools used and token usage

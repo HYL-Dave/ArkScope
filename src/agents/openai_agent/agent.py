@@ -389,7 +389,7 @@ async def run_query(
             model: str - Model used
     """
     try:
-        from agents import Runner
+        from agents import RunConfig, Runner
     except ImportError:
         raise ImportError(
             "OpenAI Agents SDK not installed. Run: pip install openai-agents"
@@ -446,6 +446,7 @@ async def run_query(
         input=question,
         max_turns=effective_max_turns,
         auto_previous_response_id=True,
+        run_config=RunConfig(trace_include_sensitive_data=False),
     )
     if session:
         runner_kwargs["session"] = session
@@ -547,7 +548,7 @@ def run_query_sync(
         Dict with answer, tools_used, provider, model
     """
     try:
-        from agents import Runner
+        from agents import RunConfig, Runner
     except ImportError:
         raise ImportError(
             "OpenAI Agents SDK not installed. Run: pip install openai-agents"
@@ -604,6 +605,7 @@ def run_query_sync(
         input=question,
         max_turns=effective_max_turns,
         auto_previous_response_id=True,
+        run_config=RunConfig(trace_include_sensitive_data=False),
     )
     if session:
         runner_kwargs["session"] = session
@@ -718,7 +720,7 @@ async def run_query_stream(
         AgentEvent for thinking, tool_end (post-run), and done
     """
     try:
-        from agents import Runner
+        from agents import RunConfig, Runner
     except ImportError:
         raise ImportError(
             "OpenAI Agents SDK not installed. Run: pip install openai-agents"
@@ -785,6 +787,7 @@ async def run_query_stream(
         input=_compose_stream_input(_hist, question),
         max_turns=effective_max_turns,
         auto_previous_response_id=True,
+        run_config=RunConfig(trace_include_sensitive_data=False),
     )
     if session:
         runner_kwargs["session"] = session
