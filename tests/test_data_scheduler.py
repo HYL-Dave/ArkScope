@@ -91,11 +91,21 @@ def hermetic(tmp_path, monkeypatch):
     # S-J strict provider preflight reads process env after apply_env. Seed dummy
     # managed keys so existing scheduler tests keep exercising their mocked
     # writers; explicit not_configured tests delenv what they need.
-    monkeypatch.setenv("MASSIVE_API_KEY", "pk_test")
-    monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
-    monkeypatch.setenv("IBKR_HOST", "127.0.0.1")
-    monkeypatch.setenv("IBKR_PORT", "4001")
-    monkeypatch.setenv("IBKR_CLIENT_ID", "1")
+    provider_env = {
+        "MASSIVE_API_KEY": "pk_test",
+        "FINNHUB_API_KEY": "fk_test",
+        "IBKR_HOST": "127.0.0.1",
+        "IBKR_PORT": "4001",
+        "IBKR_CLIENT_ID": "1",
+    }
+    from src import data_provider_config, env_keys
+
+    # Replacing a value must also replace its process-global source bookkeeping.
+    # Otherwise a preceding env-loader test makes these dummy values file-sourced.
+    monkeypatch.setattr(env_keys, "_loaded_keys", env_keys._loaded_keys - provider_env.keys())
+    monkeypatch.setattr(data_provider_config, "_APP_APPLIED", data_provider_config._APP_APPLIED - provider_env.keys())
+    for key, value in provider_env.items():
+        monkeypatch.setenv(key, value)
     from src.scheduler_state import SchedulerStateStore
     monkeypatch.setattr(ds, "_SCHED_STATE", SchedulerStateStore(tmp_path / "profile_state.db"))
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
@@ -149,6 +159,16 @@ def hermetic(tmp_path, monkeypatch):
 
 
 # --- config -------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "env_var",
+    ["MASSIVE_API_KEY", "FINNHUB_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID"],
+)
+def test_synthetic_provider_config_does_not_inherit_file_provenance(env_var):
+    from src.data_provider_config import effective_source
+
+    assert effective_source(env_var) == "env"
+
 
 def test_defaults_everything_disabled():
     assert set(ds.SOURCES) == ACTIVE_SOURCE_IDS
