@@ -1235,21 +1235,36 @@ def test_model(
             fallback_effort=fallback_effort,
         )
 
-    def run_once(selected_effort: str) -> None:
+    def run_once(selected_effort: str) -> str | None:
         if provider == "openai":
             from openai import OpenAI
+            from src.openai_response_validation import (
+                completed_response_text,
+                require_response_model,
+            )
 
             kwargs = {}
             if selected_effort != "default":
-                kwargs["reasoning_effort"] = selected_effort
-            client = OpenAI(api_key=cred.secret, timeout=30)
-            client.chat.completions.create(
-                model=model,
-                max_completion_tokens=16,
-                messages=[{"role": "user", "content": "Reply with OK."}],
-                **kwargs,
-            )
-            return
+                kwargs["reasoning"] = {"effort": selected_effort}
+            with OpenAI(api_key=cred.secret, timeout=30, max_retries=0) as client:
+                response = client.responses.create(
+                    model=model,
+                    max_output_tokens=16,
+                    input=[{"role": "user", "content": "Reply with OK."}],
+                    store=False,
+                    **kwargs,
+                )
+            require_response_model(response, model)
+            # This tiny probe establishes request access, not task generation.
+            # Keep its cost bound without claiming a clipped response completed.
+            if (response.status == "incomplete" and response.error is None
+                    and getattr(response.incomplete_details, "reason", None) == "max_output_tokens"):
+                return (
+                    "Request accepted with the selected model and effort; the 16-token "
+                    "probe budget was reached. Output generation was not verified."
+                )
+            completed_response_text(response, model)
+            return None
 
         from anthropic import Anthropic
 
@@ -1265,10 +1280,9 @@ def test_model(
         )
 
     try:
-        run_once(effort)
-        return ok_result()
+        return ok_result(warning=run_once(effort))
     except Exception as exc:  # pragma: no cover - live provider variability
-        if effort != "default" and looks_like_effort_error(exc):
+        if provider == "anthropic" and effort != "default" and looks_like_effort_error(exc):
             try:
                 run_once("default")
                 return ok_result(

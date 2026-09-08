@@ -78,9 +78,6 @@ class ModelCapability:
     max_output: int | None
     supports_structured_output: bool = True
     supports_tool_calling: bool = True
-    # Reviewed ArkScope transport choice, not a claim that every other API
-    # combination is forbidden by the provider.
-    uses_responses_for_tools: bool = False
     runtime_ready: bool = True
     # False means the registry entry exists only to preserve/display historical
     # provenance. It is stronger than task_route_status: every new execution
@@ -267,7 +264,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=("low", "medium", "high", "xhigh", "max"),
         supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        uses_responses_for_tools=True,
         task_route_status="current", in_routing_seed=True,
         quality="frontier", speed="medium", cost_tier="high",
         source_url="https://developers.openai.com/api/docs/models/gpt-6-astra",
@@ -280,7 +276,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        uses_responses_for_tools=True,
         task_route_status="current",
         in_routing_seed=True,
         aliases=("gpt-5.6",),   # official: the gpt-5.6 alias routes to Sol
@@ -295,7 +290,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        uses_responses_for_tools=True,
         task_route_status="current",
         in_routing_seed=True,
         aliases=(),
@@ -311,7 +305,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         picker_visibility="default", thinking_mode="none",
         effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        uses_responses_for_tools=True,
         task_route_status="current",
         in_routing_seed=True,
         aliases=(),

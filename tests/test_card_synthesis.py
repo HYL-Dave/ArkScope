@@ -802,31 +802,24 @@ def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
     assert calls == [(model, "high")]
 
 
-def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypatch):
+def test_openai_api_key_synthesis_preserves_schema_on_responses(monkeypatch):
     from types import SimpleNamespace
 
     from src import card_synthesis as cs
     from src.auth_drivers.live_resolver import LiveAuthResolution
 
     response = SimpleNamespace(
-        choices=[
+        model="gpt-5.4-mini", status="completed", error=None,
+        output=[
             SimpleNamespace(
-                message=SimpleNamespace(
-                    tool_calls=[
-                        SimpleNamespace(
-                            function=SimpleNamespace(
-                                name="emit_result_card",
-                                arguments=_synth().model_dump_json(),
-                            )
-                        )
-                    ]
-                )
+                type="function_call", name="emit_result_card", status="completed",
+                arguments=_synth().model_dump_json(exclude_none=True),
             )
         ]
     )
     client = MagicMock()
     bounded = MagicMock()
-    bounded.chat.completions.create.return_value = response
+    bounded.responses.create.return_value = response
     client.with_options.return_value = bounded
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.resolve_live_auth",
@@ -849,13 +842,13 @@ def test_openai_api_key_synthesis_keeps_existing_chat_completions_shape(monkeypa
 
     assert result == _synth() and meta == {"effort": "high"}
     client.with_options.assert_called_once_with(timeout=456, max_retries=0)
-    kwargs = bounded.chat.completions.create.call_args.kwargs
+    kwargs = bounded.responses.create.call_args.kwargs
     assert kwargs["model"] == "gpt-5.4-mini"
-    assert kwargs["reasoning_effort"] == "high"
-    assert kwargs["max_completion_tokens"] == 8192
+    assert kwargs["reasoning"] == {"effort": "high"}
+    assert kwargs["max_output_tokens"] == 8192
+    assert kwargs["tools"][0]["parameters"] == cs._CARD_TOOL_SCHEMA
     assert kwargs["tool_choice"] == {
-        "type": "function",
-        "function": {"name": "emit_result_card"},
+        "type": "function", "name": "emit_result_card",
     }
 
 

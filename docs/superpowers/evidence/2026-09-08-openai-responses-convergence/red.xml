@@ -1,0 +1,575 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="63" skipped="0" tests="144" time="21.502" timestamp="2026-09-08T21:22:27.475275+08:00" hostname="ais"><testcase classname="tests.test_openai_responses_convergence" name="test_remaining_openai_entrypoints_use_responses_and_selected_key[gpt-5.6-luna-probe]" time="1.610"><failure message="AssertionError: assert 3 == 1&#10; +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:81: in test_remaining_openai_entrypoints_use_responses_and_selected_key
+    assert len(requests) == 1
+E   AssertionError: assert 3 == 1
+E    +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_remaining_openai_entrypoints_use_responses_and_selected_key[gpt-5.6-luna-calibration]" time="1.367"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_responses_convergence.py:76: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_responses_convergence.py:80: in test_remaining_openai_entrypoints_use_responses_and_selected_key
+    result = invoke(operation, model=model)
+tests/test_openai_responses_convergence.py:59: in invoke
+    return asyncio.run(calibration._call_calibration_llm(
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/investor_profile_calibration_agent.py:298: in _call_calibration_llm
+    return await asyncio.to_thread(_call)
+/usr/lib/python3.10/asyncio/threads.py:25: in to_thread
+    return await loop.run_in_executor(None, func_call)
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+src/investor_profile_calibration_agent.py:288: in _call
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_remaining_openai_entrypoints_use_responses_and_selected_key[gpt-7-custom-probe]" time="1.420"><failure message="AssertionError: assert 3 == 1&#10; +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:81: in test_remaining_openai_entrypoints_use_responses_and_selected_key
+    assert len(requests) == 1
+E   AssertionError: assert 3 == 1
+E    +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_remaining_openai_entrypoints_use_responses_and_selected_key[gpt-7-custom-calibration]" time="1.352"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_responses_convergence.py:76: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_responses_convergence.py:80: in test_remaining_openai_entrypoints_use_responses_and_selected_key
+    result = invoke(operation, model=model)
+tests/test_openai_responses_convergence.py:59: in invoke
+    return asyncio.run(calibration._call_calibration_llm(
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/investor_profile_calibration_agent.py:298: in _call_calibration_llm
+    return await asyncio.to_thread(_call)
+/usr/lib/python3.10/asyncio/threads.py:25: in to_thread
+    return await loop.run_in_executor(None, func_call)
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+src/investor_profile_calibration_agent.py:288: in _call
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_probe_preserves_explicit_effort_without_inventing_a_default[default]" time="0.045" /><testcase classname="tests.test_openai_responses_convergence" name="test_probe_preserves_explicit_effort_without_inventing_a_default[none]" time="0.016"><failure message="AssertionError: assert None == {'effort': 'none'}&#10; +  where None = &lt;built-in method get of dict object at 0x76d25e8e8700&gt;('reasoning')&#10; +    where &lt;built-in method get of dict object at 0x76d25e8e8700&gt; = {'max_completion_tokens': 16, 'messages': [{'content': 'Reply with OK.', 'role': 'user'}], 'model': 'gpt-5.6-luna', 'reasoning_effort': 'none'}.get">tests/test_openai_responses_convergence.py:112: in test_probe_preserves_explicit_effort_without_inventing_a_default
+    assert body.get("reasoning") == (None if effort == "default" else {"effort": effort})
+E   AssertionError: assert None == {'effort': 'none'}
+E    +  where None = &lt;built-in method get of dict object at 0x76d25e8e8700&gt;('reasoning')
+E    +    where &lt;built-in method get of dict object at 0x76d25e8e8700&gt; = {'max_completion_tokens': 16, 'messages': [{'content': 'Reply with OK.', 'role': 'user'}], 'model': 'gpt-5.6-luna', 'reasoning_effort': 'none'}.get</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_probe_preserves_explicit_effort_without_inventing_a_default[xhigh]" time="0.013"><failure message="AssertionError: assert None == {'effort': 'xhigh'}&#10; +  where None = &lt;built-in method get of dict object at 0x76d2653b9b00&gt;('reasoning')&#10; +    where &lt;built-in method get of dict object at 0x76d2653b9b00&gt; = {'max_completion_tokens': 16, 'messages': [{'content': 'Reply with OK.', 'role': 'user'}], 'model': 'gpt-5.6-luna', 'reasoning_effort': 'xhigh'}.get">tests/test_openai_responses_convergence.py:112: in test_probe_preserves_explicit_effort_without_inventing_a_default
+    assert body.get("reasoning") == (None if effort == "default" else {"effort": effort})
+E   AssertionError: assert None == {'effort': 'xhigh'}
+E    +  where None = &lt;built-in method get of dict object at 0x76d2653b9b00&gt;('reasoning')
+E    +    where &lt;built-in method get of dict object at 0x76d2653b9b00&gt; = {'max_completion_tokens': 16, 'messages': [{'content': 'Reply with OK.', 'role': 'user'}], 'model': 'gpt-5.6-luna', 'reasoning_effort': 'xhigh'}.get</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[400-probe]" time="0.014"><failure message="AssertionError: assert 2 == 1&#10; +  where 2 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 2 == 1
+E    +  where 2 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[400-calibration]" time="0.017"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_responses_convergence.py:135: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[429-probe]" time="2.559"><failure message="AssertionError: assert 6 == 1&#10; +  where 6 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/com...POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 6 == 1
+E    +  where 6 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/com...POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[429-calibration]" time="1.512"><failure message="AssertionError: assert 3 == 1&#10; +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 3 == 1
+E    +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[500-probe]" time="2.853"><failure message="AssertionError: assert 6 == 1&#10; +  where 6 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/com...POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 6 == 1
+E    +  where 6 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/com...POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[500-calibration]" time="1.412"><failure message="AssertionError: assert 3 == 1&#10; +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 3 == 1
+E    +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[timeout-probe]" time="1.315"><failure message="AssertionError: assert 3 == 1&#10; +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 3 == 1
+E    +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_openai_failures_never_retry_or_change_billing_or_effort[timeout-calibration]" time="1.390"><failure message="AssertionError: assert 3 == 1&#10; +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])">tests/test_openai_responses_convergence.py:134: in test_openai_failures_never_retry_or_change_billing_or_effort
+    assert len(requests) == 1
+E   AssertionError: assert 3 == 1
+E    +  where 3 = len([&lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;, &lt;Request('POST', 'https://api.openai.com/v1/chat/completions')&gt;])</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[failed-probe]" time="0.018"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[failed-calibration]" time="0.017"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[error-probe]" time="0.013"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[error-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[model-probe]" time="0.013"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[model-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[refusal-probe]" time="0.013"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[refusal-calibration]" time="0.015"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[empty-probe]" time="0.014"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[empty-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[tool-probe]" time="0.014"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[tool-calibration]" time="0.045"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[partial_message-probe]" time="0.015"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:166: in test_no_tool_responses_reject_invalid_results
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_reject_invalid_results[partial_message-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:168: in test_no_tool_responses_reject_invalid_results
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_incomplete_probe_is_only_an_access_observation_not_task_completion[max_output_tokens-probe]" time="0.014"><failure message="AssertionError: assert ('ok' == 'ok'&#10;  &#10;    ok and None)&#10; +  where None = ModelTestResult(provider='openai', credential_id='local:1', model='gpt-5.6-luna', effort='high', status='ok', latency_ms=1, error=None, warning=None, fallback_effort=None).warning">tests/test_openai_responses_convergence.py:184: in test_incomplete_probe_is_only_an_access_observation_not_task_completion
+    assert result.status == "ok" and result.warning
+E   AssertionError: assert ('ok' == 'ok'
+E     
+E       ok and None)
+E    +  where None = ModelTestResult(provider='openai', credential_id='local:1', model='gpt-5.6-luna', effort='high', status='ok', latency_ms=1, error=None, warning=None, fallback_effort=None).warning</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_incomplete_probe_is_only_an_access_observation_not_task_completion[max_output_tokens-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:190: in test_incomplete_probe_is_only_an_access_observation_not_task_completion
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_incomplete_probe_is_only_an_access_observation_not_task_completion[content_filter-probe]" time="0.014"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:188: in test_incomplete_probe_is_only_an_access_observation_not_task_completion
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_incomplete_probe_is_only_an_access_observation_not_task_completion[content_filter-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:190: in test_incomplete_probe_is_only_an_access_observation_not_task_completion
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_incomplete_probe_is_only_an_access_observation_not_task_completion[None-probe]" time="0.013"><failure message="AssertionError: assert 'ok' == 'error'&#10;  &#10;  - error&#10;  + ok">tests/test_openai_responses_convergence.py:188: in test_incomplete_probe_is_only_an_access_observation_not_task_completion
+    assert result.status == "error"
+E   AssertionError: assert 'ok' == 'error'
+E     
+E     - error
+E     + ok</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_incomplete_probe_is_only_an_access_observation_not_task_completion[None-calibration]" time="0.016"><failure message="Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;">tests/test_openai_responses_convergence.py:190: in test_incomplete_probe_is_only_an_access_observation_not_task_completion
+    with pytest.raises(RuntimeError):
+E   Failed: DID NOT RAISE &lt;class 'RuntimeError'&gt;</failure></testcase><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_accept_reasoning_and_official_alias_receipts[probe]" time="0.014" /><testcase classname="tests.test_openai_responses_convergence" name="test_no_tool_responses_accept_reasoning_and_official_alias_receipts[calibration]" time="0.016"><failure message="assert False">tests/test_openai_responses_convergence.py:202: in test_no_tool_responses_accept_reasoning_and_official_alias_receipts
+    assert result.status == "ok" if operation == "probe" else result == expected
+E   assert False</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-synthesis-gpt-5.6-luna]" time="0.137" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[default-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-synthesis-gpt-5.6-luna]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[none-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-synthesis-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[low-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-synthesis-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[medium-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-synthesis-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[high-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-synthesis-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[xhigh-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-synthesis-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_fixed_tasks_preserve_effort_and_use_responses[max-translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[synthesis-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[synthesis-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[synthesis-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[synthesis-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[translation-gpt-5.6-luna]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[translation-gpt-5.6-terra]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[translation-gpt-5.6-sol]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential[translation-gpt-5.6]" time="0.004" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[synthesis-gpt-5.6-luna]" time="0.026" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[synthesis-gpt-5.6-terra]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[synthesis-gpt-5.6-sol]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[synthesis-gpt-5.6]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[translation-gpt-5.6-luna]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[translation-gpt-5.6-terra]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[translation-gpt-5.6-sol]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_subscription_does_not_construct_api_key_client[translation-gpt-5.6]" time="0.003" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-gpt-5.6-sol-True]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-gpt-5.6-sol-2026-09-08-True]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-gpt-5.6-luna-False]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-gpt-5.6-sol-unreviewed-False]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-luna-gpt-5.6-luna-2026-09-08-True]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-luna-2026-09-08-gpt-5.6-luna-2026-09-09-False]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot[gpt-5.6-luna-2026-09-08-gpt-5.6-luna-False]" time="0.005" /><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[default-synthesis-gpt-7-custom]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:504: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[default-synthesis-gpt-5.4-mini]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:504: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[default-synthesis-gpt-5.2]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:504: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[default-translation-gpt-7-custom]" time="0.004"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1050: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[default-translation-gpt-5.4-mini]" time="0.004"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1050: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[default-translation-gpt-5.2]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1050: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[high-synthesis-gpt-7-custom]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:504: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[high-synthesis-gpt-5.4-mini]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:504: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[high-synthesis-gpt-5.2]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:504: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[high-translation-gpt-7-custom]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1050: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[high-translation-gpt-5.4-mini]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1050: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_tasks_use_responses_without_changing_contract[high-translation-gpt-5.2]" time="0.005"><failure message="openai.APIConnectionError: Connection error.">tests/test_openai_fixed_output_compatibility.py:138: in handler
+    assert request.url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions
+
+The above exception was the direct cause of the following exception:
+tests/test_openai_fixed_output_compatibility.py:142: in test_custom_fixed_tasks_use_responses_without_changing_contract
+    result = invoke(operation, model, effort)
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1050: in run_once
+    resp = client.chat.completions.create(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_utils/_utils.py:298: in wrapper
+    return func(*args, **kwargs)
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py:1296: in create
+    return self._post(
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1368: in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/openai/_base_client.py:1111: in request
+    raise APIConnectionError(request=request) from err
+E   openai.APIConnectionError: Connection error.</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_rejection_never_falls_back[400-synthesis]" time="0.005"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_fixed_output_compatibility.py:166: in test_custom_fixed_task_rejection_never_falls_back
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_rejection_never_falls_back[400-translation]" time="0.005"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_fixed_output_compatibility.py:166: in test_custom_fixed_task_rejection_never_falls_back
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_rejection_never_falls_back[429-synthesis]" time="0.005"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_fixed_output_compatibility.py:166: in test_custom_fixed_task_rejection_never_falls_back
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_rejection_never_falls_back[429-translation]" time="0.005"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_fixed_output_compatibility.py:166: in test_custom_fixed_task_rejection_never_falls_back
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_rejection_never_falls_back[500-synthesis]" time="0.005"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_fixed_output_compatibility.py:166: in test_custom_fixed_task_rejection_never_falls_back
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_rejection_never_falls_back[500-translation]" time="0.005"><failure message="AssertionError: assert '/v1/chat/completions' == '/v1/responses'&#10;  &#10;  - /v1/responses&#10;  + /v1/chat/completions">tests/test_openai_fixed_output_compatibility.py:166: in test_custom_fixed_task_rejection_never_falls_back
+    assert requests[0].url.path == "/v1/responses"
+E   AssertionError: assert '/v1/chat/completions' == '/v1/responses'
+E     
+E     - /v1/responses
+E     + /v1/chat/completions</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[incomplete-synthesis]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:531: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[incomplete-translation]" time="0.004"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1077: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[model-synthesis]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:531: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[model-translation]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1077: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[refusal-synthesis]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:531: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[refusal-translation]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1077: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[schema-synthesis]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:531: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[schema-translation]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1077: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[extra_call-synthesis]" time="0.005"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:29: in invoke
+    return cs._synthesize_openai(
+src/card_synthesis.py:539: in _synthesize_openai
+    return run_once(effort), {"effort": effort}
+src/card_synthesis.py:531: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="tests.test_openai_fixed_output_compatibility" name="test_custom_fixed_task_never_accepts_invalid_output[extra_call-translation]" time="0.007"><failure message="TypeError: 'NoneType' object is not subscriptable">tests/test_openai_fixed_output_compatibility.py:188: in test_custom_fixed_task_never_accepts_invalid_output
+    invoke(operation, "gpt-7-custom")
+tests/test_openai_fixed_output_compatibility.py:33: in invoke
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+src/card_synthesis.py:1085: in _translate_openai
+    return run_once(effort)
+src/card_synthesis.py:1077: in run_once
+    msg = resp.choices[0].message
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase></testsuite></testsuites>

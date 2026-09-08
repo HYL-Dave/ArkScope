@@ -11,6 +11,7 @@ from typing import Protocol
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.investor_profile_calibration_policy import CALIBRATION_TOPICS
+from src.openai_response_validation import completed_response_text
 
 _TOPIC_CATALOG = "\n".join(
     f"{index}. {topic.id}: {', '.join(topic.fields)}"
@@ -202,15 +203,6 @@ def resolve_calibration_execution(
     return chosen_provider, _default_model(chosen_provider, model)
 
 
-def _message_text_openai(resp) -> str:
-    choice = (getattr(resp, "choices", None) or [None])[0]
-    msg = getattr(choice, "message", None)
-    content = getattr(msg, "content", None)
-    if isinstance(content, str):
-        return content
-    return "" if content is None else str(content)
-
-
 def _message_text_anthropic(resp) -> str:
     parts: list[str] = []
     for block in getattr(resp, "content", None) or []:
@@ -284,16 +276,17 @@ async def _call_calibration_llm(
         from src.auth_drivers.live_resolver import live_openai_client
 
         def _call() -> str:
-            client = live_openai_client()
-            resp = client.chat.completions.create(
+            client = live_openai_client().with_options(max_retries=0)
+            resp = client.responses.create(
                 model=model,
-                messages=[
+                input=[
                     {"role": "system", "content": instructions},
                     *input_messages,
                 ],
-                response_format={"type": "json_object"},
+                text={"format": {"type": "json_object"}},
+                store=False,
             )
-            return _message_text_openai(resp)
+            return completed_response_text(resp, model)
 
         return await asyncio.to_thread(_call)
 

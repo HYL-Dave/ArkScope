@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="5" failures="0" skipped="0" tests="5" time="5.154" timestamp="2026-09-08T21:31:17.682228+08:00" hostname="ais"><testcase classname="" name="docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_rehearse_attended" time="0.000"><error message="collection failure">ImportError while importing test module '/tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/test_rehearse_attended.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/test_rehearse_attended.py:10: in &lt;module&gt;
+    spec.loader.exec_module(runner)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/rehearse_attended.py:21: in &lt;module&gt;
+    spec.loader.exec_module(resume)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/resume_check.py:21: in &lt;module&gt;
+    spec.loader.exec_module(base)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-cutover/scripts/fresh_check_v2.py:28: in &lt;module&gt;
+    from src.security_lifecycle_provider_authority import classify_provider_listing, evidence_dict, terminal_requires_attestation
+E   ImportError: cannot import name 'terminal_requires_attestation' from 'src.security_lifecycle_provider_authority' (/tmp/arkscope-tracking-history-provenance/src/security_lifecycle_provider_authority.py)</error></testcase><testcase classname="" name="docs.superpowers.evidence.2026-09-05-lifecycle-terminal-fresh-check.scripts.test_resume_check" time="0.000"><error message="collection failure">ImportError while importing test module '/tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/test_resume_check.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/test_resume_check.py:15: in &lt;module&gt;
+    spec.loader.exec_module(runner)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-fresh-check/scripts/resume_check.py:21: in &lt;module&gt;
+    spec.loader.exec_module(base)
+docs/superpowers/evidence/2026-09-05-lifecycle-terminal-cutover/scripts/fresh_check_v2.py:28: in &lt;module&gt;
+    from src.security_lifecycle_provider_authority import classify_provider_listing, evidence_dict, terminal_requires_attestation
+E   ImportError: cannot import name 'terminal_requires_attestation' from 'src.security_lifecycle_provider_authority' (/tmp/arkscope-tracking-history-provenance/src/security_lifecycle_provider_authority.py)</error></testcase><testcase classname="" name="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.failed-renewed-r3.test_analysis_diagnostic" time="0.000"><error message="collection failure">import file mismatch:
+imported module 'test_analysis_diagnostic' has this __file__ attribute:
+  /tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/failed-live-r1/test_analysis_diagnostic.py
+which is not the same as the test file we want to collect:
+  /tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/failed-renewed-r3/test_analysis_diagnostic.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules</error></testcase><testcase classname="" name="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.live-json-analysis.test_analysis_diagnostic" time="0.000"><error message="collection failure">import file mismatch:
+imported module 'test_analysis_diagnostic' has this __file__ attribute:
+  /tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/failed-live-r1/test_analysis_diagnostic.py
+which is not the same as the test file we want to collect:
+  /tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/live-json-analysis/test_analysis_diagnostic.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules</error></testcase><testcase classname="" name="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_analysis_diagnostic" time="0.000"><error message="collection failure">import file mismatch:
+imported module 'test_analysis_diagnostic' has this __file__ attribute:
+  /tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/failed-live-r1/test_analysis_diagnostic.py
+which is not the same as the test file we want to collect:
+  /tmp/arkscope-tracking-history-provenance/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_analysis_diagnostic.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules</error></testcase></testsuite></testsuites>
