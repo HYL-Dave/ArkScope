@@ -10,8 +10,8 @@
 //   • a superseded poller (a newer run took over abortRef) never commits.
 // Persistence (C-2b): the run API persists user/assistant turns to the local
 // ResearchThreadStore; on mount this fetches + `hydrate`s the threads/messages.
-// Complete provider/model/effort selection is resolved from the latest successful
-// thread tuple, the last explicit user tuple, or the Settings route, in that order.
+// Next-run selection uses the Settings route unless the user explicitly chose
+// a tuple in the currently open conversation. History is never run authority.
 // Every candidate is validated against the shared Models-UX effective catalog;
 // invalid saved choices block instead of silently falling through.
 // Per-provider trace behaviour comes from a descriptor map, not an
@@ -25,7 +25,7 @@ import {
   ApiError,
   cancelResearchRun, createResearchRun,
   getModelCatalog, getQueryProviders, getResearchRunEvents,
-  getResearchThread, getResearchMessages, getResearchSelection,
+  getResearchThread, getResearchMessages,
   type ModelCatalog, type RuntimeConfig,
   type ResearchMessageDTO, type ResearchRunDTO, type ResearchThreadDTO,
 } from "./api";
@@ -56,12 +56,9 @@ import {
 } from "./modelPicker";
 import { modelEntryLabel, modelReasonLabel } from "./modelRoutingUx";
 import {
-  loadResearchThreadSelection,
   quotaKindForAuthMode,
   resolveResearchSelection,
-  writeExplicitResearchSelection,
   type ExplicitResearchTuple,
-  type ResearchTuple,
 } from "./researchSelection";
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
@@ -227,13 +224,6 @@ export function ResearchView({
     provider: ProviderId;
     model: string;
   } | null>(null);
-  const [threadSelection, setThreadSelection] = useState<{
-    threadId: string;
-    tuple: ResearchTuple | null;
-    loaded: boolean;
-  } | null>(null);
-  const [threadSelectionLoadError, setThreadSelectionLoadError] = useState(false);
-  const [threadSelectionRequestVersion, setThreadSelectionRequestVersion] = useState(0);
   // Track A: opt-in investor profile → per-run assistant stance override.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [runStance, setRunStance] = useState<AssistantStance>("off");
@@ -248,6 +238,8 @@ export function ResearchView({
   const lifecycleGenerationRef = useRef(0);
   const initialAutoSelectAllowedRef = useRef(true);
   const consumedNavigationSequenceRef = useRef(0);
+  const activeConversationRef = useRef(state.activeThreadId);
+  activeConversationRef.current = state.activeThreadId;
   const historyTriggerRef = useRef<HTMLButtonElement>(null);
   const evidenceTriggerRef = useRef<HTMLButtonElement>(null);
   const evidenceReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -257,22 +249,15 @@ export function ResearchView({
   const onNavigationConsumedRef = useRef(onNavigationConsumed);
   onNavigationConsumedRef.current = onNavigationConsumed;
 
-  const currentThreadSelection = state.activeThreadId
-    ? (threadSelection?.threadId === state.activeThreadId && threadSelection.loaded
-        ? threadSelection.tuple
-        : undefined)
-    : null;
   const selection = useMemo(
     () => catalog
       ? resolveResearchSelection({
           catalog,
-          hasActiveThread: !!state.activeThreadId,
-          threadSelection: currentThreadSelection,
           userSelection,
           sdkAvailability: sdk ?? undefined,
         })
       : null,
-    [catalog, currentThreadSelection, sdk, state.activeThreadId, userSelection],
+    [catalog, sdk, userSelection],
   );
   const selectionPresentation = selection
     ? presentResearchSelection({
@@ -295,7 +280,6 @@ export function ResearchView({
   const rememberUserSelection = useCallback((tuple: ExplicitResearchTuple) => {
     setIncompleteSelection(null);
     setUserSelection(tuple);
-    writeExplicitResearchSelection(tuple);
   }, []);
 
   useEffect(() => {
@@ -314,40 +298,6 @@ export function ResearchView({
     })();
     return () => { alive = false; };
   }, []);
-
-  useEffect(() => {
-    const threadId = state.activeThreadId;
-    if (!threadId) {
-      setThreadSelection(null);
-      setThreadSelectionLoadError(false);
-      return;
-    }
-    let alive = true;
-    setThreadSelectionLoadError(false);
-    setThreadSelection({ threadId, tuple: null, loaded: false });
-    void loadResearchThreadSelection(threadId, getResearchSelection)
-      .then((tuple) => {
-        if (alive) {
-          setThreadSelectionLoadError(false);
-          setThreadSelection((current) => (
-            current?.threadId === threadId && current.loaded
-              ? current
-              : { threadId, tuple, loaded: true }
-          ));
-        }
-      })
-      .catch(() => {
-        if (alive) {
-          setThreadSelectionLoadError(true);
-          setThreadSelection((current) => (
-            current?.threadId === threadId && current.loaded
-              ? current
-              : { threadId, tuple: null, loaded: false }
-          ));
-        }
-      });
-    return () => { alive = false; };
-  }, [state.activeThreadId, threadSelectionRequestVersion]);
 
   const detachLocalPolling = useCallback(() => {
     abortRef.current?.abort();
@@ -374,8 +324,10 @@ export function ResearchView({
     setTranscriptPendingThreadId(thread.id);
     detachLocalPolling();
     setThreadError(null);
-    setUserSelection(null);
-    setIncompleteSelection(null);
+    if (activeConversationRef.current !== thread.id) {
+      setUserSelection(null);
+      setIncompleteSelection(null);
+    }
     setEvidenceMessageIndex(null);
     writeActiveThreadId(thread.id);
     observeThreadRun(thread);
@@ -473,21 +425,6 @@ export function ResearchView({
         onObserveRunRef.current?.(res.run);
         if (abortRef.current !== controller) return; // detached/superseded
         setLatestRunsByThread((prev) => ({ ...prev, [res.run.thread_id]: res.run }));
-        if (res.run.status === "succeeded") {
-          const successfulProvider = asResearchProviderId(res.run.provider);
-          if (successfulProvider && res.run.model.trim()) {
-            setThreadSelection({
-              threadId: res.run.thread_id,
-              tuple: {
-                provider: successfulProvider,
-                model: res.run.model.trim(),
-                effort: res.run.effort?.trim() || null,
-              },
-              loaded: true,
-            });
-            setUserSelection(null);
-          }
-        }
         setActiveRunsByThread((prev) => {
           const next = { ...prev };
           if (isTerminalRun(res.run)) delete next[res.run.thread_id];
@@ -700,7 +637,6 @@ export function ResearchView({
       setTranscriptPendingThreadId(null);
       setUserSelection(null);
       setIncompleteSelection(null);
-      setThreadSelection(null);
       writeActiveThreadId(null);
     }
     dispatch({ kind: "deleteThread", threadId });
@@ -771,7 +707,6 @@ export function ResearchView({
         quotaKind: quotaKindForAuthMode(authMode),
         reasonCode: providerReason,
       }, researchT, commonT),
-      suggestedModel: firstReady?.id ?? "",
       disabled: !context || !block || !firstReady,
     };
   });
@@ -1063,8 +998,7 @@ export function ResearchView({
                             traceNote: choice.traceNote,
                           })}
                     >
-                      {choice.label} / {choice.suggestedModel
-                        || researchT(($) => $.workspace.noAvailableModels)}
+                      {choice.label}{" "}
                       {choice.providerReason
                         ? researchT(($) => $.workspace.providerReasonSummary, {
                             reason: choice.presentation.reasonLabel ?? choice.providerReason,
@@ -1077,28 +1011,6 @@ export function ResearchView({
                     </Button>
                   ))}
                 </div>
-                {selection?.state === "needs_selection" && state.activeThreadId && (
-                  <div className="research-providerbar">
-                    {threadSelectionLoadError ? (
-                      <>
-                        <span className="warn-text tiny">
-                          {researchT(($) => $.workspace.threadModelUnknown)}
-                        </span>
-                        <Button
-                          size="compact"
-                          tone="ghost"
-                          onClick={() => setThreadSelectionRequestVersion((version) => version + 1)}
-                        >
-                          {researchT(($) => $.workspace.reverifyModel)}
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="muted tiny">
-                        {researchT(($) => $.workspace.verifyingThreadModel)}
-                      </span>
-                    )}
-                  </div>
-                )}
                 {provider && (
                   <div className="research-pickerbar">
                     <label className="research-pick">

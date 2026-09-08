@@ -87,6 +87,15 @@ const common = {
       settingsNotice: "未驗證（舊 sidecar 相容模式）。",
     },
   },
+  executionSource: {
+    original: "原文請求",
+    translation: "翻譯請求",
+    previous: "上次執行請求",
+    next: "下次執行",
+    effort: "推理強度",
+    auth: "登入方式",
+    unknown: "未知",
+  },
   personalization: {
     stances: {
       off: "關閉",

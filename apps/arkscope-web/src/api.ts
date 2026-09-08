@@ -758,6 +758,13 @@ export function rejectCalibrationProposal(
   );
 }
 
+export type ExecutionReceipt = Readonly<{
+  provider: string | null;
+  model: string | null;
+  effort: string | null;
+  auth_mode: "api_key" | "chatgpt_oauth" | "claude_code_oauth" | null;
+}>;
+
 export interface CardSummary {
   run_id: number;
   ticker: string;
@@ -767,6 +774,7 @@ export interface CardSummary {
   status: string;
   provider: string | null;
   model: string | null;
+  execution_receipt?: ExecutionReceipt;
   generated_at: string;
   saved_report_id: number | null;
   conclusion: string | null;
@@ -840,6 +848,7 @@ export interface GenerateResult {
   status: string;
   provider: string | null;
   model: string | null;
+  execution_receipt?: ExecutionReceipt;
   effort?: string | null;
   fallback_effort?: string | null;
   warning?: string | null;
@@ -2342,14 +2351,57 @@ export function removeTickerTag(
   );
 }
 
-export function getCards(
+function invalidCardPayload(path: string): never {
+  throw new ApiError("Invalid card response", path, 502, "card_payload_invalid", null);
+}
+
+function cardResponseObject(value: unknown, path: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalidCardPayload(path);
+  return value as Record<string, unknown>;
+}
+
+function cardExecutionReceipt(row: Record<string, unknown>, path: string): ExecutionReceipt {
+  const isText = (value: unknown): value is string => typeof value === "string" && !!value.trim() && !value.includes("\0");
+  if (!Object.hasOwn(row, "execution_receipt")) {
+    // Older backends expose only these historical fields. Effort/auth stay unknown.
+    return {
+      provider: isText(row.provider) ? row.provider : null,
+      model: isText(row.model) ? row.model : null,
+      effort: null,
+      auth_mode: null,
+    };
+  }
+  const receipt = cardResponseObject(row.execution_receipt, path);
+  const keys = ["provider", "model", "effort", "auth_mode"];
+  if (Object.keys(receipt).length !== keys.length || keys.some(key => !Object.hasOwn(receipt, key))) {
+    return invalidCardPayload(path);
+  }
+  for (const key of ["provider", "model", "effort"] as const) {
+    if (receipt[key] !== null && !isText(receipt[key])) return invalidCardPayload(path);
+  }
+  if (receipt.auth_mode !== null && (typeof receipt.auth_mode !== "string"
+    || !["api_key", "chatgpt_oauth", "claude_code_oauth"].includes(receipt.auth_mode))) {
+    return invalidCardPayload(path);
+  }
+  return { provider: receipt.provider, model: receipt.model, effort: receipt.effort, auth_mode: receipt.auth_mode } as ExecutionReceipt;
+}
+
+function withCardReceipt<T extends CardSummary | GenerateResult>(value: unknown, path: string): T {
+  const row = cardResponseObject(value, path);
+  return { ...row, execution_receipt: cardExecutionReceipt(row, path) } as unknown as T;
+}
+
+export async function getCards(
   ticker?: string,
   limit = 20,
   includeArchived = false,
 ): Promise<{ cards: CardSummary[] }> {
   const params = new URLSearchParams({ limit: String(limit), include_archived: String(includeArchived) });
   if (ticker) params.set("ticker", ticker);
-  return getJSON<{ cards: CardSummary[] }>(`/analysis/cards?${params.toString()}`);
+  const path = `/analysis/cards?${params.toString()}`;
+  const response = cardResponseObject(await getJSON<unknown>(path), path);
+  if (!Array.isArray(response.cards)) return invalidCardPayload(path);
+  return { cards: response.cards.map(row => withCardReceipt<CardSummary>(row, path)) };
 }
 
 const FIXED_TASK_COMPAT_TIMEOUT_S = 900;
@@ -2364,7 +2416,7 @@ export function fixedTaskRequestTimeoutMs(
   return (seconds + FIXED_TASK_BROWSER_MARGIN_S) * 1_000;
 }
 
-export function generateCard(
+export async function generateCard(
   ticker: string,
   body: {
     question?: string;
@@ -2377,16 +2429,18 @@ export function generateCard(
   } = {},
   runtime?: RuntimeConfig | null,
 ): Promise<GenerateResult> {
-  return sendJSON<GenerateResult>(
-    `/analysis/card/${encodeURIComponent(ticker)}`,
+  const path = `/analysis/card/${encodeURIComponent(ticker)}`;
+  return withCardReceipt<GenerateResult>(await sendJSON<unknown>(
+    path,
     "POST",
     body,
     fixedTaskRequestTimeoutMs(runtime, "card_synthesis"),
-  );
+  ), path);
 }
 
-export function getCard(runId: number): Promise<CardDetail> {
-  return getJSON<CardDetail>(`/analysis/cards/${runId}`);
+export async function getCard(runId: number): Promise<CardDetail> {
+  const path = `/analysis/cards/${runId}`;
+  return withCardReceipt<CardDetail>(await getJSON<unknown>(path), path);
 }
 
 export function saveCard(
@@ -2397,17 +2451,34 @@ export function saveCard(
 
 // On-demand translation is cached server-side per language and uses its own
 // effective fixed-task budget.
-export function translateCard(
+export type CardTranslationResult = {
+  run_id: number;
+  lang: string;
+  cached: boolean;
+} & (
+  | { no_op: true; card: Partial<ResultCard>; execution_receipt: null }
+  | { no_op?: never; card: ResultCard; execution_receipt: ExecutionReceipt }
+);
+
+export async function translateCard(
   runId: number,
   lang = "zh-Hant",
   runtime?: RuntimeConfig | null,
-): Promise<{ run_id: number; lang: string; card: ResultCard; cached: boolean }> {
-  return sendJSON(
-    `/analysis/cards/${runId}/translate`,
+  options?: { refresh?: boolean },
+): Promise<CardTranslationResult> {
+  const path = `/analysis/cards/${runId}/translate`;
+  const response = cardResponseObject(await sendJSON<unknown>(
+    path,
     "POST",
-    { lang },
+    options?.refresh === true ? { lang, refresh: true } : { lang },
     fixedTaskRequestTimeoutMs(runtime, "card_translation"),
-  );
+  ), path);
+  if (Object.hasOwn(response, "no_op")) {
+    if (response.no_op !== true || response.execution_receipt !== null || response.cached !== false) return invalidCardPayload(path);
+    cardResponseObject(response.card, path);
+    return response as CardTranslationResult;
+  }
+  return { ...response, execution_receipt: cardExecutionReceipt(response, path) } as CardTranslationResult;
 }
 
 // --- market-data local-DB lifecycle (3a prices + 3b news + 3c-A iv/fundamentals) ---

@@ -1216,6 +1216,9 @@ const explore = {
     },
   },
   aiCard: {
+    retranslate: "Retranslate",
+    retranslating: "Retranslating...",
+    translationNoOp: "No text to translate",
     tickerCardLabel: "{{ticker}} AI Card",
     cardLabel: "AI Card",
     savedAsReport: "saved as report",

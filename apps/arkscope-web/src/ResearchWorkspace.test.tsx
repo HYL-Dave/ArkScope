@@ -255,7 +255,10 @@ function stubFetch(options: FetchOptions = {}) {
     if (url.pathname === "/config/runtime") return json(RUNTIME);
     if (url.pathname === "/query/providers") {
       return json({
-        providers: { openai: { available: true }, anthropic: { available: true } },
+        providers: {
+          openai: { available: true, model: "gpt-5.6-luna" },
+          anthropic: { available: true, model: "claude-opus-5" },
+        },
       });
     }
     if (url.pathname === "/config/model-catalog") return json(cat);
@@ -476,6 +479,88 @@ afterEach(async () => {
 });
 
 describe("Research workspace contracts", () => {
+  it.each(["en", "zh-Hant"])("keeps %s provider/auth toggles independent of stale provider models and the selected route", async locale => {
+    await i18n.changeLanguage(locale);
+    const cat = catalog("chatgpt_oauth");
+    cat.routes.ai_research = route("ai_research", "openai", "gpt-5.6-sol", "low");
+    vi.stubGlobal("fetch", stubFetch({ catalog: cat }));
+    await mountResearch();
+    const model = host!.querySelector<HTMLSelectElement>(".research-pickerbar select")!;
+    const providers = host!.querySelector(".research-providerbar")!;
+    expect(model.value).toBe("gpt-5.6-sol");
+    expect(host!.querySelector(".ui-page-header-context")?.textContent).toContain("gpt-5.6-sol");
+    expect(providers.textContent).toContain("OpenAI");
+    expect(providers.textContent).toContain(locale === "en" ? "ChatGPT subscription sign-in" : "ChatGPT 訂閱登入");
+    expect(providers.textContent).not.toMatch(/gpt-|claude-/);
+    await setSelect(model, "gpt-5.6-luna");
+    await setSelect(select("effort")!, "high");
+    expect(model.value).toBe("gpt-5.6-luna");
+    expect(host!.querySelector(".ui-page-header-context")?.textContent).toContain("gpt-5.6-luna");
+    expect(providers.textContent).not.toMatch(/gpt-|claude-/);
+  });
+
+  it.each([
+    { provider: "openai" as const, model: "gpt-5.6-sol", effort: "low" },
+    { provider: "anthropic" as const, model: "claude-sonnet-5", effort: "medium" },
+  ])("sends the $provider Settings route in an existing conversation and preserves message provenance", async tuple => {
+    const cat = catalog();
+    cat.routes.ai_research = { ...route("ai_research"), ...tuple };
+    const fetchMock = stubFetch({ catalog: cat, threads: [thread("historical", "Historical conversation")],
+      messages: { historical: [message("UNCHANGED HISTORY", { model: "gpt-5.4-mini", effort: "default" })] },
+      selections: { historical: { provider: "openai", model: "gpt-5.4-mini", effort: "default" } } });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "historical");
+    window.localStorage.setItem(RESEARCH_SELECTION_STORAGE_KEY, JSON.stringify({ version: 1, tuple: { provider: "openai", model: "gpt-5.6-luna", effort: "max" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await mountResearch();
+    await vi.waitFor(() => expect(host!.textContent).toContain("UNCHANGED HISTORY"));
+    expect(host!.querySelector(".research-bubble-meta")?.textContent).toContain("gpt-5.4-mini · default");
+    expect(select("模型")?.value).toBe(tuple.model);
+    expect(select("effort")?.value).toBe(tuple.effort);
+    await setTextarea("Next turn from Settings");
+    await click(button("送出")!);
+    const create = fetchMock.mock.calls.find(([input, init]) => new URL(String(input)).pathname === "/research/runs" && init?.method === "POST");
+    expect(JSON.parse(String(create?.[1]?.body ?? "{}"))).toMatchObject({ ...tuple, thread_id: "historical" });
+  });
+
+  it("preserves the explicit override through first server-confirmed ID and later turns, then resets on opening another conversation", async () => {
+    const fetchMock = stubFetch({ threads: [thread("another", "Another conversation")] });
+    vi.stubGlobal("fetch", fetchMock);
+    await mountResearch();
+    await click(button("新研究")!);
+    await setSelect(select("模型")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+    await setTextarea("First explicit turn");
+    await click(button("送出")!);
+    await vi.waitFor(() => expect(host!.querySelector(".research-pending")).toBeNull());
+    await flush();
+    expect(select("模型")?.value).toBe("gpt-5.6-sol");
+    expect(select("effort")?.value).toBe("low");
+    await setTextarea("Second explicit turn");
+    await click(button("送出")!);
+    await flush();
+    const bodies = fetchMock.mock.calls.filter(([input, init]) => new URL(String(input)).pathname === "/research/runs" && init?.method === "POST")
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].thread_id).toBeTruthy();
+    expect(bodies[1]).toMatchObject({ thread_id: bodies[0].thread_id, provider: "openai", model: "gpt-5.6-sol", effort: "low" });
+    await click(button("歷史")!);
+    await click(buttonContaining("Another conversation")!);
+    expect(select("模型")?.value).toBe("gpt-5.6-luna");
+    expect(select("effort")?.value).toBe("xhigh");
+  });
+
+  it("does not clear the current override when reopening the same conversation", async () => {
+    vi.stubGlobal("fetch", stubFetch({ threads: [thread("same", "Same conversation")] }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountResearch();
+    await setSelect(select("模型")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+    await click(button("歷史")!);
+    await click(buttonContaining("Same conversation")!);
+    expect(select("模型")?.value).toBe("gpt-5.6-sol");
+    expect(select("effort")?.value).toBe("low");
+  });
+
   it("renders the complete English Research workspace around original source content", async () => {
     await i18n.changeLanguage("en");
     const sourceTitle = "SOURCE::MU / Research 原始標題";
@@ -833,7 +918,7 @@ describe("Research workspace contracts", () => {
       "Luna display · SOURCE / decorated",
     );
 
-    expect(host!.textContent).toContain("Last explicit selection");
+    expect(host!.textContent).toContain("Settings route");
     expect(host!.textContent).toContain("ChatGPT subscription sign-in");
     expect(host!.textContent).toContain("Uses subscription quota, not API billing");
     await setTextarea("SOURCE_MODEL_SELECTION_PROMPT");
@@ -993,7 +1078,7 @@ describe("Research workspace contracts", () => {
     expect.soft(host!.querySelector(".research-trace")).toBeNull();
   });
 
-  it("2. initializes new AI Research with the current Luna xhigh preference", async () => {
+  it("2. initializes new AI Research with the configured Settings route", async () => {
     vi.stubGlobal("fetch", stubFetch());
     await mountResearch();
 
@@ -1001,7 +1086,7 @@ describe("Research workspace contracts", () => {
     expect(select("effort")?.value).toBe("xhigh");
     const context = host!.querySelector(".ui-page-header-context")?.textContent ?? "";
     expect.soft(context).toContain("openai · gpt-5.6-luna · xhigh");
-    expect.soft(context).toContain("上次明確選擇");
+    expect.soft(context).toContain("設定路線");
   });
 
   it("3. uses effective provider/model/effort blocks and exposes disabled reasons", async () => {
@@ -1027,9 +1112,12 @@ describe("Research workspace contracts", () => {
     expect.soft(context).toContain(" · xhigh");
   });
 
-  it("recovers a blocked legacy effort when the selected provider is clicked", async () => {
+  it("recovers a blocked Settings effort when the selected provider is clicked", async () => {
     const threadId = "legacy-default-recovery";
+    const cat = catalog();
+    cat.routes.ai_research = route("ai_research", "openai", "gpt-5.6-sol", "default");
     vi.stubGlobal("fetch", stubFetch({
+      catalog: cat,
       threads: [thread(threadId, "Legacy effort")],
       selections: {
         [threadId]: { provider: "openai", model: "gpt-5.6-sol", effort: "default" },
@@ -1049,9 +1137,12 @@ describe("Research workspace contracts", () => {
     await vi.waitFor(() => expect(button("送出")?.disabled).toBe(false));
   });
 
-  it("recovers a retired historical model when the selected provider is clicked", async () => {
+  it("recovers a retired Settings model when the selected provider is clicked", async () => {
     const threadId = "retired-model-recovery";
+    const cat = catalog();
+    cat.routes.ai_research = route("ai_research", "openai", "gpt-5.4-mini", "low");
     vi.stubGlobal("fetch", stubFetch({
+      catalog: cat,
       threads: [thread(threadId, "Retired model")],
       selections: {
         [threadId]: { provider: "openai", model: "gpt-5.4-mini", effort: "low" },
@@ -1099,15 +1190,8 @@ describe("Research workspace contracts", () => {
 
     expect(host!.querySelector(".research-bubble-meta")?.textContent)
       .toContain("gpt-5.4-mini · low");
-    expect(button("重試")).toBeUndefined();
-    expect(button("送出")?.disabled).toBe(true);
-
-    await click(buttonContaining("OpenAI")!);
-    await vi.waitFor(() => {
-      expect(select("模型")?.value).toBe("gpt-5.6-luna");
-      expect(select("effort")?.value).toBe("");
-    });
-    await setSelect(select("effort")!, "xhigh");
+    expect(select("模型")?.value).toBe("gpt-5.6-luna");
+    expect(select("effort")?.value).toBe("xhigh");
     await vi.waitFor(() => expect(button("重試")).toBeDefined());
     await click(button("重試")!);
 
@@ -1215,13 +1299,11 @@ describe("Research workspace contracts", () => {
     expect.soft(host!.textContent).toContain("使用 API 額度，會計入 API 帳單");
   });
 
-  it("5. blocks Send for an invalid saved tuple and navigates exactly to Models settings", async () => {
-    window.localStorage.setItem(RESEARCH_SELECTION_STORAGE_KEY, JSON.stringify({
-      version: 1,
-      tuple: { provider: "openai", model: "gpt-removed", effort: "high" },
-    }));
+  it("5. blocks Send for an invalid Settings tuple and navigates exactly to Models settings", async () => {
+    const cat = catalog();
+    cat.routes.ai_research = route("ai_research", "openai", "gpt-removed", "high");
     const onNavigate = vi.fn();
-    vi.stubGlobal("fetch", stubFetch());
+    vi.stubGlobal("fetch", stubFetch({ catalog: cat }));
     await mountResearch({ onNavigate });
     await setTextarea("Keep this draft");
 
@@ -1236,7 +1318,7 @@ describe("Research workspace contracts", () => {
     });
   });
 
-  it("6. requires a real effort after a model change and sends the persisted low tuple in a new conversation", async () => {
+  it("6. requires an explicit effort in this conversation and resets to Settings in a new conversation", async () => {
     const fetchMock = stubFetch();
     vi.stubGlobal("fetch", fetchMock);
     await mountResearch();
@@ -1253,14 +1335,10 @@ describe("Research workspace contracts", () => {
     expect.soft(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY)).toBeNull();
     if (!effort) return;
     await setSelect(effort, "low");
-    const saved = JSON.parse(
-      window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY) ?? "null",
-    );
-    expect(saved?.tuple).toEqual({
-      provider: "openai", model: "gpt-5.6-sol", effort: "low",
-    });
+    expect(select("effort")?.value).toBe("low");
+    expect(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY)).toBeNull();
     await click(button("新研究")!);
-    await setTextarea("Persist low exactly");
+    await setTextarea("Use Settings in new conversation");
     await click(button("送出")!);
     await vi.waitFor(() => expect(fetchMock.mock.calls.some(([input, init]) => (
       new URL(typeof input === "string" ? input : (input as Request).url).pathname === "/research/runs"
@@ -1271,7 +1349,7 @@ describe("Research workspace contracts", () => {
       && init?.method === "POST"
     ));
     expect(JSON.parse(String(create?.[1]?.body ?? "{}"))).toMatchObject({
-      provider: "openai", model: "gpt-5.6-sol", effort: "low",
+      provider: "openai", model: "gpt-5.6-luna", effort: "xhigh",
     });
   });
 
@@ -1327,7 +1405,7 @@ describe("Research workspace contracts", () => {
     ))).toBe(false);
   });
 
-  it("does not install default when a completed run returns null effort", async () => {
+  it("keeps Settings for the next turn when a completed run returns null effort", async () => {
     const completion = deferred<Response>();
     let threadId = "";
     vi.stubGlobal("fetch", stubFetch({
@@ -1340,7 +1418,7 @@ describe("Research workspace contracts", () => {
     await mountResearch();
     await setTextarea("Retain nullable run provenance");
     await click(button("送出")!);
-    await vi.waitFor(() => expect(select("effort")?.value).toBe("high"));
+    await vi.waitFor(() => expect(select("effort")?.value).toBe("xhigh"));
 
     await act(async () => {
       completion.resolve(json({
@@ -1350,15 +1428,14 @@ describe("Research workspace contracts", () => {
       await Promise.resolve();
     });
     await vi.waitFor(() => {
-      expect(select("effort")?.value).toBe("");
-      expect(button("送出")?.disabled).toBe(true);
+      expect(select("effort")?.value).toBe("xhigh");
     });
   });
 
   it.each([
     { label: "null", effort: null },
     { label: "blank", effort: "  " },
-  ])("makes completed $label effort authoritative over the submitted low selection", async ({ effort }) => {
+  ])("keeps the current override when completed $label effort is historical", async ({ effort }) => {
     const completion = deferred<Response>();
     let threadId = "";
     vi.stubGlobal("fetch", stubFetch({
@@ -1388,15 +1465,13 @@ describe("Research workspace contracts", () => {
       await Promise.resolve();
     });
     await vi.waitFor(() => {
-      expect(select("effort")?.value).toBe("");
-      expect(button("送出")?.disabled).toBe(true);
+      expect(select("effort")?.value).toBe("low");
     });
-    expect(JSON.parse(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY) ?? "null"))
-      .toMatchObject({ tuple: { provider: "openai", model: "gpt-5.6-sol", effort: "low" } });
+    expect(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY)).toBeNull();
 
     await click(button("新研究")!);
-    expect(select("模型")?.value).toBe("gpt-5.6-sol");
-    expect(select("effort")?.value).toBe("low");
+    expect(select("模型")?.value).toBe("gpt-5.6-luna");
+    expect(select("effort")?.value).toBe("xhigh");
   });
 
   it.each([
@@ -1408,13 +1483,14 @@ describe("Research workspace contracts", () => {
     vi.stubGlobal("fetch", stubFetch({
       threads: [thread(threadId, "Legacy provenance")],
       selections: { [threadId]: tuple },
+      messages: { [threadId]: [message("Historical tuple", tuple)] },
     }));
     window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", threadId);
     await mountResearch();
-    await vi.waitFor(() => expect(button("送出")?.disabled).toBe(true));
+    await vi.waitFor(() => expect(host!.textContent).toContain("Historical tuple"));
 
-    expect(host!.querySelector(".ui-page-header-context")?.textContent)
-      .toContain(`${tuple.provider} · ${tuple.model} · ${tuple.effort}`);
+    expect(host!.querySelector(".research-bubble-meta")?.textContent)
+      .toContain(`${tuple.model} · ${tuple.effort}`);
     if (tuple.model === "gpt-5.4-mini") {
       expect(Array.from(select("模型")?.options ?? []).map((option) => option.value))
         .not.toContain(tuple.model);
@@ -1422,8 +1498,8 @@ describe("Research workspace contracts", () => {
       expect(Array.from(select("effort")?.options ?? []).map((option) => option.value))
         .not.toContain(tuple.effort);
     }
-    expect(select("effort")?.value).toBe("");
-    if (tuple.model === "gpt-5.4-mini") expect(select("模型")?.value).toBe("");
+    expect(select("effort")?.value).toBe("xhigh");
+    expect(select("模型")?.value).toBe("gpt-5.6-luna");
   });
 
   it("shows the stored historical default effort identifier literally", async () => {

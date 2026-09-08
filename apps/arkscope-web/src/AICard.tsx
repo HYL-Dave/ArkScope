@@ -10,6 +10,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RefreshCw } from "lucide-react";
+import { IconButton } from "./ui/Button";
+import { ExecutionSource } from "./ExecutionSource";
 
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace, type RuntimeConfig } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
@@ -27,6 +30,7 @@ import {
   saveCard,
   translateCard,
   type CardSummary,
+  type ExecutionReceipt,
   type EvidenceItem,
   type EvidencePacket,
   type ResultCard,
@@ -52,6 +56,7 @@ export function AICardTab({
   const { t: commonT } = useTranslation("common");
   const [recent, setRecent] = useState<CardSummary[] | null>(null);
   const [card, setCard] = useState<ResultCard | null>(null);
+  const [executionReceipt, setExecutionReceipt] = useState<ExecutionReceipt | undefined>();
   const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
@@ -152,7 +157,6 @@ export function AICardTab({
     try {
       const r = await generateCard(ticker, {
         question: question.trim() || undefined,
-        provider: "anthropic",
         // include_sa intentionally omitted → backend uses config.sa_enabled.
         news_days: newsDays,
         max_news: maxNews,
@@ -161,6 +165,7 @@ export function AICardTab({
       if (id !== reqRef.current) return; // superseded (ticker switch / new action)
       setLastTrace(r.personalization ?? null);
       setCard(r.card);
+      setExecutionReceipt(r.execution_receipt);
       setEvidencePacket(r.evidence_packet);
       setRunId(r.run_id);
       void loadRecent();
@@ -182,6 +187,7 @@ export function AICardTab({
       if (id !== reqRef.current) return;
       setLastTrace(d.personalization ?? null);
       setCard(d.card);
+      setExecutionReceipt(d.execution_receipt);
       setEvidencePacket(d.evidence_packet);
       setRunId(d.run_id);
       setSaved(d.status === "saved");
@@ -327,6 +333,7 @@ export function AICardTab({
         <CardView
           key={runId ?? "none"}
           card={card}
+          executionReceipt={executionReceipt}
           runId={runId}
           evidencePacket={evidencePacket}
           saved={saved}
@@ -371,6 +378,7 @@ export function AICardTab({
 // its own close button) to hide the internal back button.
 export function CardView({
   card,
+  executionReceipt,
   runId,
   evidencePacket,
   saved,
@@ -383,6 +391,7 @@ export function CardView({
   backLabel,
 }: {
   card: ResultCard;
+  executionReceipt?: ExecutionReceipt;
   runId?: number | null;
   evidencePacket?: EvidencePacket | null;
   saved: boolean;
@@ -411,21 +420,34 @@ export function CardView({
   // is keyed by runId at the call sites, so this state resets per card.
   const [lang, setLang] = useState<"en" | "zh">("en");
   const [zh, setZh] = useState<ResultCard | null>(null);
+  const [translationReceipt, setTranslationReceipt] = useState<ExecutionReceipt | undefined>();
+  const [noOp, setNoOp] = useState(false);
+  const [refreshAttempt, setRefreshAttempt] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [tErr, setTErr] = useState<ExploreErrorState | null>(null);
   const shown = lang === "zh" && zh ? zh : card;
 
-  async function toZh() {
-    if (zh) {
+  async function toZh(refresh = false) {
+    if (translating) return;
+    if (!refresh && (zh || noOp)) {
       setLang("zh");
       return;
     }
     if (runId == null) return;
     setTranslating(true);
+    setRefreshAttempt(refresh);
     setTErr(null);
     try {
-      const r = await translateCard(runId, "zh-Hant", runtime);
-      setZh(r.card);
+      const r = refresh
+        ? await translateCard(runId, "zh-Hant", runtime, { refresh: true })
+        : await translateCard(runId, "zh-Hant", runtime);
+      if (r.no_op) {
+        setNoOp(true);
+      } else {
+        setZh(r.card);
+        setTranslationReceipt(r.execution_receipt);
+        setNoOp(false);
+      }
       setLang("zh");
     } catch (e) {
       setTErr(captureExploreError("card_translate", e));
@@ -456,11 +478,17 @@ export function CardView({
               onClick={() => void toZh()}
               disabled={translating}
             >
-              {translating
+              {translating && !refreshAttempt
                 ? t(($) => $.aiCard.translating)
                 : t(($) => $.aiCard.traditionalChinese)}
             </button>
           </span>
+        )}
+        {runId != null && zh && lang === "zh" && (
+          <IconButton tone="ghost" size="compact"
+            label={translating && refreshAttempt ? t(($) => $.aiCard.retranslating) : t(($) => $.aiCard.retranslate)}
+            icon={<RefreshCw size={14} />} busy={translating}
+            onClick={() => void toZh(true)} />
         )}
         <span className="spacer" />
         <span className={`conf conf-${card.confidence_level}`}>
@@ -474,12 +502,15 @@ export function CardView({
               : t(($) => $.aiCard.saveAsReport)}
         </button>
       </div>
+      <ExecutionSource source="original" receipt={executionReceipt} />
+      {lang === "zh" && zh && <ExecutionSource source="translation" receipt={translationReceipt} />}
+      {noOp && lang === "zh" && <p role="status" className="muted tiny">{t(($) => $.aiCard.translationNoOp)}</p>}
       {tErr && (
         <ExploreErrorNotice
           state={tErr}
           developerMode={developerMode}
           retryLabel={t(($) => $.aiCard.retry)}
-          onRetry={() => void toZh()}
+          onRetry={() => void toZh(refreshAttempt)}
           onNavigate={onNavigateTarget}
         />
       )}
@@ -619,6 +650,7 @@ export function CardModal({
 }) {
   const { t } = useTranslation("explore");
   const [card, setCard] = useState<ResultCard | null>(null);
+  const [executionReceipt, setExecutionReceipt] = useState<ExecutionReceipt | undefined>();
   const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -651,6 +683,7 @@ export function CardModal({
       .then((d) => {
         if (alive) {
           setCard(d.card);
+          setExecutionReceipt(d.execution_receipt);
           setEvidencePacket(d.evidence_packet);
           setSaved(d.status === "saved");
         }
@@ -723,6 +756,7 @@ export function CardModal({
           <CardView
             key={runId}
             card={card}
+            executionReceipt={executionReceipt}
             runId={runId}
             evidencePacket={evidencePacket}
             saved={saved}

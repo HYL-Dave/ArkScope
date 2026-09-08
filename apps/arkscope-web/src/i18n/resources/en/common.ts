@@ -87,6 +87,15 @@ const common = {
       settingsNotice: "Unverified (legacy sidecar compatibility mode).",
     },
   },
+  executionSource: {
+    original: "Original request",
+    translation: "Translation request",
+    previous: "Previous run request",
+    next: "Next run",
+    effort: "Effort",
+    auth: "Auth",
+    unknown: "Unknown",
+  },
   personalization: {
     stances: {
       off: "Off",
