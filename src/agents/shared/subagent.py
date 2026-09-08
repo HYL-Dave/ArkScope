@@ -367,9 +367,12 @@ def dispatch_subagent(
         f"(model={config.model}, provider={provider}, max_turns={config.max_turns})"
     )
 
-    try:
-        from src.auth_drivers.runtime_binding import activate_runtime_auth, capture_child_runtime_auth
+    from src.auth_drivers.runtime_binding import (
+        activate_runtime_auth, capture_child_runtime_auth, sanitize_runtime_error,
+    )
 
+    child_auth = None
+    try:
         child_auth = capture_child_runtime_auth(provider)
         with activate_runtime_auth(child_auth):
             if provider == "openai":
@@ -387,7 +390,8 @@ def dispatch_subagent(
             "error": None,
         }
     except Exception as e:
-        logger.error(f"Subagent '{subagent_name}' failed: {e}", exc_info=True)
+        detail = sanitize_runtime_error(e, binding=child_auth)
+        logger.error("Subagent '%s' failed: %s", subagent_name, detail)
         return {
             "subagent": subagent_name,
             "answer": "",
@@ -395,7 +399,7 @@ def dispatch_subagent(
             "model": config.model,
             "provider": provider,
             "token_usage": {},
-            "error": str(e),
+            "error": detail,
         }
 
 

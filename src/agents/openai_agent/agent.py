@@ -11,9 +11,10 @@ import asyncio
 import json
 import logging
 import os
-import traceback as _traceback_mod
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
+
+from src.auth_drivers.runtime_binding import sanitize_runtime_error
 
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.events import AgentEvent, EventType
@@ -356,6 +357,12 @@ def _build_agent(
     )
 
 
+def _agent_error_detail(agent, error) -> str:
+    # The model owns the selected client even when there is no Research context.
+    client = getattr(agent.model, "_client", None)
+    return sanitize_runtime_error(error, api_key=getattr(client, "api_key", None))
+
+
 async def run_query(
     question: str,
     model: Optional[str] = None,
@@ -457,14 +464,14 @@ async def run_query(
                 result = await Runner.run(agent, **runner_kwargs)
                 break
             except Exception as e:
-                err_str = str(e)
-                is_retryable = "No tool output found" in err_str
+                is_retryable = "No tool output found" in str(e)
+                err_str = _agent_error_detail(agent, e)
                 if is_retryable and _attempt < _max_retries - 1:
                     logger.warning(
                         "Retryable SDK error (attempt %d/%d): %s",
                         _attempt + 1, _max_retries, err_str[:200],
                     )
-                    reason = "no_tool_output" if "No tool output found" in err_str else "unknown"
+                    reason = "no_tool_output" if is_retryable else "unknown"
                     pad.log_retry(
                         attempt=_attempt + 1, error_message=err_str[:200],
                         retryable=True, reason_code=reason,
@@ -508,15 +515,15 @@ async def run_query(
         }
 
     except Exception as exc:
+        detail = _agent_error_detail(agent, exc)
         pad.log_error(
             error_type=type(exc).__name__,
-            message=str(exc),
-            traceback_str=_traceback_mod.format_exc(),
+            message=detail,
             tools_used=list(set(tools_used)) if tools_used else None,
             token_usage=tracker.summary() if tracker.turn_count > 0 else None,
         )
         pad.close()
-        raise
+        raise RuntimeError(f"{type(exc).__name__}: {detail}"[:500]) from None
 
 
 def run_query_sync(
@@ -615,14 +622,14 @@ def run_query_sync(
                 result = Runner.run_sync(agent, **runner_kwargs)
                 break
             except Exception as e:
-                err_str = str(e)
-                is_retryable = "No tool output found" in err_str
+                is_retryable = "No tool output found" in str(e)
+                err_str = _agent_error_detail(agent, e)
                 if is_retryable and _attempt < _max_retries - 1:
                     logger.warning(
                         "Retryable SDK error (attempt %d/%d): %s",
                         _attempt + 1, _max_retries, err_str[:200],
                     )
-                    reason = "no_tool_output" if "No tool output found" in err_str else "unknown"
+                    reason = "no_tool_output" if is_retryable else "unknown"
                     pad.log_retry(
                         attempt=_attempt + 1, error_message=err_str[:200],
                         retryable=True, reason_code=reason,
@@ -666,15 +673,15 @@ def run_query_sync(
         }
 
     except Exception as exc:
+        detail = _agent_error_detail(agent, exc)
         pad.log_error(
             error_type=type(exc).__name__,
-            message=str(exc),
-            traceback_str=_traceback_mod.format_exc(),
+            message=detail,
             tools_used=list(set(tools_used)) if tools_used else None,
             token_usage=tracker.summary() if tracker.turn_count > 0 else None,
         )
         pad.close()
-        raise
+        raise RuntimeError(f"{type(exc).__name__}: {detail}"[:500]) from None
 
 
 def _compose_stream_input(history: list, question: str):
@@ -797,14 +804,14 @@ async def run_query_stream(
                 result = await Runner.run(agent, **runner_kwargs)
                 break
             except Exception as e:
-                err_str = str(e)
-                is_retryable = "No tool output found" in err_str
+                is_retryable = "No tool output found" in str(e)
+                err_str = _agent_error_detail(agent, e)
                 if is_retryable and _attempt < _max_retries - 1:
                     logger.warning(
                         "Retryable SDK error (attempt %d/%d): %s",
                         _attempt + 1, _max_retries, err_str[:200],
                     )
-                    reason = "no_tool_output" if "No tool output found" in err_str else "unknown"
+                    reason = "no_tool_output" if is_retryable else "unknown"
                     pad.log_retry(
                         attempt=_attempt + 1, error_message=err_str[:200],
                         retryable=True, reason_code=reason,
@@ -850,16 +857,16 @@ async def run_query_stream(
         })
 
     except Exception as exc:
+        detail = _agent_error_detail(agent, exc)
         pad.log_error(
             error_type=type(exc).__name__,
-            message=str(exc),
-            traceback_str=_traceback_mod.format_exc(),
+            message=detail,
             tools_used=list(set(tools_used)) if tools_used else None,
             token_usage=tracker.summary() if tracker.turn_count > 0 else None,
         )
         pad.close()
         yield AgentEvent(EventType.error, {
-            "error": f"{type(exc).__name__}: {str(exc)[:500]}",
+            "error": f"{type(exc).__name__}: {detail}"[:500],
             "scratchpad": str(pad.filepath) if pad.filepath else None,
         })
 

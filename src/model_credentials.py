@@ -1198,6 +1198,7 @@ def test_model(
     store: CredentialStore | None = None,
 ) -> ModelTestResult:
     """Run a tiny paid provider call to verify credential/model/effort access."""
+    from src.auth_drivers.runtime_binding import api_key_client_options, sanitize_runtime_error
     from src.model_capabilities import model_execution_admission_detail
 
     detail = model_execution_admission_detail(model)
@@ -1245,7 +1246,7 @@ def test_model(
             kwargs = {}
             if selected_effort != "default":
                 kwargs["reasoning"] = {"effort": selected_effort}
-            with OpenAI(api_key=cred.secret, timeout=30, max_retries=0) as client:
+            with OpenAI(**api_key_client_options(provider, cred.secret), timeout=30, max_retries=0) as client:
                 response = client.responses.create(
                     model=model,
                     max_output_tokens=16,
@@ -1270,7 +1271,7 @@ def test_model(
         kwargs = {}
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
-        client = Anthropic(api_key=cred.secret, timeout=30, max_retries=0)
+        client = Anthropic(**api_key_client_options(provider, cred.secret), timeout=30, max_retries=0)
         client.messages.create(
             model=model,
             max_tokens=16,
@@ -1288,5 +1289,5 @@ def test_model(
             effort=effort,
             status="error",
             latency_ms=round((time.perf_counter() - started) * 1000),
-            error=str(exc),
+            error=sanitize_runtime_error(exc, api_key=cred.secret),
         )

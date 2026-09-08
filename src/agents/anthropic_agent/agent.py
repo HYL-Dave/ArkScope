@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import traceback
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -608,22 +607,23 @@ async def run_query_stream(
 
     except Exception as exc:
         # Fault tolerance: log error to scratchpad so failures are traceable
-        tb = traceback.format_exc()
+        from src.auth_drivers.runtime_binding import sanitize_runtime_error
+
+        detail = sanitize_runtime_error(exc, api_key=getattr(client, "api_key", None))
         logger.error(
             "Anthropic agent error on turn %d: %s: %s",
-            _current_turn, type(exc).__name__, exc,
+            _current_turn, type(exc).__name__, detail,
         )
         pad.log_error(
             error_type=type(exc).__name__,
-            message=str(exc),
-            traceback_str=tb,
+            message=detail,
             turn=_current_turn,
             tools_used=list(set(tools_used)),
             token_usage=tracker.summary(),
         )
         pad.close()
         yield AgentEvent(EventType.error, {
-            "error": f"{type(exc).__name__}: {str(exc)[:500]}",
+            "error": f"{type(exc).__name__}: {detail}"[:500],
             "turn": _current_turn,
             "tools_used": list(set(tools_used)),
             "scratchpad": str(pad.filepath) if pad.filepath else None,

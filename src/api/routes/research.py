@@ -433,16 +433,18 @@ async def create_research_run(
             history=history,
             auth_binding=auth_binding,
         )
-    except Exception:
-        logger.exception("failed to schedule research run %s", run.id)
+    except Exception as exc:
+        logger.error("failed to schedule research run %s: %s", run.id,
+                     sanitize_research_detail(exc, binding=auth_binding))
         try:
             run_store.fail_queued_run_handoff(
                 run_id=run.id,
                 thread_store=thread_store,
                 message=_SCHEDULE_FAILURE_MESSAGE,
             )
-        except Exception:
-            logger.exception("failed to persist research scheduling failure %s", run.id)
+        except Exception as exc:
+            logger.error("failed to persist research scheduling failure %s: %s", run.id,
+                         sanitize_research_detail(exc, binding=auth_binding))
         raise HTTPException(
             status_code=503,
             detail=_SCHEDULE_FAILURE_MESSAGE,
