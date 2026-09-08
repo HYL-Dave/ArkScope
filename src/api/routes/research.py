@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from src.agents.config import resolve_research_route
 from src.api.routes.query import _compose_agent_question, TITLE_MAX
 from src.auth_drivers.live_resolver import resolve_live_auth
+from src.auth_drivers.runtime_binding import activate_runtime_auth, capture_runtime_auth
 from src.research_errors import (
     classify_research_failure,
     public_research_error_code,
@@ -385,7 +386,9 @@ async def create_research_run(
     )
     if detail is not None:
         raise HTTPException(status_code=422, detail=detail)
-    auth_mode, credential_id = _resolve_auth_metadata(provider)
+    auth_binding = capture_runtime_auth(provider)
+    with activate_runtime_auth(auth_binding):
+        auth_mode, credential_id = _resolve_auth_metadata(provider)
     auth_detail = model_auth_admission_detail(model, auth_mode)
     if auth_detail is not None:
         raise HTTPException(status_code=422, detail=auth_detail)
@@ -428,6 +431,7 @@ async def create_research_run(
             thread_store=thread_store,
             dal=dal,
             history=history,
+            auth_binding=auth_binding,
         )
     except Exception:
         logger.exception("failed to schedule research run %s", run.id)

@@ -145,8 +145,8 @@ def test_investigation_route_read_error_is_not_a_billing_fallback(stores):
 
     with pytest.raises(ValueError, match="^model_route_unavailable$"):
         config.task_route(TASK, route_store=BrokenStore())
-    # The older tasks' explicit legacy fallback contract is not changed here.
-    assert config.task_route("ai_research", route_store=BrokenStore()).source == "default"
+    with pytest.raises(ValueError, match="^model_route_unavailable$"):
+        config.task_route("ai_research", route_store=BrokenStore())
 
 
 def test_investigation_route_explicit_import_export_roundtrip(stores, monkeypatch):

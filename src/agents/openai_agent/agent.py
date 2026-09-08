@@ -327,17 +327,11 @@ def _build_agent(
     - reasoning_effort == "none" → max_tokens = config.max_tokens (16384)
       不消耗 reasoning tokens，只需 visible output 空間
     """
-    from agents import Agent, ModelSettings
+    from agents import Agent, ModelSettings, OpenAIResponsesModel
     from openai.types.shared import Reasoning
 
-    # Per-query OpenAI auth bootstrap (api_key wire-in, Slice 6): register the SDK
-    # default client from the ACTIVE credential. _build_agent is called once per
-    # query by all 3 entrypoints immediately before Runner.run, so it is the
-    # per-run choke-point. OAuth-active / none → leaves the SDK env default
-    # (logged). NOTE: set_default_openai_client is a process-global — concurrent
-    # OpenAI runs in one process share it (set immediately before the run).
-    from src.auth_drivers.live_resolver import apply_openai_live_client
-    apply_openai_live_client()
+    from src.auth_drivers.live_resolver import live_openai_async_client
+    client = live_openai_async_client()
 
     # Build full tool list including any hosted server tools (single
     # wiring point — see ``_build_openai_all_tools`` docstring).
@@ -353,7 +347,7 @@ def _build_agent(
     return Agent(
         name="ArkScope Assistant",
         instructions=system_prompt or SYSTEM_PROMPT,
-        model=model_name,
+        model=OpenAIResponsesModel(model=model_name, openai_client=client),
         tools=all_tools,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=reasoning_effort),

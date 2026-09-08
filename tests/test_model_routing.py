@@ -1190,18 +1190,22 @@ def test_import_skips_ambiguous_or_retired_route(make_route_store, tmp_path, mod
     assert rs.get("ai_research") is None
 
 
-def test_task_route_db_error_degrades_to_yaml(make_route_store):
+@pytest.mark.parametrize("task", [
+    "card_synthesis", "card_translation", "ai_research", "lifecycle_investigation",
+])
+def test_task_route_read_failure_never_substitutes_yaml(make_route_store, task):
     import sqlite3
     from src.agents.config import task_route
+    from src.model_routing import ModelRouteUnavailable
 
     rs = make_route_store(_YAML_AI)  # yaml fallback present
 
-    class BoomStore:  # a route store whose read raises — resolution must NOT propagate it
+    class BoomStore:
         def get(self, task):
             raise sqlite3.OperationalError("boom")
 
-    route = task_route("ai_research", route_store=BoomStore())
-    assert (route.provider, route.model, route.source) == ("openai", "gpt-5.4-mini", "profile")
+    with pytest.raises(ModelRouteUnavailable, match="model_route_unavailable"):
+        task_route(task, route_store=BoomStore())
 
 
 def test_import_export_do_not_rewrite_env_override(make_route_store, tmp_path, monkeypatch):

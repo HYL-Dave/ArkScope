@@ -1223,7 +1223,7 @@ def test_model(
 
     started = time.perf_counter()
 
-    def ok_result(*, warning: str | None = None, fallback_effort: str | None = None) -> ModelTestResult:
+    def ok_result(*, warning: str | None = None) -> ModelTestResult:
         return ModelTestResult(
             provider=provider,
             credential_id=cred.id,
@@ -1232,7 +1232,6 @@ def test_model(
             status="ok",
             latency_ms=round((time.perf_counter() - started) * 1000),
             warning=warning,
-            fallback_effort=fallback_effort,
         )
 
     def run_once(selected_effort: str) -> str | None:
@@ -1271,7 +1270,7 @@ def test_model(
         kwargs = {}
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
-        client = Anthropic(api_key=cred.secret, timeout=30)
+        client = Anthropic(api_key=cred.secret, timeout=30, max_retries=0)
         client.messages.create(
             model=model,
             max_tokens=16,
@@ -1282,18 +1281,6 @@ def test_model(
     try:
         return ok_result(warning=run_once(effort))
     except Exception as exc:  # pragma: no cover - live provider variability
-        if provider == "anthropic" and effort != "default" and looks_like_effort_error(exc):
-            try:
-                run_once("default")
-                return ok_result(
-                    warning=(
-                        f"Provider rejected effort '{effort}', but the model worked "
-                        "after falling back to provider default."
-                    ),
-                    fallback_effort="default",
-                )
-            except Exception as fallback_exc:
-                exc = fallback_exc
         return ModelTestResult(
             provider=provider,
             credential_id=cred.id,
