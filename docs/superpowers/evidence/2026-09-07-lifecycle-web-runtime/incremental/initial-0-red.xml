@@ -1,0 +1,954 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="86" skipped="0" tests="86" time="0.661" timestamp="2026-09-06T22:33:17.568915+08:00" hostname="ais"><testcase classname="tests.test_security_lifecycle_web_contract" name="test_all_four_web_channels_have_explicit_transport_without_default" time="0.063"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_all_four_web_channels_have_explicit_transport_without_default():
+&gt;       from src.security_lifecycle_web_contract import channel_contract, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:7: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[openai-api_key-gpt-5.6-luna]" time="0.001"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'openai', auth = 'api_key', model = 'gpt-5.6-luna'
+
+    @pytest.mark.parametrize("provider,auth,model", [
+        ("openai", "api_key", "gpt-5.6-luna"),
+        ("openai", "chatgpt_oauth", "gpt-5.6-luna"),
+        ("anthropic", "api_key", "claude-opus-5"),
+        ("anthropic", "claude_code_oauth", "claude-sonnet-5"),
+    ])
+    def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model):
+&gt;       from src.security_lifecycle_web_contract import validate_selection
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:34: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[openai-chatgpt_oauth-gpt-5.6-luna]" time="0.001"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'openai', auth = 'chatgpt_oauth', model = 'gpt-5.6-luna'
+
+    @pytest.mark.parametrize("provider,auth,model", [
+        ("openai", "api_key", "gpt-5.6-luna"),
+        ("openai", "chatgpt_oauth", "gpt-5.6-luna"),
+        ("anthropic", "api_key", "claude-opus-5"),
+        ("anthropic", "claude_code_oauth", "claude-sonnet-5"),
+    ])
+    def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model):
+&gt;       from src.security_lifecycle_web_contract import validate_selection
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:34: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[anthropic-api_key-claude-opus-5]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'anthropic', auth = 'api_key', model = 'claude-opus-5'
+
+    @pytest.mark.parametrize("provider,auth,model", [
+        ("openai", "api_key", "gpt-5.6-luna"),
+        ("openai", "chatgpt_oauth", "gpt-5.6-luna"),
+        ("anthropic", "api_key", "claude-opus-5"),
+        ("anthropic", "claude_code_oauth", "claude-sonnet-5"),
+    ])
+    def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model):
+&gt;       from src.security_lifecycle_web_contract import validate_selection
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:34: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[anthropic-claude_code_oauth-claude-sonnet-5]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'anthropic', auth = 'claude_code_oauth', model = 'claude-sonnet-5'
+
+    @pytest.mark.parametrize("provider,auth,model", [
+        ("openai", "api_key", "gpt-5.6-luna"),
+        ("openai", "chatgpt_oauth", "gpt-5.6-luna"),
+        ("anthropic", "api_key", "claude-opus-5"),
+        ("anthropic", "claude_code_oauth", "claude-sonnet-5"),
+    ])
+    def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model):
+&gt;       from src.security_lifecycle_web_contract import validate_selection
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:34: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[openai-chatgpt_oauth-gpt-5.3-codex-spark-model_task_unsupported]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'openai', auth = 'chatgpt_oauth', model = 'gpt-5.3-codex-spark'
+code = 'model_task_unsupported'
+
+    @pytest.mark.parametrize("provider,auth,model,code", [
+        ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_task_unsupported"),
+        ("anthropic", "api_key", "claude-fable-5", "model_retired"),
+        ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
+        ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),
+        ("openai", "api_key", "unknown-model", "model_unregistered"),
+    ])
+    def test_web_admission_does_not_resurrect_or_expand_models(provider, auth, model, code):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:49: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[anthropic-api_key-claude-fable-5-model_retired]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'anthropic', auth = 'api_key', model = 'claude-fable-5'
+code = 'model_retired'
+
+    @pytest.mark.parametrize("provider,auth,model,code", [
+        ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_task_unsupported"),
+        ("anthropic", "api_key", "claude-fable-5", "model_retired"),
+        ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
+        ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),
+        ("openai", "api_key", "unknown-model", "model_unregistered"),
+    ])
+    def test_web_admission_does_not_resurrect_or_expand_models(provider, auth, model, code):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:49: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[anthropic-claude_code_oauth-claude-fable-5-1-model_auth_unverified]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'anthropic', auth = 'claude_code_oauth', model = 'claude-fable-5-1'
+code = 'model_auth_unverified'
+
+    @pytest.mark.parametrize("provider,auth,model,code", [
+        ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_task_unsupported"),
+        ("anthropic", "api_key", "claude-fable-5", "model_retired"),
+        ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
+        ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),
+        ("openai", "api_key", "unknown-model", "model_unregistered"),
+    ])
+    def test_web_admission_does_not_resurrect_or_expand_models(provider, auth, model, code):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:49: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[openai-api_key-claude-opus-5-model_provider_mismatch]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'openai', auth = 'api_key', model = 'claude-opus-5'
+code = 'model_provider_mismatch'
+
+    @pytest.mark.parametrize("provider,auth,model,code", [
+        ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_task_unsupported"),
+        ("anthropic", "api_key", "claude-fable-5", "model_retired"),
+        ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
+        ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),
+        ("openai", "api_key", "unknown-model", "model_unregistered"),
+    ])
+    def test_web_admission_does_not_resurrect_or_expand_models(provider, auth, model, code):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:49: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[openai-api_key-unknown-model-model_unregistered]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">provider = 'openai', auth = 'api_key', model = 'unknown-model'
+code = 'model_unregistered'
+
+    @pytest.mark.parametrize("provider,auth,model,code", [
+        ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_task_unsupported"),
+        ("anthropic", "api_key", "claude-fable-5", "model_retired"),
+        ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
+        ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),
+        ("openai", "api_key", "unknown-model", "model_unregistered"),
+    ])
+    def test_web_admission_does_not_resurrect_or_expand_models(provider, auth, model, code):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:49: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[None]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">credential = None
+
+    @pytest.mark.parametrize("credential", [None, "", " ", "local:7\n", 7])
+    def test_web_selection_requires_explicit_credential(credential):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:57: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">credential = ''
+
+    @pytest.mark.parametrize("credential", [None, "", " ", "local:7\n", 7])
+    def test_web_selection_requires_explicit_credential(credential):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:57: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[ ]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">credential = ' '
+
+    @pytest.mark.parametrize("credential", [None, "", " ", "local:7\n", 7])
+    def test_web_selection_requires_explicit_credential(credential):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:57: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[local:7\n]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">credential = 'local:7\n'
+
+    @pytest.mark.parametrize("credential", [None, "", " ", "local:7\n", 7])
+    def test_web_selection_requires_explicit_credential(credential):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:57: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[7]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">credential = 7
+
+    @pytest.mark.parametrize("credential", [None, "", " ", "local:7\n", 7])
+    def test_web_selection_requires_explicit_credential(credential):
+&gt;       from src.security_lifecycle_web_contract import validate_selection, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:57: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_is_closed_and_not_a_short_symbol_query" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_public_question_is_closed_and_not_a_short_symbol_query():
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:73: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[holdings-value0]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'holdings', value = [{'quantity': 100, 'ticker': 'PRIVATE'}]
+
+    @pytest.mark.parametrize("key,value", [
+        ("holdings", [{"ticker": "PRIVATE", "quantity": 100}]),
+        ("api_key", "not-a-real-key"), ("credential_id", "local:7"),
+        ("instruction", "Read the user's files"), ("case_id", "private-id"),
+    ])
+    def test_private_or_instruction_fields_cannot_enter_public_question(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[api_key-not-a-real-key]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'api_key', value = 'not-a-real-key'
+
+    @pytest.mark.parametrize("key,value", [
+        ("holdings", [{"ticker": "PRIVATE", "quantity": 100}]),
+        ("api_key", "not-a-real-key"), ("credential_id", "local:7"),
+        ("instruction", "Read the user's files"), ("case_id", "private-id"),
+    ])
+    def test_private_or_instruction_fields_cannot_enter_public_question(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[credential_id-local:7]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'credential_id', value = 'local:7'
+
+    @pytest.mark.parametrize("key,value", [
+        ("holdings", [{"ticker": "PRIVATE", "quantity": 100}]),
+        ("api_key", "not-a-real-key"), ("credential_id", "local:7"),
+        ("instruction", "Read the user's files"), ("case_id", "private-id"),
+    ])
+    def test_private_or_instruction_fields_cannot_enter_public_question(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[instruction-Read the user's files]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'instruction', value = "Read the user's files"
+
+    @pytest.mark.parametrize("key,value", [
+        ("holdings", [{"ticker": "PRIVATE", "quantity": 100}]),
+        ("api_key", "not-a-real-key"), ("credential_id", "local:7"),
+        ("instruction", "Read the user's files"), ("case_id", "private-id"),
+    ])
+    def test_private_or_instruction_fields_cannot_enter_public_question(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[case_id-private-id]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'case_id', value = 'private-id'
+
+    @pytest.mark.parametrize("key,value", [
+        ("holdings", [{"ticker": "PRIVATE", "quantity": 100}]),
+        ("api_key", "not-a-real-key"), ("credential_id", "local:7"),
+        ("instruction", "Read the user's files"), ("case_id", "private-id"),
+    ])
+    def test_private_or_instruction_fields_cannot_enter_public_question(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[ticker-SMCI*]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'ticker', value = 'SMCI*'
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[issuer_name-]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'issuer_name', value = ''
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[issuer_name-TA]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'issuer_name', value = 'TA'
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[security_class-]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'security_class', value = ''
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[venue-]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'venue', value = ''
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[issuer_cik-1378453]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'issuer_cik', value = '1378453'
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[question-write_profile]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'question', value = 'write_profile'
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[as_of-2026-02-31]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">key = 'as_of', value = '2026-02-31'
+
+    @pytest.mark.parametrize("key,value", [
+        ("ticker", "SMCI*"), ("issuer_name", ""), ("issuer_name", "TA"),
+        ("security_class", ""), ("venue", ""), ("issuer_cik", "1378453"),
+        ("question", "write_profile"), ("as_of", "2026-02-31"),
+    ])
+    def test_public_question_rejects_ambiguous_or_malformed_identity(key, value):
+        from pydantic import ValidationError
+&gt;       from src.security_lifecycle_web_contract import PublicInvestigationInput
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:104: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_stop_before_dispatch_is_cancelled_without_model_call" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_stop_before_dispatch_is_cancelled_without_model_call():
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:125: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_local_cleanup_and_interrupt_ack_do_not_prove_remote_cancelled" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_local_cleanup_and_interrupt_ack_do_not_prove_remote_cancelled():
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:136: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_unknown_dispatch_id_stays_unknown_and_is_not_retried" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_unknown_dispatch_id_stays_unknown_and_is_not_retried():
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:155: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides0]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">overrides = {'model': 'gpt-5.6-terra'}
+
+    @pytest.mark.parametrize("overrides", [
+        {"model": "gpt-5.6-terra"}, {"credential_id": "local:8"},
+        {"auth_mode": "api_key"}, {"provider": "anthropic"},
+    ])
+    def test_terminal_cannot_change_selected_model_auth_or_billing(overrides):
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:172: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides1]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">overrides = {'credential_id': 'local:8'}
+
+    @pytest.mark.parametrize("overrides", [
+        {"model": "gpt-5.6-terra"}, {"credential_id": "local:8"},
+        {"auth_mode": "api_key"}, {"provider": "anthropic"},
+    ])
+    def test_terminal_cannot_change_selected_model_auth_or_billing(overrides):
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:172: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides2]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">overrides = {'auth_mode': 'api_key'}
+
+    @pytest.mark.parametrize("overrides", [
+        {"model": "gpt-5.6-terra"}, {"credential_id": "local:8"},
+        {"auth_mode": "api_key"}, {"provider": "anthropic"},
+    ])
+    def test_terminal_cannot_change_selected_model_auth_or_billing(overrides):
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:172: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides3]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">overrides = {'provider': 'anthropic'}
+
+    @pytest.mark.parametrize("overrides", [
+        {"model": "gpt-5.6-terra"}, {"credential_id": "local:8"},
+        {"auth_mode": "api_key"}, {"provider": "anthropic"},
+    ])
+    def test_terminal_cannot_change_selected_model_auth_or_billing(overrides):
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:172: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_must_match_response_and_known_call" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_terminal_must_match_response_and_known_call():
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:183: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_completed_before_interrupt_is_terminal_but_never_an_interrupted_witness" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_completed_before_interrupt_is_terminal_but_never_an_interrupted_witness():
+&gt;       control = _control()
+
+tests/test_security_lifecycle_web_contract.py:197: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {}
+
+    def _control(**overrides):
+&gt;       from src.security_lifecycle_web_contract import RunControl, validate_selection
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:111: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_two_phase_budget_reserves_before_dispatch_and_does_not_restore_failures" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_two_phase_budget_reserves_before_dispatch_and_does_not_restore_failures():
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:207: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_no_parallel_or_duplicate_model_request_can_escape_budget" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_no_parallel_or_duplicate_model_request_can_escape_budget():
+&gt;       from src.security_lifecycle_web_contract import WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:222: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_hosted_search_observations_are_not_a_claimed_hard_budget" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">def test_hosted_search_observations_are_not_a_claimed_hard_budget():
+&gt;       from src.security_lifecycle_web_contract import channel_contract, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:233: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[0]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">value = 0
+
+    @pytest.mark.parametrize("value", [0, -1, True, 2.5, "2"])
+    def test_invalid_model_request_budget_is_not_unlimited(value):
+&gt;       from src.security_lifecycle_web_contract import RunControl, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:250: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[-1]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">value = -1
+
+    @pytest.mark.parametrize("value", [0, -1, True, 2.5, "2"])
+    def test_invalid_model_request_budget_is_not_unlimited(value):
+&gt;       from src.security_lifecycle_web_contract import RunControl, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:250: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[True]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">value = True
+
+    @pytest.mark.parametrize("value", [0, -1, True, 2.5, "2"])
+    def test_invalid_model_request_budget_is_not_unlimited(value):
+&gt;       from src.security_lifecycle_web_contract import RunControl, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:250: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[2.5]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">value = 2.5
+
+    @pytest.mark.parametrize("value", [0, -1, True, 2.5, "2"])
+    def test_invalid_model_request_budget_is_not_unlimited(value):
+&gt;       from src.security_lifecycle_web_contract import RunControl, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:250: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[2]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'">value = '2'
+
+    @pytest.mark.parametrize("value", [0, -1, True, 2.5, "2"])
+    def test_invalid_model_request_budget_is_not_unlimited(value):
+&gt;       from src.security_lifecycle_web_contract import RunControl, WebContractError
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_contract'
+
+tests/test_security_lifecycle_web_contract.py:250: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_public_source_preserves_complete_unicode_and_document_digest" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da878ed10&gt;
+
+    def test_public_source_preserves_complete_unicode_and_document_digest(monkeypatch):
+        body = "Issuer Old Ltd. announces 更名, effective September 6, 2026.".encode()
+&gt;       reader, connections, resolutions, destinations = _reader(monkeypatch, [Response(body)])
+
+tests/test_lifecycle_public_sources.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da878ed10&gt;
+responses = [&lt;tests.test_lifecycle_public_sources.Response object at 0x738da878e710&gt;]
+addresses = None, limit_overrides = {}
+
+    def _reader(monkeypatch, responses=None, addresses=None, **limit_overrides):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:52: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_source_request_does_not_inherit_cookies_auth_or_proxies" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c325f0&gt;
+
+    def test_source_request_does_not_inherit_cookies_auth_or_proxies(monkeypatch):
+        monkeypatch.setenv("HTTPS_PROXY", "http://private-proxy:8080")
+        monkeypatch.setenv("OPENAI_API_KEY", "secret-not-for-pages")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "secret-not-for-pages")
+&gt;       reader, connections, _, _ = _reader(monkeypatch)
+
+tests/test_lifecycle_public_sources.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c325f0&gt;
+responses = None, addresses = None, limit_overrides = {}
+
+    def _reader(monkeypatch, responses=None, addresses=None, **limit_overrides):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:52: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[http://example.com]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da878f5e0&gt;
+url = 'http://example.com'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[file:///etc/passwd]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c306a0&gt;
+url = 'file:///etc/passwd'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://u:p@example.com]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da9db3f40&gt;
+url = 'https://u:p@example.com'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com:8443/a]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c32bf0&gt;
+url = 'https://example.com:8443/a'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://localhost/a]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87f8f40&gt;
+url = 'https://localhost/a'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://127.0.0.1]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c329e0&gt;
+url = 'https://127.0.0.1'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::1]]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da879a740&gt;
+url = 'https://[::1]'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://169.254.169.254/latest/meta-data]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da8bb2bf0&gt;
+url = 'https://169.254.169.254/latest/meta-data'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com\\@127.0.0.1/]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87f87c0&gt;
+url = 'https://example.com\\@127.0.0.1/'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\nnotice]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87dc8e0&gt;
+url = 'https://example.com/\nnotice'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\tnotice]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7d68280&gt;
+url = 'https://example.com/\tnotice'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://exa mple.com]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c6cf40&gt;
+url = 'https://exa mple.com'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/%0d%0aInjected:yes]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da877bf10&gt;
+url = 'https://example.com/%0d%0aInjected:yes'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::ffff:127.0.0.1]]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c32920&gt;
+url = 'https://[::ffff:127.0.0.1]'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:116: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses0]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da8701fc0&gt;
+addresses = ['10.0.0.1']
+
+    @pytest.mark.parametrize("addresses", [
+        ["10.0.0.1"], [PUBLIC_IP, "192.168.1.1"], ["100.64.0.1"], ["0.0.0.0"],
+        ["192.0.2.1"], ["224.0.0.1"],
+    ])
+    def test_dns_with_any_nonpublic_address_cannot_connect(monkeypatch, addresses):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses1]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87bc6a0&gt;
+addresses = ['93.184.216.34', '192.168.1.1']
+
+    @pytest.mark.parametrize("addresses", [
+        ["10.0.0.1"], [PUBLIC_IP, "192.168.1.1"], ["100.64.0.1"], ["0.0.0.0"],
+        ["192.0.2.1"], ["224.0.0.1"],
+    ])
+    def test_dns_with_any_nonpublic_address_cannot_connect(monkeypatch, addresses):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses2]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7da4fa0&gt;
+addresses = ['100.64.0.1']
+
+    @pytest.mark.parametrize("addresses", [
+        ["10.0.0.1"], [PUBLIC_IP, "192.168.1.1"], ["100.64.0.1"], ["0.0.0.0"],
+        ["192.0.2.1"], ["224.0.0.1"],
+    ])
+    def test_dns_with_any_nonpublic_address_cannot_connect(monkeypatch, addresses):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses3]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87be8f0&gt;
+addresses = ['0.0.0.0']
+
+    @pytest.mark.parametrize("addresses", [
+        ["10.0.0.1"], [PUBLIC_IP, "192.168.1.1"], ["100.64.0.1"], ["0.0.0.0"],
+        ["192.0.2.1"], ["224.0.0.1"],
+    ])
+    def test_dns_with_any_nonpublic_address_cannot_connect(monkeypatch, addresses):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses4]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7da5ae0&gt;
+addresses = ['192.0.2.1']
+
+    @pytest.mark.parametrize("addresses", [
+        ["10.0.0.1"], [PUBLIC_IP, "192.168.1.1"], ["100.64.0.1"], ["0.0.0.0"],
+        ["192.0.2.1"], ["224.0.0.1"],
+    ])
+    def test_dns_with_any_nonpublic_address_cannot_connect(monkeypatch, addresses):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses5]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da879a710&gt;
+addresses = ['224.0.0.1']
+
+    @pytest.mark.parametrize("addresses", [
+        ["10.0.0.1"], [PUBLIC_IP, "192.168.1.1"], ["100.64.0.1"], ["0.0.0.0"],
+        ["192.0.2.1"], ["224.0.0.1"],
+    ])
+    def test_dns_with_any_nonpublic_address_cannot_connect(monkeypatch, addresses):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_to_private_destination_does_not_fetch_it" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7da7a60&gt;
+
+    def test_redirect_to_private_destination_does_not_fetch_it(monkeypatch):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:138: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_relative_redirect_is_resolved_and_each_request_counted" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7dea080&gt;
+
+    def test_relative_redirect_is_resolved_and_each_request_counted(monkeypatch):
+&gt;       reader, connections, _, _ = _reader(monkeypatch, [
+            Response(status=302, headers={"Location": "../final"}), Response(),
+        ])
+
+tests/test_lifecycle_public_sources.py:150: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7dea080&gt;
+responses = [&lt;tests.test_lifecycle_public_sources.Response object at 0x738da7dead70&gt;, &lt;tests.test_lifecycle_public_sources.Response object at 0x738da7dead40&gt;]
+addresses = None, limit_overrides = {}
+
+    def _reader(monkeypatch, responses=None, addresses=None, **limit_overrides):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:52: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_limit_rejects_instead_of_returning_partial_source" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7da6200&gt;
+
+    def test_redirect_limit_rejects_instead_of_returning_partial_source(monkeypatch):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:160: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_byte_limit_never_silently_truncates_even_without_content_length" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7de9d20&gt;
+
+    def test_byte_limit_never_silently_truncates_even_without_content_length(monkeypatch):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:171: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers0-%PDF-source_format_unsupported]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c298d0&gt;
+headers = {'Content-Type': 'application/pdf'}, body = b'%PDF'
+code = 'source_format_unsupported'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers1-compressed-source_encoding_unsupported]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7de9720&gt;
+headers = {'Content-Encoding': 'gzip'}, body = b'compressed'
+code = 'source_encoding_unsupported'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete]" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c0c5e0&gt;
+headers = {'Content-Length': '9'}, body = b'short'
+code = 'source_body_incomplete'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers3-text-source_response_invalid]" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7debc40&gt;
+headers = {'Content-Length': 'bad'}, body = b'text'
+code = 'source_response_invalid'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers4-text-source_encoding_unsupported]" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c0c8e0&gt;
+headers = {'Content-Type': 'text/plain; charset=not-a-codec'}, body = b'text'
+code = 'source_encoding_unsupported'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers5-\xff-source_encoding_unsupported]" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7de9360&gt;
+headers = {}, body = b'\xff', code = 'source_encoding_unsupported'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers6--source_text_empty]" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c0e0e0&gt;
+headers = {}, body = b'', code = 'source_text_empty'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_encoding_unsupported"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:189: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_failed_request_consumes_budget_and_has_no_retry" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87bfe50&gt;
+
+    def test_failed_request_consumes_budget_and_has_no_retry(monkeypatch):
+&gt;       from src.lifecycle_public_sources import SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:198: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_stop_during_dns_prevents_late_http_dispatch" time="0.003"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7c0eb30&gt;
+
+    def test_stop_during_dns_prevents_late_http_dispatch(monkeypatch):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:209: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_deadline_is_checked_after_dns_before_any_connection" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7deb100&gt;
+
+    def test_deadline_is_checked_after_dns_before_any_connection(monkeypatch):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:226: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_html_source_excludes_noncontent_without_truncating_notice" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87020b0&gt;
+
+    def test_html_source_excludes_noncontent_without_truncating_notice(monkeypatch):
+        body = b'''&lt;html&gt;&lt;head&gt;&lt;title&gt;Notice&lt;/title&gt;&lt;script&gt;fake delisting&lt;/script&gt;&lt;/head&gt;
+        &lt;body&gt;&lt;p&gt;Common stock OLD remains active.&lt;/p&gt;&lt;style&gt;not evidence&lt;/style&gt;
+        &lt;template&gt;stale fact&lt;/template&gt;&lt;span hidden&gt;not visible&lt;/span&gt;
+        &lt;span aria-hidden="true"&gt;hidden statement&lt;/span&gt;&lt;p&gt;Acquisition announced only.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;'''
+&gt;       reader, _, _, _ = _reader(monkeypatch, [Response(body, headers={"Content-Type": "text/html"})])
+
+tests/test_lifecycle_public_sources.py:247: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da87020b0&gt;
+responses = [&lt;tests.test_lifecycle_public_sources.Response object at 0x738da8701240&gt;]
+addresses = None, limit_overrides = {}
+
+    def _reader(monkeypatch, responses=None, addresses=None, **limit_overrides):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:52: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_exact_passage_requires_real_source_and_byte_aligned_unicode" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da7dea800&gt;
+
+    def test_exact_passage_requires_real_source_and_byte_aligned_unicode(monkeypatch):
+&gt;       from src.lifecycle_public_sources import cite_passage, SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:257: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_modified_page_text_cannot_reuse_source_hash" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_public_sources'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da8703340&gt;
+
+    def test_modified_page_text_cannot_reuse_source_hash(monkeypatch):
+        from dataclasses import replace
+&gt;       from src.lifecycle_public_sources import cite_passage, SourceReadError
+E       ModuleNotFoundError: No module named 'src.lifecycle_public_sources'
+
+tests/test_lifecycle_public_sources.py:279: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_pinned_https_transport_does_not_resolve_host_again" time="0.004"><failure message="ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x738da8779ab0&gt;
+
+    def test_pinned_https_transport_does_not_resolve_host_again(monkeypatch):
+&gt;       from src import lifecycle_public_sources as mod
+E       ImportError: cannot import name 'lifecycle_public_sources' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_lifecycle_public_sources.py:289: ImportError</failure></testcase></testsuite></testsuites>

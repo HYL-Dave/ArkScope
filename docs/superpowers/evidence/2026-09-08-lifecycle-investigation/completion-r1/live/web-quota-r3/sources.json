@@ -1,0 +1,489 @@
+{
+  "source-1": {
+    "captured_at": null,
+    "corpus": "web",
+    "coverage": "captured_document",
+    "mime_type": "text/html",
+    "published_at": null,
+    "publisher": "www.cspdailynews.com",
+    "references": [
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/"
+      },
+      {
+        "label": "Subscribe",
+        "url": "https://www.cspdailynews.com/membership/?t=/mergers-acquisitions/bp-completes-acquisition-travelcenters-america"
+      },
+      {
+        "label": "Company News",
+        "url": "https://www.cspdailynews.com/company-news"
+      },
+      {
+        "label": "Mergers & Acquisitions",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions"
+      },
+      {
+        "label": "Beverages",
+        "url": "https://www.cspdailynews.com/beverages"
+      },
+      {
+        "label": "CBD/Hemp",
+        "url": "https://www.cspdailynews.com/cbdhemp"
+      },
+      {
+        "label": "Foodservice",
+        "url": "https://www.cspdailynews.com/foodservice"
+      },
+      {
+        "label": "Fuels",
+        "url": "https://www.cspdailynews.com/fuels"
+      },
+      {
+        "label": "General Merchandise/HBC",
+        "url": "https://www.cspdailynews.com/general-merchandisehbc"
+      },
+      {
+        "label": "Snacks & Candy",
+        "url": "https://www.cspdailynews.com/snacks-candy"
+      },
+      {
+        "label": "Technology/Services",
+        "url": "https://www.cspdailynews.com/technologyservices"
+      },
+      {
+        "label": "Tobacco",
+        "url": "https://www.cspdailynews.com/tobacco"
+      },
+      {
+        "label": "Top 202 Convenience Store Chains",
+        "url": "https://www.cspdailynews.com/top-202-convenience-stores-2026"
+      },
+      {
+        "label": "Mystery Shop Results",
+        "url": "https://www.cspdailynews.com/mystery-shop-2025-back-back-wins-nouria"
+      },
+      {
+        "label": "Category Management Handbook",
+        "url": "https://www.cspdailynews.com/2025-category-management-handbook"
+      },
+      {
+        "label": "The State of Foodservice",
+        "url": "https://www.cspdailynews.com/state-foodservice-2025-2025/state-foodservice-2025"
+      },
+      {
+        "label": "Great Coffee Programs",
+        "url": "https://www.cspdailynews.com/20-great-coffee-programs-2026-2026/20-great-coffee-programs-2026"
+      },
+      {
+        "label": "Hot Markets for C-Stores",
+        "url": "https://www.cspdailynews.com/top-10-metro-markets-grow-now-2024/where-should-convenience-retailers-build-their-next-stores"
+      },
+      {
+        "label": "Retail Leader of the Year",
+        "url": "https://www.cspdailynews.com/2025-retail-leader-year-scott-hartman"
+      },
+      {
+        "label": "The Future of Fuels",
+        "url": "https://www.cspdailynews.com/future-fuels-2024-2024/future-fuels-2024"
+      },
+      {
+        "label": "C-Suite in the Hot Seat",
+        "url": "https://www.cspdailynews.com/c-suite-hot-seat-2026"
+      },
+      {
+        "label": "Store Design",
+        "url": "https://www.cspdailynews.com/article/grand-opening"
+      },
+      {
+        "label": "Indie Influencers",
+        "url": "https://www.cspdailynews.com/2023-indie-influencers-2023/2023-indie-influencers"
+      },
+      {
+        "label": "Sustainability Outlook 2025",
+        "url": "https://thesustainabilityexchange.com/foodservices-group-sustainability-exchange-digizine-registration/?utm_source=homepage&utm_medium=CSP&utm_id=SustainabilityExchange"
+      },
+      {
+        "label": "View All",
+        "url": "https://www.cspdailynews.com/special-reports/view-all"
+      },
+      {
+        "label": "CSP Magazine",
+        "url": "https://www.cspdailynews.com/csp-magazine"
+      },
+      {
+        "label": "Convenience Store Products",
+        "url": "https://www.cspdailynews.com/convenience-store-products"
+      },
+      {
+        "label": "Podcasts",
+        "url": "https://www.cspdailynews.com/csp-podcast"
+      },
+      {
+        "label": "Webinars",
+        "url": "https://www.cspdailynews.com/webinars"
+      },
+      {
+        "label": "Downloadable Reports",
+        "url": "https://www.cspdailynews.com/exclusive-industry-reports"
+      },
+      {
+        "label": "Newsletters",
+        "url": "https://www.cspdailynews.com/subscribe-all-newsletters"
+      },
+      {
+        "label": "Advertise",
+        "url": "https://advertise.cspdailynews.com/"
+      },
+      {
+        "label": "Contact Us",
+        "url": "https://www.cspdailynews.com/contact-us"
+      },
+      {
+        "label": "Convenience Retailing University",
+        "url": "https://convenienceretailing.com/"
+      },
+      {
+        "label": "Outlook Leadership",
+        "url": "https://www.outlookleadership.com/"
+      },
+      {
+        "label": "C-StoreTEC",
+        "url": "https://cstoretec.com/"
+      },
+      {
+        "label": "C-Store Women",
+        "url": "https://www.cstorewomen.com/"
+      },
+      {
+        "label": "All Meetings",
+        "url": "https://www.cspdailynews.com/industry-events"
+      },
+      {
+        "label": "Follow on Facebook",
+        "url": "https://www.facebook.com/CSPDailyNews/"
+      },
+      {
+        "label": "Follow on LinkedIn",
+        "url": "https://www.linkedin.com/showcase/csp-daily-news/"
+      },
+      {
+        "label": "Follow on Instagram",
+        "url": "https://www.instagram.com/cspdailynews?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+      },
+      {
+        "label": "Subscribe on YouTube",
+        "url": "https://www.youtube.com/@cspdailynews"
+      },
+      {
+        "label": "",
+        "url": "https://informaconnect.com/"
+      },
+      {
+        "label": "Edit",
+        "url": "https://platform.winsightmedia.com/node/184156/edit"
+      },
+      {
+        "label": "Steve Holtz",
+        "url": "https://www.cspdailynews.com/profile/steve-holtz"
+      },
+      {
+        "label": "Facebook",
+        "url": "https://www.facebook.com/sharer/sharer.php?u=https://cspdailynews.com/mergers-acquisitions/bp-completes-acquisition-travelcenters-america"
+      },
+      {
+        "label": "Twitter",
+        "url": "https://twitter.com/intent/tweet?text=bp%20Completes%20Acquisition%20of%20TravelCenters%20of%20America&url=https://cspdailynews.com/mergers-acquisitions/bp-completes-acquisition-travelcenters-america"
+      },
+      {
+        "label": "LinkedIn",
+        "url": "https://www.linkedin.com/shareArticle?mini=true&url=https://cspdailynews.com/mergers-acquisitions/bp-completes-acquisition-travelcenters-america&title=bp%20Completes%20Acquisition%20of%20TravelCenters%20of%20America&summary=Oil%20company%20says%20the%20deal%20fits%20its%20plan%20to%20expand%20its%20convenience%20network%20and%20mobility&source=CSP%20Daily%20News"
+      },
+      {
+        "label": "completed its $1.3 billion acquisition",
+        "url": "https://www.cspdailynews.com/company-news/bp-expects-close-travelcenters-america-deal-2nd-quarter"
+      },
+      {
+        "label": "No. 7",
+        "url": "https://www.cspdailynews.com/company-news/ranking-top-40-c-store-chains-2023-update"
+      },
+      {
+        "label": "2022 Top 20",
+        "url": "https://www.cspdailynews.com/top-202-convenience-stores-2022/travelcenters-america-llc"
+      },
+      {
+        "label": "Sign up here",
+        "url": "https://www.cspdailynews.com/membership/?utm_source=website&utm_medium=CSPDN-content&utm_campaign=membership"
+      },
+      {
+        "label": "mergers and acquisitions",
+        "url": "https://www.cspdailynews.com/article/mergers-acquisitions-csp"
+      },
+      {
+        "label": "news",
+        "url": "https://www.cspdailynews.com/article/news-csp"
+      },
+      {
+        "label": "Click here to complete your profile",
+        "url": "https://pages.cspdailynews.com/CSP-Subscription-Center-Create-Profile.html"
+      },
+      {
+        "label": "Sheetz launches new 3-episode miniseries on YouTube",
+        "url": "https://www.cspdailynews.com/foodservice/sheetz-launches-new-3-episode-miniseries-youtube"
+      },
+      {
+        "label": "How loyalty and personalization strategies are evolving",
+        "url": "https://www.cspdailynews.com/technologyservices/how-loyalty-personalization-strategies-are-evolving"
+      },
+      {
+        "label": "How AI and data integration will define the future of convenience retail",
+        "url": "https://www.cspdailynews.com/technologyservices/how-ai-data-integration-will-define-future-convenience-retail"
+      },
+      {
+        "label": "Essential strategies for convenience-store success",
+        "url": "https://www.cspdailynews.com/company-news/essential-strategies-convenience-store-success"
+      },
+      {
+        "label": "Trump signs bill delaying federal hemp ban until December",
+        "url": "https://www.cspdailynews.com/cbdhemp/trump-signs-bill-delaying-federal-hemp-ban-until-december"
+      },
+      {
+        "label": "7-Eleven debuts the BiG Flavor Bar, a sauce and topping station",
+        "url": "https://www.cspdailynews.com/foodservice/7-eleven-debuts-big-flavor-bar-sauce-topping-station"
+      },
+      {
+        "label": "Retail Daily",
+        "url": "https://www.cspdailynews.com/rss/RetailToday"
+      },
+      {
+        "label": "C-Store TEC Talks",
+        "url": "https://www.cspdailynews.com/video"
+      },
+      {
+        "label": "bp to Acquire TravelCenters of America",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/bp-acquire-travelcenters-america"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/sunoco-acquire-offen-petroleum-600m"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/rmarts-sells-8-convenience-stores-undisclosed-buyer"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/caseys-acquire-all-24-pak-sak-stores"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/arko-petroleum-corp-acquire-us-petroleum-partners-fuel-distribution"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/circle-k-owner-couche-tard-acquire-polands-zabka-group-86b"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/mergers-acquisitions/earnheart-oil-sells-integrated-retail-wholesale-transportation-portfolio"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/snacks-candy/glp-1-use-grows-consumers-turn-toward-healthier-offerings"
+      },
+      {
+        "label": "Premium",
+        "url": "https://www.cspdailynews.com/exclusive-content"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/technologyservices/smarter-targeting-cuts-wasted-loyalty-spend-convenience-retail"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/cbdhemp/could-hemp-become-state-state-market"
+      },
+      {
+        "label": "Win Snacking Occasions With Global Flavors",
+        "url": "https://www.cspdailynews.com/foodservice/win-snacking-occasions-global-flavors"
+      },
+      {
+        "label": "How Leading Retailers Are Turning the Forecourt Into a Loyalty Ecosystem",
+        "url": "https://www.cspdailynews.com/technologyservices/how-leading-retailers-are-turning-forecourt-loyalty-ecosystem"
+      },
+      {
+        "label": "Scaling What Works: How AI Turns Insight into Store‑Level Results",
+        "url": "https://www.cspdailynews.com/recirc/scaling-what-works-how-ai-turns-insight-store-level-results"
+      },
+      {
+        "label": "AI in the Forecourt: Why Circle K Bet Big on Remote Repair",
+        "url": "https://www.cspdailynews.com/fuels/ai-forecourt-why-circle-k-bet-big-remote-repair"
+      },
+      {
+        "label": "Terminal Profitability: How Modern Payment Kiosks Can Kickstart Revenue for C-Stores",
+        "url": "https://www.cspdailynews.com/technologyservices/terminal-profitability-how-modern-payment-kiosks-can-kickstart-revenue-c"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/category-management-handbook-2024-2024/category-management-handbook-2024"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/technologyservices/state-distribution-road-improvement"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/company-news/bp-names-ian-tyler-new-chair"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/technologyservices/pilot-co-rolling-out-digital-parking-pro-drivers"
+      },
+      {
+        "label": "",
+        "url": "https://www.cspdailynews.com/foodservice/steal-foodservice-idea-celebrate-oktoberfest"
+      },
+      {
+        "label": "About",
+        "url": "https://www.cspdailynews.com/about-csp"
+      },
+      {
+        "label": "",
+        "url": "https://www.qgdigitalpublishing.com/publication/?i=868451&p=0&view=issueViewer"
+      },
+      {
+        "label": "",
+        "url": "https://twitter.com/CSPDailyNews"
+      },
+      {
+        "label": "",
+        "url": "https://www.linkedin.com/showcase/11074367"
+      },
+      {
+        "label": "",
+        "url": "https://www.supermarketnews.com/"
+      },
+      {
+        "label": "",
+        "url": "https://www.technomic.com/"
+      },
+      {
+        "label": "",
+        "url": "https://restaurantleadership.com/"
+      },
+      {
+        "label": "",
+        "url": "https://globalrlc.com/"
+      },
+      {
+        "label": "",
+        "url": "https://fstec.com/"
+      },
+      {
+        "label": "",
+        "url": "https://outlookleadership.com/"
+      },
+      {
+        "label": "",
+        "url": "https://cstorewomen.com/"
+      },
+      {
+        "label": "",
+        "url": "https://www.nationalrestaurantshow.com/"
+      },
+      {
+        "label": "Do not sell my personal info",
+        "url": "https://privacy.informa.com/policies/"
+      },
+      {
+        "label": "Privacy Policy",
+        "url": "https://www.informa.com/privacy-policy/"
+      },
+      {
+        "label": "Code of Conduct",
+        "url": "https://informaconnect.com/code-of-conduct/"
+      },
+      {
+        "label": "Contact Us",
+        "url": "https://informaconnect.com/contact-us/"
+      },
+      {
+        "label": "RSS",
+        "url": "https://www.winsightmedia.com/rss"
+      }
+    ],
+    "retrieved_at": "2026-09-07T22:30:10.631322+00:00",
+    "syndication_key": null,
+    "text": "Continue to Site >>>\nMenu\nSearch CSP Daily News\nSearch\nbp Completes Acquisition of TravelCenters of America\nNewsletterLoginSubscribe\nNewsletterLoginSubscribe\nRetailer News\nCompany News\nMergers & Acquisitions\nCategory News\nBeverages\nCBD/Hemp\nFoodservice\nFuels\nGeneral Merchandise/HBC\nSnacks & Candy\nTechnology/Services\nTobacco\nData\nTop 202 Convenience Store Chains\nMystery Shop Results\nCategory Management Handbook\nThe State of Foodservice\nSpecial Reports\nGreat Coffee Programs\nHot Markets for C-Stores\nRetail Leader of the Year\nThe Future of Fuels\nC-Suite in the Hot Seat\nStore Design\nIndie Influencers\nSustainability Outlook 2025\nView All\nResources\nCSP Magazine\nConvenience Store Products\nPodcasts\nWebinars\nDownloadable Reports\nNewsletters\nAdvertise\nContact Us\nEvents & Communities\nConvenience Retailing University\nOutlook Leadership\nC-StoreTEC\nC-Store Women\nAll Meetings\nSocial\nFollow on Facebook\nFollow on X\nFollow on LinkedIn\nFollow on Instagram\nSubscribe on YouTube\nSunoco to acquire Offen Petroleum for $600M\nRmarts sells 8 convenience stores to undisclosed buyer\nCasey’s to acquire all 24 Pak-A-Sak stores\nArko Petroleum Corp. to acquire U.S. Petroleum Partners, a fuel distribution company serving the Great Lakes region\nCircle K owner Couche-Tard to acquire Poland's Żabka Group for $8.6B\nMergers & Acquisitions\nbp Completes Acquisition of TravelCenters of America\nOil company says the deal fits its plan to expand its convenience network and mobility\nBy Steve Holtz on May 15, 2023\nPhotograph courtesy of bp\nFacebook\nTwitter\nLinkedIn\nBP Products North America Inc. today completed its $1.3 billion acquisition of TravelCenters of America Inc. The acquisition marks \"a milestone for the U.S. in the growth of bp's strategic convenience and mobility business,\" according to bp.\nThe transaction:\nAdds a network of about 280 travel centers, located on major highways across United States\nAlmost doubles bp's global convenience gross margin\nBrings growth opportunities for four of bp's five transition growth engines, including EV charging via bp pulse, convenience, biofuels/ renewable natural gas (RNG) and, later, hydrogen\nAdds EBITDA immediately, expected to grow to around $800 million by 2025\n\"We are thrilled to welcome the TravelCenters of America team to bp and give a turbo-boost to our convenience and mobility business in the U.S.,\" said Emma Delaney, executive vice president customers and products, bp. \"Combining TA's sites on U.S. highways with our brilliant retail network off the highway immediately expands our offer and doubles our global convenience gross margin.\n\"By integrating bp pulse, our fast-growing EV charging business, along with biofuels and renewable natural gas businesses—and in time, hydrogen—we can help America's vital fleets and logistics companies decarbonize.\"\nbp is No. 7 and TravelCenters of America is No. 29 on CSP’s Top 40 update to the 2022 Top 202 ranking of U.S. convenience-store chains by company-owned store count. Watch for the updated list in June.\nIn February, bp announced it had agreed to acquire TA, subject to required approvals. Having received those approvals and with the transaction complete, TA's strategically located network of highway sites complements bp's existing predominantly off-highway convenience and mobility business in the US, the company said, enabling TA and bp to offer fleets and consumers a seamless nationwide service.\nThe company said the transaction will provide options to expand and continue to develop convenience and mobility offers through four of bp's five transition growth engines:\nEV charging\nBiofuels\nHydrogen\nConvenience\n“Convenience is one of five strategic transition growth engines that bp intends to grow rapidly through this decade,” the company said. “By 2030, bp aims for around half its annual investment to go into these transition growth engines; with around half of its anticipated cumulative $55 billion-$65 billion transition growth engine investment going into convenience, bioenergy and EV charging.\nWith the close of the acquisition, TravelCenters of America common shares have been converted into the right to receive $86 per share.\nTravelCenters of America is a nationwide operator and franchisor of the TA, Petro Stopping Centers and TA Express travel center brands.\nbp listed a total of 20,700 retail sites in first-quarter 2023, and 2,450 strategic convenience sites, which it defines as retail sites that sell bp-branded vehicle energy including bp, Aral, Arco, Amoco, Thorntons and bp pulse, and carry one of its strategic convenience brands. As of year-end 2022, bp had 1,224 company-owned and -operated c-store sites in the United States.\nMembers help make our journalism possible. Become a CSP member today and unlock exclusive benefits, including unlimited access to all of our content. Sign up here.\nmergers and acquisitions\nnews\nSteve Holtz is the Content Director for Winsight's convenience retail group CSP. He has been covering the convenience-store industry for two decades ...\nView All Articles by This Author\nWant breaking news at your fingertips?\nGet today’s need-to-know convenience industry intelligence. Sign up to receive texts from CSP on news and insights that matter to your brand.\nNewsletter\nThe latest from CSP, sent straight to your inbox.\nSign Up\nThanks for signing up!\nClick here to complete your profile\nMultimedia\nSheetz launches new 3-episode miniseries on YouTube\nHow loyalty and personalization strategies are evolving\nHow AI and data integration will define the future of convenience retail\nEssential strategies for convenience-store success\nThe Latest\nCBD/Hemp\nTrump signs bill delaying federal hemp ban until December\nFoodservice\nSheetz launches new 3-episode miniseries on YouTube\nFoodservice\n7-Eleven debuts the BiG Flavor Bar, a sauce and topping station\nListen to your daily news: CSP Daily News PodcastsNew episodes weekdays\nAt Your Convenience\nRetail Daily\nC-Store TEC Talks\nRelated\nCompany News\nRanking the Top 40 C-Store Chains: A 2023 Update\nCompany News\nbp Expects to Close TravelCenters of America Deal in 2nd Quarter\nMergers & Acquisitions\nbp to Acquire TravelCenters of America\nMore on this Topic\nMergers & Acquisitions\nSunoco to acquire Offen Petroleum for $600M\nMergers & Acquisitions\nRmarts sells 8 convenience stores to undisclosed buyer\nMergers & Acquisitions\nCasey’s to acquire all 24 Pak-A-Sak stores\nMergers & Acquisitions\nArko Petroleum Corp. to acquire U.S. Petroleum Partners, a fuel distribution company serving the Great Lakes region\nMergers & Acquisitions\nCircle K owner Couche-Tard to acquire Poland's Żabka Group for $8.6B\nMergers & Acquisitions\nEarnheart Oil sells integrated retail, wholesale and transportation portfolio\nExclusive Content\nPremium\nSnacks & Candy\nAs GLP-1 use grows, consumers turn toward healthier offerings\nChestnut Market, CrossAmerica Partners and G&M Oil Co. leaders discuss effects of the rise of these weight-loss drugs\nPremium\nTechnology/Services\nSmarter targeting cuts wasted loyalty spend in convenience retail\n‘Suppress your own members so every dollar buys a stranger,’ Convenience and Energy Advisors CEO Peter Rasmussen says at Outlook Leadership event\nPremium\nCBD/Hemp\nCould hemp become a state-by-state market?\nWhy a marijuana-style marketplace may not be feasible for traditional wholesalers and retailers\nTrending\nCBD/Hemp\nTrump signs bill delaying federal hemp ban until December\nFoodservice\nSheetz launches new 3-episode miniseries on YouTube\nFoodservice\n7-Eleven debuts the BiG Flavor Bar, a sauce and topping station\nMore from our partners\nFoodservice\nWin Snacking Occasions With Global Flavors\nTechnology/Services\nHow Leading Retailers Are Turning the Forecourt Into a Loyalty Ecosystem\nWebinars\nScaling What Works: How AI Turns Insight into Store‑Level Results\nFuels\nAI in the Forecourt: Why Circle K Bet Big on Remote Repair\nTechnology/Services\nTerminal Profitability: How Modern Payment Kiosks Can Kickstart Revenue for C-Stores\nNewsletter\nWant breaking news at your fingertips?\nGet today’s need-to-know convenience industry intelligence. Sign up to receive texts from CSP on news and insights that matter to your brand.\nNewsletter\nThe latest from CSP, sent straight to your inbox.\nSign Up\nThanks for signing up!\nClick here to complete your profile\nEssential Resources\nTop 202 Convenience Stores 2026\nCSP’s Top 202 details the largest chains in the convenience-store industry and the biggest mergers and acquisitions news from the past year. Take a deep dive into the c-store landscape and see the top 202 chains here.\nCategory Management Handbook 2024\nCategory sales performance in Beverages, Candy, General Merchandise, Packaged Food/Foodservice and Snacks.\nThe Distributor 15 2024\nThe industry’s largest distributors by sales volume\nConvenience Store Products\nThe latest information on products and trends in the convenience-store and foodservice industries.\nGrand Openings\nPeek inside new convenience stores to uncover the best in retail store design across North America.\nCompany News\nCorporate retail news affecting the convenience-store industry\nTrending\nCompany News\nbp names Ian Tyler new chair\nTechnology/Services\nPilot Co. is rolling out digital parking for pro drivers\nFoodservice\nSteal This Foodservice Idea: Celebrate Oktoberfest\nAbout\nNewsletters\nAdvertise\nCSP Magazine\nIn This Issue\nDash In’s long and winding road | August 2026\nDigital Edition\nDo not sell my personal infoPrivacy PolicyCode of ConductContact UsRSS\nCopyright © Informa Connect 2026",
+    "text_sha256": "ed8b01293457b71d0947e2048918a149444f8860a1d27c8714d1e27c22e4165f",
+    "title": null,
+    "url": "https://www.cspdailynews.com/mergers-acquisitions/bp-completes-acquisition-travelcenters-america"
+  },
+  "source-2": {
+    "captured_at": null,
+    "corpus": "web",
+    "coverage": "captured_document",
+    "mime_type": "text/html",
+    "published_at": null,
+    "publisher": "www.sec.gov",
+    "references": [],
+    "retrieved_at": "2026-09-07T22:30:29.724138+00:00",
+    "syndication_key": null,
+    "text": "EX-99.1\n2\ntm2315684d2_ex99-1.htm\nEXHIBIT 99.1\nExhibit 99.1\nTravelCenters\nof America Inc. Announces Intention to Delist 8.25% Senior Notes Due 2028, 8.00% Senior Notes\nDue 2029, and 8.00% Senior Notes Due 2030 (Nasdaq: TANNI; TANNL; TANNZ) from the Nasdaq.\nWESTLAKE,\nOhio – May 16, 2023 – TravelCenters\nof America Inc. (Nasdaq: TA), the nationwide operator and franchisor of the TA, Petro Stopping Centers and TA Express travel\ncenter brands, announced yesterday the completion of the all-cash acquisition of TA by BP Products North America Inc.\nNotice of\nIntent to Delist and Deregister Senior Notes (Nasdaq: TANNI; TANNL; TANNZ)\nIn connection\nwith the closing of the transaction, TA announced today that it has notified The Nasdaq Stock Market LLC (“Nasdaq”) of its\nintention to voluntarily delist from the Nasdaq Global Select Market and deregister its 8.25% Senior Notes due 2028 (CUSIP Number 894174200),\n8.00% Senior Notes due 2029 (CUSIP Number 894174309), and 8.00% Senior Notes due 2030 (CUSIP Number 894174408) (collectively, the “Notes”)\nand its intention to file a Notification of Removal from Listing on Form 25 on or about May 26, 2023 (the “Form 25”)\nwith the US Securities and Exchange Commission (“SEC”). As a result, TA expects the delisting of the Notes to become effective\non or about June 5, 2023, from which time the Notes will no longer be listed on the Nasdaq. TA has not made arrangements for the\nlisting and/or registration of the Notes on another national securities exchange or quotation medium.\nNotice of\nIntent to Redeem Senior Notes\nTA announced\ntoday that it will redeem all of the Notes outstanding on June 15, 2023 (the “Redemption Date”). The redemption price\nfor the Notes is equal to 100.00% of the principal amount of the Notes being redeemed, plus accrued and unpaid interest, if any, to but\nexcluding the Redemption Date.\nTA has instructed\nthe trustee for the Notes, U.S. Bank National Association (the “Trustee”), to distribute a notice of redemption to all registered\nholders of the Notes. Redemption with respect to book-entry interests in the Notes represented by global notes will be done in accordance\nwith the standard procedures of The Depository Trust Company.\nThis news release\nshall not constitute an offer to sell, a solicitation to buy or an offer to purchase or sell any securities in any jurisdiction in which\nsuch offer, solicitation or sale would be unlawful prior to registration or qualification under the securities laws of any such jurisdiction.\nTA reserves\nthe right, for any reason, to delay any of the filings described above, to withdraw them prior to effectiveness, and to otherwise change\nits plans in respect of delisting the Notes and the termination of its reporting obligations with respect to the Notes under applicable\nU.S. federal securities laws in any way.\nWarning Regarding\nForward Looking Statements\nThis communication contains “forward-looking\nstatements,” including statements containing the words “expect,” “intend,” “plan,” “believe,”\n“will,” “should,” “would,” “could,” “may,” and words of similar meaning,\nas well as other words or expressions referencing future events, conditions or circumstances. Statements that describe or relate to Parent’s\nor TravelCenters’ plans, goals, intentions, strategies, or financial outlook, and statements that do not relate to historical or\ncurrent fact, are examples of forward-looking statements. Examples of forward-looking statements include, without limitation, the effect\nof the announcement of the proposed transaction on the ability of TravelCenters to retain and hire key personnel and maintain relationships\nwith customers, suppliers and others with whom TravelCenters does business, or on TravelCenters operating results and business generally;\nrisks that the proposed transaction disrupts current plans and operations and the potential difficulties in employee retention as a result\nof the proposed transaction; the outcome of any legal proceedings related to the proposed transaction; the occurrence of any event, change\nor other circumstances that could give rise to the termination of the Merger Agreement, including circumstances requiring a party to\npay the other party a termination fee pursuant to the Merger Agreement; the ability of the parties to consummate the proposed transaction\non a timely basis or at all; the satisfaction of the conditions precedent to consummation of the proposed transaction, including the\nability to secure regulatory approvals on the terms expected, at all or in a timely manner; the ability of Parent to implement its plans,\nforecasts and other expectations with respect to its business after the completion of the proposed transaction and realize expected benefits;\nbusiness disruption following the proposed transaction. Forward-looking statements are not guarantees of future performance, and there\nare a number of important factors that could cause actual outcomes and results to differ materially from the results contemplated by\nsuch forward-looking statements, including those factors listed in the section entitled “Risk Factors” in Item 1A of TravelCenters’\nAnnual Report on Form 10-K filed with the SEC on March 1, 2023, as amended, and those factors detailed from time to time in\nTravelCenters’ other SEC reports including quarterly reports on Form 10-Q and current reports on Form 8-K. TravelCenters\ndoes not undertake any obligation to publicly update or revise any forward-looking statements, whether as a result of new information,\nfuture events or otherwise, except as otherwise required by law.",
+    "text_sha256": "5d2ad176bd71544693d48e637ca4f43da622ec53529d277ca8d3277fba88b3e8",
+    "title": null,
+    "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923061210/tm2315684d2_ex99-1.htm"
+  },
+  "source-3": {
+    "captured_at": null,
+    "corpus": "web",
+    "coverage": "captured_document",
+    "mime_type": "text/html",
+    "published_at": null,
+    "publisher": "www.sec.gov",
+    "references": [
+      {
+        "label": "99.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923061210/tm2315684d2_ex99-1.htm"
+      }
+    ],
+    "retrieved_at": "2026-09-07T22:35:42.462971+00:00",
+    "syndication_key": null,
+    "text": "0001378453\nfalse\n0001378453\n2023-05-16\n2023-05-16\n0001378453\nta:SharesofCommonStock0001ParValuePerShareMember\n2023-05-16\n2023-05-16\n0001378453\nta:Sec8.25PercentSeniorNotesDue2028Member\n2023-05-16\n2023-05-16\n0001378453\nta:Sec8.00PercentSeniorNotesDue2029Member\n2023-05-16\n2023-05-16\n0001378453\nta:Sec8.00PercentSeniorNotesDue2030Member\n2023-05-16\n2023-05-16\niso4217:USD\nxbrli:shares\niso4217:USD\nxbrli:shares\nUNITED STATES\nSECURITIES AND EXCHANGE COMMISSION\nWASHINGTON, D.C. 20549\nFORM 8-K\nCURRENT REPORT\nPursuant to Section 13 or 15(d) of the Securities\nExchange Act of 1934\nDate of Report (Date of earliest event reported):\nMay 16, 2023\nTravelCenters\nof America Inc.\n(Exact name of registrant as specified in its charter)\nMaryland\n001-33274\n20-5701514\n(State or Other Jurisdiction of\nIncorporation or Organization)\n(Commission File Number)\n(I.R.S. Employer Identification Number)\n24601 Center Ridge Road,\nWestlake, OH 44145-5639\n(Address of Principal Executive Offices) (Zip Code)\n(440) 808-9100\n(Registrant's Telephone Number, Including Area Code)\nCheck the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under\nany of the following provisions:\n[ ¨ ]\nWritten communications pursuant to Rule 425 under the Securities\nAct (17 CFR 230.425)\n[ ¨ ]\nSoliciting material pursuant to Rule 14a-12 under the Exchange\nAct (17 CFR 240.14a-12)\n[ ¨ ]\nPre-commencement communications pursuant to Rule 14d-2(b)\nunder the Exchange Act (17 CFR 240.14d-2(b))\n[ ¨ ]\nPre-commencement communications pursuant to Rule 13e-4(c)\nunder the Exchange Act (17 CFR 240.13e-4(c))\nSecurities registered pursuant to Section 12(b) of the Act:\nTITLE OF EACH CLASS\nTRADING SYMBOL\nNAME OF EXCHANGE\nShares of Common Stock, $0.001 Par Value Per Share\nTA\nThe NASDAQ Stock Market LLC\n8.25% Senior Notes due 2028\nTANNI\nThe NASDAQ Stock Market LLC\n8.00% Senior Notes due 2029\nTANNL\nThe NASDAQ Stock Market LLC\n8.00% Senior Notes due 2030\nTANNZ\nThe NASDAQ Stock Market LLC\nIndicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405\nof this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter).\nEmerging growth company [ ¨ ]\nIf an emerging growth company, indicate by check mark if the registrant has elected not to use the extended transition period for complying\nwith any new or revised financial accounting standards provided pursuant to Section 13(a) of the Exchange Act. [ ¨ ]\nIntroductory Note.\nAs previously disclosed, on\nFebruary 15, 2023, TravelCenters of America Inc., a Maryland corporation (the “Company”), entered into an Agreement\nand Plan of Merger (the “Merger Agreement”), by and among the Company, BP Products North America Inc., a Maryland corporation\n(“Parent”), and Bluestar RTM Inc., a Maryland corporation and an indirect wholly-owned subsidiary of Parent (“Merger\nSubsidiary”), and, on May 15, 2023, Merger Subsidiary merged with and into the Company (the “Merger”)\non the terms and conditions set forth in the Merger Agreement, with the Company surviving the Merger as an indirect wholly-owned subsidiary\nof Parent.\nItem 3.01 Notice of Delisting or Failure to\nSatisfy a Continued Listing Rule or Standard; Transfer of Listing.\nIn\nconnection with the consummation of the Merger, the Company has notified the Nasdaq Stock Market LLC (“Nasdaq”) of\nits intention to voluntarily delist from the Nasdaq Global Select Market and deregister its 8.25% Senior Notes due 2028 (CUSIP Number\n894174200), 8.00% Senior Notes due 2029 (CUSIP Number 894174309), and 8.00% Senior Notes due 2030 (CUSIP Number 894174408) (collectively,\nthe “Senior Notes”) under Section 12(b) of the Securities Exchange Act of 1934, as amended (the “Exchange\nAct”), by filing an application with the Securities and Exchange Commission (the “SEC”) on Form 25 on\nor about May 26, 2023. The Company expects the delisting of the Senior Notes to become effective on or about June 5, 2023. After\nthe delisting of the Senior Notes, the Company plans to file a Form 15 with the SEC to suspend its reporting obligations pursuant\nto Section 15(d) of the Exchange Act.\nThe Company has instructed\nthe trustee for the Senior Notes, U.S. Bank Trust Company, National Association (the “Trustee”), to disseminate a Notice\nof Full Redemption (the “Redemption Notice”) to all registered holders of the Senior Notes. The Company will redeem\nall of the outstanding Senior Notes on June 15, 2023 (the “Redemption Date”). The redemption price for the Senior\nNotes is equal to 100% of the principal amount of the Senior Notes being redeemed, plus accrued and unpaid interest, if any, up to but\nexcluding the Redemption Date. Book-entry interests in the Senior Notes represented by global notes will be redeemed in accordance with\nthe standard procedures of The Depository Trust Company.\nThis Current Report on Form 8-K\ndoes not constitute a notice of redemption with respect to the Senior Notes. The Company called the Senior Notes for redemption only by,\nand pursuant to the terms of, the Redemption Notice.\nThe\ninformation set forth in the Introductory Note and in Item 2.01 of this Current Report on Form 8-K is incorporated by reference into\nthis Item 3.01.\nItem 7.01 Regulation FD Disclosure.\nOn May 16, 2023, the Company announced its intention to voluntarily delist from Nasdaq and deregister\nits Senior Notes from Nasdaq and to instruct the Trustee to disseminate the Redemption Notice to all registered holders of the Senior\nNotes, which press release is furnished as Exhibit 99.1 and is incorporated herein by reference.\nItem 9.01 Financial Statements and Exhibits.\n(d) Exhibits\nExhibit\nNo.\nDescription\n99.1\nPress Release issued on May 16, 2023.\n104\nCover Page Interactive Data File (embedded within the Inline XBRL document)\n2\nSIGNATURE\nPursuant to the requirements\nof the Securities Exchange Act of 1934, as amended, the Registrant has duly caused this Report to be signed on its behalf by the undersigned\nhereunto duly authorized.\nDate: May 16, 2023\nTRAVELCENTERS OF AMERICA INC.\nBy:\n/s/ Gregory A. Franks\nName: Gregory A. Franks\nTitle: President and Chairman\n3",
+    "text_sha256": "c9c3c1b4ae35d6c8bc4ed65301355e9d9e002538749f455e683948517cc28bd1",
+    "title": null,
+    "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923061210/tm2315684d2_8k.htm"
+  },
+  "source-4": {
+    "captured_at": null,
+    "corpus": "web",
+    "coverage": "captured_document",
+    "mime_type": "text/html",
+    "published_at": null,
+    "publisher": "www.sec.gov",
+    "references": [
+      {
+        "label": "Exhibit 2.1 to the Current Report on Form 8-K filed by the Company with the U.S. Securities and Exchange Commission (the “ SEC ”) on February 16, 2023",
+        "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923022889/tm237083d1_ex2-1.htm"
+      },
+      {
+        "label": "3.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_ex3-1.htm"
+      },
+      {
+        "label": "3.2",
+        "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_ex3-2.htm"
+      },
+      {
+        "label": "10.1",
+        "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923022889/tm237083d1_ex10-1.htm"
+      }
+    ],
+    "retrieved_at": "2026-09-07T22:37:12.769938+00:00",
+    "syndication_key": null,
+    "text": "0001378453\nfalse\n--12-31\n0001378453\n2023-05-15\n2023-05-15\n0001378453\nta:SharesofCommonStock0001ParValuePerShareMember\n2023-05-15\n2023-05-15\n0001378453\nta:Sec8.25PercentSeniorNotesDue2028Member\n2023-05-15\n2023-05-15\n0001378453\nta:Sec8.00PercentSeniorNotesDue2029Member\n2023-05-15\n2023-05-15\n0001378453\nta:Sec8.00PercentSeniorNotesDue2030Member\n2023-05-15\n2023-05-15\niso4217:USD\nxbrli:shares\niso4217:USD\nxbrli:shares\nUNITED STATES\nSECURITIES AND EXCHANGE COMMISSION\nWASHINGTON, D.C. 20549\nFORM 8-K\nCURRENT REPORT\nPursuant to Section 13 or 15(d) of the Securities\nExchange Act of 1934\nDate of Report (Date of earliest event reported):\nMay 15, 2023\nTravelCenters\nof America Inc.\n(Exact name of registrant as specified in its charter)\nMaryland\n001-33274\n20-5701514\n(State or Other Jurisdiction of\nIncorporation or Organization)\n(Commission File Number)\n(I.R.S. Employer Identification Number)\n24601 Center Ridge Road, Westlake, OH 44145-5639\n(Address of Principal Executive Offices) (Zip Code)\n(440) 808-9100\n(Registrant's Telephone Number, Including Area Code)\nCheck the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under\nany of the following provisions:\n[ ¨ ]\nWritten communications pursuant to Rule 425 under the Securities\nAct (17 CFR 230.425)\n[ ¨ ]\nSoliciting material pursuant to Rule 14a-12 under the Exchange\nAct (17 CFR 240.14a-12)\n[ ¨ ]\nPre-commencement communications pursuant to Rule 14d-2(b)\nunder the Exchange Act (17 CFR 240.14d-2(b))\n[ ¨ ]\nPre-commencement communications pursuant to Rule 13e-4(c)\nunder the Exchange Act (17 CFR 240.13e-4(c))\nSecurities registered pursuant to Section 12(b) of the Act:\nTITLE OF EACH CLASS\nTRADING SYMBOL\nNAME OF EXCHANGE\nShares of Common Stock, $0.001 Par Value Per Share\nTA\nThe NASDAQ Stock Market LLC\n8.25% Senior Notes due 2028\nTANNI\nThe NASDAQ Stock Market LLC\n8.00% Senior Notes due 2029\nTANNL\nThe NASDAQ Stock Market LLC\n8.00% Senior Notes due 2030\nTANNZ\nThe NASDAQ Stock Market LLC\nIndicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405\nof this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter).\nEmerging growth company [ ¨ ]\nIf an emerging growth company, indicate by check mark if the registrant has elected not to use the extended transition period for complying\nwith any new or revised financial accounting standards provided pursuant to Section 13(a) of the Exchange Act. [ ¨ ]\nIntroductory Note.\nAs previously disclosed, on\nFebruary 15, 2023, TravelCenters of America Inc., a Maryland corporation (the “Company”), entered into an Agreement\nand Plan of Merger (the “Merger Agreement”), by and among the Company, BP Products North America Inc., a Maryland corporation\n(“Parent”), and Bluestar RTM Inc., a Maryland corporation and an indirect wholly-owned subsidiary of Parent (“Merger\nSubsidiary”). On May 15, 2023, Merger Subsidiary merged with and into the Company (the “Merger”) on the terms\nand conditions set forth in the Merger Agreement, with the Company surviving the Merger as an indirect wholly-owned subsidiary of Parent\n(the “Surviving Corporation”).\nItem 1.02 Termination\nof a Material Definitive Agreement.\nOn\nMay 15, 2023, the Company, Citibank, N.A., as administrative agent (“Citibank”), and Delaware Trust Company, as collateral\nagent (“DTC”), entered into a payoff letter agreement, which provided for the termination of the Company’s indebtedness\nand obligations under the Credit Agreement, dated as of December 14, 2020 (the “Citibank Credit Agreement”), among\nthe Company, as borrower, the lenders from time to time party thereto, Citibank and DTC upon the Company’s payment of all outstanding\nloans thereunder. Upon Citibank’s receipt of the payment, the Citibank Credit Agreement was terminated, and DTC released its security\ninterest in all of the assets securing the loans.\nOn\nMay 15, 2023, the TCA Parties (as defined below), certain subsidiary guarantors (the “Guarantors”) and Wells Fargo\nCapital Finance, LLC, as agent (“Wells Fargo”), entered into a payoff letter agreement, which provided for the termination\nof the Amended and Restated Loan and Security Agreement, dated as of October 25, 2011 (the “Wells Fargo Loan Agreement”),\nby and among the TCA Parties, as borrowers, the Guarantors, the lenders from time to time party thereto and Wells Fargo upon the Company’s\npayment of all outstanding obligations thereunder and the transfer of the Company’s outstanding letters of credit under the Wells\nFargo Loan Agreement to BP International Limited and BP Corporation North America Inc.’s existing letters of credit facility with\nWells Fargo Bank, N.A. Upon Wells Fargo’s receipt of the payment, the Wells Fargo Loan Agreement was terminated, and Wells Fargo\nreleased its security interest in all of the assets securing the obligations.\nOn\nMay 15, 2023, TA West Greenwich LLC, a subsidiary of the Company, and The Washington Trust Company (“Washington Trust”)\nterminated the Loan Agreement, dated as of February 6, 2020, by and between TA West Greenwich LLC, as borrower, and Washington Trust,\nas lender, pursuant to a termination statement upon the Company’s payment of all outstanding loans thereunder. Upon Washington Trust’s\nreceipt of the payment, it released its security interest in all of the assets securing the loans.\nOn\nMay 15, 2023, TA Operating LLC and The Huntington National Bank (“Huntington”) terminated a financing agreement, dated\nas of September 16, 2020, by and between TA Operating LLC, as debtor, and Huntington (as successor in interest to TCF National Bank),\nas lender, pursuant to a termination statement upon the Company’s payment of all outstanding obligations thereunder. Upon Huntington’s\nreceipt of the payment, it released its security interest in all of the assets securing the obligations.\nItem\n2.01 Completion of Acquisition or Disposition of Assets.\nCompletion of the Merger\nPursuant to the Merger Agreement,\nat the effective time of the Merger (the “Effective Time”), each share of\nCompany common stock, par value $0.001 per share (“Company Stock”), that\nwas outstanding immediately prior to the Effective Time (other than shares of Company Stock (i) owned by Parent or Merger Subsidiary\nimmediately prior to the Effective Time or (ii) held by any Subsidiary (as defined in the Merger Agreement) of the Company or Parent\n(other than Merger Subsidiary) immediately prior to the Effective Time), was converted into the right to receive $86.00 in cash, without\ninterest (the “Merger Consideration”).\nImmediately prior to the Effective\nTime, each share of then-outstanding Company Stock granted subject to vesting or other lapse restrictions under any Company stock plan\n(each, a “Company Restricted Share”) vested in full and became free of such restrictions and was converted into the\nright to receive the Merger Consideration under the same terms and conditions as applicable to the receipt of the Merger Consideration\nby holders of Company Stock generally.\nThe\ninformation set forth in the Introductory Note of this Current Report on Form 8-K is incorporated herein by reference. The description\nof the Merger and the Merger Agreement contained in this Item 2.01 does not purport to be complete and is subject to and qualified in\nits entirety by reference to the Merger Agreement, which was filed as Exhibit\n2.1 to the Current Report on Form 8-K filed by the Company with the U.S. Securities and Exchange Commission (the “SEC”)\non February 16, 2023 and is incorporated herein by reference.\nItem 3.01 Notice of Delisting\nor Failure to Satisfy a Continued Listing Rule or Standard; Transfer of Listing.\nIn\nconnection with and as a result of the consummation of the Merger, shares of Company Stock ceased to trade on the Nasdaq Stock Market\nLLC (“Nasdaq”) prior to market open on May 15, 2023, and became eligible for delisting from Nasdaq and termination\nof registration under the Securities Exchange Act of 1934, as amended (the “Exchange Act”). The Company has\nrequested that Nasdaq file with the SEC a Notification of Removal From Listing and Registration on Form 25 to delist the Company Stock\nfrom Nasdaq under Section 12(b) of the Exchange Act on May 15, 2023. After the Form 25 becomes effective, the Company intends to file\na Form 15 with the SEC to terminate the registration of the Company Stock under Section 12(g) of the Exchange Act and suspend its reporting\nobligations with the SEC under Sections 13 and 15(d) of the Exchange Act.\n2\nThe\ninformation set forth under Item 2.01 of this Current Report on Form 8-K is incorporated by reference into this Item 3.01.\nItem 3.03 Material Modification\nto Rights of Security Holders.\nIn\nconnection with the consummation of the Merger, as of the Effective Time, other than Excluded Shares (as that term is defined in\nthe Merger Agreement), each share of Company Stock outstanding immediately prior to the Effective\nTime, was cancelled and converted into the right to receive the Merger Consideration. As of the Effective Time, all shares of Company\nStock shall no longer be outstanding and shall automatically be canceled and retired and shall cease to exist, and each share shall thereafter\nrepresent only the right to receive the Merger Consideration to be paid in accordance with the Merger Agreement, without interest.\nThe\ninformation set forth in the Introductory Note and under Items 2.01, 3.01, 5.01 and 5.03 of this Current Report on Form 8-K is incorporated\nby reference into this Item 3.03. The description of the Merger and the Merger Agreement contained in this Item 3.03 does not purport\nto be complete and is subject to and qualified in its entirety by reference to the Merger Agreement, which was filed as Exhibit 2.1 to the Current Report on Form 8-K filed by the Company with the SEC on February 16, 2023 and is incorporated herein by reference.\nItem 5.01 Changes in Control\nof Registrant.\nAs\na result of the consummation of the Merger, Parent acquired all of the outstanding shares of the Company and the Company became an indirect\nwholly-owned subsidiary of Parent. The total equity value of the transaction was approximately $1.3 billion. Parent funded the Merger\nwith cash on hand. The disclosures included or incorporated by reference into this Item 5.01\ndo not constitute an admission or acknowledgment by the Company that the Merger constitutes a change in control for any purpose.\nThe\ninformation set forth in the Introductory Note and the information set forth under Items 2.01, 3.03 and 5.02 of this Current Report\non Form 8-K is incorporated by reference into this Item 5.01.\nItem 5.02 Departure of\nDirectors or Certain Officers; Election of Directors; Appointment of Certain Officers; Compensatory Arrangements of Certain Officers.\nIn connection with the Merger,\neffective as of the Effective Time, Barbara D. Gilmore, Lisa Harris Jones, Joseph L. Morea, Rajan C. Penkar, Elena P. Poptodorova and\nAdam A. Portnoy ceased to be directors of the Company, and the board of directors of the Company (the “Board of Directors”)\nwas reconstituted as follows:\n·\nDeborah C. Boffa;\n·\nMayrena Margarita Castillo Cheng;\n·\nGregory A. Franks;\n·\nDennis E. King;\n·\nJonathan M. Pertchik; and\n·\nBabu V. Rajalingam.\nEach\nof Mses. Boffa and Castillo Cheng and Messrs. Franks, Pertchik, King and Rajalingam will serve on the board of directors of the\nCompany until their respective successors are duly elected and qualified or until their earlier death, resignation or removal.\nThe\ninformation set forth in the Introductory Note of this Current Report on Form 8-K is incorporated by reference into this Item 5.02.\nItem 5.03 Amendments to\nArticles of Incorporation or Bylaws; Change in Fiscal Year.\nThe\ninformation set forth in the Introductory Note and Item 2.01 of this Current Report on Form 8-K is incorporated by reference into\nthis Item 5.03.\nPursuant\nto the Merger Agreement, at the Effective Time, the amended and restated bylaws of the Company, as in effect immediately prior\nto the Effective Time, were amended and restated in their entirety to be in the form of the amended and restated bylaws of Merger Subsidiary\nas in effect immediately prior to the Effective Time (the “Second Amended and Restated Bylaws”). A copy of the Second\nAmended and Restated Bylaws is filed as Exhibit 3.2 to this Current Report on Form 8-K and is incorporated herein by reference.\nIn\naddition, pursuant to the Merger Agreement, at the Effective Time, the articles of incorporation of the Company, as in effect immediately\nprior to the Effective Time, were amended to read substantially as set forth in Exhibit A of the Merger Agreement, which was filed as\nExhibit 2.1 to the Current Report on Form 8-K filed by the Company with the SEC on February 16, 2023. As so amended, the articles became\nthe charter of the Surviving Corporation until amended in accordance with applicable law (the “Charter”). A copy of\nthe Charter is filed as Exhibit 3.1 to this Current Report on Form 8-K and is incorporated herein by reference.\n3\nItem 8.01 Other Events.\nAs previously disclosed, in\nconnection with the Merger Agreement, the Company and its subsidiary TA Operating LLC (together with the Company, the “TCA Parties”),\nParent, Services Properties Trust (“SVC”) and certain of SVC’s subsidiaries (together with SVC, the “SVC\nParties”) also entered into a Consent and Amendment Agreement, dated as of February 15, 2023 (the “Consent and Amendment\nAgreement”). Pursuant to the Consent and Amendment Agreement, amongst other things, on May 15, 2023, simultaneously with the\nEffective Time (i) TA Operating LLC and certain subsidiaries of SVC amended and\nrestated the existing leases between TA Operating LLC and certain subsidiaries of SVC, and BP Corporation North America, Inc. and certain\nsubsidiaries of SVC amended and restated the guarantees by the Company in respect thereof and (ii) the SVC Parties sold certain trademarks\nto the Company for an amount equal to their net book value, paid by Parent on behalf of the Company.\nThe description of the\namended and restated leases, amended and restated guarantees and the sale by the SVC Parties of certain trademarks contained in this\nItem 1.01 does not purport to be complete and is subject to and qualified in its entirety by reference to the Consent and Amendment\nAgreement, which was filed as Exhibit 10.1 to the Current Report on Form 8-K filed by the Company with the SEC on February 16, 2023\nand is incorporated herein by reference.\nItem 9.01 Financial\nStatements and Exhibits.\n(d)\nExhibits\nExhibit\nNo.\nDescription\n2.1\nAgreement and Plan of Merger, dated as of February 15, 2023, by and among BP Products North America Inc., Bluestar RTM Inc. and TravelCenters of America Inc., filed as Exhibit 2.1 to the Current Report on Form 8-K filed by the Company with the SEC on February 16, 2023 and incorporated herein by reference.\n3.1\nAmended and Restated Charter of TravelCenters of America Inc.\n3.2\nSecond Amended and Restated Bylaws of TravelCenters of America Inc.\n10.1\nConsent and Amendment Agreement, dated as of February 15, 2023, by and among the parties identified therein as the SVC parties, the parties identified therein as the TCA parties and BP Products North America Inc., filed as Exhibit 10.1 to the Current Report on Form 8-K filed by the Company with the SEC on February 16, 2023 and incorporated herein by reference.\n104\nCover Page Interactive Data File (embedded within the Inline XBRL document).\n4\nSIGNATURE\nPursuant to the requirements\nof the Securities Exchange Act of 1934, as amended, the Registrant has duly caused this Report to be signed on its behalf by the undersigned\nhereunto duly authorized.\nDate: May 15, 2023\nTRAVELCENTERS OF AMERICA INC.\nBy:\n/s/ Gregory A. Franks\nName:\nGregory A. Franks\nTitle:\nPresident and Chairman\n5",
+    "text_sha256": "7340ff9e481a6b37f4e3de516a7cc20ea004fecb9d110fcd6cef403fb6133437",
+    "title": null,
+    "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+  }
+}

@@ -1,0 +1,13 @@
+[
+  {
+    "tests": 2634,
+    "skipped": 0,
+    "failed": [
+      "tests.test_security_lifecycle_current::test_frontend_fixture_is_owned_by_the_real_persisted_workflow"
+    ],
+    "name": "backend-baseline",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "87671eda427ee646e86d5f63f093a2ec0e7df05a48880d81b4df48f43039b634"
+  }
+]

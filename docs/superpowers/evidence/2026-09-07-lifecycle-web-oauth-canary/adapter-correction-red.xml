@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="31" time="1.058" timestamp="2026-09-07T08:37:37.554491+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness" time="0.011" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_analysis_has_no_web_or_filesystem_tools" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_pins_internal_helper_models_to_exact_selected_model[search]" time="0.006"><failure message="AssertionError: assert '' == 'claude-opus-5'&#10;  &#10;  - claude-opus-5">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf96231b6a0&gt;
+phase = 'search'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(monkeypatch, phase):
+        monkeypatch.setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "ambient-helper-model")
+        monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "ambient-legacy-helper")
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase=phase, call_id=phase + "-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        await mod.call_claude_web(request, credential, control)
+        environment = clients[0].options.env
+&gt;       assert environment["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == request.selection.model
+E       AssertionError: assert '' == 'claude-opus-5'
+E         
+E         - claude-opus-5
+
+tests/test_lifecycle_web_claude.py:160: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]" time="0.006"><failure message="AssertionError: assert '' == 'claude-opus-5'&#10;  &#10;  - claude-opus-5">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf9621f7f70&gt;
+phase = 'analysis'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(monkeypatch, phase):
+        monkeypatch.setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "ambient-helper-model")
+        monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "ambient-legacy-helper")
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase=phase, call_id=phase + "-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        await mod.call_claude_web(request, credential, control)
+        environment = clients[0].options.env
+&gt;       assert environment["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == request.selection.model
+E       AssertionError: assert '' == 'claude-opus-5'
+E         
+E         - claude-opus-5
+
+tests/test_lifecycle_web_claude.py:160: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed]" time="0.006"><failure message="AssertionError: assert {} == {'search-1': 'completed'}&#10;  &#10;  Right contains 1 more item:&#10;  {'search-1': 'completed'}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf96221f820&gt;
+result = {'model_usage': {'claude-haiku-4-5-20251001': {}, 'claude-opus-5': {}}}
+code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+        ({"model_usage": []}, "model_usage_invalid"),
+        ({"num_turns": 100}, "model_result_incomplete"),
+        ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
+    ])
+    async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        with pytest.raises(WebModelError, match=code):
+            await mod.call_claude_web(request, credential, control)
+&gt;       assert control.terminal_statuses == {"search-1": "completed"}
+E       AssertionError: assert {} == {'search-1': 'completed'}
+E         
+E         Right contains 1 more item:
+E         {'search-1': 'completed'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_claude.py:179: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result1-model_usage_invalid]" time="0.006"><failure message="AssertionError: assert {} == {'search-1': 'completed'}&#10;  &#10;  Right contains 1 more item:&#10;  {'search-1': 'completed'}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf962157340&gt;
+result = {'model_usage': []}, code = 'model_usage_invalid'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+        ({"model_usage": []}, "model_usage_invalid"),
+        ({"num_turns": 100}, "model_result_incomplete"),
+        ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
+    ])
+    async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        with pytest.raises(WebModelError, match=code):
+            await mod.call_claude_web(request, credential, control)
+&gt;       assert control.terminal_statuses == {"search-1": "completed"}
+E       AssertionError: assert {} == {'search-1': 'completed'}
+E         
+E         Right contains 1 more item:
+E         {'search-1': 'completed'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_claude.py:179: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete]" time="0.006"><failure message="AssertionError: assert {} == {'search-1': 'completed'}&#10;  &#10;  Right contains 1 more item:&#10;  {'search-1': 'completed'}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf96221dc60&gt;
+result = {'num_turns': 100}, code = 'model_result_incomplete'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+        ({"model_usage": []}, "model_usage_invalid"),
+        ({"num_turns": 100}, "model_result_incomplete"),
+        ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
+    ])
+    async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        with pytest.raises(WebModelError, match=code):
+            await mod.call_claude_web(request, credential, control)
+&gt;       assert control.terminal_statuses == {"search-1": "completed"}
+E       AssertionError: assert {} == {'search-1': 'completed'}
+E         
+E         Right contains 1 more item:
+E         {'search-1': 'completed'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_claude.py:179: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result3-unexpected_tool_activity]" time="0.006"><failure message="AssertionError: assert {} == {'search-1': 'completed'}&#10;  &#10;  Right contains 1 more item:&#10;  {'search-1': 'completed'}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf962156350&gt;
+result = {'permission_denials': [{'tool_name': 'Bash'}]}
+code = 'unexpected_tool_activity'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+        ({"model_usage": []}, "model_usage_invalid"),
+        ({"num_turns": 100}, "model_result_incomplete"),
+        ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
+    ])
+    async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        with pytest.raises(WebModelError, match=code):
+            await mod.call_claude_web(request, credential, control)
+&gt;       assert control.terminal_statuses == {"search-1": "completed"}
+E       AssertionError: assert {} == {'search-1': 'completed'}
+E         
+E         Right contains 1 more item:
+E         {'search-1': 'completed'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_claude.py:179: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result0]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result1]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback" time="0.172"><failure message="AssertionError: assert 'remote_outcome_unknown' == 'failed'&#10;  &#10;  - failed&#10;  + remote_outcome_unknown">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf96220f160&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7780/test_claude_mixed_model_result0')
+
+    def test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback(monkeypatch, tmp_path):
+        from src.security_lifecycle_web_pipeline import investigate
+        from tests.test_lifecycle_web_controller import controller, launch, wait_done
+    
+        mod, clients = _setup(monkeypatch, result={
+            "model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}})
+        selected = _request().selection
+        service, store, loads = controller(tmp_path, runner=investigate,
+            loader=lambda selected: WebCredential(selected, token_record=StoredTokenRecord("selected-token")))
+        try:
+            run = launch(service, selected=selected)
+            result = wait_done(service, run["run_id"])
+&gt;           assert result["status"] == "failed"
+E           AssertionError: assert 'remote_outcome_unknown' == 'failed'
+E             
+E             - failed
+E             + remote_outcome_unknown
+
+tests/test_lifecycle_web_claude.py:212: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init0]" time="0.009" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init1]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init2]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init3]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init4]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init5]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result0-execution_identity_changed]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result1-model_result_incomplete]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result2-model_result_incomplete]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result3-execution_identity_changed]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result4-model_output_invalid]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_observed_web_call_without_pretool_reservation_is_rejected" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_pretool_gate_denies_files_subagents_and_budget_excess" time="0.004" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[True]" time="0.057" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[False]" time="0.157" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[allowed-None-None]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[allowed_warning-None-None]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[rejected-None-provider_rate_limited]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[allowed-foreign-session-execution_identity_changed]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[unknown-None-protocol_incompatible]" time="0.007" /></testsuite></testsuites>

@@ -1,0 +1,518 @@
+{
+  "version": 2,
+  "run_id": "li_cb757ae62b63473bbfdb65ebbaaf488f",
+  "ticker": "TA",
+  "status": "succeeded",
+  "phase": "agent_action",
+  "created_at": "2026-09-07T21:55:08.076878+00:00",
+  "finished_at": "2026-09-07T21:56:00.324545+00:00",
+  "cancel_requested": false,
+  "failure_code": null,
+  "stop_reason": null,
+  "target": {
+    "as_of": "2026-09-07",
+    "composite_figi": null,
+    "identity_status": "needs_lookup",
+    "issuer_cik": null,
+    "issuer_name": "TravelCenters of America Inc.",
+    "security_class": "common stock",
+    "ticker": "TA",
+    "venue": "NASDAQ"
+  },
+  "execution": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "auth_mode": "claude_code_oauth",
+    "effort": "high"
+  },
+  "stats": {
+    "elapsed_seconds": 52.213,
+    "http_requests": 0,
+    "input_tokens": 47420,
+    "local_queries": 1,
+    "model_submissions": 3,
+    "output_tokens": 4726,
+    "retained_source_bytes": 16023,
+    "source_reads": 1,
+    "sources": 1,
+    "web_actions": 0
+  },
+  "finding": {
+    "announcement_date": "2023-02-15",
+    "announcement_date_text": "February 15, 2023",
+    "citations": [
+      {
+        "passage_id": "source-1:p36",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-1:p37",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-1:p68",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-1:p69",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-1:p70",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-1:p126",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-1:p86",
+        "supports": [
+          "announcement_date"
+        ]
+      },
+      {
+        "passage_id": "source-1:p87",
+        "supports": [
+          "announcement_date",
+          "acquisition_announced"
+        ]
+      },
+      {
+        "passage_id": "source-1:p90",
+        "supports": [
+          "effective_date"
+        ]
+      },
+      {
+        "passage_id": "source-1:p125",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-1:p129",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-1:p144",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-1:p145",
+        "supports": [
+          "listing_ended",
+          "effective_date"
+        ]
+      },
+      {
+        "passage_id": "source-1:p146",
+        "supports": [
+          "listing_ended",
+          "effective_date"
+        ]
+      },
+      {
+        "passage_id": "source-1:p148",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-1:p160",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-1:p161",
+        "supports": [
+          "listing_ended"
+        ]
+      }
+    ],
+    "contradictions": [],
+    "effective_date": "2023-05-15",
+    "effective_date_text": "May 15, 2023",
+    "event_kind": "listing_ended",
+    "issuer_name": "TravelCenters of America Inc.",
+    "limitations": [],
+    "security_class": "common stock",
+    "source_ticker": "TA",
+    "successor_ticker": null,
+    "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而正式下市。8-K文件明確指出TA普通股（定義為「Company Stock」）於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，而非僅為收購宣布。",
+    "timing": "completed",
+    "unresolved_conditions": [],
+    "venue": "NASDAQ",
+    "version": 2
+  },
+  "action": "terminal_delisting",
+  "block_reasons": [],
+  "passages": [
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 658,
+      "passage_id": "source-1:p36",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 645,
+      "text": "TravelCenters",
+      "text_sha256": "3c3e35fd5b92ae8ed661a9b161e717d3fb808086561af10114cfab09146ad24e",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 674,
+      "passage_id": "source-1:p37",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 659,
+      "text": "of America Inc.",
+      "text_sha256": "3571fdd884cfd5e0ad6e6ff26c80d25af2ad7b6a094d7ed4ab711e8f6ffd79d3",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 1794,
+      "passage_id": "source-1:p68",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 1744,
+      "text": "Shares of Common Stock, $0.001 Par Value Per Share",
+      "text_sha256": "2ed4ebb2714e69a08f4e034f1e6f81c7d63c720356de600c91e039217a5b6f15",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 1797,
+      "passage_id": "source-1:p69",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 1795,
+      "text": "TA",
+      "text_sha256": "034fc48ba584fc2a8b0b40c727e4ce36b79845d7ed910c63abfb2c22e630382c",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 1825,
+      "passage_id": "source-1:p70",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 1798,
+      "text": "The NASDAQ Stock Market LLC",
+      "text_sha256": "dbfcf97442467cd73ebb36459c1c980c466a3a93d2921fbb3b523da17817a4e1",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 6182,
+      "passage_id": "source-1:p126",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 6110,
+      "text": "Company common stock, par value $0.001 per share (“Company Stock”), that",
+      "text_sha256": "d5da4844515c6987b44dd019f426e9c548bdf168744749d457d011a4e44d1b4e",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 2584,
+      "passage_id": "source-1:p86",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 2557,
+      "text": "As previously disclosed, on",
+      "text_sha256": "08d86dda98a6ec6095d5c7403ed76504886d46f0b1511043b02c39ef42e6ce03",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 2700,
+      "passage_id": "source-1:p87",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 2585,
+      "text": "February 15, 2023, TravelCenters of America Inc., a Maryland corporation (the “Company”), entered into an Agreement",
+      "text_sha256": "938739f27c1f5962cf4005733eed3f6b1aebc993faa98b20b8aac5d4b916cbf5",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 3053,
+      "passage_id": "source-1:p90",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 2944,
+      "text": "Subsidiary”). On May 15, 2023, Merger Subsidiary merged with and into the Company (the “Merger”) on the terms",
+      "text_sha256": "fdca4026b53a80b245aa931f76377d89fd774c3dc406642f1b2b8f4ab36acbbf",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 6109,
+      "passage_id": "source-1:p125",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 6036,
+      "text": "at the effective time of the Merger (the “Effective Time”), each share of",
+      "text_sha256": "c77e01c796dfb407290f1b6ea668347bd5ecf1618697cee38cbe5b15966ac5b4",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 6585,
+      "passage_id": "source-1:p129",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 6449,
+      "text": "(other than Merger Subsidiary) immediately prior to the Effective Time), was converted into the right to receive $86.00 in cash, without",
+      "text_sha256": "75fab5e099c96d030a4bc422ea6a9723ec5f8ff6f3e060fe49790ea52405961f",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 7731,
+      "passage_id": "source-1:p144",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 7729,
+      "text": "In",
+      "text_sha256": "8bc1d53cc57c24b79bf7c260b1f3b29973caab7b8f501c33016b321ebfc274f1",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 7865,
+      "passage_id": "source-1:p145",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 7732,
+      "text": "connection with and as a result of the consummation of the Merger, shares of Company Stock ceased to trade on the Nasdaq Stock Market",
+      "text_sha256": "61664f0e7c6dafce6b42f84e33265ab1f75628ecc45b3e8331f1821e4331f801",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 7980,
+      "passage_id": "source-1:p146",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 7866,
+      "text": "LLC (“Nasdaq”) prior to market open on May 15, 2023, and became eligible for delisting from Nasdaq and termination",
+      "text_sha256": "091f041558bcb6eca75852cac1f07130182b555ace497f985558f651221d45b6",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 8223,
+      "passage_id": "source-1:p148",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 8089,
+      "text": "requested that Nasdaq file with the SEC a Notification of Removal From Listing and Registration on Form 25 to delist the Company Stock",
+      "text_sha256": "a618b75f81ac2248cb94db73e483f63aa1f4d1701ff7f6248782f84873fb5ea3",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 9127,
+      "passage_id": "source-1:p160",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 8994,
+      "text": "Time, was cancelled and converted into the right to receive the Merger Consideration. As of the Effective Time, all shares of Company",
+      "text_sha256": "cc20612e9d10f88e143de030c3c3ae94dcdcdeb2013b1cfcccae119e46a4c237",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "news",
+      "coverage": "full_text",
+      "end_char": 9270,
+      "passage_id": "source-1:p161",
+      "published_at": "",
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+      "source_id": "source-1",
+      "start_char": 9128,
+      "text": "Stock shall no longer be outstanding and shall automatically be canceled and retired and shall cease to exist, and each share shall thereafter",
+      "text_sha256": "2ca2b204add1bd3a9462b8c71b1a3ef7551fd67a62c4ecba904a994ea96a105d",
+      "title": "Captured public document",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    }
+  ],
+  "gaps": [],
+  "steps": [
+    {
+      "ordinal": 1,
+      "kind": "local_search",
+      "at": "2026-09-07T21:55:08.108871+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 2,
+      "kind": "source_captured",
+      "at": "2026-09-07T21:55:08.118982+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 3,
+      "kind": "model_request",
+      "at": "2026-09-07T21:55:08.142663+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 4,
+      "kind": "model_result",
+      "at": "2026-09-07T21:55:21.608487+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 5,
+      "kind": "agent_action",
+      "at": "2026-09-07T21:55:21.626317+00:00",
+      "reason": "SEC 8-K已完整記載合併完成、股票停止交易及下市程序，證據充分,無需進一步查證。",
+      "code": null
+    },
+    {
+      "ordinal": 6,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T21:55:21.640676+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 7,
+      "kind": "model_request",
+      "at": "2026-09-07T21:55:21.681647+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 8,
+      "kind": "model_result",
+      "at": "2026-09-07T21:55:33.486143+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 9,
+      "kind": "agent_action",
+      "at": "2026-09-07T21:55:33.507224+00:00",
+      "reason": "先前提交因缺少issuer_name的識別段落被拒；補充引用p36與p37（跨行的公司名稱「TravelCenters」與「of America Inc.」）以完整支持證券身分，其餘下市與生效日期證據不變。",
+      "code": null
+    },
+    {
+      "ordinal": 10,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T21:55:33.530850+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 11,
+      "kind": "model_request",
+      "at": "2026-09-07T21:55:33.567551+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 12,
+      "kind": "model_result",
+      "at": "2026-09-07T21:56:00.286259+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 13,
+      "kind": "agent_action",
+      "at": "2026-09-07T21:56:00.302837+00:00",
+      "reason": "根據先前反饋，需要補充定義段落 p126（將「Company Stock」此定義用語與普通股身分連結），以支撐下市與生效日期的引用皆對應同一證券；其餘身分、公告與下市證據已充分。",
+      "code": null
+    }
+  ]
+}

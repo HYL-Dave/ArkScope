@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="53" time="0.265" timestamp="2026-09-06T22:47:56.040903+08:00" hostname="ais"><testcase classname="tests.test_security_lifecycle_web_contract" name="test_all_four_web_channels_have_explicit_transport_without_default" time="0.066" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[openai-api_key-gpt-5.6-luna]" time="0.001" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[openai-chatgpt_oauth-gpt-5.6-luna]" time="0.001" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[anthropic-api_key-claude-opus-5]" time="0.001" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_model_admission_keeps_eligible_api_and_oauth[anthropic-claude_code_oauth-claude-sonnet-5]" time="0.001" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[openai-chatgpt_oauth-gpt-5.3-codex-spark-model_task_unsupported]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[anthropic-api_key-claude-fable-5-model_retired]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[anthropic-claude_code_oauth-claude-fable-5-1-model_auth_unverified]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[openai-api_key-claude-opus-5-model_provider_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_does_not_resurrect_or_expand_models[openai-api_key-unknown-model-model_unregistered]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_owns_existing_research_capability_boundary[overrides0-model_retired]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7d218e61ddb0&gt;
+overrides = {'task_route_status': 'retired'}, code = 'model_retired'
+
+    @pytest.mark.parametrize("overrides,code", [
+        ({"task_route_status": "retired"}, "model_retired"),
+        ({"runtime_ready": False}, "task_capability_missing"),
+        ({"supports_tool_calling": False}, "task_capability_missing"),
+        ({"execution_adapter": "unreviewed_adapter"}, "task_capability_missing"),
+    ])
+    def test_web_admission_owns_existing_research_capability_boundary(monkeypatch, overrides, code):
+        from src import security_lifecycle_web_contract as contract
+    
+        capability = contract.capability_for("gpt-5.6-luna")
+        assert capability is not None
+        changed = replace(capability, **overrides)
+        monkeypatch.setattr(contract, "capability_for", lambda model: changed)
+&gt;       with pytest.raises(contract.WebContractError, match=code):
+E       Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;
+
+tests/test_security_lifecycle_web_contract.py:68: Failed</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_owns_existing_research_capability_boundary[overrides1-task_capability_missing]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7d218e69b3d0&gt;
+overrides = {'runtime_ready': False}, code = 'task_capability_missing'
+
+    @pytest.mark.parametrize("overrides,code", [
+        ({"task_route_status": "retired"}, "model_retired"),
+        ({"runtime_ready": False}, "task_capability_missing"),
+        ({"supports_tool_calling": False}, "task_capability_missing"),
+        ({"execution_adapter": "unreviewed_adapter"}, "task_capability_missing"),
+    ])
+    def test_web_admission_owns_existing_research_capability_boundary(monkeypatch, overrides, code):
+        from src import security_lifecycle_web_contract as contract
+    
+        capability = contract.capability_for("gpt-5.6-luna")
+        assert capability is not None
+        changed = replace(capability, **overrides)
+        monkeypatch.setattr(contract, "capability_for", lambda model: changed)
+&gt;       with pytest.raises(contract.WebContractError, match=code):
+E       Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;
+
+tests/test_security_lifecycle_web_contract.py:68: Failed</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_owns_existing_research_capability_boundary[overrides2-task_capability_missing]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7d218e61e6b0&gt;
+overrides = {'supports_tool_calling': False}, code = 'task_capability_missing'
+
+    @pytest.mark.parametrize("overrides,code", [
+        ({"task_route_status": "retired"}, "model_retired"),
+        ({"runtime_ready": False}, "task_capability_missing"),
+        ({"supports_tool_calling": False}, "task_capability_missing"),
+        ({"execution_adapter": "unreviewed_adapter"}, "task_capability_missing"),
+    ])
+    def test_web_admission_owns_existing_research_capability_boundary(monkeypatch, overrides, code):
+        from src import security_lifecycle_web_contract as contract
+    
+        capability = contract.capability_for("gpt-5.6-luna")
+        assert capability is not None
+        changed = replace(capability, **overrides)
+        monkeypatch.setattr(contract, "capability_for", lambda model: changed)
+&gt;       with pytest.raises(contract.WebContractError, match=code):
+E       Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;
+
+tests/test_security_lifecycle_web_contract.py:68: Failed</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_admission_owns_existing_research_capability_boundary[overrides3-task_capability_missing]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7d218e698c10&gt;
+overrides = {'execution_adapter': 'unreviewed_adapter'}
+code = 'task_capability_missing'
+
+    @pytest.mark.parametrize("overrides,code", [
+        ({"task_route_status": "retired"}, "model_retired"),
+        ({"runtime_ready": False}, "task_capability_missing"),
+        ({"supports_tool_calling": False}, "task_capability_missing"),
+        ({"execution_adapter": "unreviewed_adapter"}, "task_capability_missing"),
+    ])
+    def test_web_admission_owns_existing_research_capability_boundary(monkeypatch, overrides, code):
+        from src import security_lifecycle_web_contract as contract
+    
+        capability = contract.capability_for("gpt-5.6-luna")
+        assert capability is not None
+        changed = replace(capability, **overrides)
+        monkeypatch.setattr(contract, "capability_for", lambda model: changed)
+&gt;       with pytest.raises(contract.WebContractError, match=code):
+E       Failed: DID NOT RAISE &lt;class 'src.security_lifecycle_web_contract.WebContractError'&gt;
+
+tests/test_security_lifecycle_web_contract.py:68: Failed</failure></testcase><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[None]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[ ]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[local:7\n]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_web_selection_requires_explicit_credential[7]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_is_closed_and_not_a_short_symbol_query" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[holdings-value0]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[api_key-not-a-real-key]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[credential_id-local:7]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[instruction-Read the user's files]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_private_or_instruction_fields_cannot_enter_public_question[case_id-private-id]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[ticker-SMCI*]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[issuer_name-]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[issuer_name-TA]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[security_class-]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[venue-]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[issuer_cik-1378453]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[question-write_profile]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_public_question_rejects_ambiguous_or_malformed_identity[as_of-2026-02-31]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_stop_before_dispatch_is_cancelled_without_model_call" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_local_cleanup_and_interrupt_ack_do_not_prove_remote_cancelled" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_unknown_dispatch_id_stays_unknown_and_is_not_retried" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides0]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides1]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides2]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_cannot_change_selected_model_auth_or_billing[overrides3]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_terminal_must_match_response_and_known_call" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_completed_before_interrupt_is_terminal_but_never_an_interrupted_witness" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_two_phase_budget_reserves_before_dispatch_and_does_not_restore_failures" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_no_parallel_or_duplicate_model_request_can_escape_budget" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_hosted_search_observations_are_not_a_claimed_hard_budget" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[0]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[-1]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[True]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[2.5]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_invalid_model_request_budget_is_not_unlimited[2]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_failed_model_request_cannot_be_followed_by_implicit_retry" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_run_selection_and_approved_budget_cannot_be_reassigned" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_contract" name="test_missing_terminal_status_is_not_a_witness" time="0.003" /></testsuite></testsuites>

@@ -1,0 +1,97 @@
+[
+  {
+    "call_id": "step-1",
+    "remote_id": "b74fa608-ba05-47d3-b7e3-3b8ef4e80430",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-2",
+    "remote_id": "901cff50-6c98-4461-af2a-3de85ffb543d",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-3",
+    "remote_id": "6abbe2ee-7ee4-4ef1-b693-ea6767ab3e04",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-4",
+    "remote_id": "e097727f-013a-4b6f-9edf-e78c9019e84d",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-5",
+    "remote_id": "bfda544a-0e88-438d-8f81-e36b3566ab45",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-6",
+    "remote_id": "f3d69784-02ec-4f19-baa6-fccea0cf6314",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-7",
+    "remote_id": "0ef81083-546e-4b26-849a-2035bb45e337",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-8",
+    "remote_id": "467080d7-82af-412e-b6e4-1c746542d121",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-9",
+    "remote_id": "1ac37507-a7e4-4dbb-8791-0cda69c2f827",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-10",
+    "remote_id": "d3b4b3a9-66f4-4e39-9308-914c69744558",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-11",
+    "remote_id": "6adeee8a-9cdf-4756-81e9-d474cd0a6b44",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-12",
+    "remote_id": "366ca9e7-3868-488e-956f-1bf446ab32d6",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-13",
+    "remote_id": "421db498-5066-45cd-9f7e-082592aff700",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-14",
+    "remote_id": "74dbee16-d0c2-4398-a576-13834fe840c7",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-15",
+    "remote_id": "eda7d6a8-485b-45b0-ab12-7e16d41bc935",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-16",
+    "remote_id": "47e267d7-de2b-4c3e-bbd4-9ced163de1ba",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-17",
+    "remote_id": "be645721-95f3-4705-af21-e83832c3ed4c",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-18",
+    "remote_id": "18c278eb-0449-4b1a-87e8-be3378b85fe2",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-19",
+    "remote_id": "bad6eedb-6097-4839-b11e-68f890fbf895",
+    "terminal": "interrupted"
+  }
+]

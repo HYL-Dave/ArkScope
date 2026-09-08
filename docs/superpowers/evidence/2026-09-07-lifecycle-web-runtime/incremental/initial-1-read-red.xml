@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="7" time="1.197" timestamp="2026-09-07T00:14:14.842559+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_read" name="test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-api_key]" time="0.099"><failure message="KeyError: 'web_runs'">tests/test_lifecycle_web_read.py:33: in test_research_and_current_detail_share_readonly_web_findings_for_every_auth
+    result = detail["web_runs"][0]
+E   KeyError: 'web_runs'</failure></testcase><testcase classname="tests.test_lifecycle_web_read" name="test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-chatgpt_oauth]" time="0.089"><failure message="KeyError: 'web_runs'">tests/test_lifecycle_web_read.py:33: in test_research_and_current_detail_share_readonly_web_findings_for_every_auth
+    result = detail["web_runs"][0]
+E   KeyError: 'web_runs'</failure></testcase><testcase classname="tests.test_lifecycle_web_read" name="test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-api_key]" time="0.090"><failure message="KeyError: 'web_runs'">tests/test_lifecycle_web_read.py:33: in test_research_and_current_detail_share_readonly_web_findings_for_every_auth
+    result = detail["web_runs"][0]
+E   KeyError: 'web_runs'</failure></testcase><testcase classname="tests.test_lifecycle_web_read" name="test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-claude_code_oauth]" time="0.091"><failure message="KeyError: 'web_runs'">tests/test_lifecycle_web_read.py:33: in test_research_and_current_detail_share_readonly_web_findings_for_every_auth
+    result = detail["web_runs"][0]
+E   KeyError: 'web_runs'</failure></testcase><testcase classname="tests.test_lifecycle_web_read" name="test_population_retains_web_sources_and_human_adoption_without_exporting_pages_or_credentials" time="0.139"><failure message="KeyError: 'web_journal'">tests/test_lifecycle_web_read.py:59: in test_population_retains_web_sources_and_human_adoption_without_exporting_pages_or_credentials
+    web = manifest["retention"]["web_journal"]
+E   KeyError: 'web_journal'</failure></testcase><testcase classname="tests.test_lifecycle_web_read" name="test_missing_journal_is_empty_but_malformed_installed_journal_is_not_silently_dropped" time="0.052"><failure message="KeyError: 'web_runs'">tests/test_lifecycle_web_read.py:74: in test_missing_journal_is_empty_but_malformed_installed_journal_is_not_silently_dropped
+    assert current(c)["web_runs"] == []
+E   KeyError: 'web_runs'</failure></testcase><testcase classname="tests.test_lifecycle_web_read" name="test_population_rejects_orphaned_web_adoption_dependency" time="0.130"><failure message="AssertionError: Regex pattern did not match.&#10; Regex: 'population_web_dependency_invalid'&#10; Input: 'population_schema_invalid'">tests/test_lifecycle_web_read.py:90: in test_population_rejects_orphaned_web_adoption_dependency
+    c["service"]._read_service.population_manifest(at=c["now"][0])
+src/tools/security_lifecycle_tools.py:1031: in population_manifest
+    return read_population_manifest(self.market_db_path, self.profile_db_path, at=at)
+src/security_lifecycle_population.py:627: in read_population_manifest
+    return build_population_manifest(read_population_snapshot(market_db_path, profile_db_path, at=at))
+src/security_lifecycle_population.py:117: in read_population_snapshot
+    raise LifecyclePopulationUnavailable("population_schema_invalid") from None
+E   src.security_lifecycle_population.LifecyclePopulationUnavailable: population_schema_invalid
+
+During handling of the above exception, another exception occurred:
+tests/test_lifecycle_web_read.py:89: in test_population_rejects_orphaned_web_adoption_dependency
+    with pytest.raises(LifecyclePopulationUnavailable, match="population_web_dependency_invalid"):
+E   AssertionError: Regex pattern did not match.
+E    Regex: 'population_web_dependency_invalid'
+E    Input: 'population_schema_invalid'</failure></testcase></testsuite></testsuites>

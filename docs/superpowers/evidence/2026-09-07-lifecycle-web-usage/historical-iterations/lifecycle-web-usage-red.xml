@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="11" skipped="0" tests="12" time="0.537" timestamp="2026-09-07T17:59:27.835446+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_usage" name="test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes" time="0.011"><failure message="AssertionError: assert {'input_token...tokens': 1036} == {'input_token...tokens': 3228}&#10;  &#10;  Differing items:&#10;  {'input_tokens': 4} != {'input_tokens': 29706}&#10;  {'output_tokens': 1036} != {'output_tokens': 3228}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bdea09150&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes(monkeypatch):
+        mod, clients = _setup(monkeypatch, result={
+            "num_turns": 4, "usage": {"input_tokens": 4, "output_tokens": 1036},
+            "model_usage": {"claude-opus-5": MODEL_COUNTS},
+        })
+        call = _request(max_search_uses=4)
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+&gt;       assert reply.usage == {"input_tokens": 29706, "output_tokens": 3228}
+E       AssertionError: assert {'input_token...tokens': 1036} == {'input_token...tokens': 3228}
+E         
+E         Differing items:
+E         {'input_tokens': 4} != {'input_tokens': 29706}
+E         {'output_tokens': 1036} != {'output_tokens': 3228}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:34: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[None]" time="0.006"><failure message="AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}&#10;  &#10;  Differing items:&#10;  {'input_tokens': 100} != {'input_tokens': None}&#10;  {'output_tokens': 50} != {'output_tokens': None}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8aefe0&gt;
+aggregate = None
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+    async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
+        mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+&gt;       assert reply.usage == {"input_tokens": None, "output_tokens": None}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}
+E         
+E         Differing items:
+E         {'input_tokens': 100} != {'input_tokens': None}
+E         {'output_tokens': 50} != {'output_tokens': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:52: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate1]" time="0.006"><failure message="AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}&#10;  &#10;  Differing items:&#10;  {'input_tokens': 100} != {'input_tokens': None}&#10;  {'output_tokens': 50} != {'output_tokens': None}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bdea091b0&gt;
+aggregate = {}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+    async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
+        mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+&gt;       assert reply.usage == {"input_tokens": None, "output_tokens": None}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}
+E         
+E         Differing items:
+E         {'input_tokens': 100} != {'input_tokens': None}
+E         {'output_tokens': 50} != {'output_tokens': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:52: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate2]" time="0.006"><failure message="AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}&#10;  &#10;  Differing items:&#10;  {'input_tokens': 100} != {'input_tokens': None}&#10;  {'output_tokens': 50} != {'output_tokens': None}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8ad810&gt;
+aggregate = {'claude-opus-5': {}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+    async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
+        mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+&gt;       assert reply.usage == {"input_tokens": None, "output_tokens": None}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}
+E         
+E         Differing items:
+E         {'input_tokens': 100} != {'input_tokens': None}
+E         {'output_tokens': 50} != {'output_tokens': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:52: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_malformed_reported_model_counter_is_not_silently_unknown[True]" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8d7b20&gt;
+value = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+&gt;       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_usage.py:63: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_malformed_reported_model_counter_is_not_silently_unknown[10]" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8aec20&gt;
+value = '10'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+&gt;       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_usage.py:63: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_malformed_reported_model_counter_is_not_silently_unknown[-1]" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8d5240&gt;
+value = -1
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+&gt;       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_usage.py:63: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_malformed_reported_model_counter_is_not_silently_unknown[1.5]" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8af5b0&gt;
+value = 1.5
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+&gt;       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_usage.py:63: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_malformed_reported_model_counter_is_not_silently_unknown[9007199254740992]" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8d4580&gt;
+value = 9007199254740992
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+&gt;       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_usage.py:63: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_malformed_reported_model_counter_is_not_silently_unknown[value5]" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8c9e10&gt;
+value = []
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+&gt;       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_usage.py:63: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_reported_zero_is_not_replaced_by_nonzero_main_loop" time="0.006"><failure message="AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...ut_tokens': 0}&#10;  &#10;  Differing items:&#10;  {'input_tokens': 100} != {'input_tokens': 0}&#10;  {'output_tokens': 50} != {'output_tokens': 0}&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x768bde8d5000&gt;
+
+    @pytest.mark.anyio
+    async def test_reported_zero_is_not_replaced_by_nonzero_main_loop(monkeypatch):
+        mod, _ = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": dict.fromkeys(MODEL_COUNTS, 0)}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+&gt;       assert reply.usage == {"input_tokens": 0, "output_tokens": 0}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...ut_tokens': 0}
+E         
+E         Differing items:
+E         {'input_tokens': 100} != {'input_tokens': 0}
+E         {'output_tokens': 50} != {'output_tokens': 0}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:75: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage" name="test_other_model_usage_still_refuses_before_accepting_counters" time="0.006" /></testsuite></testsuites>

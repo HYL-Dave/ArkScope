@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="8" time="0.519" timestamp="2026-09-07T19:44:49.191633+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]" time="0.011"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: model_result_incomplete">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x74333323c760&gt;
+phase = 'analysis', tool_budget = 2
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+&gt;       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_turns.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:298: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:284: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:257: in call_claude_web
+    _validate_result(message, call=call, status=status)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = ResultMessage(subtype='success', duration_ms=100, duration_api_ms=50, is_error=False, num_turns=3, session_id='d24f708...=None, deferred_tool_use=None, errors=None, api_error_status=None, uuid=None, terminal_reason='completed', origin=None)
+
+    def _validate_result(message: ResultMessage, *, call: ModelCall, status: str) -&gt; None:
+        usage = message.model_usage
+        if usage is not None:
+            if not isinstance(usage, dict):
+                raise WebModelError("model_usage_invalid")
+            for model in usage:
+                require_response_model({"model": model}, call.selection.model)
+        if status != "completed":
+            return
+        max_turns = call.max_search_uses + 2 if call.phase == "search" else 2
+        if type(message.num_turns) is not int or not 0 &lt; message.num_turns &lt;= max_turns:
+&gt;           raise WebModelError("model_result_incomplete")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_result_incomplete
+
+src/auth_drivers/lifecycle_web_claude.py:128: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]" time="0.006"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: model_result_incomplete">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x74333330b6a0&gt;
+phase = 'search', tool_budget = 4
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+&gt;       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_turns.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:298: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:284: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:257: in call_claude_web
+    _validate_result(message, call=call, status=status)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = ResultMessage(subtype='success', duration_ms=100, duration_api_ms=50, is_error=False, num_turns=5, session_id='8e192ab...=None, deferred_tool_use=None, errors=None, api_error_status=None, uuid=None, terminal_reason='completed', origin=None)
+
+    def _validate_result(message: ResultMessage, *, call: ModelCall, status: str) -&gt; None:
+        usage = message.model_usage
+        if usage is not None:
+            if not isinstance(usage, dict):
+                raise WebModelError("model_usage_invalid")
+            for model in usage:
+                require_response_model({"model": model}, call.selection.model)
+        if status != "completed":
+            return
+        max_turns = call.max_search_uses + 2 if call.phase == "search" else 2
+        if type(message.num_turns) is not int or not 0 &lt; message.num_turns &lt;= max_turns:
+&gt;           raise WebModelError("model_result_incomplete")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_result_incomplete
+
+src/auth_drivers/lifecycle_web_claude.py:128: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_turns" name="test_claude_max_turns_error_is_not_rescued_by_terminal_allowance" time="0.006" /></testsuite></testsuites>

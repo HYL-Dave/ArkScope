@@ -1,0 +1,106 @@
+{
+  "scope": "41 affected product files plus readonly and disposition maintenance tests",
+  "affected_product_tests": 1269,
+  "readonly_maintenance_tests": 34,
+  "disposition_maintenance_tests": 30,
+  "baseline": {
+    "passed": 1333,
+    "seconds": 83.33
+  },
+  "final_restored": {
+    "passed": 1333,
+    "seconds": 33.8,
+    "fixture_storage": "temporary_tmpfs"
+  },
+  "mutations": [
+    {
+      "id": "M1",
+      "description": "Permit otherwise denied SQL reads",
+      "exit_code": 1,
+      "failed": 1,
+      "passed": 1332,
+      "seconds": 86.43,
+      "fixture_storage": "temporary_disk",
+      "owners": [
+        "test_sql_boundary_denies_credentials_history_ddl_and_other_writes[SELECT secret FROM model_credentials]"
+      ]
+    },
+    {
+      "id": "M2",
+      "description": "Skip the original inventory/evidence binding",
+      "exit_code": 1,
+      "failed": 2,
+      "passed": 1331,
+      "seconds": 300.95,
+      "fixture_storage": "temporary_disk",
+      "owners": [
+        "test_changed_input_aborts_before_backup_or_write[evidence]",
+        "test_changed_input_aborts_before_backup_or_write[sa]"
+      ]
+    },
+    {
+      "id": "M3",
+      "description": "Hash only the main SQLite file and ignore WAL/journal",
+      "exit_code": 1,
+      "failed": 2,
+      "passed": 1331,
+      "seconds": 34.77,
+      "fixture_storage": "temporary_tmpfs",
+      "owners": [
+        "test_apply_requires_exact_rehearsal_backup_and_approval[backup]",
+        "test_sqlite_wal_changes_are_bound_not_only_the_main_database"
+      ]
+    },
+    {
+      "id": "M4",
+      "description": "Skip exact preview/effect validation",
+      "exit_code": 1,
+      "failed": 1,
+      "passed": 1332,
+      "seconds": 34.36,
+      "fixture_storage": "temporary_tmpfs",
+      "owners": [
+        "test_preview_cannot_expand_to_alias_or_another_source"
+      ]
+    },
+    {
+      "id": "M5",
+      "description": "Skip runtime source binding before application",
+      "exit_code": 1,
+      "failed": 1,
+      "passed": 1332,
+      "seconds": 34.7,
+      "fixture_storage": "temporary_tmpfs",
+      "owners": [
+        "test_execution_code_change_stops_before_production_write"
+      ]
+    },
+    {
+      "id": "M6",
+      "description": "Ignore unrelated state changes at write boundaries and readback",
+      "exit_code": 1,
+      "failed": 1,
+      "passed": 1332,
+      "seconds": 34.68,
+      "fixture_storage": "temporary_tmpfs",
+      "owners": [
+        "test_unrelated_state_change_during_write_boundary_is_not_ignored"
+      ]
+    }
+  ],
+  "restored_copy_files": 6,
+  "restored_copy_files_identical": true,
+  "production_scope_during_tests": "temporary databases only",
+  "prior_full_backend": {
+    "passed": 5978,
+    "skipped": 12,
+    "warnings": 3,
+    "rerun_in_this_maintenance_turn": false
+  },
+  "notes": [
+    "Initial maintenance test execution found a main-file-only backup hash could miss WAL mutations; its regression remains owned.",
+    "The readback CLI SQL wrapper was tightened after the initial focus; final restored focus covers the current files.",
+    "Actual production-backed rehearsal and main-tree readback did not run because the live preflight stopped before backup.",
+    "Tmpfs reduces test fixture fsync latency; these logical controls are not a power-loss durability proof."
+  ]
+}

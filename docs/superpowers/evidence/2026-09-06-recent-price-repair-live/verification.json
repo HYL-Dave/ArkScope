@@ -1,0 +1,110 @@
+{
+  "base_commit": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "approved_plan_sha256": "907a6f80ff8593db7134203d9807b06fee1692d9c2b7e96b84b6a5676c9289e5",
+  "admitted_live_command_sha256": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5",
+  "before_documentation_update": {
+    "mismatches_before_documentation_update": [],
+    "previous_source_file_count": 100
+  },
+  "xml_reports": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 13
+      },
+      "failed_nodes": [],
+      "name": "arkscope-live-price-harness-red.xml",
+      "seconds": 0.957,
+      "sha256": "59c61b3f17ee2fb7ee442da432f9a94c8da72e57c6ab52ff00f73b4b0e36e26f"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 14
+      },
+      "failed_nodes": [
+        "test_configured_gateway_is_not_required_to_be_loopback"
+      ],
+      "name": "arkscope-live-price-harness-host-red.xml",
+      "seconds": 1.029,
+      "sha256": "d0eaab57a7fb7716c5e50e40896a68248c09b4c99f24b6b436bbfb200424d186"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 14
+      },
+      "failed_nodes": [],
+      "name": "arkscope-live-price-harness-green.xml",
+      "seconds": 0.978,
+      "sha256": "963a51cb05893f42ecaddb2169553cf94a9c1e1c135073dd31bbb57c00e2122f"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2
+      },
+      "failed_nodes": [],
+      "name": "arkscope-price-history-final.xml",
+      "seconds": 0.304,
+      "sha256": "f7de08f9f637d631d511b271100902236e8d759a7be78757fa00be1070d9432c"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 4
+      },
+      "failed_nodes": [],
+      "name": "arkscope-recent-price-live-diagnostics.xml",
+      "seconds": 0.575,
+      "sha256": "aaa87146fd427602ddabbfd0123cd6abee1b950baa8aa4109ed9592a8232fa61"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 447
+      },
+      "failed_nodes": [],
+      "name": "arkscope-recent-price-live-final.xml",
+      "seconds": 24.807,
+      "sha256": "470497a464fddaad95344da4188613d76b1cc835819194fab76a96688d6a232c"
+    }
+  ],
+  "initial_red_filename_is_actually_green": true,
+  "actual_red_owner": "test_configured_gateway_is_not_required_to_be_loopback",
+  "live_guard_mutation_count": 7,
+  "mutation_baseline_and_restored_passes": 443,
+  "final_focus_manifest": "verification-files.json",
+  "final_focus_files": 29,
+  "final_focus_passes": 447,
+  "prior_product_gates": {
+    "packet": "../2026-09-06-recent-price-repair/",
+    "integration_passes": 1765,
+    "backend_passes": 6021,
+    "backend_skips": 12,
+    "backend_existing_warnings": 3,
+    "rerun_full_backend_this_turn": false
+  },
+  "provider_calls_outside_authorized_operation": 0,
+  "live_console_exit_code": null,
+  "live_completion_authority": "durable_journal_and_private_result_plus_independent_master_coverage_readback",
+  "product_source_changes_this_turn": false,
+  "frontend_changes_this_turn": false,
+  "migration": false,
+  "app_restart": false,
+  "commit": false,
+  "merge": false,
+  "push": false
+}

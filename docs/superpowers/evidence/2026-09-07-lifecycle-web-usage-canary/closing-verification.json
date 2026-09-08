@@ -1,0 +1,40 @@
+{
+  "kind": "post_live_documentation_only_verification",
+  "base_commit": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "source_manifest_files": 1101,
+  "source_manifest_deleted_files": 1,
+  "product_and_test_files_match_admitted_source": true,
+  "post_live_changed_manifest_files": {
+    "docs/design/PROJECT_PRIORITY_MAP.md": "98848584be65576ac5db8581feb6038983e9abea7393f08ee5d14ae36a815109",
+    "docs/superpowers/plans/2026-09-06-lifecycle-web-auth-adapters.md": "9ff3fa2691b2b8abe9e724eafa6877b8cafa3095422a2ddb7b7252246f0867f5",
+    "docs/superpowers/plans/2026-09-07-lifecycle-web-usage-calibration.md": "40b46d2417baee72f9a8644ab4ef922d29816b2f2b83a332ee408a94e443bf8d"
+  },
+  "additional_status_documents_sha256": {
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/RESULTS.md": "4092e4c01b1b10e37627d58433e6a877b8c37edfe090a4e2b67603bf38f12508",
+    "docs/superpowers/plans/2026-09-05-lifecycle-tracking-first-implementation.md": "562a8b629e4e11b7e05df4d2deea088246c6fe17a66c092f29c8f757fe09f12c"
+  },
+  "immutable_packet_seals": {
+    "failed-live-r1": "a7df8829579c6069ae4b5b2136f825864aead543b6a5caf1ee20b170c9d50093",
+    "prompt-admission": "2cd4bcf60f5a9fcd4f60d91402a29bcca90e2a15c9d2bd76c1a67a61c4cb1752",
+    "host-rejected-replay-r2": "3baa4ea61a1ca1ff918689a5b4e75166f42615a0438ff62eee6509ebd8cf23ac",
+    "turns-admission": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4",
+    "failed-renewed-r3": "79711c3a3a147242f748b58cc765ab7cf5d3a0dca2335296f4100b02648c2422",
+    "json-analysis-admission": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60",
+    "live-json-analysis": "c44fa6670430620747f3a5d85bcffc5220555b49afd0a068052e635a3dd5510b"
+  },
+  "measured_tests": {
+    "baseline": {"tests": 2236, "failures": 0, "errors": 0, "skipped": 0},
+    "restored": {"tests": 2236, "failures": 0, "errors": 0, "skipped": 0},
+    "integration": {"tests": 3055, "failures": 0, "errors": 0, "skipped": 0},
+    "backend": {"tests": 6913, "failures": 0, "errors": 0, "skipped": 12}
+  },
+  "owned_mutations": 15,
+  "sdk_submissions_campaign": 8,
+  "source_http_attempts_campaign": 8,
+  "source_http_budget_remaining": 0,
+  "action_ready_findings": 0,
+  "fresh_complete_live_investigation_verified": false,
+  "new_dispatch_authorized_by_this_receipt": false,
+  "historical_harnesses_are_not_renewed_dispatch_authority": true,
+  "no_commit_merge_push_or_app_restart_this_turn": true
+}

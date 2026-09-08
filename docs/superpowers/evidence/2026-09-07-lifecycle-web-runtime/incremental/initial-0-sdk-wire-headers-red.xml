@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="1.827" timestamp="2026-09-06T23:13:47.460223+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_sdk_wire" name="test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[openai]" time="1.367"><failure message="AssertionError: assert 'X-Private' not in Headers({'host': 'api.openai.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'authorization': '[...': '', 'openai-project': '', 'x-stainless-retry-count': '0', 'x-stainless-read-timeout': '5', 'content-length': '426'})&#10; +  where Headers({'host': 'api.openai.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'authorization': '[...': '', 'openai-project': '', 'x-stainless-retry-count': '0', 'x-stainless-read-timeout': '5', 'content-length': '426'}) = &lt;Request('POST', 'https://api.openai.com/v1/responses')&gt;.headers">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7698ad9c3e20&gt;
+provider = 'openai'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider", ["openai", "anthropic"])
+    async def test_real_api_sdk_serialization_keeps_selected_key_and_basic_search(monkeypatch, provider):
+        from src.auth_drivers import lifecycle_web_models as mod
+        from openai import AsyncOpenAI
+        from anthropic import AsyncAnthropic, DefaultAsyncHttpxClient
+    
+        # Use the HTTP types required by the installed SDK, not a lookalike client.
+        http_module = (httpx if provider == "openai" else importlib.import_module(next(
+            base.__module__.split(".")[0] for base in DefaultAsyncHttpxClient.__mro__ if base.__name__ == "AsyncClient")))
+    
+        model = "gpt-5.6-luna" if provider == "openai" else "claude-opus-5"
+        selection = validate_selection(provider, "api_key", model, "local:7")
+        call = ModelCall(selection, "search-1", "search", "Public issuer question", SCHEMA, "high", 4096, 2, 5)
+        control = RunControl(selection=selection, max_model_requests=1)
+        requests = []
+        monkeypatch.setenv("OPENAI_CUSTOM_HEADERS", "Authorization: Bearer ambient-openai\nX-Private: ambient-value")
+        monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "X-Api-Key: ambient-key\nAuthorization: Bearer ambient-bearer\nX-Private: ambient-value")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "ambient-bearer")
+    
+        def respond(request):
+            requests.append(request)
+            if provider == "openai":
+                payload = {"id": "resp-1", "created_at": 1, "object": "response", "model": model, "status": "completed",
+                           "output": [{"type": "web_search_call", "id": "web-1", "status": "completed", "action": {"type": "search", "query": "Issuer Old Inc"}},
+                                      {"type": "message", "id": "message-1", "role": "assistant", "status": "completed",
+                                       "content": [{"type": "output_text", "text": json.dumps(OUTPUT), "annotations": []}]}],
+                           "usage": {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30,
+                                     "input_tokens_details": {"cached_tokens": 0}, "output_tokens_details": {"reasoning_tokens": 0}}}
+            else:
+                payload = {"id": "msg-1", "type": "message", "role": "assistant", "model": model,
+                           "stop_reason": "tool_use", "stop_sequence": None,
+                           "content": [{"type": "server_tool_use", "id": "web-1", "name": "web_search", "input": {"query": "Issuer Old Inc"}},
+                                       {"type": "web_search_tool_result", "tool_use_id": "web-1", "content": []},
+                                       {"type": "tool_use", "id": "emit-1", "name": "emit_lifecycle_result", "input": OUTPUT}],
+                           "usage": {"input_tokens": 10, "output_tokens": 20}}
+            return http_module.Response(200, json=payload)
+    
+        real_factory = getattr(mod, f"_{provider}_client")
+    
+        def factory(**kwargs):
+            client = http_module.AsyncClient(transport=http_module.MockTransport(respond), trust_env=False)
+            return real_factory(**kwargs, http_client=client)
+    
+        monkeypatch.setattr(mod, f"_{provider}_client", factory)
+        result = await getattr(mod, f"call_{provider}_web")(call, WebCredential(selection, api_key="selected-key"), control)
+        assert result.output == OUTPUT and result.usage == {"input_tokens": 10, "output_tokens": 20}
+        assert len(requests) == 1
+&gt;       assert "X-Private" not in requests[0].headers
+E       AssertionError: assert 'X-Private' not in Headers({'host': 'api.openai.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'authorization': '[...': '', 'openai-project': '', 'x-stainless-retry-count': '0', 'x-stainless-read-timeout': '5', 'content-length': '426'})
+E        +  where Headers({'host': 'api.openai.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'authorization': '[...': '', 'openai-project': '', 'x-stainless-retry-count': '0', 'x-stainless-read-timeout': '5', 'content-length': '426'}) = &lt;Request('POST', 'https://api.openai.com/v1/responses')&gt;.headers
+
+tests/test_lifecycle_web_sdk_wire.py:69: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_sdk_wire" name="test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[anthropic]" time="0.029"><failure message="AssertionError: assert 'X-Private' not in Headers({'host': 'api.anthropic.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'x-stainless-tim...e': 'ambient-value', 'x-stainless-async': 'async:asyncio', 'anthropic-version': '2023-06-01', 'content-length': '505'})&#10; +  where Headers({'host': 'api.anthropic.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'x-stainless-tim...e': 'ambient-value', 'x-stainless-async': 'async:asyncio', 'anthropic-version': '2023-06-01', 'content-length': '505'}) = &lt;Request('POST', 'https://api.anthropic.com/v1/messages')&gt;.headers">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7698aa7b5c00&gt;
+provider = 'anthropic'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider", ["openai", "anthropic"])
+    async def test_real_api_sdk_serialization_keeps_selected_key_and_basic_search(monkeypatch, provider):
+        from src.auth_drivers import lifecycle_web_models as mod
+        from openai import AsyncOpenAI
+        from anthropic import AsyncAnthropic, DefaultAsyncHttpxClient
+    
+        # Use the HTTP types required by the installed SDK, not a lookalike client.
+        http_module = (httpx if provider == "openai" else importlib.import_module(next(
+            base.__module__.split(".")[0] for base in DefaultAsyncHttpxClient.__mro__ if base.__name__ == "AsyncClient")))
+    
+        model = "gpt-5.6-luna" if provider == "openai" else "claude-opus-5"
+        selection = validate_selection(provider, "api_key", model, "local:7")
+        call = ModelCall(selection, "search-1", "search", "Public issuer question", SCHEMA, "high", 4096, 2, 5)
+        control = RunControl(selection=selection, max_model_requests=1)
+        requests = []
+        monkeypatch.setenv("OPENAI_CUSTOM_HEADERS", "Authorization: Bearer ambient-openai\nX-Private: ambient-value")
+        monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "X-Api-Key: ambient-key\nAuthorization: Bearer ambient-bearer\nX-Private: ambient-value")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "ambient-bearer")
+    
+        def respond(request):
+            requests.append(request)
+            if provider == "openai":
+                payload = {"id": "resp-1", "created_at": 1, "object": "response", "model": model, "status": "completed",
+                           "output": [{"type": "web_search_call", "id": "web-1", "status": "completed", "action": {"type": "search", "query": "Issuer Old Inc"}},
+                                      {"type": "message", "id": "message-1", "role": "assistant", "status": "completed",
+                                       "content": [{"type": "output_text", "text": json.dumps(OUTPUT), "annotations": []}]}],
+                           "usage": {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30,
+                                     "input_tokens_details": {"cached_tokens": 0}, "output_tokens_details": {"reasoning_tokens": 0}}}
+            else:
+                payload = {"id": "msg-1", "type": "message", "role": "assistant", "model": model,
+                           "stop_reason": "tool_use", "stop_sequence": None,
+                           "content": [{"type": "server_tool_use", "id": "web-1", "name": "web_search", "input": {"query": "Issuer Old Inc"}},
+                                       {"type": "web_search_tool_result", "tool_use_id": "web-1", "content": []},
+                                       {"type": "tool_use", "id": "emit-1", "name": "emit_lifecycle_result", "input": OUTPUT}],
+                           "usage": {"input_tokens": 10, "output_tokens": 20}}
+            return http_module.Response(200, json=payload)
+    
+        real_factory = getattr(mod, f"_{provider}_client")
+    
+        def factory(**kwargs):
+            client = http_module.AsyncClient(transport=http_module.MockTransport(respond), trust_env=False)
+            return real_factory(**kwargs, http_client=client)
+    
+        monkeypatch.setattr(mod, f"_{provider}_client", factory)
+        result = await getattr(mod, f"call_{provider}_web")(call, WebCredential(selection, api_key="selected-key"), control)
+        assert result.output == OUTPUT and result.usage == {"input_tokens": 10, "output_tokens": 20}
+        assert len(requests) == 1
+&gt;       assert "X-Private" not in requests[0].headers
+E       AssertionError: assert 'X-Private' not in Headers({'host': 'api.anthropic.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'x-stainless-tim...e': 'ambient-value', 'x-stainless-async': 'async:asyncio', 'anthropic-version': '2023-06-01', 'content-length': '505'})
+E        +  where Headers({'host': 'api.anthropic.com', 'accept-encoding': 'gzip, deflate', 'connection': 'keep-alive', 'x-stainless-tim...e': 'ambient-value', 'x-stainless-async': 'async:asyncio', 'anthropic-version': '2023-06-01', 'content-length': '505'}) = &lt;Request('POST', 'https://api.anthropic.com/v1/messages')&gt;.headers
+
+tests/test_lifecycle_web_sdk_wire.py:69: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_sdk_wire" name="test_actual_api_client_factories_do_not_load_ambient_auth_or_proxy" time="0.042"><failure message="AssertionError: assert ('selected-key' == 'selected-key'&#10;  &#10;    selected-key and '' is None)&#10; +  where '' = &lt;anthropic.AsyncAnthropic object at 0x7698a9d07670&gt;.auth_token">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7698a9d06f50&gt;
+
+    @pytest.mark.anyio
+    async def test_actual_api_client_factories_do_not_load_ambient_auth_or_proxy(monkeypatch):
+        from src.auth_drivers.lifecycle_web_models import _openai_client, _anthropic_client
+    
+        monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "ambient-anthropic")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "ambient-bearer")
+        monkeypatch.setenv("OPENAI_ORG_ID", "ambient-org")
+        monkeypatch.setenv("OPENAI_PROJECT_ID", "ambient-project")
+        monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+        openai = _openai_client(api_key="selected-key", max_retries=0, base_url="https://api.openai.com/v1", timeout=3)
+        anthropic = _anthropic_client(api_key="selected-key", max_retries=0, base_url="https://api.anthropic.com", timeout=3)
+        try:
+            assert openai.api_key == "selected-key" and openai.organization == "" and openai.project == ""
+&gt;           assert anthropic.api_key == "selected-key" and anthropic.auth_token is None
+E           AssertionError: assert ('selected-key' == 'selected-key'
+E             
+E               selected-key and '' is None)
+E            +  where '' = &lt;anthropic.AsyncAnthropic object at 0x7698a9d07670&gt;.auth_token
+
+tests/test_lifecycle_web_sdk_wire.py:97: AssertionError</failure></testcase></testsuite></testsuites>

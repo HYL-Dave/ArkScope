@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="29" skipped="0" tests="29" time="0.375" timestamp="2026-09-06T22:52:47.871423+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_models" name="test_credentials_bind_exact_profile_row_and_never_use_environment" time="0.090"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x75aa8ed3c880&gt;
+
+    def test_credentials_bind_exact_profile_row_and_never_use_environment(monkeypatch):
+&gt;       from src.auth_drivers.lifecycle_web_models import resolve_web_credential, WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:50: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_oauth_credential_reads_only_the_exact_token_scope[openai-chatgpt_oauth]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "chatgpt_oauth"), ("anthropic", "claude_code_oauth")])
+    def test_oauth_credential_reads_only_the_exact_token_scope(provider, auth):
+&gt;       from src.auth_drivers.lifecycle_web_models import resolve_web_credential, WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:70: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_oauth_credential_reads_only_the_exact_token_scope[anthropic-claude_code_oauth]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "chatgpt_oauth"), ("anthropic", "claude_code_oauth")])
+    def test_oauth_credential_reads_only_the_exact_token_scope(provider, auth):
+&gt;       from src.auth_drivers.lifecycle_web_models import resolve_web_credential, WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:70: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_model_call_is_validated_before_client_creation[changed0]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">changed = {'phase': 'other'}
+
+    @pytest.mark.parametrize("changed", [
+        {"phase": "other"}, {"effort": "imaginary"}, {"max_search_uses": 0},
+        {"output_token_limit": True}, {"timeout_seconds": float("nan")},
+        {"output_schema": {"type": "not-json-schema"}},
+    ])
+    def test_model_call_is_validated_before_client_creation(changed):
+&gt;       from src.auth_drivers.lifecycle_web_models import WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_model_call_is_validated_before_client_creation[changed1]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">changed = {'effort': 'imaginary'}
+
+    @pytest.mark.parametrize("changed", [
+        {"phase": "other"}, {"effort": "imaginary"}, {"max_search_uses": 0},
+        {"output_token_limit": True}, {"timeout_seconds": float("nan")},
+        {"output_schema": {"type": "not-json-schema"}},
+    ])
+    def test_model_call_is_validated_before_client_creation(changed):
+&gt;       from src.auth_drivers.lifecycle_web_models import WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_model_call_is_validated_before_client_creation[changed2]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">changed = {'max_search_uses': 0}
+
+    @pytest.mark.parametrize("changed", [
+        {"phase": "other"}, {"effort": "imaginary"}, {"max_search_uses": 0},
+        {"output_token_limit": True}, {"timeout_seconds": float("nan")},
+        {"output_schema": {"type": "not-json-schema"}},
+    ])
+    def test_model_call_is_validated_before_client_creation(changed):
+&gt;       from src.auth_drivers.lifecycle_web_models import WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_model_call_is_validated_before_client_creation[changed3]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">changed = {'output_token_limit': True}
+
+    @pytest.mark.parametrize("changed", [
+        {"phase": "other"}, {"effort": "imaginary"}, {"max_search_uses": 0},
+        {"output_token_limit": True}, {"timeout_seconds": float("nan")},
+        {"output_schema": {"type": "not-json-schema"}},
+    ])
+    def test_model_call_is_validated_before_client_creation(changed):
+&gt;       from src.auth_drivers.lifecycle_web_models import WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_model_call_is_validated_before_client_creation[changed4]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">changed = {'timeout_seconds': nan}
+
+    @pytest.mark.parametrize("changed", [
+        {"phase": "other"}, {"effort": "imaginary"}, {"max_search_uses": 0},
+        {"output_token_limit": True}, {"timeout_seconds": float("nan")},
+        {"output_schema": {"type": "not-json-schema"}},
+    ])
+    def test_model_call_is_validated_before_client_creation(changed):
+&gt;       from src.auth_drivers.lifecycle_web_models import WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_model_call_is_validated_before_client_creation[changed5]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'">changed = {'output_schema': {'type': 'not-json-schema'}}
+
+    @pytest.mark.parametrize("changed", [
+        {"phase": "other"}, {"effort": "imaginary"}, {"max_search_uses": 0},
+        {"output_token_limit": True}, {"timeout_seconds": float("nan")},
+        {"output_schema": {"type": "not-json-schema"}},
+    ])
+    def test_model_call_is_validated_before_client_creation(changed):
+&gt;       from src.auth_drivers.lifecycle_web_models import WebModelError
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_models'
+
+tests/test_lifecycle_web_models.py:91: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_web_uses_native_bound_exact_key_and_no_sdk_retry" time="0.001"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_analysis_phase_does_not_keep_search_tools[openai]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_analysis_phase_does_not_keep_search_tools[anthropic]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result0-execution_identity_changed]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result1-model_result_incomplete]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result2-model_output_invalid]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result3-model_output_invalid]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result4-unexpected_tool_activity]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_failed_openai_dispatch_with_no_response_id_is_unknown_and_not_retried" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_cancel_requires_terminal_readback[True]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_openai_cancel_requires_terminal_readback[False]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_uses_basic_search_not_code_execution_and_no_retry" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result0-execution_identity_changed]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result1-model_result_incomplete]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result2-model_result_incomplete]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result3-provider_refused]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result4-unexpected_tool_activity]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result5-model_output_invalid]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result6-search_budget_exhausted]" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="tests.test_lifecycle_web_models" name="test_anthropic_transport_cancellation_is_not_remote_terminal" time="0.002"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase></testsuite></testsuites>

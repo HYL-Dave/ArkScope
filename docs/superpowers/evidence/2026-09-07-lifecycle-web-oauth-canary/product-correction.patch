@@ -1,0 +1,144 @@
+--- before/src/auth_drivers/lifecycle_web_claude.py
++++ after/src/auth_drivers/lifecycle_web_claude.py
+@@ -103,12 +103,6 @@
+ def _result_status(message: ResultMessage, *, call: ModelCall, session_id: str) -> str:
+     if message.session_id != session_id:
+         raise WebModelError("execution_identity_changed")
+-    usage = message.model_usage
+-    if usage is not None:
+-        if not isinstance(usage, dict):
+-            raise WebModelError("model_usage_invalid")
+-        for model in usage:
+-            require_response_model({"model": model}, call.selection.model)
+     reason = message.terminal_reason
+     if reason in {"aborted_streaming", "aborted_tools"}:
+         return "interrupted"
+@@ -116,12 +110,23 @@
+         if reason is None:
+             raise WebModelError("model_result_incomplete")
+         return "failed"
++    return "completed"
++
++
++def _validate_result(message: ResultMessage, *, call: ModelCall, status: str) -> None:
++    usage = message.model_usage
++    if usage is not None:
++        if not isinstance(usage, dict):
++            raise WebModelError("model_usage_invalid")
++        for model in usage:
++            require_response_model({"model": model}, call.selection.model)
++    if status != "completed":
++        return
+     max_turns = call.max_search_uses + 2 if call.phase == "search" else 2
+     if type(message.num_turns) is not int or not 0 < message.num_turns <= max_turns:
+         raise WebModelError("model_result_incomplete")
+     if message.permission_denials or message.deferred_tool_use:
+         raise WebModelError("unexpected_tool_activity")
+-    return "completed"
+ 
+ 
+ async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -> ModelReply:
+@@ -147,6 +152,10 @@
+         cwd.mkdir(mode=0o700)
+         environment = build_claude_child_environment(token=token, config_dir=str(config))
+         environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
++        # The reviewed CLI's WebSearch can use its small/fast helper independently
++        # of --model. Bind both current and legacy overrides, including ambient ones.
++        environment.update(ANTHROPIC_DEFAULT_HAIKU_MODEL=call.selection.model,
++                           ANTHROPIC_SMALL_FAST_MODEL=call.selection.model)
+         tools = ["WebSearch"] if call.phase == "search" else []
+         disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+         options = ClaudeAgentOptions(
+@@ -230,7 +239,10 @@
+                         if not initialized:
+                             raise WebModelError("subscription_auth_unverified")
+                         status = _result_status(message, call=call, session_id=session_id)
++                        # Remote completion and acceptance are separate facts. A
++                        # rejected owned result must not become an orphaned call.
+                         control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
++                        _validate_result(message, call=call, status=status)
+                         if failure is not None:
+                             raise failure
+                         if not observed_search.issubset(gate.search_reservations):
+--- before/tests/test_lifecycle_web_claude.py
++++ after/tests/test_lifecycle_web_claude.py
+@@ -147,6 +147,79 @@
+ 
+ 
+ @pytest.mark.anyio
++@pytest.mark.parametrize("phase", ["search", "analysis"])
++async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(monkeypatch, phase):
++    monkeypatch.setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "ambient-helper-model")
++    monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "ambient-legacy-helper")
++    mod, clients = _setup(monkeypatch)
++    request = _request(phase=phase, call_id=phase + "-1")
++    credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
++    control = RunControl(selection=request.selection, max_model_requests=2)
++    await mod.call_claude_web(request, credential, control)
++    environment = clients[0].options.env
++    assert environment["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == request.selection.model
++    assert environment["ANTHROPIC_SMALL_FAST_MODEL"] == request.selection.model
++    assert clients[0].options.fallback_model is None
++
++
++@pytest.mark.anyio
++@pytest.mark.parametrize("result,code", [
++    ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
++    ({"model_usage": []}, "model_usage_invalid"),
++    ({"num_turns": 100}, "model_result_incomplete"),
++    ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
++])
++async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
++    mod, clients = _setup(monkeypatch, result=result)
++    request = _request()
++    credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
++    control = RunControl(selection=request.selection, max_model_requests=2)
++    with pytest.raises(WebModelError, match=code):
++        await mod.call_claude_web(request, credential, control)
++    assert control.terminal_statuses == {"search-1": "completed"}
++    assert control.all_requests_terminal
++    with pytest.raises(ValueError, match="stop_requested"):
++        control.reserve_model_request("analysis-1")
++    assert clients[0].closed and control.model_requests == 1
++
++
++@pytest.mark.anyio
++@pytest.mark.parametrize("result", [{"session_id": "foreign"}, {"terminal_reason": None}])
++async def test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown(monkeypatch, result):
++    mod, clients = _setup(monkeypatch, result=result)
++    request = _request()
++    control = RunControl(selection=request.selection, max_model_requests=2)
++    credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
++    with pytest.raises(WebModelError):
++        await mod.call_claude_web(request, credential, control)
++    assert control.terminal_statuses == {}
++    assert control.stop_state == "remote_outcome_unknown"
++    assert clients[0].closed and control.model_requests == 1
++
++
++def test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback(monkeypatch, tmp_path):
++    from src.security_lifecycle_web_pipeline import investigate
++    from tests.test_lifecycle_web_controller import controller, launch, wait_done
++
++    mod, clients = _setup(monkeypatch, result={
++        "model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}})
++    selected = _request().selection
++    service, store, loads = controller(tmp_path, runner=investigate,
++        loader=lambda selected: WebCredential(selected, token_record=StoredTokenRecord("selected-token")))
++    try:
++        run = launch(service, selected=selected)
++        result = wait_done(service, run["run_id"])
++        assert result["status"] == "failed"
++        assert result["failure_code"] == "execution_identity_changed"
++        assert result["finding"] is None and result["model_submissions"] == 1
++        calls = store.read(run["run_id"])["calls"]
++        assert set(calls) == {"search-1"} and calls["search-1"]["terminal"] == "completed"
++        assert len(clients) == 1 and len(loads) == 1
++    finally:
++        service.close()
++
++
++@pytest.mark.anyio
+ @pytest.mark.parametrize("init", [
+     {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+     {"model": "claude-sonnet-5"}, {"session_id": "foreign"},

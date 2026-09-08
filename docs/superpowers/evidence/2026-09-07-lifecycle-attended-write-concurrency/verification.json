@@ -1,0 +1,127 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6810
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "91eecfb1c4b1ce71c4c53790a524128e8cb29f185f8ed42a157ca0d31077c251"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2133
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "159c8bbe79151b47602ad0311bba4022a4f0eb384d6e07555ab0fa87ae23ec27"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2952
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "f130a7b35e43fb3044c1b821950ea7cefce2e99cba37c9e241da849c3a4bd7bb"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2133
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "d8d2e521a760ab51ecdc573aabdadf044cfb2c174032478fd8bfde1596150a59"
+    }
+  },
+  "browser": {
+    "prior_packet": "2026-09-07-lifecycle-attended-source-gaps",
+    "prior_scenarios": 24,
+    "prior_screenshots": 42,
+    "reason": "no_frontend_source_or_DTO_changes",
+    "rerun": false,
+    "unchanged_ui_files": 284
+  },
+  "commit": false,
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1578
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "57915566326a864dfa2c0c7c7799964aa9837d5029b9b528bd3a1c5f245d0624"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1578
+      },
+      "failed_nodes": [],
+      "file": "restored.json",
+      "sha256": "77c6683d00a32e0fa94b73422844424653c284d1984004da3dce94ca88d4f7f7"
+    }
+  },
+  "merge": false,
+  "migration": false,
+  "mutations": {
+    "backend": 15,
+    "frontend": 0
+  },
+  "prior_packets": {
+    "2026-09-07-lifecycle-attended-source-gaps": {
+      "files_verified": 447,
+      "seal_sha256": "8c8f00075554c62cb8969901825a7aedf13c88356af6a109a5b1cc8a7c6dd1cc"
+    },
+    "2026-09-07-lifecycle-source-context": {
+      "files_verified": 227,
+      "seal_sha256": "52e68716d4117886934a56eff69376235851da85d9f0bb25659e13a0584f064f"
+    },
+    "2026-09-07-lifecycle-source-priority-capacity": {
+      "files_verified": 1462,
+      "seal_sha256": "be780d0a00164f47db561b16ee47c0f1d1c318b9a0ffb3091e252b191bbd32c3"
+    },
+    "2026-09-07-lifecycle-web-runtime": {
+      "files_verified": 240,
+      "seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa"
+    },
+    "2026-09-07-lifecycle-web-sonnet-canary": {
+      "files_verified": 108,
+      "seal_sha256": "70db6a06341e77128a402c443ad44d007a6138270e552c63a51bb8e836392d05"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "model_usage_calibration",
+    "authorized_fresh_live_canary",
+    "authorized_journal_installation_and_population_cutover",
+    "merge_and_handtest"
+  ],
+  "unchanged_schemas": {
+    "src/lifecycle_web_schema.py": "490ca24b56cdf29731aef12430bf30da2e63866594bbd323203bda326437ece7",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "whole_workflow_complete": false
+}

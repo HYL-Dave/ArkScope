@@ -1,0 +1,83 @@
+{
+  "lifecycle-usage-removal-maximum": {
+    "action": "terminal_delisting",
+    "active_tickers": [
+      "LIVE"
+    ],
+    "child_ru_maxrss_bytes": 1908895744,
+    "confirmation_elapsed_seconds": 22.534,
+    "decoded_source_bytes": 134217728,
+    "human_write_transactions_seconds": [
+      0.524,
+      0.395
+    ],
+    "max_heartbeat_seconds": 1.47,
+    "max_poll_seconds": 14.137,
+    "passed": true,
+    "scope": "final_source_admission",
+    "source_counts": [
+      4,
+      4
+    ],
+    "statuses": [
+      [
+        "succeeded",
+        null
+      ],
+      [
+        "succeeded",
+        null
+      ]
+    ],
+    "supervisor": {
+      "elapsed_seconds": 162.661,
+      "exit_code": 0,
+      "failure": null,
+      "rss_guard_bytes": 4294967296,
+      "runner_sha256": "356d15c9440123c7b6556f7889a82c458fbdbd5e275c37489709014f7e7d5586",
+      "sampled_peak_rss_bytes": 1901129728,
+      "source_unchanged": true
+    }
+  },
+  "lifecycle-usage-rename-maximum": {
+    "action": "symbol_continuation",
+    "active_tickers": [
+      "LIVE",
+      "NEW"
+    ],
+    "child_ru_maxrss_bytes": 1909673984,
+    "confirmation_elapsed_seconds": 21.033,
+    "decoded_source_bytes": 134217728,
+    "human_write_transactions_seconds": [
+      0.492,
+      0.349
+    ],
+    "max_heartbeat_seconds": 1.434,
+    "max_poll_seconds": 13.006,
+    "passed": true,
+    "scope": "final_source_admission",
+    "source_counts": [
+      4,
+      4
+    ],
+    "statuses": [
+      [
+        "succeeded",
+        null
+      ],
+      [
+        "succeeded",
+        null
+      ]
+    ],
+    "supervisor": {
+      "elapsed_seconds": 154.404,
+      "exit_code": 0,
+      "failure": null,
+      "rss_guard_bytes": 4294967296,
+      "runner_sha256": "356d15c9440123c7b6556f7889a82c458fbdbd5e275c37489709014f7e7d5586",
+      "sampled_peak_rss_bytes": 1887916032,
+      "source_unchanged": true
+    }
+  }
+}

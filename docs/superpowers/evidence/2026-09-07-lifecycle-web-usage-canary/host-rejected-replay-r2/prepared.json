@@ -1,0 +1,30 @@
+{
+  "capture_files_sha256": {
+    "authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+    "metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+    "profile.sqlite": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+    "result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+    "search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a"
+  },
+  "capture_source_checkpoint": {
+    "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+    "matched_files": 1084,
+    "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+  },
+  "events": [],
+  "harness_sha256": "9eda8ccd2f06376399e37a2e51cb7ed3455880f27e87702fb44d593fe316907b",
+  "kind": "analysis_only_diagnostic_not_new_end_to_end_run",
+  "local_children_reaped": [],
+  "prompt_sha256": "99847cf20e3610345feb1376602778bda0940453eb6bff285f8a55dd863181eb",
+  "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+  "sdk_submissions": 0,
+  "search_submissions": 0,
+  "source_checkpoint": {
+    "manifest_sha256": "8096fd4f8bae3374cdbd8317c20f4cad635c8a9a43c8db6847abae1fb630dde2",
+    "matched_files": 1091,
+    "seal_sha256": "2cd4bcf60f5a9fcd4f60d91402a29bcca90e2a15c9d2bd76c1a67a61c4cb1752"
+  },
+  "source_http_requests": 0,
+  "started_at": "2026-09-07T11:41:53.921685+00:00",
+  "token_loads": 0
+}

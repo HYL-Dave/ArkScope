@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="47" time="0.645" timestamp="2026-09-08T06:23:30.904137+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_investigation_findings" name="test_stock_definition_and_event_passages_jointly_support_finding" time="0.386" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_debt_event_cannot_borrow_common_stock_identity" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc (the &quot;Company&quot;) has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]" time="0.002"><failure message="AssertionError: assert 'active_listing_not_supported' in []">identity = 'Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.'
+alias = 'Company senior notes', security_class = 'common stock'
+accepted = False, event = 'active_listing'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+            assert checked["action"] is None
+&gt;           assert ("active_listing_not_supported" if event == "active_listing" else "listing_change_not_supported") in checked["block_reasons"]
+E           AssertionError: assert 'active_listing_not_supported' in []
+
+tests/test_lifecycle_investigation_findings.py:75: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock trades on NASDAQ (the &quot;Exchange&quot;).-senior notes on the Exchange-common stock-False]" time="0.002"><failure message="AssertionError: assert 'active_listing_not_supported' in []">identity = 'Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").'
+alias = 'senior notes on the Exchange', security_class = 'common stock'
+accepted = False, event = 'active_listing'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+            assert checked["action"] is None
+&gt;           assert ("active_listing_not_supported" if event == "active_listing" else "listing_change_not_supported") in checked["block_reasons"]
+E           AssertionError: assert 'active_listing_not_supported' in []
+
+tests/test_lifecycle_investigation_findings.py:75: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the &quot;Securities&quot;).-Securities-common stock-False]" time="0.002"><failure message="AssertionError: assert 'active_listing_not_supported' in []">identity = 'Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").'
+alias = 'Securities', security_class = 'common stock', accepted = False
+event = 'active_listing'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+            assert checked["action"] is None
+&gt;           assert ("active_listing_not_supported" if event == "active_listing" else "listing_change_not_supported") in checked["block_reasons"]
+E           AssertionError: assert 'active_listing_not_supported' in []
+
+tests/test_lifecycle_investigation_findings.py:75: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the &quot;Shares&quot;).-Shares-Class A common stock-False]" time="0.002"><failure message="AssertionError: assert 'active_listing_not_supported' in []">identity = 'Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").'
+alias = 'Shares', security_class = 'Class A common stock', accepted = False
+event = 'active_listing'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+            assert checked["action"] is None
+&gt;           assert ("active_listing_not_supported" if event == "active_listing" else "listing_change_not_supported") in checked["block_reasons"]
+E           AssertionError: assert 'active_listing_not_supported' in []
+
+tests/test_lifecycle_investigation_findings.py:75: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock (the &quot;Shares&quot;) on NASDAQ.-Shares-common stock-True]" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock, par value $0.001 per share (&quot;Company Stock&quot;), on NASDAQ.-Company Stock-common stock-True]" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock on NASDAQ (the &quot;Company Stock&quot;).-Company Stock-common stock-True]" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock (the &quot;Class A Shares&quot;) on NASDAQ.-Class A Shares-Class A common stock-True]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc (the &quot;Company&quot;) has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]" time="0.002"><failure message="AssertionError: assert 'terminal_delisting' is None">identity = 'Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.'
+alias = 'Company senior notes', security_class = 'common stock'
+accepted = False, event = 'listing_ended'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+&gt;           assert checked["action"] is None
+E           AssertionError: assert 'terminal_delisting' is None
+
+tests/test_lifecycle_investigation_findings.py:74: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock trades on NASDAQ (the &quot;Exchange&quot;).-senior notes on the Exchange-common stock-False]" time="0.002"><failure message="AssertionError: assert 'terminal_delisting' is None">identity = 'Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").'
+alias = 'senior notes on the Exchange', security_class = 'common stock'
+accepted = False, event = 'listing_ended'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+&gt;           assert checked["action"] is None
+E           AssertionError: assert 'terminal_delisting' is None
+
+tests/test_lifecycle_investigation_findings.py:74: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the &quot;Securities&quot;).-Securities-common stock-False]" time="0.002"><failure message="AssertionError: assert 'terminal_delisting' is None">identity = 'Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").'
+alias = 'Securities', security_class = 'common stock', accepted = False
+event = 'listing_ended'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+&gt;           assert checked["action"] is None
+E           AssertionError: assert 'terminal_delisting' is None
+
+tests/test_lifecycle_investigation_findings.py:74: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the &quot;Shares&quot;).-Shares-Class A common stock-False]" time="0.002"><failure message="AssertionError: assert 'terminal_delisting' is None">identity = 'Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").'
+alias = 'Shares', security_class = 'Class A common stock', accepted = False
+event = 'listing_ended'
+
+    @pytest.mark.parametrize("identity,alias,security_class,accepted", [
+        ('Issuer Old Inc (the "Company") has OLD common stock listed on NASDAQ.', "Company senior notes", "common stock", False),
+        ('Issuer Old Inc OLD common stock trades on NASDAQ (the "Exchange").', "senior notes on the Exchange", "common stock", False),
+        ('Issuer Old Inc OLD common stock on NASDAQ and senior notes (the "Securities").', "Securities", "common stock", False),
+        ('Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the "Shares").', "Shares", "Class A common stock", False),
+        ('Issuer Old Inc OLD common stock (the "Shares") on NASDAQ.', "Shares", "common stock", True),
+        ('Issuer Old Inc OLD common stock, par value $0.001 per share ("Company Stock"), on NASDAQ.', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD common stock on NASDAQ (the "Company Stock").', "Company Stock", "common stock", True),
+        ('Issuer Old Inc OLD Class A common stock (the "Class A Shares") on NASDAQ.', "Class A Shares", "Class A common stock", True),
+    ])
+    @pytest.mark.parametrize("event", ("active_listing", "listing_ended"))
+    def test_only_security_qualified_definitions_bind_event_aliases(identity, alias, security_class, accepted, event):
+        from src.lifecycle_investigation.findings import validate_finding
+        state = "continue to trade on NASDAQ" if event == "active_listing" else "ceased trading on September 1, 2026"
+        source, passages = material(identity + f"\nThe {alias} {state}.")
+        value = {**payload(passages), "security_class": security_class, "event_kind": event}
+        if event == "active_listing":
+            value.update(effective_date=None, effective_date_text=None)
+            value["citations"][-1]["supports"] = ["active_listing"]
+        checked = validate_finding(target().model_copy(update={"security_class": security_class}), value,
+            {"source-1": source}, {p["passage_id"] for p in passages})
+        if accepted:
+            assert checked["block_reasons"] == []
+            assert checked["action"] == ("terminal_delisting" if event == "listing_ended" else None)
+        else:
+&gt;           assert checked["action"] is None
+E           AssertionError: assert 'terminal_delisting' is None
+
+tests/test_lifecycle_investigation_findings.py:74: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock (the &quot;Shares&quot;) on NASDAQ.-Shares-common stock-True]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock, par value $0.001 per share (&quot;Company Stock&quot;), on NASDAQ.-Company Stock-common stock-True]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock on NASDAQ (the &quot;Company Stock&quot;).-Company Stock-common stock-True]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock (the &quot;Class A Shares&quot;) on NASDAQ.-Class A Shares-Class A common stock-True]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_unsupplied_or_changed_passage_never_authorizes_action" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_announced_acquisition_or_planned_delisting_never_stops_collection[acquisition_announced-completed]" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_announced_acquisition_or_planned_delisting_never_stops_collection[listing_ended-scheduled]" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_syndicated_local_and_web_copies_are_one_source" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_common_share_synonym_and_omitted_legal_suffix_keep_the_same_instrument" time="0.001" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_does_not_change_common_stock_event_identity[active_listing-Common Stock, $0.001 par value per share-common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_does_not_change_common_stock_event_identity[active_listing-common shares (par value $0.001 per share)-common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_does_not_change_common_stock_event_identity[active_listing-Class A common stock, $0.001 par value per share-Class A common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_does_not_change_common_stock_event_identity[listing_ended-Common Stock, $0.001 par value per share-common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_does_not_change_common_stock_event_identity[listing_ended-common shares (par value $0.001 per share)-common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_does_not_change_common_stock_event_identity[listing_ended-Class A common stock, $0.001 par value per share-Class A common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_normalization_never_discards_security_class[active_listing-Class B common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_normalization_never_discards_security_class[active_listing-preferred shares]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_normalization_never_discards_security_class[active_listing-senior notes]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_normalization_never_discards_security_class[listing_ended-Class B common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_normalization_never_discards_security_class[listing_ended-preferred shares]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_par_value_normalization_never_discards_security_class[listing_ended-senior notes]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_instrument_synonyms_cannot_cross_security_classes[preferred shares]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_instrument_synonyms_cannot_cross_security_classes[senior notes]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_instrument_synonyms_cannot_cross_security_classes[Class B common stock]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_target_event_passages_precede_navigation_and_query_is_effective" time="0.003" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_small_fragmented_notice_initial_context_preserves_complete_document" time="0.008" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_large_document_keeps_unselected_passages_inspectable_without_truncation" time="0.020" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_wrapped_event_sentence_binds_its_adjacent_date_but_not_a_new_sentence" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_future_scheduled_date_is_reportable_but_cannot_authorize_removal" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_unknown_exact_date_is_a_visible_limitation_not_a_material_conflict" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[actual_public_fragments]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[different_security]" time="0.002" /><testcase classname="tests.test_lifecycle_investigation_findings" name="test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[unrelated_date]" time="0.003" /></testsuite></testsuites>

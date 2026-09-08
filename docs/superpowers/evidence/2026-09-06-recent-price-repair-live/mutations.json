@@ -1,0 +1,84 @@
+[
+  {
+    "name": "L01_wrong_plan_admitted",
+    "owner": "test_live_admission_binds_the_exact_authorized_plan",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "require(plan[\"plan_sha256\"] == expected, \"live_plan_not_approved\")",
+        "after": "require(True, \"live_plan_not_approved\")"
+      }
+    ]
+  },
+  {
+    "name": "L02_outside_price_scope_written",
+    "owner": "test_live_sql_guard_rejects_out_of_scope_access",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "require(all(tuple(row[:3]) in slots for row in rows), \"live_write_row_scope\")",
+        "after": "require(True, \"live_write_row_scope\")"
+      }
+    ]
+  },
+  {
+    "name": "L03_ambient_credentials_readable",
+    "owner": "test_live_sql_guard_rejects_out_of_scope_access",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "\"sa_tracking_memberships\", \"sa_tracking_bindings\", \"sa_tracking_events\",",
+        "after": "\"sa_tracking_memberships\", \"sa_tracking_bindings\", \"sa_tracking_events\", \"data_provider_config\","
+      }
+    ]
+  },
+  {
+    "name": "L04_other_network_destination_allowed",
+    "owner": "test_network_guard_rejects_non_gateway_destinations_and_ambient_secrets",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "require(isinstance(address, tuple) and address[:2] == (config[\"host\"], config[\"port\"]), \"live_network_scope\")",
+        "after": "require(True, \"live_network_scope\")"
+      }
+    ]
+  },
+  {
+    "name": "L05_prior_backup_overwritten",
+    "owner": "test_backup_keeps_wal_rows_and_never_overwrites_a_prior_backup",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)",
+        "after": "fd = os.open(destination, os.O_CREAT | os.O_WRONLY, 0o600)"
+      }
+    ]
+  },
+  {
+    "name": "L06_gateway_before_backup",
+    "owner": "test_backup_failure_never_attempts_gateway",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "    source = MeteredSource(config, metrics, progress)\n    error = None",
+        "after": "    error = None"
+      },
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "    progress({\"phase\": \"backup\", \"provider_calls\": 0})",
+        "after": "    source = MeteredSource(config, metrics, progress)\n    source.connect()\n    progress({\"phase\": \"backup\", \"provider_calls\": 0})"
+      }
+    ]
+  },
+  {
+    "name": "L07_changed_settings_ignored",
+    "owner": "test_changed_gateway_configuration_stops_before_connection",
+    "edits": [
+      {
+        "path": "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py",
+        "before": "require(settings(paths[\"profile\"]) == config, \"live_gateway_settings_changed\")",
+        "after": "require(True, \"live_gateway_settings_changed\")"
+      }
+    ]
+  }
+]

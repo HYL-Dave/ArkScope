@@ -1,0 +1,1000 @@
+{
+  "backend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1248
+      },
+      "duration_seconds": 42.403,
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "baseline"
+    },
+    "mutations": [
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 43.292,
+        "edits": [
+          {
+            "after": "if value is None:\n        return {}",
+            "before": "if value is None:\n        return None",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_current_sources_unknown_is_not_an_empty_healthy_universe"
+        ],
+        "killed_by_owner": true,
+        "name": "unknown_sources_are_empty",
+        "owner": "test_current_sources_unknown_is_not_an_empty_healthy_universe",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 43.055,
+        "edits": [
+          {
+            "after": "True",
+            "before": "readiness[\"expected_state_sha256\"] == readiness[\"observed_state_sha256\"]",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_current_projection_checks_actual_effects_not_just_applied_status"
+        ],
+        "killed_by_owner": true,
+        "name": "trust_applied_without_effects",
+        "owner": "test_current_projection_checks_actual_effects_not_just_applied_status",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 3,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 42.512,
+        "edits": [
+          {
+            "after": "instant(snapshot[\"at\"]).date().isoformat()",
+            "before": "instant(snapshot[\"at\"]).astimezone(ZoneInfo(\"America/New_York\")).date().isoformat()",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_current_review_scheduled_state_uses_new_york_not_utc[2026-09-05T01:00:00Z]",
+          "tests.test_security_lifecycle_current::test_current_review_scheduled_state_uses_new_york_not_utc[2026-11-01T03:30:00Z]",
+          "tests.test_security_lifecycle_current::test_current_review_scheduled_state_uses_new_york_not_utc[2027-03-14T04:30:00Z]"
+        ],
+        "killed_by_owner": true,
+        "name": "schedule_uses_utc",
+        "owner": "test_current_review_scheduled_state_uses_new_york_not_utc",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 51.867,
+        "edits": [
+          {
+            "after": "False",
+            "before": "sources != _sources(service.sources_by_ticker())",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_source_loader_changes_invalidate_the_read_instead_of_mixing_collection_states"
+        ],
+        "killed_by_owner": true,
+        "name": "mix_collection_snapshots",
+        "owner": "test_source_loader_changes_invalidate_the_read_instead_of_mixing_collection_states",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 57.503,
+        "edits": [
+          {
+            "after": "False",
+            "before": "versions != [conn.execute(\"PRAGMA data_version\").fetchone()[0] for conn in connections]",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_new_source_observation_between_population_and_receipt_read_is_rejected"
+        ],
+        "killed_by_owner": true,
+        "name": "mix_database_snapshots",
+        "owner": "test_new_source_observation_between_population_and_receipt_read_is_rejected",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 56.012,
+        "edits": [
+          {
+            "after": "current_sources = [] if sources is None else sources.get(ticker, [])",
+            "before": "current_sources = [] if sources is None or review.get(\"historical\") else sources.get(ticker, [])",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_reused_ticker_current_tracking_is_not_assigned_to_historical_security"
+        ],
+        "killed_by_owner": true,
+        "name": "reused_ticker_shares_membership",
+        "owner": "test_reused_ticker_current_tracking_is_not_assigned_to_historical_security",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 8,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 59.955,
+        "edits": [
+          {
+            "after": "rows = [row for row in result[\"items\"] if row[\"finding\"] != \"unresolved\" and (case_id in row[\"case_ids\"]",
+            "before": "rows = [row for row in result[\"items\"] if (case_id in row[\"case_ids\"]",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_current_reviews_account_for_unpersisted_missing_and_recovered_cases",
+          "tests.test_security_lifecycle_current::test_current_sources_unknown_is_not_an_empty_healthy_universe",
+          "tests.test_security_lifecycle_current::test_current_review_read_creates_no_files_or_writes_and_never_reads_keys",
+          "tests.test_security_lifecycle_current::test_current_review_filters_paginate_without_hiding_population_counts",
+          "tests.test_security_lifecycle_current::test_reused_ticker_current_tracking_is_not_assigned_to_historical_security",
+          "tests.test_security_lifecycle_current::test_always_active_coverage_expires_instead_of_staying_green",
+          "tests.test_security_lifecycle_current::test_current_case_deep_link_resolves_history_outside_the_visible_page",
+          "tests.test_security_lifecycle_current::test_sec_only_review_retains_the_actual_observation_time"
+        ],
+        "killed_by_owner": true,
+        "name": "drop_unresolved_reviews",
+        "owner": "test_current_reviews_account_for_unpersisted_missing_and_recovered_cases",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 182.668,
+        "edits": [
+          {
+            "after": "f\"file:{path.resolve()}?mode=ro\"",
+            "before": "f\"{path.resolve().as_uri()}?mode=ro\"",
+            "path": "src/tools/security_lifecycle_tools.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_lazy_audit_uses_the_same_literal_database_as_current_review[%23literal]"
+        ],
+        "killed_by_owner": true,
+        "name": "unescaped_audit_path",
+        "owner": "test_lazy_audit_uses_the_same_literal_database_as_current_review[%23literal]",
+        "restored_sha256": {
+          "src/tools/security_lifecycle_tools.py": "e6d2cade7d5dc963e0efbb229e906c86c1a4aca36968cefb438461b817a03eec"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 147.684,
+        "edits": [
+          {
+            "after": "        pass",
+            "before": "        confirmation_for(transition)",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_bad_confirmation_receipt_never_becomes_displayed_success"
+        ],
+        "killed_by_owner": true,
+        "name": "trust_bad_confirmation",
+        "owner": "test_bad_confirmation_receipt_never_becomes_displayed_success",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 48.386,
+        "edits": [
+          {
+            "after": "if action[\"state\"] not in CURRENT_ACTION_STATES:",
+            "before": "if reason not in CURRENT_REVIEW_REASONS or action[\"state\"] not in CURRENT_ACTION_STATES:",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_current_closed_vocabulary_is_enforced_before_api_or_research[reason]"
+        ],
+        "killed_by_owner": true,
+        "name": "unreviewed_reason_is_public",
+        "owner": "test_current_closed_vocabulary_is_enforced_before_api_or_research[reason]",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 57.462,
+        "edits": [
+          {
+            "after": "if reason not in CURRENT_REVIEW_REASONS:",
+            "before": "if reason not in CURRENT_REVIEW_REASONS or action[\"state\"] not in CURRENT_ACTION_STATES:",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_current_closed_vocabulary_is_enforced_before_api_or_research[state]"
+        ],
+        "killed_by_owner": true,
+        "name": "unreviewed_state_is_public",
+        "owner": "test_current_closed_vocabulary_is_enforced_before_api_or_research[state]",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 65.781,
+        "edits": [
+          {
+            "after": "return service.list_current_reviews(at=_utc_now(), view=view, ticker=ticker, case_id=None, limit=limit, offset=offset)",
+            "before": "return service.list_current_reviews(at=_utc_now(), view=view, ticker=ticker, case_id=case_id, limit=limit, offset=offset)",
+            "path": "src/api/routes/security_lifecycle.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current_routes::test_current_route_case_filter_is_not_silently_ignored"
+        ],
+        "killed_by_owner": true,
+        "name": "ignore_exact_case_filter",
+        "owner": "test_current_route_case_filter_is_not_silently_ignored",
+        "restored_sha256": {
+          "src/api/routes/security_lifecycle.py": "687eddb6a2e70403fdeae3e475514705ecffc46b8adf5eb0164b8af4ab759d19"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 66.457,
+        "edits": [
+          {
+            "after": "if False:",
+            "before": "if latest[\"observation_fingerprint_sha256\"] != observation_fingerprint(case[\"observation\"]):",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_changed_observation_does_not_offer_an_old_assessment_as_current"
+        ],
+        "killed_by_owner": true,
+        "name": "offer_stale_assessment",
+        "owner": "test_changed_observation_does_not_offer_an_old_assessment_as_current",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1248
+        },
+        "duration_seconds": 65.614,
+        "edits": [
+          {
+            "after": "evidence=row[\"evidence\"], today=instant(row[\"at\"]).date(), provider_codes=row[\"blockers\"]",
+            "before": "evidence=row[\"evidence\"], today=instant(snapshot[\"at\"]).date(), provider_codes=row[\"blockers\"]",
+            "path": "src/security_lifecycle_current.py"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_security_lifecycle_current::test_always_active_coverage_expires_instead_of_staying_green"
+        ],
+        "killed_by_owner": true,
+        "name": "active_coverage_never_expires",
+        "owner": "test_always_active_coverage_expires_instead_of_staying_green",
+        "restored_sha256": {
+          "src/security_lifecycle_current.py": "d53d7f793ee0017f69a4c11f805c76885e3bc3523a874b763e76eba70c477161"
+        }
+      }
+    ],
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1248
+      },
+      "duration_seconds": 63.639,
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "restored"
+    }
+  },
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1516
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "baseline"
+    },
+    "mutations": [
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "return await getJSON<CurrentLifecycleReviewList>(`/security-lifecycle/reviews${lifecycleQuery(filters)}`);",
+            "before": "return parseCurrentReviewList(await getJSON<unknown>(`/security-lifecycle/reviews${lifecycleQuery(filters)}`));",
+            "path": "apps/arkscope-web/src/api.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not bypass current-list parsing at the real API boundary"
+        ],
+        "killed_by_owner": true,
+        "name": "cast_current_list",
+        "owner": "does not bypass current-list parsing at the real API boundary",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "31f667a92ebeed9ee154e6fe101bc715b29f2e8fabf4e0b967e2c76005c52b3c"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "<tbody>{page.items.filter((row) => row.finding !== \"unresolved\").map((row)",
+            "before": "<tbody>{page.items.map((row)",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "keeps unresolved source-only rows visible instead of silently filtering them"
+        ],
+        "killed_by_owner": true,
+        "name": "hide_unresolved_rows",
+        "owner": "keeps unresolved source-only rows visible instead of silently filtering them",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 5,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "copy.states.applied",
+            "before": "copy.states[actionable.state]",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "shows scheduled as distinct from a successful application",
+          "shows blocked as distinct from a successful application",
+          "shows cancelled as distinct from a successful application",
+          "shows reversed as distinct from a successful application",
+          "shows applied_state_changed as distinct from a successful application"
+        ],
+        "killed_by_owner": true,
+        "name": "approved_is_applied",
+        "owner": "shows scheduled as distinct from a successful application",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if ((!detail && !activityReverse) || !command) return;",
+            "before": "if ((!detail && !activityReverse) || commandLock.current || !command) return;",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "sends only one confirmation even for two clicks in the same render"
+        ],
+        "killed_by_owner": true,
+        "name": "duplicate_confirmation",
+        "owner": "sends only one confirmation even for two clicks in the same render",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "disabled={disabled || !packet.ready || error !== null}",
+            "before": "disabled={disabled || dirty || !packet.ready || error !== null}",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "invalidates a ready packet immediately when its execution date changes"
+        ],
+        "killed_by_owner": true,
+        "name": "dirty_preview_can_confirm",
+        "owner": "invalidates a ready packet immediately when its execution date changes",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (mounted.current) setPage(result);",
+            "before": "if (mounted.current && token === listSequence.current) setPage(result);",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "keeps only the newest queue response"
+        ],
+        "killed_by_owner": true,
+        "name": "late_queue_overwrites_current",
+        "owner": "keeps only the newest queue response",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (mounted.current) setDetail(result.item);",
+            "before": "if (mounted.current && token === detailSequence.current && selected.current === id) setDetail(result.item);",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "keeps only the selected detail response"
+        ],
+        "killed_by_owner": true,
+        "name": "late_detail_overwrites_selection",
+        "owner": "keeps only the selected detail response",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (!mounted.current) return;",
+            "before": "if (!mounted.current || token !== previewSequence.current || selected.current !== id) return;",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "clears the old preview lock when switching cases and discards its late result"
+        ],
+        "killed_by_owner": true,
+        "name": "late_preview_overwrites_selection",
+        "owner": "clears the old preview lock when switching cases and discards its late result",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (mounted.current) { setActivities(value.items);",
+            "before": "if (mounted.current && token === activitySequence.current) { setActivities(value.items);",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not let a late activity read undo a newer acknowledgement"
+        ],
+        "killed_by_owner": true,
+        "name": "late_activity_overwrites_ack",
+        "owner": "does not let a late activity read undo a newer acknowledgement",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (false) return;",
+            "before": "if (commandLock.current) return;",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "acknowledges activity at most once and preserves other visible case data"
+        ],
+        "killed_by_owner": true,
+        "name": "duplicate_acknowledgement",
+        "owner": "acknowledges activity at most once and preserves other visible case data",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleView.tsx": "8dacd1c4061978b2a5afa24dd145eb7de03c084120eef1d7f76316a0fde12009"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (!active && value.telemetry_status === \"valid\" && newer)",
+            "before": "if (!active && value.telemetry_status === \"valid\" && newer && belongs)",
+            "path": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not use another case's running or completed job as the request receipt"
+        ],
+        "killed_by_owner": true,
+        "name": "other_case_is_our_completion",
+        "owner": "does not use another case's running or completed job as the request receipt",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts": "7987cfeafa20aa385b02ca4fdcf528de5cd59af57a47b5bd3c046de2483089f8"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (!active && value.telemetry_status === \"valid\" && belongs)",
+            "before": "if (!active && value.telemetry_status === \"valid\" && newer && belongs)",
+            "path": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not use a stale same-case result as completion of a new request"
+        ],
+        "killed_by_owner": true,
+        "name": "stale_result_is_completion",
+        "owner": "does not use a stale same-case result as completion of a new request",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts": "7987cfeafa20aa385b02ca4fdcf528de5cd59af57a47b5bd3c046de2483089f8"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (pendingRef.current) return;",
+            "before": "if (pendingRef.current || dispatchLock.current) return;",
+            "path": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "prevents double dispatch before the first promise settles"
+        ],
+        "killed_by_owner": true,
+        "name": "duplicate_provider_dispatch",
+        "owner": "prevents double dispatch before the first promise settles",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts": "7987cfeafa20aa385b02ca4fdcf528de5cd59af57a47b5bd3c046de2483089f8"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 2,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "} catch { keepPolling = false; if (!cancelled && token === sequence.current) setReadFailed(true); }",
+            "before": "} catch { if (!cancelled && token === sequence.current) setReadFailed(true); }",
+            "path": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "continues polling a durable running job through a temporary read failure",
+          "keeps polling a pending request after a read failure without another POST"
+        ],
+        "killed_by_owner": true,
+        "name": "read_failure_stops_recovery",
+        "owner": "keeps polling a pending request after a read failure without another POST",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.ts": "7987cfeafa20aa385b02ca4fdcf528de5cd59af57a47b5bd3c046de2483089f8"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "|| result.locale !== locale)",
+            "before": "|| result.locale !== locale || result.evidence_content_sha256 !== original.content_sha256)",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not attach a translation for the wrong content digest"
+        ],
+        "killed_by_owner": true,
+        "name": "translation_ignores_content_identity",
+        "owner": "does not attach a translation for the wrong content digest",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.tsx": "ccb10aad7e99c4d5fe25cd37733fbe54e09e24dcf8d8a40aaa3032ff2e0bb95f"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 3,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "const [requested, setRequested] = useState(true);",
+            "before": "const [requested, setRequested] = useState(false);",
+            "path": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.tsx"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "loads once on disclosure and reuses the audit on close and reopen",
+          "loads audit only on disclosure and keeps the primary view usable if it fails",
+          "keeps a regulator-only notice and its source link in the lazy audit without authorizing removal"
+        ],
+        "killed_by_owner": true,
+        "name": "prefetch_historical_audit",
+        "owner": "loads audit only on disclosure and keeps the primary view usable if it fails",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.tsx": "ccb10aad7e99c4d5fe25cd37733fbe54e09e24dcf8d8a40aaa3032ff2e0bb95f"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 11,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "return await getJSON<TickerIdentityTransitionActivityResponse>(\n    `/security-lifecycle/transition-activity${query ? `?${query}` : \"\"}`,\n  );",
+            "before": "return parseCurrentActivityList(await getJSON<unknown>(\n    `/security-lifecycle/transition-activity${query ? `?${query}` : \"\"}`,\n  ));",
+            "path": "apps/arkscope-web/src/api.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "rejects malformed tracking activity before opening its UI (null)",
+          "rejects malformed tracking activity before opening its UI ({})",
+          "rejects malformed tracking activity before opening its UI ({\"items\":null,\"count\":0,\"unacknowledged_count\":0})",
+          "rejects malformed tracking activity before opening its UI ({\"items\":[null],\"count\":1,\"unacknowledged_count\":1})",
+          "rejects malformed tracking activity before opening its UI ({\"items\":[{\"activity_type\":\"applied\",\"user_owned_changes\":null}],\"count\":1,\"unacknowledged_count\":1})",
+          "reads the actual persisted tracking receipt through a closed activity projection",
+          "checks the nested tracking receipt used by the audit ({\"user_owned_changes\":null})",
+          "checks the nested tracking receipt used by the audit ({\"provider_owned_retained\":{}})",
+          "checks the nested tracking receipt used by the audit ({\"effective_date\":\"2026-02-30\"})",
+          "checks the nested tracking receipt used by the audit ({\"reverse_readiness\":{\"reversible\":true,\"block_reasons\":[\"reverse_state_changed\"]}})",
+          "checks the nested tracking receipt used by the audit ({\"reverse_readiness\":{\"reversible\":\"true\",\"block_reasons\":[]}})"
+        ],
+        "killed_by_owner": true,
+        "name": "cast_activity_list",
+        "owner": "rejects malformed tracking activity before opening its UI",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "31f667a92ebeed9ee154e6fe101bc715b29f2e8fabf4e0b967e2c76005c52b3c"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (result.acknowledged_at === null)",
+            "before": "if (result.activity_id !== activityId || result.acknowledged_at === null)",
+            "path": "apps/arkscope-web/src/api.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "binds activity acknowledgement to the requested receipt"
+        ],
+        "killed_by_owner": true,
+        "name": "acknowledge_wrong_receipt",
+        "owner": "binds activity acknowledgement to the requested receipt",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "31f667a92ebeed9ee154e6fe101bc715b29f2e8fabf4e0b967e2c76005c52b3c"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 4,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "",
+            "before": "provider_confirmation_missing: \"Listing confirmation is missing.\", ",
+            "path": "apps/arkscope-web/src/i18n/resources/en/explore.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "has exactly the current review and action vocabulary in en",
+          "bundled i18n resources contains the exact Explore subtree inventory in both locales",
+          "bundled i18n resources keeps locale namespace and recursive key paths identical",
+          "bundled i18n resources contains the reviewed remaining-surface namespace inventory in both locales"
+        ],
+        "killed_by_owner": true,
+        "name": "missing_reason_translation",
+        "owner": "has exactly the current review and action vocabulary in en",
+        "restored_sha256": {
+          "apps/arkscope-web/src/i18n/resources/en/explore.ts": "0b14dc6fe0153fd426f303e3aaf45f5e586d0977e8ecc3b2f23cef731cdf5e7e"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 2,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "  \"source_missing\", \"active_confirmed\",",
+            "before": "  \"provider_confirmation_missing\", \"source_missing\", \"active_confirmed\",",
+            "path": "apps/arkscope-web/src/lifecycle/currentReviewContract.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "has exactly the current review and action vocabulary in en",
+          "has exactly the current review and action vocabulary in zh-Hant"
+        ],
+        "killed_by_owner": true,
+        "name": "unpaired_extra_reason_translation",
+        "owner": "has exactly the current review and action vocabulary in en",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/currentReviewContract.ts": "898e56f79f5b44d5007e9f0d8cfb83f6b9718910d53456fa26bc0b8f42af997b"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "false",
+            "before": "([\"applied\", \"already_applied\"].includes(result.status) && (result.current_effects_match !== true || !result.applied_at))",
+            "path": "apps/arkscope-web/src/lifecycle/currentReviewContract.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "rejects false applied readbacks and preserves approved, scheduled and blocked states"
+        ],
+        "killed_by_owner": true,
+        "name": "false_applied_readback",
+        "owner": "rejects false applied readbacks and preserves approved, scheduled and blocked states",
+        "restored_sha256": {
+          "apps/arkscope-web/src/lifecycle/currentReviewContract.ts": "898e56f79f5b44d5007e9f0d8cfb83f6b9718910d53456fa26bc0b8f42af997b"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 1516
+        },
+        "edits": [
+          {
+            "after": "if (result.activity_id !== activityId)",
+            "before": "if (result.activity_id !== activityId || result.acknowledged_at === null)",
+            "path": "apps/arkscope-web/src/api.ts"
+          }
+        ],
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not claim an unacknowledged receipt has been acknowledged"
+        ],
+        "killed_by_owner": true,
+        "name": "missing_ack_time_is_success",
+        "owner": "does not claim an unacknowledged receipt has been acknowledged",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "31f667a92ebeed9ee154e6fe101bc715b29f2e8fabf4e0b967e2c76005c52b3c"
+        }
+      }
+    ],
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1516
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "restored"
+    }
+  }
+}

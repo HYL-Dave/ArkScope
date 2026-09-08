@@ -1,0 +1,429 @@
+{
+  "backend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 494
+      },
+      "duration_seconds": 35.659,
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "baseline"
+    },
+    "files": [
+      "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/test_diagnose_history.py",
+      "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/test_readback.py",
+      "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/test_run_repair.py",
+      "docs/superpowers/evidence/2026-09-06-recent-price-repair/scripts/test_recent_scope.py",
+      "tests/test_api.py",
+      "tests/test_data_coverage_tools.py",
+      "tests/test_data_scheduler.py",
+      "tests/test_ibkr_gateway_lock.py",
+      "tests/test_ibkr_source_event_loop.py",
+      "tests/test_ibkr_source_import_safety.py",
+      "tests/test_ibkr_source_intraday.py",
+      "tests/test_lifecycle_tracking_and_price_repair_routes.py",
+      "tests/test_market_coverage_boundaries.py",
+      "tests/test_market_coverage_calendar.py",
+      "tests/test_market_coverage_classifier.py",
+      "tests/test_market_coverage_dependencies.py",
+      "tests/test_market_coverage_observations.py",
+      "tests/test_market_data_admin.py",
+      "tests/test_market_data_direct.py",
+      "tests/test_price_coverage_history_gaps.py",
+      "tests/test_price_coverage_multiday_regression.py",
+      "tests/test_price_coverage_repair.py",
+      "tests/test_price_coverage_repair_workflow.py",
+      "tests/test_price_repair_status.py",
+      "tests/test_prices_quote_route.py",
+      "tests/test_prices_runtime.py",
+      "tests/test_recent_price_repair.py",
+      "tests/test_recent_price_repair_routes.py",
+      "tests/test_security_lifecycle_ibkr_evidence.py",
+      "tests/test_security_lifecycle_routes.py",
+      "tests/test_trading_day_coverage.py"
+    ],
+    "kind": "backend",
+    "mutations": [
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 6,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 35.508,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_data_scheduler::test_p0c1_ibkr_prices_runs_prices_worker_subprocess",
+          "tests.test_prices_runtime::test_prices_worker_requires_tickers_without_source_selector",
+          "tests.test_recent_price_repair::test_default_topup_fills_fifteen_days_without_overwriting_existing_prices[worker]",
+          "tests.test_recent_price_repair::test_default_topup_fills_fifteen_days_without_overwriting_existing_prices[direct]",
+          "tests.test_recent_price_repair_routes::test_readonly_coverage_and_preview_default_to_fifteen_days[/market-data/trading-days]",
+          "tests.test_recent_price_repair_routes::test_readonly_coverage_and_preview_default_to_fifteen_days[/market-data/price-repair/preview]"
+        ],
+        "killed_by_owner": true,
+        "name": "normal_window_regressed_to_five",
+        "owner": "test_default_topup_fills_fifteen_days_without_overwriting_existing_prices",
+        "restored_sha256": {
+          "src/price_defaults.py": "83a310bc9733a17d3ed74f2547ca984cba67a31cc0456a87e045d1adb0255691"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 35.973,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_operation_status_is_readonly_and_does_not_project_cached_provider_material"
+        ],
+        "killed_by_owner": true,
+        "name": "status_opens_writable_journal",
+        "owner": "test_operation_status_is_readonly_and_does_not_project_cached_provider_material",
+        "restored_sha256": {
+          "src/price_repair_status.py": "5a7ecb48cd4ad7a462f7a37d119ca82df93f88e3b88a13ba905e2f515e14b9e3"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 3,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 35.832,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_cached_but_uncommitted_repair_can_resume_with_zero_new_requests",
+          "tests.test_price_repair_status::test_received_empty_history_is_not_completion_or_an_effective_cache_resume",
+          "tests.test_price_repair_status::test_partial_response_already_applied_is_not_a_useful_cache_resume"
+        ],
+        "killed_by_owner": true,
+        "name": "responses_imply_complete_prices",
+        "owner": "test_received_empty_history_is_not_completion_or_an_effective_cache_resume",
+        "restored_sha256": {
+          "src/price_repair_status.py": "5a7ecb48cd4ad7a462f7a37d119ca82df93f88e3b88a13ba905e2f515e14b9e3"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 35.271,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_cached_but_uncommitted_repair_can_resume_with_zero_new_requests"
+        ],
+        "killed_by_owner": true,
+        "name": "cached_rows_cannot_resume",
+        "owner": "test_cached_but_uncommitted_repair_can_resume_with_zero_new_requests",
+        "restored_sha256": {
+          "src/price_repair_status.py": "5a7ecb48cd4ad7a462f7a37d119ca82df93f88e3b88a13ba905e2f515e14b9e3"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 3,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 37.001,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_unanswered_request_stays_explicit_and_cannot_be_reissued",
+          "tests.test_price_repair_status::test_one_unanswered_ticker_does_not_block_safe_remaining_requests",
+          "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[unanswered]"
+        ],
+        "killed_by_owner": true,
+        "name": "unknown_dispatch_becomes_unattempted",
+        "owner": "test_unanswered_request_stays_explicit_and_cannot_be_reissued",
+        "restored_sha256": {
+          "src/price_repair_execution.py": "e65270c32d8991965db228f6c87888d4c6089a4ecf6214d2cb17a95a44c88976"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 2,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 61.889,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations",
+          "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[scope_changed]"
+        ],
+        "killed_by_owner": true,
+        "name": "ignore_removed_target_scope",
+        "owner": "test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations",
+        "restored_sha256": {
+          "src/price_repair_status.py": "5a7ecb48cd4ad7a462f7a37d119ca82df93f88e3b88a13ba905e2f515e14b9e3"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 2,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 48.364,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations",
+          "tests.test_price_repair_status::test_operation_listing_rejects_symlinked_journals_without_reading_them"
+        ],
+        "killed_by_owner": true,
+        "name": "corrupt_row_breaks_entire_history",
+        "owner": "test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations",
+        "restored_sha256": {
+          "src/price_repair_status.py": "5a7ecb48cd4ad7a462f7a37d119ca82df93f88e3b88a13ba905e2f515e14b9e3"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 2,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 43.209,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[scope_changed]",
+          "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[unanswered]"
+        ],
+        "killed_by_owner": true,
+        "name": "resume_ignores_current_eligibility",
+        "owner": "test_resume_rechecks_coverage_and_scope_before_dispatch",
+        "restored_sha256": {
+          "src/api/routes/market_data.py": "c798929aea8f8ee6f005dafbcc31c96c9a5231fecdbe1fde68f1f155a804174d"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 494
+        },
+        "duration_seconds": 42.571,
+        "exit_code": 1,
+        "failed_nodes": [
+          "tests.test_price_repair_status::test_readonly_journal_holds_one_verified_snapshot"
+        ],
+        "killed_by_owner": true,
+        "name": "readonly_snapshot_can_drift",
+        "owner": "test_readonly_journal_holds_one_verified_snapshot",
+        "restored_sha256": {
+          "src/price_repair_execution.py": "e65270c32d8991965db228f6c87888d4c6089a4ecf6214d2cb17a95a44c88976"
+        }
+      }
+    ],
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 494
+      },
+      "duration_seconds": 49.28,
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "restored"
+    }
+  },
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 138
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "baseline"
+    },
+    "files": [
+      "src/priceRepairContract.test.ts",
+      "src/settings/PriceCoverageRepair.test.tsx",
+      "src/settings/DataStorageSection.test.tsx",
+      "src/SettingsLocalStorage.test.ts",
+      "src/marketDataDisplay.test.ts",
+      "src/settings/settingsReadCache.test.ts",
+      "src/coverageV2Contract.test.ts",
+      "src/i18n/resources.test.ts"
+    ],
+    "kind": "frontend",
+    "mutations": [
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 4,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "local storage panels keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads",
+          "local storage panels reloads_mounted_market_and_coverage_status_after_price_invalidation",
+          "uses fifteen calendar days for a direct coverage read and preserves explicit overrides",
+          "DataStorageSection lifecycle automation controls opens the fifteen-day coverage window and preserves an explicit longer choice"
+        ],
+        "killed_by_owner": true,
+        "name": "client_window_regressed_to_ten",
+        "owner": "uses fifteen calendar days for a direct coverage read and preserves explicit overrides",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "66d8c5938c0f54e1f5ecb49f70c1ab82a8d9183d96d85dc4b4b0f5e551d29b21"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "checks real coverage before accepting a succeeded worker result (incomplete)"
+        ],
+        "killed_by_owner": true,
+        "name": "worker_success_bypasses_bar_readback",
+        "owner": "checks real coverage before accepting a succeeded worker result (incomplete)",
+        "restored_sha256": {
+          "apps/arkscope-web/src/settings/PriceCoverageRepair.tsx": "d201915b5b8a0d2335165000732d8760b6ea7e21882f54196e88c319f0887ab2"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 2,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "reloads an unfinished operation and asks before a cache-only resume",
+          "shows a bounded new-request budget and keeps old operations reachable"
+        ],
+        "killed_by_owner": true,
+        "name": "resume_click_skips_confirmation",
+        "owner": "reloads an unfinished operation and asks before a cache-only resume",
+        "restored_sha256": {
+          "apps/arkscope-web/src/settings/PriceRepairHistory.tsx": "3db9c5aafa83d2157b96f60b23d211c357a9b32bdcafa836df1185122ab0c87f"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 16,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "projects durable operation facts without passing internal material to the view",
+          "rejects malformed operation facts instead of treating them as empty ({})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":null})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":{}})",
+          "rejects malformed operation facts instead of treating them as empty ({\"version\":2})",
+          "rejects malformed operation facts instead of treating them as empty ({\"has_more\":true})",
+          "rejects malformed operation facts instead of treating them as empty ({\"total\":-1})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"running\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":\"OLD\",\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":1,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":1,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OTHER\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"complete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":3}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":false,\"request_limit\":1}}]})",
+          "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}},{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}],\"total\":2})"
+        ],
+        "killed_by_owner": true,
+        "name": "status_payload_cast_without_validation",
+        "owner": "projects durable operation facts without passing internal material to the view",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "66d8c5938c0f54e1f5ecb49f70c1ab82a8d9183d96d85dc4b4b0f5e551d29b21"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "does not leave a stale running claim when collection status cannot be read"
+        ],
+        "killed_by_owner": true,
+        "name": "activity_failure_retains_running_claim",
+        "owner": "does not leave a stale running claim when collection status cannot be read",
+        "restored_sha256": {
+          "apps/arkscope-web/src/settings/PriceRepairHistory.tsx": "3db9c5aafa83d2157b96f60b23d211c357a9b32bdcafa836df1185122ab0c87f"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "confirms a resumed operation outside the first history page"
+        ],
+        "killed_by_owner": true,
+        "name": "completion_limited_to_first_history_page",
+        "owner": "confirms a resumed operation outside the first history page",
+        "restored_sha256": {
+          "apps/arkscope-web/src/settings/PriceCoverageRepair.tsx": "d201915b5b8a0d2335165000732d8760b6ea7e21882f54196e88c319f0887ab2"
+        }
+      },
+      {
+        "counts": {
+          "errors": 0,
+          "failures": 1,
+          "skipped": 0,
+          "tests": 138
+        },
+        "exit_code": 1,
+        "failed_nodes": [
+          "reads one operation by its exact ID and rejects mismatched or malformed results"
+        ],
+        "killed_by_owner": true,
+        "name": "single_operation_accepts_another_id",
+        "owner": "reads one operation by its exact ID and rejects mismatched or malformed results",
+        "restored_sha256": {
+          "apps/arkscope-web/src/api.ts": "66d8c5938c0f54e1f5ecb49f70c1ab82a8d9183d96d85dc4b4b0f5e551d29b21"
+        }
+      }
+    ],
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 138
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "name": "restored"
+    }
+  }
+}

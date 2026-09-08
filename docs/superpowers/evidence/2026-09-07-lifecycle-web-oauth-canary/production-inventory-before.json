@@ -1,0 +1,412 @@
+{
+  "authority": "2026-09-07 user authorization: read-only schema/case correspondence and non-secret credential metadata",
+  "claude_oauth_candidates": 2,
+  "column_reads": {
+    "market": [
+      [
+        "security_lifecycle_observation_kinds",
+        ""
+      ],
+      [
+        "security_lifecycle_observations",
+        ""
+      ],
+      [
+        "security_lifecycle_observations",
+        "source"
+      ],
+      [
+        "security_lifecycle_observations",
+        "source_ref"
+      ],
+      [
+        "security_lifecycle_observations",
+        "ticker"
+      ],
+      [
+        "sqlite_master",
+        "name"
+      ],
+      [
+        "sqlite_master",
+        "sql"
+      ],
+      [
+        "sqlite_master",
+        "tbl_name"
+      ],
+      [
+        "sqlite_master",
+        "type"
+      ]
+    ],
+    "profile": [
+      [
+        "data_provider_config",
+        "field"
+      ],
+      [
+        "data_provider_config",
+        "provider"
+      ],
+      [
+        "data_provider_config",
+        "updated_at"
+      ],
+      [
+        "llm_credentials",
+        "active"
+      ],
+      [
+        "llm_credentials",
+        "auth_type"
+      ],
+      [
+        "llm_credentials",
+        "expires_at"
+      ],
+      [
+        "llm_credentials",
+        "id"
+      ],
+      [
+        "llm_credentials",
+        "provider"
+      ],
+      [
+        "llm_credentials",
+        "updated_at"
+      ],
+      [
+        "model_route",
+        "effort"
+      ],
+      [
+        "model_route",
+        "model"
+      ],
+      [
+        "model_route",
+        "provider"
+      ],
+      [
+        "model_route",
+        "task"
+      ],
+      [
+        "model_route",
+        "updated_at"
+      ],
+      [
+        "security_lifecycle_action_proposals",
+        ""
+      ],
+      [
+        "security_lifecycle_assessment_evidence",
+        ""
+      ],
+      [
+        "security_lifecycle_assessment_outcomes",
+        ""
+      ],
+      [
+        "security_lifecycle_assessments",
+        ""
+      ],
+      [
+        "security_lifecycle_automation_facts",
+        ""
+      ],
+      [
+        "security_lifecycle_automation_run_blockers",
+        ""
+      ],
+      [
+        "security_lifecycle_automation_runs",
+        ""
+      ],
+      [
+        "security_lifecycle_case_acknowledgements",
+        ""
+      ],
+      [
+        "security_lifecycle_cases",
+        ""
+      ],
+      [
+        "security_lifecycle_cases",
+        "source"
+      ],
+      [
+        "security_lifecycle_cases",
+        "source_ref"
+      ],
+      [
+        "security_lifecycle_cases",
+        "ticker"
+      ],
+      [
+        "security_lifecycle_evidence",
+        ""
+      ],
+      [
+        "security_lifecycle_evidence_translations",
+        ""
+      ],
+      [
+        "security_lifecycle_investigation_runs",
+        ""
+      ],
+      [
+        "security_lifecycle_migration_receipts",
+        ""
+      ],
+      [
+        "security_lifecycle_provider_checks",
+        ""
+      ],
+      [
+        "security_lifecycle_provider_checks",
+        "observed_at"
+      ],
+      [
+        "security_lifecycle_provider_checks",
+        "rowid"
+      ],
+      [
+        "security_lifecycle_provider_checks",
+        "state"
+      ],
+      [
+        "security_lifecycle_provider_checks",
+        "ticker"
+      ],
+      [
+        "sqlite_master",
+        "name"
+      ],
+      [
+        "sqlite_master",
+        "sql"
+      ],
+      [
+        "sqlite_master",
+        "tbl_name"
+      ],
+      [
+        "sqlite_master",
+        "type"
+      ]
+    ],
+    "sa": [
+      [
+        "sqlite_master",
+        "name"
+      ],
+      [
+        "sqlite_master",
+        "sql"
+      ],
+      [
+        "sqlite_master",
+        "tbl_name"
+      ],
+      [
+        "sqlite_master",
+        "type"
+      ]
+    ]
+  },
+  "configured_provider_fields_not_values": [
+    {
+      "field": "api_key",
+      "provider": "eodhd",
+      "updated_at": "2026-09-04T13:31:08+00:00"
+    },
+    {
+      "field": "api_key",
+      "provider": "financial_datasets",
+      "updated_at": "2026-06-27T08:56:13+00:00"
+    },
+    {
+      "field": "api_key",
+      "provider": "finnhub",
+      "updated_at": "2026-06-27T08:56:12+00:00"
+    },
+    {
+      "field": "api_key",
+      "provider": "fred",
+      "updated_at": "2026-06-27T08:56:12+00:00"
+    },
+    {
+      "field": "client_id",
+      "provider": "ibkr",
+      "updated_at": "2026-07-02T12:28:43+00:00"
+    },
+    {
+      "field": "host",
+      "provider": "ibkr",
+      "updated_at": "2026-06-27T08:56:13+00:00"
+    },
+    {
+      "field": "port",
+      "provider": "ibkr",
+      "updated_at": "2026-06-27T08:56:13+00:00"
+    },
+    {
+      "field": "api_key",
+      "provider": "massive",
+      "updated_at": "2026-08-29T19:35:54+00:00"
+    },
+    {
+      "field": "api_key",
+      "provider": "polygon",
+      "updated_at": "2026-06-27T08:56:12+00:00"
+    },
+    {
+      "field": "user_agent",
+      "provider": "sec_edgar",
+      "updated_at": "2026-07-02T13:33:23+00:00"
+    }
+  ],
+  "correspondence": {
+    "case_count": 39,
+    "case_identity_sha256": "920ff70d71d105473c2ca71bef36991871407644635cd0c252242ac0bb485ebb",
+    "case_sources": {
+      "listing_authority": 3,
+      "sec_edgar": 36
+    },
+    "case_without_observation_count": 0,
+    "expected_identity_sha256": "920ff70d71d105473c2ca71bef36991871407644635cd0c252242ac0bb485ebb",
+    "expected_provider_observation_count": 3,
+    "expected_provider_without_case_count": 0,
+    "market_identity_sha256": "874c269651b5e1df59ba42ba23ece872780883419eeb96832674674cb968b55c",
+    "market_observation_count": 36,
+    "market_only_count": 0,
+    "provider_case_count": 3
+  },
+  "credentials": [
+    {
+      "active": true,
+      "auth_type": "claude_code_oauth",
+      "expires_at": "2027-06-15T00:00:00+00:00",
+      "provider": "anthropic",
+      "updated_at": "2026-09-03T12:20:54+00:00"
+    },
+    {
+      "active": false,
+      "auth_type": "api_key",
+      "expires_at": null,
+      "provider": "openai",
+      "updated_at": "2026-06-25T12:17:38+00:00"
+    },
+    {
+      "active": false,
+      "auth_type": "api_key",
+      "expires_at": null,
+      "provider": "openai",
+      "updated_at": "2026-07-17T23:49:17+00:00"
+    },
+    {
+      "active": false,
+      "auth_type": "api_key",
+      "expires_at": null,
+      "provider": "anthropic",
+      "updated_at": "2026-09-03T06:31:39+00:00"
+    },
+    {
+      "active": false,
+      "auth_type": "api_key",
+      "expires_at": null,
+      "provider": "anthropic",
+      "updated_at": "2026-09-03T12:17:49+00:00"
+    },
+    {
+      "active": false,
+      "auth_type": "claude_code_oauth",
+      "expires_at": "2027-06-20T00:00:00+00:00",
+      "provider": "anthropic",
+      "updated_at": "2026-09-01T23:57:08+00:00"
+    },
+    {
+      "active": true,
+      "auth_type": "chatgpt_oauth",
+      "expires_at": "2026-08-03T04:29:17+00:00",
+      "provider": "openai",
+      "updated_at": "2026-08-28T11:31:45+00:00"
+    }
+  ],
+  "market": {
+    "lifecycle_table_rows": {
+      "security_lifecycle_observation_kinds": 37,
+      "security_lifecycle_observations": 36
+    },
+    "schema_sha256": "89f4ee5ebb91942686c697d3076fd2ca04a5df7e81f3e6cad31481d624811134",
+    "table_count": 35,
+    "web_journal_present": false
+  },
+  "model_routes": [
+    {
+      "effort": "max",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "task": "ai_research",
+      "updated_at": "2026-09-03T13:25:14+00:00"
+    },
+    {
+      "effort": "max",
+      "model": "claude-sonnet-5",
+      "provider": "anthropic",
+      "task": "card_synthesis",
+      "updated_at": "2026-09-03T13:25:14+00:00"
+    },
+    {
+      "effort": "xhigh",
+      "model": "gpt-5.3-codex-spark",
+      "provider": "openai",
+      "task": "card_translation",
+      "updated_at": "2026-09-03T13:25:14+00:00"
+    }
+  ],
+  "observed_at": "2026-09-07T00:27:08.113271+00:00",
+  "production_writes": false,
+  "profile": {
+    "lifecycle_table_rows": {
+      "security_lifecycle_action_proposals": 10,
+      "security_lifecycle_assessment_evidence": 250,
+      "security_lifecycle_assessment_outcomes": 17,
+      "security_lifecycle_assessments": 17,
+      "security_lifecycle_automation_facts": 503,
+      "security_lifecycle_automation_run_blockers": 91,
+      "security_lifecycle_automation_runs": 76,
+      "security_lifecycle_case_acknowledgements": 0,
+      "security_lifecycle_cases": 39,
+      "security_lifecycle_evidence": 1025,
+      "security_lifecycle_evidence_translations": 4,
+      "security_lifecycle_investigation_runs": 0,
+      "security_lifecycle_migration_receipts": 1,
+      "security_lifecycle_provider_checks": 3
+    },
+    "schema_sha256": "5dbb8e9bc3a901a64fa9569fb0d74a3b096cd6c89cc5c0bb14074da42ffaeebc",
+    "table_count": 71,
+    "web_journal_present": false
+  },
+  "provider_calls": 0,
+  "provider_checks": {
+    "latest_state_counts": {
+      "unresolved": 3
+    },
+    "latest_tickers": 3,
+    "newest_latest_observation": "2026-09-05T10:42:27Z",
+    "oldest_latest_observation": "2026-09-05T10:42:27Z",
+    "total": 3
+  },
+  "sa": {
+    "lifecycle_table_rows": {},
+    "schema_sha256": "9e149f31467a5f24da7fda67352745f5ba14f10d90002cd015d416401b5b3c55",
+    "table_count": 23,
+    "web_journal_present": false
+  },
+  "snapshot_scope": "independent SQLite read snapshots; no cross-file atomicity claim",
+  "token_store_read": false
+}

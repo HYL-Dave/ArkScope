@@ -1,0 +1,9 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "check:i18n-literals"
+  ],
+  "exit_code": 0,
+  "output": "\n> arkscope-web@0.0.1 check:i18n-literals\n> node scripts/i18n/visible-literal-scanner.mjs check\n\n{\"candidateCount\":37,\"signatureCount\":20,\"debtSignatureCount\":0,\"allowlistCount\":20,\"migratedScopes\":[\"src/**\"]}\n"
+}

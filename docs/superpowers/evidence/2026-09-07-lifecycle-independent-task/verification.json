@@ -1,0 +1,89 @@
+{
+  "added": [
+    "tests/test_lifecycle_investigation_routing.py",
+    "tests/test_lifecycle_investigation_task_test.py"
+  ],
+  "backend": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 12,
+    "tests": 6993
+  },
+  "backend_mutations": {
+    "focus_nodes": 976,
+    "owned": 9,
+    "restored": true,
+    "worktree_unchanged": true
+  },
+  "browser": {
+    "actual_provider_calls": 0,
+    "scenarios": 12,
+    "screenshots": 24
+  },
+  "changed": [
+    "apps/arkscope-web/src/ModelRoutingSection.test.ts",
+    "apps/arkscope-web/src/Settings.tsx",
+    "apps/arkscope-web/src/SettingsModelRouting.test.ts",
+    "apps/arkscope-web/src/api.ts",
+    "apps/arkscope-web/src/i18n/resources.test.ts",
+    "apps/arkscope-web/src/i18n/resources/en/explore.ts",
+    "apps/arkscope-web/src/i18n/resources/en/settings.ts",
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts",
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts",
+    "apps/arkscope-web/src/lifecycle/webPresentation.test.ts",
+    "apps/arkscope-web/src/settings/ModelRoutingSection.tsx",
+    "apps/arkscope-web/src/settings/settingsCopy.test.ts",
+    "apps/arkscope-web/src/settings/settingsCopy.ts",
+    "src/agents/config.py",
+    "src/api/routes/config_routes.py",
+    "src/api/routes/lifecycle_web.py",
+    "src/auth_drivers/chatgpt_oauth_driver.py",
+    "src/lifecycle_web_controller.py",
+    "src/model_effective.py",
+    "src/model_routing.py",
+    "src/model_task_canary.py",
+    "src/security_lifecycle_web_contract.py",
+    "tests/test_chatgpt_oauth_driver.py",
+    "tests/test_model_effective.py",
+    "tests/test_model_routing.py"
+  ],
+  "frontend": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 1610
+  },
+  "frontend_mutations": {
+    "focus_nodes": 1610,
+    "owned": 4,
+    "restored": true,
+    "worktree_unchanged": true
+  },
+  "full_agent_verified": false,
+  "independent_target_launch_delivered": false,
+  "kind": "independent_lifecycle_routing_foundation_offline_only",
+  "legacy_retirement_delivered": false,
+  "local_news_delivered": false,
+  "prior": {
+    "files_verified": 330,
+    "sha256": "6129d26288cba6089c2040c35a5b9c273da8de4b239c941683d19e8f3c90e257"
+  },
+  "production_read_write_provider_restart_merge_push": false,
+  "schemas_unchanged": [
+    "src/security_lifecycle_schema.py",
+    "src/ticker_identity_schema.py",
+    "src/lifecycle_web_schema.py",
+    "src/sa_tracking_memberships.py"
+  ],
+  "status_documents_sha256": {
+    "docs/design/PROJECT_PRIORITY_MAP.md": "d287ad89cec74c6faf0d4f2ed71d0b34fb145027a4fa994af262e35a6e4dc644",
+    "docs/superpowers/plans/2026-09-05-lifecycle-tracking-first-implementation.md": "4db3c89d43104fad45c3e6677c8a3d271741f94153c69f981237300b2b1b01cd",
+    "docs/superpowers/plans/2026-09-07-lifecycle-web-bounded-followup.md": "19538477ef46015970d80d54f5a82e8a6038329d4d9749437fd9866a08af4417"
+  },
+  "test_environment": {
+    "assertions_and_timeouts_not_relaxed": true,
+    "backend_final_tmpdir": "/dev/shm",
+    "frontend_final_tmpdir": "/dev/shm",
+    "frontend_max_workers": 4
+  }
+}

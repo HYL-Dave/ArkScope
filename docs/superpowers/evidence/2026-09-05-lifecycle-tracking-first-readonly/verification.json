@@ -1,0 +1,103 @@
+{
+  "scope": "readonly_inventory_and_network_denied_maintenance_harness",
+  "base_revision": "0b66732b",
+  "product_runtime_changes_in_this_followup": false,
+  "pre_production_read_tests": {
+    "passed": 32,
+    "duration_s": 1.73
+  },
+  "final_harness_tests": 34,
+  "affected_focus": {
+    "passed": 216,
+    "duration_s": 10.5,
+    "components": [
+      "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-readonly/scripts/test_inventory.py",
+      "tests/test_market_data_direct.py",
+      "tests/test_price_coverage_repair.py",
+      "tests/test_price_coverage_repair_workflow.py",
+      "tests/test_trading_day_coverage.py",
+      "tests/test_active_universe.py",
+      "tests/test_active_universe_profile_store.py",
+      "tests/test_sa_tracking_memberships.py",
+      "tests/test_security_lifecycle_provider_authority.py",
+      "tests/test_security_lifecycle_provider_store.py",
+      "tests/test_security_lifecycle_terminal_workflow.py"
+    ],
+    "independent_copy_baseline": {
+      "passed": 216,
+      "duration_s": 10.62
+    },
+    "canonical_pre_mutation": {
+      "passed": 216,
+      "duration_s": 10.16
+    },
+    "restored_copy_matches_canonical_bytes": true
+  },
+  "mutations": [
+    {
+      "id": "M1",
+      "change": "allow out-of-scope SQL reads",
+      "failed": 2,
+      "passed": 214,
+      "duration_s": 10.55,
+      "owners": [
+        "test_sql_scope_rejects_secrets_and_mutation[SELECT secret FROM model_credentials]",
+        "test_sql_scope_also_rejects_unneeded_position_values"
+      ]
+    },
+    {
+      "id": "M2",
+      "change": "ignore concurrent database changes",
+      "failed": 2,
+      "passed": 214,
+      "duration_s": 10.61,
+      "owners": [
+        "test_database_change_invalidates_inventory_even_if_other_fields_match",
+        "test_full_inventory_cannot_publish_after_a_mid_read_source_change"
+      ]
+    },
+    {
+      "id": "M3",
+      "change": "omit contract qualification from total data requests",
+      "failed": 8,
+      "passed": 208,
+      "duration_s": 10.61,
+      "owners": [
+        "test_budget_runs_real_chunker_and_counts_both_request_types[15-1]",
+        "test_budget_runs_real_chunker_and_counts_both_request_types[60-1]",
+        "test_budget_runs_real_chunker_and_counts_both_request_types[61-1]",
+        "test_budget_runs_real_chunker_and_counts_both_request_types[62-1]",
+        "test_budget_runs_real_chunker_and_counts_both_request_types[65-2]",
+        "test_budget_runs_real_chunker_and_counts_both_request_types[120-2]",
+        "test_budget_fetches_complete_window_not_only_visible_gap",
+        "test_full_inventory_uses_real_coverage_and_preserves_all_source_rows"
+      ]
+    },
+    {
+      "id": "M4",
+      "change": "misclassify changed SA content as timestamp-only",
+      "failed": 1,
+      "passed": 215,
+      "duration_s": 10.54,
+      "owners": [
+        "test_pending_sa_diagnostic_distinguishes_timestamps_from_real_changes"
+      ]
+    }
+  ],
+  "runner_hashes": {
+    "inventory": "e9695a4d265fa0aec88087b2b65440cbdd67babc610ad95ac5fce883edeb4f20",
+    "sync_inventory": "f2e35bfe2b33dc4334d0478808b152641621401d441b6fcc4859d27fbde36f66",
+    "test_inventory": "e2f6492207e922dfc538645ab685d73f02745a78326425994cbae4b20f37bb2f"
+  },
+  "previous_product_suite_not_rerun_this_followup": {
+    "passed": 5978,
+    "skipped": 12,
+    "warnings": 3
+  },
+  "production_reads": "three authorized databases, scoped tables and columns; no credential/token fields",
+  "production_writes": 0,
+  "provider_requests": 0,
+  "backup_created": false,
+  "execution_authority_granted": false,
+  "live_repair_metering_and_durable_resume_ready": false
+}

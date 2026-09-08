@@ -1,0 +1,222 @@
+{
+  "scenarios": [
+    {
+      "name": "en-1440-success",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-1440-response_lost",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-1440-malformed",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 0,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-390-success",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-390-response_lost",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-390-malformed",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 0,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-320-success",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-320-response_lost",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "en-320-malformed",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 0,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-1440-success",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-1440-response_lost",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-1440-malformed",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 0,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-390-success",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-390-response_lost",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-390-malformed",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 0,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-320-success",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-320-response_lost",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 1,
+      "unexpected_requests": [],
+      "page_errors": []
+    },
+    {
+      "name": "zh-Hant-320-malformed",
+      "geometry": {
+        "overlaps": [],
+        "clipped": [],
+        "overflow": [],
+        "bodyOverflow": false
+      },
+      "mocked_posts": 0,
+      "unexpected_requests": [],
+      "page_errors": []
+    }
+  ],
+  "provider_calls": 0,
+  "production_app_started": false
+}

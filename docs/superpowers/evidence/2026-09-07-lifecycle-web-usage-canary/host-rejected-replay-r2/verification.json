@@ -1,0 +1,13 @@
+{
+  "adoptions": 0,
+  "cause": "Host compared tool-use round-trip limit with total turns including final completion.",
+  "docs": "https://code.claude.com/docs/en/agent-sdk/agent-loop",
+  "host_acceptance": false,
+  "native_output_not_retained_by_this_old_diagnostic": true,
+  "native_success": true,
+  "native_tool_round_trip_limit": 2,
+  "reported_total_turns": 3,
+  "sdk_submissions": 1,
+  "source_http_requests": 0,
+  "source_schema_prompt_observed": true
+}

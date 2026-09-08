@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="28" time="0.716" timestamp="2026-09-07T20:04:53.465490+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_declares_final_json_without_native_output_tool" time="0.011"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: model_output_invalid">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed4fb2b0&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_declares_final_json_without_native_output_tool(monkeypatch):
+        mod, clients = setup(monkeypatch)
+&gt;       reply, control = await invoke(mod)
+
+tests/test_lifecycle_web_claude_json_analysis.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_claude_json_analysis.py:45: in invoke
+    return await mod.call_claude_web(call, credential, control), control
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:269: in call_claude_web
+    output = validate_output(message.structured_output, call.output_schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = None
+schema = {'additionalProperties': False, 'properties': {'sources': {'items': {'type': 'string'}, 'type': 'array'}}, 'required': ['sources'], 'type': 'object'}
+
+    def validate_output(value: Any, schema: dict) -&gt; dict:
+        def unique_object(pairs):
+            result = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ValueError("duplicate key")
+                result[key] = item
+            return result
+    
+        def invalid_constant(value):
+            raise ValueError("invalid JSON constant")
+    
+        try:
+            if isinstance(value, str):
+                value = json.loads(value, object_pairs_hook=unique_object, parse_constant=invalid_constant)
+            if not isinstance(value, dict):
+                raise ValueError("not an object")
+            json.dumps(value, allow_nan=False)
+            Draft202012Validator(schema).validate(value)
+        except (ValueError, TypeError, ValidationError):
+&gt;           raise WebModelError("model_output_invalid") from None
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_output_invalid
+
+src/auth_drivers/lifecycle_web_models.py:180: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[None]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[value1]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[null]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[[]]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[true]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;result&quot;: {&quot;sources&quot;: [&quot;https://ir.example.com/notice&quot;]}}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[```json\n{&quot;sources&quot;: [&quot;https://ir.example.com/notice&quot;]}\n```]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;: [&quot;https://ir.example.com/notice&quot;]} explanation]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;: [&quot;https://ir.example.com/notice&quot;]}{&quot;sources&quot;: [&quot;https://ir.example.com/notice&quot;]}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;:[],&quot;sources&quot;:[&quot;valid&quot;]}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;:[],&quot;number&quot;:NaN}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;:[],&quot;number&quot;:Infinity}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;: [], &quot;write_profile&quot;: true}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{&quot;sources&quot;:&quot;wrong shape&quot;}]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins[False]" time="0.006"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: model_output_invalid">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed3d1ea0&gt;
+duplicate = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("duplicate", [False, True])
+    async def test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins(monkeypatch, duplicate):
+        schema = {"type": "object", "properties": {"nested": {"type": "object", "properties": {"value": {"type": "string"}},
+            "required": ["value"], "additionalProperties": False}}, "required": ["nested"], "additionalProperties": False}
+        value = '{"nested":{"value":"first","value":"last"}}' if duplicate else '{"nested":{"value":"last"}}'
+        mod, _ = setup(monkeypatch, result={"result": value})
+        if duplicate:
+            with pytest.raises(WebModelError, match="^model_output_invalid$"):
+                await invoke(mod, schema=schema)
+        else:
+&gt;           reply, _ = await invoke(mod, schema=schema)
+
+tests/test_lifecycle_web_claude_json_analysis.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_claude_json_analysis.py:45: in invoke
+    return await mod.call_claude_web(call, credential, control), control
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:269: in call_claude_web
+    output = validate_output(message.structured_output, call.output_schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = None
+schema = {'additionalProperties': False, 'properties': {'nested': {'additionalProperties': False, 'properties': {'value': {'type': 'string'}}, 'required': ['value'], 'type': 'object'}}, 'required': ['nested'], 'type': 'object'}
+
+    def validate_output(value: Any, schema: dict) -&gt; dict:
+        def unique_object(pairs):
+            result = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ValueError("duplicate key")
+                result[key] = item
+            return result
+    
+        def invalid_constant(value):
+            raise ValueError("invalid JSON constant")
+    
+        try:
+            if isinstance(value, str):
+                value = json.loads(value, object_pairs_hook=unique_object, parse_constant=invalid_constant)
+            if not isinstance(value, dict):
+                raise ValueError("not an object")
+            json.dumps(value, allow_nan=False)
+            Draft202012Validator(schema).validate(value)
+        except (ValueError, TypeError, ValidationError):
+&gt;           raise WebModelError("model_output_invalid") from None
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_output_invalid
+
+src/auth_drivers/lifecycle_web_models.py:180: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins[True]" time="0.007" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_never_chooses_between_native_and_final_json" time="0.006"><failure message="Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed3d7160&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_never_chooses_between_native_and_final_json(monkeypatch):
+        mod, _ = setup(monkeypatch, result={"structured_output": OUTPUT})
+&gt;       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE &lt;class 'src.auth_drivers.lifecycle_web_models.WebModelError'&gt;
+
+tests/test_lifecycle_web_claude_json_analysis.py:102: Failed</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_denies_structured_output_tool_at_every_boundary[pretool]" time="0.004"><failure message="AssertionError: assert 'allow' == 'deny'&#10;  &#10;  - deny&#10;  + allow">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed24aec0&gt;
+boundary = 'pretool'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+&gt;           assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+E           AssertionError: assert 'allow' == 'deny'
+E             
+E             - deny
+E             + allow
+
+tests/test_lifecycle_web_claude_json_analysis.py:117: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_denies_structured_output_tool_at_every_boundary[init]" time="0.008"><failure message="AssertionError: &#10;- model_output_invalid&#10;+ unexpected_tool_activity">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed2cb880&gt;
+boundary = 'init'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+            assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert gate.failure == "unexpected_tool_activity"
+        else:
+            mod, _ = setup(monkeypatch, init={"tools": ["StructuredOutput"]} if boundary == "init" else None,
+                           tool="StructuredOutput" if boundary == "notification" else None)
+            with pytest.raises(WebModelError, match="^unexpected_tool_activity$"):
+&gt;               await invoke(mod)
+
+tests/test_lifecycle_web_claude_json_analysis.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_claude_json_analysis.py:45: in invoke
+    return await mod.call_claude_web(call, credential, control), control
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:269: in call_claude_web
+    output = validate_output(message.structured_output, call.output_schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = None
+schema = {'additionalProperties': False, 'properties': {'sources': {'items': {'type': 'string'}, 'type': 'array'}}, 'required': ['sources'], 'type': 'object'}
+
+    def validate_output(value: Any, schema: dict) -&gt; dict:
+        def unique_object(pairs):
+            result = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ValueError("duplicate key")
+                result[key] = item
+            return result
+    
+        def invalid_constant(value):
+            raise ValueError("invalid JSON constant")
+    
+        try:
+            if isinstance(value, str):
+                value = json.loads(value, object_pairs_hook=unique_object, parse_constant=invalid_constant)
+            if not isinstance(value, dict):
+                raise ValueError("not an object")
+            json.dumps(value, allow_nan=False)
+            Draft202012Validator(schema).validate(value)
+        except (ValueError, TypeError, ValidationError):
+&gt;           raise WebModelError("model_output_invalid") from None
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_output_invalid
+
+src/auth_drivers/lifecycle_web_models.py:180: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed2cb880&gt;
+boundary = 'init'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+            assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert gate.failure == "unexpected_tool_activity"
+        else:
+            mod, _ = setup(monkeypatch, init={"tools": ["StructuredOutput"]} if boundary == "init" else None,
+                           tool="StructuredOutput" if boundary == "notification" else None)
+&gt;           with pytest.raises(WebModelError, match="^unexpected_tool_activity$"):
+E           AssertionError: 
+E           - model_output_invalid
+E           + unexpected_tool_activity
+
+tests/test_lifecycle_web_claude_json_analysis.py:122: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_denies_structured_output_tool_at_every_boundary[notification]" time="0.008"><failure message="AssertionError: &#10;- model_output_invalid&#10;+ unexpected_tool_activity">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed3d3f70&gt;
+boundary = 'notification'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+            assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert gate.failure == "unexpected_tool_activity"
+        else:
+            mod, _ = setup(monkeypatch, init={"tools": ["StructuredOutput"]} if boundary == "init" else None,
+                           tool="StructuredOutput" if boundary == "notification" else None)
+            with pytest.raises(WebModelError, match="^unexpected_tool_activity$"):
+&gt;               await invoke(mod)
+
+tests/test_lifecycle_web_claude_json_analysis.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_claude_json_analysis.py:45: in invoke
+    return await mod.call_claude_web(call, credential, control), control
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:269: in call_claude_web
+    output = validate_output(message.structured_output, call.output_schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = None
+schema = {'additionalProperties': False, 'properties': {'sources': {'items': {'type': 'string'}, 'type': 'array'}}, 'required': ['sources'], 'type': 'object'}
+
+    def validate_output(value: Any, schema: dict) -&gt; dict:
+        def unique_object(pairs):
+            result = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ValueError("duplicate key")
+                result[key] = item
+            return result
+    
+        def invalid_constant(value):
+            raise ValueError("invalid JSON constant")
+    
+        try:
+            if isinstance(value, str):
+                value = json.loads(value, object_pairs_hook=unique_object, parse_constant=invalid_constant)
+            if not isinstance(value, dict):
+                raise ValueError("not an object")
+            json.dumps(value, allow_nan=False)
+            Draft202012Validator(schema).validate(value)
+        except (ValueError, TypeError, ValidationError):
+&gt;           raise WebModelError("model_output_invalid") from None
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_output_invalid
+
+src/auth_drivers/lifecycle_web_models.py:180: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7909ed3d3f70&gt;
+boundary = 'notification'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+            assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert gate.failure == "unexpected_tool_activity"
+        else:
+            mod, _ = setup(monkeypatch, init={"tools": ["StructuredOutput"]} if boundary == "init" else None,
+                           tool="StructuredOutput" if boundary == "notification" else None)
+&gt;           with pytest.raises(WebModelError, match="^unexpected_tool_activity$"):
+E           AssertionError: 
+E           - model_output_invalid
+E           + unexpected_tool_activity
+
+tests/test_lifecycle_web_claude_json_analysis.py:122: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_json_does_not_bypass_terminal_or_identity_guards[changes0-execution_identity_changed-terminal0]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_json_does_not_bypass_terminal_or_identity_guards[changes1-model_result_incomplete-terminal1]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_json_does_not_bypass_terminal_or_identity_guards[changes2-model_result_incomplete-terminal2]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_analysis_json_does_not_bypass_terminal_or_identity_guards[changes3-execution_identity_changed-terminal3]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_json_analysis" name="test_claude_search_does_not_fall_back_to_analysis_json_mode" time="0.006" /></testsuite></testsuites>

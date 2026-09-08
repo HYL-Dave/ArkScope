@@ -1,0 +1,33 @@
+[
+  {
+    "ordinal": 1,
+    "kind": "local_search",
+    "at": "2026-09-07T17:12:28.570943+00:00",
+    "payload": {
+      "coverage": "available_local_corpora",
+      "gaps": [
+        {
+          "corpus": "news",
+          "reason": "local_news_unavailable"
+        }
+      ],
+      "items": [],
+      "next_offset": null,
+      "observed_at": "2026-09-07T17:12:28.569226+00:00",
+      "query": {},
+      "status": "unavailable"
+    }
+  },
+  {
+    "ordinal": 2,
+    "kind": "model_request",
+    "at": "2026-09-07T17:12:28.594849+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "phase": "analysis",
+      "prompt_sha256": "e0ae28732f4ab5b23ba8338271e1bd299ee94fcdd13d6a354ab44e7c01950de3",
+      "remaining_seconds": 1799.9757009493187,
+      "supplied_passages": []
+    }
+  }
+]

@@ -1,0 +1,65 @@
+{
+  "announcement_date": "2023-05-16",
+  "announcement_date_text": "May 16, 2023",
+  "citations": [
+    {
+      "quote_sha256": "478aff396cdd9165e90aec11d0d6a6af63e01c87195d199055ca3a56055a8774",
+      "quote_utf8_bytes": 256,
+      "source_id": "source-1",
+      "supports": [
+        "acquisition_announced",
+        "security_identity"
+      ]
+    },
+    {
+      "quote_sha256": "d166b90bbd5859252e66430d5b77f2064d43696083c2414a99325e3549aa1de8",
+      "quote_utf8_bytes": 149,
+      "source_id": "source-1",
+      "supports": [
+        "listing_ended",
+        "effective_date"
+      ]
+    },
+    {
+      "quote_sha256": "5693ec8f54eb070857deea84726b091ca0edd61adb8d9ca6e47448055f037514",
+      "quote_utf8_bytes": 108,
+      "source_id": "source-2",
+      "supports": [
+        "acquisition_announced"
+      ]
+    },
+    {
+      "quote_sha256": "79d2c4cafd60d6b800a96c5cfb13ed650fb19c1b2467bbb7273ebc23f4a02480",
+      "quote_utf8_bytes": 134,
+      "source_id": "source-2",
+      "supports": [
+        "listing_ended",
+        "same_security_continuation"
+      ]
+    },
+    {
+      "quote_sha256": "9088fee4e3d28b1c128838deb3d2a616ef9e1dcd0d400b6139b87887784e1f72",
+      "quote_utf8_bytes": 301,
+      "source_id": "source-3",
+      "supports": [
+        "acquisition_announced",
+        "announcement_date"
+      ]
+    }
+  ],
+  "contradictions": [],
+  "effective_date": "2023-05-15",
+  "effective_date_text": "announced yesterday the completion of the all-cash acquisition of TA by BP Products North America Inc.",
+  "event_kind": "acquisition_announced",
+  "issuer_name": "TravelCenters of America Inc.",
+  "security_class": "common stock",
+  "source_ticker": "TA",
+  "successor_ticker": null,
+  "summary": "BP Products North America Inc. completed its all-cash acquisition of TravelCenters of America Inc. (Nasdaq: TA) on or about May 15, 2023, with TA common shares converted into the right to receive $86 per share, ending TA's status as an independent publicly traded company. The supplied sources directly document the delisting of TA's separately listed senior notes (TANNI; TANNL; TANNZ) from Nasdaq, with an expected notes-delisting effective date on or about June 5, 2023, following a Form 25 filing on or about May 26, 2023. However, none of the supplied passages contain a Nasdaq notice or Form 25 filing specific to the TA common stock listing itself; the common stock delisting is inferable only from the acquisition-completion language and the standard practice of common shares ceasing to trade upon merger closing, not from a direct exchange notice for the common stock CUSIP/symbol.",
+  "timing": "completed",
+  "unresolved_conditions": [
+    "No source passage directly documents a Nasdaq Form 25 or delisting notice specifically for TA common stock (as opposed to the senior notes); the exact effective date/time TA common stock itself stopped trading on Nasdaq is not confirmed by a primary exchange or SEC filing in the supplied evidence.",
+    "Confirmation of Form 15 deregistration filing date for TA common stock under Exchange Act Section 12(g) is not independently verified in the supplied sources."
+  ],
+  "venue": "NASDAQ"
+}

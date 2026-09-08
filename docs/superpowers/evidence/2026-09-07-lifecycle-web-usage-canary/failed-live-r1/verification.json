@@ -1,0 +1,38 @@
+{
+  "adoptions": 0,
+  "app_restart": false,
+  "commit": false,
+  "complete_investigation_live_verified": false,
+  "diagnostic_cause": "two_literal_function_parameter_wrapper_outputs_fail_required_field_schema",
+  "diagnostic_rehearsal": {
+    "initial_import_order_fixture_failures_corrected": 3,
+    "passed": 14
+  },
+  "first_analysis_cause": "unobserved_tool_result_details; max_turns_owned_terminal",
+  "main_and_helper_model": "claude-sonnet-5",
+  "merge": false,
+  "migration": false,
+  "native_terminal": "error_max_turns",
+  "original_source_checkpoint": {
+    "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+    "matched_files": 1084,
+    "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+  },
+  "profile_writes": false,
+  "push": false,
+  "rate_limit_failure_observed": false,
+  "raw_temporary_journal_archived": false,
+  "raw_temporary_journal_sha256": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+  "sdk_submissions": 3,
+  "source_http_budget_remaining": 4,
+  "source_http_requests": 4,
+  "source_reader_captured_pages": 3,
+  "source_unavailable_pages": 1,
+  "subscription_api_key_source_values": [
+    "none",
+    "none",
+    "none"
+  ],
+  "upstream_report_is_not_vendor_confirmation": true,
+  "upstream_similar_report": "https://github.com/anthropics/claude-code/issues/87234"
+}

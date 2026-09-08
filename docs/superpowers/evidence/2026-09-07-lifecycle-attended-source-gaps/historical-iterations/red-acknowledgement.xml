@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="9" time="2.824" timestamp="2026-09-07T15:03:59.048016+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_gaps" name="test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]" time="0.535"><failure message="AssertionError: {&quot;version&quot;:1,&quot;status&quot;:&quot;applied&quot;,&quot;transition_id&quot;:&quot;tit_70cdc055cf0847608f4663791a4c7a8f&quot;,&quot;case_id&quot;:&quot;slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c&quot;,&quot;packet_sha256&quot;:&quot;dcb1b1e2b03b30261cffabe6ded47850339e4e9109394aee7eca110db83c15e7&quot;,&quot;action&quot;:&quot;terminal_delisting&quot;,&quot;source_ticker&quot;:&quot;OLD&quot;,&quot;successor_ticker&quot;:null,&quot;execute_on&quot;:&quot;2026-09-01&quot;,&quot;applied_at&quot;:&quot;2026-09-06T01:00:00Z&quot;,&quot;current_effects_match&quot;:true,&quot;block_reasons&quot;:[]}&#10;assert 200 == 409&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_old_or_malformed_confirma0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x75bcfa5509a0&gt;
+acknowledgement = 'omitted'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+&gt;           assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+E           AssertionError: {"version":1,"status":"applied","transition_id":"tit_70cdc055cf0847608f4663791a4c7a8f","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","packet_sha256":"dcb1b1e2b03b30261cffabe6ded47850339e4e9109394aee7eca110db83c15e7","action":"terminal_delisting","source_ticker":"OLD","successor_ticker":null,"execute_on":"2026-09-01","applied_at":"2026-09-06T01:00:00Z","current_effects_match":true,"block_reasons":[]}
+E           assert 200 == 409
+E            +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_lifecycle_web_gaps.py:82: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]" time="0.203"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;extra_forbidden&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;acknowledge_source_gaps&quot;],&quot;msg&quot;:&quot;Extra inputs are not permitted&quot;,&quot;input&quot;:false}]}&#10;assert 422 == 409&#10; +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_old_or_malformed_confirma1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x75bcb87e39d0&gt;
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+&gt;           assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+E           AssertionError: {"detail":[{"type":"extra_forbidden","loc":["body","acknowledge_source_gaps"],"msg":"Extra inputs are not permitted","input":false}]}
+E           assert 422 == 409
+E            +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code
+
+tests/test_lifecycle_web_gaps.py:82: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]" time="0.211"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;extra_forbidden&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;acknowledge_source_gaps&quot;],&quot;msg&quot;:&quot;Extra inputs are not permitted&quot;,&quot;input&quot;:true}]}&#10;assert (422 == 200)&#10; +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_old_or_malformed_confirma2')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x75bcb879b280&gt;
+acknowledgement = None
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+            assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+            if acknowledgement in ("omitted", False):
+                assert response.json()["detail"]["code"] == "web_source_gaps_not_acknowledged"
+            assert rows(c) == before and "OLD" in c["sources"]()
+            accepted = client.post(route + "/confirm", json={**body, "acknowledge_source_gaps": True})
+&gt;           assert accepted.status_code == 200 and accepted.json()["status"] == "applied", accepted.text
+E           AssertionError: {"detail":[{"type":"extra_forbidden","loc":["body","acknowledge_source_gaps"],"msg":"Extra inputs are not permitted","input":true}]}
+E           assert (422 == 200)
+E            +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code
+
+tests/test_lifecycle_web_gaps.py:87: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]" time="0.208"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;extra_forbidden&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;acknowledge_source_gaps&quot;],&quot;msg&quot;:&quot;Extra inputs are not permitted&quot;,&quot;input&quot;:true}]}&#10;assert (422 == 200)&#10; +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_old_or_malformed_confirma3')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x75bcb3d72a10&gt;
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+            assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+            if acknowledgement in ("omitted", False):
+                assert response.json()["detail"]["code"] == "web_source_gaps_not_acknowledged"
+            assert rows(c) == before and "OLD" in c["sources"]()
+            accepted = client.post(route + "/confirm", json={**body, "acknowledge_source_gaps": True})
+&gt;           assert accepted.status_code == 200 and accepted.json()["status"] == "applied", accepted.text
+E           AssertionError: {"detail":[{"type":"extra_forbidden","loc":["body","acknowledge_source_gaps"],"msg":"Extra inputs are not permitted","input":true}]}
+E           assert (422 == 200)
+E            +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code
+
+tests/test_lifecycle_web_gaps.py:87: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]" time="0.210"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;extra_forbidden&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;acknowledge_source_gaps&quot;],&quot;msg&quot;:&quot;Extra inputs are not permitted&quot;,&quot;input&quot;:true}]}&#10;assert (422 == 200)&#10; +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_old_or_malformed_confirma4')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x75bcb13152a0&gt;
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+            assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+            if acknowledgement in ("omitted", False):
+                assert response.json()["detail"]["code"] == "web_source_gaps_not_acknowledged"
+            assert rows(c) == before and "OLD" in c["sources"]()
+            accepted = client.post(route + "/confirm", json={**body, "acknowledge_source_gaps": True})
+&gt;           assert accepted.status_code == 200 and accepted.json()["status"] == "applied", accepted.text
+E           AssertionError: {"detail":[{"type":"extra_forbidden","loc":["body","acknowledge_source_gaps"],"msg":"Extra inputs are not permitted","input":true}]}
+E           assert (422 == 200)
+E            +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code
+
+tests/test_lifecycle_web_gaps.py:87: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_direct_adoption_requires_literal_gap_acknowledgement[False]" time="0.198"><failure message="TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_direct_adoption_requires_0')
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+&gt;           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+E           TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'
+
+tests/test_lifecycle_web_gaps.py:98: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_direct_adoption_requires_literal_gap_acknowledgement[None]" time="0.188"><failure message="TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_direct_adoption_requires_1')
+acknowledgement = None
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+&gt;           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+E           TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'
+
+tests/test_lifecycle_web_gaps.py:98: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_direct_adoption_requires_literal_gap_acknowledgement[1]" time="0.184"><failure message="TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_direct_adoption_requires_2')
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+&gt;           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+E           TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'
+
+tests/test_lifecycle_web_gaps.py:98: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_direct_adoption_requires_literal_gap_acknowledgement[true]" time="0.187"><failure message="TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7812/test_direct_adoption_requires_3')
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+&gt;           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+E           TypeError: confirm() got an unexpected keyword argument 'acknowledge_source_gaps'
+
+tests/test_lifecycle_web_gaps.py:98: TypeError</failure></testcase></testsuite></testsuites>

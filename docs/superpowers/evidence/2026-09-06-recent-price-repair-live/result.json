@@ -1,0 +1,275 @@
+{
+  "started_at": "2026-09-06T01:01:35.757301+00:00",
+  "finished_at": "2026-09-06T01:03:00.583053+00:00",
+  "plan_sha256": "907a6f80ff8593db7134203d9807b06fee1692d9c2b7e96b84b6a5676c9289e5",
+  "backup": {
+    "bytes": 3743113216,
+    "quick_check": "ok",
+    "sha256": "2556436c4a124320fc4eae93e7fa800c72f128e7d2c84130229e9a65526cfea7"
+  },
+  "metrics": {
+    "actual_data_calls": {
+      "history": 32,
+      "qualification": 32
+    },
+    "connection_attempts": 1,
+    "ibkr_codes": {
+      "2104": 1,
+      "2106": 1,
+      "2107": 1,
+      "2158": 1
+    },
+    "inserted_on_guarded_connections": 4940,
+    "socket_connection_attempts": 1,
+    "sqlite_denials": 0
+  },
+  "dispatch_reservations": 64,
+  "received_responses": 64,
+  "unknown_dispatches": 0,
+  "result": {
+    "status": "succeeded",
+    "provider": "ibkr",
+    "gaps_found": 190,
+    "tickers_scanned": 32,
+    "succeeded_ticker_count": 32,
+    "rows_added": 4940,
+    "error_count": 0,
+    "unresolved_after_fetch_count": 0,
+    "repair_execution": {
+      "fallback": false,
+      "plan_sha256": "907a6f80ff8593db7134203d9807b06fee1692d9c2b7e96b84b6a5676c9289e5",
+      "request_budget": {
+        "history": 32,
+        "qualification": 32,
+        "total": 64
+      },
+      "requests_this_execution": 64,
+      "requests_total": 64,
+      "retry": false
+    }
+  },
+  "exception": null,
+  "before_coverage": {
+    "calendar_health": "ok",
+    "days": [
+      {
+        "complete": null,
+        "date": "2026-09-05",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-04",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-03",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-02",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-01",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-31",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": null,
+        "date": "2026-08-30",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": null,
+        "date": "2026-08-29",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": 152,
+        "date": "2026-08-28",
+        "partial": 0,
+        "unknown": 31
+      },
+      {
+        "complete": 152,
+        "date": "2026-08-27",
+        "partial": 0,
+        "unknown": 31
+      },
+      {
+        "complete": 151,
+        "date": "2026-08-26",
+        "partial": 0,
+        "unknown": 32
+      },
+      {
+        "complete": 151,
+        "date": "2026-08-25",
+        "partial": 0,
+        "unknown": 32
+      },
+      {
+        "complete": 151,
+        "date": "2026-08-24",
+        "partial": 0,
+        "unknown": 32
+      },
+      {
+        "complete": null,
+        "date": "2026-08-23",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": null,
+        "date": "2026-08-22",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": 151,
+        "date": "2026-08-21",
+        "partial": 0,
+        "unknown": 32
+      }
+    ],
+    "missing_ticker_days": 190,
+    "observation_health": "ok",
+    "partial_ticker_days": 0,
+    "universe_count": 183,
+    "unresolved_tickers": 32
+  },
+  "after_coverage": {
+    "calendar_health": "ok",
+    "days": [
+      {
+        "complete": null,
+        "date": "2026-09-05",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-04",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-03",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-02",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-09-01",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-31",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": null,
+        "date": "2026-08-30",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": null,
+        "date": "2026-08-29",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-28",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-27",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-26",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-25",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-24",
+        "partial": 0,
+        "unknown": 0
+      },
+      {
+        "complete": null,
+        "date": "2026-08-23",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": null,
+        "date": "2026-08-22",
+        "partial": null,
+        "unknown": null
+      },
+      {
+        "complete": 183,
+        "date": "2026-08-21",
+        "partial": 0,
+        "unknown": 0
+      }
+    ],
+    "missing_ticker_days": 0,
+    "observation_health": "ok",
+    "partial_ticker_days": 0,
+    "universe_count": 183,
+    "unresolved_tickers": 0
+  },
+  "before_universe_count": 183,
+  "after_universe_count": 183,
+  "target_sources_unchanged": true,
+  "preexisting_target_rows_changed": 0,
+  "new_target_rows_inside_scope": 4940,
+  "new_target_rows_outside_scope_observed": 0,
+  "other_concurrent_writers_not_frozen": true,
+  "profile_writes": 0,
+  "automatic_retry": false,
+  "provider_fallback": false,
+  "schema_migration": false
+}

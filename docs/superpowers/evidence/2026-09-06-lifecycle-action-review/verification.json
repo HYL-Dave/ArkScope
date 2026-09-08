@@ -1,0 +1,313 @@
+{
+  "app_restart": false,
+  "changed_product_test_files_verified": 58,
+  "commit": false,
+  "complete_slice": "provider_backed_action_review_backend",
+  "fixture_correction_reports_not_admission": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 7,
+        "skipped": 0,
+        "tests": 36
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_review_uses_new_york_execution_date_not_utc_date[2026-09-05T01:00:00Z]",
+        "tests.test_security_lifecycle_review::test_review_uses_new_york_execution_date_not_utc_date[2026-11-01T03:30:00Z]",
+        "tests.test_security_lifecycle_review::test_review_uses_new_york_execution_date_not_utc_date[2026-03-08T04:30:00Z]",
+        "tests.test_security_lifecycle_review::test_scheduled_review_preserves_due_runner_result_contract[True]",
+        "tests.test_security_lifecycle_review::test_newer_assessment_invalidates_review_even_without_new_evidence",
+        "tests.test_security_lifecycle_review::test_citation_material_is_bound_and_integrity_checked[content]",
+        "tests.test_security_lifecycle_review::test_citation_material_is_bound_and_integrity_checked[link]"
+      ],
+      "file": "arkscope-lifecycle-review-boundaries-red.xml",
+      "sha256": "60f00a5d8b7082f609fe7056af004420ea9944821c32698933e2f49d280d31a5"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 5,
+        "skipped": 0,
+        "tests": 61
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_reviewed_same_security_rename_moves_only_its_tracking_sources[False]",
+        "tests.test_security_lifecycle_review::test_reviewed_same_security_rename_moves_only_its_tracking_sources[True]",
+        "tests.test_security_lifecycle_review::test_confirmation_readback_rejects_tampered_action_binding[confirmed_at]",
+        "tests.test_security_lifecycle_review::test_confirmation_readback_rejects_tampered_action_binding[packet_version]",
+        "tests.test_security_lifecycle_review::test_legacy_store_apply_cannot_bypass_action_packet_revalidation"
+      ],
+      "file": "arkscope-lifecycle-review-recovery-red.xml",
+      "sha256": "a476e443cd96cc1fdf8c1d0e9a4f2550667f9640c43919b154b946defb3e6d5c"
+    }
+  ],
+  "frozen_source_files_verified": 110,
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6204
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "8cb6f64514cf80643faa4c3b085556d540b674326b02a9d8b4a65cacf71240ef"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1111
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "1e066edc9ba28721d9c8a03d2035fbd75f1f6885f81ac392c232be21f86b39ad"
+    },
+    "frontend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1432
+      },
+      "file": "frontend.json",
+      "sha256": "e755f6c8600ad9c78e60c686820bbe347e72f9aee38a6bfd5a0b9cd415efcee9"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1955
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "3a5e5bd6078a4c20753eb00f77b70f942b843d407dcddc31c6df7cdb7fd5b928"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1111
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "5ba5cd83086a66c42403813d8147b0be25eebf81a9516dceb809aa3303662c70"
+    }
+  },
+  "merge": false,
+  "migration": false,
+  "mutation_count": 23,
+  "node_changes": {
+    "backend": {
+      "added_count": 86,
+      "removed_count": 0
+    },
+    "integration": {
+      "added_count": 86,
+      "removed_count": 0
+    }
+  },
+  "prior_packets": {
+    "2026-09-06-lifecycle-population-reconciliation": {
+      "files_verified": 15,
+      "seal_sha256": "5c4f702e5689cf3bd6166dd8f9c30791bb0674e4dabca5dd833e6656a50f300d"
+    },
+    "2026-09-06-price-window-and-repair-ui": {
+      "files_verified": 48,
+      "seal_sha256": "be2d8514000b77f0a1573e0ef4f972157b274b3b0156a0b00536b02db11d9c64"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "red": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 17,
+        "skipped": 0,
+        "tests": 17
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_prepare_review_is_read_only_and_does_not_fake_acceptance",
+        "tests.test_security_lifecycle_review::test_confirmation_applies_exact_reviewed_action_with_one_command[False]",
+        "tests.test_security_lifecycle_review::test_confirmation_applies_exact_reviewed_action_with_one_command[True]",
+        "tests.test_security_lifecycle_review::test_existing_acceptance_is_not_a_confirmation_and_cannot_schedule",
+        "tests.test_security_lifecycle_review::test_confirmation_rejects_changed_material_without_accepting_draft[membership]",
+        "tests.test_security_lifecycle_review::test_confirmation_rejects_changed_material_without_accepting_draft[finding]",
+        "tests.test_security_lifecycle_review::test_confirmation_rejects_changed_material_without_accepting_draft[source]",
+        "tests.test_security_lifecycle_review::test_confirmation_rejects_changed_material_without_accepting_draft[evidence]",
+        "tests.test_security_lifecycle_review::test_confirmation_does_not_bind_unrelated_tickers_or_sa_capture_timestamps",
+        "tests.test_security_lifecycle_review::test_confirmation_rejects_forged_digest_and_action_without_writes",
+        "tests.test_security_lifecycle_review::test_confirmation_permission_denial_precedes_every_write",
+        "tests.test_security_lifecycle_review::test_duplicate_confirmation_reads_receipt_without_reapplying",
+        "tests.test_security_lifecycle_review::test_confirmation_recovers_after_durable_approval",
+        "tests.test_security_lifecycle_review::test_confirmation_rolls_back_all_staging_before_approval_commit[assessment_accepted]",
+        "tests.test_security_lifecycle_review::test_confirmation_rolls_back_all_staging_before_approval_commit[proposals_created]",
+        "tests.test_security_lifecycle_review::test_confirmation_rolls_back_all_staging_before_approval_commit[approval_created]",
+        "tests.test_security_lifecycle_review::test_replayed_confirmation_does_not_claim_current_effects_after_user_edit"
+      ],
+      "file": "arkscope-lifecycle-review-initial-red.xml",
+      "sha256": "aa0000fa5518c23be36900c7b108e9a51f168a2881394c909a0afdae3a92481b"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 14,
+        "skipped": 0,
+        "tests": 46
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_scheduled_review_preserves_due_runner_result_contract[True]",
+        "tests.test_security_lifecycle_review::test_newer_assessment_invalidates_review_even_without_new_evidence",
+        "tests.test_security_lifecycle_review::test_citation_material_is_bound_and_integrity_checked[content]",
+        "tests.test_security_lifecycle_review::test_citation_material_is_bound_and_integrity_checked[link]",
+        "tests.test_security_lifecycle_review_routes::test_review_api_prepares_without_writes_and_confirms_with_one_post",
+        "tests.test_security_lifecycle_review_routes::test_confirmation_request_refuses_client_authority_and_malformed_options[extra0]",
+        "tests.test_security_lifecycle_review_routes::test_confirmation_request_refuses_client_authority_and_malformed_options[extra1]",
+        "tests.test_security_lifecycle_review_routes::test_confirmation_request_refuses_client_authority_and_malformed_options[extra2]",
+        "tests.test_security_lifecycle_review_routes::test_confirmation_request_refuses_client_authority_and_malformed_options[extra3]",
+        "tests.test_security_lifecycle_review_routes::test_confirmation_request_refuses_client_authority_and_malformed_options[extra4]",
+        "tests.test_security_lifecycle_review_routes::test_confirmation_request_refuses_client_authority_and_malformed_options[extra5]",
+        "tests.test_security_lifecycle_review_routes::test_review_api_reports_changed_packet_without_writes",
+        "tests.test_security_lifecycle_review_routes::test_review_api_denial_is_not_partial_acceptance[require_db_write]",
+        "tests.test_security_lifecycle_review_routes::test_review_api_denial_is_not_partial_acceptance[require_profile_state_write]"
+      ],
+      "file": "arkscope-lifecycle-review-boundaries-red-v2.xml",
+      "sha256": "6b57cded86b349292bc02395f835e8b5bfcccff3198076a819cdcae0268f45c8"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 61
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_confirmation_readback_rejects_tampered_action_binding[confirmed_at]",
+        "tests.test_security_lifecycle_review::test_confirmation_readback_rejects_tampered_action_binding[packet_version]",
+        "tests.test_security_lifecycle_review::test_legacy_store_apply_cannot_bypass_action_packet_revalidation"
+      ],
+      "file": "arkscope-lifecycle-review-recovery-red-v2.xml",
+      "sha256": "4d5b7eda77e558a8c58d6080f7ba6b211b6a91899b8f4c7d2d9a201749a90322"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 67
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_confirmation_readback_rejects_tampered_action_binding[confirmed_at]",
+        "tests.test_security_lifecycle_review::test_confirmation_readback_rejects_tampered_action_binding[packet_version]",
+        "tests.test_security_lifecycle_review::test_legacy_store_apply_cannot_bypass_action_packet_revalidation",
+        "tests.test_security_lifecycle_review_routes::test_review_projection_has_no_raw_membership_or_future_columns"
+      ],
+      "file": "arkscope-lifecycle-review-projection-red.xml",
+      "sha256": "a5160eae66ef65faee44498b02b442ebe51d79466f9cf9ee3c76f6c5bd2f218a"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1092
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_routes::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes"
+      ],
+      "file": "arkscope-lifecycle-review-full-focus.xml",
+      "sha256": "ada56f3108b3d7a1999c8e194102f88cf5b1137eca52f0d7013ffaff01e08b00"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 71
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_dismissed_required_proposal_is_not_offered_as_confirmable[before_review]",
+        "tests.test_security_lifecycle_review::test_dismissed_required_proposal_is_not_offered_as_confirmable[after_review]"
+      ],
+      "file": "arkscope-lifecycle-review-proposals-red.xml",
+      "sha256": "d9f2aa6ee213627a4ca30923a1d8ea20a1ba522f1de54fc09d04c75767f269b0"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 6,
+        "skipped": 0,
+        "tests": 78
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review_routes::test_existing_case_readers_do_not_export_private_confirmation[case_api]",
+        "tests.test_security_lifecycle_review_routes::test_existing_case_readers_do_not_export_private_confirmation[research]",
+        "tests.test_security_lifecycle_review_routes::test_legacy_transition_commands_close_their_response[cancel]",
+        "tests.test_security_lifecycle_review_routes::test_legacy_transition_commands_close_their_response[retry]",
+        "tests.test_security_lifecycle_review_routes::test_legacy_transition_commands_close_their_response[reverse]",
+        "tests.test_security_lifecycle_review_routes::test_case_transition_preview_is_recursively_closed_without_changing_receipt"
+      ],
+      "file": "arkscope-lifecycle-review-legacy-projection-red.xml",
+      "sha256": "25a4af87ba18913513dab3bcb5a4e5e895e1815b330e5fc4977766ab80015e1c"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 82
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review_routes::test_legacy_retry_does_not_claim_an_incomplete_review_action_completed[scheduled]",
+        "tests.test_security_lifecycle_review_routes::test_legacy_retry_does_not_claim_an_incomplete_review_action_completed[cancelled]",
+        "tests.test_security_lifecycle_review_routes::test_legacy_retry_does_not_claim_an_incomplete_review_action_completed[reversed]",
+        "tests.test_security_lifecycle_review_routes::test_legacy_retry_does_not_claim_an_incomplete_review_action_completed[applied_state_changed]"
+      ],
+      "file": "arkscope-lifecycle-review-legacy-status-red.xml",
+      "sha256": "0d38c1b9d5e1e21cf991794240da2c5094934c3ad03c05f8a26d7aa75af4a407"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 86
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_legacy_reapproval_cannot_discard_an_action_confirmation[attended_user-True]",
+        "tests.test_security_lifecycle_review::test_legacy_reapproval_cannot_discard_an_action_confirmation[automation_policy-True]"
+      ],
+      "file": "arkscope-lifecycle-review-reapproval-red.xml",
+      "sha256": "9edd4d0c3c429d279e817ff4af0961b2ddf07c2206c31b2f40adb6a1da1861fb"
+    }
+  ],
+  "remaining": [
+    "validated_web_finding_and_confirmation",
+    "compact_ui_and_research_projection",
+    "bounded_web_adapter",
+    "release_cutover"
+  ],
+  "schema_files_unchanged": {
+    "src/sa_tracking_memberships.py": {
+      "basis": "prior_source_manifest",
+      "sha256": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4"
+    },
+    "src/security_lifecycle_schema.py": {
+      "basis": "prior_base_commit",
+      "sha256": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8"
+    },
+    "src/ticker_identity_schema.py": {
+      "basis": "prior_base_commit",
+      "sha256": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+    }
+  },
+  "task_6_complete": false,
+  "temporary_stores": "separate_tmpfs_filesystem"
+}

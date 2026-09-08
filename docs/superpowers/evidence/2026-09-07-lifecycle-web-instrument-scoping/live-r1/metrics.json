@@ -1,0 +1,487 @@
+{
+  "failure_code": null,
+  "finished_at": "2026-09-07T13:41:33.132960+00:00",
+  "human_adoptions_created": 0,
+  "human_assessments_created": 0,
+  "journal_calls": {
+    "analysis-1": {
+      "terminal": "completed"
+    },
+    "search-1": {
+      "terminal": "completed"
+    }
+  },
+  "journal_model_submissions": 2,
+  "local_children_reaped": [
+    true,
+    true
+  ],
+  "phase_replies": [
+    {
+      "phase": "search",
+      "usage": {
+        "input_tokens": 29555,
+        "output_tokens": 3510
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 6330,
+          "cache_read_input_tokens": 2149,
+          "input_tokens": 4,
+          "output_tokens": 1315,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 6330,
+          "cache_read_input_tokens": 2149,
+          "input_tokens": 29555,
+          "output_tokens": 3510,
+          "web_search_requests": 2
+        }
+      }
+    },
+    {
+      "phase": "analysis",
+      "usage": {
+        "input_tokens": 10773,
+        "output_tokens": 5230
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 11398,
+          "cache_read_input_tokens": 0,
+          "input_tokens": 2,
+          "output_tokens": 5214,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 11398,
+          "cache_read_input_tokens": 0,
+          "input_tokens": 10773,
+          "output_tokens": 5230,
+          "web_search_requests": 0
+        }
+      }
+    }
+  ],
+  "result_status": "succeeded",
+  "sdk_query_submissions": 2,
+  "sec_contact_configured": true,
+  "selected_metadata_unchanged": true,
+  "sessions": [
+    {
+      "allowed_tools": [
+        "WebSearch"
+      ],
+      "api_key_env_empty": true,
+      "api_token_env_empty": true,
+      "auto_compact_disabled": "1",
+      "cli_max_retries": "0",
+      "disallowed_tools": [
+        "Bash",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Skill",
+        "Task",
+        "WebFetch",
+        "Write"
+      ],
+      "events": [
+        {
+          "api_key_source": "none",
+          "kind": "init",
+          "mcp_server_count": 0,
+          "model": "claude-sonnet-5",
+          "session_matches_request": true,
+          "tools": [
+            "StructuredOutput",
+            "WebSearch"
+          ]
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": []
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": [
+            "WebSearch"
+          ]
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": [
+            "WebSearch"
+          ]
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "kind": "UserMessage"
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "kind": "UserMessage"
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": []
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": [
+            "StructuredOutput"
+          ]
+        },
+        {
+          "kind": "UserMessage"
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "has_structured_output": true,
+          "is_error": false,
+          "kind": "result",
+          "model_usage": {
+            "models": [
+              {
+                "cache_creation_input_tokens": 6330,
+                "cache_read_input_tokens": 2149,
+                "input_tokens": 29555,
+                "invalid_fields": [],
+                "model": "claude-sonnet-5",
+                "output_tokens": 3510,
+                "shape": "object",
+                "web_search_requests": 2
+              }
+            ],
+            "shape": "object"
+          },
+          "model_usage_models": [
+            "claude-sonnet-5"
+          ],
+          "num_turns": 4,
+          "permission_denial_count": 0,
+          "session_matches_request": true,
+          "subtype": "success",
+          "terminal_reason": "completed"
+        }
+      ],
+      "fallback_model": null,
+      "helper_model_overrides": {
+        "current": "claude-sonnet-5",
+        "legacy": "claude-sonnet-5"
+      },
+      "max_turns": 14,
+      "model": "claude-sonnet-5",
+      "permission_mode": "dontAsk",
+      "setting_sources": [],
+      "strict_mcp_config": true,
+      "tools": [
+        "WebSearch"
+      ]
+    },
+    {
+      "allowed_tools": [],
+      "api_key_env_empty": true,
+      "api_token_env_empty": true,
+      "auto_compact_disabled": "1",
+      "cli_max_retries": "0",
+      "disallowed_tools": [
+        "Bash",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Skill",
+        "StructuredOutput",
+        "Task",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "events": [
+        {
+          "api_key_source": "none",
+          "kind": "init",
+          "mcp_server_count": 0,
+          "model": "claude-sonnet-5",
+          "session_matches_request": true,
+          "tools": []
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "kind": "SystemMessage"
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": []
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": []
+        },
+        {
+          "has_structured_output": false,
+          "is_error": false,
+          "kind": "result",
+          "model_usage": {
+            "models": [
+              {
+                "cache_creation_input_tokens": 11398,
+                "cache_read_input_tokens": 0,
+                "input_tokens": 10773,
+                "invalid_fields": [],
+                "model": "claude-sonnet-5",
+                "output_tokens": 5230,
+                "shape": "object",
+                "web_search_requests": 0
+              }
+            ],
+            "shape": "object"
+          },
+          "model_usage_models": [
+            "claude-sonnet-5"
+          ],
+          "num_turns": 1,
+          "permission_denial_count": 0,
+          "session_matches_request": true,
+          "subtype": "success",
+          "terminal_reason": "completed"
+        }
+      ],
+      "fallback_model": null,
+      "helper_model_overrides": {
+        "current": "claude-sonnet-5",
+        "legacy": "claude-sonnet-5"
+      },
+      "max_turns": 2,
+      "model": "claude-sonnet-5",
+      "permission_mode": "dontAsk",
+      "setting_sources": [],
+      "strict_mcp_config": true,
+      "tools": []
+    }
+  ],
+  "source_http_requests": 5,
+  "source_reads": [
+    {
+      "capture_sha256": "190050ae6e68e77f7f1fef1c195d71bb0cc79e90bddc8ed115db6600a24ccabc",
+      "document_sha256": "906ecdbe57ed593d03002ce1650b75fa47ed36fa801fdaf0a410898d9fcf22ea",
+      "observations": [
+        {
+          "content_encoding": "gzip",
+          "declared_body_bytes": null,
+          "decoded_body_bytes": 124421,
+          "framing": "chunked",
+          "received_body_bytes": 29312,
+          "request_index": 1,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "requests_after": 1,
+      "requests_before": 0,
+      "status": "captured",
+      "text_characters": 4881,
+      "text_sha256": "3e18954a72478ca98adc33e3d1c943ef02cbe06c13b864cb4e3414bb299febd3",
+      "url": "https://capedge.com/filing/1378453/0001104659-23-060301/TA-8K"
+    },
+    {
+      "capture_sha256": "a85eef92a1e8eca225294632ee59e8b5fd44dafe2479a9f81484be8032a281ef",
+      "document_sha256": "01d2221c448cc18f56d5c1b9d9cc2f8a2a72c1adc56b5f42155eadd7e8751d49",
+      "observations": [
+        {
+          "content_encoding": "gzip",
+          "declared_body_bytes": 2924,
+          "decoded_body_bytes": 9868,
+          "framing": "content_length",
+          "received_body_bytes": 2924,
+          "request_index": 2,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "requests_after": 2,
+      "requests_before": 1,
+      "status": "captured",
+      "text_characters": 5580,
+      "text_sha256": "5d2ad176bd71544693d48e637ca4f43da622ec53529d277ca8d3277fba88b3e8",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923061210/tm2315684d2_ex99-1.htm"
+    },
+    {
+      "capture_sha256": "ce9d6a731d11ef67c00e28ca81febd683fa67ac1f10069c91f80af13381cef5e",
+      "document_sha256": "6b1a9a568b1627c23b36d6d5f1131a7cbc79a35b1d90087087f9b85aa36d9ab2",
+      "observations": [
+        {
+          "content_encoding": "gzip",
+          "declared_body_bytes": null,
+          "decoded_body_bytes": 39824,
+          "framing": "chunked",
+          "received_body_bytes": 8586,
+          "request_index": 3,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "requests_after": 3,
+      "requests_before": 2,
+      "status": "captured",
+      "text_characters": 1614,
+      "text_sha256": "a1459ac0e194d1825c3765f23ebda5f1784bd80517e8a922d536dbaed88689a0",
+      "url": "https://www.ta-petro.com/newsroom/travelcenters-of-america-to-be-acquired-by-bp-for-8600-per-share-or-approximately-13-billion/"
+    },
+    {
+      "code": "source_unavailable",
+      "observations": [
+        {
+          "content_encoding": null,
+          "declared_body_bytes": null,
+          "decoded_body_bytes": 0,
+          "framing": null,
+          "received_body_bytes": 0,
+          "request_index": 4,
+          "result_code": "source_unavailable",
+          "status": 403
+        }
+      ],
+      "requests_after": 4,
+      "requests_before": 3,
+      "status": "failed",
+      "url": "https://www.bp.com/en_us/united-states/home/news/press-releases/travelcenters-of-america-inc-announces-intention-to-delist-senior-notes-from-the-nasdaq.html"
+    },
+    {
+      "capture_sha256": "fb6984b33efdacde5f59bc40e9a728116f396cc8e14fddd74dfbb0a24ab47738",
+      "document_sha256": "58c0dede3901661a9d55297b5f939feab2619fce578ecbddf5f63335e1c29193",
+      "observations": [
+        {
+          "content_encoding": "gzip",
+          "declared_body_bytes": 34768,
+          "decoded_body_bytes": 157625,
+          "framing": "content_length",
+          "received_body_bytes": 34768,
+          "request_index": 5,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "requests_after": 5,
+      "requests_before": 4,
+      "status": "captured",
+      "text_characters": 8591,
+      "text_sha256": "6d7d384fbb93d8a2c4993edbf222bad259e3fa21a081a937c518616fe7d9b100",
+      "url": "https://www.nasdaq.com/press-release/travelcenters-of-america-inc.-announces-intention-to-delist-8.25-senior-notes-due"
+    }
+  ],
+  "stages": [
+    "searching",
+    "reading_sources",
+    "analyzing",
+    "completed"
+  ],
+  "started_at": "2026-09-07T13:40:10.721180+00:00",
+  "token_backend": "keyring",
+  "token_loads": 1
+}

@@ -1,0 +1,16 @@
+{
+  "baseline": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "scope": "maintenance source and existing scoped read boundary",
+  "files": {
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-disposition/scripts/disposition.py": "5c71459f93c19062a970122e2658aba2d53b33e83fbe40a3f1e61aaa2aabacba",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-disposition/scripts/readback.py": "99f0cb954c91b01b92304ae63a886ba6006490cb14da3829679218f3c5c3cca8",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-disposition/scripts/test_disposition.py": "e6b50b4970e5a233f026f14fd0af994d8fd60146a3faf1b57ec832b6c6e36229",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-readonly/scripts/inventory.py": "e9695a4d265fa0aec88087b2b65440cbdd67babc610ad95ac5fce883edeb4f20",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-readonly/scripts/sync_inventory.py": "f2e35bfe2b33dc4334d0478808b152641621401d441b6fcc4859d27fbde36f66",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-tracking-first-readonly/scripts/test_inventory.py": "e2f6492207e922dfc538645ab685d73f02745a78326425994cbae4b20f37bb2f"
+  },
+  "product_hash_manifest": "../2026-09-05-lifecycle-tracking-first-policy/files.sha256.json",
+  "read_source_hash_manifest": "../2026-09-05-lifecycle-tracking-first-readonly/source-manifest.json",
+  "product_hashes_reverified": 17,
+  "read_source_hashes_reverified": 12
+}

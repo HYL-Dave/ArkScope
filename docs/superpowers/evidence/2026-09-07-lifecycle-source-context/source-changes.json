@@ -1,0 +1,95 @@
+{
+  "added": {
+    "src/lifecycle_source_context.py": "0dc5a07102879d38986a9c47251a0b36af9aa5761bb118c7783d1a2209baf4f9",
+    "tests/test_lifecycle_source_compatibility.py": "28304051cbf0c48e3a688bf5034e6335c691670484382e0c93347c5d6c1ea907",
+    "tests/test_lifecycle_source_context.py": "3f90cdb8d8150a6a5bd4aa4577353696c12d249125a8bdcb9f85e02bd8591906",
+    "tests/test_lifecycle_source_read_report.py": "5677acc77ae72ca5044ba16f3d910fa008ff954f420818418e25efa006ff5247"
+  },
+  "changed": {
+    "apps/arkscope-web/src/i18n/resources.test.ts": {
+      "after": "70d400f3c2778d48db3db947fa804b97124e8f6cd5e08755e6891ad7a14b2136",
+      "before": "66e759c63c2d1b3f9f217f667e86c82bf2f198ac221acd6a10a951e2bf583faa"
+    },
+    "apps/arkscope-web/src/i18n/resources/en/explore.ts": {
+      "after": "4f2635c0dcc381afc3bb36d2ccf401e81b12a875f2e77ef1cf8d27b6e03e0121",
+      "before": "97742e43f48e13913eed8fd670d2c1e8c8576f05103fb0ced230d10f8537572b"
+    },
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts": {
+      "after": "eda7ddc579f5de3ea9f59b7df2c797c7a7724b6242342be7ca4223bf8acf8274",
+      "before": "13f6533c6b10d49ad01074390cde280f43eb56af8fc9fcf44fe2255332bef8a9"
+    },
+    "apps/arkscope-web/src/lifecycle/LifecycleWebPanel.test.tsx": {
+      "after": "3b1a17eba3eb9074f938cd098658c842c4e6fd82027d7e734cbc56ece27cd637",
+      "before": "614fc38a393b655bf35b2f30bbecb8505c436454b21b38533dc0498eee4f4c32"
+    },
+    "apps/arkscope-web/src/lifecycle/LifecycleWebPanel.tsx": {
+      "after": "e6674d9438df2ae9228ce2e6107c70b21ebdc62fc495755c1e5690567fe2958c",
+      "before": "1a8ee33ec5cd4654ce883cbcb49fc57943fad6dfbdac5f7f533008654c98004c"
+    },
+    "apps/arkscope-web/src/lifecycle/webContract.test.ts": {
+      "after": "7765864750b21350aa0bcb40aa3f4eb4d09deecc169c62a5336079a37fbbae83",
+      "before": "4f60ff70d4c524010df86d77e5a17897d2611afa4198a1ca73372c021b3f80ac"
+    },
+    "apps/arkscope-web/src/lifecycle/webContract.ts": {
+      "after": "99b477976ed4985ffa656907fb155f9177d455b749850cc7ab3b83994b6d91cf",
+      "before": "5a72ee2397be43f2472beeacc6ec93137df6affccc8cfc57b6fdf119738b1a0b"
+    },
+    "apps/arkscope-web/src/lifecycle/webFixtures.ts": {
+      "after": "f73f39c899827aa75e0caf1e6d8cf25de8a37fa04e4a2ab2483e98bd053e7d55",
+      "before": "6ec1fd1135870960ee05d07ce47553bc4649559da1b86a03e12aa8a54880ae8d"
+    },
+    "apps/arkscope-web/src/lifecycle/webPresentation.test.ts": {
+      "after": "46faf61b278ac8ad93abd321b36cc03618d30dd9f6718ffba09b9856236fefa7",
+      "before": "09220674a85c90c3878757cd540dae7b4be9a5b5f800212bef6cc3f58458c250"
+    },
+    "requirements.txt": {
+      "after": "8b0ea34dd48a0ce21be232c7642225dfed44e0d9358279fe6337b77606ef38cb",
+      "before": "a3b65b118930ab955ceddac7a3e4d063a07f7cc64c1c23a55b868c14784d6cb2"
+    },
+    "src/lifecycle_public_sources.py": {
+      "after": "af349d966a5ba3b6d49223d49d30a185bd24aa68d9d040455707477bc065f310",
+      "before": "4ee5393d042c6abcf89ab1008442bcf3c6183aa99337faa3c8c5a7b5cd502225"
+    },
+    "src/lifecycle_web_controller.py": {
+      "after": "66e5d83eb5d8f40ed2df6512252dfae25022a2327b88e4b637b540595dd268ce",
+      "before": "5c4081cc91a0ba05ab94107425c9c982ad5df343b26dd74aa6c3d0132da0e96f"
+    },
+    "src/lifecycle_web_preflight.py": {
+      "after": "6190d2e4437e5d486fe5d61a86d2b91c7d1977342b59447bc5973fc955e71432",
+      "before": "b42794fe3dcd807e563c88ee984eb681728f2f82582a31a35de45bd2e546836a"
+    },
+    "src/lifecycle_web_projection.py": {
+      "after": "e1a39fa5a17fcbbfd61506d48c97f21b89184c74ed31a2b7704308f30af28b5b",
+      "before": "a4befb9312ba178018c571236e29f9b9150d3ac71ba104dc34f8c3101f68c9f7"
+    },
+    "src/lifecycle_web_store.py": {
+      "after": "313e82e52093f109614d719f7e7dc03b0cbb44cd10c4f340549c7cd15777d8b6",
+      "before": "1f8c5509c1e81102ef6ba683f3ba68246922824a2725499cd3164b2151e5c54c"
+    },
+    "src/security_lifecycle_population.py": {
+      "after": "bb92331e0f78d7b1f25bb350c74b90015748e8d162a9ccdd92a29adad1469520",
+      "before": "de2f4bfc34091a1767c15229b7e544aa992d38ceaa6a3e9d9589c6c7a1b38a61"
+    },
+    "src/security_lifecycle_web_finding.py": {
+      "after": "7d169b4048b110473d12a1dc63f8e56f4bbd8a8e5add67d509232685600c5d66",
+      "before": "6fbb2ca7e19ce92a1465e332c90c89d5ab49bb38509b5bb2ab0f90e7cd0d1a2e"
+    },
+    "src/security_lifecycle_web_pipeline.py": {
+      "after": "f0a1bfa894b550fcf66807e5499ad18391406b8e1090a6982403ba903aed34ca",
+      "before": "28691b6ac690c7f6b5c15787509163b549f280f352f9737e13fa1982479eae84"
+    },
+    "tests/test_lifecycle_public_sources.py": {
+      "after": "86b8df62c222f78c714e591e4945d2c26c6e9fd8f32440c7fd601899add27c18",
+      "before": "9dfec624c5cecc96dc23496d2c2b1c2a1595dad2d0f4479541395496f3c1f238"
+    },
+    "tests/test_lifecycle_web_preflight.py": {
+      "after": "029d08c60a4ec17140789e784c143731a1cd493444338812341278d027b39d83",
+      "before": "11ea2d7d4041ab931e3c0fe941a8d4a70ecb8fe30bbc101d9003f27a62e4c547"
+    },
+    "tests/test_security_lifecycle_web_pipeline.py": {
+      "after": "c0535a4d0a87e9a5102bce9e1704c459f0cc124736151f8da8dde38f7c27069b",
+      "before": "ebc525138ecca36e5e2ea8c02297e92a15f0b43bef6b4c11b76d8212f9f935cf"
+    }
+  },
+  "prior_manifest_sha256": "d7a8bc51143143275feefe5c7d83b32ea08f366863e2aab678caac4a80361bba"
+}

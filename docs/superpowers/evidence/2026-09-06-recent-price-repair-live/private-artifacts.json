@@ -1,0 +1,28 @@
+{
+  "algorithm": "sha256",
+  "files": [
+    {
+      "sha256": "2556436c4a124320fc4eae93e7fa800c72f128e7d2c84130229e9a65526cfea7",
+      "name": "market.before.db"
+    },
+    {
+      "sha256": "d987edc7c8539be03e42969f46c82c77518caf0e22ac198671c4c1edee22c1e0",
+      "name": "result.private.json"
+    },
+    {
+      "sha256": "e6964fa71b43974ffaef0db01255b3f38123aea83afef029ddeaae7cef50d20f",
+      "name": "responses-summary.private.json"
+    },
+    {
+      "sha256": "872c4460be8460303e9933d2c44421ebd2d36a74119d96e4cd75592ae77219a0",
+      "name": "inserted-keys.private.json"
+    },
+    {
+      "sha256": "e1f334662623fe7f2e0964c41a51136425a07f2574bd26097aa1bcf2804616b8",
+      "name": "requests.sqlite3"
+    }
+  ],
+  "inspected_directory_modes": "0700",
+  "inspected_backup_result_journal_modes": "0600",
+  "raw_responses_or_production_paths_included": false
+}

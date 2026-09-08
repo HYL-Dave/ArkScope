@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="10" skipped="0" tests="10" time="0.293" timestamp="2026-09-06T23:22:41.234478+08:00" hostname="ais"><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[openai-api_key]" time="0.003"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3e7b7c0&gt;
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_all_four_channels_share_source_reading_and_finding_validation(monkeypatch, provider, auth):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:73: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[openai-chatgpt_oauth]" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3b07e80&gt;
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_all_four_channels_share_source_reading_and_finding_validation(monkeypatch, provider, auth):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:73: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[anthropic-api_key]" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3e7ab30&gt;
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_all_four_channels_share_source_reading_and_finding_validation(monkeypatch, provider, auth):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:73: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[anthropic-claude_code_oauth]" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3c20310&gt;
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_all_four_channels_share_source_reading_and_finding_validation(monkeypatch, provider, auth):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:73: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_source_read_failure_remains_visible_and_never_retries" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3cabbb0&gt;
+
+    @pytest.mark.anyio
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:95: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources0-search_no_sources]" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3b051e0&gt;
+sources = [], reason = 'search_no_sources'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("sources,reason", [
+        ([], "search_no_sources"), (["https://127.0.0.1/private"], "unsafe_source_url"),
+        (["https://a.example.com", "https://b.example.com", "https://c.example.com"], "search_output_invalid"),
+    ])
+    async def test_invalid_or_empty_search_does_not_fetch_or_submit_analysis(monkeypatch, sources, reason):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:116: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources1-unsafe_source_url]" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3e7be20&gt;
+sources = ['https://127.0.0.1/private'], reason = 'unsafe_source_url'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("sources,reason", [
+        ([], "search_no_sources"), (["https://127.0.0.1/private"], "unsafe_source_url"),
+        (["https://a.example.com", "https://b.example.com", "https://c.example.com"], "search_output_invalid"),
+    ])
+    async def test_invalid_or_empty_search_does_not_fetch_or_submit_analysis(monkeypatch, sources, reason):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:116: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources2-search_output_invalid]" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3b07130&gt;
+sources = ['https://a.example.com', 'https://b.example.com', 'https://c.example.com']
+reason = 'search_output_invalid'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("sources,reason", [
+        ([], "search_no_sources"), (["https://127.0.0.1/private"], "unsafe_source_url"),
+        (["https://a.example.com", "https://b.example.com", "https://c.example.com"], "search_output_invalid"),
+    ])
+    async def test_invalid_or_empty_search_does_not_fetch_or_submit_analysis(monkeypatch, sources, reason):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:116: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_failed_search_or_stop_never_dispatches_more_work" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3ca9f30&gt;
+
+    @pytest.mark.anyio
+    async def test_failed_search_or_stop_never_dispatches_more_work(monkeypatch):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:131: ImportError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_stop_during_source_read_joins_worker_and_never_dispatches_analysis" time="0.002"><failure message="ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700cf3c25270&gt;
+
+    @pytest.mark.anyio
+    async def test_stop_during_source_read_joins_worker_and_never_dispatches_analysis(monkeypatch):
+&gt;       from src import security_lifecycle_web_pipeline as mod
+E       ImportError: cannot import name 'security_lifecycle_web_pipeline' from 'src' (/tmp/arkscope-lifecycle-terminal-membership/src/__init__.py)
+
+tests/test_security_lifecycle_web_pipeline.py:147: ImportError</failure></testcase></testsuite></testsuites>

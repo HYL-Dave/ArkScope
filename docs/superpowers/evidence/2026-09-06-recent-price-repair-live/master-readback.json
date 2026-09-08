@@ -1,0 +1,118 @@
+{
+  "calendar_health": "ok",
+  "coverage_at": "2026-09-05T13:03:42-04:00",
+  "days": [
+    {
+      "complete": null,
+      "date": "2026-09-05",
+      "partial": null,
+      "unknown": null
+    },
+    {
+      "complete": 183,
+      "date": "2026-09-04",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-09-03",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-09-02",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-09-01",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-31",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": null,
+      "date": "2026-08-30",
+      "partial": null,
+      "unknown": null
+    },
+    {
+      "complete": null,
+      "date": "2026-08-29",
+      "partial": null,
+      "unknown": null
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-28",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-27",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-26",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-25",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-24",
+      "partial": 0,
+      "unknown": 0
+    },
+    {
+      "complete": null,
+      "date": "2026-08-23",
+      "partial": null,
+      "unknown": null
+    },
+    {
+      "complete": null,
+      "date": "2026-08-22",
+      "partial": null,
+      "unknown": null
+    },
+    {
+      "complete": 183,
+      "date": "2026-08-21",
+      "partial": 0,
+      "unknown": 0
+    }
+  ],
+  "missing_ticker_days": 0,
+  "observation_health": "ok",
+  "observed_at": "2026-09-06T01:06:41.949632+00:00",
+  "partial_ticker_days": 0,
+  "price_writes": 0,
+  "profile_writes": 0,
+  "provider_requests": 0,
+  "source_hashes": {
+    "src/active_universe.py": "b83aafd801b2f2461fb293c031c4060129307f7ca87a4ac727b1a88678c220fe",
+    "src/market_coverage/service.py": "e59df6f0541f9e1e8137729a661c89cd63b76a2b2d8c8b3e2fde68ffa3264d76"
+  },
+  "universe_count": 183,
+  "unresolved_tickers": 0,
+  "source_tree": "master",
+  "source_revision": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "frontend_or_app_restart": false
+}

@@ -1,0 +1,10 @@
+{
+  "benchmark_sha256": "a4dae65ec174cf6cda8af31893a530ba14bbe3ac6c64976589d60ce5f2c2a967",
+  "elapsed_seconds": 560.69,
+  "exit_code": 0,
+  "failure": null,
+  "rss_guard_bytes": 4294967296,
+  "sampled_peak_rss_bytes": 2624987136,
+  "source_unchanged": true,
+  "terminated_by_supervisor": false
+}

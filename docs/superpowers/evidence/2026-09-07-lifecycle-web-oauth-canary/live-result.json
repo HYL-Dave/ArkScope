@@ -1,0 +1,24 @@
+{
+  "cancel_requested_at": null,
+  "case_id": "canary-TA",
+  "created_at": "2026-09-07T00:33:15.974008+00:00",
+  "execution": {
+    "auth_mode": "claude_code_oauth",
+    "model": "claude-sonnet-5",
+    "provider": "anthropic"
+  },
+  "failure_code": "execution_identity_changed",
+  "finding": null,
+  "finished_at": "2026-09-07T00:33:36.755990+00:00",
+  "model_submissions": 1,
+  "phase": null,
+  "run_id": "lwr_ef06374f26b949ddb37fbc7e981bc1a3",
+  "source_requests": null,
+  "status": "remote_outcome_unknown",
+  "ticker": "TA",
+  "usage": {
+    "input_tokens": null,
+    "output_tokens": null
+  },
+  "version": 1
+}

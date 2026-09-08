@@ -1,0 +1,29 @@
+{
+  "at": "2026-09-05T15:36:16+00:00",
+  "binding_count": 105,
+  "bindings_sha256": "0416005a1632b759ec9d3e36396960d27cdbde54bc19a62ee50891d9ab243d72",
+  "bindings_without_current_observation": 0,
+  "boundary_sha256": "e9695a4d265fa0aec88087b2b65440cbdd67babc610ad95ac5fce883edeb4f20",
+  "change_counts": {
+    "timestamp_only": 105
+  },
+  "observations_sha256": "a100a4fab12e5e8c8efba6a7b7872a615cebe67eeeba013b02c0d5ed4259a051",
+  "observed_lineages": 105,
+  "production_writes": 0,
+  "provider_requests": 0,
+  "runner_sha256": "f2e35bfe2b33dc4334d0478808b152641621401d441b6fcc4859d27fbde36f66",
+  "stable_read_interval": true,
+  "status": "readonly_sync_diagnosis_complete",
+  "target_changes": {
+    "ARCH": [
+      "timestamp_only"
+    ],
+    "LTHM": [
+      "timestamp_only"
+    ],
+    "TA": [
+      "timestamp_only"
+    ]
+  },
+  "private_summary_sha256": "053b64d81bb28f9e946a1585ff37d4c0b6be412dabc205702002470ef1d305c9"
+}

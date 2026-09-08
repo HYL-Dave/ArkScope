@@ -1,0 +1,29 @@
+{
+  "files": {
+    "frontend-arkscope-lifecycle-web-stop-copy-green.json": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [],
+      "file": "arkscope-lifecycle-web-stop-copy-green.json",
+      "sha256": "93e75d2370dc4a7d555661dc2e5261e0b9eeb297b69016a8520bb689f1bc96a6"
+    },
+    "frontend-arkscope-lifecycle-web-stop-copy-red.json": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [
+        "cancel acknowledgment stays pending, then an unknown outcome stays visible without retry"
+      ],
+      "file": "arkscope-lifecycle-web-stop-copy-red.json",
+      "sha256": "ba27f6f32adca1a88d1e86924399379683933fd217f884af585551bb3a4f1b80"
+    }
+  },
+  "scope": "historical_incremental_red_green_not_final_source_admission"
+}

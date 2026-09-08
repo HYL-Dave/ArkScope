@@ -1,0 +1,170 @@
+{
+  "added": [
+    "tests/test_lifecycle_web_claude_json_analysis.py"
+  ],
+  "analysis_capture_receipts": [
+    {
+      "files": {
+        "authorized-plan.json": "97fb9f86678a811139ec006ea8988b7ce6f93fac5615bb49080db69cb03d3d1b",
+        "metrics.json": "17c9f27aea1081674023ea9989876a2e478698f0ca4ee084d03e996f646d8455",
+        "profile.sqlite": "5e4817e0f3e7627433eca5e54254066d686e3c4900c6600be4a10a061e28269a",
+        "result.json": "7d1115e20d9932bfb142c492db2b2deeedfb5d2b0576109a89ee436d40885870",
+        "search-output.json": "9c5a3925314f4acc1b90d2a25d5deee824dcfc9f8837c3af16a992caf34279ff"
+      },
+      "label": "R3",
+      "prompt_sha256": "e05bb1280fed190323601e59e8cebff1b9a66c98fd8a11c6fac4d769ddd1f9c6",
+      "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+      "source_checkpoint": {
+        "manifest_sha256": "0d20a6b4ec6b4c014d7d7da3c2ff9e4224d610c96d9af51b4807b3639069113e",
+        "matched_files": 1095,
+        "seal_sha256": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4"
+      }
+    },
+    {
+      "files": {
+        "authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+        "metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+        "profile.sqlite": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+        "result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+        "search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a"
+      },
+      "label": "R1",
+      "prompt_sha256": "99847cf20e3610345feb1376602778bda0940453eb6bff285f8a55dd863181eb",
+      "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+      "source_checkpoint": {
+        "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+        "matched_files": 1084,
+        "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+      }
+    }
+  ],
+  "analysis_json_strictly_validated_by_shared_parser": true,
+  "analysis_native_output_tool_removed": true,
+  "analysis_replay_authority": {
+    "human_adoptions": 0,
+    "max_submissions_each": 1,
+    "no_fallback": true,
+    "no_retry": true,
+    "selected_subscription_only": true,
+    "source_http_attempts": 0
+  },
+  "changed": [
+    "src/auth_drivers/lifecycle_web_claude.py",
+    "tests/test_lifecycle_web_claude.py",
+    "tests/test_lifecycle_web_claude_output_contract.py",
+    "tests/test_lifecycle_web_claude_wire.py"
+  ],
+  "frontend_unchanged": true,
+  "kind": "offline_explicit_final_json_analysis_transport",
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6913
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "9838ffba17ca1b4151863f3d1f50ab1e2ccd0bea9db79cd14901904949b1ec72"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2236
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "a02f968aaa5f6a1f7c258b18cb95e75723b9aab85ccaafca0e3d0b9a34156d9d"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 3055
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "ee40f2b1c6eb1590443a9237dae2b58f4ee6287c0d9e1df56fc68f6e419a77f0"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2236
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "7821c0edd21278001556d412e4aa82475f9f4a862c63bb407d939f2de9166476"
+    }
+  },
+  "migration": false,
+  "native_tool_round_trip_budgets_unchanged": true,
+  "other_auth_adapters_unchanged": true,
+  "owned_mutations": 15,
+  "preparation": {
+    "json-analysis-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 134
+      },
+      "failed_nodes": [],
+      "file": "json-analysis-green.xml",
+      "sha256": "067e4967373c976490daa66bcbc0c1ce65808c93515735c7036d71bf33f5590f"
+    },
+    "json-analysis-harness-final": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 16
+      },
+      "failed_nodes": [],
+      "file": "json-analysis-harness-final.xml",
+      "sha256": "143a2ccf3910d5a981d9d240246d5ced0833ad082dbfb642a83ded5d2cf39a91"
+    },
+    "json-analysis-integration-first": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 133
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_claude_wire::test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False]"
+      ],
+      "file": "json-analysis-integration-first.xml",
+      "sha256": "6f2ea7878235df3744ba279dab3a055e7bbee2d9d5c62b43fcc8fbd27b9757c9"
+    },
+    "json-analysis-red": {
+      "counts": {
+        "errors": 0,
+        "failures": 6,
+        "skipped": 0,
+        "tests": 28
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_claude_json_analysis::test_claude_analysis_declares_final_json_without_native_output_tool",
+        "tests.test_lifecycle_web_claude_json_analysis::test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins[False]",
+        "tests.test_lifecycle_web_claude_json_analysis::test_claude_analysis_never_chooses_between_native_and_final_json",
+        "tests.test_lifecycle_web_claude_json_analysis::test_claude_analysis_denies_structured_output_tool_at_every_boundary[pretool]",
+        "tests.test_lifecycle_web_claude_json_analysis::test_claude_analysis_denies_structured_output_tool_at_every_boundary[init]",
+        "tests.test_lifecycle_web_claude_json_analysis::test_claude_analysis_denies_structured_output_tool_at_every_boundary[notification]"
+      ],
+      "file": "json-analysis-red.xml",
+      "sha256": "401aae50618ec5d94b0bcb434c7df9ede8db4055010c0d2bf50fecf6aee62504"
+    }
+  },
+  "previous_turns_admission_seal": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4",
+  "provider_calls": 0,
+  "replay_is_not_a_new_full_retrieval_canary": true,
+  "schema_and_finding_validation_unchanged": true,
+  "search_transport_unchanged": true,
+  "source_http_attempts_remaining": 0
+}

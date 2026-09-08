@@ -1,0 +1,25 @@
+{
+  "algorithm": "sha256",
+  "file_count": 18,
+  "files": {
+    "README.md": "fc0a5e53572ad83a42e665b21424cdffc656d8358c002aa6105710b99e5fa63c",
+    "job-history.json": "fc34d1e742d1f6557fb80f15da0cb3886a223a0be415f89c4dee374a75cea1bf",
+    "master-readback.json": "5cea5a14b86f228e5b18f618ed5e5f8fd536442e769c12d942cdf7d6613258fc",
+    "mutation-results.json": "e1cabc7d0904b24a65b64096864359086ce5709a72239492711a3f305d9ceb16",
+    "mutations.json": "dc0924ab6d4a6a56d5e13db31467bb92ae236d3e6ceddc1ddaf800ffbf947bb0",
+    "price-focus-files.json": "49b18b9fa07158f4c1d87e75a01cb3fd25515685d76f6a34a6ce91a917194682",
+    "private-artifacts.json": "11b8f0b1f7683f70f7f78bfe6658a62a4db00375b170fe7db819cce713be7ec0",
+    "result.json": "40a1571b1fd5ac0097a0e1f641e57f3ddb4189c30c6521fab23871eb8bb06298",
+    "scripts/diagnose_history.py": "76b5d6f7a4ebd823f7c1d63a873b1f408f529770430cbd92d9852463264558e1",
+    "scripts/readback.py": "e539f421546961ab355d3433bf9c5045a9906feb2290db5a86e490647d925df9",
+    "scripts/run_mutations.py": "611abade9114239275f1f3ad15fe1bb8c95a981c2e9a419811f4baea4ff71856",
+    "scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5",
+    "scripts/test_diagnose_history.py": "f8ac12e4433411927e0e482a1e98a35dd7b2631d0cca22715de13aea2dd7d245",
+    "scripts/test_readback.py": "71255f3f3c70937e73dbf1924c496b867f13e5315eddc9a92b06f8248ab6eba7",
+    "scripts/test_run_repair.py": "399009f7bb91390af15dde7f733fdac000e116271f6301db3acdc10e4834b940",
+    "source-manifest.json": "25c5f817405facbc4fd9f8479a65936956b7b1ce2f697558d8a0f1794bf688df",
+    "verification-files.json": "b44dec29fcb6a77f357b4ed065d8fb94236a813ec131f65f1a92b73b683cd165",
+    "verification.json": "7061ee410cc3802adf2c3b36dd98f071ca3243b15e3359f51d5f88bcfc67c1cb"
+  },
+  "scope": "this_packet_excluding_files_sha256_json"
+}

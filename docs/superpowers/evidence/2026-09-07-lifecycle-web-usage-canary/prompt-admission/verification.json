@@ -1,0 +1,83 @@
+{
+  "added": [
+    "tests/test_lifecycle_web_claude_output_contract.py"
+  ],
+  "api_and_other_auth_adapters_unchanged": true,
+  "changed": [
+    "src/auth_drivers/lifecycle_web_claude.py"
+  ],
+  "frontend_unchanged": true,
+  "interrupted_test_attempt": "prompt-campaign-r1-interrupted.json; same product, RAM-backed rerun; no timeout/expectation change",
+  "kind": "offline_prompt_amendment_not_live_confirmation",
+  "live_replay": "Same R1 public captures, one fresh analysis-only Sonnet subscription request; no search or HTTP; original failure retained.",
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6876
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "2ca74028d35a05bf6bc099012f817b8f0e86bc820a6cb7920977fc8aa1d82d39"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2199
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "800a65037cda41e0023ec87db2f56043030529d6697a42667e0dd42b9a468c83"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 3018
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "134a9bfe878c099188739c4357565ece0914fc7c66522957979677b27cc71e3f"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2199
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "e3302c3b96098c02af678f6a5906f89f30ca71c3b830dfabda9397b4625652d2"
+    }
+  },
+  "migration": false,
+  "model_submissions": 0,
+  "original_capture_files": {
+    "authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+    "metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+    "profile.sqlite": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+    "result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+    "search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a"
+  },
+  "owned_mutations": 4,
+  "prior_source": {
+    "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+    "matched_files": 1084,
+    "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+  },
+  "renewed_full_canary_budget": {
+    "cumulative_http_limit": 8,
+    "sdk_submissions": 2,
+    "source_http_requests": 4
+  },
+  "schema_and_validation_unchanged": true,
+  "source_http_requests": 0,
+  "tool_surface_unchanged": true,
+  "turn_limits_unchanged": true
+}

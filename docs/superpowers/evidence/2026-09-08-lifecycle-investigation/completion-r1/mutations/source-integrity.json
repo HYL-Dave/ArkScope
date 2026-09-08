@@ -1,0 +1,6 @@
+{
+  "changed": [],
+  "original_worktree_modified_by_harness": false,
+  "backend_workers": 8,
+  "independent_mutant_workspaces": 24
+}

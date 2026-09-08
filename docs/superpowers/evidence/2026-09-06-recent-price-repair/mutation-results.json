@@ -1,0 +1,367 @@
+{
+  "baseline": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 428
+    },
+    "duration_seconds": 16.155,
+    "exit_code": 0,
+    "failed_nodes": [],
+    "name": "baseline"
+  },
+  "focus": [
+    "docs/superpowers/evidence/2026-09-06-recent-price-repair/scripts/test_recent_scope.py",
+    "tests/test_data_coverage_tools.py",
+    "tests/test_data_scheduler.py",
+    "tests/test_ibkr_gateway_lock.py",
+    "tests/test_ibkr_source_event_loop.py",
+    "tests/test_ibkr_source_import_safety.py",
+    "tests/test_ibkr_source_intraday.py",
+    "tests/test_lifecycle_tracking_and_price_repair_routes.py",
+    "tests/test_market_coverage_boundaries.py",
+    "tests/test_market_coverage_calendar.py",
+    "tests/test_market_coverage_classifier.py",
+    "tests/test_market_coverage_dependencies.py",
+    "tests/test_market_coverage_observations.py",
+    "tests/test_market_data_admin.py",
+    "tests/test_market_data_direct.py",
+    "tests/test_price_coverage_history_gaps.py",
+    "tests/test_price_coverage_multiday_regression.py",
+    "tests/test_price_coverage_repair.py",
+    "tests/test_price_coverage_repair_workflow.py",
+    "tests/test_prices_quote_route.py",
+    "tests/test_prices_runtime.py",
+    "tests/test_recent_price_repair.py",
+    "tests/test_recent_price_repair_routes.py",
+    "tests/test_security_lifecycle_ibkr_evidence.py",
+    "tests/test_security_lifecycle_routes.py",
+    "tests/test_trading_day_coverage.py"
+  ],
+  "mutations": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.282,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_unknown_dispatch_is_not_retried_but_other_authorized_items_can_finish"
+      ],
+      "killed_by_owner": true,
+      "name": "M01_unknown_is_empty",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 19,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 13.42,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_explicit_repair_reuses_fetched_response_after_write_interruption",
+        "tests.test_recent_price_repair::test_repair_dispatch_budget_and_cached_qualification_survive_resume",
+        "tests.test_recent_price_repair::test_resume_reuses_a_completed_qualification_before_the_first_history_request",
+        "tests.test_recent_price_repair::test_unknown_dispatch_is_not_retried_but_other_authorized_items_can_finish",
+        "tests.test_recent_price_repair::test_request_response_tampering_is_rejected_before_any_new_request[shape]",
+        "tests.test_recent_price_repair::test_request_response_tampering_is_rejected_before_any_new_request[content]",
+        "tests.test_recent_price_repair::test_request_response_tampering_is_rejected_before_any_new_request[binding]",
+        "tests.test_recent_price_repair::test_removed_target_blocks_request_without_blocking_an_unrelated_new_membership",
+        "tests.test_recent_price_repair::test_target_removed_after_response_is_not_written",
+        "tests.test_recent_price_repair::test_incomplete_or_failed_provider_result_is_never_retried_or_called_complete[empty]",
+        "tests.test_recent_price_repair::test_incomplete_or_failed_provider_result_is_never_retried_or_called_complete[partial]",
+        "tests.test_recent_price_repair::test_repair_does_not_fold_unrelated_aliases_or_write_outside_requested_rth_slots",
+        "tests.test_recent_price_repair::test_scheduler_preserves_measured_repair_diagnostics_and_typed_failures",
+        "tests.test_recent_price_repair::test_half_day_and_holiday_repair_uses_calendar_slots_not_twenty_six_per_day",
+        "tests.test_recent_price_repair::test_approved_coverage_clock_does_not_expand_to_later_intraday_slots",
+        "tests.test_recent_price_repair::test_thirty_two_target_shape_uses_sixty_four_requests_to_fill_190_days_only",
+        "tests.test_recent_price_repair::test_repair_writer_reserves_alias_identity_before_insert",
+        "tests.test_recent_price_repair::test_changed_alias_blocks_cached_price_write_without_requerying_provider",
+        "tests.test_recent_price_repair_routes::test_real_worker_uses_prepared_plan_and_refuses_parameter_changes"
+      ],
+      "killed_by_owner": true,
+      "name": "M02_skip_received_cache",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.599,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_actual_request_parameters_must_match_the_authorized_plan[useRTH-False]",
+        "tests.test_recent_price_repair::test_actual_request_parameters_must_match_the_authorized_plan[barSizeSetting-1 min]",
+        "tests.test_recent_price_repair::test_actual_request_parameters_must_match_the_authorized_plan[whatToShow-BID]",
+        "tests.test_recent_price_repair::test_actual_request_parameters_must_match_the_authorized_plan[durationStr-120 D]"
+      ],
+      "killed_by_owner": true,
+      "name": "M03_unbound_request_options",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.38,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_repair_does_not_fold_unrelated_aliases_or_write_outside_requested_rth_slots"
+      ],
+      "killed_by_owner": true,
+      "name": "M04_unbounded_price_slots",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.649,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_target_removed_after_response_is_not_written"
+      ],
+      "killed_by_owner": true,
+      "name": "M05_removed_target_written",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.408,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_incomplete_or_failed_provider_result_is_never_retried_or_called_complete[empty]",
+        "tests.test_recent_price_repair::test_incomplete_or_failed_provider_result_is_never_retried_or_called_complete[partial]"
+      ],
+      "killed_by_owner": true,
+      "name": "M06_provider_success_is_coverage",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 15.641,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_request_response_tampering_is_rejected_before_any_new_request[content]"
+      ],
+      "killed_by_owner": true,
+      "name": "M07_cache_content_not_sealed",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.569,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_request_response_tampering_is_rejected_before_any_new_request[binding]"
+      ],
+      "killed_by_owner": true,
+      "name": "M08_cache_bound_to_wrong_request",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 17.051,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_sealed_plan_edit_is_rejected_before_gateway_or_journal_creation"
+      ],
+      "killed_by_owner": true,
+      "name": "M09_sealed_plan_not_checked",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.59,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_gateway_failure_attempts_connection_once_not_once_per_ticker"
+      ],
+      "killed_by_owner": true,
+      "name": "M10_connection_per_ticker",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.72,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_planned_source_never_reconnects_after_execution_has_admitted_connection"
+      ],
+      "killed_by_owner": true,
+      "name": "M11_unplanned_reconnect",
+      "restored_files": {
+        "data_sources/ibkr_source.py": "28de96a95e192f919f612348a07825d4773ea397b126c96cf733305be813e6b8"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.713,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_repair_writer_does_not_create_a_missing_market_database"
+      ],
+      "killed_by_owner": true,
+      "name": "M12_missing_database_created",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.696,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_repair_writer_reserves_alias_identity_before_insert"
+      ],
+      "killed_by_owner": true,
+      "name": "M13_alias_not_reserved",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.622,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_planned_request_pacing_survives_resume_and_clock_rollback_is_not_slept_through"
+      ],
+      "killed_by_owner": true,
+      "name": "M14_clock_rollback_slept_through",
+      "restored_files": {
+        "src/price_repair_execution.py": "6570d8e90190974cb38802818dae8c2dfb8a8360339e055005e2985f4ba82291"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.798,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_scheduler_preserves_measured_repair_diagnostics_and_typed_failures"
+      ],
+      "killed_by_owner": true,
+      "name": "M15_repair_diagnostics_stripped",
+      "restored_files": {
+        "src/service/data_scheduler.py": "a4fb484dfdd702c496947658f449be7e47119b9cbacfcf18fdd6cdac9939a93e"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 428
+      },
+      "duration_seconds": 16.932,
+      "exit_code": 1,
+      "failed_nodes": [
+        "tests.test_recent_price_repair_routes::test_worker_requires_a_prepared_plan_before_loading_provider_configuration"
+      ],
+      "killed_by_owner": true,
+      "name": "M16_preview_failure_loads_configuration",
+      "restored_files": {
+        "src/prices_runtime.py": "54554fc7b5bd0ec5429aad8cd4176a81d37453af5163774611acce098b9a8d47"
+      }
+    }
+  ],
+  "restored": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 428
+    },
+    "duration_seconds": 16.72,
+    "exit_code": 0,
+    "failed_nodes": [],
+    "name": "restored"
+  },
+  "temporary_data_on_distinct_filesystem": true
+}

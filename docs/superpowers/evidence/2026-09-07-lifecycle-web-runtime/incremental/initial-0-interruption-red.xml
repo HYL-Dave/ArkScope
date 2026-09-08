@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="57" time="1.332" timestamp="2026-09-06T22:37:34.925298+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_public_sources" name="test_public_source_preserves_complete_unicode_and_document_digest" time="0.071" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_request_does_not_inherit_cookies_auth_or_proxies" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[http://example.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[file:///etc/passwd]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://u:p@example.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com:8443/a]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://localhost/a]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://127.0.0.1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::1]]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://169.254.169.254/latest/meta-data]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com\\@127.0.0.1/]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\nnotice]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\tnotice]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://exa mple.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/%0d%0aInjected:yes]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::ffff:127.0.0.1]]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses5]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_to_private_destination_does_not_fetch_it" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_relative_redirect_is_resolved_and_each_request_counted" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_limit_rejects_instead_of_returning_partial_source" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_byte_limit_never_silently_truncates_even_without_content_length" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers0-%PDF-source_format_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers1-compressed-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers3-text-source_response_invalid]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers4-text-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers5-\xff-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers6--source_text_empty]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_failed_request_consumes_budget_and_has_no_retry" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_stop_during_dns_prevents_late_http_dispatch" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_deadline_is_checked_after_dns_before_any_connection" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_html_source_excludes_noncontent_without_truncating_notice" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_exact_passage_requires_real_source_and_byte_aligned_unicode" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_modified_page_text_cannot_reuse_source_hash" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_pinned_https_transport_does_not_resolve_host_again" time="0.002"><failure message="TypeError: test_pinned_https_transport_does_not_resolve_host_again.&lt;locals&gt;.Context.wrap_socket() missing 1 required keyword-only argument: 'do_handshake_on_connect'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fe24f10&gt;
+
+    def test_pinned_https_transport_does_not_resolve_host_again(monkeypatch):
+        from src import lifecycle_public_sources as mod
+    
+        observed = {}
+    
+        class Sock:
+            def settimeout(self, value):
+                observed["timeout"] = value
+            def connect(self, address):
+                observed["address"] = address
+            def close(self):
+                observed["closed"] = True
+            def shutdown(self, how):
+                assert how == socket.SHUT_RDWR
+            def do_handshake(self):
+                observed["handshake"] = True
+    
+        sock = Sock()
+        monkeypatch.setattr(mod.socket, "socket", lambda family, kind: sock)
+    
+        class Context:
+            verify_mode = mod.ssl.CERT_REQUIRED
+            check_hostname = True
+    
+            def wrap_socket(self, actual, *, server_hostname, do_handshake_on_connect):
+                assert actual is sock
+                assert do_handshake_on_connect is False
+                observed["tls_hostname"] = server_hostname
+                return actual
+    
+        monkeypatch.setattr(mod.ssl, "create_default_context", lambda: Context())
+        conn = mod._PinnedHTTPSConnection("ir.example.com", (socket.AF_INET, (PUBLIC_IP, 443)), timeout=3)
+&gt;       conn.connect()
+
+tests/test_lifecycle_public_sources.py:324: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_public_sources._PinnedHTTPSConnection object at 0x77d77fe25330&gt;
+
+    def connect(self) -&gt; None:
+        family, endpoint = self._address
+        raw = socket.socket(family, socket.SOCK_STREAM)
+        try:
+            raw.settimeout(self.timeout)
+            raw.connect(endpoint)
+&gt;           self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+E           TypeError: test_pinned_https_transport_does_not_resolve_host_again.&lt;locals&gt;.Context.wrap_socket() missing 1 required keyword-only argument: 'do_handshake_on_connect'
+
+src/lifecycle_public_sources.py:109: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change0]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fe8fb50&gt;
+change = {'url': 'https://other.example.com/false'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:342: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change1]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fe25f90&gt;
+change = {'body_sha256': '0000000000000000000000000000000000000000000000000000000000000000'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:342: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change2]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fe8f1f0&gt;
+change = {'retrieved_at': '2030-01-01T00:00:00+00:00'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:342: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change3]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fefae00&gt;
+change = {'redirect_chain': ('https://elsewhere.example.com',)}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:342: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change4]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fe8efe0&gt;
+change = {'mime_type': 'text/html'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:342: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits5]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits6]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits7]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits8]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits9]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_deadline_interrupts_an_inflight_read_not_only_its_return" time="1.003"><failure message="AssertionError: in-flight read was not interrupted&#10;assert False&#10; +  where False = wait(1)&#10; +    where wait = &lt;threading.Event object at 0x77d77fefbd30&gt;.wait">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fef90f0&gt;
+
+    def test_deadline_interrupts_an_inflight_read_not_only_its_return(monkeypatch):
+        from threading import Event
+        from src import lifecycle_public_sources as mod
+    
+        interrupted = Event()
+    
+        class SlowResponse(Response):
+            def read(self, size):
+                assert interrupted.wait(1), "in-flight read was not interrupted"
+                raise OSError("socket closed")
+    
+        class SlowConnection(Connection):
+            def abort(self):
+                interrupted.set()
+                self.close()
+    
+        reader, _, _, _ = _reader(monkeypatch, timeout_seconds=0.05)
+        connection = SlowConnection(SlowResponse())
+        monkeypatch.setattr(mod, "_PinnedHTTPSConnection", lambda *a, **kw: connection)
+        with pytest.raises(mod.SourceReadError, match="source_read_timeout"):
+&gt;           reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources.py:382: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:285: in read
+    chunk = response.read(min(65536, self.limits.max_response_bytes + 1 - len(body)))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_lifecycle_public_sources.test_deadline_interrupts_an_inflight_read_not_only_its_return.&lt;locals&gt;.SlowResponse object at 0x77d77fef9090&gt;
+size = 65536
+
+    def read(self, size):
+&gt;       assert interrupted.wait(1), "in-flight read was not interrupted"
+E       AssertionError: in-flight read was not interrupted
+E       assert False
+E        +  where False = wait(1)
+E        +    where wait = &lt;threading.Event object at 0x77d77fefbd30&gt;.wait
+
+tests/test_lifecycle_public_sources.py:370: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_cancel_interrupts_an_inflight_read_and_refuses_next_hop" time="0.003"><failure message="AssertionError: cancellation did not close the active transport&#10;assert False&#10; +  where False = is_set()&#10; +    where is_set = &lt;threading.Event object at 0x77d77fe8c7f0&gt;.is_set">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x77d77fe8eb90&gt;
+
+    def test_cancel_interrupts_an_inflight_read_and_refuses_next_hop(monkeypatch):
+        from threading import Event
+        from src import lifecycle_public_sources as mod
+    
+        interrupted = Event()
+        reader, _, _, _ = _reader(monkeypatch)
+    
+        class PendingResponse(Response):
+            def read(self, size):
+                reader.request_stop()
+                assert interrupted.is_set(), "cancellation did not close the active transport"
+                raise OSError("socket closed")
+    
+        class PendingConnection(Connection):
+            def abort(self):
+                interrupted.set()
+                self.close()
+    
+        monkeypatch.setattr(mod, "_PinnedHTTPSConnection", lambda *a, **kw: PendingConnection(PendingResponse()))
+        with pytest.raises(mod.SourceReadError, match="source_read_cancelled"):
+&gt;           reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources.py:406: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:285: in read
+    chunk = response.read(min(65536, self.limits.max_response_bytes + 1 - len(body)))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_lifecycle_public_sources.test_cancel_interrupts_an_inflight_read_and_refuses_next_hop.&lt;locals&gt;.PendingResponse object at 0x77d77fe8ca90&gt;
+size = 65536
+
+    def read(self, size):
+        reader.request_stop()
+&gt;       assert interrupted.is_set(), "cancellation did not close the active transport"
+E       AssertionError: cancellation did not close the active transport
+E       assert False
+E        +  where False = is_set()
+E        +    where is_set = &lt;threading.Event object at 0x77d77fe8c7f0&gt;.is_set
+
+tests/test_lifecycle_public_sources.py:396: AssertionError</failure></testcase></testsuite></testsuites>

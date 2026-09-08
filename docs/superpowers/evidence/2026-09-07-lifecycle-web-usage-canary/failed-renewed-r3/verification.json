@@ -1,0 +1,38 @@
+{
+  "adoptions": 0,
+  "capture_files_sha256": {
+    "authorized-plan.json": "97fb9f86678a811139ec006ea8988b7ce6f93fac5615bb49080db69cb03d3d1b",
+    "metrics.json": "17c9f27aea1081674023ea9989876a2e478698f0ca4ee084d03e996f646d8455",
+    "profile.sqlite": "5e4817e0f3e7627433eca5e54254066d686e3c4900c6600be4a10a061e28269a",
+    "result.json": "7d1115e20d9932bfb142c492db2b2deeedfb5d2b0576109a89ee436d40885870",
+    "search-output.json": "9c5a3925314f4acc1b90d2a25d5deee824dcfc9f8837c3af16a992caf34279ff"
+  },
+  "cause": "schema_prompt_did_not_prevent_literal_parameter_wrapper_on_toolless_analysis",
+  "commit": false,
+  "current_full_investigation_live_verified": false,
+  "main_and_helper_model": "claude-sonnet-5",
+  "merge": false,
+  "migration": false,
+  "native_completion_count_guard_caused_this_failure": false,
+  "offline_source": {
+    "manifest_sha256": "0d20a6b4ec6b4c014d7d7da3c2ff9e4224d610c96d9af51b4807b3639069113e",
+    "matched_files": 1095,
+    "seal_sha256": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4"
+  },
+  "profile_writes": false,
+  "push": false,
+  "rate_limit_failure_observed": false,
+  "raw_temporary_journal_archived": false,
+  "restart": false,
+  "sdk_submissions_campaign_so_far": 6,
+  "sdk_submissions_this_run": 2,
+  "source_candidate_not_dispatched_due_to_budget": 1,
+  "source_http_attempts_this_run": 4,
+  "source_http_budget_remaining": 0,
+  "source_http_campaign_attempts": 8,
+  "source_pages_captured": 3,
+  "subscription_auth_values": [
+    "none",
+    "none"
+  ]
+}

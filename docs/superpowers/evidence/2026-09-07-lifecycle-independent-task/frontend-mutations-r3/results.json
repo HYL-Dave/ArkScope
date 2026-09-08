@@ -1,0 +1,57 @@
+[
+  {
+    "name": "offer_custom_models",
+    "owner": "has its own localized route and bounded test",
+    "owned": true,
+    "exit_code": 1,
+    "tests": 1610,
+    "passed": 1606,
+    "failed": [
+      "independent lifecycle investigation routing has its own localized route and bounded test in zh-Hant",
+      "independent lifecycle investigation routing has its own localized route and bounded test in en",
+      "independent lifecycle investigation routing does not promote an absent retained investigation model",
+      "independent lifecycle investigation routing does not promote an explicitly_rejected retained investigation model"
+    ],
+    "runtime_errors": 0
+  },
+  {
+    "name": "promote_retained_unknown",
+    "owner": "does not promote an absent retained investigation model",
+    "owned": true,
+    "exit_code": 1,
+    "tests": 1610,
+    "passed": 1609,
+    "failed": [
+      "independent lifecycle investigation routing does not promote an absent retained investigation model"
+    ],
+    "runtime_errors": 0
+  },
+  {
+    "name": "claim_full_test_success",
+    "owner": "does not call a schema check a full investigation success",
+    "owned": true,
+    "exit_code": 1,
+    "tests": 1610,
+    "passed": 1607,
+    "failed": [
+      "independent lifecycle investigation routing does not call a schema check a full investigation success in zh-Hant",
+      "independent lifecycle investigation routing does not call a schema check a full investigation success in en",
+      "ModelRoutingSection provider-first UX renders an actual-call success only for the current five-field snapshot"
+    ],
+    "runtime_errors": 0
+  },
+  {
+    "name": "show_other_model_rejection",
+    "owner": "renders one selector with four groups and disables ineligible entries with text reasons",
+    "owned": true,
+    "exit_code": 1,
+    "tests": 1610,
+    "passed": 1607,
+    "failed": [
+      "ModelRoutingSection provider-first UX renders one selector with four groups and disables ineligible entries with text reasons",
+      "ModelRoutingSection provider-first UX uses the task-scoped test and explains subscription billing",
+      "ModelRoutingSection provider-first UX renders English task model effort and thinking copy from semantic ids"
+    ],
+    "runtime_errors": 0
+  }
+]

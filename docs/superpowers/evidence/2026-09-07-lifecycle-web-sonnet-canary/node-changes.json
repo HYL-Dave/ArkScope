@@ -1,0 +1,78 @@
+{
+  "backend": {
+    "added": [
+      "tests.test_lifecycle_public_sources_wire::test_real_truncated_response_remains_rejected",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[eof-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-True]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True]"
+    ],
+    "after": 6617,
+    "before": 6605,
+    "removed": []
+  },
+  "baseline": {
+    "added": [
+      "tests.test_lifecycle_public_sources_wire::test_real_truncated_response_remains_rejected",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[eof-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-True]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True]"
+    ],
+    "after": 1940,
+    "before": 1928,
+    "removed": []
+  },
+  "integration": {
+    "added": [
+      "tests.test_lifecycle_public_sources_wire::test_real_truncated_response_remains_rejected",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[eof-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-True]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True]"
+    ],
+    "after": 2759,
+    "before": 2747,
+    "removed": []
+  },
+  "restored": {
+    "added": [
+      "tests.test_lifecycle_public_sources_wire::test_real_truncated_response_remains_rejected",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[eof-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-True]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]",
+      "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]",
+      "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True]"
+    ],
+    "after": 1940,
+    "before": 1928,
+    "removed": []
+  }
+}

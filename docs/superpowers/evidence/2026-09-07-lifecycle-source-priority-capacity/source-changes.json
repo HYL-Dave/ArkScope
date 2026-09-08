@@ -1,0 +1,65 @@
+{
+  "added": {
+    "tests/test_lifecycle_source_capacity.py": "531a30690453841947676a9cddb942d41bc2aa3cec3b34af45e30bdc21b98b3c",
+    "tests/test_lifecycle_source_progress.py": "62c2e507b4984d957a0b77f097b905f76a9b10b3c10104e609b2cea8ecb6a8b5"
+  },
+  "changed": {
+    "apps/arkscope-web/src/api.ts": {
+      "after": "9fda0201d6ccd1f900af1c1b6c14582de0108293c64c386f69f27f10b5ead393",
+      "before": "ca4496dc3bca24437a2f37fc7a76dea7c84b3a8758f6c6eb24dbfa432e74a415"
+    },
+    "apps/arkscope-web/src/lifecycle/webApi.test.ts": {
+      "after": "d0c586041d5bee3fee2175435df9bd543a77c6abd79c64489884b32e8fc87847",
+      "before": "0ffb4c8fa981b63bfd68268199ca1c7d35c3ed9fa339508bc6b651099843e271"
+    },
+    "src/lifecycle_public_sources.py": {
+      "after": "9626cf0e55840e5a02da154ce293fae044d65916479e6915c737279834d1d856",
+      "before": "af349d966a5ba3b6d49223d49d30a185bd24aa68d9d040455707477bc065f310"
+    },
+    "src/lifecycle_source_context.py": {
+      "after": "105450620a604680869f5bb24b28bad146c197311aeabe777a86f63251239889",
+      "before": "0dc5a07102879d38986a9c47251a0b36af9aa5761bb118c7783d1a2209baf4f9"
+    },
+    "src/lifecycle_web_controller.py": {
+      "after": "759e440f46f65c5026dfebec3394a266ca45f319fc3f914c37fcceb853beb589",
+      "before": "66e5d83eb5d8f40ed2df6512252dfae25022a2327b88e4b637b540595dd268ce"
+    },
+    "src/lifecycle_web_preflight.py": {
+      "after": "6c9b46e4fbb326179d738d9bebf458a997fe0cf7183ffd341f9626ede744e0bf",
+      "before": "6190d2e4437e5d486fe5d61a86d2b91c7d1977342b59447bc5973fc955e71432"
+    },
+    "src/lifecycle_web_projection.py": {
+      "after": "5402a3e0bc13f7b3562a4aa64a3ef2fe77b9f778475c0f0552f7f55a7fc6e49f",
+      "before": "e1a39fa5a17fcbbfd61506d48c97f21b89184c74ed31a2b7704308f30af28b5b"
+    },
+    "src/lifecycle_web_store.py": {
+      "after": "405fa6281a08cc2379fe8f8a039b417e385e5373cb7bad718b6fbdbcb3d155ca",
+      "before": "313e82e52093f109614d719f7e7dc03b0cbb44cd10c4f340549c7cd15777d8b6"
+    },
+    "src/security_lifecycle_web_contract.py": {
+      "after": "6dee3eba975b84dc9ffdfb05a1f9180f6d4428bf5dd7764ffec6c7765bd42179",
+      "before": "9cf1b075c836fc17066cb8ed9cc1f3c0496d5c39837ec58a687f0a8f55b16451"
+    },
+    "src/security_lifecycle_web_pipeline.py": {
+      "after": "f2dff64442309397bb06f71f26ea5d145e0d710b2aa7c456bc3e9d9296c8a042",
+      "before": "f0a1bfa894b550fcf66807e5499ad18391406b8e1090a6982403ba903aed34ca"
+    },
+    "tests/test_lifecycle_web_preflight.py": {
+      "after": "7a36c06344f4b5806432d4f1a645c24693792d6eb9300e6bce65adc22feb9d65",
+      "before": "029d08c60a4ec17140789e784c143731a1cd493444338812341278d027b39d83"
+    },
+    "tests/test_security_lifecycle_web_contract.py": {
+      "after": "b1ded2953e417423c923fad68146f84dc0d6a8ddbce7fb9ebb38f3164bcddf0d",
+      "before": "7b1a9abd569c38d7752e255fd23a4b2bede97b203adbae898e2cc2219a81aa20"
+    },
+    "tests/test_security_lifecycle_web_finding.py": {
+      "after": "208eec0e22ade31b99a53756e063a67a4622fba68c2b8d21b40b41f7264ce756",
+      "before": "db635d23c0a22e7e749eb82cb6035f02d937e5e00a1dbf92e1e2ad3e7cd12637"
+    },
+    "tests/test_security_lifecycle_web_pipeline.py": {
+      "after": "29255bb330021ebdb049d38374c55e87525bb3d0d70ecf6e5dabf8a310b79692",
+      "before": "c0535a4d0a87e9a5102bce9e1704c459f0cc124736151f8da8dde38f7c27069b"
+    }
+  },
+  "prior_manifest_sha256": "ea31c54fe10ddf5a4c09c4a1951dd5d94fdcce5135c13d8a31fa27de099a684a"
+}

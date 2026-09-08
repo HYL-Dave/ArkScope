@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="5" time="1.159" timestamp="2026-09-07T13:26:59.310996+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_source_progress" name="test_web_journal_wait_is_bounded_below_the_unchanged_lease[False]" time="0.081"><failure message="assert 5000 == 45000">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7805/test_web_journal_wait_is_bound0')
+write = False
+
+    @pytest.mark.parametrize("write", [False, True])
+    def test_web_journal_wait_is_bounded_below_the_unchanged_lease(tmp_path, write):
+        from src.lifecycle_web_store import LEASE_SECONDS
+    
+        _, store = setup_store(tmp_path)
+        with store.connection(write=write) as conn:
+&gt;           assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 45_000
+E           assert 5000 == 45000
+
+tests/test_lifecycle_source_progress.py:18: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_source_progress" name="test_web_journal_wait_is_bounded_below_the_unchanged_lease[True]" time="0.068"><failure message="assert 5000 == 45000">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7805/test_web_journal_wait_is_bound1')
+write = True
+
+    @pytest.mark.parametrize("write", [False, True])
+    def test_web_journal_wait_is_bounded_below_the_unchanged_lease(tmp_path, write):
+        from src.lifecycle_web_store import LEASE_SECONDS
+    
+        _, store = setup_store(tmp_path)
+        with store.connection(write=write) as conn:
+&gt;           assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 45_000
+E           assert 5000 == 45000
+
+tests/test_lifecycle_source_progress.py:18: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_source_progress" name="test_web_journal_wait_preserves_owner_cancellation_and_failure[commit]" time="0.223"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7805/test_web_journal_wait_preserve0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x774d724898a0&gt;
+competing_write = 'commit'
+
+    @pytest.mark.parametrize("competing_write", ["commit", "cancel", "busy"])
+    def test_web_journal_wait_preserves_owner_cancellation_and_failure(tmp_path, monkeypatch, competing_write):
+        from src.lifecycle_web_store import WebJournalError
+    
+        path, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        connect, waiting = sqlite3.connect, Event()
+    
+        def scaled_connection(*args, **kwargs):
+            # Exercise real SQLite contention at 1/100 of the configured wait.
+            kwargs["timeout"] *= 0.01
+            conn = connect(*args, **kwargs)
+            conn.set_trace_callback(lambda sql: waiting.set() if sql == "BEGIN IMMEDIATE" else None)
+            return conn
+    
+        with connect(path) as competing:
+            competing.execute("BEGIN IMMEDIATE")
+            if competing_write == "cancel":
+                competing.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (AT, identity))
+            monkeypatch.setattr(sqlite3, "connect", scaled_connection)
+            with ThreadPoolExecutor(max_workers=1) as worker:
+                future = worker.submit(store.heartbeat, identity, owner="worker-1")
+                assert waiting.wait(5)
+                if competing_write == "busy":
+                    with pytest.raises(WebJournalError, match="^web_recording_unavailable$"):
+                        future.result(timeout=2)
+                else:
+                    time.sleep(0.15)
+                    competing.commit()
+&gt;                   assert future.result(timeout=2) is (competing_write == "cancel")
+
+tests/test_lifecycle_source_progress.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:451: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+src/lifecycle_web_store.py:121: in heartbeat
+    with self.connection(write=True) as conn:
+/usr/lib/python3.10/contextlib.py:135: in __enter__
+    return next(self.gen)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.LifecycleWebStore object at 0x774d7248b130&gt;
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+&gt;           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError</failure></testcase><testcase classname="tests.test_lifecycle_source_progress" name="test_web_journal_wait_preserves_owner_cancellation_and_failure[cancel]" time="0.278"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7805/test_web_journal_wait_preserve1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x774d737c6650&gt;
+competing_write = 'cancel'
+
+    @pytest.mark.parametrize("competing_write", ["commit", "cancel", "busy"])
+    def test_web_journal_wait_preserves_owner_cancellation_and_failure(tmp_path, monkeypatch, competing_write):
+        from src.lifecycle_web_store import WebJournalError
+    
+        path, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        connect, waiting = sqlite3.connect, Event()
+    
+        def scaled_connection(*args, **kwargs):
+            # Exercise real SQLite contention at 1/100 of the configured wait.
+            kwargs["timeout"] *= 0.01
+            conn = connect(*args, **kwargs)
+            conn.set_trace_callback(lambda sql: waiting.set() if sql == "BEGIN IMMEDIATE" else None)
+            return conn
+    
+        with connect(path) as competing:
+            competing.execute("BEGIN IMMEDIATE")
+            if competing_write == "cancel":
+                competing.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (AT, identity))
+            monkeypatch.setattr(sqlite3, "connect", scaled_connection)
+            with ThreadPoolExecutor(max_workers=1) as worker:
+                future = worker.submit(store.heartbeat, identity, owner="worker-1")
+                assert waiting.wait(5)
+                if competing_write == "busy":
+                    with pytest.raises(WebJournalError, match="^web_recording_unavailable$"):
+                        future.result(timeout=2)
+                else:
+                    time.sleep(0.15)
+                    competing.commit()
+&gt;                   assert future.result(timeout=2) is (competing_write == "cancel")
+
+tests/test_lifecycle_source_progress.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.10/concurrent/futures/_base.py:451: in result
+    return self.__get_result()
+/usr/lib/python3.10/concurrent/futures/_base.py:403: in __get_result
+    raise self._exception
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+src/lifecycle_web_store.py:121: in heartbeat
+    with self.connection(write=True) as conn:
+/usr/lib/python3.10/contextlib.py:135: in __enter__
+    return next(self.gen)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.LifecycleWebStore object at 0x774d745e4280&gt;
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+&gt;           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError</failure></testcase><testcase classname="tests.test_lifecycle_source_progress" name="test_web_journal_wait_preserves_owner_cancellation_and_failure[busy]" time="0.136" /></testsuite></testsuites>

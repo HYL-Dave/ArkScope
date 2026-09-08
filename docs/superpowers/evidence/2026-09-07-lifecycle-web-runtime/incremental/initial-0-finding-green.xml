@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="21" time="0.195" timestamp="2026-09-06T23:21:42.196220+08:00" hostname="ais"><testcase classname="tests.test_security_lifecycle_web_finding" name="test_web_finding_requires_real_source_identity_date_and_citation" time="0.027" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_search_snippets_and_unknown_source_ids_cannot_support_action[change0-source_citation_unavailable]" time="0.002"><failure message="src.security_lifecycle_web_finding.FindingFormatError: web_finding_invalid">change = {'source_id': 'invented'}, reason = 'source_citation_unavailable'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_id": "invented"}, "source_citation_unavailable"),
+        ({"quote": "An invented search snippet."}, "source_citation_mismatch"),
+    ])
+    def test_search_snippets_and_unknown_source_ids_cannot_support_action(change, reason):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        payload = finding_payload()
+        payload["citations"][0].update(change)
+&gt;       result = validate_finding(public_input(), payload, {"source-1": source_page(NOTICE)})
+
+tests/test_security_lifecycle_web_finding.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = PublicInvestigationInput(ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common stock', venue='NASDAQ', issuer_cik='0000012345', composite_figi=None, question='listing_status', as_of='2026-09-06')
+payload = {'citations': [{'quote': 'Issuer Old Inc Class A common stock (OLD) was delisted from NASDAQ effective September 1, 20...ective_date']}], 'contradictions': [], 'effective_date': '2026-09-01', 'effective_date_text': 'September 1, 2026', ...}
+pages = {'source-1': PublicSourcePage(url='https://ir.example.com/notice', redirect_chain=(), body_sha256='b3194862545ec09f0a5...ved_at='2026-09-06T01:00:00+00:00', capture_sha256='89aa8702de01547a471370a10196a4cc73a905f4a3220dc3b2ef93c4eac25d78')}
+
+    def validate_finding(request: PublicInvestigationInput, payload: dict,
+                         pages: Mapping[str, PublicSourcePage], *, unread_source_count=0) -&gt; ValidatedFinding:
+        try:
+            finding = WebFinding.model_validate(payload)
+        except ValidationError:
+&gt;           raise FindingFormatError("web_finding_invalid") from None
+E           src.security_lifecycle_web_finding.FindingFormatError: web_finding_invalid
+
+src/security_lifecycle_web_finding.py:122: FindingFormatError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_search_snippets_and_unknown_source_ids_cannot_support_action[change1-source_citation_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_short_ticker_match_without_issuer_and_share_class_never_authorizes" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_web_continuation_is_not_inferred_from_acquirer_or_common_issuer_alone" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_positive_active_otc_citation_vetoes_removal_even_if_summary_ignores_it" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_syndicated_passages_are_not_counted_as_independent_sources" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_candidate_is_visible_incompleteness_not_absence[1]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_candidate_is_visible_incompleteness_not_absence[2]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_tampered_document_metadata_cannot_supply_valid_passage" time="0.002" /></testsuite></testsuites>

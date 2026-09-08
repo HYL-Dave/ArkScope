@@ -1,0 +1,12 @@
+{
+  "files": [
+    "src/priceRepairContract.test.ts",
+    "src/settings/PriceCoverageRepair.test.tsx",
+    "src/settings/DataStorageSection.test.tsx",
+    "src/SettingsLocalStorage.test.ts",
+    "src/marketDataDisplay.test.ts",
+    "src/settings/settingsReadCache.test.ts",
+    "src/coverageV2Contract.test.ts",
+    "src/i18n/resources.test.ts"
+  ]
+}

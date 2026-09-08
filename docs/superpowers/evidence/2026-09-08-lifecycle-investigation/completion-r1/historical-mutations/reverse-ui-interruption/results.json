@@ -1,0 +1,77 @@
+[
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [],
+    "name": "backend-baseline",
+    "layer": "backend",
+    "returncode": 0,
+    "report_sha256": "fb9cb9a1c09416b8ee035240b0d57bce131cb20e4d82304b284ed156e2df786e"
+  },
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_provider::test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]"
+    ],
+    "name": "provider_preview_attempts_auto_approval",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "894de525133ca547a6465d76575d546802502fba67360e057e85d34fde3051ed",
+    "owner": "test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]",
+    "path": "src/lifecycle_investigation/provider_review.py",
+    "old": "transition_mutation_allowed=lambda: False",
+    "new": "transition_mutation_allowed=lambda: True",
+    "owner_failed": true
+  },
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_store::test_success_requires_a_completed_owned_conclusion[no_result]",
+      "tests.test_lifecycle_investigation_store::test_success_requires_a_completed_owned_conclusion[failed_remote]"
+    ],
+    "name": "success_without_owned_conclusion",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "237c2604f5271852ada3cb2b83be4522764cb69647fe8c1e89a4f965ab0a9fb3",
+    "owner": "test_success_requires_a_completed_owned_conclusion",
+    "path": "src/lifecycle_investigation/store.py",
+    "old": "self._require_success(conn, run_id, payload)",
+    "new": "pass",
+    "owner_failed": true
+  },
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_store::test_unknown_remote_is_not_reported_cancelled_or_successful"
+    ],
+    "name": "unknown_remote_reported_cancelled",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "c29427f7f12fd1ccef1584a92ad188fe3dfe0393b0ac9be60156fb6c899c4a5e",
+    "owner": "test_unknown_remote_is_not_reported_cancelled_or_successful",
+    "path": "src/lifecycle_investigation/store.py",
+    "old": "if pending:\n                status, failure_code",
+    "new": "if False:\n                status, failure_code",
+    "owner_failed": true
+  },
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_controller::test_pre_dispatch_rereads_stop_identity_and_permission_after_credential_load[cancel]",
+      "tests.test_lifecycle_investigation_controller::test_pre_dispatch_rereads_stop_identity_and_permission_after_credential_load[permission]"
+    ],
+    "name": "skip_post_credential_stop_and_permission",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "fa1af783d5e727767a029fef02babc6ad7a12b394a611ccd2024b114c4aa9f4d",
+    "owner": "test_pre_dispatch_rereads_stop_identity_and_permission_after_credential_load",
+    "path": "src/lifecycle_investigation/controller.py",
+    "old": "            self.before_dispatch()\n            if worker.control.stop_state != \"running\":\n                raise WebModelError(\"stop_requested\")\n",
+    "new": "",
+    "owner_failed": true
+  }
+]

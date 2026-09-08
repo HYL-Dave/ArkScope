@@ -1,0 +1,291 @@
+{
+  "files": {
+    "lifecycle-usage-canary-final-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-usage-canary-final-green.xml",
+      "sha256": "0600d0fc9781a0c09477cb4dd0466f3a5520d75120b9f8af5b6038a9fa02bc1d"
+    },
+    "lifecycle-usage-canary-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-usage-canary-green.xml",
+      "sha256": "8a2fb2f851b4fb2546e058eddaf913cf5d5fa92099ff870d439635fc4b2bd6bc"
+    },
+    "lifecycle-usage-canary-observation-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]"
+      ],
+      "file": "lifecycle-usage-canary-observation-red.xml",
+      "sha256": "7312308a0f27a9f497e79a3676646a13040016f36b21d6c59f4656edb471ad2c"
+    },
+    "lifecycle-usage-canary-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 9,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_source_admission_precedes_any_credential_metadata_read",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_requires_explicit_new_checkpoint_not_reused_authority",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_limits_match_current_source_envelope_without_token_truncation",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary::test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]"
+      ],
+      "file": "lifecycle-usage-canary-red.xml",
+      "sha256": "d8322df344cccc235b78f9a728831cdc7e07cc72e7dbce3725a8dc58e2a6d72b"
+    },
+    "lifecycle-usage-i18n-green.json": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 16
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-usage-i18n-green.json",
+      "sha256": "401d30f1d40b035b824012292ea4d46bd48b723064240d286ef1c82ef6d84454"
+    },
+    "lifecycle-web-usage-added-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 5,
+        "skipped": 0,
+        "tests": 58
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[None]",
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value1]",
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[unknown]",
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value3]",
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value4]"
+      ],
+      "file": "lifecycle-web-usage-added-red.xml",
+      "sha256": "b0e22ec5c679f0f90a1994abc1b6f2cff74e9ba3b18202dc90c686cd92b450d9"
+    },
+    "lifecycle-web-usage-binding-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 36
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-binding-green.xml",
+      "sha256": "9d44872a18a5a181495c93159fb36dbc5279f06f8131065f2ec156153dd1ce5f"
+    },
+    "lifecycle-web-usage-contract-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 118
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-contract-green.xml",
+      "sha256": "2f8ad060beef9627c169e58df3b0d46b20a79a9691ab21a22a1825f6ac9952c0"
+    },
+    "lifecycle-web-usage-frontend-final-unit.json": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 45
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-frontend-final-unit.json",
+      "sha256": "ee1e33f82a969e065322cbc4882ad05c159dbe319e8debd51a03108a8c1a4fcc"
+    },
+    "lifecycle-web-usage-frontend-green.json": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 85
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-frontend-green.json",
+      "sha256": "85caf15afd658882649018dc9378bc93d9ea8c8c084afbd426e5c780654bda9d"
+    },
+    "lifecycle-web-usage-frontend-red.json": {
+      "counts": {
+        "errors": 0,
+        "failures": 24,
+        "skipped": 0,
+        "tests": 41
+      },
+      "failed_nodes": [
+        "keeps usage in a collapsed record and never dispatches on expansion: en",
+        "keeps usage in a collapsed record and never dispatches on expansion: zh-Hant",
+        "does not present a partial accounting subtotal as the complete amount or investigation success",
+        "shows unrecorded scope for old history instead of declaring zero or complete usage",
+        "roundtrips phase counters without losing provenance or cache counts",
+        "keeps old usage scope unknown rather than inventing a zero or complete report",
+        "keeps completed search accounting separate from failed investigation status",
+        "retains a known subtotal while a submitted analysis has no returned counters",
+        "rejects string counter instead of hiding present malformed usage",
+        "rejects negative counter instead of hiding present malformed usage",
+        "rejects unsafe integer instead of hiding present malformed usage",
+        "rejects duplicate phase instead of hiding present malformed usage",
+        "rejects missing counter instead of hiding present malformed usage",
+        "rejects internal id instead of hiding present malformed usage",
+        "rejects invented cost instead of hiding present malformed usage",
+        "rejects wrong subtotal instead of hiding present malformed usage",
+        "rejects wrong total instead of hiding present malformed usage",
+        "rejects fake coverage instead of hiding present malformed usage",
+        "rejects fake submissions instead of hiding present malformed usage",
+        "rejects unknown basis instead of hiding present malformed usage",
+        "rejects phase array absent instead of hiding present malformed usage",
+        "rejects phase array malformed instead of hiding present malformed usage",
+        "rejects disagreement with the parent usage pair",
+        "keeps actual zero counters distinguishable from unreported counters"
+      ],
+      "file": "lifecycle-web-usage-frontend-red.json",
+      "sha256": "0718d528e2deb5348456d077fa8eb70dd8b83cd2acaef9c03c4083479bed1f23"
+    },
+    "lifecycle-web-usage-journal-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 80
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-journal-green.xml",
+      "sha256": "91be22413f205bdf7aa27c0f77805b043342c9a43d9040961f297fcacc9b1975"
+    },
+    "lifecycle-web-usage-journal-red-r2.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 20,
+        "skipped": 0,
+        "tests": 20
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[analysis-failed]",
+        "tests.test_lifecycle_web_usage_journal::test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[lost-remote_outcome_unknown]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown",
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_has_no_fabricated_scope_or_zero_counters",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>0]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>1]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>2]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>3]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>4]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>5]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>6]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_only_failure_receipt_is_readable_and_does_not_create_a_finding"
+      ],
+      "file": "lifecycle-web-usage-journal-red-r2.xml",
+      "sha256": "d86eb262e8165988b2227758374d0529147eee0d2d0b45a808c9deee0a1a61d0"
+    },
+    "lifecycle-web-usage-journal-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 20,
+        "skipped": 0,
+        "tests": 20
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[analysis-failed]",
+        "tests.test_lifecycle_web_usage_journal::test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[lost-remote_outcome_unknown]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-api_key]",
+        "tests.test_lifecycle_web_usage_journal::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_usage_journal::test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown",
+        "tests.test_lifecycle_web_usage_journal::test_legacy_usage_has_no_fabricated_scope_or_zero_counters",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>0]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>1]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>2]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>3]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>4]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>5]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>6]",
+        "tests.test_lifecycle_web_usage_journal::test_usage_only_failure_receipt_is_readable_and_does_not_create_a_finding"
+      ],
+      "file": "lifecycle-web-usage-journal-red.xml",
+      "sha256": "59cfe094a9ada8d8af2044a956a1eeb9fdec06348dbe901404a051f4482761a7"
+    },
+    "lifecycle-web-usage-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 11,
+        "skipped": 0,
+        "tests": 12
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_usage::test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes",
+        "tests.test_lifecycle_web_usage::test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[None]",
+        "tests.test_lifecycle_web_usage::test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate1]",
+        "tests.test_lifecycle_web_usage::test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate2]",
+        "tests.test_lifecycle_web_usage::test_malformed_reported_model_counter_is_not_silently_unknown[True]",
+        "tests.test_lifecycle_web_usage::test_malformed_reported_model_counter_is_not_silently_unknown[10]",
+        "tests.test_lifecycle_web_usage::test_malformed_reported_model_counter_is_not_silently_unknown[-1]",
+        "tests.test_lifecycle_web_usage::test_malformed_reported_model_counter_is_not_silently_unknown[1.5]",
+        "tests.test_lifecycle_web_usage::test_malformed_reported_model_counter_is_not_silently_unknown[9007199254740992]",
+        "tests.test_lifecycle_web_usage::test_malformed_reported_model_counter_is_not_silently_unknown[value5]",
+        "tests.test_lifecycle_web_usage::test_reported_zero_is_not_replaced_by_nonzero_main_loop"
+      ],
+      "file": "lifecycle-web-usage-red.xml",
+      "sha256": "7d2553b5bc6d9d94c56ea2dd4d7c51de4c6c0fc30dee429cd987daadb40a1252"
+    },
+    "lifecycle-web-usage-roundtrip.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 4
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-roundtrip.xml",
+      "sha256": "b1ee431e191e33e16c16c3446666647936087692ba36e74002bfcc9f856c46df"
+    },
+    "lifecycle-web-usage-unit.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 46
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-web-usage-unit.xml",
+      "sha256": "a6f1e3d63f9aed224e583b8e26d442d0bd3de144e04fbfa96558556610796680"
+    }
+  },
+  "scope": "historical_red_green_not_final_source_admission"
+}

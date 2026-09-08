@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="8" failures="0" errors="0" time="0.089726657">
+    <testsuite name="src/settings/dataScheduleControls.test.tsx" timestamp="2026-09-07T22:58:43.703Z" hostname="ais" tests="8" failures="0" errors="0" skipped="0" time="0.089726657">
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; shares one schedule read across visible consumers" time="0.025197584">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; partitions schedule rows by write target without changing registry truth" time="0.038566502">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; manual run sends exactly one POST and follows terminal state" time="0.004782883">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; enable and interval mutations invalidate the shared schedule key" time="0.003347346">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; successful macro sources invalidate exact stored data keys" time="0.003128976">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; failed skipped and busy macro runs do not invalidate stored data keys" time="0.009756504">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; classifies future macro sources by write target and fails closed to both macro keys" time="0.001307375">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/settings/dataScheduleControls.test.tsx" name="Data schedule controls &gt; mount idle focus visibility and local status reload send zero POSTs" time="0.002399788">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+    </testsuite>
+</testsuites>

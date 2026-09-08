@@ -1,0 +1,145 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6872
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "3e800f3b4ccd3c57a99bae451fceadf2840677f03cc646b5575ac5665a362819"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2195
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "d8bf78e3b27c9f37d88c2ae74a2b481ff2207e183982635e743693f2d7ff67f8"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 3014
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "c83519a348ce95bda1521602486e4be06abe2ffe90da718b4cc35de2e7b7ffd3"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2195
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "f562350b0ac1774571fac29ce24f7720bffafa865b8e271f16fb67a4b69dcdee"
+    }
+  },
+  "browser": {
+    "cases": 54,
+    "nonblank_and_geometry_verified": true,
+    "screenshots": 108
+  },
+  "canary_harness": {
+    "live_executed": false,
+    "mutations": 3,
+    "production_reads": false,
+    "rehearsal_passed": 9
+  },
+  "commit": false,
+  "crash_durable_phase_usage": false,
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1604
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "4d3d31477da81b33cd6114c540e86c47af4b91b70168eb4651e6a804b1ae620e"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1604
+      },
+      "failed_nodes": [],
+      "file": "restored.json",
+      "sha256": "8230c5568bf7a064397fe982be4901326dd69c2bf47fd55ee11d7c7baa7311fa"
+    }
+  },
+  "merge": false,
+  "migration": false,
+  "mutations": {
+    "backend": 16,
+    "frontend": 8
+  },
+  "prior_packets": {
+    "2026-09-07-lifecycle-attended-source-gaps": {
+      "files_verified": 447,
+      "seal_sha256": "8c8f00075554c62cb8969901825a7aedf13c88356af6a109a5b1cc8a7c6dd1cc"
+    },
+    "2026-09-07-lifecycle-attended-write-concurrency": {
+      "files_verified": 307,
+      "seal_sha256": "1c4564f7d59261deb2fdb710fa421e90e5541be1b55df482774bbec1cc26e0e4"
+    },
+    "2026-09-07-lifecycle-source-context": {
+      "files_verified": 227,
+      "seal_sha256": "52e68716d4117886934a56eff69376235851da85d9f0bb25659e13a0584f064f"
+    },
+    "2026-09-07-lifecycle-source-priority-capacity": {
+      "files_verified": 1462,
+      "seal_sha256": "be780d0a00164f47db561b16ee47c0f1d1c318b9a0ffb3091e252b191bbd32c3"
+    },
+    "2026-09-07-lifecycle-web-runtime": {
+      "files_verified": 240,
+      "seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa"
+    },
+    "2026-09-07-lifecycle-web-sonnet-canary": {
+      "files_verified": 108,
+      "seal_sha256": "70db6a06341e77128a402c443ad44d007a6138270e552c63a51bb8e836392d05"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "explicit_canary_envelope_confirmation",
+    "authorized_fresh_live_canary",
+    "remaining_live_channel_gates",
+    "authorized_journal_installation_and_population_cutover",
+    "merge_restart_and_handtest"
+  ],
+  "unchanged_other_execution_paths": {
+    "src/auth_drivers/claude_code_sdk_driver.py": "33484778a3f45b01b1883b558effd768050c0f9737812a04ace5fed6a7eba8a0",
+    "src/auth_drivers/codex_app_server_runtime.py": "e57ce1249c3cff11ad7ec195b5325e75b2e067dce74b2327236a6e0070100f07",
+    "src/auth_drivers/codex_translation_adapter.py": "47695baee9ae985f543e2d686bd9188ed7e4d792a3820c93b5f8b1e5d1b3a15e",
+    "src/auth_drivers/lifecycle_web_dispatch.py": "eada4dc30c56f74c1379cd75d60e67585883d0481bb3893bb36569517e39aa31",
+    "src/card_synthesis.py": "641017ae9f266694205cc45f033787aa8eed02d1cd1810ad8b8c2932361af18f",
+    "src/model_capabilities.py": "ca3b416c58088d6c49d95fafcb87194f45abcd57b4d341735bfa2a4c699cc862"
+  },
+  "unchanged_schemas": {
+    "src/lifecycle_web_schema.py": "490ca24b56cdf29731aef12430bf30da2e63866594bbd323203bda326437ece7",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "usage_is_billing_authority": false,
+  "whole_workflow_complete": false
+}

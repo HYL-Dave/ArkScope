@@ -1,0 +1,163 @@
+{
+  "baseline": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 443
+    },
+    "duration_seconds": 16.296,
+    "exit_code": 0,
+    "failed_nodes": [],
+    "name": "baseline"
+  },
+  "restored": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 443
+    },
+    "duration_seconds": 16.795,
+    "exit_code": 0,
+    "failed_nodes": [],
+    "name": "restored"
+  },
+  "mutations": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 16.616,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_live_admission_binds_the_exact_authorized_plan"
+      ],
+      "killed_by_owner": true,
+      "name": "L01_wrong_plan_admitted",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 16.596,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_live_sql_guard_rejects_out_of_scope_access[ticker]",
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_live_sql_guard_rejects_out_of_scope_access[date]"
+      ],
+      "killed_by_owner": true,
+      "name": "L02_outside_price_scope_written",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 16.659,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_live_sql_guard_rejects_out_of_scope_access[credential]"
+      ],
+      "killed_by_owner": true,
+      "name": "L03_ambient_credentials_readable",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 17.006,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_configured_gateway_is_not_required_to_be_loopback",
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_network_guard_rejects_non_gateway_destinations_and_ambient_secrets"
+      ],
+      "killed_by_owner": true,
+      "name": "L04_other_network_destination_allowed",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 16.804,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_backup_keeps_wal_rows_and_never_overwrites_a_prior_backup"
+      ],
+      "killed_by_owner": true,
+      "name": "L05_prior_backup_overwritten",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 16.634,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_real_maintenance_flow_backs_up_meters_writes_and_reads_back",
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_backup_failure_never_attempts_gateway",
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_changed_gateway_configuration_stops_before_connection"
+      ],
+      "killed_by_owner": true,
+      "name": "L06_gateway_before_backup",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 443
+      },
+      "duration_seconds": 16.766,
+      "exit_code": 1,
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-06-recent-price-repair-live.scripts.test_run_repair::test_changed_gateway_configuration_stops_before_connection"
+      ],
+      "killed_by_owner": true,
+      "name": "L07_changed_settings_ignored",
+      "restored_files": {
+        "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/run_repair.py": "58818663c22bd8063c452fb753858cff0c164b7aa0f3f53a6f0ecc7e235e43d5"
+      }
+    }
+  ],
+  "focus_manifest": "price-focus-files.json",
+  "focus_file_count": 27,
+  "independent_mutations": true,
+  "all_seven_owned": true,
+  "source_changes_after_campaign": false
+}

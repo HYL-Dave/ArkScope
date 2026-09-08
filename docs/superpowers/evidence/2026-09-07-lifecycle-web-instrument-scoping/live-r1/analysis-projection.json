@@ -1,0 +1,73 @@
+{
+  "announcement_date": "2023-02-15",
+  "announcement_date_text": null,
+  "citations": [
+    {
+      "quote_sha256": "b2dcf5653951cbb3365eae04555ed21c28e5f525b2845c0a6d3a339abb69698f",
+      "quote_utf8_bytes": 311,
+      "source_id": "source-3",
+      "supports": [
+        "security_identity",
+        "acquisition_announced"
+      ]
+    },
+    {
+      "quote_sha256": "8f71033dd49cab76c588aed94150e59f8bbd3a0ef9a4150ccdd76e5a236e8682",
+      "quote_utf8_bytes": 123,
+      "source_id": "source-3",
+      "supports": [
+        "announcement_date"
+      ]
+    },
+    {
+      "quote_sha256": "828d76c54b366975f2aa730fb4b6266f3d9775b8a4cc47e6b66402c00803a558",
+      "quote_utf8_bytes": 81,
+      "source_id": "source-1",
+      "supports": [
+        "security_identity"
+      ]
+    },
+    {
+      "quote_sha256": "a411136ac2ef84b52b2240b372ef6660e85c6454186e4df9c78bd64b1d1cc65f",
+      "quote_utf8_bytes": 271,
+      "source_id": "source-1",
+      "supports": [
+        "listing_ended",
+        "effective_date"
+      ]
+    },
+    {
+      "quote_sha256": "d767453487c470e0342d55209f23e8fb3e28f92cd0d0edd1db043cc6a3ba774c",
+      "quote_utf8_bytes": 292,
+      "source_id": "source-2",
+      "supports": [
+        "security_identity",
+        "acquisition_announced"
+      ]
+    },
+    {
+      "quote_sha256": "9088fee4e3d28b1c128838deb3d2a616ef9e1dcd0d400b6139b87887784e1f72",
+      "quote_utf8_bytes": 301,
+      "source_id": "source-5",
+      "supports": [
+        "security_identity",
+        "acquisition_announced"
+      ]
+    }
+  ],
+  "contradictions": [],
+  "effective_date": "2023-05-15",
+  "effective_date_text": "May 15, 2023",
+  "event_kind": "listing_ended",
+  "issuer_name": "TravelCenters of America Inc.",
+  "security_class": "common stock",
+  "source_ticker": "TA",
+  "successor_ticker": null,
+  "summary": "TravelCenters of America Inc. (Nasdaq: TA) common stock was the subject of an all-cash acquisition by BP Products North America Inc. announced February 16, 2023 ($86.00/share) and completed May 15, 2023, when the merger subsidiary merged into TA and TA became a wholly-owned subsidiary of BP's parent. The retrieved passages give explicit, dated Nasdaq delisting/Form 25 notices only for TA's Senior Notes (TANNI, TANNL, TANNZ), not an explicit separate exchange notice for the common stock. However, the same 8-K and press releases confirm the merger closed May 15, 2023 and describe 'completion of the all-cash acquisition of TA,' which as a cash-out merger necessarily ends public trading of TA common stock; no successor ticker exists because shareholders were cashed out rather than receiving a new listed security.",
+  "timing": "completed",
+  "unresolved_conditions": [
+    "No source passage contains an explicit Nasdaq/Form 25 delisting notice specifically for TA common stock (as opposed to the Senior Notes TANNI/TANNL/TANNZ); the common-stock listing termination is inferred from the merger completion rather than from a dedicated exchange notice.",
+    "Exact market-close/last-trading-day mechanics for TA common stock (e.g., a Form 25 filing date or Nasdaq halt notice for the common stock) are not present in the retrieved passages."
+  ],
+  "venue": "NASDAQ"
+}

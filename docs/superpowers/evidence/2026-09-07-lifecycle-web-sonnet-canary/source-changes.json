@@ -1,0 +1,21 @@
+{
+  "added": {
+    "tests/test_lifecycle_public_sources_wire.py": "c2627713eb185d8cf36c468b79dbb843ffc7222c15ae9eb2996b579aa3b303e8"
+  },
+  "changed": {
+    "src/lifecycle_public_sources.py": {
+      "after": "4ee5393d042c6abcf89ab1008442bcf3c6183aa99337faa3c8c5a7b5cd502225",
+      "before": "1cf82a114a93224813bc1d072861515ad875ce5695f336b60f2c65a0f86233b1"
+    },
+    "tests/test_lifecycle_public_sources.py": {
+      "after": "9dfec624c5cecc96dc23496d2c2b1c2a1595dad2d0f4479541395496f3c1f238",
+      "before": "1f8c94b09c4519a7b241098757fa6ab69089431499c3ad38cadb277f1cb09766"
+    }
+  },
+  "prior_manifest_sha256": "f345b5a78536d62e1534d29be72a877eecf5fd7a1aa4b1dfbfd65e16b3639f70",
+  "updated_unsealed_docs": [
+    "docs/design/PROJECT_PRIORITY_MAP.md",
+    "docs/superpowers/plans/2026-09-05-lifecycle-tracking-first-implementation.md",
+    "docs/superpowers/plans/2026-09-06-lifecycle-web-auth-adapters.md"
+  ]
+}

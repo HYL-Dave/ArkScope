@@ -1,0 +1,55 @@
+{
+  "sdk_submissions": 1,
+  "token_loads": 1,
+  "init": [
+    {
+      "api_key_source": "none",
+      "model": "claude-sonnet-5",
+      "tools": [],
+      "mcp_server_count": 0
+    }
+  ],
+  "results": [
+    {
+      "subtype": "success",
+      "is_error": false,
+      "num_turns": 1,
+      "model_usage": {
+        "claude-sonnet-5": {
+          "inputTokens": 14989,
+          "outputTokens": 1098,
+          "cacheReadInputTokens": 2118,
+          "cacheCreationInputTokens": 13968,
+          "webSearchRequests": 0,
+          "costUSD": 0.0972536,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 128,
+          "canonicalModel": "claude-sonnet-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      }
+    }
+  ],
+  "rate_limits": [
+    {
+      "status": "allowed",
+      "rate_limit_type": "five_hour",
+      "utilization": null,
+      "resets_at": 1788834600
+    }
+  ],
+  "local_fixture": {
+    "kind": "previously_captured_public_source_not_new_provider_observation",
+    "source_id": "source-2",
+    "input_file_sha256": "96d8e54f8fe95adc0e5fda484ac0b6958b56b41c47348a53692f0176adec30d8",
+    "text_sha256": "7340ff9e481a6b37f4e3de516a7cc20ea004fecb9d110fcd6cef403fb6133437",
+    "original_read_at": "2026-09-07T16:49:14.761495+00:00"
+  },
+  "authority": "2026-09-08 user preauthorized Claude OAuth freely; no other billing channel",
+  "production_writes": false,
+  "profile_actions": false,
+  "fallback": false,
+  "execution_source_manifest_sha256": "f0b55c97cd7263f58842730d1b783d7ebb6dde8fbea1d349efca153bda8704c8"
+}

@@ -1,0 +1,307 @@
+{
+  "at": "2026-09-05T15:33:44+00:00",
+  "completed_at": "2026-09-05T15:34:01+00:00",
+  "status": "readonly_inventory_complete_no_execution",
+  "provider_requests": 0,
+  "production_writes": 0,
+  "production_backup_created": false,
+  "credential_fields_read": false,
+  "stable_read_interval": true,
+  "universe_before": 186,
+  "hypothetical_universe_after": 183,
+  "hypothetical_removed_targets": [
+    "ARCH",
+    "LTHM",
+    "TA"
+  ],
+  "universe_sha256": "13121b58e0e28310f35e2b1961a6bd2de2a94f01d97b45391c1da9142191f23a",
+  "unchanged_other_sources_sha256": "383dfa2c325f2095cfc0e1c0928f89963e4975b381397c944998cd75c764cad1",
+  "sa_sync_status": "pending",
+  "sa_observed_lineages": 105,
+  "sa_observations_sha256": "a100a4fab12e5e8c8efba6a7b7872a615cebe67eeeba013b02c0d5ed4259a051",
+  "targets": [
+    {
+      "already_hidden": false,
+      "application_authorized": false,
+      "candidate_tickers": [],
+      "continuation_reasons": [
+        "successor_check_unavailable"
+      ],
+      "continuation_state": "unavailable",
+      "evidence_observed_at": [
+        "2026-09-05T10:33:44+00:00",
+        "2026-09-05T10:33:44Z",
+        "2026-09-05T10:42:28Z",
+        "2026-09-05T10:42:40Z",
+        "2026-09-05T10:42:53Z"
+      ],
+      "evidence_records": 6,
+      "evidence_sources": [
+        "eodhd_symbol_directory",
+        "massive_reference",
+        "nasdaq_symbol_directory"
+      ],
+      "existing_transitions": [],
+      "legacy_archives": 0,
+      "listing_end_date": "2025-01-15",
+      "listing_reasons": [],
+      "listing_state": "inactive",
+      "observed_at": "2026-09-05T10:42:27Z",
+      "open_position": false,
+      "provider_check_sha256": "7729cc1bd228128bb6ea59a35ae072dfd641cd4a9eaaae1f52fd37c3d1d9a426",
+      "provider_codes": [
+        "massive_not_found"
+      ],
+      "ready_for_new_attended_preview": true,
+      "sa_current_sources_to_stop": 0,
+      "sa_memberships_to_suppress": 1,
+      "sources": [
+        "sa_alpha_picks_former"
+      ],
+      "stored_state": "unresolved",
+      "ticker": "ARCH",
+      "tracked": true,
+      "watchlist_archives": 0
+    },
+    {
+      "already_hidden": false,
+      "application_authorized": false,
+      "candidate_tickers": [],
+      "continuation_reasons": [
+        "successor_check_unavailable"
+      ],
+      "continuation_state": "unavailable",
+      "evidence_observed_at": [
+        "2026-09-05T10:33:44+00:00",
+        "2026-09-05T10:33:44Z",
+        "2026-09-05T10:43:18Z",
+        "2026-09-05T10:43:30Z",
+        "2026-09-05T10:43:43Z"
+      ],
+      "evidence_records": 6,
+      "evidence_sources": [
+        "eodhd_symbol_directory",
+        "massive_reference",
+        "nasdaq_symbol_directory"
+      ],
+      "existing_transitions": [],
+      "legacy_archives": 0,
+      "listing_end_date": "2024-01-05",
+      "listing_reasons": [],
+      "listing_state": "inactive",
+      "observed_at": "2026-09-05T10:42:27Z",
+      "open_position": false,
+      "provider_check_sha256": "d11ed244665ddb8cd59b13a07d213f6e4f0793f094c487f505c8e2b4cd12d0b2",
+      "provider_codes": [
+        "massive_not_found"
+      ],
+      "ready_for_new_attended_preview": true,
+      "sa_current_sources_to_stop": 0,
+      "sa_memberships_to_suppress": 1,
+      "sources": [
+        "sa_alpha_picks_former"
+      ],
+      "stored_state": "unresolved",
+      "ticker": "LTHM",
+      "tracked": true,
+      "watchlist_archives": 0
+    },
+    {
+      "already_hidden": false,
+      "application_authorized": false,
+      "candidate_tickers": [],
+      "continuation_reasons": [
+        "successor_check_unavailable"
+      ],
+      "continuation_state": "unavailable",
+      "evidence_observed_at": [
+        "2026-09-05T10:33:44+00:00",
+        "2026-09-05T10:33:44Z",
+        "2026-09-05T10:44:08Z",
+        "2026-09-05T10:44:20Z",
+        "2026-09-05T10:44:33Z"
+      ],
+      "evidence_records": 6,
+      "evidence_sources": [
+        "eodhd_symbol_directory",
+        "massive_reference",
+        "nasdaq_symbol_directory"
+      ],
+      "existing_transitions": [],
+      "legacy_archives": 0,
+      "listing_end_date": "2023-05-16",
+      "listing_reasons": [],
+      "listing_state": "inactive",
+      "observed_at": "2026-09-05T10:42:27Z",
+      "open_position": false,
+      "provider_check_sha256": "7cb187c970695f59d4cfcc07b366038578e1dbad96ba3619a4393ba20b31f616",
+      "provider_codes": [
+        "massive_not_found"
+      ],
+      "ready_for_new_attended_preview": true,
+      "sa_current_sources_to_stop": 0,
+      "sa_memberships_to_suppress": 1,
+      "sources": [
+        "sa_alpha_picks_former"
+      ],
+      "stored_state": "unresolved",
+      "ticker": "TA",
+      "tracked": true,
+      "watchlist_archives": 0
+    }
+  ],
+  "coverage": {
+    "current_120": {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": [
+        "ARCH",
+        "LTHM",
+        "TA"
+      ],
+      "calendar_health": "ok",
+      "fetch_end": "2026-09-04",
+      "fetch_start": "2026-05-08",
+      "gap_reason_counts": {
+        "before_first_local_bar": 36,
+        "no_local_history": 3,
+        "partial_observations": 147
+      },
+      "historical_requests": 366,
+      "lookback_days": 120,
+      "missing_ticker_days": 2951,
+      "observation_health": "ok",
+      "partial_ticker_days": 438,
+      "preview_sha256": "15d6a0792911c9680c68b547e7806c0252dc84c2bc2da97133a0b36df0eaf1c7",
+      "provider_issue_reason_counts": {
+        "security_definition_unavailable": 3
+      },
+      "qualification_requests": 366,
+      "repair_tickers": 183,
+      "total_data_requests": 732,
+      "universe_count": 186
+    },
+    "current_15": {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": [
+        "ARCH",
+        "LTHM",
+        "TA"
+      ],
+      "calendar_health": "ok",
+      "fetch_end": "2026-09-04",
+      "fetch_start": "2026-08-21",
+      "gap_reason_counts": {
+        "before_first_local_bar": 32,
+        "no_local_history": 3
+      },
+      "historical_requests": 32,
+      "lookback_days": 15,
+      "missing_ticker_days": 223,
+      "observation_health": "ok",
+      "partial_ticker_days": 0,
+      "preview_sha256": "43f0e182cc7f687e06b91aab9448a2e6b3f18caa8c42846a68d6280f9700b719",
+      "provider_issue_reason_counts": {
+        "security_definition_unavailable": 3
+      },
+      "qualification_requests": 32,
+      "repair_tickers": 32,
+      "total_data_requests": 64,
+      "universe_count": 186
+    },
+    "current_5": {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": [
+        "ARCH",
+        "LTHM",
+        "TA"
+      ],
+      "calendar_health": "ok",
+      "fetch_end": "2026-09-04",
+      "fetch_start": "2026-08-31",
+      "gap_reason_counts": {
+        "no_local_history": 3
+      },
+      "historical_requests": 0,
+      "lookback_days": 5,
+      "missing_ticker_days": 15,
+      "observation_health": "ok",
+      "partial_ticker_days": 0,
+      "preview_sha256": "28435df0252b5c89f68a13b4e47ad49290887ef938a3097659d1ce0082f402ff",
+      "provider_issue_reason_counts": {
+        "security_definition_unavailable": 3
+      },
+      "qualification_requests": 0,
+      "repair_tickers": 0,
+      "total_data_requests": 0,
+      "universe_count": 186
+    },
+    "hypothetical_after_approved_removal_120": {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": [],
+      "calendar_health": "ok",
+      "fetch_end": "2026-09-04",
+      "fetch_start": "2026-05-08",
+      "gap_reason_counts": {
+        "before_first_local_bar": 36,
+        "partial_observations": 147
+      },
+      "historical_requests": 366,
+      "lookback_days": 120,
+      "missing_ticker_days": 2702,
+      "observation_health": "ok",
+      "partial_ticker_days": 438,
+      "preview_sha256": "b64c03d58311208198729cdbe2d313d906996164f4a4fdde90b268cbc33aff1f",
+      "provider_issue_reason_counts": {},
+      "qualification_requests": 366,
+      "repair_tickers": 183,
+      "total_data_requests": 732,
+      "universe_count": 183
+    },
+    "hypothetical_after_approved_removal_15": {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": [],
+      "calendar_health": "ok",
+      "fetch_end": "2026-09-04",
+      "fetch_start": "2026-08-21",
+      "gap_reason_counts": {
+        "before_first_local_bar": 32
+      },
+      "historical_requests": 32,
+      "lookback_days": 15,
+      "missing_ticker_days": 190,
+      "observation_health": "ok",
+      "partial_ticker_days": 0,
+      "preview_sha256": "151280a4a07ea1913d95cfed3a14d2bdc95dbd27703a8443d174ac75f28a9b09",
+      "provider_issue_reason_counts": {},
+      "qualification_requests": 32,
+      "repair_tickers": 32,
+      "total_data_requests": 64,
+      "universe_count": 183
+    },
+    "hypothetical_after_approved_removal_5": {
+      "as_of_date": "2026-09-05",
+      "blocked_tickers": [],
+      "calendar_health": "ok",
+      "fetch_end": "2026-09-04",
+      "fetch_start": "2026-08-31",
+      "gap_reason_counts": {},
+      "historical_requests": 0,
+      "lookback_days": 5,
+      "missing_ticker_days": 0,
+      "observation_health": "ok",
+      "partial_ticker_days": 0,
+      "preview_sha256": "085009ac0e6327120a246443c75e69d837824fa47874669e0e2bba05b6f31f97",
+      "provider_issue_reason_counts": {},
+      "qualification_requests": 0,
+      "repair_tickers": 0,
+      "total_data_requests": 0,
+      "universe_count": 183
+    }
+  },
+  "effects_sha256": "245015480bd3a13dd4d335c6852c5118f99a689175a349f1c6bdc64f8a294a67",
+  "price_requests_authorized": false,
+  "runner_sha256": "e9695a4d265fa0aec88087b2b65440cbdd67babc610ad95ac5fce883edeb4f20",
+  "read_columns_sha256": "f1e38742dea7a01a35e7edc113158f5d23b0f91d69c29b1424dfab58575fc18d",
+  "projection": "aggregates_and_reviewed_target_symbols_only",
+  "private_summary_sha256": "a19b2ac13eda5cef20f649f3f1ce8ec4ef87321428bf97a8b9c2687eeba259ee"
+}

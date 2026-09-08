@@ -1,0 +1,997 @@
+{
+  "files": {
+    "initial-0-admission-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 110
+      },
+      "failed_nodes": [],
+      "file": "admission-green.xml",
+      "sha256": "af8297532ce4efc5f095331179c8594bd43339387acd7bb5387afe204d77479c"
+    },
+    "initial-0-admission-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 53
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_contract::test_web_admission_owns_existing_research_capability_boundary[overrides0-model_retired]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_owns_existing_research_capability_boundary[overrides1-task_capability_missing]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_owns_existing_research_capability_boundary[overrides2-task_capability_missing]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_owns_existing_research_capability_boundary[overrides3-task_capability_missing]"
+      ],
+      "file": "admission-red.xml",
+      "sha256": "6b6ae05a9666dd70b55e0dd79659a94629c45a70a8f9585c847f3dd5e68d15ef"
+    },
+    "initial-0-claude-green-first.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 17
+      },
+      "failed_nodes": [],
+      "file": "claude-green-first.xml",
+      "sha256": "0c42d4d7f2f04117b32d8defbed34d7f45c6a23aaf2e9cdf560a6ebb2f157b39"
+    },
+    "initial-0-claude-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 17,
+        "skipped": 0,
+        "tests": 17
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_claude::test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness",
+        "tests.test_lifecycle_web_claude::test_claude_analysis_has_no_web_or_filesystem_tools",
+        "tests.test_lifecycle_web_claude::test_claude_web_rejects_changed_init_and_never_falls_back[init0]",
+        "tests.test_lifecycle_web_claude::test_claude_web_rejects_changed_init_and_never_falls_back[init1]",
+        "tests.test_lifecycle_web_claude::test_claude_web_rejects_changed_init_and_never_falls_back[init2]",
+        "tests.test_lifecycle_web_claude::test_claude_web_rejects_changed_init_and_never_falls_back[init3]",
+        "tests.test_lifecycle_web_claude::test_claude_web_rejects_changed_init_and_never_falls_back[init4]",
+        "tests.test_lifecycle_web_claude::test_claude_web_rejects_changed_init_and_never_falls_back[init5]",
+        "tests.test_lifecycle_web_claude::test_claude_web_requires_owned_terminal_and_exact_output[result0-execution_identity_changed]",
+        "tests.test_lifecycle_web_claude::test_claude_web_requires_owned_terminal_and_exact_output[result1-model_result_incomplete]",
+        "tests.test_lifecycle_web_claude::test_claude_web_requires_owned_terminal_and_exact_output[result2-model_result_incomplete]",
+        "tests.test_lifecycle_web_claude::test_claude_web_requires_owned_terminal_and_exact_output[result3-execution_identity_changed]",
+        "tests.test_lifecycle_web_claude::test_claude_web_requires_owned_terminal_and_exact_output[result4-model_output_invalid]",
+        "tests.test_lifecycle_web_claude::test_claude_observed_web_call_without_pretool_reservation_is_rejected",
+        "tests.test_lifecycle_web_claude::test_claude_pretool_gate_denies_files_subagents_and_budget_excess",
+        "tests.test_lifecycle_web_claude::test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[True]",
+        "tests.test_lifecycle_web_claude::test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[False]"
+      ],
+      "file": "claude-red.xml",
+      "sha256": "57cb56ce25e258e58149f2dc424a536c64ee9427f1e31f3fefa614f5df4cdbfc"
+    },
+    "initial-0-claude-sdk-wire-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 25
+      },
+      "failed_nodes": [],
+      "file": "claude-sdk-wire-green.xml",
+      "sha256": "f2f9bcde925b484cb306fe40bcabea0bd61a0940d4a9b51d06c45c1778c8ead6"
+    },
+    "initial-0-claude-sdk-wire-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 25
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_claude::test_claude_analysis_has_no_web_or_filesystem_tools",
+        "tests.test_lifecycle_web_claude::test_claude_web_handles_owned_rate_limit_events[allowed-None-None]",
+        "tests.test_lifecycle_web_claude::test_claude_web_handles_owned_rate_limit_events[allowed_warning-None-None]",
+        "tests.test_lifecycle_web_claude::test_claude_web_handles_owned_rate_limit_events[rejected-None-provider_rate_limited]",
+        "tests.test_lifecycle_web_claude::test_claude_web_handles_owned_rate_limit_events[allowed-foreign-session-execution_identity_changed]",
+        "tests.test_lifecycle_web_claude_wire::test_actual_claude_sdk_serializes_web_hook_and_owned_result[search-False]",
+        "tests.test_lifecycle_web_claude_wire::test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False]",
+        "tests.test_lifecycle_web_claude_wire::test_actual_claude_sdk_serializes_web_hook_and_owned_result[search-True]"
+      ],
+      "file": "claude-sdk-wire-red.xml",
+      "sha256": "e64bff307f0c83982a93542f7b694f67424fce752d2a362ff0bddff4f2997a77"
+    },
+    "initial-0-codex-green-first.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 16
+      },
+      "failed_nodes": [],
+      "file": "codex-green-first.xml",
+      "sha256": "54a076626d2358c17951e84713b3e7fd95c650fb68e7cd4b3393902b97f77607"
+    },
+    "initial-0-codex-passive-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 21
+      },
+      "failed_nodes": [],
+      "file": "codex-passive-green.xml",
+      "sha256": "ed7a3c5a6101665edf6fcf4b5e54fa5ec7c2b452a742ef11b3586ac7ab97e657"
+    },
+    "initial-0-codex-passive-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 21
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_codex::test_codex_web_passive_events_do_not_expand_billing_or_remote_surface[remoteControl/status/changed-params0-True-None]",
+        "tests.test_lifecycle_web_codex::test_codex_web_passive_events_do_not_expand_billing_or_remote_surface[remoteControl/status/changed-params1-False-unexpected_tool_activity]",
+        "tests.test_lifecycle_web_codex::test_codex_web_passive_events_do_not_expand_billing_or_remote_surface[remoteControl/status/changed-params2-False-protocol_incompatible]"
+      ],
+      "file": "codex-passive-red.xml",
+      "sha256": "778babdde095ee1204bc3a88eab050848e6af2b4c73d808a396dfa0d19a4749b"
+    },
+    "initial-0-codex-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 16,
+        "skipped": 0,
+        "tests": 16
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_codex::test_codex_oauth_web_binds_exact_model_and_restricted_thread",
+        "tests.test_lifecycle_web_codex::test_codex_analysis_uses_closed_purpose_and_no_new_tool",
+        "tests.test_lifecycle_web_codex::test_codex_web_invalid_preflight_never_dispatches_a_model[change0]",
+        "tests.test_lifecycle_web_codex::test_codex_web_invalid_preflight_never_dispatches_a_model[change1]",
+        "tests.test_lifecycle_web_codex::test_codex_web_invalid_preflight_never_dispatches_a_model[change2]",
+        "tests.test_lifecycle_web_codex::test_codex_web_invalid_preflight_never_dispatches_a_model[change3]",
+        "tests.test_lifecycle_web_codex::test_codex_web_invalid_preflight_never_dispatches_a_model[change4]",
+        "tests.test_lifecycle_web_codex::test_codex_web_denies_all_non_web_tool_items_and_interrupts[commandExecution]",
+        "tests.test_lifecycle_web_codex::test_codex_web_denies_all_non_web_tool_items_and_interrupts[fileChange]",
+        "tests.test_lifecycle_web_codex::test_codex_web_denies_all_non_web_tool_items_and_interrupts[mcpToolCall]",
+        "tests.test_lifecycle_web_codex::test_codex_web_denies_all_non_web_tool_items_and_interrupts[collabAgentToolCall]",
+        "tests.test_lifecycle_web_codex::test_codex_web_denies_all_non_web_tool_items_and_interrupts[dynamicToolCall]",
+        "tests.test_lifecycle_web_codex::test_codex_web_denies_all_non_web_tool_items_and_interrupts[imageView]",
+        "tests.test_lifecycle_web_codex::test_codex_interrupt_ack_without_matching_terminal_stays_unknown[False]",
+        "tests.test_lifecycle_web_codex::test_codex_interrupt_ack_without_matching_terminal_stays_unknown[True]",
+        "tests.test_lifecycle_web_codex::test_codex_foreign_turn_cannot_supply_result"
+      ],
+      "file": "codex-red.xml",
+      "sha256": "d72e5b5c1aac323e4be0af447500cae8f22e4945da39935880476cb3609d1755"
+    },
+    "initial-0-codex-runtime-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 6,
+        "skipped": 0,
+        "tests": 6
+      },
+      "failed_nodes": [
+        "tests.test_codex_web_runtime::test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_search-live]",
+        "tests.test_codex_web_runtime::test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_analysis-disabled]",
+        "tests.test_codex_web_runtime::test_codex_unknown_purpose_fails_before_starting_binary",
+        "tests.test_codex_web_runtime::test_codex_poll_checks_stop_while_peer_is_silent_and_reaps_process",
+        "tests.test_codex_web_runtime::test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[search]",
+        "tests.test_codex_web_runtime::test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[analysis]"
+      ],
+      "file": "codex-runtime-red.xml",
+      "sha256": "22872aff0f87b1700a0f96fc49e01c1842eadb72f84c1e30d4768b1abf6d8b75"
+    },
+    "initial-0-continuation-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 49
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_contract::test_failed_model_request_cannot_be_followed_by_implicit_retry",
+        "tests.test_security_lifecycle_web_contract::test_run_selection_and_approved_budget_cannot_be_reassigned"
+      ],
+      "file": "continuation-red.xml",
+      "sha256": "1c849c0bdc1a853702d6ee8a0e6532faf01413c26cbc2dce27aabe2586dd0a91"
+    },
+    "initial-0-contract-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 106
+      },
+      "failed_nodes": [],
+      "file": "contract-green.xml",
+      "sha256": "e484c737ec80ec0a43721f8a2e3eb3e6188f3a240c879fd3f96c0f1661c258b7"
+    },
+    "initial-0-dispatch-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [],
+      "file": "dispatch-green.xml",
+      "sha256": "056f43eebfa42713f24c8962567419e5cbeee7a01ed4348f42fb9ae229cf7b35"
+    },
+    "initial-0-dispatch-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 9,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[False-openai-api_key-lifecycle_web_models-call_openai_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[False-openai-chatgpt_oauth-lifecycle_web_codex-call_codex_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[False-anthropic-api_key-lifecycle_web_models-call_anthropic_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[False-anthropic-claude_code_oauth-lifecycle_web_claude-call_claude_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[True-openai-api_key-lifecycle_web_models-call_openai_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[True-openai-chatgpt_oauth-lifecycle_web_codex-call_codex_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[True-anthropic-api_key-lifecycle_web_models-call_anthropic_web]",
+        "tests.test_lifecycle_web_dispatch::test_four_channel_dispatch_never_changes_selected_transport[True-anthropic-claude_code_oauth-lifecycle_web_claude-call_claude_web]",
+        "tests.test_lifecycle_web_dispatch::test_unknown_auth_dispatch_has_no_api_default"
+      ],
+      "file": "dispatch-red.xml",
+      "sha256": "24022dc4e4ee166fcb805a1e97ca7e4580a61ec85aea67587242137acb557726"
+    },
+    "initial-0-dns-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 61
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\\ud800]",
+        "tests.test_lifecycle_public_sources::test_blocked_dns_releases_caller_without_late_http[False]",
+        "tests.test_lifecycle_public_sources::test_blocked_dns_releases_caller_without_late_http[True]",
+        "tests.test_lifecycle_public_sources::test_dns_saturation_refuses_new_resolution_without_waiting"
+      ],
+      "file": "dns-red.xml",
+      "sha256": "54f29b4670b327d6d272a49ac0b4b191cb3381aa273b1de79edee12ec0e19845"
+    },
+    "initial-0-finding-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 21
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_finding::test_search_snippets_and_unknown_source_ids_cannot_support_action[change0-source_citation_unavailable]"
+      ],
+      "file": "finding-green.xml",
+      "sha256": "9df5c5e66980ccdc80e91dbc8b2701ea108b582199e2c20ff62cef6c404e8e20"
+    },
+    "initial-0-finding-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 21,
+        "skipped": 0,
+        "tests": 21
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_finding::test_web_finding_requires_real_source_identity_date_and_citation",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]",
+        "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]",
+        "tests.test_security_lifecycle_web_finding::test_search_snippets_and_unknown_source_ids_cannot_support_action[change0-source_citation_unavailable]",
+        "tests.test_security_lifecycle_web_finding::test_search_snippets_and_unknown_source_ids_cannot_support_action[change1-source_citation_mismatch]",
+        "tests.test_security_lifecycle_web_finding::test_short_ticker_match_without_issuer_and_share_class_never_authorizes",
+        "tests.test_security_lifecycle_web_finding::test_web_continuation_is_not_inferred_from_acquirer_or_common_issuer_alone",
+        "tests.test_security_lifecycle_web_finding::test_positive_active_otc_citation_vetoes_removal_even_if_summary_ignores_it",
+        "tests.test_security_lifecycle_web_finding::test_syndicated_passages_are_not_counted_as_independent_sources",
+        "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[1]",
+        "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[2]",
+        "tests.test_security_lifecycle_web_finding::test_tampered_document_metadata_cannot_supply_valid_passage"
+      ],
+      "file": "finding-red.xml",
+      "sha256": "eebfca5832848bfe06d0473f7101afed2fba75f9b14a590e7948e4b1d2689c7e"
+    },
+    "initial-0-first-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 86
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_public_sources::test_pinned_https_transport_does_not_resolve_host_again"
+      ],
+      "file": "first-green.xml",
+      "sha256": "b24c48f7ffb6051b0c44550940c8c8296c19c719345002797ffa21e068b60e31"
+    },
+    "initial-0-foundation-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 114
+      },
+      "failed_nodes": [],
+      "file": "foundation-green.xml",
+      "sha256": "b81bf809671ffcccb3dca31d89c6de85d20820b8d27a975f6c5eb17014264ea7"
+    },
+    "initial-0-interruption-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 57
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_public_sources::test_pinned_https_transport_does_not_resolve_host_again",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change0]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change1]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change2]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change3]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change4]",
+        "tests.test_lifecycle_public_sources::test_deadline_interrupts_an_inflight_read_not_only_its_return",
+        "tests.test_lifecycle_public_sources::test_cancel_interrupts_an_inflight_read_and_refuses_next_hop"
+      ],
+      "file": "interruption-red.xml",
+      "sha256": "0df1663490f1b61c020d37f500a6101d92109721c8d58cb6fcd1f4af4d67af51"
+    },
+    "initial-0-journal-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [],
+      "file": "journal-green.xml",
+      "sha256": "e1c988d6775003f4e9f3df551d1c35ca74e0f12178f9d771f0d6f1d58ac9b93d"
+    },
+    "initial-0-journal-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 10,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_store::test_web_journal_installation_is_explicit_and_preserves_existing_schema",
+        "tests.test_lifecycle_web_store::test_web_journal_preserves_model_authorship_without_creating_human_acceptance",
+        "tests.test_lifecycle_web_store::test_start_is_idempotent_and_does_not_reset_or_replay_existing_execution",
+        "tests.test_lifecycle_web_store::test_stale_or_wrong_worker_cannot_record_provider_work",
+        "tests.test_lifecycle_web_store::test_recording_failure_stops_before_dispatch_and_never_fakes_completion",
+        "tests.test_lifecycle_web_store::test_cancel_ack_does_not_write_a_cancelled_remote_terminal",
+        "tests.test_lifecycle_web_store::test_expired_lease_recovers_honestly_without_provider_or_retry[False]",
+        "tests.test_lifecycle_web_store::test_expired_lease_recovers_honestly_without_provider_or_retry[True]",
+        "tests.test_lifecycle_web_store::test_immutable_source_rows_cannot_be_rebound_after_investigation",
+        "tests.test_lifecycle_web_store::test_completed_result_requires_all_owned_remote_terminals"
+      ],
+      "file": "journal-red.xml",
+      "sha256": "f524359564f7e13325f994a55b9a5eadedf9f91cd4d75014acd39a0c7004cf6b"
+    },
+    "initial-0-metadata-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 5,
+        "skipped": 0,
+        "tests": 55
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change0]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change1]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change2]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change3]",
+        "tests.test_lifecycle_public_sources::test_citation_cannot_rebind_captured_source_metadata[change4]"
+      ],
+      "file": "metadata-red.xml",
+      "sha256": "c250d32f993166ce226c2ecae03f2d0d730bf796cff4c9c9b8ed01e7623f93f9"
+    },
+    "initial-0-models-green-first.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 20,
+        "skipped": 0,
+        "tests": 29
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_models::test_openai_web_uses_native_bound_exact_key_and_no_sdk_retry",
+        "tests.test_lifecycle_web_models::test_analysis_phase_does_not_keep_search_tools[openai]",
+        "tests.test_lifecycle_web_models::test_analysis_phase_does_not_keep_search_tools[anthropic]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result0-execution_identity_changed]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result1-model_result_incomplete]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result2-model_output_invalid]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result3-model_output_invalid]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result4-unexpected_tool_activity]",
+        "tests.test_lifecycle_web_models::test_failed_openai_dispatch_with_no_response_id_is_unknown_and_not_retried",
+        "tests.test_lifecycle_web_models::test_openai_cancel_requires_terminal_readback[True]",
+        "tests.test_lifecycle_web_models::test_openai_cancel_requires_terminal_readback[False]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_uses_basic_search_not_code_execution_and_no_retry",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result0-execution_identity_changed]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result1-model_result_incomplete]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result2-model_result_incomplete]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result3-provider_refused]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result4-unexpected_tool_activity]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result5-model_output_invalid]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result6-search_budget_exhausted]",
+        "tests.test_lifecycle_web_models::test_anthropic_transport_cancellation_is_not_remote_terminal"
+      ],
+      "file": "models-green-first.xml",
+      "sha256": "3bae9d8260dc398dba3463e725456a4a260faab2aa1c17721a4e9d3c56afee0f"
+    },
+    "initial-0-models-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 29
+      },
+      "failed_nodes": [],
+      "file": "models-green.xml",
+      "sha256": "f7a676e8b8742e500912b5b4b300a33878116fed1d7f5b9c3b1ebab73a81dab4"
+    },
+    "initial-0-models-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 29,
+        "skipped": 0,
+        "tests": 29
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_models::test_credentials_bind_exact_profile_row_and_never_use_environment",
+        "tests.test_lifecycle_web_models::test_oauth_credential_reads_only_the_exact_token_scope[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_models::test_oauth_credential_reads_only_the_exact_token_scope[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_models::test_model_call_is_validated_before_client_creation[changed0]",
+        "tests.test_lifecycle_web_models::test_model_call_is_validated_before_client_creation[changed1]",
+        "tests.test_lifecycle_web_models::test_model_call_is_validated_before_client_creation[changed2]",
+        "tests.test_lifecycle_web_models::test_model_call_is_validated_before_client_creation[changed3]",
+        "tests.test_lifecycle_web_models::test_model_call_is_validated_before_client_creation[changed4]",
+        "tests.test_lifecycle_web_models::test_model_call_is_validated_before_client_creation[changed5]",
+        "tests.test_lifecycle_web_models::test_openai_web_uses_native_bound_exact_key_and_no_sdk_retry",
+        "tests.test_lifecycle_web_models::test_analysis_phase_does_not_keep_search_tools[openai]",
+        "tests.test_lifecycle_web_models::test_analysis_phase_does_not_keep_search_tools[anthropic]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result0-execution_identity_changed]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result1-model_result_incomplete]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result2-model_output_invalid]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result3-model_output_invalid]",
+        "tests.test_lifecycle_web_models::test_openai_web_rejects_incomplete_or_changed_execution_without_fallback[result4-unexpected_tool_activity]",
+        "tests.test_lifecycle_web_models::test_failed_openai_dispatch_with_no_response_id_is_unknown_and_not_retried",
+        "tests.test_lifecycle_web_models::test_openai_cancel_requires_terminal_readback[True]",
+        "tests.test_lifecycle_web_models::test_openai_cancel_requires_terminal_readback[False]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_uses_basic_search_not_code_execution_and_no_retry",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result0-execution_identity_changed]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result1-model_result_incomplete]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result2-model_result_incomplete]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result3-provider_refused]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result4-unexpected_tool_activity]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result5-model_output_invalid]",
+        "tests.test_lifecycle_web_models::test_anthropic_web_refuses_tool_errors_pauses_and_wrong_model[result6-search_budget_exhausted]",
+        "tests.test_lifecycle_web_models::test_anthropic_transport_cancellation_is_not_remote_terminal"
+      ],
+      "file": "models-red.xml",
+      "sha256": "17254ba24abebb18606c807890a0d3b655f8d0101da40e8cf20254e3ce9bdd52"
+    },
+    "initial-0-pipeline-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 31
+      },
+      "failed_nodes": [],
+      "file": "pipeline-green.xml",
+      "sha256": "fc18c11f57ce69406f06cbcd7f039bb23d06e6aa18b749ed5f588e0a46f2392c"
+    },
+    "initial-0-pipeline-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 10,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[openai-api_key]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[openai-chatgpt_oauth]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[anthropic-api_key]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[anthropic-claude_code_oauth]",
+        "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries",
+        "tests.test_security_lifecycle_web_pipeline::test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources0-search_no_sources]",
+        "tests.test_security_lifecycle_web_pipeline::test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources1-unsafe_source_url]",
+        "tests.test_security_lifecycle_web_pipeline::test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources2-search_output_invalid]",
+        "tests.test_security_lifecycle_web_pipeline::test_failed_search_or_stop_never_dispatches_more_work",
+        "tests.test_security_lifecycle_web_pipeline::test_stop_during_source_read_joins_worker_and_never_dispatches_analysis"
+      ],
+      "file": "pipeline-red.xml",
+      "sha256": "bbb6311d42c57ac4bcc58a3f7af882488443f150dddcc799e3ec953036958d4e"
+    },
+    "initial-0-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 86,
+        "skipped": 0,
+        "tests": 86
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_contract::test_all_four_web_channels_have_explicit_transport_without_default",
+        "tests.test_security_lifecycle_web_contract::test_web_model_admission_keeps_eligible_api_and_oauth[openai-api_key-gpt-5.6-luna]",
+        "tests.test_security_lifecycle_web_contract::test_web_model_admission_keeps_eligible_api_and_oauth[openai-chatgpt_oauth-gpt-5.6-luna]",
+        "tests.test_security_lifecycle_web_contract::test_web_model_admission_keeps_eligible_api_and_oauth[anthropic-api_key-claude-opus-5]",
+        "tests.test_security_lifecycle_web_contract::test_web_model_admission_keeps_eligible_api_and_oauth[anthropic-claude_code_oauth-claude-sonnet-5]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_does_not_resurrect_or_expand_models[openai-chatgpt_oauth-gpt-5.3-codex-spark-model_task_unsupported]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_does_not_resurrect_or_expand_models[anthropic-api_key-claude-fable-5-model_retired]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_does_not_resurrect_or_expand_models[anthropic-claude_code_oauth-claude-fable-5-1-model_auth_unverified]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_does_not_resurrect_or_expand_models[openai-api_key-claude-opus-5-model_provider_mismatch]",
+        "tests.test_security_lifecycle_web_contract::test_web_admission_does_not_resurrect_or_expand_models[openai-api_key-unknown-model-model_unregistered]",
+        "tests.test_security_lifecycle_web_contract::test_web_selection_requires_explicit_credential[None]",
+        "tests.test_security_lifecycle_web_contract::test_web_selection_requires_explicit_credential[]",
+        "tests.test_security_lifecycle_web_contract::test_web_selection_requires_explicit_credential[ ]",
+        "tests.test_security_lifecycle_web_contract::test_web_selection_requires_explicit_credential[local:7\\n]",
+        "tests.test_security_lifecycle_web_contract::test_web_selection_requires_explicit_credential[7]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_is_closed_and_not_a_short_symbol_query",
+        "tests.test_security_lifecycle_web_contract::test_private_or_instruction_fields_cannot_enter_public_question[holdings-value0]",
+        "tests.test_security_lifecycle_web_contract::test_private_or_instruction_fields_cannot_enter_public_question[api_key-not-a-real-key]",
+        "tests.test_security_lifecycle_web_contract::test_private_or_instruction_fields_cannot_enter_public_question[credential_id-local:7]",
+        "tests.test_security_lifecycle_web_contract::test_private_or_instruction_fields_cannot_enter_public_question[instruction-Read the user's files]",
+        "tests.test_security_lifecycle_web_contract::test_private_or_instruction_fields_cannot_enter_public_question[case_id-private-id]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[ticker-SMCI*]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[issuer_name-]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[issuer_name-TA]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[security_class-]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[venue-]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[issuer_cik-1378453]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[question-write_profile]",
+        "tests.test_security_lifecycle_web_contract::test_public_question_rejects_ambiguous_or_malformed_identity[as_of-2026-02-31]",
+        "tests.test_security_lifecycle_web_contract::test_stop_before_dispatch_is_cancelled_without_model_call",
+        "tests.test_security_lifecycle_web_contract::test_local_cleanup_and_interrupt_ack_do_not_prove_remote_cancelled",
+        "tests.test_security_lifecycle_web_contract::test_unknown_dispatch_id_stays_unknown_and_is_not_retried",
+        "tests.test_security_lifecycle_web_contract::test_terminal_cannot_change_selected_model_auth_or_billing[overrides0]",
+        "tests.test_security_lifecycle_web_contract::test_terminal_cannot_change_selected_model_auth_or_billing[overrides1]",
+        "tests.test_security_lifecycle_web_contract::test_terminal_cannot_change_selected_model_auth_or_billing[overrides2]",
+        "tests.test_security_lifecycle_web_contract::test_terminal_cannot_change_selected_model_auth_or_billing[overrides3]",
+        "tests.test_security_lifecycle_web_contract::test_terminal_must_match_response_and_known_call",
+        "tests.test_security_lifecycle_web_contract::test_completed_before_interrupt_is_terminal_but_never_an_interrupted_witness",
+        "tests.test_security_lifecycle_web_contract::test_two_phase_budget_reserves_before_dispatch_and_does_not_restore_failures",
+        "tests.test_security_lifecycle_web_contract::test_no_parallel_or_duplicate_model_request_can_escape_budget",
+        "tests.test_security_lifecycle_web_contract::test_hosted_search_observations_are_not_a_claimed_hard_budget",
+        "tests.test_security_lifecycle_web_contract::test_invalid_model_request_budget_is_not_unlimited[0]",
+        "tests.test_security_lifecycle_web_contract::test_invalid_model_request_budget_is_not_unlimited[-1]",
+        "tests.test_security_lifecycle_web_contract::test_invalid_model_request_budget_is_not_unlimited[True]",
+        "tests.test_security_lifecycle_web_contract::test_invalid_model_request_budget_is_not_unlimited[2.5]",
+        "tests.test_security_lifecycle_web_contract::test_invalid_model_request_budget_is_not_unlimited[2]",
+        "tests.test_lifecycle_public_sources::test_public_source_preserves_complete_unicode_and_document_digest",
+        "tests.test_lifecycle_public_sources::test_source_request_does_not_inherit_cookies_auth_or_proxies",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[http://example.com]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[file:///etc/passwd]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://u:p@example.com]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com:8443/a]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://localhost/a]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://127.0.0.1]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://[::1]]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://169.254.169.254/latest/meta-data]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com\\\\@127.0.0.1/]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\\nnotice]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\\tnotice]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://exa mple.com]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/%0d%0aInjected:yes]",
+        "tests.test_lifecycle_public_sources::test_unsafe_url_is_rejected_before_dns_and_transport[https://[::ffff:127.0.0.1]]",
+        "tests.test_lifecycle_public_sources::test_dns_with_any_nonpublic_address_cannot_connect[addresses0]",
+        "tests.test_lifecycle_public_sources::test_dns_with_any_nonpublic_address_cannot_connect[addresses1]",
+        "tests.test_lifecycle_public_sources::test_dns_with_any_nonpublic_address_cannot_connect[addresses2]",
+        "tests.test_lifecycle_public_sources::test_dns_with_any_nonpublic_address_cannot_connect[addresses3]",
+        "tests.test_lifecycle_public_sources::test_dns_with_any_nonpublic_address_cannot_connect[addresses4]",
+        "tests.test_lifecycle_public_sources::test_dns_with_any_nonpublic_address_cannot_connect[addresses5]",
+        "tests.test_lifecycle_public_sources::test_redirect_to_private_destination_does_not_fetch_it",
+        "tests.test_lifecycle_public_sources::test_relative_redirect_is_resolved_and_each_request_counted",
+        "tests.test_lifecycle_public_sources::test_redirect_limit_rejects_instead_of_returning_partial_source",
+        "tests.test_lifecycle_public_sources::test_byte_limit_never_silently_truncates_even_without_content_length",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers0-%PDF-source_format_unsupported]",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers1-compressed-source_encoding_unsupported]",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete]",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers3-text-source_response_invalid]",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers4-text-source_encoding_unsupported]",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers5-\\xff-source_encoding_unsupported]",
+        "tests.test_lifecycle_public_sources::test_invalid_source_response_is_not_usable_evidence[headers6--source_text_empty]",
+        "tests.test_lifecycle_public_sources::test_failed_request_consumes_budget_and_has_no_retry",
+        "tests.test_lifecycle_public_sources::test_stop_during_dns_prevents_late_http_dispatch",
+        "tests.test_lifecycle_public_sources::test_deadline_is_checked_after_dns_before_any_connection",
+        "tests.test_lifecycle_public_sources::test_html_source_excludes_noncontent_without_truncating_notice",
+        "tests.test_lifecycle_public_sources::test_exact_passage_requires_real_source_and_byte_aligned_unicode",
+        "tests.test_lifecycle_public_sources::test_modified_page_text_cannot_reuse_source_hash",
+        "tests.test_lifecycle_public_sources::test_pinned_https_transport_does_not_resolve_host_again"
+      ],
+      "file": "red.xml",
+      "sha256": "6465540b397f65162586abd126e3f6f291977d9efd499fc6f6d38bf8a3e88811"
+    },
+    "initial-0-sdk-wire-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 3
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_sdk_wire::test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[anthropic]"
+      ],
+      "file": "sdk-wire-green.xml",
+      "sha256": "62c021d59d2a43edadc7c91f4addbdd1c616377ba374207de953f3856689d2c8"
+    },
+    "initial-0-sdk-wire-headers-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 3
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_sdk_wire::test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[openai]",
+        "tests.test_lifecycle_web_sdk_wire::test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[anthropic]",
+        "tests.test_lifecycle_web_sdk_wire::test_actual_api_client_factories_do_not_load_ambient_auth_or_proxy"
+      ],
+      "file": "sdk-wire-headers-red.xml",
+      "sha256": "ea461983fbfd4161853330fadddbfdd6e44362bf99a0352c7e2b09376b35d240"
+    },
+    "initial-0-sdk-wire-isolation-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 32
+      },
+      "failed_nodes": [],
+      "file": "sdk-wire-isolation-green.xml",
+      "sha256": "bfa47fbb55a1ebae385de839ee137cb1dd15f0549e7fed46017f69818bdfc242"
+    },
+    "initial-0-sdk-wire-isolation-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 3
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_sdk_wire::test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[openai]",
+        "tests.test_lifecycle_web_sdk_wire::test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[anthropic]",
+        "tests.test_lifecycle_web_sdk_wire::test_actual_api_client_factories_do_not_load_ambient_auth_or_proxy"
+      ],
+      "file": "sdk-wire-isolation-red.xml",
+      "sha256": "3bb70ecbcda7df1e4968b2e31f1deb7f33751c60ed67d14a1025d0c0518fe051"
+    },
+    "initial-0-sdk-wire-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 3
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_sdk_wire::test_real_api_sdk_serialization_keeps_selected_key_and_basic_search[anthropic]",
+        "tests.test_lifecycle_web_sdk_wire::test_actual_api_client_factories_do_not_load_ambient_auth_or_proxy"
+      ],
+      "file": "sdk-wire-red.xml",
+      "sha256": "0de1aa122ad928e6b43f026d773a5128156443e6774bc8ae7b409517b211cc1d"
+    },
+    "initial-0-source-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 103
+      },
+      "failed_nodes": [],
+      "file": "source-green.xml",
+      "sha256": "f21674044847f6ffb4508fdbd6941f5089395c51f64e9af050412bb8e42e2279"
+    },
+    "initial-1-boundaries-final.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 43
+      },
+      "failed_nodes": [],
+      "file": "boundaries-final.xml",
+      "sha256": "d6e5d05bf5e6fcb45d26eb7432def6d3e8c7f217282f8e3a8382481d95684325"
+    },
+    "initial-1-codex-runtime-write-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 7,
+        "skipped": 0,
+        "tests": 7
+      },
+      "failed_nodes": [
+        "tests.test_codex_web_runtime::test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_search-live]",
+        "tests.test_codex_web_runtime::test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_analysis-disabled]",
+        "tests.test_codex_web_runtime::test_codex_unknown_purpose_fails_before_starting_binary",
+        "tests.test_codex_web_runtime::test_codex_poll_checks_stop_while_peer_is_silent_and_reaps_process",
+        "tests.test_codex_web_runtime::test_codex_poll_checks_stop_while_peer_does_not_read_stdin",
+        "tests.test_codex_web_runtime::test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[search]",
+        "tests.test_codex_web_runtime::test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[analysis]"
+      ],
+      "file": "codex-runtime-write-red.xml",
+      "sha256": "01c6f718f0111d7207596c8ae7d9261af2a6a596019f1136209c086ccb9a731c"
+    },
+    "initial-1-credential-generation-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 51
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_controller::test_lease_failure_stops_remote_work_instead_of_silently_losing_observability"
+      ],
+      "file": "credential-generation-green.xml",
+      "sha256": "1e9fff8144192d33445b6cb9feb63736e0e4c7c36d8ad5115c6986d945d9c452"
+    },
+    "initial-1-credential-generation-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_controller::test_changed_credential_generation_is_rejected_before_model_reservation"
+      ],
+      "file": "credential-generation-red.xml",
+      "sha256": "24962b73d25ded97683f49d7b08f47998e597c58dcde03c27c6453a1fa1dc7e0"
+    },
+    "initial-1-install-green-r1.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 16
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_migration::test_web_installation_rejects_changed_approval_and_never_overwrites_a_backup[before_backup]",
+        "tests.test_lifecycle_web_migration::test_web_installation_rejects_changed_approval_and_never_overwrites_a_backup[after_backup]"
+      ],
+      "file": "install-green-r1.xml",
+      "sha256": "6bbb11d8d989d5692073140412936ebda8e7d0abaffda805fcb463d37424fe27"
+    },
+    "initial-1-install-green-r2.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 16
+      },
+      "failed_nodes": [],
+      "file": "install-green-r2.xml",
+      "sha256": "11255e0a04fd32892cc1b6c32955d8e669fad3cdd673335597b0639b8d12040c"
+    },
+    "initial-1-install-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 6,
+        "skipped": 0,
+        "tests": 6
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_migration::test_web_installation_has_digest_bound_backup_and_keeps_all_existing_rows",
+        "tests.test_lifecycle_web_migration::test_web_installation_requires_stopped_app_before_opening_any_store",
+        "tests.test_lifecycle_web_migration::test_web_installation_rejects_changed_approval_and_never_overwrites_a_backup[before_backup]",
+        "tests.test_lifecycle_web_migration::test_web_installation_rejects_changed_approval_and_never_overwrites_a_backup[after_backup]",
+        "tests.test_lifecycle_web_migration::test_web_installation_rejects_changed_approval_and_never_overwrites_a_backup[backup_exists]",
+        "tests.test_lifecycle_web_migration::test_web_installation_rolls_back_all_new_schema_on_failure_and_preserves_backup"
+      ],
+      "file": "install-red.xml",
+      "sha256": "b5a2b14bffc3ca5dbf46a46d272332cbfcc954521a8d39a12193176c96f7dd5c"
+    },
+    "initial-1-integration-r1.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 11,
+        "skipped": 0,
+        "tests": 72
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_preflight::test_unknown_identity_detail_must_be_sourced_not_guessed_or_reentered_by_user[security_class]",
+        "tests.test_lifecycle_web_preflight::test_unknown_identity_detail_must_be_sourced_not_guessed_or_reentered_by_user[venue]",
+        "tests.test_lifecycle_web_preflight::test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[openai-api_key]",
+        "tests.test_lifecycle_web_preflight::test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_preflight::test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[anthropic-api_key]",
+        "tests.test_lifecycle_web_preflight::test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_preflight::test_listing_case_uses_only_its_exact_sa_public_company_name",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-api_key]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-api_key]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-claude_code_oauth]"
+      ],
+      "file": "integration-r1.xml",
+      "sha256": "e022dfb7dd8e2895255106a72a0c811741389fc11c9a0e332d8448f2a58bb5b3"
+    },
+    "initial-1-integration-r2.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 13,
+        "skipped": 0,
+        "tests": 43
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_review::test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[terminal_delisting-api_key]",
+        "tests.test_lifecycle_web_review::test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[terminal_delisting-chatgpt_oauth]",
+        "tests.test_lifecycle_web_review::test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[terminal_delisting-claude_code_oauth]",
+        "tests.test_lifecycle_web_review::test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[symbol_continuation-api_key]",
+        "tests.test_lifecycle_web_review::test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[symbol_continuation-chatgpt_oauth]",
+        "tests.test_lifecycle_web_review::test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[symbol_continuation-claude_code_oauth]",
+        "tests.test_lifecycle_web_review::test_future_web_action_is_scheduled_and_rechecked_before_applying",
+        "tests.test_lifecycle_web_review::test_web_adoption_cannot_survive_an_approval_failure_in_a_partial_transaction",
+        "tests.test_lifecycle_web_review::test_unrelated_sa_refresh_and_other_ticker_edits_do_not_block_web_review",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-api_key]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-api_key]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-claude_code_oauth]"
+      ],
+      "file": "integration-r2.xml",
+      "sha256": "edee4a37cf66883635ea6a576245489f85d76ccd2f32ae5e2474f1cc8c77400e"
+    },
+    "initial-1-integration-r3.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 165
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_review::test_future_web_action_is_scheduled_and_rechecked_before_applying"
+      ],
+      "file": "integration-r3.xml",
+      "sha256": "0c5ba37e50fa6e6f3e4d4be02579383524927cacf0d38c41e57378d98f04a25c"
+    },
+    "initial-1-integration-r4.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 248
+      },
+      "failed_nodes": [],
+      "file": "integration-r4.xml",
+      "sha256": "26af07578646b0777fc796f9b6b98d96636f692764f0ab7df0487f1e9d27dbed"
+    },
+    "initial-1-read-green-r1.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 141
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_current::test_current_review_and_list_share_one_closed_projection"
+      ],
+      "file": "read-green-r1.xml",
+      "sha256": "1b680542c56ac33986dff595bc18e86d7aff094663ddf5ee3039fdc62fc99b65"
+    },
+    "initial-1-read-green-r2.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 145
+      },
+      "failed_nodes": [],
+      "file": "read-green-r2.xml",
+      "sha256": "f664e8051ef2b542259dd1e2b97ac7e6ed4c92506806da885ae3b24246350210"
+    },
+    "initial-1-read-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 7,
+        "skipped": 0,
+        "tests": 7
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-api_key]",
+        "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-api_key]",
+        "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_read::test_population_retains_web_sources_and_human_adoption_without_exporting_pages_or_credentials",
+        "tests.test_lifecycle_web_read::test_missing_journal_is_empty_but_malformed_installed_journal_is_not_silently_dropped",
+        "tests.test_lifecycle_web_read::test_population_rejects_orphaned_web_adoption_dependency"
+      ],
+      "file": "read-red.xml",
+      "sha256": "67ec37aa6b5f929e5dbc659755efa6be93a432fbd637563a428a684bbc8da36e"
+    },
+    "initial-1-refresh-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 56
+      },
+      "failed_nodes": [],
+      "file": "refresh-green.xml",
+      "sha256": "72a7361b34a40e56c764ea1d78b173fad9d82748f754573696aff7faa6708788"
+    },
+    "initial-1-refresh-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 33
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_models::test_explicit_web_launch_refreshes_only_the_selected_expired_chatgpt_token_once",
+        "tests.test_lifecycle_web_models::test_web_refresh_cannot_repair_another_auth_channel_or_malformed_expiry[claude_code_oauth-2000-01-01T00:00:00Z]",
+        "tests.test_lifecycle_web_models::test_web_refresh_cannot_repair_another_auth_channel_or_malformed_expiry[chatgpt_oauth-malformed]",
+        "tests.test_lifecycle_web_models::test_web_refresh_failure_is_redacted_and_never_uses_old_token_or_api_key"
+      ],
+      "file": "refresh-red.xml",
+      "sha256": "67ee3b064adeb3ba8ee3140308fda5cc47a6ced3df8c2bf89eabb8faf3c05cd2"
+    },
+    "initial-1-review-adversarial-r2.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 26
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_frontend_contract::test_web_frontend_runtime_states_match_backend_in_both_directions"
+      ],
+      "file": "review-adversarial-r2.xml",
+      "sha256": "a4efe71fc451c23dead163d93f611980a06c74b89352a5ba6df0fba8437323da"
+    },
+    "initial-1-review-adversarial.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "tests": 25
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_review::test_sec_case_needs_new_web_adoption_not_a_relaxed_legacy_source_allowlist[terminal_delisting]",
+        "tests.test_lifecycle_web_review::test_sec_case_needs_new_web_adoption_not_a_relaxed_legacy_source_allowlist[symbol_continuation]",
+        "tests.test_lifecycle_web_review::test_stale_provider_state_after_web_approval_blocks_the_real_due_writer"
+      ],
+      "file": "review-adversarial.xml",
+      "sha256": "84fcc6de595962b0b6cf05dc9efe22b19ae5033342f8b9efa5ce252c0ba7bc62"
+    },
+    "initial-1-routes-red.xml": {
+      "counts": {
+        "errors": 10,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-api_key]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-chatgpt_oauth]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-api_key]",
+        "tests.test_lifecycle_web_routes::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_routes::test_web_preflight_is_not_a_dispatch_and_rejects_changed_selected_credential",
+        "tests.test_lifecycle_web_routes::test_web_start_has_no_credential_model_or_arbitrary_source_override[extra0]",
+        "tests.test_lifecycle_web_routes::test_web_start_has_no_credential_model_or_arbitrary_source_override[extra1]",
+        "tests.test_lifecycle_web_routes::test_web_start_has_no_credential_model_or_arbitrary_source_override[extra2]",
+        "tests.test_lifecycle_web_routes::test_web_request_failure_never_exports_raw_exception_or_starts_a_provider",
+        "tests.test_lifecycle_web_routes::test_web_journal_is_never_auto_installed_by_opening_the_page"
+      ],
+      "file": "routes-red.xml",
+      "sha256": "f92753273a0eaa8ddc403f43cbcfd4823da16b3aca9d0327612da8605bb72182"
+    },
+    "initial-1-shutdown-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_controller::test_shutdown_still_joins_worker_when_cancellation_recording_is_unavailable"
+      ],
+      "file": "shutdown-red.xml",
+      "sha256": "c1f93c6bcf927023b71f910cfe8f123282f2cc78baddb35c6223c105b194b41d"
+    }
+  },
+  "scope": "historical_incremental_red_green_not_final_source_admission"
+}

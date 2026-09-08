@@ -1,0 +1,46 @@
+{
+  "backend": {
+    "added": [
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_search_keeps_its_existing_prompt_and_tool_budget"
+    ],
+    "after": 6876,
+    "before": 6872,
+    "removed": []
+  },
+  "baseline": {
+    "added": [
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_search_keeps_its_existing_prompt_and_tool_budget"
+    ],
+    "after": 2199,
+    "before": 2195,
+    "removed": []
+  },
+  "integration": {
+    "added": [
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_search_keeps_its_existing_prompt_and_tool_budget"
+    ],
+    "after": 3018,
+    "before": 3014,
+    "removed": []
+  },
+  "restored": {
+    "added": [
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools",
+      "tests.test_lifecycle_web_claude_output_contract::test_claude_search_keeps_its_existing_prompt_and_tool_budget"
+    ],
+    "after": 2199,
+    "before": 2195,
+    "removed": []
+  }
+}

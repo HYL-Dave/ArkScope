@@ -1,0 +1,44 @@
+{
+  "partial_days": [
+    {
+      "date": "2026-06-26",
+      "session_kind": "regular",
+      "expected_slot_count": 26,
+      "partial_ticker_count": 147,
+      "unmatched_rth_row_count": 0,
+      "observed_slot_counts": {
+        "3": 146,
+        "19": 1
+      }
+    },
+    {
+      "date": "2026-06-25",
+      "session_kind": "regular",
+      "expected_slot_count": 26,
+      "partial_ticker_count": 146,
+      "unmatched_rth_row_count": 0,
+      "observed_slot_counts": {
+        "5": 146
+      }
+    },
+    {
+      "date": "2026-06-05",
+      "session_kind": "regular",
+      "expected_slot_count": 26,
+      "partial_ticker_count": 145,
+      "unmatched_rth_row_count": 0,
+      "observed_slot_counts": {
+        "6": 143,
+        "7": 2
+      }
+    }
+  ],
+  "first_local_bar_date_counts": {
+    "2026-08-31": 31,
+    "2026-08-12": 1,
+    "2026-07-14": 2,
+    "2026-07-29": 1,
+    "2026-08-27": 1
+  },
+  "not_a_listing_date_or_root_cause_inference": true
+}

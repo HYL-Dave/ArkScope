@@ -1,0 +1,110 @@
+{
+  "files": {
+    "lifecycle-source-receipt-180-green.json": {
+      "classification": "historical_test_execution",
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 85
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-receipt-180-green.json",
+      "reported_success": true,
+      "sha256": "bb2ace1051c09893f67acb2d671d75df16c959dcfe63c0920ad3b6affb246acf"
+    },
+    "lifecycle-source-receipt-180-red-corrected.json": {
+      "classification": "historical_test_execution",
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 15
+      },
+      "failed_nodes": [
+        "gives retained-source validation its own receipt budget: 'current detail'",
+        "gives retained-source validation its own receipt budget: 'latest result'",
+        "gives retained-source validation its own receipt budget: 'run result'",
+        "gives retained-source validation its own receipt budget: 'cancel receipt'",
+        "gives retained-source validation its own receipt budget: 'review packet'",
+        "gives retained-source validation its own receipt budget: 'confirm receipt'",
+        "accepts a slow verified local result without retrying or starting another investigation",
+        "still bounds a stalled receipt read and never retries it"
+      ],
+      "file": "lifecycle-source-receipt-180-red-corrected.json",
+      "reported_success": false,
+      "sha256": "6bee83fe899fa61d4eff5ffaa7090c90670b601f436f2ba0eeeb1f18ce8c2b44"
+    },
+    "lifecycle-source-receipt-180-red.json": {
+      "classification": "command_failure_no_tests",
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 0
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-receipt-180-red.json",
+      "reported_success": false,
+      "sha256": "93d8d80bd7391d0b7127f4f12e951e936c46692b39bf88db82873c9a94b66f6d"
+    },
+    "lifecycle-source-receipt-timeout-green.json": {
+      "classification": "historical_test_execution",
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 85
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-receipt-timeout-green.json",
+      "reported_success": true,
+      "sha256": "1c86009697b8c7260b4be4a4d77ad144dc5accbbbbe52047b0d9537a424e7a3e"
+    },
+    "lifecycle-source-receipt-timeout-red-corrected.json": {
+      "classification": "historical_test_execution",
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 15
+      },
+      "failed_nodes": [
+        "gives retained-source validation its own receipt budget: 'current detail'",
+        "gives retained-source validation its own receipt budget: 'latest result'",
+        "gives retained-source validation its own receipt budget: 'run result'",
+        "gives retained-source validation its own receipt budget: 'cancel receipt'",
+        "gives retained-source validation its own receipt budget: 'review packet'",
+        "gives retained-source validation its own receipt budget: 'confirm receipt'",
+        "accepts a slow verified local result without retrying or starting another investigation",
+        "still bounds a stalled receipt read and never retries it"
+      ],
+      "file": "lifecycle-source-receipt-timeout-red-corrected.json",
+      "reported_success": false,
+      "sha256": "2f30fd81e336d3deeffc0744fe9f70dcc4fc9045b6291ebe9c26ec5af40b638e"
+    },
+    "lifecycle-source-receipt-timeout-red.json": {
+      "classification": "historical_test_execution",
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 15
+      },
+      "failed_nodes": [
+        "gives retained-source validation its own receipt budget: 'current detail'",
+        "gives retained-source validation its own receipt budget: 'latest result'",
+        "gives retained-source validation its own receipt budget: 'run result'",
+        "gives retained-source validation its own receipt budget: 'cancel receipt'",
+        "gives retained-source validation its own receipt budget: 'review packet'",
+        "gives retained-source validation its own receipt budget: 'confirm receipt'",
+        "accepts a slow verified local result without retrying or starting another investigation",
+        "still bounds a stalled receipt read and never retries it"
+      ],
+      "file": "lifecycle-source-receipt-timeout-red.json",
+      "reported_success": false,
+      "sha256": "1515d37bc1a03e7ae5302b441495944de394d0fe3508cfc0c59147bf62a67cfe"
+    }
+  },
+  "scope": "historical_red_green_not_final_admission"
+}

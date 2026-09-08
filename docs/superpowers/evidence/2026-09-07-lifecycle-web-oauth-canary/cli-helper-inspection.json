@@ -1,0 +1,27 @@
+{
+  "binary_sha256": "704f1334ac65d3e89e1c6c1d7663293ad786a6166afdb71b5075337df630f976",
+  "features": {
+    "current_override": {
+      "matches": 1,
+      "offset": 178914980
+    },
+    "helper_selector": {
+      "matches": 1,
+      "offset": 184570359
+    },
+    "legacy_override": {
+      "matches": 1,
+      "offset": 178907556
+    },
+    "web_source": {
+      "matches": 1,
+      "offset": 184570945
+    }
+  },
+  "nearby_native_tool_max_uses": [
+    8
+  ],
+  "provider_calls": 0,
+  "scope": "static_read_after_failed_canary_not_corrected_live_behavior",
+  "size_bytes": 215473560
+}

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="13" skipped="0" tests="43" time="6.325" timestamp="2026-09-07T00:03:00.933044+08:00" hostname="ais"><testcase classname="tests.test_codex_web_runtime" name="test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_search-live]" time="0.049" /><testcase classname="tests.test_codex_web_runtime" name="test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_analysis-disabled]" time="0.046" /><testcase classname="tests.test_codex_web_runtime" name="test_codex_unknown_purpose_fails_before_starting_binary" time="0.002" /><testcase classname="tests.test_codex_web_runtime" name="test_codex_poll_checks_stop_while_peer_is_silent_and_reaps_process" time="0.898" /><testcase classname="tests.test_codex_web_runtime" name="test_codex_poll_checks_stop_while_peer_does_not_read_stdin" time="0.916" /><testcase classname="tests.test_codex_web_runtime" name="test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[search]" time="0.052" /><testcase classname="tests.test_codex_web_runtime" name="test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[analysis]" time="0.053" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_unknown_identity_detail_must_be_sourced_not_guessed_or_reentered_by_user[security_class]" time="0.003" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_unknown_identity_detail_must_be_sourced_not_guessed_or_reentered_by_user[venue]" time="0.002" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[openai-api_key]" time="0.068" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[openai-chatgpt_oauth]" time="0.066" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[anthropic-api_key]" time="0.067" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_preflight_uses_public_sec_identity_and_exact_profile_auth_without_provider[anthropic-claude_code_oauth]" time="0.068" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_listing_case_uses_only_its_exact_sa_public_company_name" time="0.068" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_missing_issuer_is_not_replaced_by_short_ticker_or_private_notes" time="0.066" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_preflight_change_requires_new_confirmation_instead_of_switching_credentials" time="0.071" /><testcase classname="tests.test_lifecycle_web_preflight" name="test_preflight_does_not_fall_back_from_missing_active_db_credential" time="0.055" /><testcase classname="tests.test_lifecycle_web_review" name="test_web_review_preparation_never_creates_a_human_assessment_or_tracking_change" time="0.068" /><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[terminal_delisting-api_key]" time="0.080"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:88: in test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[terminal_delisting-chatgpt_oauth]" time="0.083"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:88: in test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[terminal_delisting-claude_code_oauth]" time="0.080"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:88: in test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[symbol_continuation-api_key]" time="0.081"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:88: in test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[symbol_continuation-chatgpt_oauth]" time="0.081"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:88: in test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success[symbol_continuation-claude_code_oauth]" time="0.081"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:88: in test_web_confirmation_uses_existing_atomic_writer_without_requiring_provider_success
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_rejects_changed_material_without_partial_human_adoption[membership]" time="0.090" /><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_rejects_changed_material_without_partial_human_adoption[new_observation]" time="0.089" /><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_rejects_changed_material_without_partial_human_adoption[evidence]" time="0.089" /><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_rejects_changed_material_without_partial_human_adoption[future_lease]" time="0.087" /><testcase classname="tests.test_lifecycle_web_review" name="test_web_confirmation_rejects_changed_material_without_partial_human_adoption[open_position]" time="0.107" /><testcase classname="tests.test_lifecycle_web_review" name="test_current_active_otc_veto_is_not_lost_when_other_provider_requests_failed" time="0.063" /><testcase classname="tests.test_lifecycle_web_review" name="test_future_web_action_is_scheduled_and_rechecked_before_applying" time="0.081"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:144: in test_future_web_action_is_scheduled_and_rechecked_before_applying
+    result = confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_web_adoption_cannot_survive_an_approval_failure_in_a_partial_transaction" time="0.083"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:159: in test_web_adoption_cannot_survive_an_approval_failure_in_a_partial_transaction
+    confirm(c, packet)
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_review" name="test_unrelated_sa_refresh_and_other_ticker_edits_do_not_block_web_review" time="0.085"><failure message="NameError: name 'nullcontext' is not defined">tests/test_lifecycle_web_review.py:168: in test_unrelated_sa_refresh_and_other_ticker_edits_do_not_block_web_review
+    assert confirm(c, packet)["status"] == "applied"
+tests/test_lifecycle_web_review.py:62: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:232: in confirm
+    investigation.create_assessment(
+src/security_lifecycle_investigation.py:970: in create_assessment
+    with (nullcontext() if _caller_transaction else self.conn):
+E   NameError: name 'nullcontext' is not defined</failure></testcase><testcase classname="tests.test_lifecycle_web_routes" name="test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-api_key]" time="0.433"><failure message="AssertionError: {&quot;detail&quot;:{&quot;code&quot;:&quot;web_operation_unavailable&quot;}}&#10;assert (503 == 200)&#10; +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code">tests/test_lifecycle_web_routes.py:82: in test_web_routes_prepare_start_read_and_confirm_all_four_channels
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "applied", confirmed.text
+E   AssertionError: {"detail":{"code":"web_operation_unavailable"}}
+E   assert (503 == 200)
+E    +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code</failure></testcase><testcase classname="tests.test_lifecycle_web_routes" name="test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-chatgpt_oauth]" time="0.233"><failure message="AssertionError: {&quot;detail&quot;:{&quot;code&quot;:&quot;web_operation_unavailable&quot;}}&#10;assert (503 == 200)&#10; +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code">tests/test_lifecycle_web_routes.py:82: in test_web_routes_prepare_start_read_and_confirm_all_four_channels
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "applied", confirmed.text
+E   AssertionError: {"detail":{"code":"web_operation_unavailable"}}
+E   assert (503 == 200)
+E    +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code</failure></testcase><testcase classname="tests.test_lifecycle_web_routes" name="test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-api_key]" time="0.235"><failure message="AssertionError: {&quot;detail&quot;:{&quot;code&quot;:&quot;web_operation_unavailable&quot;}}&#10;assert (503 == 200)&#10; +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code">tests/test_lifecycle_web_routes.py:82: in test_web_routes_prepare_start_read_and_confirm_all_four_channels
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "applied", confirmed.text
+E   AssertionError: {"detail":{"code":"web_operation_unavailable"}}
+E   assert (503 == 200)
+E    +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code</failure></testcase><testcase classname="tests.test_lifecycle_web_routes" name="test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-claude_code_oauth]" time="0.240"><failure message="AssertionError: {&quot;detail&quot;:{&quot;code&quot;:&quot;web_operation_unavailable&quot;}}&#10;assert (503 == 200)&#10; +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code">tests/test_lifecycle_web_routes.py:82: in test_web_routes_prepare_start_read_and_confirm_all_four_channels
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "applied", confirmed.text
+E   AssertionError: {"detail":{"code":"web_operation_unavailable"}}
+E   assert (503 == 200)
+E    +  where 503 = &lt;Response [503 Service Unavailable]&gt;.status_code</failure></testcase><testcase classname="tests.test_lifecycle_web_routes" name="test_web_preflight_is_not_a_dispatch_and_rejects_changed_selected_credential" time="0.103" /><testcase classname="tests.test_lifecycle_web_routes" name="test_web_start_has_no_credential_model_or_arbitrary_source_override[extra0]" time="0.050" /><testcase classname="tests.test_lifecycle_web_routes" name="test_web_start_has_no_credential_model_or_arbitrary_source_override[extra1]" time="0.050" /><testcase classname="tests.test_lifecycle_web_routes" name="test_web_start_has_no_credential_model_or_arbitrary_source_override[extra2]" time="0.048" /><testcase classname="tests.test_lifecycle_web_routes" name="test_web_request_failure_never_exports_raw_exception_or_starts_a_provider" time="0.048" /><testcase classname="tests.test_lifecycle_web_routes" name="test_web_journal_is_never_auto_installed_by_opening_the_page" time="0.050" /></testsuite></testsuites>

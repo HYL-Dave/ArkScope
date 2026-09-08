@@ -1,0 +1,214 @@
+{
+  "files": {
+    "lifecycle-source-context-memory-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 50
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-context-memory-green.xml",
+      "sha256": "dcf568fe3ef4908df122369ae40af673992c2a1af539e3cad47bec0f2be9ecba"
+    },
+    "lifecycle-source-context-memory-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 7,
+        "skipped": 0,
+        "tests": 34
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_source_capacity::test_full_context_reuses_the_retained_text_without_a_second_source_copy[text/plain]",
+        "tests.test_lifecycle_source_capacity::test_full_context_reuses_the_retained_text_without_a_second_source_copy[application/json]",
+        "tests.test_lifecycle_source_capacity::test_full_context_reuses_the_retained_text_without_a_second_source_copy[application/xml]",
+        "tests.test_security_lifecycle_web_pipeline::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-api_key]",
+        "tests.test_security_lifecycle_web_pipeline::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-chatgpt_oauth]",
+        "tests.test_security_lifecycle_web_pipeline::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-api_key]",
+        "tests.test_security_lifecycle_web_pipeline::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-claude_code_oauth]"
+      ],
+      "file": "lifecycle-source-context-memory-red.xml",
+      "sha256": "d085098507da66b92a2b5fa3db64b838105946ee16aa5a2926a6c24e6ec9921b"
+    },
+    "lifecycle-source-lock-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 86
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-lock-green.xml",
+      "sha256": "cf213bf2627f97c1d83bd0322dc19555f6720421f56a6461ebc19bddd41a28b6"
+    },
+    "lifecycle-source-lock-red-corrected.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_source_capacity::test_final_source_validation_does_not_block_heartbeat_or_cancellation[False]",
+        "tests.test_lifecycle_source_capacity::test_final_source_validation_does_not_block_heartbeat_or_cancellation[True]"
+      ],
+      "file": "lifecycle-source-lock-red-corrected.xml",
+      "sha256": "f3f81b7a09d989e9057fbf2b6caa83fbc739952719d627e1aef465bf21307857"
+    },
+    "lifecycle-source-lock-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_source_capacity::test_source_journal_still_rejects_changed_page_and_capture_fingerprints[page_sha256]",
+        "tests.test_lifecycle_source_capacity::test_source_journal_still_rejects_changed_page_and_capture_fingerprints[capture_sha256]",
+        "tests.test_lifecycle_source_capacity::test_final_source_validation_does_not_block_heartbeat_or_cancellation[False]",
+        "tests.test_lifecycle_source_capacity::test_final_source_validation_does_not_block_heartbeat_or_cancellation[True]"
+      ],
+      "file": "lifecycle-source-lock-red.xml",
+      "sha256": "bfcc941b077a597bbedcb8a3f95dcb06d9065e123bc876923d8e1151962ac3fd"
+    },
+    "lifecycle-source-memory-red-bounded.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 6,
+        "skipped": 0,
+        "tests": 6
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_source_capacity::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[ascii]",
+        "tests.test_lifecycle_source_capacity::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[escapes]",
+        "tests.test_lifecycle_source_capacity::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[unicode]",
+        "tests.test_lifecycle_source_capacity::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[chunk_boundary]",
+        "tests.test_lifecycle_source_capacity::test_large_page_hash_never_serializes_the_whole_source_at_once",
+        "tests.test_lifecycle_source_capacity::test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests"
+      ],
+      "file": "lifecycle-source-memory-red-bounded.xml",
+      "sha256": "fc51efaa3ef31f9f259f53e1933ed86f901dd67a713d56ea3bdefa8384bdf574"
+    },
+    "lifecycle-source-priority-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 113
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-priority-green.xml",
+      "sha256": "55b363bba75ffef53f2511f27b80f2a6a65e42903058362806c9562fbf734653"
+    },
+    "lifecycle-source-priority-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 7,
+        "skipped": 0,
+        "tests": 81
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_web_contract::test_search_priority_follows_the_tracking_question_not_a_mandatory_sec_hop[listing_status]",
+        "tests.test_security_lifecycle_web_contract::test_search_priority_follows_the_tracking_question_not_a_mandatory_sec_hop[symbol_continuation]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[openai-api_key]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[openai-chatgpt_oauth]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[anthropic-api_key]",
+        "tests.test_security_lifecycle_web_pipeline::test_all_four_channels_share_source_reading_and_finding_validation[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_preflight::test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation"
+      ],
+      "file": "lifecycle-source-priority-red.xml",
+      "sha256": "f36549b3dc21f522907973aeff6315e18707a719508fe1769a73367aedf9a490"
+    },
+    "lifecycle-source-progress-final-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 8
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-progress-final-green.xml",
+      "sha256": "d930cf2d6391a51b2a513b9993172c9a20d49e9995c38da8c52474867b14530c"
+    },
+    "lifecycle-source-progress-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 93
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-progress-green.xml",
+      "sha256": "035343f16c4ec4d34b92f970df22d60b7376159839a4a7118aae29ab8285d1c5"
+    },
+    "lifecycle-source-progress-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 5,
+        "skipped": 0,
+        "tests": 7
+      },
+      "failed_nodes": [
+        "lifecycle_source_progress_red::test_progress_poll_does_not_decode_running_source_bodies",
+        "lifecycle_source_progress_red::test_source_read_decoding_releases_its_owned_read_transaction",
+        "lifecycle_source_progress_red::test_source_read_validation_releases_its_owned_read_transaction",
+        "lifecycle_source_progress_red::test_connection_reader_does_not_hold_page_cursor_during_decoding",
+        "lifecycle_source_progress_red::test_source_read_keeps_snapshot_when_worker_adds_a_later_source"
+      ],
+      "file": "lifecycle-source-progress-red.xml",
+      "sha256": "f498ab909bf68aa69f145d6b7a5d85bdbd9fcc51fb8339da87a9ce2309275d55"
+    },
+    "lifecycle-source-sql-wait-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 63
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-sql-wait-green.xml",
+      "sha256": "b8fecd2e1de2737e20e6a09038736de8450b5851c8b265609331a5b3b7b26c9a"
+    },
+    "lifecycle-source-sql-wait-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 5
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_source_progress::test_web_journal_wait_is_bounded_below_the_unchanged_lease[False]",
+        "tests.test_lifecycle_source_progress::test_web_journal_wait_is_bounded_below_the_unchanged_lease[True]",
+        "tests.test_lifecycle_source_progress::test_web_journal_wait_preserves_owner_cancellation_and_failure[commit]",
+        "tests.test_lifecycle_source_progress::test_web_journal_wait_preserves_owner_cancellation_and_failure[cancel]"
+      ],
+      "file": "lifecycle-source-sql-wait-red.xml",
+      "sha256": "279ab437d3c6740f529e952de8c5f707142a926a863d1d75f6ee8b92ecefad4b"
+    },
+    "lifecycle-source-time-budget-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 43
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-source-time-budget-green.xml",
+      "sha256": "363fbaecad419aed7a1be60cc36ff2a1523c299ad16ab1f81d83831ef36704cd"
+    },
+    "lifecycle-source-time-budget-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_preflight::test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation"
+      ],
+      "file": "lifecycle-source-time-budget-red.xml",
+      "sha256": "bc6ed5e87f543e592bb6b6fd25a0d1cdd1505a7cb04f077601c20122326d7a16"
+    }
+  },
+  "scope": "historical_red_green_not_final_admission"
+}

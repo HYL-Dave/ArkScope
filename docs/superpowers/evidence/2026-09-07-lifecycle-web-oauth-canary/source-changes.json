@@ -1,0 +1,18 @@
+{
+  "code": {
+    "src/auth_drivers/lifecycle_web_claude.py": {
+      "after": "e10f318d1ea418908a944b020e5fdcd06411adcffdb8489bfbb449d6a740ff48",
+      "before": "0ebc1cc4afe7342e6cf207d3c43db914460aa2b9c19156450556ce1d6039b2cc"
+    },
+    "tests/test_lifecycle_web_claude.py": {
+      "after": "014e81bcfe8cdb0746140fddc483f2759f8c8c35e888c2f08071b96fe4df593b",
+      "before": "df2c7242a9de1b1558c2fe2557cb20edf7e159b3e80be15c61c3481cc8d7e2ac"
+    }
+  },
+  "prior_manifest_sha256": "d25bea368df087a19893e63b52d94847009ce058e996706a4f1326a3a4417256",
+  "updated_unsealed_docs": [
+    "docs/design/PROJECT_PRIORITY_MAP.md",
+    "docs/superpowers/plans/2026-09-05-lifecycle-tracking-first-implementation.md",
+    "docs/superpowers/plans/2026-09-06-lifecycle-web-auth-adapters.md"
+  ]
+}

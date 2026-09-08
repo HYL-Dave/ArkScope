@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="10" time="0.847" timestamp="2026-09-07T12:13:31.955118+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_source_capacity" name="test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[ascii]" time="0.020" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[escapes]" time="0.002" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[unicode]" time="0.002" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[chunk_boundary]" time="0.007" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_large_page_hash_never_serializes_the_whole_source_at_once" time="0.022" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests" time="0.232" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_source_journal_still_rejects_changed_page_and_capture_fingerprints[page_sha256]" time="0.075" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_source_journal_still_rejects_changed_page_and_capture_fingerprints[capture_sha256]" time="0.076" /><testcase classname="tests.test_lifecycle_source_capacity" name="test_final_source_validation_does_not_block_heartbeat_or_cancellation[False]" time="0.105"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tests/test_lifecycle_source_capacity.py:113: in test_final_source_validation_does_not_block_heartbeat_or_cancellation
+    completed(store)
+tests/test_lifecycle_web_store.py:53: in completed
+    store.complete(run["run_id"], owner="worker-1", payload=finding_payload(), source_failures={},
+src/lifecycle_web_store.py:209: in complete
+    with self.connection(write=True) as conn:
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+src/lifecycle_web_store.py:63: in connection
+    raise WebJournalError("web_recording_unavailable") from None
+E   src.lifecycle_web_schema.WebJournalError: web_recording_unavailable</failure></testcase><testcase classname="tests.test_lifecycle_source_capacity" name="test_final_source_validation_does_not_block_heartbeat_or_cancellation[True]" time="0.102"><failure message="AssertionError: &#10;- web_recording_unavailable&#10;+ stop_requested">tests/test_lifecycle_source_capacity.py:109: in test_final_source_validation_does_not_block_heartbeat_or_cancellation
+    completed(store)
+tests/test_lifecycle_web_store.py:53: in completed
+    store.complete(run["run_id"], owner="worker-1", payload=finding_payload(), source_failures={},
+src/lifecycle_web_store.py:209: in complete
+    raise WebJournalError("web_model_work_incomplete")
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+src/lifecycle_web_store.py:63: in connection
+    raise WebJournalError("web_recording_unavailable") from None
+E   src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+During handling of the above exception, another exception occurred:
+tests/test_lifecycle_source_capacity.py:108: in test_final_source_validation_does_not_block_heartbeat_or_cancellation
+    with pytest.raises(journal.WebJournalError, match="^stop_requested$"):
+E   AssertionError: 
+E   - web_recording_unavailable
+E   + stop_requested</failure></testcase></testsuite></testsuites>

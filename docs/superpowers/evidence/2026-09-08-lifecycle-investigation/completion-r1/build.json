@@ -1,0 +1,11 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "build"
+  ],
+  "cwd": "/tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web",
+  "returncode": 0,
+  "log_sha256": "01ecd05985c846217551b916b3fb67b5127ac029f46f60e4cee83ef271e70587",
+  "source_manifest_sha256": "1e9a99b307d23bc524dec098e08db4b539173f336ddbee185bc8dfd9c88563d0"
+}

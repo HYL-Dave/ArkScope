@@ -1,0 +1,22 @@
+[
+  {
+    "call_id": "step-1",
+    "remote_id": "26ec9115-5832-40fc-917e-92621772b447",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-2",
+    "remote_id": "a06dc988-4d74-46d8-9328-b8ed701ea0d4",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-3",
+    "remote_id": "a1aa012a-c1a5-4c0d-a6fc-035d49ae1967",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-4",
+    "remote_id": "7bac1c01-5d3f-4d9e-9d1e-4b60fe5c3a42",
+    "terminal": "completed"
+  }
+]

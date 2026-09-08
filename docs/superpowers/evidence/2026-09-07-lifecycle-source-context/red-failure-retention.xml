@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.827" timestamp="2026-09-07T11:06:43.097781+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_source_read_report" name="test_population_retains_failure_receipts_without_accepting_them_as_findings" time="0.547"><failure message="src.security_lifecycle_population.LifecyclePopulationUnavailable: population_web_dependency_invalid">tests/test_lifecycle_source_read_report.py:91: in test_population_retains_failure_receipts_without_accepting_them_as_findings
+    retained = build_population_manifest(snapshot)["retention"]["web_journal"]
+src/security_lifecycle_population.py:564: in build_population_manifest
+    return _build(snapshot)
+src/security_lifecycle_population.py:604: in _build
+    retention = _retention(tables, material["identity_tables"], material.get("web_journal_inventory"))
+src/security_lifecycle_population.py:535: in _retention
+    "web_journal": _web_retention(web_inventory, tables=tables, assessments=assessments),
+src/security_lifecycle_population.py:486: in _web_retention
+    raise LifecyclePopulationUnavailable("population_web_dependency_invalid")
+E   src.security_lifecycle_population.LifecyclePopulationUnavailable: population_web_dependency_invalid</failure></testcase></testsuite></testsuites>

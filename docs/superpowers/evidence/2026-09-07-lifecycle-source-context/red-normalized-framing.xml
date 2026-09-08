@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.173" timestamp="2026-09-07T11:03:47.197598+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_source_compatibility" name="test_normalized_content_length_does_not_consume_bytes_after_the_document" time="0.065"><failure message="src.lifecycle_public_sources.SourceReadError: source_body_incomplete">tests/test_lifecycle_source_compatibility.py:60: in test_normalized_content_length_does_not_consume_bytes_after_the_document
+    assert reader.read("https://ir.example.com/notice").text == body.decode()
+src/lifecycle_public_sources.py:426: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:488: in _read
+    body = self._body(response, observed)
+src/lifecycle_public_sources.py:586: in _body
+    raise SourceReadError("source_body_incomplete")
+E   src.lifecycle_public_sources.SourceReadError: source_body_incomplete</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_chunked_optional_whitespace_is_decoded_by_the_wire_parser" time="0.002"><failure message="AssertionError: assert '10\nComplete notice.\n0' == 'Complete notice.'&#10;  &#10;  + 10&#10;  - Complete notice.&#10;  + Complete notice.&#10;  ?                 +&#10;  + 0">tests/test_lifecycle_source_compatibility.py:66: in test_chunked_optional_whitespace_is_decoded_by_the_wire_parser
+    assert reader.read("https://ir.example.com/notice").text == "Complete notice."
+E   AssertionError: assert '10\nComplete notice.\n0' == 'Complete notice.'
+E     
+E     + 10
+E     - Complete notice.
+E     + Complete notice.
+E     ?                 +
+E     + 0</failure></testcase></testsuite></testsuites>

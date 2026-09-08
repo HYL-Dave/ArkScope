@@ -1,0 +1,539 @@
+{
+  "acceptances": 1,
+  "action": "symbol_continuation",
+  "active_tickers": [
+    "LIVE",
+    "NEW"
+  ],
+  "confirmation_elapsed_seconds": 0.234,
+  "database_bytes": 8912896,
+  "decodes": [
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.022,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.012,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.009,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.009,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.019,
+      "thread": "attended-confirmation"
+    },
+    {
+      "elapsed_seconds": 0.012,
+      "thread": "attended-confirmation"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "attended-confirmation"
+    },
+    {
+      "elapsed_seconds": 0.018,
+      "thread": "attended-confirmation"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "lifecycle-web"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "synthetic-progress-poll"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "synthetic-progress-poll"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "synthetic-progress-poll"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "synthetic-progress-poll"
+    },
+    {
+      "elapsed_seconds": 0.009,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.007,
+      "thread": "MainThread"
+    },
+    {
+      "elapsed_seconds": 0.008,
+      "thread": "MainThread"
+    }
+  ],
+  "document_decoded_bytes": 1048576,
+  "document_encoded_bytes": {
+    "first": 1368,
+    "second": 1376
+  },
+  "elapsed_seconds": 3.155,
+  "events": [
+    {
+      "at_seconds": 0.219,
+      "job": "first",
+      "phase": "search",
+      "stage": "model"
+    },
+    {
+      "at_seconds": 0.572,
+      "job": "first",
+      "phase": "analysis",
+      "stage": "model"
+    },
+    {
+      "at_seconds": 0.717,
+      "stage": "first_completed"
+    },
+    {
+      "at_seconds": 0.867,
+      "stage": "packet_prepared"
+    },
+    {
+      "at_seconds": 0.912,
+      "job": "second",
+      "phase": "search",
+      "stage": "model"
+    },
+    {
+      "at_seconds": 0.919,
+      "stage": "human_confirmation_started"
+    },
+    {
+      "at_seconds": 1.153,
+      "error": null,
+      "stage": "human_confirmation_finished"
+    },
+    {
+      "at_seconds": 1.41,
+      "job": "second",
+      "phase": "analysis",
+      "stage": "model"
+    },
+    {
+      "at_seconds": 3.024,
+      "stage": "second_worker_finished"
+    }
+  ],
+  "heartbeats": [
+    {
+      "at_seconds": 0.207,
+      "elapsed_seconds": 0.002,
+      "error": null,
+      "job": "first"
+    },
+    {
+      "at_seconds": 0.887,
+      "elapsed_seconds": 0.006,
+      "error": null,
+      "job": "second"
+    }
+  ],
+  "model_phases": [
+    {
+      "job": "first",
+      "phase": "search"
+    },
+    {
+      "job": "first",
+      "phase": "analysis"
+    },
+    {
+      "job": "second",
+      "phase": "search"
+    },
+    {
+      "job": "second",
+      "phase": "analysis"
+    }
+  ],
+  "network_calls": 0,
+  "options": {
+    "effort": "high",
+    "max_decoded_source_bytes": 1048576,
+    "max_redirects": 2,
+    "max_search_uses": 4,
+    "max_source_bytes": 33554432,
+    "max_source_requests": 8,
+    "max_sources": 4,
+    "model_timeout_seconds": 180,
+    "output_token_limit": 16384,
+    "source_timeout_seconds": 180
+  },
+  "passed": true,
+  "peak_rss_bytes": 114446336,
+  "polls": [
+    {
+      "elapsed_seconds": 0.105,
+      "error": null,
+      "status": "succeeded"
+    }
+  ],
+  "production_data_access": false,
+  "provider_calls": 0,
+  "real_controller_heartbeat_and_governed_writer": true,
+  "receipt": {
+    "action": "symbol_continuation",
+    "applied_at": "2026-09-07T08:24:28.347715+00:00",
+    "block_reasons": [],
+    "case_id": "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c",
+    "current_effects_match": true,
+    "execute_on": "2026-09-01",
+    "packet_sha256": "fe5abfa651e32768890339302021af032b97d1c4890ce224157aca4cbd3fdbb5",
+    "source_ticker": "OLD",
+    "status": "applied",
+    "successor_ticker": "NEW",
+    "transition_id": "tit_e46e9e7c976844c19336a86206627df1",
+    "version": 1
+  },
+  "second_receipt": {
+    "source_reading": {
+      "model_text_bytes": 192804,
+      "retained_text_bytes": 4165020,
+      "selected_sources": 4,
+      "sources": 4
+    },
+    "source_requests": 4,
+    "status": "succeeded"
+  },
+  "shared_temporary_profile": true,
+  "source_counts": [
+    4,
+    4
+  ],
+  "sql": [
+    {
+      "at_seconds": 0.125,
+      "elapsed_seconds": 0.0,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.17,
+      "elapsed_seconds": 0.002,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.191,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.201,
+      "elapsed_seconds": 0.0,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.202,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.209,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.211,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.216,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.218,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.22,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.223,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.255,
+      "elapsed_seconds": 0.004,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.286,
+      "elapsed_seconds": 0.004,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.317,
+      "elapsed_seconds": 0.004,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.345,
+      "elapsed_seconds": 0.011,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.358,
+      "elapsed_seconds": 0.002,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.554,
+      "elapsed_seconds": 0.011,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.568,
+      "elapsed_seconds": 0.004,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.574,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.677,
+      "elapsed_seconds": 0.004,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.87,
+      "elapsed_seconds": 0.0,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.871,
+      "elapsed_seconds": 0.011,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 0.889,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.896,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.904,
+      "elapsed_seconds": 0.003,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.909,
+      "elapsed_seconds": 0.003,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.913,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.916,
+      "elapsed_seconds": 0.001,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 0.964,
+      "elapsed_seconds": 0.006,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.008,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.051,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.071,
+      "elapsed_seconds": 0.043,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "attended-confirmation"
+    },
+    {
+      "at_seconds": 1.118,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "attended-confirmation"
+    },
+    {
+      "at_seconds": 1.089,
+      "elapsed_seconds": 0.078,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.168,
+      "elapsed_seconds": 0.019,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.19,
+      "elapsed_seconds": 0.002,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.391,
+      "elapsed_seconds": 0.011,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.405,
+      "elapsed_seconds": 0.005,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.412,
+      "elapsed_seconds": 0.004,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 1.511,
+      "elapsed_seconds": 0.002,
+      "error": null,
+      "operation": "write_transaction_commit",
+      "thread": "lifecycle-web"
+    }
+  ],
+  "statuses": [
+    [
+      "succeeded",
+      null
+    ],
+    [
+      "succeeded",
+      null
+    ]
+  ]
+}

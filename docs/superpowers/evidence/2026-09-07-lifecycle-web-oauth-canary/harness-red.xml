@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="8" time="0.074" timestamp="2026-09-07T08:28:48.353008+08:00" hostname="ais"><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_selects_only_unique_active_claude_oauth_without_secret" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7774/test_canary_selects_only_uniqu0')
+
+    def test_canary_selects_only_unique_active_claude_oauth_without_secret(tmp_path):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:29: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e47943c2b0&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_ambiguous_or_inactive_credentials_cannot_fall_back[rows0]" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7774/test_canary_ambiguous_or_inact0')
+rows = []
+
+    @pytest.mark.parametrize("rows", [[], [row(7, 0)], [row(), row(8)]])
+    def test_canary_ambiguous_or_inactive_credentials_cannot_fall_back(tmp_path, rows):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e4781a6470&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_ambiguous_or_inactive_credentials_cannot_fall_back[rows1]" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7774/test_canary_ambiguous_or_inact1')
+rows = [(7, 'anthropic', 'claude_code_oauth', 0, '2026-09-01', None, ...)]
+
+    @pytest.mark.parametrize("rows", [[], [row(7, 0)], [row(), row(8)]])
+    def test_canary_ambiguous_or_inactive_credentials_cannot_fall_back(tmp_path, rows):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e47943c0a0&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_ambiguous_or_inactive_credentials_cannot_fall_back[rows2]" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7774/test_canary_ambiguous_or_inact2')
+rows = [(7, 'anthropic', 'claude_code_oauth', 1, '2026-09-01', None, ...), (8, 'anthropic', 'claude_code_oauth', 1, '2026-09-01', None, ...)]
+
+    @pytest.mark.parametrize("rows", [[], [row(7, 0)], [row(), row(8)]])
+    def test_canary_ambiguous_or_inactive_credentials_cannot_fall_back(tmp_path, rows):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e4781a75e0&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_observer_records_literal_auth_and_actual_model_not_raw_message" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">def test_canary_observer_records_literal_auth_and_actual_model_not_raw_message():
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e477e19b40&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_observer_does_not_sanitize_absent_auth_into_none_literal" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">def test_canary_observer_does_not_sanitize_absent_auth_into_none_literal():
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:64: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e478de92d0&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_budget_is_search_plus_analysis_not_generic_retry" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">def test_canary_budget_is_search_plus_analysis_not_generic_retry():
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e477e1be20&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-oauth-canary.test_live_harness" name="test_canary_sec_contact_query_cannot_read_api_keys" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7774/test_canary_sec_contact_query_0')
+
+    def test_canary_sec_contact_query_cannot_read_api_keys(tmp_path):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:84: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py:14: in module
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x71e4781a6830&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase></testsuite></testsuites>

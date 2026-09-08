@@ -1,0 +1,231 @@
+{
+  "app_restart": false,
+  "changed_product_test_files_verified": 52,
+  "commit": false,
+  "current_and_test_copy_verified_at_seal": true,
+  "frozen_code_files_verified": 105,
+  "full_backend_command": "python -m pytest -q tests",
+  "harness_resume": {
+    "completed_mutations": 21,
+    "current_and_original_copy_verified": true,
+    "newly_recorded_hashes": {
+      "src/security_lifecycle.py": "b402fef238f68cdcbe32350f934f3d87c8bffb0a56bca83dfab424b9ae502f2f",
+      "src/security_lifecycle_investigation.py": "f165b4f4422f735516771191a0a3215fece708aaa53593a3f3f27b94ab06cff8"
+    },
+    "original_report_sha256": "a4479ba71b3dae0255d1e43cb2a879359cc51a972eaf905f1076b591cafaab18",
+    "product_source_changed": false,
+    "reason": "nested_reader_hashes_omitted_from_ledger"
+  },
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6118
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "c099d72cfcdfcb780f9548cb1f24ba2b36aeb4e99e330d73b8ba4d9a8d4c5eef"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 701
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "7390860bc99088ca603ffb92781404f96748fd9ef02b5bcbb818ef282d9bb7f8"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1869
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "29613500356ffc06d2fa4ae4672e66366494e72844f0712f1197e65169d3a6b6"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 701
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "0f4401c51211fa3d1ec722e10715640cff972e184cf78d105fdcdb38dcaf0d64"
+    }
+  },
+  "merge": false,
+  "migration": false,
+  "mutation_count": 22,
+  "node_changes": {
+    "backend": {
+      "added_count": 63,
+      "removed_count": 0
+    },
+    "integration": {
+      "added_count": 63,
+      "removed_count": 0
+    }
+  },
+  "prior_packet": {
+    "files_verified": 48,
+    "seal_sha256": "be2d8514000b77f0a1573e0ef4f972157b274b3b0156a0b00536b02db11d9c64"
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "red": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 7,
+        "skipped": 0,
+        "tests": 7
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_population_manifest_accounts_for_all_three_input_populations",
+        "tests.test_security_lifecycle_population::test_equal_population_counts_do_not_prove_equal_case_keys",
+        "tests.test_security_lifecycle_population::test_equal_sec_sets_need_no_orphan_remediation",
+        "tests.test_security_lifecycle_population::test_first_provider_assessment_persists_same_review_not_a_second_security",
+        "tests.test_security_lifecycle_population::test_old_accepted_assessment_never_screens_out_a_source_missing_question",
+        "tests.test_security_lifecycle_population::test_population_reads_neither_create_stores_nor_read_credentials",
+        "tests.test_security_lifecycle_population::test_population_capture_rejects_cross_store_changes_without_blocking_writers"
+      ],
+      "file": "arkscope-lifecycle-population-red-v2.xml",
+      "sha256": "5d07e93b1616208d60fbe5fd699a3a89d14803d86744f2c4f3bffacceba26db1"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 25
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_proven_current_security_consolidates_without_counting_a_new_security",
+        "tests.test_security_lifecycle_population::test_read_service_population_uses_only_explicit_stores",
+        "tests.test_security_lifecycle_population::test_actual_removal_receipt_does_not_erase_unresolved_continuation[False-current-continuation_followup_pending]",
+        "tests.test_security_lifecycle_population::test_actual_removal_receipt_does_not_erase_unresolved_continuation[True-history-removal_applied]"
+      ],
+      "file": "arkscope-lifecycle-population-boundaries-red.xml",
+      "sha256": "c3d2134638ac1e8bfde7cd9f60a796bfe74c251f736cdb00fd43a4b366524858"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 37
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_bound_active_listing_does_not_erase_future_regulator_event",
+        "tests.test_security_lifecycle_population::test_retention_inventories_actual_evidence_and_translations_without_prose"
+      ],
+      "file": "arkscope-lifecycle-population-dependencies-red-v2.xml",
+      "sha256": "666071d96aef6c13e76d9b1bddee898d8df831ce59cc8ac6ec2d7bcfa313a4bd"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 5,
+        "skipped": 0,
+        "tests": 40
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_bound_active_listing_does_not_erase_future_regulator_event",
+        "tests.test_security_lifecycle_population::test_bound_active_listing_keeps_unresolved_identity_facts[extra0]",
+        "tests.test_security_lifecycle_population::test_bound_active_listing_keeps_unresolved_identity_facts[extra1]",
+        "tests.test_security_lifecycle_population::test_bound_active_listing_keeps_unresolved_identity_facts[extra2]",
+        "tests.test_security_lifecycle_population::test_retention_inventories_actual_evidence_and_translations_without_prose"
+      ],
+      "file": "arkscope-lifecycle-population-regulator-red.xml",
+      "sha256": "ffb4ab1604229d2deb3ecd0aa91bff60b78d2373312fc202d9fa4b6150b041a5"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 46
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_reused_provider_ticker_retains_distinct_historical_identity",
+        "tests.test_security_lifecycle_population::test_old_retirement_receipt_does_not_describe_reused_ticker_as_removed"
+      ],
+      "file": "arkscope-lifecycle-population-reused-red.xml",
+      "sha256": "b250d9fc5f1b8818fef4016566711f55d84b98575f4bfb56e8b11781e1990400"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 49
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_sealed_but_malformed_population_shape_is_a_typed_failure[identity_tables-invalid0]",
+        "tests.test_security_lifecycle_population::test_sealed_but_malformed_population_shape_is_a_typed_failure[schemas-None]"
+      ],
+      "file": "arkscope-lifecycle-population-shape-red.xml",
+      "sha256": "c717ce0efc5e60d6798d198d399ab720255b4805491fd03b55ce93051177a210"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_provider_source_missing_is_not_recovered_by_a_different_source_ref"
+      ],
+      "file": "arkscope-lifecycle-population-provider-binding-red.xml",
+      "sha256": "349343971e8cfdf1f4ec7004ff28390d77b66c91f93ddc4fb88b11cc24dcece0"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 4
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_actual_removal_receipt_does_not_erase_unresolved_continuation[2026-09-05T01:00:00Z-False-current-continuation_followup_pending]",
+        "tests.test_security_lifecycle_population::test_actual_removal_receipt_does_not_erase_unresolved_continuation[2026-09-05T01:00:00Z-True-history-removal_applied]",
+        "tests.test_security_lifecycle_population::test_actual_removal_receipt_does_not_erase_unresolved_continuation[2026-09-10T01:00:00Z-False-current-continuation_followup_pending]",
+        "tests.test_security_lifecycle_population::test_actual_removal_receipt_does_not_erase_unresolved_continuation[2026-09-10T01:00:00Z-True-history-removal_applied]"
+      ],
+      "file": "arkscope-lifecycle-population-persistent-retirement-red.xml",
+      "sha256": "424561f4bfbed0f61f25ae5278c5d5237e25c2f6d41cb32b4fde98ca126c82e7"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_population::test_population_capture_uses_literal_store_paths[#selected-market]",
+        "tests.test_security_lifecycle_population::test_population_capture_uses_literal_store_paths[#selected-profile]",
+        "tests.test_security_lifecycle_population::test_population_capture_uses_literal_store_paths[%23selected-market]",
+        "tests.test_security_lifecycle_population::test_population_capture_uses_literal_store_paths[%23selected-profile]",
+        "tests.test_security_lifecycle_population::test_population_capture_uses_literal_store_paths[?mode=rw&ignored=-market]",
+        "tests.test_security_lifecycle_population::test_population_capture_uses_literal_store_paths[?mode=rw&ignored=-profile]",
+        "tests.test_security_lifecycle_population::test_population_capture_never_interprets_uri_options_or_creates_other_store[market]",
+        "tests.test_security_lifecycle_population::test_population_capture_never_interprets_uri_options_or_creates_other_store[profile]"
+      ],
+      "file": "arkscope-lifecycle-population-literal-path-red-v2.xml",
+      "sha256": "5b37e0e19d3bb7ac9a1cd24535fc8d2139c947fd21c67c153024d746cb8ae43c"
+    }
+  ]
+}

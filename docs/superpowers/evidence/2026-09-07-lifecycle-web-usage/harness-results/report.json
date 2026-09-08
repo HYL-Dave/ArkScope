@@ -1,0 +1,110 @@
+{
+  "baseline": {
+    "exit_code": 0,
+    "failed_nodes": [],
+    "nodes": [
+      "test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]",
+      "test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+      "test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+      "test_canary_limits_match_current_source_envelope_without_token_truncation",
+      "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+      "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+      "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+      "test_canary_requires_explicit_new_checkpoint_not_reused_authority",
+      "test_canary_source_admission_precedes_any_credential_metadata_read"
+    ]
+  },
+  "complete": true,
+  "mutations": [
+    {
+      "exit_code": 1,
+      "failed_nodes": [
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]"
+      ],
+      "name": "usage_callback_dropped",
+      "nodes": [
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+        "test_canary_limits_match_current_source_envelope_without_token_truncation",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+        "test_canary_requires_explicit_new_checkpoint_not_reused_authority",
+        "test_canary_source_admission_precedes_any_credential_metadata_read"
+      ],
+      "owner": "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls"
+    },
+    {
+      "exit_code": 1,
+      "failed_nodes": [
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+        "test_canary_source_admission_precedes_any_credential_metadata_read"
+      ],
+      "name": "metadata_before_source_admission",
+      "nodes": [
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+        "test_canary_limits_match_current_source_envelope_without_token_truncation",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+        "test_canary_requires_explicit_new_checkpoint_not_reused_authority",
+        "test_canary_source_admission_precedes_any_credential_metadata_read"
+      ],
+      "owner": "test_canary_source_admission_precedes_any_credential_metadata_read"
+    },
+    {
+      "exit_code": 1,
+      "failed_nodes": [
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]"
+      ],
+      "name": "source_observation_field_drift",
+      "nodes": [
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+        "test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+        "test_canary_limits_match_current_source_envelope_without_token_truncation",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+        "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+        "test_canary_requires_explicit_new_checkpoint_not_reused_authority",
+        "test_canary_source_admission_precedes_any_credential_metadata_read"
+      ],
+      "owner": "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls"
+    }
+  ],
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "restored": {
+    "exit_code": 0,
+    "failed_nodes": [],
+    "nodes": [
+      "test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]",
+      "test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]",
+      "test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]",
+      "test_canary_limits_match_current_source_envelope_without_token_truncation",
+      "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]",
+      "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]",
+      "test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]",
+      "test_canary_requires_explicit_new_checkpoint_not_reused_authority",
+      "test_canary_source_admission_precedes_any_credential_metadata_read"
+    ]
+  },
+  "source_sha256": {
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/read_inventory.py": "0b0afb42952a303d9d3ce3aed00931fdf9208d42a9f623336a829c16e6eb5d53",
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py": "f31561e301c9a21bc05a48a66a065c97471eb6b97340ef9b3ae4b61f1e6d4585",
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py": "a337355ea080c1b6b74df3f15b8ea482f7c415807d793c91b5a113a783794bf3",
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py": "70dcb3ac6ab45d99f6829c01f3030cb944313cfa9d8f27ef2ba52ed58a851e0b",
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py": "0ef97b164a048009cba2d3656b836b4d14647374cd61c1799f1664d9c7860e6f",
+    "docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/verify_harness.py": "918458d22debaad5ad55a73bfbba64490867c64bcbdc662bc74a07fef1fa751f"
+  }
+}

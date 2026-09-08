@@ -1,0 +1,11 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "typecheck"
+  ],
+  "cwd": "apps/arkscope-web",
+  "exit_code": 2,
+  "output": "\n> arkscope-web@0.0.1 typecheck\n> tsc --noEmit\n\nsrc/settings/PriceCoverageRepair.tsx(36,61): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.\n  Type 'null' is not assignable to type 'string'.\nnpm error Lifecycle script `typecheck` failed with error:\nnpm error code 2\nnpm error path /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web\nnpm error workspace arkscope-web@0.0.1\nnpm error location /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web\nnpm error command failed\nnpm error command sh -c tsc --noEmit\n",
+  "output_sha256": "eb870b00f0766c54aa69e36cadbd9be48f838aacc18223f37e8ddea975577528"
+}

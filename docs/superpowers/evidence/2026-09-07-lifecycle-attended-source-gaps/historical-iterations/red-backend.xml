@@ -1,0 +1,1666 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="32" skipped="0" tests="86" time="5.951" timestamp="2026-09-07T14:53:29.747459+08:00" hostname="ais"><testcase classname="tests.test_security_lifecycle_web_finding" name="test_web_finding_requires_real_source_identity_date_and_citation" time="0.003" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_completed_notice_is_reviewable_without_a_required_publisher_or_sec_source[https://financial-news.example.com/completed-listing-event]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_completed_notice_is_reviewable_without_a_required_publisher_or_sec_source[https://ir.example.com/completed-listing-event]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_completed_notice_is_reviewable_without_a_required_publisher_or_sec_source[https://www.sec.gov/Archives/edgar/data/12345/completed-listing-event.htm]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_newer_completed_reporting_can_resolve_an_older_sec_announcement" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_filing_date_and_announcement_alone_do_not_supply_completed_listing_evidence" time="0.001" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_search_snippets_and_unknown_source_ids_cannot_support_action[change0-source_citation_unavailable]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_search_snippets_and_unknown_source_ids_cannot_support_action[change1-source_citation_mismatch]" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_short_ticker_match_without_issuer_and_share_class_never_authorizes" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_web_continuation_is_not_inferred_from_acquirer_or_common_issuer_alone" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_positive_active_otc_citation_vetoes_removal_even_if_summary_ignores_it" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_syndicated_passages_are_not_counted_as_independent_sources" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]" time="0.002"><failure message="AssertionError: assert (None == 'terminal_delisting')&#10; +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action">unread = 1
+
+    @pytest.mark.parametrize("unread", [1, 2])
+    def test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding(unread):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        result = validate_finding(public_input(), finding_payload(), {"source-1": source_page(NOTICE)}, unread_source_count=unread)
+&gt;       assert result.action == "terminal_delisting" and result.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:173: AssertionError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]" time="0.002"><failure message="AssertionError: assert (None == 'terminal_delisting')&#10; +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action">unread = 2
+
+    @pytest.mark.parametrize("unread", [1, 2])
+    def test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding(unread):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        result = validate_finding(public_input(), finding_payload(), {"source-1": source_page(NOTICE)}, unread_source_count=unread)
+&gt;       assert result.action == "terminal_delisting" and result.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:173: AssertionError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_source_cannot_be_cited_or_replace_all_missing_evidence" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_finding" name="test_tampered_document_metadata_cannot_supply_valid_passage" time="0.002" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[openai-api_key]" time="0.018" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[openai-chatgpt_oauth]" time="0.015" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[anthropic-api_key]" time="0.015" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_all_four_channels_share_source_reading_and_finding_validation[anthropic-claude_code_oauth]" time="0.015" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_source_read_failure_remains_visible_and_never_retries[openai-api_key]" time="0.016"><failure message="AssertionError: assert (None == 'terminal_delisting')&#10; +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action&#10; +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7c14cff05b40&gt;
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+&gt;       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]" time="0.016"><failure message="AssertionError: assert (None == 'terminal_delisting')&#10; +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action&#10; +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7c14c95cafe0&gt;
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+&gt;       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]" time="0.016"><failure message="AssertionError: assert (None == 'terminal_delisting')&#10; +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action&#10; +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7c14cff06980&gt;
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+&gt;       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]" time="0.016"><failure message="AssertionError: assert (None == 'terminal_delisting')&#10; +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action&#10; +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7c14cff28a00&gt;
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+&gt;       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...91bd91fe35cb73da90', 'source_bytes': 95, 'ranges': [[0, 95]]}}, source_read_report={'requests': 2, 'observations': []}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources0-search_no_sources]" time="0.004" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources1-unsafe_source_url]" time="0.004" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources2-search_output_invalid]" time="0.004" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_failed_search_or_stop_never_dispatches_more_work" time="0.006" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_stop_during_source_read_joins_worker_and_never_dispatches_analysis" time="0.055" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_large_source_is_saved_whole_but_analysis_receives_traceable_passages" time="0.117" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-api_key]" time="0.021" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-chatgpt_oauth]" time="0.021" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-api_key]" time="0.021" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-claude_code_oauth]" time="0.021" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_model_context_rejection_never_clips_relevant_input_or_retries[openai-api_key]" time="0.067" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_model_context_rejection_never_clips_relevant_input_or_retries[openai-chatgpt_oauth]" time="0.073" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_model_context_rejection_never_clips_relevant_input_or_retries[anthropic-api_key]" time="0.069" /><testcase classname="tests.test_security_lifecycle_web_pipeline" name="test_model_context_rejection_never_clips_relevant_input_or_retries[anthropic-claude_code_oauth]" time="0.087" /><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]" time="0.181"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi0')
+provider = 'openai', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi0')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]" time="0.158"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi1')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi1')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi2')
+provider = 'anthropic', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi2')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]" time="0.167"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi3')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi3')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]" time="0.168"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi4')
+provider = 'openai', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi4')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]" time="0.164"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi5')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi5')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]" time="0.184"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi6')
+provider = 'anthropic', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi6')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]" time="0.168"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi7')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+&gt;       c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_gap_disclosure_follows_fi7')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]" time="0.163"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di0')
+change = 'omitted'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+&gt;       c = context(tmp_path, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di0')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di1')
+change = 'empty'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+&gt;       c = context(tmp_path, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di1')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di2')
+change = 'reason'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+&gt;       c = context(tmp_path, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di2')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]" time="0.178"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di3')
+change = 'url'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+&gt;       c = context(tmp_path, completion=COMPLETION)
+
+tests/test_lifecycle_web_gaps.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_confirmation_rejects_a_di3')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_disclosed_read_gap_does_not_override_missing_essential_proof[change0-material_contradiction]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n0')
+change = {'contradictions': ['The exchange reports continued trading.']}
+reason = 'material_contradiction'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"contradictions": ["The exchange reports continued trading."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The effective date cannot be established."]}, "finding_incomplete"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"citations": []}, "source_passage_missing"),
+    ])
+    def test_disclosed_read_gap_does_not_override_missing_essential_proof(tmp_path, change, reason):
+&gt;       c = context(tmp_path, completion={**COMPLETION, "payload": finding_payload(**change)})
+
+tests/test_lifecycle_web_gaps.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n0')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete]" time="0.164"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n1')
+change = {'unresolved_conditions': ['The effective date cannot be established.']}
+reason = 'finding_incomplete'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"contradictions": ["The exchange reports continued trading."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The effective date cannot be established."]}, "finding_incomplete"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"citations": []}, "source_passage_missing"),
+    ])
+    def test_disclosed_read_gap_does_not_override_missing_essential_proof(tmp_path, change, reason):
+&gt;       c = context(tmp_path, completion={**COMPLETION, "payload": finding_payload(**change)})
+
+tests/test_lifecycle_web_gaps.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n1')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_disclosed_read_gap_does_not_override_missing_essential_proof[change2-effective_date_missing]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n2')
+change = {'effective_date': None, 'effective_date_text': None}
+reason = 'effective_date_missing'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"contradictions": ["The exchange reports continued trading."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The effective date cannot be established."]}, "finding_incomplete"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"citations": []}, "source_passage_missing"),
+    ])
+    def test_disclosed_read_gap_does_not_override_missing_essential_proof(tmp_path, change, reason):
+&gt;       c = context(tmp_path, completion={**COMPLETION, "payload": finding_payload(**change)})
+
+tests/test_lifecycle_web_gaps.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n2')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_disclosed_read_gap_does_not_override_missing_essential_proof[change3-security_identity_mismatch]" time="0.167"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n3')
+change = {'source_ticker': 'OTHER'}, reason = 'security_identity_mismatch'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"contradictions": ["The exchange reports continued trading."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The effective date cannot be established."]}, "finding_incomplete"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"citations": []}, "source_passage_missing"),
+    ])
+    def test_disclosed_read_gap_does_not_override_missing_essential_proof(tmp_path, change, reason):
+&gt;       c = context(tmp_path, completion={**COMPLETION, "payload": finding_payload(**change)})
+
+tests/test_lifecycle_web_gaps.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n3')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_disclosed_read_gap_does_not_override_missing_essential_proof[change4-source_passage_missing]" time="0.163"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n4')
+change = {'citations': []}, reason = 'source_passage_missing'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"contradictions": ["The exchange reports continued trading."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The effective date cannot be established."]}, "finding_incomplete"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"citations": []}, "source_passage_missing"),
+    ])
+    def test_disclosed_read_gap_does_not_override_missing_essential_proof(tmp_path, change, reason):
+&gt;       c = context(tmp_path, completion={**COMPLETION, "payload": finding_payload(**change)})
+
+tests/test_lifecycle_web_gaps.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_disclosed_read_gap_does_n4')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[None]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met0')
+urls = None
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met0')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls1]" time="0.164"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met1')
+urls = []
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met1')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls2]" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met2')
+urls = {}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met2')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls3]" time="0.164"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met3')
+urls = {'source-3': 'https://financial-news.example.com/old-listing-update'}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met3')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4]" time="0.163"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met4')
+urls = {'source-2': None}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met4')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5]" time="0.164"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met5')
+urls = {'source-2': 'https://127.0.0.1/private'}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met5')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6]" time="0.167"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met6')
+urls = {'source-2': 'https://user:secret@example.com/private'}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+        with pytest.raises(ValueError, match="web_source_gaps_invalid"):
+&gt;           context(tmp_path, completion={**COMPLETION, "source_failure_urls": urls})
+
+tests/test_lifecycle_web_gaps.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_present_malformed_gap_met6')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_legacy_read_gap_is_visible_without_inventing_a_source_url" time="0.189"><failure message="assert (False)">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_legacy_read_gap_is_visibl0')
+
+    def test_legacy_read_gap_is_visible_without_inventing_a_source_url(tmp_path):
+        c = context(tmp_path, completion={"source_failures": {"source-2": "source_unavailable"}, "source_requests": 2})
+        packet = prepare(c)
+&gt;       assert packet["ready"] and packet["source_gaps"] == [{"url": None, "reason": "source_unavailable"}]
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:88: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_gaps" name="test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape" time="0.165"><failure message="TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_no_gaps_is_an_empty_list_0')
+
+    def test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape(tmp_path):
+&gt;       c = context(tmp_path, completion={"source_failure_urls": {}})
+
+tests/test_lifecycle_web_gaps.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7809/test_no_gaps_is_an_empty_list_0')
+
+    def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,
+                completion=None):
+        c = setup_workflow(tmp_path, assess=False, event_available=False)
+        c["now"][0] = "2026-09-06T01:00:00Z"
+        # Missing structured checks are the reason for Web investigation, not a
+        # requirement that must become successful before a human can confirm.
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+        observation = c["checks"].latest()["OLD"]["observation"]
+        if sec_case:
+            from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
+            with sqlite3.connect(c["market"]) as conn:
+                SecurityLifecycleStore(conn).upsert_observation(LifecycleObservation(ticker="OLD", cik="0000012345", issuer_name="Issuer Old Inc",
+                    filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
+                    evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
+                    kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            with sqlite3.connect(c["profile"]) as conn:
+                c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
+            observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
+        fingerprint = observation_fingerprint(observation)
+        with sqlite3.connect(c["profile"]) as conn:
+            install_web_journal(conn, at=c["now"][0])
+        store = LifecycleWebStore(c["profile"], clock=lambda: c["now"][0])
+        provider = provider or ("anthropic" if auth == "claude_code_oauth" else "openai")
+        selected = validate_selection(provider, auth, "claude-sonnet-5" if provider == "anthropic" else "gpt-5.6-luna", "local:7")
+        request = public_input().model_copy(update={"composite_figi": None})
+        run = store.start(case_id=c["case_id"], observation_sha256=fingerprint, request=request, selection=selected,
+                          options=_options(auth), owner="worker-1", request_key="click-1")
+        identity = run["run_id"]
+        control = store.control(identity, owner="worker-1")
+        for phase in ("search", "analysis"):
+            control.reserve_model_request(phase + "-1")
+            control.bind_remote_id(phase + "-1", phase)
+            control.observe_terminal(phase + "-1", response_id=phase, status="completed", selection=selected)
+        payload, notice = finding_payload(), NOTICE
+        if kind == "symbol_continuation":
+            notice = "Issuer Old Inc OLD Class A common stock on NASDAQ changes its ticker from OLD to NEW for the same security effective September 1, 2026."
+            payload.update(event_kind="symbol_continuation", successor_ticker="NEW")
+            payload["citations"][0]["supports"] = ["security_identity", "same_security_continuation", "effective_date"]
+        if future:
+            notice = notice.replace("September 1, 2026", "September 7, 2026")
+            payload.update(timing="scheduled", effective_date="2026-09-07", effective_date_text="September 7, 2026")
+        payload["citations"][0]["quote"] = notice
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page(notice))
+&gt;       store.complete(identity, owner="worker-1", **{ "payload": payload, "source_failures": {},
+            "usage": {"input_tokens": 20, "output_tokens": 40}, "source_requests": 1, **(completion or {})})
+E       TypeError: LifecycleWebStore.complete() got an unexpected keyword argument 'source_failure_urls'
+
+tests/test_lifecycle_web_review.py:61: TypeError</failure></testcase></testsuite></testsuites>

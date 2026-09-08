@@ -1,0 +1,47 @@
+{
+  "date_counts": {
+    "2026-08-21": 32,
+    "2026-08-24": 32,
+    "2026-08-25": 32,
+    "2026-08-26": 32,
+    "2026-08-27": 31,
+    "2026-08-28": 31
+  },
+  "fallback": false,
+  "gateway_connection_attempts_per_execution": 1,
+  "inventory_at": "2026-09-05T17:03:42+00:00",
+  "inventory_sha256": "4cb5533434ee92024dc7262da6893027eb4ab04c26547f64d9c166254a871c0a",
+  "max_insertable_slots": 4940,
+  "missing_ticker_days": 190,
+  "pacing_seconds": 1.0,
+  "partial_ticker_days": 0,
+  "plan_sha256": "907a6f80ff8593db7134203d9807b06fee1692d9c2b7e96b84b6a5676c9289e5",
+  "preview_sha256": "151280a4a07ea1913d95cfed3a14d2bdc95dbd27703a8443d174ac75f28a9b09",
+  "production_reads": 0,
+  "production_writes": 0,
+  "provider_requests": 0,
+  "received_results_reusable": true,
+  "request_budget": {
+    "history": 32,
+    "qualification": 32,
+    "total": 64
+  },
+  "retry": false,
+  "scope_source": "previously_authorized_immutable_post_disposition_inventory",
+  "status": "prepared_not_authorized_for_execution",
+  "summary_sha256": "907c4ca4105753d6625168133c824200b66f08e3eea2305d7c42e53552c5a7a5",
+  "ticker_count": 32,
+  "unknown_dispatch_may_repeat": false,
+  "windows": [
+    {
+      "end": "2026-08-26",
+      "start": "2026-08-21",
+      "tickers": 1
+    },
+    {
+      "end": "2026-08-28",
+      "start": "2026-08-21",
+      "tickers": 31
+    }
+  ]
+}

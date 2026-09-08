@@ -1,0 +1,79 @@
+{
+  "all_model_calls_exact_sonnet_subscription": true,
+  "automatic_retry_or_billing_fallback": false,
+  "capacity_limit_was_not_reached": true,
+  "fresh_action_ready_live_runs": 0,
+  "fresh_full_live_runs": 1,
+  "manual_positive_control_not_model_result": {
+    "actual_selected_context": {
+      "action": "terminal_delisting",
+      "block_reasons": []
+    },
+    "citation_lengths": [
+      1000,
+      2380
+    ],
+    "full_capture": {
+      "action": "terminal_delisting",
+      "block_reasons": []
+    },
+    "kind": "offline_manual_verbatim_positive_control_not_model_output",
+    "no_live_finding_changed": true,
+    "profile_actions": 0,
+    "provider_calls": 0,
+    "source_capture_sha256": "9b57f6eb8db2b974deca3efb38dad2faaeffa90fea299089f02e15418f4dc47e",
+    "source_http_requests": 0
+  },
+  "output_failure_r1_cause_unobserved": true,
+  "primary_document_read_after_index_metadata": true,
+  "production_writes_install_restart_commit_merge_push": false,
+  "public_original_followed_by_host_diagnostic_not_product_agent": true,
+  "raw_files_sha256": {
+    "analysis-r2": {
+      "analysis-output.json": "41fc263f2998bf314d732c23469cd77b3bfae565f9ebe46b0a0ccc7564ed66b1",
+      "metrics.json": "1c9dc70601a8649469f3684fc3b594298d6283374eec429fc764411702dda312",
+      "native-final.json": "95e6de2cccda53922911bf4914b6052479674419d67b18b56f6bafb3bb4ec451",
+      "prepared.json": "e0e5e7195703f9e2c7ea72df4253112dfc9a9a584e80d67afd3cc78005972e51"
+    },
+    "document": {
+      "document-page.json": "f1a96e667325653d0dda60d5151be07e7c8baac322ba5f093305ff4b0734a82c",
+      "index-page.json": "8a24efdea0a3f7d996bfc6ede5b2c292ecc0bc75b7a6b0c753b6c802c34e4cd8",
+      "metrics.json": "64f0f0ef8cbf7d91592ac9f84564896fb8c39bcdf14586445f6f926ed56f2866",
+      "prepared.json": "88a59fa2be1e2d5fd92b39c06e8f2801869ea1cc476087d0966463cba716a5b7"
+    },
+    "original": {
+      "metrics.json": "0e2884d1d854582758e82adb93bf9f0746e9fb4327e42bfa46792ae2e5860a6f",
+      "original-page.json": "d2d28a54d25e9bd992fcab3dc4239fb865e022b0721211721d38744d691e01ce",
+      "prepared.json": "d9a2df22fa7cea7af99e251cb3e4ade09eafcddd8fb51ad5714ab4cc412a439a",
+      "preview.json": "0ce118c7ea2c678619eeb2314f85a50c0be310f3c7d829f1229374834ed3a766"
+    }
+  },
+  "remaining_product_gaps": [
+    "No search/follow-source pass after discovering publisher-provided partial text",
+    "No bounded correction of citation, definition, date or contradictory-label output",
+    "Journal call-id CHECK admits only search-1 and analysis-1; expansion requires an explicit schema decision"
+  ],
+  "same_input_analysis_r2_schema_valid_but_not_actionable": {
+    "action": null,
+    "block_reasons": [
+      "announcement_date_not_supported",
+      "effective_date_not_supported",
+      "listing_change_not_supported",
+      "material_contradiction",
+      "security_identity_not_supported",
+      "source_citation_mismatch"
+    ],
+    "unique_passage_count": 4
+  },
+  "sdk_submissions_this_turn": 4,
+  "source_checkpoint": {
+    "manifest_sha256": "5ec0d8b7852c102d5765ab8575c6c38d35287d38caef62be96444b503927e76e",
+    "matched_files": 1113,
+    "seal_sha256": "05a81e10133bbd66fe14b42fed636d4b2cd6f629cef4c379dda43000ce7d7781"
+  },
+  "source_http_attempts_this_turn": 9,
+  "source_http_budget_remaining": 15,
+  "verifier_sha256": "328a75cd0dad69edcadd025f3cc56b91996f9cf495b933086af712fc7a2f78b2",
+  "whole_document_decoded_bytes": 64749,
+  "whole_document_encoded_bytes": 9529
+}

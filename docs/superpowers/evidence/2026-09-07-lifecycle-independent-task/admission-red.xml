@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="1.291" timestamp="2026-09-07T23:20:47.606696+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_investigation_routing" name="test_investigation_catalog_does_not_offer_unimplemented_custom_models" time="0.002"><failure message="AttributeError: 'TaskInfo' object has no attribute 'supports_custom_models'">tests/test_lifecycle_investigation_routing.py:50: in test_investigation_catalog_does_not_offer_unimplemented_custom_models
+    assert tasks[TASK].supports_custom_models is False
+/home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/pydantic/main.py:1026: in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E   AttributeError: 'TaskInfo' object has no attribute 'supports_custom_models'</failure></testcase><testcase classname="tests.test_lifecycle_investigation_routing" name="test_investigation_route_store_failure_projects_an_actionable_gap" time="0.283"><failure message="ImportError: cannot import name 'ModelRouteUnavailable' from 'src.model_routing' (/tmp/arkscope-lifecycle-terminal-membership/src/model_routing.py)">tests/test_lifecycle_investigation_routing.py:66: in test_investigation_route_store_failure_projects_an_actionable_gap
+    packet = service.prepare(c["case_id"], question="listing_status")
+src/lifecycle_web_preflight.py:89: in prepare
+    binding, request, selected, options, label = self._material(case_id, question=question)
+src/lifecycle_web_preflight.py:71: in _material
+    route = self.route_loader()
+tests/test_lifecycle_investigation_routing.py:62: in unavailable
+    from src.model_routing import ModelRouteUnavailable
+E   ImportError: cannot import name 'ModelRouteUnavailable' from 'src.model_routing' (/tmp/arkscope-lifecycle-terminal-membership/src/model_routing.py)</failure></testcase></testsuite></testsuites>

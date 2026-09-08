@@ -1,0 +1,9 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "typecheck"
+  ],
+  "exit_code": 0,
+  "output": "\n> arkscope-web@0.0.1 typecheck\n> tsc --noEmit\n\n"
+}

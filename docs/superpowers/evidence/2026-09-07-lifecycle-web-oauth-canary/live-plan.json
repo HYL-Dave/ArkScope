@@ -1,0 +1,64 @@
+{
+  "as_of": "2026-09-07",
+  "authority": "2026-09-07 user authorized Claude Code OAuth LLM live test; no other provider/billing source",
+  "credential_metadata_sha256": "d056df71646718169a7d8ceac3f0ccc7ffc79885b748b3bf06ff577683d1f586",
+  "credential_selection": "unique currently active Claude Code OAuth credential; no credential change",
+  "execution": {
+    "auth_mode": "claude_code_oauth",
+    "model": "claude-sonnet-5",
+    "provider": "anthropic"
+  },
+  "harness_sha256": "37c05195402ec367061ac20da02472411263707cc560671e399415fd2f6eb374",
+  "limits_not_claimed": [
+    "Exact native/hidden provider HTTP count",
+    "No hidden provider-internal retry",
+    "Other auth channels are live verified"
+  ],
+  "max_cli_internal_turns": {
+    "analysis": 2,
+    "search": 6
+  },
+  "max_model_submissions": 2,
+  "no_fallback": true,
+  "no_profile_action": true,
+  "no_retry": true,
+  "offline_source": {
+    "manifest_sha256": "d25bea368df087a19893e63b52d94847009ce058e996706a4f1326a3a4417256",
+    "matched_files": 1070
+  },
+  "options": {
+    "effort": "medium",
+    "max_redirects": 2,
+    "max_search_uses": 4,
+    "max_source_bytes": 2097152,
+    "max_source_requests": 8,
+    "max_sources": 4,
+    "model_timeout_seconds": 180,
+    "output_token_limit": null,
+    "source_timeout_seconds": 45
+  },
+  "oracle": {
+    "auth": "Every phase must observe literal apiKeySource=none and the selected model.",
+    "protocol": "Real search, at least one captured public page, complete analysis and durable readback.",
+    "quality": "TA must bind TravelCenters, not a generic abbreviation. Acquisition alone is not delisting; BP is not an alias. Insufficient source text must block action.",
+    "safety": "No executable/file/MCP tool, substitute credential/model or automatic human confirmation."
+  },
+  "production_route_change": false,
+  "production_writes": false,
+  "public_input": {
+    "as_of": "2026-09-07",
+    "composite_figi": null,
+    "issuer_cik": null,
+    "issuer_name": "TravelCenters of America Inc.",
+    "question": "listing_status",
+    "security_class": null,
+    "ticker": "TA",
+    "venue": null
+  },
+  "runtime": {
+    "cli_binary_version": "2.1.258",
+    "cli_metadata_version": "2.1.258",
+    "sdk_module_version": "0.2.151",
+    "sdk_version": "0.2.151"
+  }
+}

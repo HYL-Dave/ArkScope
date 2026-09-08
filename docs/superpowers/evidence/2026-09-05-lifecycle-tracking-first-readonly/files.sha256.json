@@ -1,0 +1,15 @@
+{
+  "algorithm": "sha256",
+  "scope": "public_readonly_inventory_packet",
+  "files": {
+    "README.md": "8b1e858ad05f5e43de2095140017fd662200cb826cc87a6a6214b698e56f0d40",
+    "inventory-summary.json": "8905d64e0922e42164e69be48572aa1ddf35bee28a5b4552ff474e47818c8e82",
+    "sa-sync-summary.json": "22cd2e411e0ccfd7003cf6f9947c9c3d139f2d675a9ce2f8cea951db3d005b13",
+    "price-gap-shapes.json": "6d600d466e356d092c17a004f5d7d82ef6963ff700806e4970c6ea026da7474a",
+    "source-manifest.json": "535eba3947e36fdd3ff49c6dbcb6fc800d80e6898b37c4223436991428b41bee",
+    "verification.json": "ac889dd63a0f2cffade74c374bdecfcd6044bf486be247d37cfe03d98d1bcda8",
+    "scripts/inventory.py": "e9695a4d265fa0aec88087b2b65440cbdd67babc610ad95ac5fce883edeb4f20",
+    "scripts/sync_inventory.py": "f2e35bfe2b33dc4334d0478808b152641621401d441b6fcc4859d27fbde36f66",
+    "scripts/test_inventory.py": "e2f6492207e922dfc538645ab685d73f02745a78326425994cbae4b20f37bb2f"
+  }
+}

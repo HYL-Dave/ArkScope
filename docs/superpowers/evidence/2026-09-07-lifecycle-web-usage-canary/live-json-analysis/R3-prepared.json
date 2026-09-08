@@ -1,0 +1,30 @@
+{
+  "capture_files_sha256": {
+    "authorized-plan.json": "97fb9f86678a811139ec006ea8988b7ce6f93fac5615bb49080db69cb03d3d1b",
+    "metrics.json": "17c9f27aea1081674023ea9989876a2e478698f0ca4ee084d03e996f646d8455",
+    "profile.sqlite": "5e4817e0f3e7627433eca5e54254066d686e3c4900c6600be4a10a061e28269a",
+    "result.json": "7d1115e20d9932bfb142c492db2b2deeedfb5d2b0576109a89ee436d40885870",
+    "search-output.json": "9c5a3925314f4acc1b90d2a25d5deee824dcfc9f8837c3af16a992caf34279ff"
+  },
+  "capture_source_checkpoint": {
+    "manifest_sha256": "0d20a6b4ec6b4c014d7d7da3c2ff9e4224d610c96d9af51b4807b3639069113e",
+    "matched_files": 1095,
+    "seal_sha256": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4"
+  },
+  "events": [],
+  "harness_sha256": "e85b5adeda59d34a02409104d2f304ffb9cb173f97c1ee9df4f1ee6c46cb3412",
+  "kind": "analysis_only_diagnostic_not_new_end_to_end_run",
+  "local_children_reaped": [],
+  "prompt_sha256": "e05bb1280fed190323601e59e8cebff1b9a66c98fd8a11c6fac4d769ddd1f9c6",
+  "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+  "sdk_submissions": 0,
+  "search_submissions": 0,
+  "source_checkpoint": {
+    "manifest_sha256": "bc0b382b3e517e992a4818c839157e9a9c850986bdbb88f56d7c50a582c799bf",
+    "matched_files": 1101,
+    "seal_sha256": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60"
+  },
+  "source_http_requests": 0,
+  "started_at": "2026-09-07T12:23:08.375210+00:00",
+  "token_loads": 0
+}

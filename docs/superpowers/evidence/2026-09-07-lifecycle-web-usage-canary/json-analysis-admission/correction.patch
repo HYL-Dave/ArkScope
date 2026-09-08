@@ -1,0 +1,204 @@
+--- before/src/auth_drivers/lifecycle_web_claude.py
++++ after/src/auth_drivers/lifecycle_web_claude.py
+@@ -75,7 +75,7 @@
+                 return self.reject("search_budget_exhausted")
+             else:
+                 self._search[identity] = signature
+-        elif name != "StructuredOutput":
++        elif name != "StructuredOutput" or self.call.phase != "search":
+             return self.reject("unexpected_tool_activity")
+         return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}
+ 
+@@ -94,7 +94,7 @@
+         raise WebModelError("subscription_auth_unverified") from None
+     require_response_model(data, call.selection.model)
+     tools = data.get("tools")
+-    expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
++    expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+     if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+             or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+             or data.get("mcp_servers") != []):
+@@ -166,19 +166,20 @@
+         disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+         system_prompt = "Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks."
+         if call.phase == "analysis":
+-            # Toolless CLI output can emit generic tool-template fields. Anchor
+-            # the response to the same schema; never repair malformed arguments.
++            # Toolless native StructuredOutput can emit template placeholders.
++            # Declare final JSON up front, with the same strict host validator.
++            disallowed.add("StructuredOutput")
+             system_prompt += (
+-                " StructuredOutput is the required response mechanism, not an evidence-access tool. "
+-                "Submit the final object itself as its arguments, not a function-call wrapper. "
+-                "Use the exact property names and value types in the schema below, including nested objects. "
+-                "Do not search, read files, execute commands, or call any other tool.\nOutput schema:\n"
++                " Your final response must be exactly one JSON object matching the schema below. "
++                "Use its exact property names and value types, including nested objects. "
++                "Do not wrap the object in a function call, Markdown fences, or explanatory text. "
++                "Do not search, read files, execute commands, or call any tool.\nOutput schema:\n"
+                 + json.dumps(call.output_schema, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
+             )
+         options = ClaudeAgentOptions(
+             model=call.selection.model, effort=call.effort, fallback_model=None,
+             system_prompt=system_prompt,
+-            output_format={"type": "json_schema", "schema": call.output_schema},
++            output_format={"type": "json_schema", "schema": call.output_schema} if call.phase == "search" else None,
+             tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+             mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+             hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+@@ -248,7 +249,7 @@
+                             if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                 observed_search.add(block.id)
+                                 control.observe_web_action(call.call_id, block.id, "search")
+-                            elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
++                            elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput" and call.phase == "search":
+                                 continue
+                             elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                 raise WebModelError("unexpected_tool_activity")
+@@ -266,7 +267,13 @@
+                             raise WebModelError("tool_admission_missing")
+                         if status != "completed":
+                             raise WebModelError("model_result_incomplete")
+-                        output = validate_output(message.structured_output, call.output_schema)
++                        if call.phase == "analysis":
++                            if message.structured_output is not None or not isinstance(message.result, str):
++                                raise WebModelError("model_output_invalid")
++                            value = message.result
++                        else:
++                            value = message.structured_output
++                        output = validate_output(value, call.output_schema)
+                         usage = claude_usage_observation(message, call.selection.model)
+                         return ModelReply(session_id, output, {key: usage["values"][key] for key in TOKEN_FIELDS}, usage)
+                     elif isinstance(message, UserMessage):
+--- before/tests/test_lifecycle_web_claude.py
++++ after/tests/test_lifecycle_web_claude.py
+@@ -1,4 +1,5 @@
+ import asyncio
++import json
+ from dataclasses import replace
+ from pathlib import Path
+ from types import SimpleNamespace
+@@ -68,7 +69,7 @@
+         session = self.options.session_id
+         yield SystemMessage(subtype="init", data={
+             "session_id": session, "apiKeySource": "none", "model": "claude-opus-5",
+-            "tools": list(self.options.tools) + ["StructuredOutput"], "mcp_servers": [],
++            "tools": list(self.options.tools) + (["StructuredOutput"] if self.options.output_format else []), "mcp_servers": [],
+             **self.init_changes,
+         })
+         if "WebSearch" in self.options.tools:
+@@ -84,7 +85,8 @@
+             async for item in self.before_result(self):
+                 yield item
+             return
+-        yield _result(session, **self.result_changes)
++        response = {} if self.options.output_format else {"structured_output": None, "result": json.dumps(OUTPUT)}
++        yield _result(session, **{**response, **self.result_changes})
+ 
+ 
+ def _setup(monkeypatch, **changes):
+--- before/tests/test_lifecycle_web_claude_output_contract.py
++++ after/tests/test_lifecycle_web_claude_output_contract.py
+@@ -22,9 +22,10 @@
+     result = await mod.call_claude_web(request, credential, control)
+     options = clients[0].options
+     instructions, separator, schema = options.system_prompt.partition("\nOutput schema:\n")
+-    assert separator and json.loads(schema) == options.output_format["schema"] == SCHEMA
+-    assert "StructuredOutput" in instructions and "final object itself" in instructions
+-    assert "not a function-call wrapper" in instructions
++    assert separator and json.loads(schema) == request.output_schema == SCHEMA
++    assert options.output_format is None
++    assert "final response" in instructions and "one JSON object" in instructions
++    assert "Do not wrap the object in a function call" in instructions
+     assert options.tools == [] and "WebSearch" in options.disallowed_tools
+     assert options.max_turns == 2 and len(clients[0].queries) == control.model_requests == 1
+     assert clients[0].queries[0][0] == request.prompt and result.output == OUTPUT
+@@ -48,7 +49,7 @@
+     {"result": OUTPUT},
+ ])
+ async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+-    mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
++    mod, clients = _setup(monkeypatch, result={"result": json.dumps(wrapped)})
+     request = _request(phase="analysis", call_id="analysis-1")
+     control = RunControl(selection=request.selection, max_model_requests=1)
+     credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+--- before/tests/test_lifecycle_web_claude_wire.py
++++ after/tests/test_lifecycle_web_claude_wire.py
+@@ -49,9 +49,16 @@
+             assert message["session_id"] == session
+             await self.messages.put({"type": "system", "subtype": "init", "session_id": session,
+                                      "model": self.options.model, "apiKeySource": "none",
+-                                     "tools": list(self.options.tools) + ["StructuredOutput"], "mcp_servers": []})
++                                     "tools": list(self.options.tools) + (["StructuredOutput"] if self.options.output_format else []),
++                                     "mcp_servers": []})
+             await self.messages.put({"type": "rate_limit_event", "uuid": "rate-1", "session_id": session,
+                                      "rate_limit_info": {"status": "allowed", "rateLimitType": "five_hour"}})
++            if self.options.output_format is None and not self.forbidden:
++                await self.messages.put({"type": "assistant", "session_id": session, "message": {
++                    "model": self.options.model, "content": [{"type": "text", "text": json.dumps(OUTPUT)}],
++                }})
++                await self.finish(True)
++                return
+             name = "Bash" if self.forbidden else ("WebSearch" if "WebSearch" in self.options.tools else "StructuredOutput")
+             value = {"query": "Issuer Old Inc listing"} if name == "WebSearch" else OUTPUT
+             await self.messages.put({"type": "control_request", "request_id": "gate-1", "request": {
+@@ -67,12 +74,17 @@
+                     "model": self.options.model, "content": [{"type": "tool_use", "id": "tool-1", "name": "WebSearch",
+                                                               "input": {"query": "Issuer Old Inc listing"}}],
+                 }})
+-            await self.messages.put({"type": "result", "subtype": "success", "duration_ms": 1, "duration_api_ms": 1,
+-                                     "is_error": False, "num_turns": 2, "session_id": session,
+-                                     "terminal_reason": "completed" if allowed else "aborted_tools",
+-                                     "structured_output": OUTPUT if allowed else None,
+-                                     "usage": {"input_tokens": 1, "output_tokens": 2},
+-                                     "modelUsage": {self.options.model: {"inputTokens": 1, "outputTokens": 2}}})
++            await self.finish(allowed)
++
++    async def finish(self, allowed):
++        await self.messages.put({"type": "result", "subtype": "success", "duration_ms": 1, "duration_api_ms": 1,
++                                 "is_error": False, "num_turns": 2 if self.options.output_format else 1,
++                                 "session_id": self.options.session_id,
++                                 "terminal_reason": "completed" if allowed else "aborted_tools",
++                                 "structured_output": OUTPUT if allowed and self.options.output_format else None,
++                                 "result": json.dumps(OUTPUT) if allowed and self.options.output_format is None else None,
++                                 "usage": {"input_tokens": 1, "output_tokens": 2},
++                                 "modelUsage": {self.options.model: {"inputTokens": 1, "outputTokens": 2}}})
+ 
+     async def read_messages(self):
+         while True:
+@@ -94,7 +106,7 @@
+ 
+ 
+ @pytest.mark.anyio
+-@pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True)])
++@pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True), ("analysis", True)])
+ async def test_actual_claude_sdk_serializes_web_hook_and_owned_result(monkeypatch, phase, forbidden):
+     from src.auth_drivers import lifecycle_web_claude as mod
+ 
+@@ -121,10 +133,14 @@
+         assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+     assert len(peers) == 1 and peers[0].closed
+     assert len([message for message in peers[0].writes if message["type"] == "user"]) == 1
+-    hook = next(message["response"]["response"] for message in peers[0].writes if message["type"] == "control_response")
+-    assert hook["hookSpecificOutput"]["permissionDecision"] == ("deny" if forbidden else "allow")
++    hooks = [message["response"]["response"] for message in peers[0].writes if message["type"] == "control_response"]
++    if phase == "search" or forbidden:
++        assert len(hooks) == 1
++        assert hooks[0]["hookSpecificOutput"]["permissionDecision"] == ("deny" if forbidden else "allow")
++    else:
++        assert hooks == []
+     if forbidden:
+-        assert hook["continue"] is False and "continue_" not in hook
++        assert hooks[0]["continue"] is False and "continue_" not in hooks[0]
+         assert control.stop_state == "cancelled"
+     command = commands[0]
+     assert command[0] == "/reviewed/bundled/claude"
+@@ -132,4 +148,7 @@
+     assert command[command.index("--permission-mode") + 1] == "dontAsk"
+     assert "--setting-sources=" in command
+     assert "--strict-mcp-config" in command
+-    assert json.loads(command[command.index("--json-schema") + 1]) == SCHEMA
++    if phase == "search":
++        assert json.loads(command[command.index("--json-schema") + 1]) == SCHEMA
++    else:
++        assert "--json-schema" not in command

@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="17" skipped="0" tests="17" time="0.598" timestamp="2026-09-06T22:57:52.844755+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness" time="0.003"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b00d0&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness(monkeypatch):
+&gt;       mod, clients = _setup(monkeypatch)
+
+tests/test_lifecycle_web_claude.py:108: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b00d0&gt;
+changes = {}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_analysis_has_no_web_or_filesystem_tools" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f7b50&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_has_no_web_or_filesystem_tools(monkeypatch):
+&gt;       mod, clients = _setup(monkeypatch)
+
+tests/test_lifecycle_web_claude.py:139: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f7b50&gt;
+changes = {}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init0]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b0b80&gt;
+init = {'apiKeySource': None}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("init", [
+        {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+        {"model": "claude-sonnet-5"}, {"session_id": "foreign"},
+        {"tools": ["WebSearch", "Bash"]}, {"mcp_servers": [{"name": "foreign"}]},
+    ])
+    async def test_claude_web_rejects_changed_init_and_never_falls_back(monkeypatch, init):
+&gt;       mod, clients = _setup(monkeypatch, init=init)
+
+tests/test_lifecycle_web_claude.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b0b80&gt;
+changes = {'init': {'apiKeySource': None}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init1]" time="0.003"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b20b0&gt;
+init = {'apiKeySource': 'ANTHROPIC_API_KEY'}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("init", [
+        {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+        {"model": "claude-sonnet-5"}, {"session_id": "foreign"},
+        {"tools": ["WebSearch", "Bash"]}, {"mcp_servers": [{"name": "foreign"}]},
+    ])
+    async def test_claude_web_rejects_changed_init_and_never_falls_back(monkeypatch, init):
+&gt;       mod, clients = _setup(monkeypatch, init=init)
+
+tests/test_lifecycle_web_claude.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b20b0&gt;
+changes = {'init': {'apiKeySource': 'ANTHROPIC_API_KEY'}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init2]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee656cb0&gt;
+init = {'model': 'claude-sonnet-5'}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("init", [
+        {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+        {"model": "claude-sonnet-5"}, {"session_id": "foreign"},
+        {"tools": ["WebSearch", "Bash"]}, {"mcp_servers": [{"name": "foreign"}]},
+    ])
+    async def test_claude_web_rejects_changed_init_and_never_falls_back(monkeypatch, init):
+&gt;       mod, clients = _setup(monkeypatch, init=init)
+
+tests/test_lifecycle_web_claude.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee656cb0&gt;
+changes = {'init': {'model': 'claude-sonnet-5'}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init3]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b3670&gt;
+init = {'session_id': 'foreign'}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("init", [
+        {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+        {"model": "claude-sonnet-5"}, {"session_id": "foreign"},
+        {"tools": ["WebSearch", "Bash"]}, {"mcp_servers": [{"name": "foreign"}]},
+    ])
+    async def test_claude_web_rejects_changed_init_and_never_falls_back(monkeypatch, init):
+&gt;       mod, clients = _setup(monkeypatch, init=init)
+
+tests/test_lifecycle_web_claude.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b3670&gt;
+changes = {'init': {'session_id': 'foreign'}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init4]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee654490&gt;
+init = {'tools': ['WebSearch', 'Bash']}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("init", [
+        {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+        {"model": "claude-sonnet-5"}, {"session_id": "foreign"},
+        {"tools": ["WebSearch", "Bash"]}, {"mcp_servers": [{"name": "foreign"}]},
+    ])
+    async def test_claude_web_rejects_changed_init_and_never_falls_back(monkeypatch, init):
+&gt;       mod, clients = _setup(monkeypatch, init=init)
+
+tests/test_lifecycle_web_claude.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee654490&gt;
+changes = {'init': {'tools': ['WebSearch', 'Bash']}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init5]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f5b70&gt;
+init = {'mcp_servers': [{'name': 'foreign'}]}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("init", [
+        {"apiKeySource": None}, {"apiKeySource": "ANTHROPIC_API_KEY"},
+        {"model": "claude-sonnet-5"}, {"session_id": "foreign"},
+        {"tools": ["WebSearch", "Bash"]}, {"mcp_servers": [{"name": "foreign"}]},
+    ])
+    async def test_claude_web_rejects_changed_init_and_never_falls_back(monkeypatch, init):
+&gt;       mod, clients = _setup(monkeypatch, init=init)
+
+tests/test_lifecycle_web_claude.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f5b70&gt;
+changes = {'init': {'mcp_servers': [{'name': 'foreign'}]}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result0-execution_identity_changed]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b0ee0&gt;
+result = {'session_id': 'foreign'}, code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+&gt;       mod, clients = _setup(monkeypatch, result=result)
+
+tests/test_lifecycle_web_claude.py:173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee7b0ee0&gt;
+changes = {'result': {'session_id': 'foreign'}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result1-model_result_incomplete]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee655e10&gt;
+result = {'is_error': True, 'terminal_reason': 'max_turns'}
+code = 'model_result_incomplete'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+&gt;       mod, clients = _setup(monkeypatch, result=result)
+
+tests/test_lifecycle_web_claude.py:173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee655e10&gt;
+changes = {'result': {'is_error': True, 'terminal_reason': 'max_turns'}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result2-model_result_incomplete]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f5c00&gt;
+result = {'terminal_reason': None}, code = 'model_result_incomplete'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+&gt;       mod, clients = _setup(monkeypatch, result=result)
+
+tests/test_lifecycle_web_claude.py:173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f5c00&gt;
+changes = {'result': {'terminal_reason': None}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result3-execution_identity_changed]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee655f00&gt;
+result = {'model_usage': {'claude-sonnet-5': {}}}
+code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+&gt;       mod, clients = _setup(monkeypatch, result=result)
+
+tests/test_lifecycle_web_claude.py:173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee655f00&gt;
+changes = {'result': {'model_usage': {'claude-sonnet-5': {}}}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result4-model_output_invalid]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f61d0&gt;
+result = {'structured_output': {'sources': [], 'write_profile': True}}
+code = 'model_output_invalid'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+&gt;       mod, clients = _setup(monkeypatch, result=result)
+
+tests/test_lifecycle_web_claude.py:173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee5f61d0&gt;
+changes = {'result': {'structured_output': {'sources': [], 'write_profile': True}}}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_observed_web_call_without_pretool_reservation_is_rejected" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee655b40&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_observed_web_call_without_pretool_reservation_is_rejected(monkeypatch):
+&gt;       mod, clients = _setup(monkeypatch, omit_hook=True)
+
+tests/test_lifecycle_web_claude.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee655b40&gt;
+changes = {'omit_hook': True}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_pretool_gate_denies_files_subagents_and_budget_excess" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_claude'">@pytest.mark.anyio
+    async def test_claude_pretool_gate_denies_files_subagents_and_budget_excess():
+&gt;       from src.auth_drivers.lifecycle_web_claude import WebToolGate
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_claude'
+
+tests/test_lifecycle_web_claude.py:195: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[True]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee6573d0&gt;
+terminal = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("terminal", [True, False])
+    async def test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation(monkeypatch, terminal):
+        ready = asyncio.Event()
+    
+        async def hold(client):
+            ready.set()
+            await client.interrupted.wait()
+            if terminal:
+                yield _result(client.options.session_id, terminal_reason="aborted_streaming", structured_output=None)
+            else:
+                await asyncio.Event().wait()
+    
+&gt;       mod, clients = _setup(monkeypatch, before_result=hold)
+
+tests/test_lifecycle_web_claude.py:230: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee6573d0&gt;
+changes = {'before_result': &lt;function test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation.&lt;locals&gt;.hold at 0x7987ee5eb0a0&gt;}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[False]" time="0.003"><failure message="ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee64bf70&gt;
+terminal = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("terminal", [True, False])
+    async def test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation(monkeypatch, terminal):
+        ready = asyncio.Event()
+    
+        async def hold(client):
+            ready.set()
+            await client.interrupted.wait()
+            if terminal:
+                yield _result(client.options.session_id, terminal_reason="aborted_streaming", structured_output=None)
+            else:
+                await asyncio.Event().wait()
+    
+&gt;       mod, clients = _setup(monkeypatch, before_result=hold)
+
+tests/test_lifecycle_web_claude.py:230: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7987ee64bf70&gt;
+changes = {'before_result': &lt;function test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation.&lt;locals&gt;.hold at 0x7987ee5ea560&gt;}
+
+    def _setup(monkeypatch, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_claude as mod
+E       ImportError: cannot import name 'lifecycle_web_claude' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_claude.py:91: ImportError</failure></testcase></testsuite></testsuites>

@@ -1,0 +1,23 @@
+{
+  "added": {
+    "tests/test_lifecycle_web_attended_concurrency.py": "5b347cc15c3efb759d17d9445a17dffe8339dd2b63e37211637fce9d1fbdd788"
+  },
+  "changed": {
+    "src/lifecycle_web_review.py": {
+      "after": "31592f2cb89a7b8da5d42bfbab229c8ede76b76c84ec22a65971d74058437155",
+      "before": "9e4067951ee26d1ad0c3f5fb854afbe3fdedc1314ffa717d1444e762c5fed2b3"
+    },
+    "src/lifecycle_web_store.py": {
+      "after": "0f9a82d6ec1bca169a182577c92a25a3dda5875c1badf70903be5c1c6f4471cd",
+      "before": "50cad02233b6af1ab35482f351ac16446f724d63f0da616b4101d088cc6bb500"
+    },
+    "src/security_lifecycle_review.py": {
+      "after": "b5710e2fe49ebd259a5b5b29657199a6c85652938b6b17aac89f4cd373dcc6c3",
+      "before": "2e2aa668549ccb2592d9f3af18713e81e1c2fc1f99b23f32b79300ab71b9d599"
+    },
+    "src/ticker_identity_transition.py": {
+      "after": "4aedf17577e8332337ee024c95f79bea3e3817e93d086bf031c69382c600baed",
+      "before": "8d9b23a310ae73805ac283d0bdab329b9c7a21e227dd27d94d7a161e33684c2f"
+    }
+  }
+}

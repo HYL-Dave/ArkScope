@@ -1,0 +1,183 @@
+[
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [],
+    "name": "backend-baseline",
+    "layer": "backend",
+    "returncode": 0,
+    "report_sha256": "3dafd2c4432ddb1299258ac659b07d776a8553ec5b79c9d26e59a268b6ed4aa3"
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[active_listing-Class B common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[listing_ended-Class B common stock]",
+      "tests.test_lifecycle_investigation_findings::test_instrument_synonyms_cannot_cross_security_classes[Class B common stock]"
+    ],
+    "name": "nominal_value_normalization_erases_named_share_class",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "c32e5f2583dbb6faee956d3a538e2f5f2522a616b5d71f9a36b03cc04d862b73",
+    "owner": "test_par_value_normalization_never_discards_security_class",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "name = _PAR_VALUE_SUFFIX.sub(\"\", name.strip())",
+    "new": "name = re.sub(r\"^Class [A-Za-z0-9]+\\s+\", \"\", _PAR_VALUE_SUFFIX.sub(\"\", name.strip()), flags=re.I)",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-Common Stock, $0.001 par value per share-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-common shares (par value $0.001 per share)-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-Class A common stock, $0.001 par value per share-Class A common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-Common Stock, $0.001 par value per share-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-common shares (par value $0.001 per share)-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-Class A common stock, $0.001 par value per share-Class A common stock]"
+    ],
+    "name": "par_value_mistaken_for_share_class",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "1deb81821a17770c67d759c7175fa0bc7f3c5af8e638d0500cde68fcc3098231",
+    "owner": "test_par_value_does_not_change_common_stock_event_identity",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "name = _PAR_VALUE_SUFFIX.sub(\"\", name.strip())",
+    "new": "name = name.strip()",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_grounding_feedback_preserves_candidate_for_targeted_correction"
+    ],
+    "name": "rejected_candidate_lost_between_corrections",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "b95700c9c865e7eae03deda73b3d2201a0692b2be543c25c9dbb36ed3b1adac0",
+    "owner": "test_grounding_feedback_preserves_candidate_for_targeted_correction",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "\"candidate\": step.finding.model_dump()",
+    "new": "\"candidate\": None",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_small_fragmented_notice_initial_context_preserves_complete_document"
+    ],
+    "name": "fragment_count_starves_short_notice",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "795ab8517e5755122d51348ec43e6774a02a3d57c2e093c2d9865b86c3259aa0",
+    "owner": "test_small_fragmented_notice_initial_context_preserves_complete_document",
+    "path": "src/lifecycle_investigation/sources.py",
+    "old": "complete = limit is None and offset == 0 and len(source[\"text\"]) <= 12 * 2000",
+    "new": "complete = False",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed"
+    ],
+    "name": "read_query_accepted_but_ignored",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "5d7c0b59ed7efccc97a3db4a1edc6712971a267b51dc84bb04c84a41cd182e3b",
+    "owner": "test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "last_feedback = await read_url(step.url, query=step.query)",
+    "new": "last_feedback = await read_url(step.url)",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed"
+    ],
+    "name": "search_date_hints_accepted_but_ignored",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "2793d0850f3acd15d218817fa5ecc319e2a851316d9a31825ba774230cb8312b",
+    "owner": "test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "\"publication_window_hint\": {\"since\": step.since, \"until\": step.until}",
+    "new": "\"publication_window_hint\": {\"since\": None, \"until\": None}",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed"
+    ],
+    "name": "observed_search_candidates_disappear_after_error",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "cca366d03a7c868e582c4953942548088707b4e0a4a356eeaf1aeb3aff26904c",
+    "owner": "test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "\"web_candidates\": list(web_candidates.values())",
+    "new": "\"web_candidates\": []",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_routes::test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]"
+    ],
+    "name": "adopted_finding_offered_as_new_action",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "8d1ee84efedcc0ac3a56b5503dbb7489d6ab2a8580bd3a5bde74bb92ce4fc794",
+    "owner": "test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+    "path": "src/lifecycle_investigation/controller.py",
+    "old": " and not row[\"adopted\"]",
+    "new": "",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]",
+      "tests.test_security_lifecycle_current::test_frontend_fixture_is_owned_by_the_real_persisted_workflow"
+    ],
+    "name": "current_reverse_readiness_not_projected",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "fb184097b018ced51a23afde61ee9070f4906e79f6ccb5c5c81a3c16e076dd98",
+    "owner": "test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+    "path": "src/ticker_identity_service.py",
+    "old": "item[\"reverse_readiness\"] = readiness_by_transition[transition_id]",
+    "new": "pass",
+    "owner_failed": true
+  },
+  {
+    "tests": 2659,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_provider::test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]"
+    ],
+    "name": "provider_preview_attempts_auto_approval",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "9e4004e3221cd65b1a4e2bb889ebbac930cdba30ada3b36df3cc4f336a9f17ff",
+    "owner": "test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]",
+    "path": "src/lifecycle_investigation/provider_review.py",
+    "old": "transition_mutation_allowed=lambda: False",
+    "new": "transition_mutation_allowed=lambda: True",
+    "owner_failed": true
+  }
+]

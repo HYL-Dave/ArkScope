@@ -1,0 +1,199 @@
+{
+  "capture_files_sha256": {
+    "authorized-plan.json": "97fb9f86678a811139ec006ea8988b7ce6f93fac5615bb49080db69cb03d3d1b",
+    "metrics.json": "17c9f27aea1081674023ea9989876a2e478698f0ca4ee084d03e996f646d8455",
+    "profile.sqlite": "5e4817e0f3e7627433eca5e54254066d686e3c4900c6600be4a10a061e28269a",
+    "result.json": "7d1115e20d9932bfb142c492db2b2deeedfb5d2b0576109a89ee436d40885870",
+    "search-output.json": "9c5a3925314f4acc1b90d2a25d5deee824dcfc9f8837c3af16a992caf34279ff"
+  },
+  "capture_source_checkpoint": {
+    "manifest_sha256": "0d20a6b4ec6b4c014d7d7da3c2ff9e4224d610c96d9af51b4807b3639069113e",
+    "matched_files": 1095,
+    "seal_sha256": "3bd019ea5014e06a0249173e208ac5f7900ee9c063081c9e017b77afc1e438d4"
+  },
+  "events": [
+    {
+      "api_key_source": "none",
+      "kind": "init",
+      "mcp_server_count": 0,
+      "model": "claude-sonnet-5",
+      "session_matches_request": true,
+      "tools": []
+    },
+    {
+      "kind": "RateLimitEvent"
+    },
+    {
+      "error_present": false,
+      "kind": "assistant",
+      "model": "claude-sonnet-5",
+      "structured_output_attempts": [],
+      "tool_names": []
+    },
+    {
+      "errors": [],
+      "final_json_schema_valid": true,
+      "has_structured_output": false,
+      "is_error": false,
+      "kind": "result",
+      "model_usage": {
+        "models": [
+          {
+            "cache_creation_input_tokens": 10646,
+            "cache_read_input_tokens": 0,
+            "input_tokens": 10450,
+            "invalid_fields": [],
+            "model": "claude-sonnet-5",
+            "output_tokens": 1204,
+            "shape": "object",
+            "web_search_requests": 0
+          }
+        ],
+        "shape": "object"
+      },
+      "model_usage_models": [
+        "claude-sonnet-5"
+      ],
+      "native_output_is_observation_not_host_acceptance": true,
+      "native_output_projection": {
+        "announcement_date": "2023-05-16",
+        "announcement_date_text": "May 16, 2023",
+        "citations": [
+          {
+            "quote_sha256": "478aff396cdd9165e90aec11d0d6a6af63e01c87195d199055ca3a56055a8774",
+            "quote_utf8_bytes": 256,
+            "source_id": "source-1",
+            "supports": [
+              "acquisition_announced",
+              "security_identity"
+            ]
+          },
+          {
+            "quote_sha256": "d166b90bbd5859252e66430d5b77f2064d43696083c2414a99325e3549aa1de8",
+            "quote_utf8_bytes": 149,
+            "source_id": "source-1",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "quote_sha256": "5693ec8f54eb070857deea84726b091ca0edd61adb8d9ca6e47448055f037514",
+            "quote_utf8_bytes": 108,
+            "source_id": "source-2",
+            "supports": [
+              "acquisition_announced"
+            ]
+          },
+          {
+            "quote_sha256": "79d2c4cafd60d6b800a96c5cfb13ed650fb19c1b2467bbb7273ebc23f4a02480",
+            "quote_utf8_bytes": 134,
+            "source_id": "source-2",
+            "supports": [
+              "listing_ended",
+              "same_security_continuation"
+            ]
+          },
+          {
+            "quote_sha256": "9088fee4e3d28b1c128838deb3d2a616ef9e1dcd0d400b6139b87887784e1f72",
+            "quote_utf8_bytes": 301,
+            "source_id": "source-3",
+            "supports": [
+              "acquisition_announced",
+              "announcement_date"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "announced yesterday the completion of the all-cash acquisition of TA by BP Products North America Inc.",
+        "event_kind": "acquisition_announced",
+        "issuer_name": "TravelCenters of America Inc.",
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "BP Products North America Inc. completed its all-cash acquisition of TravelCenters of America Inc. (Nasdaq: TA) on or about May 15, 2023, with TA common shares converted into the right to receive $86 per share, ending TA's status as an independent publicly traded company. The supplied sources directly document the delisting of TA's separately listed senior notes (TANNI; TANNL; TANNZ) from Nasdaq, with an expected notes-delisting effective date on or about June 5, 2023, following a Form 25 filing on or about May 26, 2023. However, none of the supplied passages contain a Nasdaq notice or Form 25 filing specific to the TA common stock listing itself; the common stock delisting is inferable only from the acquisition-completion language and the standard practice of common shares ceasing to trade upon merger closing, not from a direct exchange notice for the common stock CUSIP/symbol.",
+        "timing": "completed",
+        "unresolved_conditions": [
+          "No source passage directly documents a Nasdaq Form 25 or delisting notice specifically for TA common stock (as opposed to the senior notes); the exact effective date/time TA common stock itself stopped trading on Nasdaq is not confirmed by a primary exchange or SEC filing in the supplied evidence.",
+          "Confirmation of Form 15 deregistration filing date for TA common stock under Exchange Act Section 12(g) is not independently verified in the supplied sources."
+        ],
+        "venue": "NASDAQ"
+      },
+      "num_turns": 1,
+      "permission_denial_count": 0,
+      "session_matches_request": true,
+      "subtype": "success",
+      "terminal_reason": "completed"
+    }
+  ],
+  "finished_at": "2026-09-07T12:23:22.248757+00:00",
+  "harness_sha256": "e85b5adeda59d34a02409104d2f304ffb9cb173f97c1ee9df4f1ee6c46cb3412",
+  "kind": "analysis_only_diagnostic_not_new_end_to_end_run",
+  "local_children_reaped": [
+    true
+  ],
+  "model_requests": 1,
+  "options": {
+    "cli_max_retries": "0",
+    "fallback_model": null,
+    "max_turns": 2,
+    "model": "claude-sonnet-5",
+    "native_output_format": null,
+    "output_mode": "final_json",
+    "output_schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+    "prompt_schema_matches_contract": true,
+    "system_prompt_sha256": "94fabbc661d1b74408657a8a89140697b7e0a5e239215608b438cb0bf953ed71",
+    "tools": []
+  },
+  "original_capture_unchanged": true,
+  "prompt_sha256": "e05bb1280fed190323601e59e8cebff1b9a66c98fd8a11c6fac4d769ddd1f9c6",
+  "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+  "sdk_submissions": 1,
+  "search_submissions": 0,
+  "selected_metadata_unchanged": true,
+  "source_checkpoint": {
+    "manifest_sha256": "bc0b382b3e517e992a4818c839157e9a9c850986bdbb88f56d7c50a582c799bf",
+    "matched_files": 1101,
+    "seal_sha256": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60"
+  },
+  "source_http_requests": 0,
+  "started_at": "2026-09-07T12:23:08.375210+00:00",
+  "status": "completed",
+  "stop_state": "running",
+  "terminal_statuses": {
+    "analysis-1": "completed"
+  },
+  "token_loads": 1,
+  "usage": {
+    "input_tokens": 10450,
+    "output_tokens": 1204
+  },
+  "usage_observation": {
+    "basis": "claude_model_usage",
+    "main_loop": {
+      "cache_creation_input_tokens": 10646,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 2,
+      "output_tokens": 1181,
+      "web_search_requests": null
+    },
+    "values": {
+      "cache_creation_input_tokens": 10646,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 10450,
+      "output_tokens": 1204,
+      "web_search_requests": 0
+    }
+  },
+  "validated_finding": {
+    "action": null,
+    "block_reasons": [
+      "event_not_actionable",
+      "finding_incomplete",
+      "security_identity_not_supported"
+    ],
+    "event_kind": "acquisition_announced",
+    "unique_passage_count": 5
+  }
+}

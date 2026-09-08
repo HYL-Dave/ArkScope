@@ -1,0 +1,112 @@
+{
+  "added": {
+    "tests/test_lifecycle_web_gaps.py": "8e41ccbecacbefa86e52262942e9982be32411fb7f0ee0b8e5f45414c88fd06d"
+  },
+  "changed": {
+    "apps/arkscope-web/src/api.ts": {
+      "after": "0ef981df0d13651542318178fe7adec60ea990c7a39d3e2ffa55f2b0e94e47ca",
+      "before": "9fda0201d6ccd1f900af1c1b6c14582de0108293c64c386f69f27f10b5ead393"
+    },
+    "apps/arkscope-web/src/i18n/resources.test.ts": {
+      "after": "4ceefcd01bf9a2739c4f2701eee925e630fd8f909e618ef5953c5307b265aba2",
+      "before": "70d400f3c2778d48db3db947fa804b97124e8f6cd5e08755e6891ad7a14b2136"
+    },
+    "apps/arkscope-web/src/i18n/resources/en/explore.ts": {
+      "after": "37440c674f5249b77e9c5143c313bf3aedf26288f7e694dcbf6a19a93b60968d",
+      "before": "4f2635c0dcc381afc3bb36d2ccf401e81b12a875f2e77ef1cf8d27b6e03e0121"
+    },
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts": {
+      "after": "a96ba4aac50398a11e8fc5386b39cb884bbe03820f58ba427bd2606e7fc0a6a7",
+      "before": "eda7ddc579f5de3ea9f59b7df2c797c7a7724b6242342be7ca4223bf8acf8274"
+    },
+    "apps/arkscope-web/src/lifecycle/LifecycleWebPanel.test.tsx": {
+      "after": "2eea6abb982c46db2077757cb3d79dff2e535ee70d4192b7d5bbb59d5f42a027",
+      "before": "3b1a17eba3eb9074f938cd098658c842c4e6fd82027d7e734cbc56ece27cd637"
+    },
+    "apps/arkscope-web/src/lifecycle/LifecycleWebPanel.tsx": {
+      "after": "b4153465453b7d6dde544de1d9e5e91c544a851ce8726d6a32a6bc1dd4b7c586",
+      "before": "e6674d9438df2ae9228ce2e6107c70b21ebdc62fc495755c1e5690567fe2958c"
+    },
+    "apps/arkscope-web/src/lifecycle/currentReviewContract.test.ts": {
+      "after": "579f4357a3124ee6d696ce1dd4d8dce4f0ba453c5219e6d59c0f3567810fd8cb",
+      "before": "9fc8f6be816b80a0f6fc4864aa99cd44074c7c4e72dbd58c6cb379d1589846d3"
+    },
+    "apps/arkscope-web/src/lifecycle/currentReviewContract.ts": {
+      "after": "4300637d4be07fa7ed236dae237f017f975eb85f56184676015f3347561616e1",
+      "before": "c706e4353ca42e356651bd08a0f1c5d764e81d19f395a22a0622c0e06b2f6e09"
+    },
+    "apps/arkscope-web/src/lifecycle/webApi.test.ts": {
+      "after": "0a12a6c840d5fa2810c6497a7145831567c470b00fff34b0596c1ae6851c7f25",
+      "before": "d0c586041d5bee3fee2175435df9bd543a77c6abd79c64489884b32e8fc87847"
+    },
+    "apps/arkscope-web/src/lifecycle/webContract.test.ts": {
+      "after": "bfb05eeb3c45c22da0a0cfd2672445688d06dfdc559781eabab87ac80c6219e3",
+      "before": "7765864750b21350aa0bcb40aa3f4eb4d09deecc169c62a5336079a37fbbae83"
+    },
+    "apps/arkscope-web/src/lifecycle/webContract.ts": {
+      "after": "39c3ee7f8d0cd5df7f0f118129e40f0462c3ddadaa03fe38048778b9ab417c39",
+      "before": "99b477976ed4985ffa656907fb155f9177d455b749850cc7ab3b83994b6d91cf"
+    },
+    "apps/arkscope-web/src/lifecycle/webFixtures.ts": {
+      "after": "2e1c082fda3d3835bda8867775ff78550469b8f234eca202bbd34653a74cba26",
+      "before": "f73f39c899827aa75e0caf1e6d8cf25de8a37fa04e4a2ab2483e98bd053e7d55"
+    },
+    "apps/arkscope-web/src/lifecycle/webPresentation.test.ts": {
+      "after": "863ad7c6232fee6de89741231c5a9a5ec0a1c2c16902c6e0a86a378595367e06",
+      "before": "46faf61b278ac8ad93abd321b36cc03618d30dd9f6718ffba09b9856236fefa7"
+    },
+    "apps/arkscope-web/src/styles.css": {
+      "after": "ebf820d3a80fa722d7f6ec2d376334302b25539e8a66a8bdb8c69e97f10f2c1d",
+      "before": "78be1565a83814688ce96dde68a7590fa20307795e1a6098b2c7f428e1f9de3d"
+    },
+    "src/api/routes/lifecycle_web.py": {
+      "after": "7bef36979c34123470a1a8b0f724f617babedd4d94589462de8c4fb6d7709d57",
+      "before": "487143d04f599f08a1a7096d1afbdd0d30b046253e8e7ef8e124409537900bb4"
+    },
+    "src/lifecycle_web_controller.py": {
+      "after": "ffbf4acd9d5aedeaa31755e5e41e2020f2f954a04c47d1c47c391d6650fed5db",
+      "before": "759e440f46f65c5026dfebec3394a266ca45f319fc3f914c37fcceb853beb589"
+    },
+    "src/lifecycle_web_projection.py": {
+      "after": "f9814424f27e1829de6ee1453b4a1544ef1eb1d4662180694bf6259570165658",
+      "before": "5402a3e0bc13f7b3562a4aa64a3ef2fe77b9f778475c0f0552f7f55a7fc6e49f"
+    },
+    "src/lifecycle_web_review.py": {
+      "after": "9e4067951ee26d1ad0c3f5fb854afbe3fdedc1314ffa717d1444e762c5fed2b3",
+      "before": "ef6564771434053aae77c148570b9afe69b7369abba9bdb8f2b61b7154e9655f"
+    },
+    "src/lifecycle_web_store.py": {
+      "after": "50cad02233b6af1ab35482f351ac16446f724d63f0da616b4101d088cc6bb500",
+      "before": "405fa6281a08cc2379fe8f8a039b417e385e5373cb7bad718b6fbdbcb3d155ca"
+    },
+    "src/security_lifecycle_review.py": {
+      "after": "2e2aa668549ccb2592d9f3af18713e81e1c2fc1f99b23f32b79300ab71b9d599",
+      "before": "4bf14f6007977e028405eb61d474661c86da3996b671d056b063e97c9ca44005"
+    },
+    "src/security_lifecycle_web_finding.py": {
+      "after": "9ce90f5997b24a00350b1d1266392f97ea0e9988441385d981f803ed967ce7e7",
+      "before": "7d169b4048b110473d12a1dc63f8e56f4bbd8a8e5add67d509232685600c5d66"
+    },
+    "src/security_lifecycle_web_pipeline.py": {
+      "after": "9f975eb5b1f011fc8bdc25252a0dd61eb56b24cf14bdd2ef51ceb1548933852e",
+      "before": "f2dff64442309397bb06f71f26ea5d145e0d710b2aa7c456bc3e9d9296c8a042"
+    },
+    "tests/test_lifecycle_web_read.py": {
+      "after": "692f94b375791adcccc45506b8401c812f6b1fb5be648166c5faf31b6532e512",
+      "before": "5c3fc9c8f22313d4a8b23d5d65518874e8ed5560b69d50e1d35b7f885ac5c2c1"
+    },
+    "tests/test_lifecycle_web_review.py": {
+      "after": "7b0f4519cb76a92a1894433466e111f59bfd0611910451b1867e3fa06628d1ec",
+      "before": "763848b941ca39acea92e2a607f06c932bfe91e1b89fbd4410d8bc10b4ee201b"
+    },
+    "tests/test_security_lifecycle_web_finding.py": {
+      "after": "7e1edd30e67a7033fd8b01db59714cad5777a37887348676b3ab24e8147344af",
+      "before": "208eec0e22ade31b99a53756e063a67a4622fba68c2b8d21b40b41f7264ce756"
+    },
+    "tests/test_security_lifecycle_web_pipeline.py": {
+      "after": "2a7a304f4beeb92975541393e5f51d02d5bf62dc6d79baeda6e7d00a388f6e2e",
+      "before": "29255bb330021ebdb049d38374c55e87525bb3d0d70ecf6e5dabf8a310b79692"
+    }
+  },
+  "prior_manifest_sha256": "3696a1bf0367de1f5cea182805e6923ef0ff778a6c626013a64828501433e545"
+}

@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="9" time="2.757" timestamp="2026-09-07T18:35:11.305392+08:00" hostname="ais"><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_source_admission_precedes_any_credential_metadata_read" time="0.145"><failure message="Failed: production_metadata_read_before_source_admission">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700784ea1270&gt;
+
+    def test_canary_source_admission_precedes_any_credential_metadata_read(monkeypatch):
+        api = module()
+        def rejected():
+            raise ValueError("offline_checkpoint_changed")
+        monkeypatch.setattr(api, "source_identity", rejected)
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_metadata_read_before_source_admission"))
+        with pytest.raises(ValueError, match="^offline_checkpoint_changed$"):
+&gt;           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:83: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+&gt;   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_metadata_read_before_source_admission"))
+E   Failed: production_metadata_read_before_source_admission
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:41: Failed</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_requires_explicit_new_checkpoint_not_reused_authority" time="0.001"><failure message="AssertionError: assert '2026-09-07-l...-oauth-canary' == '2026-09-07-l...cle-web-usage'&#10;  &#10;  - 2026-09-07-lifecycle-web-usage&#10;  ?                           ^ ^^&#10;  + 2026-09-07-lifecycle-web-oauth-canary&#10;  ?                          ++ ^^^^ ^^^^">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700783d1d990&gt;
+
+    def test_canary_requires_explicit_new_checkpoint_not_reused_authority(monkeypatch):
+        api = module()
+&gt;       assert api.CHECKPOINT.name == "2026-09-07-lifecycle-web-usage"
+E       AssertionError: assert '2026-09-07-l...-oauth-canary' == '2026-09-07-l...cle-web-usage'
+E         
+E         - 2026-09-07-lifecycle-web-usage
+E         ?                           ^ ^^
+E         + 2026-09-07-lifecycle-web-oauth-canary
+E         ?                          ++ ^^^^ ^^^^
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:48: AssertionError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_limits_match_current_source_envelope_without_token_truncation" time="0.032"><failure message="AssertionError: assert 2097152 == (32 * (1024 ** 2))&#10; +  where 2097152 = WebInvestigationOptions(max_sources=4, max_source_requests=8, max_redirects=2, max_source_bytes=2097152, source_timeou... model_timeout_seconds=180, max_search_uses=4, output_token_limit=None, effort='medium', max_decoded_source_bytes=None).max_source_bytes">def test_canary_limits_match_current_source_envelope_without_token_truncation():
+        api = module()
+        limits = api.options()
+&gt;       assert limits.max_source_bytes == 32 * 1024**2
+E       AssertionError: assert 2097152 == (32 * (1024 ** 2))
+E        +  where 2097152 = WebInvestigationOptions(max_sources=4, max_source_requests=8, max_redirects=2, max_source_bytes=2097152, source_timeou... model_timeout_seconds=180, max_search_uses=4, output_token_limit=None, effort='medium', max_decoded_source_bytes=None).max_source_bytes
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:57: AssertionError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]" time="1.033"><failure message="AssertionError: assert 1 == 0&#10; +  where 1 = &lt;function execute at 0x700783466560&gt;(PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke0/production-fixture.sqlite'), {'as_of': '2026-09-07', 'authority': '2026-09-07 renewed user authorization: one corrected Claude OAuth canary, no Hai...75337df630f976', 'credential_metadata_sha256': 'a4012c39f49a4f0a3ffff0e09b6bcbcde38b0ceb28b387b5b359a9719265106b', ...}, PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke0/rehearsal'))&#10; +    where &lt;function execute at 0x700783466560&gt; = &lt;module 'usage_canary' from '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py'&gt;.execute">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700783ce3b80&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke0')
+failure = None
+
+    @pytest.mark.parametrize("failure", [None, "source", "analysis"])
+    def test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls(monkeypatch, tmp_path, failure):
+        from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, ToolUseBlock
+        import claude_agent_sdk
+        from src.auth_drivers import token_store
+        from src.lifecycle_public_sources import PublicSourceReader, SourceReadError
+        from src.security_lifecycle_web_finding import WebFinding
+        from tests.test_security_lifecycle_web_finding import finding_payload, source_page
+    
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        helper = load("original_harness_helpers", OLD.parent / "2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py")
+        profile = tmp_path / "production-fixture.sqlite"
+        helper.credentials(profile, [helper.row()])
+        with sqlite3.connect(profile) as conn:
+            conn.execute("CREATE TABLE data_provider_config(provider TEXT,field TEXT,value TEXT)")
+        original = profile.read_bytes()
+        notice = "TravelCenters of America Inc. Class A common stock (TA) was delisted from NASDAQ effective September 1, 2026."
+        finding = WebFinding.model_validate(finding_payload(source_ticker="TA", issuer_name="TravelCenters of America Inc.", citations=[{
+            "source_id": "source-1", "quote": notice, "supports": ["security_identity", "listing_ended", "effective_date"]}])).model_dump()
+        queries = []
+    
+        class Tokens:
+            backend = "offline_fixture"
+            def load(self, **kwargs):
+                assert kwargs == {"provider": "anthropic", "auth_mode": "claude_code_oauth", "credential_id": "local:7"}
+                return token_store.StoredTokenRecord("private-fixture-token")
+    
+        class OfflineClient:
+            def __init__(self, *, options):
+                self.options = options
+            async def connect(self):
+                pass
+            async def query(self, prompt, **kwargs):
+                assert kwargs["session_id"] == self.options.session_id
+                queries.append("search" if self.options.tools else "analysis")
+            async def disconnect(self):
+                pass
+            async def interrupt(self):
+                pass
+            async def receive_response(self):
+                options = self.options
+                session = options.session_id
+                yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none", "model": options.model,
+                    "tools": list(options.tools) + ["StructuredOutput"], "mcp_servers": []})
+                search = bool(options.tools)
+                if search:
+                    result = await options.hooks["PreToolUse"][0].hooks[0]({"hook_event_name": "PreToolUse", "session_id": session,
+                        "tool_name": "WebSearch", "tool_input": {"query": "TA common stock listing fixture"}, "tool_use_id": "web-1"}, "web-1", {})
+                    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+                    yield AssistantMessage(model=options.model, content=[ToolUseBlock(id="web-1", name="WebSearch", input={"query": "TA fixture"})])
+                output = {"sources": ["https://ir.example.com/notice"], "unresolved_conditions": []} if search else finding
+                failed = not search and failure == "analysis"
+                yield ResultMessage(subtype="error_during_execution" if failed else "success", duration_ms=1, duration_api_ms=1,
+                    is_error=failed, num_turns=2, session_id=session, terminal_reason="completed", structured_output=output,
+                    usage={"input_tokens": 4, "output_tokens": 1036}, model_usage={options.model: {
+                        "inputTokens": 29706 if search else 300, "outputTokens": 3228 if search else 400,
+                        "cacheReadInputTokens": 3354, "cacheCreationInputTokens": 3976, "webSearchRequests": 2 if search else 0}})
+    
+        def read(self, url):
+            self._request_count += 1
+            if failure == "source":
+                raise SourceReadError("source_http_error")
+            return source_page(notice, url)
+    
+        monkeypatch.setattr(token_store, "get_token_store", lambda **kwargs: Tokens())
+        monkeypatch.setattr(claude_agent_sdk, "ClaudeSDKClient", OfflineClient)
+        monkeypatch.setattr(PublicSourceReader, "read", read)
+        plan = api.prepared_plan(profile, "2026-09-07")
+        work = tmp_path / "rehearsal"
+&gt;       assert api.execute(profile, plan, work) == (0 if failure is None else 1)
+E       AssertionError: assert 1 == 0
+E        +  where 1 = &lt;function execute at 0x700783466560&gt;(PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke0/production-fixture.sqlite'), {'as_of': '2026-09-07', 'authority': '2026-09-07 renewed user authorization: one corrected Claude OAuth canary, no Hai...75337df630f976', 'credential_metadata_sha256': 'a4012c39f49a4f0a3ffff0e09b6bcbcde38b0ceb28b387b5b359a9719265106b', ...}, PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke0/rehearsal'))
+E        +    where &lt;function execute at 0x700783466560&gt; = &lt;module 'usage_canary' from '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py'&gt;.execute
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:136: AssertionError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]" time="0.663"><failure message="AssertionError: assert [] == ['search']&#10;  &#10;  Right contains one more item: 'search'&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700782e37ac0&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke1')
+failure = 'source'
+
+    @pytest.mark.parametrize("failure", [None, "source", "analysis"])
+    def test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls(monkeypatch, tmp_path, failure):
+        from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, ToolUseBlock
+        import claude_agent_sdk
+        from src.auth_drivers import token_store
+        from src.lifecycle_public_sources import PublicSourceReader, SourceReadError
+        from src.security_lifecycle_web_finding import WebFinding
+        from tests.test_security_lifecycle_web_finding import finding_payload, source_page
+    
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        helper = load("original_harness_helpers", OLD.parent / "2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py")
+        profile = tmp_path / "production-fixture.sqlite"
+        helper.credentials(profile, [helper.row()])
+        with sqlite3.connect(profile) as conn:
+            conn.execute("CREATE TABLE data_provider_config(provider TEXT,field TEXT,value TEXT)")
+        original = profile.read_bytes()
+        notice = "TravelCenters of America Inc. Class A common stock (TA) was delisted from NASDAQ effective September 1, 2026."
+        finding = WebFinding.model_validate(finding_payload(source_ticker="TA", issuer_name="TravelCenters of America Inc.", citations=[{
+            "source_id": "source-1", "quote": notice, "supports": ["security_identity", "listing_ended", "effective_date"]}])).model_dump()
+        queries = []
+    
+        class Tokens:
+            backend = "offline_fixture"
+            def load(self, **kwargs):
+                assert kwargs == {"provider": "anthropic", "auth_mode": "claude_code_oauth", "credential_id": "local:7"}
+                return token_store.StoredTokenRecord("private-fixture-token")
+    
+        class OfflineClient:
+            def __init__(self, *, options):
+                self.options = options
+            async def connect(self):
+                pass
+            async def query(self, prompt, **kwargs):
+                assert kwargs["session_id"] == self.options.session_id
+                queries.append("search" if self.options.tools else "analysis")
+            async def disconnect(self):
+                pass
+            async def interrupt(self):
+                pass
+            async def receive_response(self):
+                options = self.options
+                session = options.session_id
+                yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none", "model": options.model,
+                    "tools": list(options.tools) + ["StructuredOutput"], "mcp_servers": []})
+                search = bool(options.tools)
+                if search:
+                    result = await options.hooks["PreToolUse"][0].hooks[0]({"hook_event_name": "PreToolUse", "session_id": session,
+                        "tool_name": "WebSearch", "tool_input": {"query": "TA common stock listing fixture"}, "tool_use_id": "web-1"}, "web-1", {})
+                    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+                    yield AssistantMessage(model=options.model, content=[ToolUseBlock(id="web-1", name="WebSearch", input={"query": "TA fixture"})])
+                output = {"sources": ["https://ir.example.com/notice"], "unresolved_conditions": []} if search else finding
+                failed = not search and failure == "analysis"
+                yield ResultMessage(subtype="error_during_execution" if failed else "success", duration_ms=1, duration_api_ms=1,
+                    is_error=failed, num_turns=2, session_id=session, terminal_reason="completed", structured_output=output,
+                    usage={"input_tokens": 4, "output_tokens": 1036}, model_usage={options.model: {
+                        "inputTokens": 29706 if search else 300, "outputTokens": 3228 if search else 400,
+                        "cacheReadInputTokens": 3354, "cacheCreationInputTokens": 3976, "webSearchRequests": 2 if search else 0}})
+    
+        def read(self, url):
+            self._request_count += 1
+            if failure == "source":
+                raise SourceReadError("source_http_error")
+            return source_page(notice, url)
+    
+        monkeypatch.setattr(token_store, "get_token_store", lambda **kwargs: Tokens())
+        monkeypatch.setattr(claude_agent_sdk, "ClaudeSDKClient", OfflineClient)
+        monkeypatch.setattr(PublicSourceReader, "read", read)
+        plan = api.prepared_plan(profile, "2026-09-07")
+        work = tmp_path / "rehearsal"
+        assert api.execute(profile, plan, work) == (0 if failure is None else 1)
+        value = json.loads((work / "result.json").read_text())
+        metrics = json.loads((work / "metrics.json").read_text())
+        expected_queries = ["search"] if failure == "source" else ["search", "analysis"]
+&gt;       assert queries == expected_queries
+E       AssertionError: assert [] == ['search']
+E         
+E         Right contains one more item: 'search'
+E         Use -v to get more diff
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:140: AssertionError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]" time="0.694"><failure message="AssertionError: assert [] == ['search', 'analysis']&#10;  &#10;  Right contains 2 more items, first extra item: 'search'&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x700783297bb0&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_real_controller_ke2')
+failure = 'analysis'
+
+    @pytest.mark.parametrize("failure", [None, "source", "analysis"])
+    def test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls(monkeypatch, tmp_path, failure):
+        from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, ToolUseBlock
+        import claude_agent_sdk
+        from src.auth_drivers import token_store
+        from src.lifecycle_public_sources import PublicSourceReader, SourceReadError
+        from src.security_lifecycle_web_finding import WebFinding
+        from tests.test_security_lifecycle_web_finding import finding_payload, source_page
+    
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        helper = load("original_harness_helpers", OLD.parent / "2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py")
+        profile = tmp_path / "production-fixture.sqlite"
+        helper.credentials(profile, [helper.row()])
+        with sqlite3.connect(profile) as conn:
+            conn.execute("CREATE TABLE data_provider_config(provider TEXT,field TEXT,value TEXT)")
+        original = profile.read_bytes()
+        notice = "TravelCenters of America Inc. Class A common stock (TA) was delisted from NASDAQ effective September 1, 2026."
+        finding = WebFinding.model_validate(finding_payload(source_ticker="TA", issuer_name="TravelCenters of America Inc.", citations=[{
+            "source_id": "source-1", "quote": notice, "supports": ["security_identity", "listing_ended", "effective_date"]}])).model_dump()
+        queries = []
+    
+        class Tokens:
+            backend = "offline_fixture"
+            def load(self, **kwargs):
+                assert kwargs == {"provider": "anthropic", "auth_mode": "claude_code_oauth", "credential_id": "local:7"}
+                return token_store.StoredTokenRecord("private-fixture-token")
+    
+        class OfflineClient:
+            def __init__(self, *, options):
+                self.options = options
+            async def connect(self):
+                pass
+            async def query(self, prompt, **kwargs):
+                assert kwargs["session_id"] == self.options.session_id
+                queries.append("search" if self.options.tools else "analysis")
+            async def disconnect(self):
+                pass
+            async def interrupt(self):
+                pass
+            async def receive_response(self):
+                options = self.options
+                session = options.session_id
+                yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none", "model": options.model,
+                    "tools": list(options.tools) + ["StructuredOutput"], "mcp_servers": []})
+                search = bool(options.tools)
+                if search:
+                    result = await options.hooks["PreToolUse"][0].hooks[0]({"hook_event_name": "PreToolUse", "session_id": session,
+                        "tool_name": "WebSearch", "tool_input": {"query": "TA common stock listing fixture"}, "tool_use_id": "web-1"}, "web-1", {})
+                    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+                    yield AssistantMessage(model=options.model, content=[ToolUseBlock(id="web-1", name="WebSearch", input={"query": "TA fixture"})])
+                output = {"sources": ["https://ir.example.com/notice"], "unresolved_conditions": []} if search else finding
+                failed = not search and failure == "analysis"
+                yield ResultMessage(subtype="error_during_execution" if failed else "success", duration_ms=1, duration_api_ms=1,
+                    is_error=failed, num_turns=2, session_id=session, terminal_reason="completed", structured_output=output,
+                    usage={"input_tokens": 4, "output_tokens": 1036}, model_usage={options.model: {
+                        "inputTokens": 29706 if search else 300, "outputTokens": 3228 if search else 400,
+                        "cacheReadInputTokens": 3354, "cacheCreationInputTokens": 3976, "webSearchRequests": 2 if search else 0}})
+    
+        def read(self, url):
+            self._request_count += 1
+            if failure == "source":
+                raise SourceReadError("source_http_error")
+            return source_page(notice, url)
+    
+        monkeypatch.setattr(token_store, "get_token_store", lambda **kwargs: Tokens())
+        monkeypatch.setattr(claude_agent_sdk, "ClaudeSDKClient", OfflineClient)
+        monkeypatch.setattr(PublicSourceReader, "read", read)
+        plan = api.prepared_plan(profile, "2026-09-07")
+        work = tmp_path / "rehearsal"
+        assert api.execute(profile, plan, work) == (0 if failure is None else 1)
+        value = json.loads((work / "result.json").read_text())
+        metrics = json.loads((work / "metrics.json").read_text())
+        expected_queries = ["search"] if failure == "source" else ["search", "analysis"]
+&gt;       assert queries == expected_queries
+E       AssertionError: assert [] == ['search', 'analysis']
+E         
+E         Right contains 2 more items, first extra item: 'search'
+E         Use -v to get more diff
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:140: AssertionError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]" time="0.002"><failure message="Failed: production_profile_read">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70077b7a5690&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_checkpoint_drift_s0')
+change = 'source'
+
+    @pytest.mark.parametrize("change", ["source", "seal", "resurrection"])
+    def test_canary_checkpoint_drift_stops_before_runtime_or_profile(monkeypatch, tmp_path, change):
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        if change == "source":
+            (api.ROOT / "owned.py").write_text("changed")
+        elif change == "seal":
+            monkeypatch.setattr(api, "CHECKPOINT_SEAL", "0" * 64)
+        else:
+            (api.ROOT / "removed.py").write_text("resurrected")
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+        with pytest.raises(ValueError, match="^offline_(admitted_source|checkpoint)_changed$"):
+&gt;           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:174: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:83: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+&gt;   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+E   Failed: production_profile_read
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:172: Failed</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]" time="0.001"><failure message="Failed: production_profile_read">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70077b7a6320&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_checkpoint_drift_s1')
+change = 'seal'
+
+    @pytest.mark.parametrize("change", ["source", "seal", "resurrection"])
+    def test_canary_checkpoint_drift_stops_before_runtime_or_profile(monkeypatch, tmp_path, change):
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        if change == "source":
+            (api.ROOT / "owned.py").write_text("changed")
+        elif change == "seal":
+            monkeypatch.setattr(api, "CHECKPOINT_SEAL", "0" * 64)
+        else:
+            (api.ROOT / "removed.py").write_text("resurrected")
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+        with pytest.raises(ValueError, match="^offline_(admitted_source|checkpoint)_changed$"):
+&gt;           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:174: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:83: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+&gt;   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+E   Failed: production_profile_read
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:172: Failed</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-usage-canary.test_usage_canary" name="test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]" time="0.002"><failure message="Failed: production_profile_read">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70077b7a5210&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7821/test_canary_checkpoint_drift_s2')
+change = 'resurrection'
+
+    @pytest.mark.parametrize("change", ["source", "seal", "resurrection"])
+    def test_canary_checkpoint_drift_stops_before_runtime_or_profile(monkeypatch, tmp_path, change):
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        if change == "source":
+            (api.ROOT / "owned.py").write_text("changed")
+        elif change == "seal":
+            monkeypatch.setattr(api, "CHECKPOINT_SEAL", "0" * 64)
+        else:
+            (api.ROOT / "removed.py").write_text("resurrected")
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+        with pytest.raises(ValueError, match="^offline_(admitted_source|checkpoint)_changed$"):
+&gt;           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:174: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:83: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+&gt;   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+E   Failed: production_profile_read
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:172: Failed</failure></testcase></testsuite></testsuites>

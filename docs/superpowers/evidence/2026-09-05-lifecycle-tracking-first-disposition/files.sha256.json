@@ -1,0 +1,14 @@
+{
+  "algorithm": "sha256",
+  "scope": "attended_maintenance_offline_and_stopped_preflight_packet",
+  "files": {
+    "README.md": "1d9830973c59e976e85c7189f76413262dd70a5d9a7786402c3efc1d9e0102c3",
+    "verification.json": "d988c14d1a2ebf3245cbcf96c106ee4603d6180b6997c57e789e2253a6511200",
+    "preflight-stopped.json": "55eba2da401c657229a31f3d99eb3c0559085a1e53c3759a437924b700277970",
+    "focus-files.json": "51a6854b32bcdc0d0a2cae9a7d763c7fd1db7b44a3f89ea02cb0c3271d6c533e",
+    "source-manifest.json": "4212db16b7f25355724331c65c83b0cf8707529c57ecb1260f1b5f814e71c438",
+    "scripts/disposition.py": "5c71459f93c19062a970122e2658aba2d53b33e83fbe40a3f1e61aaa2aabacba",
+    "scripts/readback.py": "99f0cb954c91b01b92304ae63a886ba6006490cb14da3829679218f3c5c3cca8",
+    "scripts/test_disposition.py": "e6b50b4970e5a233f026f14fd0af994d8fd60146a3faf1b57ec832b6c6e36229"
+  }
+}

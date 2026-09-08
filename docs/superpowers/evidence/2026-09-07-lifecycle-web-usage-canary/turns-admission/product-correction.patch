@@ -1,0 +1,34 @@
+--- before/src/auth_drivers/lifecycle_web_claude.py
++++ after/src/auth_drivers/lifecycle_web_claude.py
+@@ -114,6 +114,10 @@
+     return "completed"
+ 
+ 
++def _tool_round_trip_limit(call: ModelCall) -> int:
++    return call.max_search_uses + 2 if call.phase == "search" else 2
++
++
+ def _validate_result(message: ResultMessage, *, call: ModelCall, status: str) -> None:
+     usage = message.model_usage
+     if usage is not None:
+@@ -123,8 +127,9 @@
+             require_response_model({"model": model}, call.selection.model)
+     if status != "completed":
+         return
+-    max_turns = call.max_search_uses + 2 if call.phase == "search" else 2
+-    if type(message.num_turns) is not int or not 0 < message.num_turns <= max_turns:
++    # max_turns bounds tool round trips; num_turns also includes completion.
++    max_total_turns = _tool_round_trip_limit(call) + 1
++    if type(message.num_turns) is not int or not 0 < message.num_turns <= max_total_turns:
+         raise WebModelError("model_result_incomplete")
+     if message.permission_denials or message.deferred_tool_use:
+         raise WebModelError("unexpected_tool_activity")
+@@ -177,7 +182,7 @@
+             tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+             mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+             hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+-            max_turns=call.max_search_uses + 2 if call.phase == "search" else 2, session_id=session_id,
++            max_turns=_tool_round_trip_limit(call), session_id=session_id,
+             cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+             stderr=discard_claude_sdk_stderr,
+         )

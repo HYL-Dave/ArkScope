@@ -1,0 +1,130 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6257
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "51b794f96c30145fba80f3cc594d4ff25c63fd42c53de7dde1397f599503d394"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1248
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "5f43ca6069b54c19b719717b9a7ca5406869a8b7d87434dbe3ac9118f27d5e6d"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2067
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "d7f6b456ab32962232b67dd089a0f184f70f74bcd9a737a075b6c6506a63006d"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1248
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "c8e8c3a9b08efa6c7f1db92725704357477b86b71bd613356db5e4022dd63682"
+    }
+  },
+  "browser_scenarios": 36,
+  "browser_screenshots": 120,
+  "browser_source_files_verified": 265,
+  "changed_product_test_files_verified": 89,
+  "commit": false,
+  "complete_slice": "current_review_ui_api_research",
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1516
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "704684b63b505bff7312e868c36cc49b30b3113bfa567b1c9dbe6acd6024b43f"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1516
+      },
+      "failed_nodes": [],
+      "file": "restored.json",
+      "sha256": "298f3b7e0fa89ecdd473335993e09b1e6ca19ba7a2d3072984683b7db4fea590"
+    }
+  },
+  "frontend_max_workers": 4,
+  "frozen_source_files_verified": 141,
+  "merge": false,
+  "migration": false,
+  "mutations": {
+    "backend": 14,
+    "frontend": 22
+  },
+  "node_changes": {
+    "backend": {
+      "added_count": 53,
+      "removed_count": 0
+    },
+    "frontend": {
+      "added_count": 145,
+      "removed_count": 61
+    },
+    "integration": {
+      "added_count": 112,
+      "removed_count": 0
+    }
+  },
+  "prior_packets": {
+    "2026-09-06-lifecycle-action-review": {
+      "files_verified": 21,
+      "seal_sha256": "a213433de8ba262208439ad800255ec2ee45c22d510cc6196af444ab747fbd45"
+    },
+    "2026-09-06-lifecycle-population-reconciliation": {
+      "files_verified": 15,
+      "seal_sha256": "5c4f702e5689cf3bd6166dd8f9c30791bb0674e4dabca5dd833e6656a50f300d"
+    },
+    "2026-09-06-price-window-and-repair-ui": {
+      "files_verified": 48,
+      "seal_sha256": "be2d8514000b77f0a1573e0ef4f972157b274b3b0156a0b00536b02db11d9c64"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "validated_web_finding_and_confirmation",
+    "bounded_web_adapter",
+    "release_cutover"
+  ],
+  "schema_files_unchanged": {
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "whole_workflow_complete": false
+}

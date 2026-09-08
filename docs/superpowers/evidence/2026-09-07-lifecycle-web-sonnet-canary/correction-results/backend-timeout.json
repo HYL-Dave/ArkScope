@@ -1,0 +1,11 @@
+{
+  "captured_stdout_retained": false,
+  "not_claimed": "No pass count is inferred for the incomplete original attempt.",
+  "observation": "subprocess.TimeoutExpired at 600 seconds; child PID 1461130 was no longer present",
+  "previous_temporary_storage": "disk-backed /tmp; test process was observed waiting on journal I/O",
+  "result": null,
+  "runner_timeout_seconds": 600,
+  "scope": "full_backend_same_source_no_provider_calls",
+  "status": "runner_timeout",
+  "xml_produced": false
+}

@@ -1,0 +1,66 @@
+{
+  "backend": {
+    "added": [
+      "tests.test_lifecycle_web_claude::test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result1-model_usage_invalid]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result3-unexpected_tool_activity]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result0]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result1]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[search]"
+    ],
+    "after": 6605,
+    "before": 6596,
+    "removed": []
+  },
+  "baseline": {
+    "added": [
+      "tests.test_lifecycle_web_claude::test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result1-model_usage_invalid]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result3-unexpected_tool_activity]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result0]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result1]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[search]"
+    ],
+    "after": 1928,
+    "before": 1919,
+    "removed": []
+  },
+  "integration": {
+    "added": [
+      "tests.test_lifecycle_web_claude::test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result1-model_usage_invalid]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result3-unexpected_tool_activity]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result0]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result1]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[search]"
+    ],
+    "after": 2747,
+    "before": 2738,
+    "removed": []
+  },
+  "restored": {
+    "added": [
+      "tests.test_lifecycle_web_claude::test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result1-model_usage_invalid]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete]",
+      "tests.test_lifecycle_web_claude::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result3-unexpected_tool_activity]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result0]",
+      "tests.test_lifecycle_web_claude::test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unknown[result1]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]",
+      "tests.test_lifecycle_web_claude::test_claude_web_pins_internal_helper_models_to_exact_selected_model[search]"
+    ],
+    "after": 1928,
+    "before": 1919,
+    "removed": []
+  }
+}

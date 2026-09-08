@@ -1,0 +1,153 @@
+{
+  "affected_tickers": 32,
+  "credential_fields_read": false,
+  "first_bar_is_not_ipo_or_membership_time": true,
+  "ibkr_commit_phase_runs": [
+    {
+      "commit_phase_date": "2026-08-21",
+      "rows_added": 3926,
+      "run_count": 1,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-22",
+      "rows_added": 3926,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-23",
+      "rows_added": 0,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-24",
+      "rows_added": 0,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-25",
+      "rows_added": 3926,
+      "run_count": 1,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-28",
+      "rows_added": 15704,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-29",
+      "rows_added": 0,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-30",
+      "rows_added": 0,
+      "run_count": 1,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-08-31",
+      "rows_added": 0,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-09-01",
+      "rows_added": 3926,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 151
+    },
+    {
+      "commit_phase_date": "2026-09-02",
+      "rows_added": 4030,
+      "run_count": 2,
+      "status": "succeeded",
+      "tickers_scanned": 152
+    },
+    {
+      "commit_phase_date": "2026-09-03",
+      "rows_added": 2418,
+      "run_count": 1,
+      "status": "failed",
+      "tickers_scanned": 187
+    },
+    {
+      "commit_phase_date": "2026-09-03",
+      "rows_added": 3952,
+      "run_count": 1,
+      "status": "succeeded",
+      "tickers_scanned": 152
+    },
+    {
+      "commit_phase_date": "2026-09-04",
+      "rows_added": 0,
+      "run_count": 1,
+      "status": "failed",
+      "tickers_scanned": 186
+    },
+    {
+      "commit_phase_date": "2026-09-04",
+      "rows_added": 4758,
+      "run_count": 1,
+      "status": "failed",
+      "tickers_scanned": 187
+    },
+    {
+      "commit_phase_date": "2026-09-05",
+      "rows_added": 4758,
+      "run_count": 2,
+      "status": "failed",
+      "tickers_scanned": 186
+    }
+  ],
+  "manual_membership_created_dates": {
+    "2026-09-04": 1
+  },
+  "missing_ticker_days": 190,
+  "price_rows_have_inserted_at": false,
+  "production_writes": 0,
+  "provider_requests": 0,
+  "request_parameters_retained_by_provider_sync_runs": false,
+  "sa_membership_created_dates": {
+    "2026-09-05": 34
+  },
+  "sa_membership_reasons": {
+    "bootstrap_accepted": 34
+  },
+  "source": "existing_private_backup_and_post_disposition_inventory",
+  "source_and_first_bar_groups": [
+    {
+      "count": 1,
+      "first_local_bar_at": "2026-08-27T13:30:00+00:00",
+      "reason": "before_first_local_bar",
+      "sources": [
+        "manual_lists",
+        "sa_alpha_picks_current"
+      ]
+    },
+    {
+      "count": 31,
+      "first_local_bar_at": "2026-08-31T13:30:00+00:00",
+      "reason": "before_first_local_bar",
+      "sources": [
+        "sa_alpha_picks_former"
+      ]
+    }
+  ]
+}

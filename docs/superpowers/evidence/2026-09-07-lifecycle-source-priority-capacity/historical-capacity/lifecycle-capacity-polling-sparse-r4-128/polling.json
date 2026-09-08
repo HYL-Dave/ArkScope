@@ -1,0 +1,66 @@
+{
+  "observations": [
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 1.512,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 1.513,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.057,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.067,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.734,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.734,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 4.925,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 4.926,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 5.004,
+      "error": "web_recording_unavailable",
+      "status": null
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 5.005,
+      "error": "web_recording_unavailable",
+      "status": null
+    }
+  ],
+  "production_data_access": false,
+  "provider_calls": 0
+}

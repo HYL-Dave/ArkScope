@@ -1,0 +1,610 @@
+[
+  {
+    "ordinal": 1,
+    "kind": "local_search",
+    "at": "2026-09-07T22:29:20.282717+00:00",
+    "payload": {
+      "coverage": "available_local_corpora",
+      "gaps": [],
+      "items": [
+        {
+          "candidate_id": "candidate-010bc0f84ef34c8fa9b4867889e59aef",
+          "corpus": "news",
+          "coverage": "full_text",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        }
+      ],
+      "next_offset": null,
+      "observed_at": "2026-09-07T22:29:20.281202+00:00",
+      "query": {},
+      "status": "ok"
+    }
+  },
+  {
+    "ordinal": 2,
+    "kind": "source_captured",
+    "at": "2026-09-07T22:29:20.292855+00:00",
+    "payload": {
+      "corpus": "news",
+      "coverage": "full_text",
+      "source_id": "source-1",
+      "text_sha256": "7340ff9e481a6b37f4e3de516a7cc20ea004fecb9d110fcd6cef403fb6133437",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    }
+  },
+  {
+    "ordinal": 3,
+    "kind": "model_request",
+    "at": "2026-09-07T22:29:20.316857+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "phase": "analysis",
+      "prompt_sha256": "1e780883b0413730661950ff9e5c9c42e2f1cf25c49a51af0b55fcc5bac1ccf9",
+      "remaining_seconds": 1799.964989028871,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p100",
+        "source-1:p101",
+        "source-1:p102",
+        "source-1:p103",
+        "source-1:p104",
+        "source-1:p105",
+        "source-1:p106",
+        "source-1:p107",
+        "source-1:p108",
+        "source-1:p109",
+        "source-1:p11",
+        "source-1:p110",
+        "source-1:p111",
+        "source-1:p112",
+        "source-1:p113",
+        "source-1:p114",
+        "source-1:p115",
+        "source-1:p116",
+        "source-1:p117",
+        "source-1:p118",
+        "source-1:p119",
+        "source-1:p12",
+        "source-1:p120",
+        "source-1:p121",
+        "source-1:p122",
+        "source-1:p123",
+        "source-1:p124",
+        "source-1:p125",
+        "source-1:p126",
+        "source-1:p127",
+        "source-1:p128",
+        "source-1:p129",
+        "source-1:p13",
+        "source-1:p130",
+        "source-1:p131",
+        "source-1:p132",
+        "source-1:p133",
+        "source-1:p134",
+        "source-1:p135",
+        "source-1:p136",
+        "source-1:p137",
+        "source-1:p138",
+        "source-1:p139",
+        "source-1:p14",
+        "source-1:p140",
+        "source-1:p141",
+        "source-1:p142",
+        "source-1:p143",
+        "source-1:p144",
+        "source-1:p145",
+        "source-1:p146",
+        "source-1:p147",
+        "source-1:p148",
+        "source-1:p149",
+        "source-1:p15",
+        "source-1:p150",
+        "source-1:p151",
+        "source-1:p152",
+        "source-1:p153",
+        "source-1:p154",
+        "source-1:p155",
+        "source-1:p156",
+        "source-1:p157",
+        "source-1:p158",
+        "source-1:p159",
+        "source-1:p16",
+        "source-1:p160",
+        "source-1:p161",
+        "source-1:p162",
+        "source-1:p163",
+        "source-1:p164",
+        "source-1:p165",
+        "source-1:p166",
+        "source-1:p167",
+        "source-1:p168",
+        "source-1:p169",
+        "source-1:p17",
+        "source-1:p170",
+        "source-1:p171",
+        "source-1:p172",
+        "source-1:p173",
+        "source-1:p174",
+        "source-1:p175",
+        "source-1:p176",
+        "source-1:p177",
+        "source-1:p178",
+        "source-1:p179",
+        "source-1:p18",
+        "source-1:p180",
+        "source-1:p181",
+        "source-1:p182",
+        "source-1:p183",
+        "source-1:p184",
+        "source-1:p185",
+        "source-1:p186",
+        "source-1:p187",
+        "source-1:p188",
+        "source-1:p189",
+        "source-1:p19",
+        "source-1:p190",
+        "source-1:p191",
+        "source-1:p192",
+        "source-1:p193",
+        "source-1:p194",
+        "source-1:p195",
+        "source-1:p196",
+        "source-1:p197",
+        "source-1:p198",
+        "source-1:p199",
+        "source-1:p2",
+        "source-1:p20",
+        "source-1:p200",
+        "source-1:p201",
+        "source-1:p202",
+        "source-1:p203",
+        "source-1:p204",
+        "source-1:p205",
+        "source-1:p206",
+        "source-1:p207",
+        "source-1:p208",
+        "source-1:p209",
+        "source-1:p21",
+        "source-1:p210",
+        "source-1:p211",
+        "source-1:p212",
+        "source-1:p213",
+        "source-1:p214",
+        "source-1:p215",
+        "source-1:p216",
+        "source-1:p217",
+        "source-1:p218",
+        "source-1:p219",
+        "source-1:p22",
+        "source-1:p220",
+        "source-1:p221",
+        "source-1:p222",
+        "source-1:p223",
+        "source-1:p224",
+        "source-1:p225",
+        "source-1:p226",
+        "source-1:p227",
+        "source-1:p228",
+        "source-1:p229",
+        "source-1:p23",
+        "source-1:p230",
+        "source-1:p231",
+        "source-1:p232",
+        "source-1:p233",
+        "source-1:p234",
+        "source-1:p235",
+        "source-1:p236",
+        "source-1:p237",
+        "source-1:p238",
+        "source-1:p239",
+        "source-1:p24",
+        "source-1:p240",
+        "source-1:p241",
+        "source-1:p242",
+        "source-1:p243",
+        "source-1:p244",
+        "source-1:p245",
+        "source-1:p246",
+        "source-1:p247",
+        "source-1:p248",
+        "source-1:p249",
+        "source-1:p25",
+        "source-1:p250",
+        "source-1:p251",
+        "source-1:p252",
+        "source-1:p253",
+        "source-1:p254",
+        "source-1:p255",
+        "source-1:p256",
+        "source-1:p257",
+        "source-1:p258",
+        "source-1:p259",
+        "source-1:p26",
+        "source-1:p260",
+        "source-1:p261",
+        "source-1:p262",
+        "source-1:p27",
+        "source-1:p28",
+        "source-1:p29",
+        "source-1:p3",
+        "source-1:p30",
+        "source-1:p31",
+        "source-1:p32",
+        "source-1:p33",
+        "source-1:p34",
+        "source-1:p35",
+        "source-1:p36",
+        "source-1:p37",
+        "source-1:p38",
+        "source-1:p39",
+        "source-1:p4",
+        "source-1:p40",
+        "source-1:p41",
+        "source-1:p42",
+        "source-1:p43",
+        "source-1:p44",
+        "source-1:p45",
+        "source-1:p46",
+        "source-1:p47",
+        "source-1:p48",
+        "source-1:p49",
+        "source-1:p5",
+        "source-1:p50",
+        "source-1:p51",
+        "source-1:p52",
+        "source-1:p53",
+        "source-1:p54",
+        "source-1:p55",
+        "source-1:p56",
+        "source-1:p57",
+        "source-1:p58",
+        "source-1:p59",
+        "source-1:p6",
+        "source-1:p60",
+        "source-1:p61",
+        "source-1:p62",
+        "source-1:p63",
+        "source-1:p64",
+        "source-1:p65",
+        "source-1:p66",
+        "source-1:p67",
+        "source-1:p68",
+        "source-1:p69",
+        "source-1:p7",
+        "source-1:p70",
+        "source-1:p71",
+        "source-1:p72",
+        "source-1:p73",
+        "source-1:p74",
+        "source-1:p75",
+        "source-1:p76",
+        "source-1:p77",
+        "source-1:p78",
+        "source-1:p79",
+        "source-1:p8",
+        "source-1:p80",
+        "source-1:p81",
+        "source-1:p82",
+        "source-1:p83",
+        "source-1:p84",
+        "source-1:p85",
+        "source-1:p86",
+        "source-1:p87",
+        "source-1:p88",
+        "source-1:p89",
+        "source-1:p9",
+        "source-1:p90",
+        "source-1:p91",
+        "source-1:p92",
+        "source-1:p93",
+        "source-1:p94",
+        "source-1:p95",
+        "source-1:p96",
+        "source-1:p97",
+        "source-1:p98",
+        "source-1:p99"
+      ]
+    }
+  },
+  {
+    "ordinal": 4,
+    "kind": "model_result",
+    "at": "2026-09-07T22:29:33.680740+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": "2023-02-15",
+          "announcement_date_text": "February 15, 2023",
+          "citations": [
+            {
+              "passage_id": "source-1:p36",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p37",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p68",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p69",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p70",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p87",
+              "supports": [
+                "announcement_date",
+                "acquisition_announced"
+              ]
+            },
+            {
+              "passage_id": "source-1:p90",
+              "supports": [
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p126",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p129",
+              "supports": [
+                "listing_ended",
+                "acquisition_announced"
+              ]
+            },
+            {
+              "passage_id": "source-1:p144",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p145",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p146",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p148",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p149",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p160",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p161",
+              "supports": [
+                "listing_ended"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": "2023-05-15",
+          "effective_date_text": "May 15, 2023",
+          "event_kind": "listing_ended",
+          "issuer_name": "TravelCenters of America Inc.",
+          "limitations": [],
+          "security_class": "common stock",
+          "source_ticker": "TA",
+          "successor_ticker": null,
+          "summary": "TravelCenters of America Inc.（代號TA，NASDAQ）因與BP Products North America Inc.的合併案已於2023年5月15日完成，公司普通股於當日開盤前即停止在Nasdaq交易，並已申請下市及終止證券登記。此為已完成之下市事件，並非僅為收購宣布，且無跡象顯示該證券在其他交易所以相同名義延續交易。",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "本地SEC 8-K文件已明確且完整地證實TA普通股因合併下市之確切日期與事實，無需進一步查證。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "586b5c4a-d4b7-44ef-8b9c-7f2ea5e95312",
+      "usage": {
+        "input_tokens": 14989,
+        "output_tokens": 1098
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 13968,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1073,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 13968,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 14989,
+          "output_tokens": 1098,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 5,
+    "kind": "agent_action",
+    "at": "2026-09-07T22:29:33.698961+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": "2023-02-15",
+        "announcement_date_text": "February 15, 2023",
+        "citations": [
+          {
+            "passage_id": "source-1:p36",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p37",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p68",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p69",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p70",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p87",
+            "supports": [
+              "announcement_date",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p90",
+            "supports": [
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p126",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p129",
+            "supports": [
+              "listing_ended",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p144",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p145",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p146",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p148",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p149",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p160",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p161",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc.（代號TA，NASDAQ）因與BP Products North America Inc.的合併案已於2023年5月15日完成，公司普通股於當日開盤前即停止在Nasdaq交易，並已申請下市及終止證券登記。此為已完成之下市事件，並非僅為收購宣布，且無跡象顯示該證券在其他交易所以相同名義延續交易。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "本地SEC 8-K文件已明確且完整地證實TA普通股因合併下市之確切日期與事實，無需進一步查證。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  }
+]

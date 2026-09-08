@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="12" time="0.226" timestamp="2026-09-07T09:13:49.109170+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_owned_body_survives_connection_close[fixed-False]" time="0.071"><failure message="src.lifecycle_public_sources.SourceReadError: source_body_incomplete">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef14cdc4c0&gt;, {'client': &lt;socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+framing = 'fixed', keep_alive = False
+
+    @pytest.mark.parametrize("framing,keep_alive", [
+        ("fixed", False), ("chunked", False), ("eof", False), ("fixed", True),
+    ])
+    def test_response_owned_body_survives_connection_close(wire, framing, keep_alive):
+        start, state = wire
+        body = ("A public common-stock notice. " * 600 + "Complete final sentence.").encode()
+        reader = start(body=body, framing=framing, keep_alive=keep_alive)
+&gt;       page = reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources_wire.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:316: in read
+    return self._read(url)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_public_sources.PublicSourceReader object at 0x77ef14c515d0&gt;
+url = 'https://ir.example.com/notice'
+
+    def _read(self, url: str) -&gt; PublicSourcePage:
+        current = canonical_source_url(url)
+        redirects: list[str] = []
+        while True:
+            self._remaining()
+            with self._lock:
+                if self._request_count &gt;= self.limits.max_requests:
+                    raise SourceReadError("source_request_budget_exhausted")
+            parts = urlsplit(current)
+            user_agent = "ArkScope-Lifecycle/1.0"
+            if parts.hostname == "sec.gov" or parts.hostname.endswith(".sec.gov"):
+                if self.sec_policy is None:
+                    from src.lifecycle_web_sec_sources import SecSourcePolicy
+                    self.sec_policy = SecSourcePolicy()
+                user_agent = self.sec_policy.prepare(current, check=self._remaining)
+            address = self._address(parts.hostname)
+            with self._lock:
+                remaining = self._remaining()
+                if self._request_count &gt;= self.limits.max_requests:
+                    raise SourceReadError("source_request_budget_exhausted")
+                self._request_count += 1
+            connection = _PinnedHTTPSConnection(parts.hostname, address, timeout=remaining)
+            timer = Timer(remaining, connection.abort)
+            timer.daemon = True
+            try:
+                with self._lock:
+                    self._active_connection = connection
+                self._remaining()
+                timer.start()
+                connection.request("GET", parts.path + ("?" + parts.query if parts.query else ""), headers={
+                    "Accept": "text/html,application/xhtml+xml,text/plain",
+                    "Accept-Encoding": "identity", "User-Agent": user_agent,
+                    "Connection": "close",
+                })
+                response = connection.getresponse()
+                self._remaining()
+                if response.status in {301, 302, 303, 307, 308}:
+                    if len(redirects) &gt;= self.limits.max_redirects:
+                        raise SourceReadError("source_redirect_limit")
+                    location = response.getheader("Location")
+                    if not isinstance(location, str) or not location:
+                        raise SourceReadError("source_response_invalid")
+                    destination = canonical_source_url(urljoin(current, location))
+                    if destination == current or destination in redirects:
+                        raise SourceReadError("source_redirect_limit")
+                    redirects.append(current)
+                    current = destination
+                    continue
+                if response.status == 429:
+                    raise SourceReadError("source_rate_limited")
+                if response.status != 200:
+                    raise SourceReadError("source_unavailable")
+                if response.getheader("Content-Encoding", "identity").lower() != "identity":
+                    raise SourceReadError("source_encoding_unsupported")
+                length = response.getheader("Content-Length")
+                if length is not None and (not length.isascii() or not length.isdecimal()):
+                    raise SourceReadError("source_response_invalid")
+                if length is not None and int(length) &gt; self.limits.max_response_bytes:
+                    raise SourceReadError("source_body_too_large")
+                body = bytearray()
+                while True:
+                    self._remaining()
+                    chunk = response.read(min(65536, self.limits.max_response_bytes + 1 - len(body)))
+                    self._remaining()
+                    if not chunk:
+                        break
+                    body.extend(chunk)
+                    if len(body) &gt; self.limits.max_response_bytes:
+                        raise SourceReadError("source_body_too_large")
+                if length is not None and len(body) != int(length):
+&gt;                   raise SourceReadError("source_body_incomplete")
+E                   src.lifecycle_public_sources.SourceReadError: source_body_incomplete
+
+src/lifecycle_public_sources.py:390: SourceReadError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_owned_body_survives_connection_close[chunked-False]" time="0.002"><failure message="src.lifecycle_public_sources.SourceReadError: source_transport_unavailable">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef14368670&gt;, {'client': &lt;socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+framing = 'chunked', keep_alive = False
+
+    @pytest.mark.parametrize("framing,keep_alive", [
+        ("fixed", False), ("chunked", False), ("eof", False), ("fixed", True),
+    ])
+    def test_response_owned_body_survives_connection_close(wire, framing, keep_alive):
+        start, state = wire
+        body = ("A public common-stock notice. " * 600 + "Complete final sentence.").encode()
+        reader = start(body=body, framing=framing, keep_alive=keep_alive)
+&gt;       page = reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources_wire.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:316: in read
+    return self._read(url)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_public_sources.PublicSourceReader object at 0x77ef14c50a90&gt;
+url = 'https://ir.example.com/notice'
+
+    def _read(self, url: str) -&gt; PublicSourcePage:
+        current = canonical_source_url(url)
+        redirects: list[str] = []
+        while True:
+            self._remaining()
+            with self._lock:
+                if self._request_count &gt;= self.limits.max_requests:
+                    raise SourceReadError("source_request_budget_exhausted")
+            parts = urlsplit(current)
+            user_agent = "ArkScope-Lifecycle/1.0"
+            if parts.hostname == "sec.gov" or parts.hostname.endswith(".sec.gov"):
+                if self.sec_policy is None:
+                    from src.lifecycle_web_sec_sources import SecSourcePolicy
+                    self.sec_policy = SecSourcePolicy()
+                user_agent = self.sec_policy.prepare(current, check=self._remaining)
+            address = self._address(parts.hostname)
+            with self._lock:
+                remaining = self._remaining()
+                if self._request_count &gt;= self.limits.max_requests:
+                    raise SourceReadError("source_request_budget_exhausted")
+                self._request_count += 1
+            connection = _PinnedHTTPSConnection(parts.hostname, address, timeout=remaining)
+            timer = Timer(remaining, connection.abort)
+            timer.daemon = True
+            try:
+                with self._lock:
+                    self._active_connection = connection
+                self._remaining()
+                timer.start()
+                connection.request("GET", parts.path + ("?" + parts.query if parts.query else ""), headers={
+                    "Accept": "text/html,application/xhtml+xml,text/plain",
+                    "Accept-Encoding": "identity", "User-Agent": user_agent,
+                    "Connection": "close",
+                })
+                response = connection.getresponse()
+                self._remaining()
+                if response.status in {301, 302, 303, 307, 308}:
+                    if len(redirects) &gt;= self.limits.max_redirects:
+                        raise SourceReadError("source_redirect_limit")
+                    location = response.getheader("Location")
+                    if not isinstance(location, str) or not location:
+                        raise SourceReadError("source_response_invalid")
+                    destination = canonical_source_url(urljoin(current, location))
+                    if destination == current or destination in redirects:
+                        raise SourceReadError("source_redirect_limit")
+                    redirects.append(current)
+                    current = destination
+                    continue
+                if response.status == 429:
+                    raise SourceReadError("source_rate_limited")
+                if response.status != 200:
+                    raise SourceReadError("source_unavailable")
+                if response.getheader("Content-Encoding", "identity").lower() != "identity":
+                    raise SourceReadError("source_encoding_unsupported")
+                length = response.getheader("Content-Length")
+                if length is not None and (not length.isascii() or not length.isdecimal()):
+                    raise SourceReadError("source_response_invalid")
+                if length is not None and int(length) &gt; self.limits.max_response_bytes:
+                    raise SourceReadError("source_body_too_large")
+                body = bytearray()
+                while True:
+                    self._remaining()
+                    chunk = response.read(min(65536, self.limits.max_response_bytes + 1 - len(body)))
+                    self._remaining()
+                    if not chunk:
+                        break
+                    body.extend(chunk)
+                    if len(body) &gt; self.limits.max_response_bytes:
+                        raise SourceReadError("source_body_too_large")
+                if length is not None and len(body) != int(length):
+                    raise SourceReadError("source_body_incomplete")
+                text, mime = _page_text(bytes(body), response.getheader("Content-Type", "application/octet-stream"))
+                observed_at = self._now()
+                if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+                    raise SourceReadError("source_observation_time")
+                self._remaining()
+                page = PublicSourcePage(
+                    current, tuple(redirects), hashlib.sha256(body).hexdigest(),
+                    hashlib.sha256(text.encode()).hexdigest(), text, mime, observed_at.isoformat(),
+                )
+                return replace(page, capture_sha256=_capture_digest(page))
+            except (TimeoutError, socket.timeout):
+                raise SourceReadError("source_read_timeout") from None
+            except (OSError, http.client.HTTPException):
+                self._remaining()
+&gt;               raise SourceReadError("source_transport_unavailable") from None
+E               src.lifecycle_public_sources.SourceReadError: source_transport_unavailable
+
+src/lifecycle_public_sources.py:405: SourceReadError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_owned_body_survives_connection_close[eof-False]" time="0.002"><failure message="src.lifecycle_public_sources.SourceReadError: source_text_empty">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef14369900&gt;, {'client': &lt;socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+framing = 'eof', keep_alive = False
+
+    @pytest.mark.parametrize("framing,keep_alive", [
+        ("fixed", False), ("chunked", False), ("eof", False), ("fixed", True),
+    ])
+    def test_response_owned_body_survives_connection_close(wire, framing, keep_alive):
+        start, state = wire
+        body = ("A public common-stock notice. " * 600 + "Complete final sentence.").encode()
+        reader = start(body=body, framing=framing, keep_alive=keep_alive)
+&gt;       page = reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources_wire.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:316: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:391: in _read
+    text, mime = _page_text(bytes(body), response.getheader("Content-Type", "application/octet-stream"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+body = b'', content_type = 'text/plain; charset=utf-8'
+
+    def _page_text(body: bytes, content_type: str) -&gt; tuple[str, str]:
+        header = Message()
+        header["Content-Type"] = content_type
+        mime = header.get_content_type()
+        if mime not in {"text/plain", "text/html", "application/xhtml+xml"}:
+            raise SourceReadError("source_format_unsupported")
+        charset = header.get_content_charset() or "utf-8"
+        try:
+            text = body.decode(charset, errors="strict")
+        except (LookupError, UnicodeError):
+            raise SourceReadError("source_encoding_unsupported") from None
+        if mime != "text/plain":
+            parser = _SourceTextParser()
+            parser.feed(text)
+            parser.close()
+            text = "".join(parser.parts)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+&gt;           raise SourceReadError("source_text_empty")
+E           src.lifecycle_public_sources.SourceReadError: source_text_empty
+
+src/lifecycle_public_sources.py:231: SourceReadError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_owned_body_survives_connection_close[fixed-True]" time="0.003" /><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_real_truncated_response_remains_rejected" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]" time="0.003"><failure message="AssertionError: assert 'source_body_incomplete' == 'source_read_timeout'&#10;  &#10;  - source_read_timeout&#10;  + source_body_incomplete">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef14369240&gt;, {'client': &lt;socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+cancel = False, framing = 'fixed'
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    @pytest.mark.parametrize("framing", ["fixed", "chunked"])
+    def test_stop_interrupts_response_after_connection_ownership_transfer(wire, cancel, framing):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"A delayed notice", framing=framing, stall_body=True,
+                       timeout_seconds=5 if cancel else 0.15)
+        errors = []
+    
+        def run():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                errors.append(exc)
+    
+        worker = Thread(target=run)
+        worker.start()
+        try:
+            assert state["response_returned"].wait(1)
+            assert state["read_entered"].wait(1)
+            if cancel:
+                assert worker.is_alive()
+                reader.request_stop()
+            worker.join(1)
+            assert not worker.is_alive(), "response-owned socket outlived cancellation/deadline"
+            assert len(errors) == 1 and isinstance(errors[0], SourceReadError)
+&gt;           assert str(errors[0]) == ("source_read_cancelled" if cancel else "source_read_timeout")
+E           AssertionError: assert 'source_body_incomplete' == 'source_read_timeout'
+E             
+E             - source_read_timeout
+E             + source_body_incomplete
+
+tests/test_lifecycle_public_sources_wire.py:180: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True]" time="0.003" /><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]" time="0.003"><failure message="AssertionError: assert 'source_transport_unavailable' == 'source_read_timeout'&#10;  &#10;  - source_read_timeout&#10;  + source_transport_unavailable">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef1436a9e0&gt;, {'client': &lt;socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+cancel = False, framing = 'chunked'
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    @pytest.mark.parametrize("framing", ["fixed", "chunked"])
+    def test_stop_interrupts_response_after_connection_ownership_transfer(wire, cancel, framing):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"A delayed notice", framing=framing, stall_body=True,
+                       timeout_seconds=5 if cancel else 0.15)
+        errors = []
+    
+        def run():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                errors.append(exc)
+    
+        worker = Thread(target=run)
+        worker.start()
+        try:
+            assert state["response_returned"].wait(1)
+            assert state["read_entered"].wait(1)
+            if cancel:
+                assert worker.is_alive()
+                reader.request_stop()
+            worker.join(1)
+            assert not worker.is_alive(), "response-owned socket outlived cancellation/deadline"
+            assert len(errors) == 1 and isinstance(errors[0], SourceReadError)
+&gt;           assert str(errors[0]) == ("source_read_cancelled" if cancel else "source_read_timeout")
+E           AssertionError: assert 'source_transport_unavailable' == 'source_read_timeout'
+E             
+E             - source_read_timeout
+E             + source_transport_unavailable
+
+tests/test_lifecycle_public_sources_wire.py:180: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True]" time="0.003" /><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]" time="0.002"><failure message="assert False&#10; +  where False = isclosed()&#10; +    where isclosed = &lt;tests.test_lifecycle_public_sources_wire.wire.&lt;locals&gt;.ObservedResponse object at 0x77ef1430add0&gt;.isclosed">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef1436b370&gt;, {'client': &lt;socket.socket [closed] fd=11, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+status = 429, code = 'source_rate_limited'
+
+    @pytest.mark.parametrize("status,code", [
+        (429, "source_rate_limited"), (503, "source_unavailable"), (302, "source_redirect_limit"),
+    ])
+    def test_response_stream_is_closed_when_headers_reject_source(wire, status, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Unused body", status=status)
+        with pytest.raises(SourceReadError, match=f"^{code}$"):
+            reader.read("https://ir.example.com/notice")
+        assert reader.request_count == 1
+&gt;       assert state["responses"][0].isclosed()
+E       assert False
+E        +  where False = isclosed()
+E        +    where isclosed = &lt;tests.test_lifecycle_public_sources_wire.wire.&lt;locals&gt;.ObservedResponse object at 0x77ef1430add0&gt;.isclosed
+
+tests/test_lifecycle_public_sources_wire.py:201: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]" time="0.002"><failure message="assert False&#10; +  where False = isclosed()&#10; +    where isclosed = &lt;tests.test_lifecycle_public_sources_wire.wire.&lt;locals&gt;.ObservedResponse object at 0x77ef1432ab90&gt;.isclosed">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef1436b400&gt;, {'client': &lt;socket.socket [closed] fd=11, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+status = 503, code = 'source_unavailable'
+
+    @pytest.mark.parametrize("status,code", [
+        (429, "source_rate_limited"), (503, "source_unavailable"), (302, "source_redirect_limit"),
+    ])
+    def test_response_stream_is_closed_when_headers_reject_source(wire, status, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Unused body", status=status)
+        with pytest.raises(SourceReadError, match=f"^{code}$"):
+            reader.read("https://ir.example.com/notice")
+        assert reader.request_count == 1
+&gt;       assert state["responses"][0].isclosed()
+E       assert False
+E        +  where False = isclosed()
+E        +    where isclosed = &lt;tests.test_lifecycle_public_sources_wire.wire.&lt;locals&gt;.ObservedResponse object at 0x77ef1432ab90&gt;.isclosed
+
+tests/test_lifecycle_public_sources_wire.py:201: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources_wire" name="test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]" time="0.003"><failure message="assert False&#10; +  where False = isclosed()&#10; +    where isclosed = &lt;tests.test_lifecycle_public_sources_wire.wire.&lt;locals&gt;.ObservedResponse object at 0x77ef14309e40&gt;.isclosed">wire = (&lt;function wire.&lt;locals&gt;.start at 0x77ef1436b910&gt;, {'client': &lt;socket.socket [closed] fd=11, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+status = 302, code = 'source_redirect_limit'
+
+    @pytest.mark.parametrize("status,code", [
+        (429, "source_rate_limited"), (503, "source_unavailable"), (302, "source_redirect_limit"),
+    ])
+    def test_response_stream_is_closed_when_headers_reject_source(wire, status, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Unused body", status=status)
+        with pytest.raises(SourceReadError, match=f"^{code}$"):
+            reader.read("https://ir.example.com/notice")
+        assert reader.request_count == 1
+&gt;       assert state["responses"][0].isclosed()
+E       assert False
+E        +  where False = isclosed()
+E        +    where isclosed = &lt;tests.test_lifecycle_public_sources_wire.wire.&lt;locals&gt;.ObservedResponse object at 0x77ef14309e40&gt;.isclosed
+
+tests/test_lifecycle_public_sources_wire.py:201: AssertionError</failure></testcase></testsuite></testsuites>

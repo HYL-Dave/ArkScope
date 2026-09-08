@@ -1,0 +1,5058 @@
+{
+  "observations": [
+    {
+      "at_seconds": 4.194,
+      "elapsed_seconds": 0.205,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 4.194,
+      "elapsed_seconds": 0.205,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 4.194,
+      "elapsed_seconds": 0.217,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 4.446,
+      "elapsed_seconds": 0.444,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 4.89,
+      "elapsed_seconds": 0.252,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 7.189,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 7.191,
+      "elapsed_seconds": 0.034,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 9.293,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 9.295,
+      "elapsed_seconds": 0.038,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 11.401,
+      "elapsed_seconds": 0.046,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 11.408,
+      "elapsed_seconds": 0.058,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 11.948,
+      "elapsed_seconds": 1.03,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 12.978,
+      "elapsed_seconds": 0.046,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 12.771,
+      "elapsed_seconds": 0.33,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 13.625,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 13.626,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 13.671,
+      "elapsed_seconds": 0.149,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 13.103,
+      "elapsed_seconds": 1.233,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 14.336,
+      "elapsed_seconds": 0.115,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 14.451,
+      "elapsed_seconds": 0.034,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 13.668,
+      "elapsed_seconds": 0.845,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 14.529,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 14.555,
+      "elapsed_seconds": 0.166,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 13.669,
+      "elapsed_seconds": 1.104,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 14.773,
+      "elapsed_seconds": 1.476,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 16.236,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 16.305,
+      "elapsed_seconds": 0.591,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 16.324,
+      "elapsed_seconds": 0.572,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 18.802,
+      "elapsed_seconds": 0.266,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 19.068,
+      "elapsed_seconds": 0.758,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 19.115,
+      "elapsed_seconds": 1.265,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 19.068,
+      "elapsed_seconds": 1.313,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 19.115,
+      "elapsed_seconds": 1.496,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 19.826,
+      "elapsed_seconds": 0.789,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 20.381,
+      "elapsed_seconds": 0.234,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 20.62,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 20.649,
+      "elapsed_seconds": 0.273,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 20.649,
+      "elapsed_seconds": 0.273,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 20.657,
+      "elapsed_seconds": 0.342,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 22.993,
+      "elapsed_seconds": 0.13,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 23.017,
+      "elapsed_seconds": 0.14,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 23.063,
+      "elapsed_seconds": 0.117,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 23.587,
+      "elapsed_seconds": 1.346,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 24.933,
+      "elapsed_seconds": 0.079,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 24.933,
+      "elapsed_seconds": 0.11,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 25.138,
+      "elapsed_seconds": 0.124,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 25.187,
+      "elapsed_seconds": 0.138,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 25.195,
+      "elapsed_seconds": 0.341,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 25.962,
+      "elapsed_seconds": 1.108,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 27.071,
+      "elapsed_seconds": 0.082,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 27.091,
+      "elapsed_seconds": 0.102,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 27.153,
+      "elapsed_seconds": 0.058,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 27.292,
+      "elapsed_seconds": 0.159,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 27.46,
+      "elapsed_seconds": 0.733,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 28.194,
+      "elapsed_seconds": 0.553,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 27.281,
+      "elapsed_seconds": 1.657,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 28.971,
+      "elapsed_seconds": 0.28,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 28.967,
+      "elapsed_seconds": 0.285,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 28.967,
+      "elapsed_seconds": 0.442,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 28.968,
+      "elapsed_seconds": 0.53,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 32.349,
+      "elapsed_seconds": 0.189,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 31.804,
+      "elapsed_seconds": 0.742,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 31.804,
+      "elapsed_seconds": 0.752,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 32.578,
+      "elapsed_seconds": 0.254,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 32.575,
+      "elapsed_seconds": 0.443,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 32.572,
+      "elapsed_seconds": 0.531,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 32.577,
+      "elapsed_seconds": 0.531,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 33.133,
+      "elapsed_seconds": 0.126,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 33.109,
+      "elapsed_seconds": 0.343,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 35.02,
+      "elapsed_seconds": 0.145,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 35.076,
+      "elapsed_seconds": 0.348,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 35.391,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 35.515,
+      "elapsed_seconds": 0.2,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 35.556,
+      "elapsed_seconds": 0.342,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 35.847,
+      "elapsed_seconds": 0.055,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 35.905,
+      "elapsed_seconds": 3.583,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 39.488,
+      "elapsed_seconds": 0.167,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 39.656,
+      "elapsed_seconds": 0.069,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 39.494,
+      "elapsed_seconds": 0.316,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 37.324,
+      "elapsed_seconds": 2.486,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 39.494,
+      "elapsed_seconds": 0.33,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 39.494,
+      "elapsed_seconds": 0.331,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 39.887,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 39.948,
+      "elapsed_seconds": 0.897,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 39.95,
+      "elapsed_seconds": 0.914,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 42.416,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 39.913,
+      "elapsed_seconds": 2.576,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 39.914,
+      "elapsed_seconds": 2.642,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 42.604,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 43.546,
+      "elapsed_seconds": 0.335,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 44.467,
+      "elapsed_seconds": 1.82,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 45.373,
+      "elapsed_seconds": 0.914,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 46.306,
+      "elapsed_seconds": 0.047,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 47.301,
+      "elapsed_seconds": 0.059,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 44.552,
+      "elapsed_seconds": 2.864,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 46.288,
+      "elapsed_seconds": 1.165,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 46.354,
+      "elapsed_seconds": 1.162,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 47.417,
+      "elapsed_seconds": 0.14,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 47.639,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 47.663,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 47.76,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 47.794,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 47.794,
+      "elapsed_seconds": 0.048,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 53.632,
+      "elapsed_seconds": 1.056,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 54.6,
+      "elapsed_seconds": 0.089,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 54.693,
+      "elapsed_seconds": 1.468,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 47.85,
+      "elapsed_seconds": 8.875,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 47.869,
+      "elapsed_seconds": 8.864,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 54.689,
+      "elapsed_seconds": 4.504,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 54.688,
+      "elapsed_seconds": 4.514,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 59.249,
+      "elapsed_seconds": 0.667,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 59.221,
+      "elapsed_seconds": 0.717,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 56.739,
+      "elapsed_seconds": 5.382,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 62.121,
+      "elapsed_seconds": 0.092,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 62.214,
+      "elapsed_seconds": 0.062,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 59.221,
+      "elapsed_seconds": 3.123,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 62.374,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 59.24,
+      "elapsed_seconds": 3.242,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 62.483,
+      "elapsed_seconds": 0.517,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 62.488,
+      "elapsed_seconds": 1.362,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 62.876,
+      "elapsed_seconds": 1.034,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 63.925,
+      "elapsed_seconds": 0.418,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 64.437,
+      "elapsed_seconds": 0.746,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.51,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.534,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 66.684,
+      "elapsed_seconds": 0.883,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.534,
+      "elapsed_seconds": 0.034,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 66.684,
+      "elapsed_seconds": 0.889,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.574,
+      "elapsed_seconds": 0.046,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.567,
+      "elapsed_seconds": 0.106,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.711,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.753,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.775,
+      "elapsed_seconds": 0.035,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.838,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.868,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.868,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.904,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.911,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.941,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.929,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.965,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.965,
+      "elapsed_seconds": 0.03,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.947,
+      "elapsed_seconds": 0.049,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.998,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 67.996,
+      "elapsed_seconds": 0.071,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 68.084,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 68.084,
+      "elapsed_seconds": 0.047,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 68.262,
+      "elapsed_seconds": 0.043,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 68.324,
+      "elapsed_seconds": 0.062,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 68.393,
+      "elapsed_seconds": 1.741,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 68.393,
+      "elapsed_seconds": 1.753,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 70.18,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_results WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 70.204,
+      "elapsed_seconds": 4.808,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 68.13,
+      "elapsed_seconds": 8.467,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 67.996,
+      "elapsed_seconds": 8.665,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 76.687,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 77.232,
+      "elapsed_seconds": 0.347,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 78.623,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 78.722,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 78.75,
+      "elapsed_seconds": 0.468,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 78.751,
+      "elapsed_seconds": 1.448,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 79.371,
+      "elapsed_seconds": 0.833,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 78.751,
+      "elapsed_seconds": 4.059,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 82.848,
+      "elapsed_seconds": 0.608,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 82.847,
+      "elapsed_seconds": 0.623,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 80.208,
+      "elapsed_seconds": 5.365,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 85.573,
+      "elapsed_seconds": 0.118,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 85.691,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 82.813,
+      "elapsed_seconds": 2.95,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 82.839,
+      "elapsed_seconds": 3.043,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 85.899,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 88.88,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 88.88,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 88.88,
+      "elapsed_seconds": 0.047,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 88.879,
+      "elapsed_seconds": 0.048,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 88.929,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 88.93,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 88.968,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 88.993,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 89.003,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 89.061,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 89.06,
+      "elapsed_seconds": 0.767,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 89.084,
+      "elapsed_seconds": 0.744,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 91.291,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 89.085,
+      "elapsed_seconds": 2.866,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 91.951,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 89.041,
+      "elapsed_seconds": 2.938,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 93.523,
+      "elapsed_seconds": 0.492,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 93.997,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 94.066,
+      "elapsed_seconds": 0.82,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 94.166,
+      "elapsed_seconds": 0.72,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 94.166,
+      "elapsed_seconds": 0.72,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 95.363,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 95.973,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 94.887,
+      "elapsed_seconds": 1.153,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 96.04,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 94.888,
+      "elapsed_seconds": 1.233,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 95.178,
+      "elapsed_seconds": 0.949,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 96.138,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 96.158,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 96.207,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 96.212,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 96.239,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 96.245,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 98.238,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.238,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.275,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.329,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.274,
+      "elapsed_seconds": 0.086,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 98.377,
+      "elapsed_seconds": 0.038,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 98.427,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 98.532,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.559,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 98.565,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "BEGIN",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.586,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 98.778,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.841,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.879,
+      "elapsed_seconds": 0.235,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 98.926,
+      "elapsed_seconds": 0.271,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 99.706,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 99.816,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 96.297,
+      "elapsed_seconds": 4.175,
+      "error": null,
+      "operation": "INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 100.473,
+      "elapsed_seconds": 29.271,
+      "error": null,
+      "operation": "synthetic_large_commit_hold",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 129.744,
+      "elapsed_seconds": 0.044,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 98.638,
+      "elapsed_seconds": 31.173,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 129.788,
+      "elapsed_seconds": 0.044,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 101.876,
+      "elapsed_seconds": 28.015,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 129.811,
+      "elapsed_seconds": 0.08,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 101.761,
+      "elapsed_seconds": 28.131,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 129.901,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 129.902,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 129.952,
+      "elapsed_seconds": 0.312,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 129.937,
+      "elapsed_seconds": 1.243,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 98.448,
+      "elapsed_seconds": 32.783,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 129.938,
+      "elapsed_seconds": 1.338,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 131.338,
+      "elapsed_seconds": 0.334,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 132.029,
+      "elapsed_seconds": 1.451,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 133.361,
+      "elapsed_seconds": 0.132,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 133.378,
+      "elapsed_seconds": 0.115,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 133.511,
+      "elapsed_seconds": 0.771,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 133.507,
+      "elapsed_seconds": 2.048,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 135.511,
+      "elapsed_seconds": 0.063,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 135.389,
+      "elapsed_seconds": 0.192,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 135.735,
+      "elapsed_seconds": 0.449,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 137.61,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 137.496,
+      "elapsed_seconds": 0.514,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 137.941,
+      "elapsed_seconds": 0.071,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 139.27,
+      "elapsed_seconds": 0.046,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 137.656,
+      "elapsed_seconds": 1.756,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 139.412,
+      "elapsed_seconds": 0.075,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 137.666,
+      "elapsed_seconds": 1.846,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 139.728,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 139.819,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 139.851,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 139.877,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 139.909,
+      "elapsed_seconds": 0.057,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 140.957,
+      "elapsed_seconds": 0.885,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 141.868,
+      "elapsed_seconds": 0.052,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 141.869,
+      "elapsed_seconds": 0.052,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 141.921,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 141.92,
+      "elapsed_seconds": 0.035,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 141.976,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 142.007,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 141.997,
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 142.036,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 142.057,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 142.178,
+      "elapsed_seconds": 0.055,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 142.329,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 142.312,
+      "elapsed_seconds": 0.051,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 142.33,
+      "elapsed_seconds": 0.043,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 142.39,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 142.464,
+      "elapsed_seconds": 0.36,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 142.889,
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 143.912,
+      "elapsed_seconds": 0.064,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 142.402,
+      "elapsed_seconds": 1.669,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 142.412,
+      "elapsed_seconds": 1.659,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 144.088,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 144.071,
+      "elapsed_seconds": 0.057,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 144.127,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 144.149,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 144.174,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 144.966,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 145.463,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 145.524,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_results WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 145.545,
+      "elapsed_seconds": 0.357,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.011,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.149,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.17,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.179,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.219,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.28,
+      "elapsed_seconds": 0.03,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.34,
+      "elapsed_seconds": 0.044,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.44,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.486,
+      "elapsed_seconds": 0.044,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.502,
+      "elapsed_seconds": 0.054,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.531,
+      "elapsed_seconds": 0.047,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.578,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.597,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.658,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.73,
+      "elapsed_seconds": 0.067,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.715,
+      "elapsed_seconds": 0.259,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 146.646,
+      "elapsed_seconds": 3.88,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 146.622,
+      "elapsed_seconds": 3.941,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 148.84,
+      "elapsed_seconds": 1.738,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 150.709,
+      "elapsed_seconds": 0.348,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 151.981,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 152.557,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 152.544,
+      "elapsed_seconds": 0.329,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 154.019,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 154.279,
+      "elapsed_seconds": 0.565,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 152.648,
+      "elapsed_seconds": 2.253,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 154.901,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 152.652,
+      "elapsed_seconds": 2.343,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 154.048,
+      "elapsed_seconds": 0.969,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 154.996,
+      "elapsed_seconds": 0.623,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 155.636,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 155.63,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 155.659,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 155.659,
+      "elapsed_seconds": 0.076,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 155.723,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 155.862,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 155.915,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "BEGIN",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 156.147,
+      "elapsed_seconds": 0.182,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 156.946,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 156.015,
+      "elapsed_seconds": 0.975,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 156.861,
+      "elapsed_seconds": 0.15,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 156.99,
+      "elapsed_seconds": 0.08,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 157.083,
+      "elapsed_seconds": 0.328,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 158.193,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 157.087,
+      "elapsed_seconds": 1.263,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 158.35,
+      "elapsed_seconds": 0.047,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 157.757,
+      "elapsed_seconds": 0.645,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 157.096,
+      "elapsed_seconds": 1.334,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.467,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.477,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.536,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.556,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.598,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.625,
+      "elapsed_seconds": 0.03,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.635,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 158.63,
+      "elapsed_seconds": 0.03,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.665,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.666,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 158.66,
+      "elapsed_seconds": 0.09,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.718,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 158.707,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 158.75,
+      "elapsed_seconds": 0.06,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 158.788,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 159.103,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 159.463,
+      "elapsed_seconds": 0.405,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.256,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.28,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.512,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.754,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.763,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 160.785,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_results WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.785,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 160.925,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 160.907,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 160.959,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.818,
+      "elapsed_seconds": 0.403,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.949,
+      "elapsed_seconds": 2.558,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 163.106,
+      "elapsed_seconds": 0.439,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 160.97,
+      "elapsed_seconds": 2.634,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 163.627,
+      "elapsed_seconds": 0.385,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 163.626,
+      "elapsed_seconds": 2.259,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 165.913,
+      "elapsed_seconds": 0.565,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 167.912,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 165.925,
+      "elapsed_seconds": 2.486,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 167.202,
+      "elapsed_seconds": 1.257,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 167.938,
+      "elapsed_seconds": 0.551,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 168.492,
+      "elapsed_seconds": 0.795,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 170.978,
+      "elapsed_seconds": 0.061,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 168.609,
+      "elapsed_seconds": 2.471,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 170.35,
+      "elapsed_seconds": 0.755,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 171.08,
+      "elapsed_seconds": 0.06,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 171.129,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 170.425,
+      "elapsed_seconds": 0.743,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 171.209,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 171.434,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 171.468,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 171.503,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 171.53,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 171.547,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 171.585,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_results WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 171.607,
+      "elapsed_seconds": 0.317,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 171.59,
+      "elapsed_seconds": 1.361,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 172.951,
+      "elapsed_seconds": 0.044,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 173.165,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 173.226,
+      "elapsed_seconds": 0.321,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 175.003,
+      "elapsed_seconds": 0.078,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 175.022,
+      "elapsed_seconds": 0.098,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 173.249,
+      "elapsed_seconds": 1.886,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 175.135,
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 174.916,
+      "elapsed_seconds": 0.281,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 175.256,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 175.275,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 175.477,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 175.621,
+      "elapsed_seconds": 0.274,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 177.275,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.381,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.397,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 177.449,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.445,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.46,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 177.484,
+      "elapsed_seconds": 0.03,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.49,
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_results WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 177.514,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.576,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.531,
+      "elapsed_seconds": 0.283,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 178.533,
+      "elapsed_seconds": 0.053,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 177.6,
+      "elapsed_seconds": 1.056,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 177.61,
+      "elapsed_seconds": 1.069,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 178.662,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 178.696,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 178.685,
+      "elapsed_seconds": 0.035,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 178.656,
+      "elapsed_seconds": 0.067,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 178.736,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 178.763,
+      "elapsed_seconds": 0.035,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 178.814,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 178.833,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 179.005,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 179.066,
+      "elapsed_seconds": 0.992,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 180.079,
+      "elapsed_seconds": 0.35,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 180.687,
+      "elapsed_seconds": 1.06,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 182.241,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 180.763,
+      "elapsed_seconds": 2.158,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 180.884,
+      "elapsed_seconds": 2.039,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 184.343,
+      "elapsed_seconds": 0.933,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 185.277,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 185.334,
+      "elapsed_seconds": 0.484,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 185.339,
+      "elapsed_seconds": 1.548,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 185.339,
+      "elapsed_seconds": 1.644,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 187.04,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 187.064,
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.155,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.155,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.138,
+      "elapsed_seconds": 0.05,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.166,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.223,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.232,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.435,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.435,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.425,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.462,
+      "elapsed_seconds": 0.046,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.471,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.522,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.513,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "SELECT phase FROM security_lifecycle_migration_receipts WHERE phase <> 'complete' LIMIT 1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.557,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.702,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.727,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.75,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.775,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.763,
+      "elapsed_seconds": 0.272,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.839,
+      "elapsed_seconds": 0.243,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 190.553,
+      "elapsed_seconds": 0.053,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 190.583,
+      "elapsed_seconds": 0.039,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 189.602,
+      "elapsed_seconds": 1.054,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 190.656,
+      "elapsed_seconds": 0.05,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 189.549,
+      "elapsed_seconds": 1.158,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 190.75,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 190.776,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 192.621,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 192.651,
+      "elapsed_seconds": 0.032,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 192.683,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 192.717,
+      "elapsed_seconds": 0.041,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 192.718,
+      "elapsed_seconds": 0.041,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 192.759,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 192.824,
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 192.862,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 192.903,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 192.931,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 192.971,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 192.971,
+      "elapsed_seconds": 0.045,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 193.026,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 193.011,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_results WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 193.043,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 193.054,
+      "elapsed_seconds": 0.3,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 194.215,
+      "elapsed_seconds": 0.049,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 193.077,
+      "elapsed_seconds": 1.242,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 193.049,
+      "elapsed_seconds": 1.27,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 194.319,
+      "elapsed_seconds": 0.05,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 193.065,
+      "elapsed_seconds": 1.346,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 194.421,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 194.452,
+      "elapsed_seconds": 0.677,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 196.707,
+      "elapsed_seconds": 0.036,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 194.474,
+      "elapsed_seconds": 3.047,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 196.743,
+      "elapsed_seconds": 0.834,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 196.743,
+      "elapsed_seconds": 0.834,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 197.585,
+      "elapsed_seconds": 0.361,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 197.588,
+      "elapsed_seconds": 1.549,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 196.758,
+      "elapsed_seconds": 3.08,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 199.843,
+      "elapsed_seconds": 0.286,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 199.858,
+      "elapsed_seconds": 0.271,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 199.873,
+      "elapsed_seconds": 1.644,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 201.104,
+      "elapsed_seconds": 0.43,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 201.41,
+      "elapsed_seconds": 0.138,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 201.149,
+      "elapsed_seconds": 0.434,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 201.549,
+      "elapsed_seconds": 0.302,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 201.549,
+      "elapsed_seconds": 1.185,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 203.351,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 201.588,
+      "elapsed_seconds": 1.849,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 203.421,
+      "elapsed_seconds": 0.042,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 203.437,
+      "elapsed_seconds": 0.041,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 203.549,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 203.62,
+      "elapsed_seconds": 0.404,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 203.683,
+      "elapsed_seconds": 1.953,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 205.529,
+      "elapsed_seconds": 0.135,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 205.528,
+      "elapsed_seconds": 0.142,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 205.68,
+      "elapsed_seconds": 0.688,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 205.681,
+      "elapsed_seconds": 1.948,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 207.558,
+      "elapsed_seconds": 0.1,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 207.892,
+      "elapsed_seconds": 0.368,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 207.779,
+      "elapsed_seconds": 1.45,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 209.726,
+      "elapsed_seconds": 0.579,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 209.748,
+      "elapsed_seconds": 2.06,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 211.182,
+      "elapsed_seconds": 0.641,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 211.256,
+      "elapsed_seconds": 0.649,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 212.0,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 211.924,
+      "elapsed_seconds": 0.303,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 212.023,
+      "elapsed_seconds": 1.147,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 212.606,
+      "elapsed_seconds": 0.632,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 213.773,
+      "elapsed_seconds": 0.716,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 213.24,
+      "elapsed_seconds": 1.814,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 215.054,
+      "elapsed_seconds": 0.062,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 216.492,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 216.492,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 213.855,
+      "elapsed_seconds": 3.047,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 216.513,
+      "elapsed_seconds": 0.434,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 216.521,
+      "elapsed_seconds": 0.436,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 216.521,
+      "elapsed_seconds": 0.437,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 216.972,
+      "elapsed_seconds": 0.342,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 216.98,
+      "elapsed_seconds": 1.447,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 216.979,
+      "elapsed_seconds": 1.536,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 219.013,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 218.964,
+      "elapsed_seconds": 0.453,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 219.045,
+      "elapsed_seconds": 1.759,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 220.804,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 220.357,
+      "elapsed_seconds": 0.538,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 220.562,
+      "elapsed_seconds": 0.336,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 221.019,
+      "elapsed_seconds": 0.353,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 222.602,
+      "elapsed_seconds": 0.029,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 220.991,
+      "elapsed_seconds": 1.759,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 222.732,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 222.787,
+      "elapsed_seconds": 0.567,
+      "error": null,
+      "operation": "SELECT version,schema_sha256 FROM lifecycle_web_installation WHERE singleton=1",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 223.366,
+      "elapsed_seconds": 0.474,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 223.375,
+      "elapsed_seconds": 1.645,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 224.639,
+      "elapsed_seconds": 0.442,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 224.545,
+      "elapsed_seconds": 0.536,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 224.774,
+      "elapsed_seconds": 0.341,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 225.103,
+      "elapsed_seconds": 0.497,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 225.087,
+      "elapsed_seconds": 1.548,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 226.635,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 227.676,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 225.136,
+      "elapsed_seconds": 2.689,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 227.291,
+      "elapsed_seconds": 0.537,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 227.295,
+      "elapsed_seconds": 0.552,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 227.914,
+      "elapsed_seconds": 0.444,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 227.893,
+      "elapsed_seconds": 2.451,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 229.734,
+      "elapsed_seconds": 0.644,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 229.849,
+      "elapsed_seconds": 0.54,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 230.444,
+      "elapsed_seconds": 0.035,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 230.526,
+      "elapsed_seconds": 0.502,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 230.527,
+      "elapsed_seconds": 1.647,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 232.308,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 232.379,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 232.348,
+      "elapsed_seconds": 0.493,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 232.541,
+      "elapsed_seconds": 2.098,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 234.136,
+      "elapsed_seconds": 0.504,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 234.665,
+      "elapsed_seconds": 0.408,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 234.678,
+      "elapsed_seconds": 1.563,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 236.181,
+      "elapsed_seconds": 0.061,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 236.323,
+      "elapsed_seconds": 0.339,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 236.813,
+      "elapsed_seconds": 0.935,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 236.995,
+      "elapsed_seconds": 0.832,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 237.829,
+      "elapsed_seconds": 1.347,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 239.176,
+      "elapsed_seconds": 0.06,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 239.236,
+      "elapsed_seconds": 1.246,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 239.236,
+      "elapsed_seconds": 1.253,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 240.482,
+      "elapsed_seconds": 0.599,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 240.486,
+      "elapsed_seconds": 0.611,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 240.486,
+      "elapsed_seconds": 0.611,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 240.486,
+      "elapsed_seconds": 0.612,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 241.182,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 241.239,
+      "elapsed_seconds": 0.401,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 241.248,
+      "elapsed_seconds": 0.427,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 241.207,
+      "elapsed_seconds": 1.739,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 242.946,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 241.181,
+      "elapsed_seconds": 1.84,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 243.045,
+      "elapsed_seconds": 0.044,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 244.919,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 245.0,
+      "elapsed_seconds": 0.023,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 245.059,
+      "elapsed_seconds": 0.815,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 244.872,
+      "elapsed_seconds": 1.002,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 245.087,
+      "elapsed_seconds": 2.148,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 245.12,
+      "elapsed_seconds": 2.135,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 246.274,
+      "elapsed_seconds": 1.031,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 247.309,
+      "elapsed_seconds": 0.277,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 249.175,
+      "elapsed_seconds": 0.523,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 248.7,
+      "elapsed_seconds": 1.673,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 249.191,
+      "elapsed_seconds": 1.182,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 250.373,
+      "elapsed_seconds": 0.063,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 251.945,
+      "elapsed_seconds": 0.034,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 249.258,
+      "elapsed_seconds": 2.744,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 249.265,
+      "elapsed_seconds": 2.74,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 252.002,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 254.628,
+      "elapsed_seconds": 0.764,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 254.649,
+      "elapsed_seconds": 0.77,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 254.637,
+      "elapsed_seconds": 3.061,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 254.638,
+      "elapsed_seconds": 3.143,
+      "error": null,
+      "operation": "BEGIN IMMEDIATE",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 257.802,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 257.824,
+      "elapsed_seconds": 0.026,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 259.67,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 259.749,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 259.631,
+      "elapsed_seconds": 0.585,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 259.693,
+      "elapsed_seconds": 0.574,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 259.827,
+      "elapsed_seconds": 2.164,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 259.879,
+      "elapsed_seconds": 2.136,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 263.267,
+      "elapsed_seconds": 1.625,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 263.986,
+      "elapsed_seconds": 0.906,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 263.98,
+      "elapsed_seconds": 0.912,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 264.892,
+      "elapsed_seconds": 0.028,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 264.012,
+      "elapsed_seconds": 2.55,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 264.03,
+      "elapsed_seconds": 2.544,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 266.562,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 268.469,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.469,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.552,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.625,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 268.625,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.659,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_calls WHERE run_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.573,
+      "elapsed_seconds": 0.381,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.705,
+      "elapsed_seconds": 0.386,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 268.742,
+      "elapsed_seconds": 1.678,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 268.748,
+      "elapsed_seconds": 1.739,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 270.573,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 272.837,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 272.997,
+      "elapsed_seconds": 0.374,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 272.996,
+      "elapsed_seconds": 0.384,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 272.948,
+      "elapsed_seconds": 1.55,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 274.036,
+      "elapsed_seconds": 0.534,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 272.948,
+      "elapsed_seconds": 1.638,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 274.574,
+      "elapsed_seconds": 1.368,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 274.594,
+      "elapsed_seconds": 1.747,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 277.006,
+      "elapsed_seconds": 0.396,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 277.04,
+      "elapsed_seconds": 0.439,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 277.004,
+      "elapsed_seconds": 1.647,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 278.353,
+      "elapsed_seconds": 0.339,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 277.284,
+      "elapsed_seconds": 1.434,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 278.732,
+      "elapsed_seconds": 0.349,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 280.404,
+      "elapsed_seconds": 0.414,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 280.676,
+      "elapsed_seconds": 0.501,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 280.744,
+      "elapsed_seconds": 1.747,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 282.12,
+      "elapsed_seconds": 0.431,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 282.556,
+      "elapsed_seconds": 1.554,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 284.111,
+      "elapsed_seconds": 0.686,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 282.681,
+      "elapsed_seconds": 2.118,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 284.799,
+      "elapsed_seconds": 0.582,
+      "error": null,
+      "operation": "close",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 284.818,
+      "elapsed_seconds": 1.279,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 286.097,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 286.165,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "UPDATE lifecycle_web_runs SET lease_until=? WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 286.148,
+      "elapsed_seconds": 0.395,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 286.186,
+      "elapsed_seconds": 1.563,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 289.778,
+      "elapsed_seconds": 0.389,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 289.845,
+      "elapsed_seconds": 1.448,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 293.403,
+      "elapsed_seconds": 0.376,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 293.439,
+      "elapsed_seconds": 1.545,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 294.113,
+      "elapsed_seconds": 0.934,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 295.05,
+      "elapsed_seconds": 1.511,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 296.561,
+      "elapsed_seconds": 0.031,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 297.122,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 297.122,
+      "elapsed_seconds": 0.03,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 297.189,
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 297.334,
+      "elapsed_seconds": 0.349,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 297.285,
+      "elapsed_seconds": 1.849,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 299.134,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 301.203,
+      "elapsed_seconds": 0.414,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 301.276,
+      "elapsed_seconds": 2.148,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 305.356,
+      "elapsed_seconds": 0.021,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 305.497,
+      "elapsed_seconds": 0.038,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_runs WHERE run_id=?",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 305.496,
+      "elapsed_seconds": 0.314,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 305.539,
+      "elapsed_seconds": 1.832,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 305.539,
+      "elapsed_seconds": 1.833,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 307.378,
+      "elapsed_seconds": 1.497,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 308.875,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 308.901,
+      "elapsed_seconds": 0.596,
+      "error": null,
+      "operation": "PRAGMA foreign_keys=ON",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 309.56,
+      "elapsed_seconds": 0.418,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 309.547,
+      "elapsed_seconds": 1.637,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 311.184,
+      "elapsed_seconds": 0.027,
+      "error": null,
+      "operation": "close",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 313.489,
+      "elapsed_seconds": 0.431,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 313.496,
+      "elapsed_seconds": 2.453,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 317.867,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 318.07,
+      "elapsed_seconds": 0.537,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 318.043,
+      "elapsed_seconds": 2.654,
+      "error": null,
+      "operation": "commit",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 320.681,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 320.571,
+      "elapsed_seconds": 0.133,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 320.707,
+      "elapsed_seconds": 0.413,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "lifecycle-web"
+    },
+    {
+      "at_seconds": 320.706,
+      "elapsed_seconds": 1.59,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 322.296,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 322.991,
+      "elapsed_seconds": 0.121,
+      "error": null,
+      "operation": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_lifecycle_migration_receipts'",
+      "thread": "lifecycle-web-lease"
+    },
+    {
+      "at_seconds": 322.992,
+      "elapsed_seconds": 0.121,
+      "error": null,
+      "operation": "SELECT name,sql FROM sqlite_master WHERE type=? AND name LIKE ? AND sql IS NOT NULL",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 323.234,
+      "elapsed_seconds": 0.277,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 324.429,
+      "elapsed_seconds": 1.375,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 325.805,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 333.148,
+      "elapsed_seconds": 1.631,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 334.779,
+      "elapsed_seconds": 0.022,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 344.246,
+      "elapsed_seconds": 1.289,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 345.534,
+      "elapsed_seconds": 0.024,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 353.357,
+      "elapsed_seconds": 1.316,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "synthetic-ui-progress"
+    },
+    {
+      "at_seconds": 421.848,
+      "elapsed_seconds": 0.313,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 422.93,
+      "elapsed_seconds": 1.21,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 428.848,
+      "elapsed_seconds": 1.007,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 434.974,
+      "elapsed_seconds": 1.397,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 436.372,
+      "elapsed_seconds": 0.025,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 442.01,
+      "elapsed_seconds": 1.249,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 491.151,
+      "elapsed_seconds": 0.251,
+      "error": null,
+      "operation": "SELECT source_id,page_sha256 FROM lifecycle_web_pages WHERE run_id=? ORDER BY source_id",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 492.299,
+      "elapsed_seconds": 1.253,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 493.552,
+      "elapsed_seconds": 0.02,
+      "error": null,
+      "operation": "fetchone",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 498.762,
+      "elapsed_seconds": 1.057,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 504.774,
+      "elapsed_seconds": 1.322,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    },
+    {
+      "at_seconds": 510.474,
+      "elapsed_seconds": 1.186,
+      "error": null,
+      "operation": "SELECT * FROM lifecycle_web_pages WHERE run_id=? AND source_id=?",
+      "thread": "MainThread"
+    }
+  ],
+  "parameters_recorded": false,
+  "production_data_access": false,
+  "provider_calls": 0,
+  "source_inserts_observed": 8,
+  "synthetic_commit_holds_seconds": [
+    29.0
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "additional_status_documents_sha256": {
+    "docs/superpowers/plans/2026-09-07-lifecycle-web-bounded-followup.md": "af03339fea8c7f0a27172c6a12e6652c20efb0a8e0529f72da6ae17717174590"
+  },
+  "admission_and_live_seals": {
+    "admission": "05a81e10133bbd66fe14b42fed636d4b2cd6f629cef4c379dda43000ce7d7781",
+    "failed-original-analysis-r1": "ff1ed46b26e044e60cf8d199d7e2014669a58a429b551c9a20c03af7c877ab4d",
+    "live-r1": "bcdb7581d9447177ad386e7c85d2b4eea73b6c1d59a472d590ff86504d7a5ab1",
+    "public-original-followup": "a76271c27e134771184b0d739c1dbafaaf09f841b8a8ee86122eaf9f9984f2e4"
+  },
+  "backend_passed": 6931,
+  "backend_skipped": 12,
+  "base_commit": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "current_harness_passed": 24,
+  "focused_passed": 2266,
+  "integration_passed": 3085,
+  "no_action_ready_live_finding": true,
+  "post_live_changed_manifest_files": {
+    "docs/design/PROJECT_PRIORITY_MAP.md": "7f5fb31c38191f78893c021ac8ad2a9d31cff878daa68a934f21e829063f8321",
+    "docs/superpowers/plans/2026-09-05-lifecycle-tracking-first-implementation.md": "3f7f211d68fb2bca5edcad2dc85c8abe874db4a3a8a961a4495a272812514763",
+    "docs/superpowers/plans/2026-09-06-lifecycle-web-auth-adapters.md": "f68357c1c56f7065f4f548087d3ee1424f608ebd31fbda82465ebcc2dc771b34",
+    "docs/superpowers/plans/2026-09-07-lifecycle-web-instrument-scoping.md": "26eca3a3038c86cdec9ee55c5ab6f4896655766e79e382812480f2f082b367f3",
+    "docs/superpowers/plans/2026-09-07-lifecycle-web-usage-calibration.md": "2efe4a65c588b341c5733cc361bb317fff424b7d5103ce4ec710dcdb43e02ced"
+  },
+  "product_and_test_source_unchanged_after_admission": true,
+  "production_install_adoption_restart_commit_merge_push": false,
+  "schema_followup_approved": false,
+  "sdk_submissions_this_turn": 4,
+  "source_http_attempts_this_turn": 9,
+  "whole_focus_owned_mutants": 25
+}

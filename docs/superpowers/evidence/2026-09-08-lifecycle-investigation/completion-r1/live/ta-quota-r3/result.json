@@ -1,0 +1,667 @@
+{
+  "version": 2,
+  "run_id": "li_b6196df5d50a4f57a64bf70e25c10c27",
+  "ticker": "TA",
+  "status": "failed",
+  "phase": "model_request",
+  "created_at": "2026-09-07T17:00:24.879313+00:00",
+  "finished_at": "2026-09-07T17:07:43.674992+00:00",
+  "cancel_requested": false,
+  "failure_code": "provider_rate_limited",
+  "stop_reason": "provider_rate_limited",
+  "target": {
+    "as_of": "2026-09-07",
+    "composite_figi": null,
+    "identity_status": "needs_lookup",
+    "issuer_cik": null,
+    "issuer_name": "TravelCenters of America Inc.",
+    "security_class": "common stock",
+    "ticker": "TA",
+    "venue": "NASDAQ"
+  },
+  "execution": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "auth_mode": "claude_code_oauth",
+    "effort": "high"
+  },
+  "stats": {
+    "elapsed_seconds": 438.757,
+    "http_requests": 2,
+    "input_tokens": null,
+    "local_queries": 1,
+    "model_submissions": 19,
+    "output_tokens": null,
+    "retained_source_bytes": 14509,
+    "source_reads": 2,
+    "sources": 1,
+    "web_actions": 10
+  },
+  "finding": {
+    "announcement_date": null,
+    "announcement_date_text": null,
+    "citations": [
+      {
+        "passage_id": "source-1:p440",
+        "supports": [
+          "security_identity",
+          "listing_ended",
+          "effective_date",
+          "acquisition_announced"
+        ]
+      },
+      {
+        "passage_id": "source-1:p452",
+        "supports": [
+          "security_identity",
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-1:p445",
+        "supports": [
+          "acquisition_announced"
+        ]
+      }
+    ],
+    "contradictions": [],
+    "effective_date": "2023-05-15",
+    "effective_date_text": "May 15, 2023",
+    "event_kind": "listing_ended",
+    "issuer_name": "TravelCenters of America Inc.",
+    "security_class": "common stock",
+    "source_ticker": "TA",
+    "successor_ticker": null,
+    "summary": "2023年5月15日，BP Products North America Inc.（BP p.l.c.子公司）完成對TravelCenters of America Inc.（Nasdaq: TA）之1.3億美元收購案；新聞稿明確載明「Today...completed its $1.3 billion acquisition of TravelCenters of America Inc. (Nasdaq: TA)」，並確認「TravelCenters of America common shares have been converted into the right to receive $86 per share」，顯示TA普通股已因收購完成而轉換為現金對價、終止以原身分於Nasdaq掛牌交易。收購案於2月由BP宣布，但新聞稿未載明確切公告日期，故公告日期欄位留空。此為現金併購，無後續證券代號延續。",
+    "timing": "completed",
+    "unresolved_conditions": [
+      "新聞稿僅提及BP於「2月」宣布收購協議，未載明確切公告日期"
+    ],
+    "venue": "NASDAQ",
+    "version": 2
+  },
+  "action": null,
+  "block_reasons": [
+    "effective_date_not_supported",
+    "finding_incomplete"
+  ],
+  "passages": [
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 9198,
+      "passage_id": "source-1:p440",
+      "published_at": null,
+      "publisher": "www.prnewswire.com",
+      "retrieved_at": "2026-09-07T17:02:01.611865+00:00",
+      "source_id": "source-1",
+      "start_char": 8756,
+      "text": "HOUSTON, May 15, 2023 /PRNewswire/ -- Today BP Products North America Inc., a wholly owned indirect subsidiary of BP p.l.c. (NYSE: bp), completed its $1.3 billion acquisition of TravelCenters of America Inc. (Nasdaq: TA), one of the country's leading full-service travel center operators, marking a milestone for the US in the growth of bp's strategic convenience and mobility business and welcoming thousands of additional employees into bp.",
+      "text_sha256": "499f54068c0e85a639312ae025272a4ccd8b539d95bfe540031abba853ab6358",
+      "title": null,
+      "url": "https://www.prnewswire.com/news-releases/bp-expands-mobility-and-convenience-network-completing-the-purchase-of-leading-travel-center-operator-travelcenters-of-america-301824610.html"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 11020,
+      "passage_id": "source-1:p452",
+      "published_at": null,
+      "publisher": "www.prnewswire.com",
+      "retrieved_at": "2026-09-07T17:02:01.611865+00:00",
+      "source_id": "source-1",
+      "start_char": 10886,
+      "text": "With the close of the acquisition, TravelCenters of America common shares have been converted into the right to receive $86 per share.",
+      "text_sha256": "79d2c4cafd60d6b800a96c5cfb13ed650fb19c1b2467bbb7273ebc23f4a02480",
+      "title": null,
+      "url": "https://www.prnewswire.com/news-releases/bp-expands-mobility-and-convenience-network-completing-the-purchase-of-leading-travel-center-operator-travelcenters-of-america-301824610.html"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 10323,
+      "passage_id": "source-1:p445",
+      "published_at": null,
+      "publisher": "www.prnewswire.com",
+      "retrieved_at": "2026-09-07T17:02:01.611865+00:00",
+      "source_id": "source-1",
+      "start_char": 9942,
+      "text": "In February, bp announced it had agreed to acquire TA, subject to required approvals. Having received those approvals and with the transaction complete, TA's strategically located network of highway sites complements bp's existing predominantly off-highway convenience and mobility business in the US, enabling TA and bp to offer fleets and consumers a seamless nationwide service.",
+      "text_sha256": "2fc2c4a2018d47ca114fc8eb141714e1868a798ed7b8968fd2aca3d1b6616e54",
+      "title": null,
+      "url": "https://www.prnewswire.com/news-releases/bp-expands-mobility-and-convenience-network-completing-the-purchase-of-leading-travel-center-operator-travelcenters-of-america-301824610.html"
+    }
+  ],
+  "gaps": [
+    {
+      "corpus": "news",
+      "reason": "local_news_unavailable",
+      "url": null
+    },
+    {
+      "corpus": null,
+      "reason": "source_unavailable",
+      "url": "https://www.bp.com/en/global/bp-supply-trading-and-shipping/news/press-releases/bp-expands-mobility-and-convenience-network-completing-the-purchase-of-leading-travel-center-operator-travelcenters-of-america2.html"
+    }
+  ],
+  "steps": [
+    {
+      "ordinal": 1,
+      "kind": "local_search",
+      "at": "2026-09-07T17:00:24.915518+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 2,
+      "kind": "model_request",
+      "at": "2026-09-07T17:00:24.939572+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 3,
+      "kind": "model_result",
+      "at": "2026-09-07T17:00:31.345185+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 4,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:00:31.361610+00:00",
+      "reason": "沒有本地候選來源,需要搜尋TravelCenters of America (TA)下市/被收購的公開資訊以確認其上市狀態。",
+      "code": null
+    },
+    {
+      "ordinal": 5,
+      "kind": "model_request",
+      "at": "2026-09-07T17:00:31.373574+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 6,
+      "kind": "web_action",
+      "at": "2026-09-07T17:00:33.872034+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 7,
+      "kind": "web_action",
+      "at": "2026-09-07T17:00:34.348616+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 8,
+      "kind": "web_action",
+      "at": "2026-09-07T17:00:49.160782+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 9,
+      "kind": "web_action",
+      "at": "2026-09-07T17:00:49.197413+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 10,
+      "kind": "model_result",
+      "at": "2026-09-07T17:01:14.928417+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 11,
+      "kind": "model_request",
+      "at": "2026-09-07T17:01:14.968360+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 12,
+      "kind": "model_result",
+      "at": "2026-09-07T17:01:21.711478+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 13,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:01:21.727846+00:00",
+      "reason": "讀取BP官方新聞稿以確認BP完成收購TravelCenters of America及其普通股下市情況,取得可引用段落。",
+      "code": null
+    },
+    {
+      "ordinal": 14,
+      "kind": "source_read",
+      "at": "2026-09-07T17:01:22.110162+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 15,
+      "kind": "model_request",
+      "at": "2026-09-07T17:01:22.144414+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 16,
+      "kind": "model_result",
+      "at": "2026-09-07T17:01:27.541783+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 17,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:01:27.559366+00:00",
+      "reason": "BP官方新聞稿連結無法讀取,需另尋其他可靠來源(如Nasdaq、SEC 8-K、財經新聞)確認TravelCenters of America (TA)普通股因被BP收購而下市的具體生效日期及細節。",
+      "code": null
+    },
+    {
+      "ordinal": 18,
+      "kind": "model_request",
+      "at": "2026-09-07T17:01:27.572773+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 19,
+      "kind": "web_action",
+      "at": "2026-09-07T17:01:31.811827+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 20,
+      "kind": "web_action",
+      "at": "2026-09-07T17:01:31.964375+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 21,
+      "kind": "model_result",
+      "at": "2026-09-07T17:01:55.450133+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 22,
+      "kind": "model_request",
+      "at": "2026-09-07T17:01:55.506600+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 23,
+      "kind": "model_result",
+      "at": "2026-09-07T17:02:00.994033+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 24,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:02:01.007543+00:00",
+      "reason": "讀取PR Newswire上BP完成收購TravelCenters of America的官方新聞稿,以取得可引用的段落確認交易完成日期及對TA普通股下市的影響。",
+      "code": null
+    },
+    {
+      "ordinal": 25,
+      "kind": "source_captured",
+      "at": "2026-09-07T17:02:01.656852+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 26,
+      "kind": "source_read",
+      "at": "2026-09-07T17:02:01.662761+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 27,
+      "kind": "model_request",
+      "at": "2026-09-07T17:02:01.687537+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 28,
+      "kind": "model_result",
+      "at": "2026-09-07T17:02:17.353292+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 29,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:02:17.369675+00:00",
+      "reason": "已取得PRNewswire新聞稿確認BP於2023年5月15日完成收購TravelCenters of America,普通股轉換為每股86美元現金對價,足以確認下市與生效日期,無需進一步查證。",
+      "code": null
+    },
+    {
+      "ordinal": 30,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:02:17.381718+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 31,
+      "kind": "model_request",
+      "at": "2026-09-07T17:02:17.407942+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 32,
+      "kind": "model_result",
+      "at": "2026-09-07T17:02:35.519477+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 33,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:02:35.536691+00:00",
+      "reason": "新聞稿明確載明BP於2023年5月15日完成收購TravelCenters of America,TA普通股轉換為現金對價,已從Nasdaq下市;證據充分,無需再查。",
+      "code": null
+    },
+    {
+      "ordinal": 34,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:02:35.550003+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 35,
+      "kind": "model_request",
+      "at": "2026-09-07T17:02:35.597357+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 36,
+      "kind": "model_result",
+      "at": "2026-09-07T17:02:54.700631+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 37,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:02:54.718682+00:00",
+      "reason": "新聞稿明確載明BP於2023年5月15日完成收購TravelCenters of America Inc.(Nasdaq: TA),TA普通股(common shares)已轉換為每股86美元現金對價,顯示該證券已下市且交易終止,無需再進一步查證。",
+      "code": null
+    },
+    {
+      "ordinal": 38,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:02:54.731188+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 39,
+      "kind": "model_request",
+      "at": "2026-09-07T17:02:54.770027+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 40,
+      "kind": "model_result",
+      "at": "2026-09-07T17:03:15.559363+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 41,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:03:15.576507+00:00",
+      "reason": "新聞稿明確記載日期與收購完成事實，足以支持下市結論與生效日期，直接引用該段落作為效果日期依據。",
+      "code": null
+    },
+    {
+      "ordinal": 42,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:03:15.587174+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 43,
+      "kind": "model_request",
+      "at": "2026-09-07T17:03:15.624151+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 44,
+      "kind": "model_result",
+      "at": "2026-09-07T17:03:37.718863+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 45,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:03:37.723037+00:00",
+      "reason": "PRNewswire新聞稿明確以2023年5月15日之新聞稿頭載明BP完成收購TravelCenters of America Inc.（Nasdaq: TA），並在同一新聞稿後段確認「TravelCenters of America common shares」已轉換為每股86美元現金對價，證券身分（發行人、代號、交易所）與證券類別（普通股）皆有段落支持，且下市生效日可由新聞稿發布日期（2023-05-15）確定，已足以支持下市結論。",
+      "code": null
+    },
+    {
+      "ordinal": 46,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:03:37.728112+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 47,
+      "kind": "model_request",
+      "at": "2026-09-07T17:03:37.752364+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 48,
+      "kind": "model_result",
+      "at": "2026-09-07T17:03:57.134400+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 49,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:03:57.152626+00:00",
+      "reason": "先前多次結論均因effective_date_not_supported/finding_incomplete遭拒，需尋找明確說明TravelCenters of America (TA)普通股於Nasdaq正式下市（如Form 25申報或交易所停牌公告）之來源，以取得明確下市生效日期與更完整的證券身分佐證段落。",
+      "code": null
+    },
+    {
+      "ordinal": 50,
+      "kind": "model_request",
+      "at": "2026-09-07T17:03:57.166471+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 51,
+      "kind": "web_action",
+      "at": "2026-09-07T17:04:01.779226+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 52,
+      "kind": "web_action",
+      "at": "2026-09-07T17:04:02.426722+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 53,
+      "kind": "web_action",
+      "at": "2026-09-07T17:04:17.822896+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 54,
+      "kind": "web_action",
+      "at": "2026-09-07T17:04:18.214757+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 55,
+      "kind": "model_result",
+      "at": "2026-09-07T17:04:51.682336+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 56,
+      "kind": "model_request",
+      "at": "2026-09-07T17:04:51.746465+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 57,
+      "kind": "model_result",
+      "at": "2026-09-07T17:05:45.592979+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 58,
+      "kind": "rejected_output",
+      "at": "2026-09-07T17:05:45.610947+00:00",
+      "reason": null,
+      "code": "model_output_invalid"
+    },
+    {
+      "ordinal": 59,
+      "kind": "model_request",
+      "at": "2026-09-07T17:05:45.659910+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 60,
+      "kind": "model_result",
+      "at": "2026-09-07T17:06:12.025427+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 61,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:06:12.043398+00:00",
+      "reason": "已有充分證據確認BP於收購完成後,TravelCenters of America Inc.(Nasdaq: TA)普通股已轉換為現金對價並下市;因新聞稿正文並未以明確語句將發布日期(2023-05-15)標示為交易生效日,故依規定生效日期留空並於摘要揭露此限制,避免臆測日期。",
+      "code": null
+    },
+    {
+      "ordinal": 62,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:06:12.054763+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 63,
+      "kind": "model_request",
+      "at": "2026-09-07T17:06:12.092054+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 64,
+      "kind": "model_result",
+      "at": "2026-09-07T17:06:49.749264+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 65,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:06:49.768043+00:00",
+      "reason": "已取得PRNewswire新聞稿(source-1)之關鍵段落，聯合建立證券身分（發行人、代號、交易所）與證券類別（普通股），並確認BP於2023年5月15日完成收購TravelCenters of America Inc.，該公司普通股已轉換為每股86美元現金對價，代表原股票已下市終止交易；公告日期僅提及「2月」而未載明確切日期，故該欄位留空並於摘要揭露此限制。",
+      "code": null
+    },
+    {
+      "ordinal": 66,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:06:49.795266+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 67,
+      "kind": "model_request",
+      "at": "2026-09-07T17:06:49.839436+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 68,
+      "kind": "model_result",
+      "at": "2026-09-07T17:07:04.071444+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 69,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:07:04.088124+00:00",
+      "reason": "在已擷取的PRNewswire新聞稿(source-1)中搜尋是否有明確提及TA普通股於Nasdaq下市(delist)或停止交易的具體語句與生效日期，以補強下市證據及生效日期支持。",
+      "code": null
+    },
+    {
+      "ordinal": 70,
+      "kind": "model_request",
+      "at": "2026-09-07T17:07:04.144304+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 71,
+      "kind": "model_result",
+      "at": "2026-09-07T17:07:41.589579+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 72,
+      "kind": "agent_action",
+      "at": "2026-09-07T17:07:41.606373+00:00",
+      "reason": "已充分確認TA已因收購下市，現提交包含明確生效日期(2023-05-15，取自新聞稿發布日期與「Today...completed」用語)及完整證券身分引用(發行人、代號、交易所、證券類別)之最終結論。",
+      "code": null
+    },
+    {
+      "ordinal": 73,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T17:07:41.621394+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 74,
+      "kind": "model_request",
+      "at": "2026-09-07T17:07:41.669469+00:00",
+      "reason": null,
+      "code": null
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="9" time="0.259" timestamp="2026-09-06T23:18:10.730582+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[False-openai-api_key-lifecycle_web_models-call_openai_web]" time="0.003"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7f16c6a0&gt;
+provider = 'openai', auth = 'api_key', module = 'lifecycle_web_models'
+function = 'call_openai_web', fail = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[False-openai-chatgpt_oauth-lifecycle_web_codex-call_codex_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7efabbb0&gt;
+provider = 'openai', auth = 'chatgpt_oauth', module = 'lifecycle_web_codex'
+function = 'call_codex_web', fail = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[False-anthropic-api_key-lifecycle_web_models-call_anthropic_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7efcbb50&gt;
+provider = 'anthropic', auth = 'api_key', module = 'lifecycle_web_models'
+function = 'call_anthropic_web', fail = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[False-anthropic-claude_code_oauth-lifecycle_web_claude-call_claude_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7efab340&gt;
+provider = 'anthropic', auth = 'claude_code_oauth'
+module = 'lifecycle_web_claude', function = 'call_claude_web', fail = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[True-openai-api_key-lifecycle_web_models-call_openai_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7efdba60&gt;
+provider = 'openai', auth = 'api_key', module = 'lifecycle_web_models'
+function = 'call_openai_web', fail = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[True-openai-chatgpt_oauth-lifecycle_web_codex-call_codex_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7efaa620&gt;
+provider = 'openai', auth = 'chatgpt_oauth', module = 'lifecycle_web_codex'
+function = 'call_codex_web', fail = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[True-anthropic-api_key-lifecycle_web_models-call_anthropic_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7efda230&gt;
+provider = 'anthropic', auth = 'api_key', module = 'lifecycle_web_models'
+function = 'call_anthropic_web', fail = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_four_channel_dispatch_never_changes_selected_transport[True-anthropic-claude_code_oauth-lifecycle_web_claude-call_claude_web]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x71cb7effb9d0&gt;
+provider = 'anthropic', auth = 'claude_code_oauth'
+module = 'lifecycle_web_claude', function = 'call_claude_web', fail = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth,module,function", CHANNELS)
+    @pytest.mark.parametrize("fail", [False, True])
+    async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatch, provider, auth, module, function, fail):
+        import importlib
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:26: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_dispatch" name="test_unknown_auth_dispatch_has_no_api_default" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'">@pytest.mark.anyio
+    async def test_unknown_auth_dispatch_has_no_api_default():
+&gt;       from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+E       ModuleNotFoundError: No module named 'src.auth_drivers.lifecycle_web_dispatch'
+
+tests/test_lifecycle_web_dispatch.py:56: ModuleNotFoundError</failure></testcase></testsuite></testsuites>

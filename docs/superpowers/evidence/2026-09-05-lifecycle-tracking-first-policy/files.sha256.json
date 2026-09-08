@@ -1,0 +1,23 @@
+{
+  "baseline": "0b66732b",
+  "scope": "changed_or_new_product_and_test_files",
+  "files": {
+    "src/security_lifecycle_decision_policy.py": "1a238cbeebdc9f8fa5fbc735bde683e4afd5f372fdc92d3f16d7adf54620dae8",
+    "src/security_lifecycle_provider_authority.py": "894b5cc78e7f520918c5c7c3217ab1ffb8825f7f6d5eb1fdcb7a609bbad0db48",
+    "src/security_lifecycle_provider_diagnostics.py": "b240c4a7670570bfb17890dec4a676f043a25845a709c505a5b54a82381776c9",
+    "src/security_lifecycle_provider_scan.py": "58eec298e1fad722dcf4c5f834e4674db781cc0f4946502172f251faf356227f",
+    "src/security_lifecycle_provider_snapshot.py": "e267587ee4bb5c55c155102a6dc867ca04f7bc7216ef95949796cdd58e8431d3",
+    "src/security_lifecycle_provider_store.py": "f0b0bec3a93092ac427b124897ce64588384cb6f1c3a2de2b3a4f0a1aa73692f",
+    "tests/fixtures/security_lifecycle_provider_snapshots_v1.json": "b065d0767c739cd9113d444ea4617d711228f6beb906db909c56fe0ac7b6e7b6",
+    "tests/test_price_coverage_repair_workflow.py": "a0faa6b8c7ebdf4460cfc699a8d47c412ef3fb6bf83cabc9434e2db0800b1427",
+    "tests/test_security_lifecycle_automation_worker.py": "8f51cd2ced709e7a80b3586ed2bc014ee3589a9b6188a5cfff6579bf3fd0d0d7",
+    "tests/test_security_lifecycle_decision_policy.py": "21b1a27bceb1131a6ff2569ce2877c1e35fec7cca2db91f0c914add18b74d924",
+    "tests/test_security_lifecycle_fact_kernel.py": "ad23912b4e74551408849ee4b405046399dff85a30c436360aad1ae67246c4c7",
+    "tests/test_security_lifecycle_provider_authority.py": "b383a6817cdd98b4b83586a952e645ebcbdf043e79efb1befb9304a11722b669",
+    "tests/test_security_lifecycle_provider_scan.py": "09cf06169f9c50237f12962c7cd2701648c211d886cffc140b39a6ec0fe6a15c",
+    "tests/test_security_lifecycle_provider_snapshot.py": "61fbf4876590d88e8441c1bc3a4561660609f179000d6e23586c05adc0463e80",
+    "tests/test_security_lifecycle_provider_store.py": "8ddd6e36d8be5e02a4d69e4eecc3fe2d0b69aa22f34283abc1e2da72ac26cc69",
+    "tests/test_security_lifecycle_terminal_workflow.py": "8174ffd310fead881074ef5acd3564add364d97a8b71f1dfdfb5af9508122187",
+    "tests/test_security_lifecycle_tracking_policy.py": "a98543109da766606a7a95f2c2bf2af2362c1d04b09af8c167fe34b2877cc9d3"
+  }
+}

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="1.416" timestamp="2026-09-08T02:26:18.060363+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_investigation_routes" name="test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]" time="0.414"><failure message="KeyError: 'reverse_readiness'">client = {'calls': [], 'case_id': 'slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c', 'checks': &lt;src.securi...roviderCheckStore object at 0x74861ad72080&gt;, 'client': &lt;starlette.testclient.TestClient object at 0x748618320bb0&gt;, ...}
+later_change = 'none'
+
+    @pytest.mark.parametrize("later_change", ("none", "unrelated", "affected"))
+    def test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases(client, later_change):
+        from src.profile_state import ProfileStateStore
+        c = client
+        base = "/security-lifecycle/investigations/runs/" + c["run_id"]
+        packet = c["client"].get(base + "/review").json()
+        applied = c["client"].post(base + "/confirm", json={
+            "packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]})
+        assert applied.status_code == 200 and applied.json()["status"] == "applied"
+        if later_change != "none":
+            ProfileStateStore(c["profile"]).set_priority("OLD" if later_change == "affected" else "LIVE", "high")
+        response = c["client"].get("/security-lifecycle/transition-activity")
+        assert response.status_code == 200
+        item, = response.json()["items"]
+&gt;       assert item["reverse_readiness"] == {
+            "reversible": later_change != "affected",
+            "block_reasons": ["reverse_state_changed"] if later_change == "affected" else [],
+        }
+E       KeyError: 'reverse_readiness'
+
+tests/test_lifecycle_investigation_routes.py:62: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_routes" name="test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]" time="0.177"><failure message="KeyError: 'reverse_readiness'">client = {'calls': [], 'case_id': 'slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c', 'checks': &lt;src.securi...roviderCheckStore object at 0x7486183234f0&gt;, 'client': &lt;starlette.testclient.TestClient object at 0x7486159133a0&gt;, ...}
+later_change = 'unrelated'
+
+    @pytest.mark.parametrize("later_change", ("none", "unrelated", "affected"))
+    def test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases(client, later_change):
+        from src.profile_state import ProfileStateStore
+        c = client
+        base = "/security-lifecycle/investigations/runs/" + c["run_id"]
+        packet = c["client"].get(base + "/review").json()
+        applied = c["client"].post(base + "/confirm", json={
+            "packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]})
+        assert applied.status_code == 200 and applied.json()["status"] == "applied"
+        if later_change != "none":
+            ProfileStateStore(c["profile"]).set_priority("OLD" if later_change == "affected" else "LIVE", "high")
+        response = c["client"].get("/security-lifecycle/transition-activity")
+        assert response.status_code == 200
+        item, = response.json()["items"]
+&gt;       assert item["reverse_readiness"] == {
+            "reversible": later_change != "affected",
+            "block_reasons": ["reverse_state_changed"] if later_change == "affected" else [],
+        }
+E       KeyError: 'reverse_readiness'
+
+tests/test_lifecycle_investigation_routes.py:62: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_routes" name="test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]" time="0.172"><failure message="KeyError: 'reverse_readiness'">client = {'calls': [], 'case_id': 'slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c', 'checks': &lt;src.securi...roviderCheckStore object at 0x748615957c10&gt;, 'client': &lt;starlette.testclient.TestClient object at 0x7486159613f0&gt;, ...}
+later_change = 'affected'
+
+    @pytest.mark.parametrize("later_change", ("none", "unrelated", "affected"))
+    def test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases(client, later_change):
+        from src.profile_state import ProfileStateStore
+        c = client
+        base = "/security-lifecycle/investigations/runs/" + c["run_id"]
+        packet = c["client"].get(base + "/review").json()
+        applied = c["client"].post(base + "/confirm", json={
+            "packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]})
+        assert applied.status_code == 200 and applied.json()["status"] == "applied"
+        if later_change != "none":
+            ProfileStateStore(c["profile"]).set_priority("OLD" if later_change == "affected" else "LIVE", "high")
+        response = c["client"].get("/security-lifecycle/transition-activity")
+        assert response.status_code == 200
+        item, = response.json()["items"]
+&gt;       assert item["reverse_readiness"] == {
+            "reversible": later_change != "affected",
+            "block_reasons": ["reverse_state_changed"] if later_change == "affected" else [],
+        }
+E       KeyError: 'reverse_readiness'
+
+tests/test_lifecycle_investigation_routes.py:62: KeyError</failure></testcase></testsuite></testsuites>

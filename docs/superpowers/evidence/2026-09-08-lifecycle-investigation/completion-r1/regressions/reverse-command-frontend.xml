@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="8" failures="1" errors="0" time="0.207286377">
+    <testsuite name="src/lifecycle/InvestigationView.test.tsx" timestamp="2026-09-07T18:26:24.251Z" hostname="ais" tests="8" failures="1" errors="0" skipped="0" time="0.207286377">
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="opens by ticker without legacy cases or provider calls and keeps start behind consent" time="0.070672274">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="shows unavailable setup with an exit to Settings without launching" time="0.010905815">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="provider checking is separately confirmed and never launches an LLM" time="0.021637192">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="scheduled actions can be cancelled without reading any old cases" time="0.010091258">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="requires explicit source-gap acknowledgement before confirmation" time="0.027604781">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="requires a refreshed preview after changing the execution date" time="0.027946565">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="can review provider evidence with no LLM credential and only applies after separate confirmation" time="0.016103101">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/lifecycle/InvestigationView.test.tsx" name="confirms reversal separately and refreshes the tracked targets without launching an investigation" time="0.021177385">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+i18next: languageChanged en
+
+            </system-out>
+            <failure message="expected [ &apos;SMCI&apos; ] to include &apos;TA&apos;" type="AssertionError">
+AssertionError: expected [ &apos;SMCI&apos; ] to include &apos;TA&apos;
+ ❯ src/lifecycle/InvestigationView.test.tsx:175:99
+            </failure>
+        </testcase>
+    </testsuite>
+</testsuites>

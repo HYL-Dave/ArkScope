@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="4" time="0.478" timestamp="2026-09-07T19:24:42.766568+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_claude_output_contract" name="test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools" time="0.011"><failure message="AssertionError: assert ('')">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7cf14b360340&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1", prompt="Public evidence only; do not invoke any tool.")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        result = await mod.call_claude_web(request, credential, control)
+        options = clients[0].options
+        instructions, separator, schema = options.system_prompt.partition("\nOutput schema:\n")
+&gt;       assert separator and json.loads(schema) == options.output_format["schema"] == SCHEMA
+E       AssertionError: assert ('')
+
+tests/test_lifecycle_web_claude_output_contract.py:25: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_output_contract" name="test_claude_search_keeps_its_existing_prompt_and_tool_budget" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_output_contract" name="test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_output_contract" name="test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]" time="0.008" /></testsuite></testsuites>

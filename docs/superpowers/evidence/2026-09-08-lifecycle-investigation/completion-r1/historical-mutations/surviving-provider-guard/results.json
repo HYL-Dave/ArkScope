@@ -1,0 +1,42 @@
+[
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [],
+    "name": "backend-baseline",
+    "layer": "backend",
+    "returncode": 0,
+    "report_sha256": "3c186cc332d85980f8276b91eac15374d96ee02d79a0ddf85850cdf4ddcee524"
+  },
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [],
+    "name": "provider_preview_attempts_auto_approval",
+    "layer": "backend",
+    "returncode": 0,
+    "report_sha256": "f8bcac4a04a19dc7002e5f718b7f8ef5ec07e185a27aef0b9d98d8b7a66b3b8d",
+    "owner": "test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]",
+    "path": "src/lifecycle_investigation/provider_review.py",
+    "old": "transition_mutation_allowed=lambda: False",
+    "new": "transition_mutation_allowed=lambda: True",
+    "owner_failed": false
+  },
+  {
+    "tests": 2631,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_store::test_success_requires_a_completed_owned_conclusion[no_result]",
+      "tests.test_lifecycle_investigation_store::test_success_requires_a_completed_owned_conclusion[failed_remote]"
+    ],
+    "name": "success_without_owned_conclusion",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "df12bad4db86ca9ba8fe05f39010a82cc478dbd6a20fbf4b1be663c958cd57bc",
+    "owner": "test_success_requires_a_completed_owned_conclusion",
+    "path": "src/lifecycle_investigation/store.py",
+    "old": "self._require_success(conn, run_id, payload)",
+    "new": "pass",
+    "owner_failed": true
+  }
+]

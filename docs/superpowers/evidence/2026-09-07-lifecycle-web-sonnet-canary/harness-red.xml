@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="13" skipped="0" tests="13" time="0.442" timestamp="2026-09-07T09:05:30.546646+08:00" hostname="ais"><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_records_session_binding_without_exporting_ids[init-owned-True]" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">session = 'owned', expected = True, kind = 'init'
+
+    @pytest.mark.parametrize("session,expected", [("owned", True), ("foreign", False), (None, False)])
+    @pytest.mark.parametrize("kind", ["init", "result"])
+    def test_canary_records_session_binding_without_exporting_ids(session, expected, kind):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a599e5600&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_records_session_binding_without_exporting_ids[init-foreign-False]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">session = 'foreign', expected = False, kind = 'init'
+
+    @pytest.mark.parametrize("session,expected", [("owned", True), ("foreign", False), (None, False)])
+    @pytest.mark.parametrize("kind", ["init", "result"])
+    def test_canary_records_session_binding_without_exporting_ids(session, expected, kind):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a597dfc70&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_records_session_binding_without_exporting_ids[init-None-False]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">session = None, expected = False, kind = 'init'
+
+    @pytest.mark.parametrize("session,expected", [("owned", True), ("foreign", False), (None, False)])
+    @pytest.mark.parametrize("kind", ["init", "result"])
+    def test_canary_records_session_binding_without_exporting_ids(session, expected, kind):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a597e62c0&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_records_session_binding_without_exporting_ids[result-owned-True]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">session = 'owned', expected = True, kind = 'result'
+
+    @pytest.mark.parametrize("session,expected", [("owned", True), ("foreign", False), (None, False)])
+    @pytest.mark.parametrize("kind", ["init", "result"])
+    def test_canary_records_session_binding_without_exporting_ids(session, expected, kind):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a5980b520&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_records_session_binding_without_exporting_ids[result-foreign-False]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">session = 'foreign', expected = False, kind = 'result'
+
+    @pytest.mark.parametrize("session,expected", [("owned", True), ("foreign", False), (None, False)])
+    @pytest.mark.parametrize("kind", ["init", "result"])
+    def test_canary_records_session_binding_without_exporting_ids(session, expected, kind):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a599e4250&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_records_session_binding_without_exporting_ids[result-None-False]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">session = None, expected = False, kind = 'result'
+
+    @pytest.mark.parametrize("session,expected", [("owned", True), ("foreign", False), (None, False)])
+    @pytest.mark.parametrize("kind", ["init", "result"])
+    def test_canary_records_session_binding_without_exporting_ids(session, expected, kind):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a5982be20&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_retains_per_model_counts_instead_of_just_a_pass_flag" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">def test_canary_retains_per_model_counts_instead_of_just_a_pass_flag():
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a599e6d40&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use[None-absent]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">value = None, shape = 'absent'
+
+    @pytest.mark.parametrize("value,shape", [(None, "absent"), ([], "invalid"), ({}, "object")])
+    def test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use(value, shape):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a599e5090&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use[value1-invalid]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">value = [], shape = 'invalid'
+
+    @pytest.mark.parametrize("value,shape", [(None, "absent"), ([], "invalid"), ({}, "object")])
+    def test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use(value, shape):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a597dfd60&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use[value2-object]" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">value = {}, shape = 'object'
+
+    @pytest.mark.parametrize("value,shape", [(None, "absent"), ([], "invalid"), ({}, "object")])
+    def test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use(value, shape):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a59828b50&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_missing_or_malformed_counts_are_not_fabricated_or_leaked" time="0.000"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">def test_canary_missing_or_malformed_counts_are_not_fabricated_or_leaked():
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a597e7e20&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_source_guard_rejects_changed_or_resurrected_inputs" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7782/test_canary_source_guard_rejec0')
+
+    def test_canary_source_guard_rejects_changed_or_resurrected_inputs(tmp_path):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a59809e40&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase><testcase classname="docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary" name="test_canary_complete_offline_rehearsal_preserves_selected_auth_and_new_witnesses" time="0.001"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7e7a597dda50&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7782/test_canary_complete_offline_r0')
+
+    def test_canary_complete_offline_rehearsal_preserves_selected_auth_and_new_witnesses(monkeypatch, tmp_path):
+&gt;       api = module()
+
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:24: in module
+    return load("renewed_sonnet_canary", PACKET / "claude_canary.py")
+docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/test_sonnet_canary.py:19: in load
+    spec.loader.exec_module(value)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_frozen_importlib_external.SourceFileLoader object at 0x7e7a597df790&gt;
+path = '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&gt;   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-web-sonnet-canary/claude_canary.py'
+
+&lt;frozen importlib._bootstrap_external&gt;:1073: FileNotFoundError</failure></testcase></testsuite></testsuites>

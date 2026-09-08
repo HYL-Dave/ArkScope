@@ -1,0 +1,122 @@
+{
+  "added": [
+    "tests/test_lifecycle_web_claude_turns.py"
+  ],
+  "api_and_other_auth_adapters_unchanged": true,
+  "changed": [
+    "src/auth_drivers/lifecycle_web_claude.py"
+  ],
+  "completed_total_turn_allowance": 1,
+  "frontend_unchanged": true,
+  "full_live_gate": {
+    "campaign_http_limit": 8,
+    "human_adoptions": 0,
+    "no_fallback": true,
+    "no_retry": true,
+    "sdk_submissions": 2,
+    "source_http_requests": 4
+  },
+  "kind": "offline_total_turn_count_correction",
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6884
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "14daf591ca16625551e71c8881c9da25880be7e7b87948fbb654d944ea4b113a"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2207
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "d76ac2fc1ce1498986fd20956189cf1f6aef4237f4d84d010185ff1de50c022b"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 3026
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "0dd9e7d8fa9135875173c665b496c9d8ce426678def7b9c759c1d3d5c595aed5"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2207
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "9dc9657d0913d5535249046582f5720a2507a7b0539bc4df81e5fb744b71a48f"
+    }
+  },
+  "migration": false,
+  "native_tool_round_trip_budgets_unchanged": true,
+  "original_capture_files": {
+    "authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+    "metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+    "profile.sqlite": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+    "result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+    "search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a"
+  },
+  "owned_mutations": 7,
+  "preparation": {
+    "renewed-native-observer-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [],
+      "file": "renewed-native-observer-green.xml",
+      "sha256": "a3aa7d8dff380f46be38eaafe1244983d8fd639a4935b836c3d4b07ff5573e91"
+    },
+    "turns-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 125
+      },
+      "failed_nodes": [],
+      "file": "turns-green.xml",
+      "sha256": "d1f5215de9dd4af0daadd5aa9082b4e1c0c2864bbc37ccaee2f73708b2374b8c"
+    },
+    "turns-red": {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 8
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]",
+        "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]"
+      ],
+      "file": "turns-red.xml",
+      "sha256": "a36d99b65b1eadeb8e9b791d98ed2d436dd33e8644dea2eb0be6044722b469e3"
+    }
+  },
+  "previous_prompt_admission_seal": "2cd4bcf60f5a9fcd4f60d91402a29bcca90e2a15c9d2bd76c1a67a61c4cb1752",
+  "prior_source": {
+    "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+    "matched_files": 1084,
+    "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+  },
+  "provider_calls": 0,
+  "schema_and_output_validation_unchanged": true
+}

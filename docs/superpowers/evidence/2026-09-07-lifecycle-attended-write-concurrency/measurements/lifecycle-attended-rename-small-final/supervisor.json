@@ -1,0 +1,9 @@
+{
+  "elapsed_seconds": 3.794,
+  "exit_code": 0,
+  "failure": null,
+  "rss_guard_bytes": 4294967296,
+  "runner_sha256": "356d15c9440123c7b6556f7889a82c458fbdbd5e275c37489709014f7e7d5586",
+  "sampled_peak_rss_bytes": 115097600,
+  "source_unchanged": true
+}

@@ -1,0 +1,2463 @@
+[
+  {
+    "ordinal": 1,
+    "kind": "local_search",
+    "at": "2026-09-07T21:55:08.108871+00:00",
+    "payload": {
+      "coverage": "available_local_corpora",
+      "gaps": [],
+      "items": [
+        {
+          "candidate_id": "candidate-336e19530c904666a857a0a5f2340e47",
+          "corpus": "news",
+          "coverage": "full_text",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        }
+      ],
+      "next_offset": null,
+      "observed_at": "2026-09-07T21:55:08.107335+00:00",
+      "query": {},
+      "status": "ok"
+    }
+  },
+  {
+    "ordinal": 2,
+    "kind": "source_captured",
+    "at": "2026-09-07T21:55:08.118982+00:00",
+    "payload": {
+      "corpus": "news",
+      "coverage": "full_text",
+      "source_id": "source-1",
+      "text_sha256": "7340ff9e481a6b37f4e3de516a7cc20ea004fecb9d110fcd6cef403fb6133437",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    }
+  },
+  {
+    "ordinal": 3,
+    "kind": "model_request",
+    "at": "2026-09-07T21:55:08.142663+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "phase": "analysis",
+      "prompt_sha256": "643cfe417376bd17361fc8536950e4c774b4cc847480d7ca41be97725a4915f2",
+      "remaining_seconds": 1799.9652971643955,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p100",
+        "source-1:p101",
+        "source-1:p102",
+        "source-1:p103",
+        "source-1:p104",
+        "source-1:p105",
+        "source-1:p106",
+        "source-1:p107",
+        "source-1:p108",
+        "source-1:p109",
+        "source-1:p11",
+        "source-1:p110",
+        "source-1:p111",
+        "source-1:p112",
+        "source-1:p113",
+        "source-1:p114",
+        "source-1:p115",
+        "source-1:p116",
+        "source-1:p117",
+        "source-1:p118",
+        "source-1:p119",
+        "source-1:p12",
+        "source-1:p120",
+        "source-1:p121",
+        "source-1:p122",
+        "source-1:p123",
+        "source-1:p124",
+        "source-1:p125",
+        "source-1:p126",
+        "source-1:p127",
+        "source-1:p128",
+        "source-1:p129",
+        "source-1:p13",
+        "source-1:p130",
+        "source-1:p131",
+        "source-1:p132",
+        "source-1:p133",
+        "source-1:p134",
+        "source-1:p135",
+        "source-1:p136",
+        "source-1:p137",
+        "source-1:p138",
+        "source-1:p139",
+        "source-1:p14",
+        "source-1:p140",
+        "source-1:p141",
+        "source-1:p142",
+        "source-1:p143",
+        "source-1:p144",
+        "source-1:p145",
+        "source-1:p146",
+        "source-1:p147",
+        "source-1:p148",
+        "source-1:p149",
+        "source-1:p15",
+        "source-1:p150",
+        "source-1:p151",
+        "source-1:p152",
+        "source-1:p153",
+        "source-1:p154",
+        "source-1:p155",
+        "source-1:p156",
+        "source-1:p157",
+        "source-1:p158",
+        "source-1:p159",
+        "source-1:p16",
+        "source-1:p160",
+        "source-1:p161",
+        "source-1:p162",
+        "source-1:p163",
+        "source-1:p164",
+        "source-1:p165",
+        "source-1:p166",
+        "source-1:p167",
+        "source-1:p168",
+        "source-1:p169",
+        "source-1:p17",
+        "source-1:p170",
+        "source-1:p171",
+        "source-1:p172",
+        "source-1:p173",
+        "source-1:p174",
+        "source-1:p175",
+        "source-1:p176",
+        "source-1:p177",
+        "source-1:p178",
+        "source-1:p179",
+        "source-1:p18",
+        "source-1:p180",
+        "source-1:p181",
+        "source-1:p182",
+        "source-1:p183",
+        "source-1:p184",
+        "source-1:p185",
+        "source-1:p186",
+        "source-1:p187",
+        "source-1:p188",
+        "source-1:p189",
+        "source-1:p19",
+        "source-1:p190",
+        "source-1:p191",
+        "source-1:p192",
+        "source-1:p193",
+        "source-1:p194",
+        "source-1:p195",
+        "source-1:p196",
+        "source-1:p197",
+        "source-1:p198",
+        "source-1:p199",
+        "source-1:p2",
+        "source-1:p20",
+        "source-1:p200",
+        "source-1:p201",
+        "source-1:p202",
+        "source-1:p203",
+        "source-1:p204",
+        "source-1:p205",
+        "source-1:p206",
+        "source-1:p207",
+        "source-1:p208",
+        "source-1:p209",
+        "source-1:p21",
+        "source-1:p210",
+        "source-1:p211",
+        "source-1:p212",
+        "source-1:p213",
+        "source-1:p214",
+        "source-1:p215",
+        "source-1:p216",
+        "source-1:p217",
+        "source-1:p218",
+        "source-1:p219",
+        "source-1:p22",
+        "source-1:p220",
+        "source-1:p221",
+        "source-1:p222",
+        "source-1:p223",
+        "source-1:p224",
+        "source-1:p225",
+        "source-1:p226",
+        "source-1:p227",
+        "source-1:p228",
+        "source-1:p229",
+        "source-1:p23",
+        "source-1:p230",
+        "source-1:p231",
+        "source-1:p232",
+        "source-1:p233",
+        "source-1:p234",
+        "source-1:p235",
+        "source-1:p236",
+        "source-1:p237",
+        "source-1:p238",
+        "source-1:p239",
+        "source-1:p24",
+        "source-1:p240",
+        "source-1:p241",
+        "source-1:p242",
+        "source-1:p243",
+        "source-1:p244",
+        "source-1:p245",
+        "source-1:p246",
+        "source-1:p247",
+        "source-1:p248",
+        "source-1:p249",
+        "source-1:p25",
+        "source-1:p250",
+        "source-1:p251",
+        "source-1:p252",
+        "source-1:p253",
+        "source-1:p254",
+        "source-1:p255",
+        "source-1:p256",
+        "source-1:p257",
+        "source-1:p258",
+        "source-1:p259",
+        "source-1:p26",
+        "source-1:p260",
+        "source-1:p261",
+        "source-1:p262",
+        "source-1:p27",
+        "source-1:p28",
+        "source-1:p29",
+        "source-1:p3",
+        "source-1:p30",
+        "source-1:p31",
+        "source-1:p32",
+        "source-1:p33",
+        "source-1:p34",
+        "source-1:p35",
+        "source-1:p36",
+        "source-1:p37",
+        "source-1:p38",
+        "source-1:p39",
+        "source-1:p4",
+        "source-1:p40",
+        "source-1:p41",
+        "source-1:p42",
+        "source-1:p43",
+        "source-1:p44",
+        "source-1:p45",
+        "source-1:p46",
+        "source-1:p47",
+        "source-1:p48",
+        "source-1:p49",
+        "source-1:p5",
+        "source-1:p50",
+        "source-1:p51",
+        "source-1:p52",
+        "source-1:p53",
+        "source-1:p54",
+        "source-1:p55",
+        "source-1:p56",
+        "source-1:p57",
+        "source-1:p58",
+        "source-1:p59",
+        "source-1:p6",
+        "source-1:p60",
+        "source-1:p61",
+        "source-1:p62",
+        "source-1:p63",
+        "source-1:p64",
+        "source-1:p65",
+        "source-1:p66",
+        "source-1:p67",
+        "source-1:p68",
+        "source-1:p69",
+        "source-1:p7",
+        "source-1:p70",
+        "source-1:p71",
+        "source-1:p72",
+        "source-1:p73",
+        "source-1:p74",
+        "source-1:p75",
+        "source-1:p76",
+        "source-1:p77",
+        "source-1:p78",
+        "source-1:p79",
+        "source-1:p8",
+        "source-1:p80",
+        "source-1:p81",
+        "source-1:p82",
+        "source-1:p83",
+        "source-1:p84",
+        "source-1:p85",
+        "source-1:p86",
+        "source-1:p87",
+        "source-1:p88",
+        "source-1:p89",
+        "source-1:p9",
+        "source-1:p90",
+        "source-1:p91",
+        "source-1:p92",
+        "source-1:p93",
+        "source-1:p94",
+        "source-1:p95",
+        "source-1:p96",
+        "source-1:p97",
+        "source-1:p98",
+        "source-1:p99"
+      ]
+    }
+  },
+  {
+    "ordinal": 4,
+    "kind": "model_result",
+    "at": "2026-09-07T21:55:21.608487+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": "2023-02-15",
+          "announcement_date_text": "February 15, 2023",
+          "citations": [
+            {
+              "passage_id": "source-1:p68",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p69",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p70",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p86",
+              "supports": [
+                "announcement_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p87",
+              "supports": [
+                "announcement_date",
+                "acquisition_announced"
+              ]
+            },
+            {
+              "passage_id": "source-1:p90",
+              "supports": [
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p125",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p129",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p144",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p145",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p146",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p148",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p160",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p161",
+              "supports": [
+                "listing_ended"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": "2023-05-15",
+          "effective_date_text": "May 15, 2023",
+          "event_kind": "listing_ended",
+          "issuer_name": "TravelCenters of America Inc.",
+          "limitations": [],
+          "security_class": "common stock",
+          "source_ticker": "TA",
+          "successor_ticker": null,
+          "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而下市。該8-K文件明確指出TA普通股於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，非僅為收購宣布。",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "SEC 8-K已完整記載合併完成、股票停止交易及下市程序，證據充分,無需進一步查證。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "94da180e-00a7-4d26-9b19-95d6bc59e951",
+      "usage": {
+        "input_tokens": 14985,
+        "output_tokens": 1052
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 13964,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1024,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 13964,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 14985,
+          "output_tokens": 1052,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 5,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:55:21.626317+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": "2023-02-15",
+        "announcement_date_text": "February 15, 2023",
+        "citations": [
+          {
+            "passage_id": "source-1:p68",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p69",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p70",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p86",
+            "supports": [
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p87",
+            "supports": [
+              "announcement_date",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p90",
+            "supports": [
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p125",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p129",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p144",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p145",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p146",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p148",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p160",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p161",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而下市。該8-K文件明確指出TA普通股於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，非僅為收購宣布。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "SEC 8-K已完整記載合併完成、股票停止交易及下市程序，證據充分,無需進一步查證。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 6,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:55:21.640676+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [
+        {
+          "missing_identity_fields": [
+            "issuer_name"
+          ],
+          "source_id": "source-1"
+        }
+      ],
+      "block_reasons": [
+        "effective_date_not_supported",
+        "listing_change_not_supported",
+        "security_identity_not_supported"
+      ],
+      "finding": {
+        "announcement_date": "2023-02-15",
+        "announcement_date_text": "February 15, 2023",
+        "citations": [
+          {
+            "passage_id": "source-1:p68",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p69",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p70",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p86",
+            "supports": [
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p87",
+            "supports": [
+              "announcement_date",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p90",
+            "supports": [
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p125",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p129",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p144",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p145",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p146",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p148",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p160",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p161",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而下市。該8-K文件明確指出TA普通股於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，非僅為收購宣布。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 1794,
+          "passage_id": "source-1:p68",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 1744,
+          "text": "Shares of Common Stock, $0.001 Par Value Per Share",
+          "text_sha256": "2ed4ebb2714e69a08f4e034f1e6f81c7d63c720356de600c91e039217a5b6f15",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 1797,
+          "passage_id": "source-1:p69",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 1795,
+          "text": "TA",
+          "text_sha256": "034fc48ba584fc2a8b0b40c727e4ce36b79845d7ed910c63abfb2c22e630382c",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 1825,
+          "passage_id": "source-1:p70",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 1798,
+          "text": "The NASDAQ Stock Market LLC",
+          "text_sha256": "dbfcf97442467cd73ebb36459c1c980c466a3a93d2921fbb3b523da17817a4e1",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 2584,
+          "passage_id": "source-1:p86",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 2557,
+          "text": "As previously disclosed, on",
+          "text_sha256": "08d86dda98a6ec6095d5c7403ed76504886d46f0b1511043b02c39ef42e6ce03",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 2700,
+          "passage_id": "source-1:p87",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 2585,
+          "text": "February 15, 2023, TravelCenters of America Inc., a Maryland corporation (the “Company”), entered into an Agreement",
+          "text_sha256": "938739f27c1f5962cf4005733eed3f6b1aebc993faa98b20b8aac5d4b916cbf5",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 3053,
+          "passage_id": "source-1:p90",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 2944,
+          "text": "Subsidiary”). On May 15, 2023, Merger Subsidiary merged with and into the Company (the “Merger”) on the terms",
+          "text_sha256": "fdca4026b53a80b245aa931f76377d89fd774c3dc406642f1b2b8f4ab36acbbf",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 6109,
+          "passage_id": "source-1:p125",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 6036,
+          "text": "at the effective time of the Merger (the “Effective Time”), each share of",
+          "text_sha256": "c77e01c796dfb407290f1b6ea668347bd5ecf1618697cee38cbe5b15966ac5b4",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 6585,
+          "passage_id": "source-1:p129",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 6449,
+          "text": "(other than Merger Subsidiary) immediately prior to the Effective Time), was converted into the right to receive $86.00 in cash, without",
+          "text_sha256": "75fab5e099c96d030a4bc422ea6a9723ec5f8ff6f3e060fe49790ea52405961f",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 7731,
+          "passage_id": "source-1:p144",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 7729,
+          "text": "In",
+          "text_sha256": "8bc1d53cc57c24b79bf7c260b1f3b29973caab7b8f501c33016b321ebfc274f1",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 7865,
+          "passage_id": "source-1:p145",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 7732,
+          "text": "connection with and as a result of the consummation of the Merger, shares of Company Stock ceased to trade on the Nasdaq Stock Market",
+          "text_sha256": "61664f0e7c6dafce6b42f84e33265ab1f75628ecc45b3e8331f1821e4331f801",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 7980,
+          "passage_id": "source-1:p146",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 7866,
+          "text": "LLC (“Nasdaq”) prior to market open on May 15, 2023, and became eligible for delisting from Nasdaq and termination",
+          "text_sha256": "091f041558bcb6eca75852cac1f07130182b555ace497f985558f651221d45b6",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 8223,
+          "passage_id": "source-1:p148",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 8089,
+          "text": "requested that Nasdaq file with the SEC a Notification of Removal From Listing and Registration on Form 25 to delist the Company Stock",
+          "text_sha256": "a618b75f81ac2248cb94db73e483f63aa1f4d1701ff7f6248782f84873fb5ea3",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 9127,
+          "passage_id": "source-1:p160",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 8994,
+          "text": "Time, was cancelled and converted into the right to receive the Merger Consideration. As of the Effective Time, all shares of Company",
+          "text_sha256": "cc20612e9d10f88e143de030c3c3ae94dcdcdeb2013b1cfcccae119e46a4c237",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 9270,
+          "passage_id": "source-1:p161",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 9128,
+          "text": "Stock shall no longer be outstanding and shall automatically be canceled and retired and shall cease to exist, and each share shall thereafter",
+          "text_sha256": "2ca2b204add1bd3a9462b8c71b1a3ef7551fd67a62c4ecba904a994ea96a105d",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 7,
+    "kind": "model_request",
+    "at": "2026-09-07T21:55:21.681647+00:00",
+    "payload": {
+      "call_id": "step-2",
+      "phase": "analysis",
+      "prompt_sha256": "81c3bd2916d61644f8fda20540397dfb4eb2cc1cc72feb425fab8beba1656a83",
+      "remaining_seconds": 1786.426263413392,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p100",
+        "source-1:p101",
+        "source-1:p102",
+        "source-1:p103",
+        "source-1:p104",
+        "source-1:p105",
+        "source-1:p106",
+        "source-1:p107",
+        "source-1:p108",
+        "source-1:p109",
+        "source-1:p11",
+        "source-1:p110",
+        "source-1:p111",
+        "source-1:p112",
+        "source-1:p113",
+        "source-1:p114",
+        "source-1:p115",
+        "source-1:p116",
+        "source-1:p117",
+        "source-1:p118",
+        "source-1:p119",
+        "source-1:p12",
+        "source-1:p120",
+        "source-1:p121",
+        "source-1:p122",
+        "source-1:p123",
+        "source-1:p124",
+        "source-1:p125",
+        "source-1:p126",
+        "source-1:p127",
+        "source-1:p128",
+        "source-1:p129",
+        "source-1:p13",
+        "source-1:p130",
+        "source-1:p131",
+        "source-1:p132",
+        "source-1:p133",
+        "source-1:p134",
+        "source-1:p135",
+        "source-1:p136",
+        "source-1:p137",
+        "source-1:p138",
+        "source-1:p139",
+        "source-1:p14",
+        "source-1:p140",
+        "source-1:p141",
+        "source-1:p142",
+        "source-1:p143",
+        "source-1:p144",
+        "source-1:p145",
+        "source-1:p146",
+        "source-1:p147",
+        "source-1:p148",
+        "source-1:p149",
+        "source-1:p15",
+        "source-1:p150",
+        "source-1:p151",
+        "source-1:p152",
+        "source-1:p153",
+        "source-1:p154",
+        "source-1:p155",
+        "source-1:p156",
+        "source-1:p157",
+        "source-1:p158",
+        "source-1:p159",
+        "source-1:p16",
+        "source-1:p160",
+        "source-1:p161",
+        "source-1:p162",
+        "source-1:p163",
+        "source-1:p164",
+        "source-1:p165",
+        "source-1:p166",
+        "source-1:p167",
+        "source-1:p168",
+        "source-1:p169",
+        "source-1:p17",
+        "source-1:p170",
+        "source-1:p171",
+        "source-1:p172",
+        "source-1:p173",
+        "source-1:p174",
+        "source-1:p175",
+        "source-1:p176",
+        "source-1:p177",
+        "source-1:p178",
+        "source-1:p179",
+        "source-1:p18",
+        "source-1:p180",
+        "source-1:p181",
+        "source-1:p182",
+        "source-1:p183",
+        "source-1:p184",
+        "source-1:p185",
+        "source-1:p186",
+        "source-1:p187",
+        "source-1:p188",
+        "source-1:p189",
+        "source-1:p19",
+        "source-1:p190",
+        "source-1:p191",
+        "source-1:p192",
+        "source-1:p193",
+        "source-1:p194",
+        "source-1:p195",
+        "source-1:p196",
+        "source-1:p197",
+        "source-1:p198",
+        "source-1:p199",
+        "source-1:p2",
+        "source-1:p20",
+        "source-1:p200",
+        "source-1:p201",
+        "source-1:p202",
+        "source-1:p203",
+        "source-1:p204",
+        "source-1:p205",
+        "source-1:p206",
+        "source-1:p207",
+        "source-1:p208",
+        "source-1:p209",
+        "source-1:p21",
+        "source-1:p210",
+        "source-1:p211",
+        "source-1:p212",
+        "source-1:p213",
+        "source-1:p214",
+        "source-1:p215",
+        "source-1:p216",
+        "source-1:p217",
+        "source-1:p218",
+        "source-1:p219",
+        "source-1:p22",
+        "source-1:p220",
+        "source-1:p221",
+        "source-1:p222",
+        "source-1:p223",
+        "source-1:p224",
+        "source-1:p225",
+        "source-1:p226",
+        "source-1:p227",
+        "source-1:p228",
+        "source-1:p229",
+        "source-1:p23",
+        "source-1:p230",
+        "source-1:p231",
+        "source-1:p232",
+        "source-1:p233",
+        "source-1:p234",
+        "source-1:p235",
+        "source-1:p236",
+        "source-1:p237",
+        "source-1:p238",
+        "source-1:p239",
+        "source-1:p24",
+        "source-1:p240",
+        "source-1:p241",
+        "source-1:p242",
+        "source-1:p243",
+        "source-1:p244",
+        "source-1:p245",
+        "source-1:p246",
+        "source-1:p247",
+        "source-1:p248",
+        "source-1:p249",
+        "source-1:p25",
+        "source-1:p250",
+        "source-1:p251",
+        "source-1:p252",
+        "source-1:p253",
+        "source-1:p254",
+        "source-1:p255",
+        "source-1:p256",
+        "source-1:p257",
+        "source-1:p258",
+        "source-1:p259",
+        "source-1:p26",
+        "source-1:p260",
+        "source-1:p261",
+        "source-1:p262",
+        "source-1:p27",
+        "source-1:p28",
+        "source-1:p29",
+        "source-1:p3",
+        "source-1:p30",
+        "source-1:p31",
+        "source-1:p32",
+        "source-1:p33",
+        "source-1:p34",
+        "source-1:p35",
+        "source-1:p36",
+        "source-1:p37",
+        "source-1:p38",
+        "source-1:p39",
+        "source-1:p4",
+        "source-1:p40",
+        "source-1:p41",
+        "source-1:p42",
+        "source-1:p43",
+        "source-1:p44",
+        "source-1:p45",
+        "source-1:p46",
+        "source-1:p47",
+        "source-1:p48",
+        "source-1:p49",
+        "source-1:p5",
+        "source-1:p50",
+        "source-1:p51",
+        "source-1:p52",
+        "source-1:p53",
+        "source-1:p54",
+        "source-1:p55",
+        "source-1:p56",
+        "source-1:p57",
+        "source-1:p58",
+        "source-1:p59",
+        "source-1:p6",
+        "source-1:p60",
+        "source-1:p61",
+        "source-1:p62",
+        "source-1:p63",
+        "source-1:p64",
+        "source-1:p65",
+        "source-1:p66",
+        "source-1:p67",
+        "source-1:p68",
+        "source-1:p69",
+        "source-1:p7",
+        "source-1:p70",
+        "source-1:p71",
+        "source-1:p72",
+        "source-1:p73",
+        "source-1:p74",
+        "source-1:p75",
+        "source-1:p76",
+        "source-1:p77",
+        "source-1:p78",
+        "source-1:p79",
+        "source-1:p8",
+        "source-1:p80",
+        "source-1:p81",
+        "source-1:p82",
+        "source-1:p83",
+        "source-1:p84",
+        "source-1:p85",
+        "source-1:p86",
+        "source-1:p87",
+        "source-1:p88",
+        "source-1:p89",
+        "source-1:p9",
+        "source-1:p90",
+        "source-1:p91",
+        "source-1:p92",
+        "source-1:p93",
+        "source-1:p94",
+        "source-1:p95",
+        "source-1:p96",
+        "source-1:p97",
+        "source-1:p98",
+        "source-1:p99"
+      ]
+    }
+  },
+  {
+    "ordinal": 8,
+    "kind": "model_result",
+    "at": "2026-09-07T21:55:33.486143+00:00",
+    "payload": {
+      "call_id": "step-2",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": "2023-02-15",
+          "announcement_date_text": "February 15, 2023",
+          "citations": [
+            {
+              "passage_id": "source-1:p36",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p37",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p68",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p69",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p70",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p86",
+              "supports": [
+                "announcement_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p87",
+              "supports": [
+                "announcement_date",
+                "acquisition_announced"
+              ]
+            },
+            {
+              "passage_id": "source-1:p90",
+              "supports": [
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p125",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p129",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p144",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p145",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p146",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p148",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p160",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p161",
+              "supports": [
+                "listing_ended"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": "2023-05-15",
+          "effective_date_text": "May 15, 2023",
+          "event_kind": "listing_ended",
+          "issuer_name": "TravelCenters of America Inc.",
+          "limitations": [],
+          "security_class": "common stock",
+          "source_ticker": "TA",
+          "successor_ticker": null,
+          "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而下市。該8-K文件明確指出TA普通股於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，非僅為收購宣布。",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "先前提交因缺少issuer_name的識別段落被拒；補充引用p36與p37（跨行的公司名稱「TravelCenters」與「of America Inc.」）以完整支持證券身分，其餘下市與生效日期證據不變。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "c9df4513-0d3d-473d-be84-eaaac9ea9da9",
+      "usage": {
+        "input_tokens": 16117,
+        "output_tokens": 1183
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 15096,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1158,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 15096,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 16117,
+          "output_tokens": 1183,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 9,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:55:33.507224+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": "2023-02-15",
+        "announcement_date_text": "February 15, 2023",
+        "citations": [
+          {
+            "passage_id": "source-1:p36",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p37",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p68",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p69",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p70",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p86",
+            "supports": [
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p87",
+            "supports": [
+              "announcement_date",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p90",
+            "supports": [
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p125",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p129",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p144",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p145",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p146",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p148",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p160",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p161",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而下市。該8-K文件明確指出TA普通股於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，非僅為收購宣布。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "先前提交因缺少issuer_name的識別段落被拒；補充引用p36與p37（跨行的公司名稱「TravelCenters」與「of America Inc.」）以完整支持證券身分，其餘下市與生效日期證據不變。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 10,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:55:33.530850+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [
+        {
+          "inspect_definition_passages": [
+            "source-1:p126"
+          ],
+          "source_id": "source-1"
+        }
+      ],
+      "block_reasons": [
+        "effective_date_not_supported",
+        "listing_change_not_supported"
+      ],
+      "finding": {
+        "announcement_date": "2023-02-15",
+        "announcement_date_text": "February 15, 2023",
+        "citations": [
+          {
+            "passage_id": "source-1:p36",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p37",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p68",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p69",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p70",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p86",
+            "supports": [
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p87",
+            "supports": [
+              "announcement_date",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p90",
+            "supports": [
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p125",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p129",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p144",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p145",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p146",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p148",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p160",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p161",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而下市。該8-K文件明確指出TA普通股於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，非僅為收購宣布。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 658,
+          "passage_id": "source-1:p36",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 645,
+          "text": "TravelCenters",
+          "text_sha256": "3c3e35fd5b92ae8ed661a9b161e717d3fb808086561af10114cfab09146ad24e",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 674,
+          "passage_id": "source-1:p37",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 659,
+          "text": "of America Inc.",
+          "text_sha256": "3571fdd884cfd5e0ad6e6ff26c80d25af2ad7b6a094d7ed4ab711e8f6ffd79d3",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 1794,
+          "passage_id": "source-1:p68",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 1744,
+          "text": "Shares of Common Stock, $0.001 Par Value Per Share",
+          "text_sha256": "2ed4ebb2714e69a08f4e034f1e6f81c7d63c720356de600c91e039217a5b6f15",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 1797,
+          "passage_id": "source-1:p69",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 1795,
+          "text": "TA",
+          "text_sha256": "034fc48ba584fc2a8b0b40c727e4ce36b79845d7ed910c63abfb2c22e630382c",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 1825,
+          "passage_id": "source-1:p70",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 1798,
+          "text": "The NASDAQ Stock Market LLC",
+          "text_sha256": "dbfcf97442467cd73ebb36459c1c980c466a3a93d2921fbb3b523da17817a4e1",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 2584,
+          "passage_id": "source-1:p86",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 2557,
+          "text": "As previously disclosed, on",
+          "text_sha256": "08d86dda98a6ec6095d5c7403ed76504886d46f0b1511043b02c39ef42e6ce03",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 2700,
+          "passage_id": "source-1:p87",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 2585,
+          "text": "February 15, 2023, TravelCenters of America Inc., a Maryland corporation (the “Company”), entered into an Agreement",
+          "text_sha256": "938739f27c1f5962cf4005733eed3f6b1aebc993faa98b20b8aac5d4b916cbf5",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 3053,
+          "passage_id": "source-1:p90",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 2944,
+          "text": "Subsidiary”). On May 15, 2023, Merger Subsidiary merged with and into the Company (the “Merger”) on the terms",
+          "text_sha256": "fdca4026b53a80b245aa931f76377d89fd774c3dc406642f1b2b8f4ab36acbbf",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 6109,
+          "passage_id": "source-1:p125",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 6036,
+          "text": "at the effective time of the Merger (the “Effective Time”), each share of",
+          "text_sha256": "c77e01c796dfb407290f1b6ea668347bd5ecf1618697cee38cbe5b15966ac5b4",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 6585,
+          "passage_id": "source-1:p129",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 6449,
+          "text": "(other than Merger Subsidiary) immediately prior to the Effective Time), was converted into the right to receive $86.00 in cash, without",
+          "text_sha256": "75fab5e099c96d030a4bc422ea6a9723ec5f8ff6f3e060fe49790ea52405961f",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 7731,
+          "passage_id": "source-1:p144",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 7729,
+          "text": "In",
+          "text_sha256": "8bc1d53cc57c24b79bf7c260b1f3b29973caab7b8f501c33016b321ebfc274f1",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 7865,
+          "passage_id": "source-1:p145",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 7732,
+          "text": "connection with and as a result of the consummation of the Merger, shares of Company Stock ceased to trade on the Nasdaq Stock Market",
+          "text_sha256": "61664f0e7c6dafce6b42f84e33265ab1f75628ecc45b3e8331f1821e4331f801",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 7980,
+          "passage_id": "source-1:p146",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 7866,
+          "text": "LLC (“Nasdaq”) prior to market open on May 15, 2023, and became eligible for delisting from Nasdaq and termination",
+          "text_sha256": "091f041558bcb6eca75852cac1f07130182b555ace497f985558f651221d45b6",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 8223,
+          "passage_id": "source-1:p148",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 8089,
+          "text": "requested that Nasdaq file with the SEC a Notification of Removal From Listing and Registration on Form 25 to delist the Company Stock",
+          "text_sha256": "a618b75f81ac2248cb94db73e483f63aa1f4d1701ff7f6248782f84873fb5ea3",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 9127,
+          "passage_id": "source-1:p160",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 8994,
+          "text": "Time, was cancelled and converted into the right to receive the Merger Consideration. As of the Effective Time, all shares of Company",
+          "text_sha256": "cc20612e9d10f88e143de030c3c3ae94dcdcdeb2013b1cfcccae119e46a4c237",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        },
+        {
+          "corpus": "news",
+          "coverage": "full_text",
+          "end_char": 9270,
+          "passage_id": "source-1:p161",
+          "published_at": "",
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:55:08.110987+00:00",
+          "source_id": "source-1",
+          "start_char": 9128,
+          "text": "Stock shall no longer be outstanding and shall automatically be canceled and retired and shall cease to exist, and each share shall thereafter",
+          "text_sha256": "2ca2b204add1bd3a9462b8c71b1a3ef7551fd67a62c4ecba904a994ea96a105d",
+          "title": "Captured public document",
+          "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 11,
+    "kind": "model_request",
+    "at": "2026-09-07T21:55:33.567551+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "phase": "analysis",
+      "prompt_sha256": "391d34266e481dac96e3ae4f382072f5c03492c17266e2d3e11f2bbad6842c11",
+      "remaining_seconds": 1774.540339116007,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p100",
+        "source-1:p101",
+        "source-1:p102",
+        "source-1:p103",
+        "source-1:p104",
+        "source-1:p105",
+        "source-1:p106",
+        "source-1:p107",
+        "source-1:p108",
+        "source-1:p109",
+        "source-1:p11",
+        "source-1:p110",
+        "source-1:p111",
+        "source-1:p112",
+        "source-1:p113",
+        "source-1:p114",
+        "source-1:p115",
+        "source-1:p116",
+        "source-1:p117",
+        "source-1:p118",
+        "source-1:p119",
+        "source-1:p12",
+        "source-1:p120",
+        "source-1:p121",
+        "source-1:p122",
+        "source-1:p123",
+        "source-1:p124",
+        "source-1:p125",
+        "source-1:p126",
+        "source-1:p127",
+        "source-1:p128",
+        "source-1:p129",
+        "source-1:p13",
+        "source-1:p130",
+        "source-1:p131",
+        "source-1:p132",
+        "source-1:p133",
+        "source-1:p134",
+        "source-1:p135",
+        "source-1:p136",
+        "source-1:p137",
+        "source-1:p138",
+        "source-1:p139",
+        "source-1:p14",
+        "source-1:p140",
+        "source-1:p141",
+        "source-1:p142",
+        "source-1:p143",
+        "source-1:p144",
+        "source-1:p145",
+        "source-1:p146",
+        "source-1:p147",
+        "source-1:p148",
+        "source-1:p149",
+        "source-1:p15",
+        "source-1:p150",
+        "source-1:p151",
+        "source-1:p152",
+        "source-1:p153",
+        "source-1:p154",
+        "source-1:p155",
+        "source-1:p156",
+        "source-1:p157",
+        "source-1:p158",
+        "source-1:p159",
+        "source-1:p16",
+        "source-1:p160",
+        "source-1:p161",
+        "source-1:p162",
+        "source-1:p163",
+        "source-1:p164",
+        "source-1:p165",
+        "source-1:p166",
+        "source-1:p167",
+        "source-1:p168",
+        "source-1:p169",
+        "source-1:p17",
+        "source-1:p170",
+        "source-1:p171",
+        "source-1:p172",
+        "source-1:p173",
+        "source-1:p174",
+        "source-1:p175",
+        "source-1:p176",
+        "source-1:p177",
+        "source-1:p178",
+        "source-1:p179",
+        "source-1:p18",
+        "source-1:p180",
+        "source-1:p181",
+        "source-1:p182",
+        "source-1:p183",
+        "source-1:p184",
+        "source-1:p185",
+        "source-1:p186",
+        "source-1:p187",
+        "source-1:p188",
+        "source-1:p189",
+        "source-1:p19",
+        "source-1:p190",
+        "source-1:p191",
+        "source-1:p192",
+        "source-1:p193",
+        "source-1:p194",
+        "source-1:p195",
+        "source-1:p196",
+        "source-1:p197",
+        "source-1:p198",
+        "source-1:p199",
+        "source-1:p2",
+        "source-1:p20",
+        "source-1:p200",
+        "source-1:p201",
+        "source-1:p202",
+        "source-1:p203",
+        "source-1:p204",
+        "source-1:p205",
+        "source-1:p206",
+        "source-1:p207",
+        "source-1:p208",
+        "source-1:p209",
+        "source-1:p21",
+        "source-1:p210",
+        "source-1:p211",
+        "source-1:p212",
+        "source-1:p213",
+        "source-1:p214",
+        "source-1:p215",
+        "source-1:p216",
+        "source-1:p217",
+        "source-1:p218",
+        "source-1:p219",
+        "source-1:p22",
+        "source-1:p220",
+        "source-1:p221",
+        "source-1:p222",
+        "source-1:p223",
+        "source-1:p224",
+        "source-1:p225",
+        "source-1:p226",
+        "source-1:p227",
+        "source-1:p228",
+        "source-1:p229",
+        "source-1:p23",
+        "source-1:p230",
+        "source-1:p231",
+        "source-1:p232",
+        "source-1:p233",
+        "source-1:p234",
+        "source-1:p235",
+        "source-1:p236",
+        "source-1:p237",
+        "source-1:p238",
+        "source-1:p239",
+        "source-1:p24",
+        "source-1:p240",
+        "source-1:p241",
+        "source-1:p242",
+        "source-1:p243",
+        "source-1:p244",
+        "source-1:p245",
+        "source-1:p246",
+        "source-1:p247",
+        "source-1:p248",
+        "source-1:p249",
+        "source-1:p25",
+        "source-1:p250",
+        "source-1:p251",
+        "source-1:p252",
+        "source-1:p253",
+        "source-1:p254",
+        "source-1:p255",
+        "source-1:p256",
+        "source-1:p257",
+        "source-1:p258",
+        "source-1:p259",
+        "source-1:p26",
+        "source-1:p260",
+        "source-1:p261",
+        "source-1:p262",
+        "source-1:p27",
+        "source-1:p28",
+        "source-1:p29",
+        "source-1:p3",
+        "source-1:p30",
+        "source-1:p31",
+        "source-1:p32",
+        "source-1:p33",
+        "source-1:p34",
+        "source-1:p35",
+        "source-1:p36",
+        "source-1:p37",
+        "source-1:p38",
+        "source-1:p39",
+        "source-1:p4",
+        "source-1:p40",
+        "source-1:p41",
+        "source-1:p42",
+        "source-1:p43",
+        "source-1:p44",
+        "source-1:p45",
+        "source-1:p46",
+        "source-1:p47",
+        "source-1:p48",
+        "source-1:p49",
+        "source-1:p5",
+        "source-1:p50",
+        "source-1:p51",
+        "source-1:p52",
+        "source-1:p53",
+        "source-1:p54",
+        "source-1:p55",
+        "source-1:p56",
+        "source-1:p57",
+        "source-1:p58",
+        "source-1:p59",
+        "source-1:p6",
+        "source-1:p60",
+        "source-1:p61",
+        "source-1:p62",
+        "source-1:p63",
+        "source-1:p64",
+        "source-1:p65",
+        "source-1:p66",
+        "source-1:p67",
+        "source-1:p68",
+        "source-1:p69",
+        "source-1:p7",
+        "source-1:p70",
+        "source-1:p71",
+        "source-1:p72",
+        "source-1:p73",
+        "source-1:p74",
+        "source-1:p75",
+        "source-1:p76",
+        "source-1:p77",
+        "source-1:p78",
+        "source-1:p79",
+        "source-1:p8",
+        "source-1:p80",
+        "source-1:p81",
+        "source-1:p82",
+        "source-1:p83",
+        "source-1:p84",
+        "source-1:p85",
+        "source-1:p86",
+        "source-1:p87",
+        "source-1:p88",
+        "source-1:p89",
+        "source-1:p9",
+        "source-1:p90",
+        "source-1:p91",
+        "source-1:p92",
+        "source-1:p93",
+        "source-1:p94",
+        "source-1:p95",
+        "source-1:p96",
+        "source-1:p97",
+        "source-1:p98",
+        "source-1:p99"
+      ]
+    }
+  },
+  {
+    "ordinal": 12,
+    "kind": "model_result",
+    "at": "2026-09-07T21:56:00.286259+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": "2023-02-15",
+          "announcement_date_text": "February 15, 2023",
+          "citations": [
+            {
+              "passage_id": "source-1:p36",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p37",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p68",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p69",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p70",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p126",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-1:p86",
+              "supports": [
+                "announcement_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p87",
+              "supports": [
+                "announcement_date",
+                "acquisition_announced"
+              ]
+            },
+            {
+              "passage_id": "source-1:p90",
+              "supports": [
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p125",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p129",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p144",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p145",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p146",
+              "supports": [
+                "listing_ended",
+                "effective_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p148",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p160",
+              "supports": [
+                "listing_ended"
+              ]
+            },
+            {
+              "passage_id": "source-1:p161",
+              "supports": [
+                "listing_ended"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": "2023-05-15",
+          "effective_date_text": "May 15, 2023",
+          "event_kind": "listing_ended",
+          "issuer_name": "TravelCenters of America Inc.",
+          "limitations": [],
+          "security_class": "common stock",
+          "source_ticker": "TA",
+          "successor_ticker": null,
+          "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而正式下市。8-K文件明確指出TA普通股（定義為「Company Stock」）於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，而非僅為收購宣布。",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "根據先前反饋，需要補充定義段落 p126（將「Company Stock」此定義用語與普通股身分連結），以支撐下市與生效日期的引用皆對應同一證券；其餘身分、公告與下市證據已充分。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "6fe85f8b-ef00-42c0-a688-d2400909163f",
+      "usage": {
+        "input_tokens": 16318,
+        "output_tokens": 2491
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 15297,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 2466,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 15297,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 16318,
+          "output_tokens": 2491,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 13,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:56:00.302837+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": "2023-02-15",
+        "announcement_date_text": "February 15, 2023",
+        "citations": [
+          {
+            "passage_id": "source-1:p36",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p37",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p68",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p69",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p70",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p126",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-1:p86",
+            "supports": [
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p87",
+            "supports": [
+              "announcement_date",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "passage_id": "source-1:p90",
+            "supports": [
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p125",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p129",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p144",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p145",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p146",
+            "supports": [
+              "listing_ended",
+              "effective_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p148",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p160",
+            "supports": [
+              "listing_ended"
+            ]
+          },
+          {
+            "passage_id": "source-1:p161",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc.（NASDAQ: TA）已於2023年5月15日因遭BP Products North America Inc.以每股86美元現金收購完成合併而正式下市。8-K文件明確指出TA普通股（定義為「Company Stock」）於2023年5月15日開盤前停止在Nasdaq交易，公司並已要求Nasdaq向SEC提交Form 25以正式下市並終止證券註冊。此為已完成的下市事件，而非僅為收購宣布。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "根據先前反饋，需要補充定義段落 p126（將「Company Stock」此定義用語與普通股身分連結），以支撐下市與生效日期的引用皆對應同一證券；其餘身分、公告與下市證據已充分。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  }
+]

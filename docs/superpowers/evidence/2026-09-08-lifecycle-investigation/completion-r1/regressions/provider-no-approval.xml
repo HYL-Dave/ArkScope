@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="5" time="0.385" timestamp="2026-09-08T01:54:42.261197+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_investigation_provider" name="test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate" time="0.022"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'">tmp_path = PosixPath('/dev/shm/pytest-of-hyl/pytest-52/test_structured_provider_revie0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7faf9c1d4ee0&gt;
+
+    def test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate(tmp_path, monkeypatch):
+&gt;       from src.lifecycle_investigation.provider_review import provider_decision, prepare_provider_review
+E       ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'
+
+tests/test_lifecycle_investigation_provider.py:10: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_provider" name="test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[active]" time="0.001"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'">tmp_path = PosixPath('/dev/shm/pytest-of-hyl/pytest-52/test_provider_preparation_refu0')
+change = 'active'
+
+    @pytest.mark.parametrize("change", ("active", "unavailable", "changed_digest", "permission"))
+    def test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes(tmp_path, change):
+&gt;       from src.lifecycle_investigation.provider_review import provider_decision, prepare_provider_review
+E       ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'
+
+tests/test_lifecycle_investigation_provider.py:35: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_provider" name="test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[unavailable]" time="0.001"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'">tmp_path = PosixPath('/dev/shm/pytest-of-hyl/pytest-52/test_provider_preparation_refu1')
+change = 'unavailable'
+
+    @pytest.mark.parametrize("change", ("active", "unavailable", "changed_digest", "permission"))
+    def test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes(tmp_path, change):
+&gt;       from src.lifecycle_investigation.provider_review import provider_decision, prepare_provider_review
+E       ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'
+
+tests/test_lifecycle_investigation_provider.py:35: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_provider" name="test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[changed_digest]" time="0.001"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'">tmp_path = PosixPath('/dev/shm/pytest-of-hyl/pytest-52/test_provider_preparation_refu2')
+change = 'changed_digest'
+
+    @pytest.mark.parametrize("change", ("active", "unavailable", "changed_digest", "permission"))
+    def test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes(tmp_path, change):
+&gt;       from src.lifecycle_investigation.provider_review import provider_decision, prepare_provider_review
+E       ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'
+
+tests/test_lifecycle_investigation_provider.py:35: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_provider" name="test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[permission]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'">tmp_path = PosixPath('/dev/shm/pytest-of-hyl/pytest-52/test_provider_preparation_refu3')
+change = 'permission'
+
+    @pytest.mark.parametrize("change", ("active", "unavailable", "changed_digest", "permission"))
+    def test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes(tmp_path, change):
+&gt;       from src.lifecycle_investigation.provider_review import provider_decision, prepare_provider_review
+E       ModuleNotFoundError: No module named 'src.lifecycle_investigation.provider_review'
+
+tests/test_lifecycle_investigation_provider.py:35: ModuleNotFoundError</failure></testcase></testsuite></testsuites>

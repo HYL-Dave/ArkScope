@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="61" time="2.382" timestamp="2026-09-06T22:48:35.082387+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_public_sources" name="test_public_source_preserves_complete_unicode_and_document_digest" time="0.072" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_request_does_not_inherit_cookies_auth_or_proxies" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[http://example.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[file:///etc/passwd]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://u:p@example.com]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com:8443/a]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://localhost/a]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://127.0.0.1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::1]]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://169.254.169.254/latest/meta-data]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com\\@127.0.0.1/]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\nnotice]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\tnotice]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://exa mple.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/%0d%0aInjected:yes]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::ffff:127.0.0.1]]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\ud800]" time="0.002"><failure message="UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' in position 20: surrogates not allowed">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70b850dec040&gt;
+url = 'https://example.com/\ud800'
+
+    @pytest.mark.parametrize("url", [
+        "http://example.com", "file:///etc/passwd", "https://u:p@example.com",
+        "https://example.com:8443/a", "https://localhost/a", "https://127.0.0.1",
+        "https://[::1]", "https://169.254.169.254/latest/meta-data",
+        "https://example.com\\@127.0.0.1/", "https://example.com/\nnotice",
+        "https://example.com/\tnotice", "https://exa mple.com",
+        "https://example.com/%0d%0aInjected:yes", "https://[::ffff:127.0.0.1]",
+        "https://example.com/\ud800",
+    ])
+    def test_unsafe_url_is_rejected_before_dns_and_transport(monkeypatch, url):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        reader, connections, resolutions, _ = _reader(monkeypatch)
+        with pytest.raises(SourceReadError, match="unsafe_source_url"):
+&gt;           reader.read(url)
+
+tests/test_lifecycle_public_sources.py:125: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:283: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:288: in _read
+    current = canonical_source_url(url)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = 'https://example.com/\ud800'
+
+    def canonical_source_url(value: str) -&gt; str:
+&gt;       if (type(value) is not str or not value or len(value.encode("utf-8")) &gt; 1000
+                or "\\" in value or any(ord(ch) &lt;= 32 or ord(ch) == 127 for ch in value)):
+E               UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' in position 20: surrogates not allowed
+
+src/lifecycle_public_sources.py:46: UnicodeEncodeError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses5]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_to_private_destination_does_not_fetch_it" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_relative_redirect_is_resolved_and_each_request_counted" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_limit_rejects_instead_of_returning_partial_source" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_byte_limit_never_silently_truncates_even_without_content_length" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers0-%PDF-source_format_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers1-compressed-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers3-text-source_response_invalid]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers4-text-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers5-\xff-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers6--source_text_empty]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_failed_request_consumes_budget_and_has_no_retry" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_blocked_dns_releases_caller_without_late_http[False]" time="1.003"><failure message="AssertionError: DNS prevented cancellation/deadline from releasing the caller&#10;assert not True&#10; +  where True = is_alive()&#10; +    where is_alive = &lt;Thread(Thread-16 (read), started 123936932099648)&gt;.is_alive">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70b85046d8a0&gt;
+cancel = False
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    def test_blocked_dns_releases_caller_without_late_http(monkeypatch, cancel):
+        from threading import Event, Thread
+        from src import lifecycle_public_sources as mod
+    
+        reader, connections, _, _ = _reader(monkeypatch, timeout_seconds=0.1 if not cancel else 5)
+        entered, release, exited = Event(), Event(), Event()
+        result = []
+    
+        def resolve(*args, **kwargs):
+            entered.set()
+            release.wait(3)
+            exited.set()
+            return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (PUBLIC_IP, 443))]
+    
+        def read():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                result.append(exc)
+    
+        monkeypatch.setattr(mod.socket, "getaddrinfo", resolve)
+        worker = Thread(target=read)
+        worker.start()
+        try:
+            assert entered.wait(1)
+            if cancel:
+                reader.request_stop()
+            worker.join(1)
+&gt;           assert not worker.is_alive(), "DNS prevented cancellation/deadline from releasing the caller"
+E           AssertionError: DNS prevented cancellation/deadline from releasing the caller
+E           assert not True
+E            +  where True = is_alive()
+E            +    where is_alive = &lt;Thread(Thread-16 (read), started 123936932099648)&gt;.is_alive
+
+tests/test_lifecycle_public_sources.py:242: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_blocked_dns_releases_caller_without_late_http[True]" time="1.003"><failure message="AssertionError: DNS prevented cancellation/deadline from releasing the caller&#10;assert not True&#10; +  where True = is_alive()&#10; +    where is_alive = &lt;Thread(Thread-17 (read), started 123936932099648)&gt;.is_alive">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70b8504592d0&gt;
+cancel = True
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    def test_blocked_dns_releases_caller_without_late_http(monkeypatch, cancel):
+        from threading import Event, Thread
+        from src import lifecycle_public_sources as mod
+    
+        reader, connections, _, _ = _reader(monkeypatch, timeout_seconds=0.1 if not cancel else 5)
+        entered, release, exited = Event(), Event(), Event()
+        result = []
+    
+        def resolve(*args, **kwargs):
+            entered.set()
+            release.wait(3)
+            exited.set()
+            return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (PUBLIC_IP, 443))]
+    
+        def read():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                result.append(exc)
+    
+        monkeypatch.setattr(mod.socket, "getaddrinfo", resolve)
+        worker = Thread(target=read)
+        worker.start()
+        try:
+            assert entered.wait(1)
+            if cancel:
+                reader.request_stop()
+            worker.join(1)
+&gt;           assert not worker.is_alive(), "DNS prevented cancellation/deadline from releasing the caller"
+E           AssertionError: DNS prevented cancellation/deadline from releasing the caller
+E           assert not True
+E            +  where True = is_alive()
+E            +    where is_alive = &lt;Thread(Thread-17 (read), started 123936932099648)&gt;.is_alive
+
+tests/test_lifecycle_public_sources.py:242: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_saturation_refuses_new_resolution_without_waiting" time="0.003"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x70b85042b790&gt;
+
+    def test_dns_saturation_refuses_new_resolution_without_waiting(monkeypatch):
+        from threading import BoundedSemaphore
+        from src import lifecycle_public_sources as mod
+    
+        reader, connections, resolutions, _ = _reader(monkeypatch)
+        slots = BoundedSemaphore(1)
+        slots.acquire()
+        monkeypatch.setattr(mod, "_DNS_SLOTS", slots, raising=False)
+&gt;       with pytest.raises(mod.SourceReadError, match="source_dns_busy"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:260: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_stop_during_dns_prevents_late_http_dispatch" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_deadline_is_checked_after_dns_before_any_connection" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_html_source_excludes_noncontent_without_truncating_notice" time="0.003" /><testcase classname="tests.test_lifecycle_public_sources" name="test_exact_passage_requires_real_source_and_byte_aligned_unicode" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_modified_page_text_cannot_reuse_source_hash" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_pinned_https_transport_does_not_resolve_host_again" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits5]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits6]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits7]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits8]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits9]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_deadline_interrupts_an_inflight_read_not_only_its_return" time="0.053" /><testcase classname="tests.test_lifecycle_public_sources" name="test_cancel_interrupts_an_inflight_read_and_refuses_next_hop" time="0.004" /></testsuite></testsuites>

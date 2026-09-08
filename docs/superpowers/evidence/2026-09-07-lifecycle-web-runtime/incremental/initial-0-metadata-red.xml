@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="55" time="0.294" timestamp="2026-09-06T22:36:32.728279+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_public_sources" name="test_public_source_preserves_complete_unicode_and_document_digest" time="0.070" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_request_does_not_inherit_cookies_auth_or_proxies" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[http://example.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[file:///etc/passwd]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://u:p@example.com]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com:8443/a]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://localhost/a]" time="0.001" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://127.0.0.1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::1]]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://169.254.169.254/latest/meta-data]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com\\@127.0.0.1/]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\nnotice]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/\tnotice]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://exa mple.com]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://example.com/%0d%0aInjected:yes]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_unsafe_url_is_rejected_before_dns_and_transport[https://[::ffff:127.0.0.1]]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_dns_with_any_nonpublic_address_cannot_connect[addresses5]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_to_private_destination_does_not_fetch_it" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_relative_redirect_is_resolved_and_each_request_counted" time="0.003" /><testcase classname="tests.test_lifecycle_public_sources" name="test_redirect_limit_rejects_instead_of_returning_partial_source" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_byte_limit_never_silently_truncates_even_without_content_length" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers0-%PDF-source_format_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers1-compressed-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers3-text-source_response_invalid]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers4-text-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers5-\xff-source_encoding_unsupported]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_invalid_source_response_is_not_usable_evidence[headers6--source_text_empty]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_failed_request_consumes_budget_and_has_no_retry" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_stop_during_dns_prevents_late_http_dispatch" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_deadline_is_checked_after_dns_before_any_connection" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_html_source_excludes_noncontent_without_truncating_notice" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_exact_passage_requires_real_source_and_byte_aligned_unicode" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_modified_page_text_cannot_reuse_source_hash" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_pinned_https_transport_does_not_resolve_host_again" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change0]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x79589bc30df0&gt;
+change = {'url': 'https://other.example.com/false'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:333: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change1]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x79589bc77be0&gt;
+change = {'body_sha256': '0000000000000000000000000000000000000000000000000000000000000000'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:333: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change2]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x79589bc33b20&gt;
+change = {'retrieved_at': '2030-01-01T00:00:00+00:00'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:333: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change3]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x79589bc77730&gt;
+change = {'redirect_chain': ('https://elsewhere.example.com',)}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:333: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_citation_cannot_rebind_captured_source_metadata[change4]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x79589bc9c2e0&gt;
+change = {'mime_type': 'text/html'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+&gt;       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;
+
+tests/test_lifecycle_public_sources.py:333: Failed</failure></testcase><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits0]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits1]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits2]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits3]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits4]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits5]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits6]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits7]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits8]" time="0.002" /><testcase classname="tests.test_lifecycle_public_sources" name="test_source_limits_cannot_silently_become_unbounded[limits9]" time="0.003" /></testsuite></testsuites>

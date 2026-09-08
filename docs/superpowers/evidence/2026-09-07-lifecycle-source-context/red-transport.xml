@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="22" skipped="0" tests="22" time="0.182" timestamp="2026-09-07T10:49:43.713292+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_source_compatibility" name="test_complete_gzip_uses_encoded_length_and_preserves_decoded_document[False]" time="0.065"><failure message="src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported">E   src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_complete_gzip_uses_encoded_length_and_preserves_decoded_document[True]" time="0.002"><failure message="src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported">E   src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_identical_repeated_content_lengths_are_normalized_not_rejected" time="0.002"><failure message="src.lifecycle_public_sources.SourceReadError: source_response_invalid">E   src.lifecycle_public_sources.SourceReadError: source_response_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_ambiguous_framing_is_not_reported_as_a_short_document[headers0]" time="0.003"><failure message="AssertionError: &#10;- source_body_incomplete&#10;+ source_framing_invalid">E   src.lifecycle_public_sources.SourceReadError: source_body_incomplete
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_body_incomplete
+    + source_framing_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_ambiguous_framing_is_not_reported_as_a_short_document[headers1]" time="0.002"><failure message="AssertionError: &#10;- source_response_invalid&#10;?         ^^^^ ^^&#10;+ source_framing_invalid&#10;?        + ^^^ ^">E   src.lifecycle_public_sources.SourceReadError: source_response_invalid
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_response_invalid
+    ?         ^^^^ ^^
+    + source_framing_invalid
+    ?        + ^^^ ^</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_ambiguous_framing_is_not_reported_as_a_short_document[headers2]" time="0.002"><failure message="Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;">E   Failed: DID NOT RAISE &lt;class 'src.lifecycle_public_sources.SourceReadError'&gt;</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_missing_chunk_terminator_is_transport_incomplete[10\r\nshort]" time="0.002"><failure message="AssertionError: &#10;- source_transport_unavailable&#10;+ source_body_incomplete">E   src.lifecycle_public_sources.SourceReadError: source_transport_unavailable
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_transport_unavailable
+    + source_body_incomplete</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_missing_chunk_terminator_is_transport_incomplete[10\r\nComplete notice.\r\n]" time="0.002"><failure message="AssertionError: &#10;- source_transport_unavailable&#10;+ source_body_incomplete">E   src.lifecycle_public_sources.SourceReadError: source_transport_unavailable
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_transport_unavailable
+    + source_body_incomplete</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_complete_wire_body_does_not_hide_damaged_gzip[&lt;lambda&gt;-source_compression_incomplete]" time="0.002"><failure message="AssertionError: &#10;- source_encoding_unsupported&#10;+ source_compression_incomplete">E   src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_encoding_unsupported
+    + source_compression_incomplete</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_complete_wire_body_does_not_hide_damaged_gzip[&lt;lambda&gt;-source_compression_invalid0]" time="0.002"><failure message="AssertionError: &#10;- source_encoding_unsupported&#10;+ source_compression_invalid">E   src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_encoding_unsupported
+    + source_compression_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_complete_wire_body_does_not_hide_damaged_gzip[&lt;lambda&gt;-source_compression_invalid1]" time="0.002"><failure message="AssertionError: &#10;- source_encoding_unsupported&#10;+ source_compression_invalid">E   src.lifecycle_public_sources.SourceReadError: source_encoding_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_encoding_unsupported
+    + source_compression_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_decoded_size_budget_is_separate_and_never_returns_a_prefix" time="0.002"><failure message="TypeError: SourceReadLimits.__init__() got an unexpected keyword argument 'max_decoded_bytes'">E   TypeError: SourceReadLimits.__init__() got an unexpected keyword argument 'max_decoded_bytes'</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_source_diagnostics_do_not_contain_arbitrary_headers_or_body" time="0.002"><failure message="AttributeError: 'PublicSourceReader' object has no attribute 'observations'">E   AttributeError: 'PublicSourceReader' object has no attribute 'observations'</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_html_retains_paragraph_boundaries_and_tail_without_hidden_text" time="0.002"><failure message="AssertionError: assert 'Issuer notic...Not delisted.' == 'Issuer notic...Not delisted.'&#10;  &#10;  + Issuer notice First paragraph. Not delisted.&#10;  - Issuer notice&#10;  - First paragraph.&#10;  - Not delisted.">E   AssertionError: assert 'Issuer notic...Not delisted.' == 'Issuer notic...Not delisted.'
+      
+      + Issuer notice First paragraph. Not delisted.
+      - Issuer notice
+      - First paragraph.
+      - Not delisted.</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_form25_xml_preserves_security_class_and_named_fields" time="0.002"><failure message="src.lifecycle_public_sources.SourceReadError: source_format_unsupported">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_xml_dtd_entities_and_malformed_documents_are_rejected[&lt;!DOCTYPE x [&lt;!ENTITY secret SYSTEM &quot;file:///etc/passwd&quot;&gt;]&gt;&lt;x&gt;&amp;secret;&lt;/x&gt;]" time="0.002"><failure message="AssertionError: &#10;- source_format_unsupported&#10;+ source_document_invalid">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_format_unsupported
+    + source_document_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_xml_dtd_entities_and_malformed_documents_are_rejected[&lt;!DOCTYPE x [&lt;!ENTITY a &quot;expanded&quot;&gt;]&gt;&lt;x&gt;&amp;a;&lt;/x&gt;]" time="0.002"><failure message="AssertionError: &#10;- source_format_unsupported&#10;+ source_document_invalid">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_format_unsupported
+    + source_document_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_xml_dtd_entities_and_malformed_documents_are_rejected[&lt;x&gt;&lt;unclosed&gt;&lt;/x&gt;]" time="0.002"><failure message="AssertionError: &#10;- source_format_unsupported&#10;+ source_document_invalid">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_format_unsupported
+    + source_document_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_structured_json_is_retained_with_keys_not_misread_as_html" time="0.002"><failure message="src.lifecycle_public_sources.SourceReadError: source_format_unsupported">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_invalid_or_ambiguous_json_is_not_converted_to_evidence[{&quot;a&quot;:1,&quot;a&quot;:2}]" time="0.002"><failure message="AssertionError: &#10;- source_format_unsupported&#10;+ source_document_invalid">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_format_unsupported
+    + source_document_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_invalid_or_ambiguous_json_is_not_converted_to_evidence[{&quot;a&quot;: NaN}]" time="0.002"><failure message="AssertionError: &#10;- source_format_unsupported&#10;+ source_document_invalid">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_format_unsupported
+    + source_document_invalid</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_invalid_or_ambiguous_json_is_not_converted_to_evidence[{&quot;a&quot;:]" time="0.002"><failure message="AssertionError: &#10;- source_format_unsupported&#10;+ source_document_invalid">E   src.lifecycle_public_sources.SourceReadError: source_format_unsupported
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: 
+    - source_format_unsupported
+    + source_document_invalid</failure></testcase></testsuite></testsuites>

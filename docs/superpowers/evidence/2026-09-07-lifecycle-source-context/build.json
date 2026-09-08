@@ -1,0 +1,9 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "build"
+  ],
+  "exit_code": 0,
+  "output": "\n> arkscope-web@0.0.1 build\n> tsc --noEmit && vite build\n\nvite v5.4.21 building for production...\ntransforming...\n\u2713 2205 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                     0.40 kB \u2502 gzip:   0.27 kB\ndist/assets/index-DA4LVaGr.css     90.28 kB \u2502 gzip:  15.16 kB\ndist/assets/index-DZX1ITHb.js   1,180.04 kB \u2502 gzip: 352.33 kB\n\u2713 built in 2.75s\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+}

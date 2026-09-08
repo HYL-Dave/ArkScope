@@ -1,0 +1,24 @@
+--- before/src/auth_drivers/lifecycle_web_claude.py
++++ after/src/auth_drivers/lifecycle_web_claude.py
+@@ -159,9 +159,20 @@
+                            ANTHROPIC_SMALL_FAST_MODEL=call.selection.model)
+         tools = ["WebSearch"] if call.phase == "search" else []
+         disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
++        system_prompt = "Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks."
++        if call.phase == "analysis":
++            # Toolless CLI output can emit generic tool-template fields. Anchor
++            # the response to the same schema; never repair malformed arguments.
++            system_prompt += (
++                " StructuredOutput is the required response mechanism, not an evidence-access tool. "
++                "Submit the final object itself as its arguments, not a function-call wrapper. "
++                "Use the exact property names and value types in the schema below, including nested objects. "
++                "Do not search, read files, execute commands, or call any other tool.\nOutput schema:\n"
++                + json.dumps(call.output_schema, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
++            )
+         options = ClaudeAgentOptions(
+             model=call.selection.model, effort=call.effort, fallback_model=None,
+-            system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
++            system_prompt=system_prompt,
+             output_format={"type": "json_schema", "schema": call.output_schema},
+             tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+             mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",

@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "scope": "recent_price_repair_offline_admission",
+  "base_commit": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "branch": "codex/lifecycle-tracking-first",
+  "product_and_test_changes_committed": false,
+  "final": {
+    "integrated": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1765
+      },
+      "duration_seconds": 60.617,
+      "failed_nodes": [],
+      "testcase_attributes_sha256": "a9ef34327ffec328fff9c3e4f1bcced003c112b3afa5ae9acfb6e7c7ce43aeaa",
+      "timestamp": "2026-09-06T05:25:57.627686+08:00",
+      "xml_sha256": "c8fa31037a7dcf71e3a9fd4cca21a7e72feb013ca536fb5d91cc0765bb8402ac",
+      "passed": 1765,
+      "file_manifest": "focus-files.json",
+      "exit_code": 0
+    },
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6033
+      },
+      "duration_seconds": 300.74,
+      "failed_nodes": [],
+      "testcase_attributes_sha256": "2c03dad8996dab59d2f869c21417271fcbfe432b2d594d0291b37088917a0607",
+      "timestamp": "2026-09-06T05:24:40.729014+08:00",
+      "xml_sha256": "8a9d7d7d25c50c56ded6b53e9bf348f9a088a345e075e3f3026bc82d6bdeaf91",
+      "passed": 6021,
+      "warnings": 3,
+      "warning_category": "existing_edgartools_deprecations",
+      "exit_code": 0
+    },
+    "mutation_campaign": {
+      "file_manifest": "price-focus-files.json",
+      "file_count": 26,
+      "baseline_passed": 428,
+      "independent_mutants": 16,
+      "killed_by_named_owner": 16,
+      "restored_passed": 428,
+      "report": "mutation-results.json",
+      "all_mutated_source_hashes_match_restored_copy": true
+    }
+  },
+  "earlier_completed_runs": {
+    "initial_integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "tests": 1706
+      },
+      "duration_seconds": 120.046,
+      "failed_nodes": [
+        "tests.test_market_coverage_boundaries::test_coverage_enum_consumers_use_exact_exhaustive_matching",
+        "tests.test_security_lifecycle_routes::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes"
+      ],
+      "testcase_attributes_sha256": "57767c46184b50c09fddf629267e87cd16d225a4168feeccefb346fdeeb6be8e",
+      "timestamp": "2026-09-06T05:02:26.718041+08:00",
+      "xml_sha256": "137537e02b48306117b28ae605da57394608f17da37ead5b4114b91dff607451",
+      "passed": 1704,
+      "exit_code": 1,
+      "fixes": [
+        "Moved execution out of the read-only coverage package; kept its boundary test unchanged.",
+        "Updated the lifecycle runtime route count and explicitly named the resume route."
+      ]
+    },
+    "integration_before_runtime_startup_file": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1740
+      },
+      "duration_seconds": 56.717,
+      "failed_nodes": [],
+      "testcase_attributes_sha256": "9da274b22236f299ecbd4cf8ef528d1140d0ef24096103bd390e5a5727aa7fe1",
+      "timestamp": "2026-09-06T05:12:02.896186+08:00",
+      "xml_sha256": "9b29c7acc37fd1dea38faee7f38df34824745b91e6c55eecb22baff0e02bf2e9",
+      "passed": 1740,
+      "exit_code": 0
+    },
+    "initial_full_backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 12,
+        "tests": 6033
+      },
+      "duration_seconds": 305.473,
+      "failed_nodes": [
+        "tests.test_api::test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes"
+      ],
+      "testcase_attributes_sha256": "ecaa806a153ed56a62277f382de77aeefa017c3f914d78fa697234203f8d762d",
+      "timestamp": "2026-09-06T05:13:20.266001+08:00",
+      "xml_sha256": "5a6b15dcb698ad210b1a722a410db03fabdfad72af5765031ae8d441b44d827e",
+      "passed": 6020,
+      "exit_code": 1,
+      "fix": "Updated the separate runtime-lifespan route count and explicitly named resume; reran the complete backend."
+    }
+  },
+  "interrupted_not_admitted": [
+    {
+      "run": "on_disk_integration",
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 94
+      },
+      "duration_seconds": 284.749,
+      "failed_nodes": [],
+      "testcase_attributes_sha256": "3b344d2c40f548666f5351f70f1df1bc40ec7b2a7438d72b0c8eeee78410b8e7",
+      "timestamp": "2026-09-06T05:06:45.533718+08:00",
+      "xml_sha256": "3d4e1fb3d34162c6fda4c18994e4b599e34c8f38f36b892a4fe17f404f9c0588",
+      "exit_code": 2,
+      "completed_nodes": 94,
+      "reason": "SIGINT after observed filesystem-journal wait; not a completed green run."
+    },
+    {
+      "run": "on_disk_mutation_baseline",
+      "exit_code": 2,
+      "completed_nodes": 401,
+      "mutations_started": 0,
+      "reason": "SIGINT after observed filesystem-journal wait; replaced by a complete fresh-copy tmpfs campaign."
+    }
+  ],
+  "environment": {
+    "python": "3.10",
+    "large_test_data": "separate_tmpfs_directories",
+    "earlier_focused_tests_used_disk": true,
+    "product_sqlite_synchronous": "FULL",
+    "os_or_power_loss_survival_proven": false,
+    "frontend_changed": false,
+    "frontend_browser_gates_rerun": false,
+    "actual_provider_calls": 0,
+    "live_production_database_reads": 0,
+    "existing_authorized_backup_and_inventory_metadata_read": true,
+    "credential_fields_read": false,
+    "production_price_writes": 0,
+    "profile_writes": 0,
+    "profile_or_market_schema_migration": false,
+    "app_restart": false,
+    "merge": false,
+    "push": false
+  },
+  "contract_changes": [
+    "Prepared explicit repairs use request receipts and the original coverage clock; ordinary five-day collection remains unchanged.",
+    "POST resume uses the original plan and both existing write gates; missing or malformed plan never loads provider configuration.",
+    "Received responses may be reused, but a dispatched request is never repeated in the same journal; unknown/failed/incomplete remains explicit.",
+    "Job output retains closed measured repair diagnostics and typed failures; provider return is not a coverage-completion verdict.",
+    "Startup route surface is 199 instead of 198, with the new route explicitly asserted."
+  ],
+  "retained_controls": [
+    "Default successful five-day collection can coexist with wider visible historical gaps.",
+    "Full-window positive control fills history without changing the daily default.",
+    "Real-shaped 32-target scenario measures 64 calls and 4940 allowed inserts while preserving existing bars.",
+    "Holiday, half-day and original intraday-clock slots remain calendar-bound.",
+    "Removed/changed-alias targets are not written; unrelated memberships need no global approval.",
+    "First local price time is neither IPO nor historic membership time; old gaps stay visible.",
+    "Readonly metadata authorizer denies credentials, unapproved columns and writes."
+  ],
+  "evidence_limit": "Initial targeted RED outputs were observed during implementation but their raw session logs are not archived here. The later integration and mutation manifests must not be called a complete pre-edit baseline.",
+  "previous_packet_file_digest_check": {
+    "packet": "../2026-09-06-lifecycle-target-scoped-disposition",
+    "files": 8,
+    "mismatches": 0
+  },
+  "pending": [
+    "Exact live repair authorization, consistent market backup, bounded execution and independent coverage readback.",
+    "Operator-facing resume/status UI.",
+    "Remaining lifecycle population/confirmation/UI/web tasks.",
+    "Separate merge and App restart approval; push stays with the user."
+  ]
+}

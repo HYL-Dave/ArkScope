@@ -1,0 +1,54 @@
+{
+  "observations": [
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 3.42,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.732,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 2.883,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.1,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.28,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.557,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 5.005,
+      "error": "web_recording_unavailable",
+      "status": null
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 5.004,
+      "error": "web_recording_unavailable",
+      "status": null
+    }
+  ],
+  "production_data_access": false,
+  "provider_calls": 0
+}

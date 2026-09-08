@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="10" skipped="0" tests="10" time="0.286" timestamp="2026-09-06T23:27:50.816352+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_store" name="test_web_journal_installation_is_explicit_and_preserves_existing_schema" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_web_journal_installation_0')
+
+    def test_web_journal_installation_is_explicit_and_preserves_existing_schema(tmp_path):
+&gt;       from src.lifecycle_web_store import WebJournalError, install_web_journal
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:59: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_web_journal_preserves_model_authorship_without_creating_human_acceptance" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_web_journal_preserves_mod0')
+
+    def test_web_journal_preserves_model_authorship_without_creating_human_acceptance(tmp_path):
+&gt;       path, store = setup_store(tmp_path)
+
+tests/test_lifecycle_web_store.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_web_journal_preserves_mod0')
+
+    def setup_store(tmp_path, *, install=True):
+&gt;       from src.lifecycle_web_store import LifecycleWebStore, install_web_journal
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:20: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_start_is_idempotent_and_does_not_reset_or_replay_existing_execution" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_start_is_idempotent_and_d0')
+
+    def test_start_is_idempotent_and_does_not_reset_or_replay_existing_execution(tmp_path):
+&gt;       from src.lifecycle_web_store import WebJournalError
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:88: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_stale_or_wrong_worker_cannot_record_provider_work" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_stale_or_wrong_worker_can0')
+
+    def test_stale_or_wrong_worker_cannot_record_provider_work(tmp_path):
+&gt;       from src.lifecycle_web_store import WebJournalError
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:100: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_recording_failure_stops_before_dispatch_and_never_fakes_completion" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_recording_failure_stops_b0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7e732cb14850&gt;
+
+    def test_recording_failure_stops_before_dispatch_and_never_fakes_completion(tmp_path, monkeypatch):
+&gt;       from src.lifecycle_web_store import WebJournalError
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:114: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_cancel_ack_does_not_write_a_cancelled_remote_terminal" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_cancel_ack_does_not_write0')
+
+    def test_cancel_ack_does_not_write_a_cancelled_remote_terminal(tmp_path):
+&gt;       _, store = setup_store(tmp_path)
+
+tests/test_lifecycle_web_store.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_cancel_ack_does_not_write0')
+
+    def setup_store(tmp_path, *, install=True):
+&gt;       from src.lifecycle_web_store import LifecycleWebStore, install_web_journal
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:20: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_expired_lease_recovers_honestly_without_provider_or_retry[False]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_expired_lease_recovers_ho0')
+pending = False
+
+    @pytest.mark.parametrize("pending", [False, True])
+    def test_expired_lease_recovers_honestly_without_provider_or_retry(tmp_path, pending):
+&gt;       _, store = setup_store(tmp_path)
+
+tests/test_lifecycle_web_store.py:145: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_expired_lease_recovers_ho0')
+
+    def setup_store(tmp_path, *, install=True):
+&gt;       from src.lifecycle_web_store import LifecycleWebStore, install_web_journal
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:20: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_expired_lease_recovers_honestly_without_provider_or_retry[True]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_expired_lease_recovers_ho1')
+pending = True
+
+    @pytest.mark.parametrize("pending", [False, True])
+    def test_expired_lease_recovers_honestly_without_provider_or_retry(tmp_path, pending):
+&gt;       _, store = setup_store(tmp_path)
+
+tests/test_lifecycle_web_store.py:145: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_expired_lease_recovers_ho1')
+
+    def setup_store(tmp_path, *, install=True):
+&gt;       from src.lifecycle_web_store import LifecycleWebStore, install_web_journal
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:20: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_immutable_source_rows_cannot_be_rebound_after_investigation" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_immutable_source_rows_can0')
+
+    def test_immutable_source_rows_cannot_be_rebound_after_investigation(tmp_path):
+&gt;       path, store = setup_store(tmp_path)
+
+tests/test_lifecycle_web_store.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_immutable_source_rows_can0')
+
+    def setup_store(tmp_path, *, install=True):
+&gt;       from src.lifecycle_web_store import LifecycleWebStore, install_web_journal
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:20: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_lifecycle_web_store" name="test_completed_result_requires_all_owned_remote_terminals" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.lifecycle_web_store'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7759/test_completed_result_requires0')
+
+    def test_completed_result_requires_all_owned_remote_terminals(tmp_path):
+&gt;       from src.lifecycle_web_store import WebJournalError
+E       ModuleNotFoundError: No module named 'src.lifecycle_web_store'
+
+tests/test_lifecycle_web_store.py:169: ModuleNotFoundError</failure></testcase></testsuite></testsuites>

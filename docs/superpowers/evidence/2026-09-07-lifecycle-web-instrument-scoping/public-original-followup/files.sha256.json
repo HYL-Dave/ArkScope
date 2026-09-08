@@ -1,0 +1,10 @@
+{
+  "files": {
+    "analysis-metrics.json": "1c9dc70601a8649469f3684fc3b594298d6283374eec429fc764411702dda312",
+    "analysis-projection.json": "26b848190c44dd54791ead834c05cf6c70e6cbb047bee1999f8b2b52235d6685",
+    "document-metrics.json": "64f0f0ef8cbf7d91592ac9f84564896fb8c39bcdf14586445f6f926ed56f2866",
+    "original-metrics.json": "0e2884d1d854582758e82adb93bf9f0746e9fb4327e42bfa46792ae2e5860a6f",
+    "secret-shape-scan.json": "94ae46f6b2ab4c2c4d426a00ccccdcb00c6758d5f32544469aba2515c0c96f12",
+    "verification.json": "ffa8a4837cff146d8a75e3fa878c340305aa108ddc2b9444ab7d101625888e14"
+  }
+}

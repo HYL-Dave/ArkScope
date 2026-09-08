@@ -1,0 +1,12 @@
+{
+  "sources": [
+    "https://www.sec.gov/Archives/edgar/data/0001378453/000110465923061210/tm2315684d2_ex99-1.htm",
+    "https://www.cspdailynews.com/mergers-acquisitions/bp-completes-acquisition-travelcenters-america",
+    "https://www.prnewswire.com/news-releases/travelcenters-of-america-inc-announces-intention-to-delist-8-25-senior-notes-due-2028--8-00-senior-notes-due-2029--and-8-00-senior-notes-due-2030-nasdaq-tanni-tannl-tannz-from-the-nasdaq-301825324.html",
+    "https://www.bp.com/en/global/bp-supply-trading-and-shipping/news/press-releases/bp-expands-mobility-and-convenience-network-completing-the-purchase-of-leading-travel-center-operator-travelcenters-of-america2.html"
+  ],
+  "unresolved_conditions": [
+    "Exact Form 25 filing/effective date for TA common stock delisting from Nasdaq (distinct from the separately announced senior notes delisting) was referenced in secondary sources but not confirmed via a primary SEC Form 25 filing or Nasdaq notice directly.",
+    "Confirmation of Form 15 filing date to deregister TA common stock under Exchange Act Section 12(g) not independently verified via SEC EDGAR filing index."
+  ]
+}

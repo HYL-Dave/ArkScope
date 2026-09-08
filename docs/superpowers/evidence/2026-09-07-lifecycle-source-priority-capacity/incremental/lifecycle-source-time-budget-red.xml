@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.813" timestamp="2026-09-07T13:46:36.009074+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_preflight" name="test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation" time="0.281"><failure message="assert 45 == 180">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7807/test_source_capacity_is_separa0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x73240ff88d30&gt;
+
+    def test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation(tmp_path, monkeypatch):
+        c = context(tmp_path)
+        service, _, _ = setup(c)
+        monkeypatch.setattr(service, "_public_input", lambda *args, **kwargs: public_input())
+        packet = service.prepare(c["case_id"], question="listing_status")
+        values = service.validate_start(c["case_id"], question="listing_status", preflight_sha256=packet["preflight_sha256"])
+        assert values["options"].max_source_bytes == packet["limits"]["max_source_bytes"] == 32 * 1024 * 1024
+        assert values["options"].max_decoded_source_bytes == packet["limits"]["max_decoded_source_bytes"] == 128 * 1024 * 1024
+&gt;       assert values["options"].source_timeout_seconds == packet["limits"]["source_timeout_seconds"] == 180
+E       assert 45 == 180
+
+tests/test_lifecycle_web_preflight.py:65: AssertionError</failure></testcase></testsuite></testsuites>

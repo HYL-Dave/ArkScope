@@ -1,0 +1,747 @@
+{
+  "backend": {
+    "errors": [],
+    "failed": [],
+    "passed": 7114,
+    "skipped": 12,
+    "tests": 7126
+  },
+  "browser": {
+    "provider_calls": 0,
+    "scenarios": 6,
+    "screenshots": 96
+  },
+  "build": {
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "cwd": "/tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web",
+    "log_sha256": "01ecd05985c846217551b916b3fb67b5127ac029f46f60e4cee83ef271e70587",
+    "returncode": 0,
+    "source_manifest_sha256": "1e9a99b307d23bc524dec098e08db4b539173f336ddbee185bc8dfd9c88563d0"
+  },
+  "frontend": {
+    "errors": [],
+    "failed": [],
+    "passed": 1633,
+    "skipped": 0,
+    "tests": 1633
+  },
+  "historical_mutations": [
+    {
+      "failed_baselines": [],
+      "final_acceptance": false,
+      "name": "surviving-provider-guard",
+      "recorded_mutants": 2,
+      "surviving_mutants": [
+        "provider_preview_attempts_auto_approval"
+      ]
+    },
+    {
+      "failed_baselines": [],
+      "final_acceptance": false,
+      "name": "reverse-ui-interruption",
+      "recorded_mutants": 4,
+      "surviving_mutants": []
+    },
+    {
+      "failed_baselines": [
+        "backend-baseline"
+      ],
+      "final_acceptance": false,
+      "name": "fixture-baseline",
+      "recorded_mutants": 0,
+      "surviving_mutants": []
+    },
+    {
+      "failed_baselines": [],
+      "final_acceptance": false,
+      "name": "definition-interruption",
+      "recorded_mutants": 10,
+      "surviving_mutants": []
+    },
+    {
+      "failed_baselines": [
+        "frontend-restored"
+      ],
+      "final_acceptance": false,
+      "name": "restoration-timeout",
+      "recorded_mutants": 31,
+      "surviving_mutants": []
+    },
+    {
+      "failed_baselines": [
+        "frontend-baseline"
+      ],
+      "final_acceptance": false,
+      "name": "scanner-contention",
+      "recorded_mutants": 24,
+      "surviving_mutants": []
+    }
+  ],
+  "historical_tests": [
+    {
+      "errors": [],
+      "failed": [],
+      "final_acceptance": false,
+      "name": "restored-r2-green",
+      "passed": 1633,
+      "report_sha256": "791e96f71ded8792c376952e4fcd8b88b6c95ecee947d6159e959561a783270b",
+      "skipped": 0,
+      "tests": 1633
+    },
+    {
+      "errors": [],
+      "failed": [
+        "src/settings/dataScheduleControls.test.tsx::Data schedule controls shares one schedule read across visible consumers"
+      ],
+      "final_acceptance": false,
+      "name": "restored-r3-timeout",
+      "passed": 1632,
+      "report_sha256": "abe9a06d23913e875a9a22804c98b5d3e5ce6fcc6da4ab0011a5f4f3179aa3b2",
+      "skipped": 0,
+      "tests": 1633
+    },
+    {
+      "errors": [],
+      "failed": [],
+      "final_acceptance": false,
+      "name": "module-probe-pass-r1",
+      "passed": 1633,
+      "report_sha256": "b05e4b69ec59499346cd3d4e1b119d2faa8683dd87738260938a6b5d1a2fe0a8",
+      "skipped": 0,
+      "tests": 1633
+    },
+    {
+      "errors": [],
+      "failed": [],
+      "final_acceptance": false,
+      "name": "module-probe-pass-r2",
+      "passed": 1633,
+      "report_sha256": "814f297c03fcbeeb897520714e47d0c25e739323be6172c8ad3e15795bdd0eb4",
+      "skipped": 0,
+      "tests": 1633
+    },
+    {
+      "errors": [],
+      "failed": [
+        "src/i18n/visibleLiteralScanner.test.ts::visible literal scanner requires empty debt global src scope and exact allowlist arithmetic"
+      ],
+      "final_acceptance": false,
+      "name": "parallel-scanner-timeout",
+      "passed": 1632,
+      "report_sha256": "08f33f83d51dc6bb6f49e8b3913a472fb89597b00f70098c9b1333b0ffddd441",
+      "skipped": 0,
+      "tests": 1633
+    },
+    {
+      "errors": [],
+      "failed": [],
+      "final_acceptance": false,
+      "name": "schedule-static-import",
+      "passed": 8,
+      "report_sha256": "a30557f1afd5a8a6644563a893e87b29a3eb65435b6c2d230d194baf437e4e04",
+      "skipped": 0,
+      "tests": 8
+    },
+    {
+      "errors": [],
+      "failed": [],
+      "final_acceptance": false,
+      "name": "scanner-single-worker",
+      "passed": 18,
+      "report_sha256": "ad86b0c1357b520b5c9178e0813630d9e412d795b653992e60dd05eabecc2cb0",
+      "skipped": 0,
+      "tests": 18
+    }
+  ],
+  "kind": "lifecycle_investigation_completion",
+  "live": [
+    {
+      "action": null,
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "ta-budget-r1",
+      "sdk_submissions": 24,
+      "source_manifest_present": false,
+      "stats": {
+        "elapsed_seconds": 538.203,
+        "http_requests": 7,
+        "input_tokens": 953707,
+        "local_queries": 1,
+        "model_submissions": 24,
+        "output_tokens": 46858,
+        "retained_source_bytes": 29616,
+        "source_reads": 7,
+        "sources": 4,
+        "web_actions": 8
+      },
+      "status": "incomplete",
+      "stop_reason": "investigation_budget_exhausted"
+    },
+    {
+      "action": null,
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "ta-budget-r2",
+      "sdk_submissions": 24,
+      "source_manifest_present": false,
+      "stats": {
+        "elapsed_seconds": 657.083,
+        "http_requests": 3,
+        "input_tokens": 301824,
+        "local_queries": 1,
+        "model_submissions": 24,
+        "output_tokens": 62333,
+        "retained_source_bytes": 20541,
+        "source_reads": 3,
+        "sources": 2,
+        "web_actions": 6
+      },
+      "status": "incomplete",
+      "stop_reason": "investigation_budget_exhausted"
+    },
+    {
+      "action": null,
+      "failure_code": "provider_rate_limited",
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "ta-quota-r3",
+      "sdk_submissions": 19,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 438.757,
+        "http_requests": 2,
+        "input_tokens": null,
+        "local_queries": 1,
+        "model_submissions": 19,
+        "output_tokens": null,
+        "retained_source_bytes": 14509,
+        "source_reads": 2,
+        "sources": 1,
+        "web_actions": 10
+      },
+      "status": "failed",
+      "stop_reason": "provider_rate_limited"
+    },
+    {
+      "action": null,
+      "failure_code": "provider_rate_limited",
+      "final_acceptance": false,
+      "model": "claude-opus-5",
+      "name": "ta-opus-quota-r1",
+      "sdk_submissions": 1,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 1.959,
+        "http_requests": 0,
+        "input_tokens": null,
+        "local_queries": 1,
+        "model_submissions": 1,
+        "output_tokens": null,
+        "retained_source_bytes": 0,
+        "source_reads": 0,
+        "sources": 0,
+        "web_actions": 0
+      },
+      "status": "failed",
+      "stop_reason": "provider_rate_limited"
+    },
+    {
+      "action": null,
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "local-host-no-progress",
+      "sdk_submissions": 7,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 84.227,
+        "http_requests": 0,
+        "input_tokens": 80818,
+        "local_queries": 1,
+        "model_submissions": 7,
+        "output_tokens": 8710,
+        "retained_source_bytes": 16023,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 4
+      },
+      "status": "incomplete",
+      "stop_reason": "investigation_no_progress"
+    },
+    {
+      "action": "terminal_delisting",
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "local-prefinal-r2",
+      "sdk_submissions": 3,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 48.559,
+        "http_requests": 0,
+        "input_tokens": 45680,
+        "local_queries": 1,
+        "model_submissions": 3,
+        "output_tokens": 4827,
+        "retained_source_bytes": 16023,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 0
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": "terminal_delisting",
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "web-prefinal-r1",
+      "sdk_submissions": 7,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 136.607,
+        "http_requests": 1,
+        "input_tokens": 127273,
+        "local_queries": 1,
+        "model_submissions": 7,
+        "output_tokens": 12734,
+        "retained_source_bytes": 14509,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 2
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": null,
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "active-prefinal-r1",
+      "sdk_submissions": 16,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 293.948,
+        "http_requests": 4,
+        "input_tokens": 226112,
+        "local_queries": 2,
+        "model_submissions": 16,
+        "output_tokens": 27634,
+        "retained_source_bytes": 764534,
+        "source_reads": 4,
+        "sources": 3,
+        "web_actions": 6
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": "terminal_delisting",
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "local-predefinition-r3",
+      "sdk_submissions": 3,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 52.213,
+        "http_requests": 0,
+        "input_tokens": 47420,
+        "local_queries": 1,
+        "model_submissions": 3,
+        "output_tokens": 4726,
+        "retained_source_bytes": 16023,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 0
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": "terminal_delisting",
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "web-predefinition-r2",
+      "sdk_submissions": 14,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 367.307,
+        "http_requests": 5,
+        "input_tokens": 360794,
+        "local_queries": 1,
+        "model_submissions": 14,
+        "output_tokens": 34377,
+        "retained_source_bytes": 46669,
+        "source_reads": 5,
+        "sources": 4,
+        "web_actions": 4
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": null,
+      "failure_code": null,
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "active-predefinition-r2",
+      "sdk_submissions": 15,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 240.67,
+        "http_requests": 5,
+        "input_tokens": 226516,
+        "local_queries": 2,
+        "model_submissions": 15,
+        "output_tokens": 21817,
+        "retained_source_bytes": 765041,
+        "source_reads": 4,
+        "sources": 3,
+        "web_actions": 4
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": "terminal_delisting",
+      "failure_code": null,
+      "final_acceptance": true,
+      "model": "claude-sonnet-5",
+      "name": "local-ta",
+      "sdk_submissions": 1,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 13.434,
+        "http_requests": 0,
+        "input_tokens": 14989,
+        "local_queries": 1,
+        "model_submissions": 1,
+        "output_tokens": 1098,
+        "retained_source_bytes": 16023,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 0
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": null,
+      "failure_code": null,
+      "final_acceptance": true,
+      "model": "claude-sonnet-5",
+      "name": "active-smci",
+      "sdk_submissions": 7,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 80.113,
+        "http_requests": 2,
+        "input_tokens": 67336,
+        "local_queries": 2,
+        "model_submissions": 7,
+        "output_tokens": 6929,
+        "retained_source_bytes": 752832,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 2
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    },
+    {
+      "action": null,
+      "failure_code": "provider_rate_limited",
+      "final_acceptance": false,
+      "model": "claude-sonnet-5",
+      "name": "web-quota-r3",
+      "sdk_submissions": 16,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 473.243,
+        "http_requests": 7,
+        "input_tokens": null,
+        "local_queries": 1,
+        "model_submissions": 16,
+        "output_tokens": null,
+        "retained_source_bytes": 37457,
+        "source_reads": 7,
+        "sources": 4,
+        "web_actions": 4
+      },
+      "status": "failed",
+      "stop_reason": "provider_rate_limited"
+    },
+    {
+      "action": "terminal_delisting",
+      "failure_code": null,
+      "final_acceptance": true,
+      "model": "claude-opus-5",
+      "name": "web-ta",
+      "sdk_submissions": 4,
+      "source_manifest_present": true,
+      "stats": {
+        "elapsed_seconds": 131.333,
+        "http_requests": 1,
+        "input_tokens": 95195,
+        "local_queries": 1,
+        "model_submissions": 4,
+        "output_tokens": 12151,
+        "retained_source_bytes": 16023,
+        "source_reads": 1,
+        "sources": 1,
+        "web_actions": 5
+      },
+      "status": "succeeded",
+      "stop_reason": null
+    }
+  ],
+  "merged": false,
+  "mutations": {
+    "backend_focus": 2675,
+    "expected_mutation_setup_errors": {
+      "valid_security_definition_ignored": [
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]",
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]",
+        "tests.test_lifecycle_investigation_routes::test_pending_confirmed_actions_remain_visible_without_the_legacy_queue",
+        "tests.test_lifecycle_investigation_routes::test_provider_preparation_api_is_bound_to_the_selected_snapshot_without_dispatch",
+        "tests.test_lifecycle_investigation_routes::test_runtime_routes_roundtrip_unknown_fields_reject_and_reset",
+        "tests.test_lifecycle_investigation_routes::test_saved_provider_observations_are_dated_readonly_and_refresh_is_target_scoped",
+        "tests.test_lifecycle_investigation_routes::test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+        "tests.test_lifecycle_investigation_routes::test_unknown_failures_are_closed_and_contain_no_private_data"
+      ]
+    },
+    "frontend_focus": 1633,
+    "named_mutants": 31,
+    "post_test_documentation_changes": {
+      "docs/design/PROJECT_PRIORITY_MAP.md": {
+        "reported": "32ec3fe99d13ed2b905754681205bf277264e3fe32735d92e52f62d8894e41ad",
+        "tested": "dbddfe32e3c55a92aba5ed04fb1b2a5617572aeee4119a11044d14c277c8aa13"
+      },
+      "docs/superpowers/evidence/2026-09-08-lifecycle-investigation/scripts/review_packet.py": {
+        "reported": "c0eb4b0255300b180e7940d5c5083efb0dcf66f1dbb2788fff05701d456a94d1",
+        "tested": "c5c5c5cbc7a370f50c24fbed04f3b68486dc47af4b2678ed3e1e782b2e0e3aef"
+      },
+      "docs/superpowers/plans/2026-09-08-lifecycle-investigation-completion.md": {
+        "reported": "39793ca6942c2c23a819990088486e91c954b566c8371a5dc7394c40fa3a30cb",
+        "tested": "709e7f35cbc1a92ca149e621833e02cef3f4090976771efa6da5aac2cf38c06f"
+      }
+    },
+    "verified_restored_workspaces": 25
+  },
+  "prior": {
+    "files": 205,
+    "path": "docs/superpowers/evidence/2026-09-07-lifecycle-independent-task",
+    "seal_sha256": "2806a7cab50e1bd021e84b254944f13ca2030fb8eeb99d9bb6769ac0e8dbd16d"
+  },
+  "producer_check": {
+    "checks": {
+      "different_mutation_rejected": true,
+      "expected_nine_setup_assertions": true,
+      "missing_direct_owner_rejected": true,
+      "missing_setup_error_rejected": true,
+      "unexpected_node_rejected": true,
+      "wrong_assertion_rejected": true,
+      "wrong_exception_rejected": true,
+      "wrong_fixture_rejected": true
+    },
+    "producer_sha256": "c0eb4b0255300b180e7940d5c5083efb0dcf66f1dbb2788fff05701d456a94d1"
+  },
+  "production_app_restarted": false,
+  "production_mutations": false,
+  "pushed": false,
+  "red_regressions": [
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_provider::test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate",
+        "tests.test_lifecycle_investigation_provider::test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[active]",
+        "tests.test_lifecycle_investigation_provider::test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[unavailable]",
+        "tests.test_lifecycle_investigation_provider::test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[changed_digest]",
+        "tests.test_lifecycle_investigation_provider::test_provider_preparation_refuses_unproven_or_changed_evidence_without_tracking_writes[permission]"
+      ],
+      "name": "provider-no-approval",
+      "passed": 0,
+      "skipped": 0,
+      "tests": 5
+    },
+    {
+      "disproved_hypothesis": true,
+      "errors": [],
+      "failed": [],
+      "name": "disproved-row-probe",
+      "passed": 7,
+      "skipped": 0,
+      "tests": 7
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]",
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]"
+      ],
+      "name": "reverse-readiness-backend",
+      "passed": 0,
+      "skipped": 0,
+      "tests": 3
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "src/lifecycle/InvestigationView.test.tsx::confirms reversal separately and refreshes the tracked targets without launching an investigation"
+      ],
+      "name": "reverse-command-frontend",
+      "passed": 7,
+      "skipped": 0,
+      "tests": 8
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "src/lifecycle/InvestigationView.test.tsx::confirms reversal separately and refreshes the tracked targets without launching an investigation",
+        "src/lifecycle/InvestigationView.test.tsx::refreshes a reversal refused after a concurrent edit instead of leaving the stale action enabled"
+      ],
+      "name": "reverse-refresh-frontend",
+      "passed": 7,
+      "skipped": 0,
+      "tests": 9
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_routes::test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+        "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]"
+      ],
+      "name": "adopted-backend",
+      "passed": 1,
+      "skipped": 0,
+      "tests": 4
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "src/lifecycle/InvestigationView.test.tsx::keeps a removed target readable without offering another provider removal"
+      ],
+      "name": "adopted-frontend",
+      "passed": 9,
+      "skipped": 0,
+      "tests": 10
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_agent::test_action_schema_accepts_meaningful_read_queries_and_search_date_hints[read_url-arguments0]",
+        "tests.test_lifecycle_investigation_agent::test_action_schema_accepts_meaningful_read_queries_and_search_date_hints[search_web-arguments1]",
+        "tests.test_lifecycle_investigation_agent::test_action_date_hints_and_irrelevant_arguments_remain_validated[arguments0-action_date_invalid]",
+        "tests.test_lifecycle_investigation_agent::test_action_date_hints_and_irrelevant_arguments_remain_validated[arguments1-action_date_invalid]",
+        "tests.test_lifecycle_investigation_agent::test_action_date_hints_and_irrelevant_arguments_remain_validated[arguments2-action_date_range_invalid]",
+        "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+        "tests.test_lifecycle_investigation_findings::test_small_fragmented_notice_initial_context_preserves_complete_document"
+      ],
+      "name": "source-action-host",
+      "passed": 26,
+      "skipped": 0,
+      "tests": 33
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_agent::test_malformed_action_shape_has_safe_field_feedback"
+      ],
+      "name": "action-shape",
+      "passed": 0,
+      "skipped": 0,
+      "tests": 1
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_agent::test_grounding_feedback_preserves_candidate_for_targeted_correction"
+      ],
+      "name": "correction-context",
+      "passed": 0,
+      "skipped": 0,
+      "tests": 1
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "src/lifecycle/InvestigationView.test.tsx::shows the localized action instead of internal assessment prose in confirmation"
+      ],
+      "name": "review-copy",
+      "passed": 10,
+      "skipped": 0,
+      "tests": 11
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-Common Stock, $0.001 par value per share-common stock]",
+        "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-common shares (par value $0.001 per share)-common stock]",
+        "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-Class A common stock, $0.001 par value per share-Class A common stock]",
+        "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-Common Stock, $0.001 par value per share-common stock]",
+        "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-common shares (par value $0.001 per share)-common stock]",
+        "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-Class A common stock, $0.001 par value per share-Class A common stock]",
+        "tests.test_lifecycle_investigation_agent::test_requested_language_is_explicit_before_source_material[en-English]",
+        "tests.test_lifecycle_investigation_agent::test_requested_language_is_explicit_before_source_material[zh-Hant-Traditional Chinese (zh-Hant)]"
+      ],
+      "name": "nominal-value",
+      "passed": 41,
+      "skipped": 0,
+      "tests": 49
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc (the \"Company\") has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock trades on NASDAQ (the \"Exchange\").-senior notes on the Exchange-common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the \"Securities\").-Securities-common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc (the \"Company\") has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock trades on NASDAQ (the \"Exchange\").-senior notes on the Exchange-common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the \"Securities\").-Securities-common stock-False]",
+        "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]"
+      ],
+      "name": "security-definition",
+      "passed": 39,
+      "skipped": 0,
+      "tests": 47
+    },
+    {
+      "disproved_hypothesis": false,
+      "errors": [],
+      "failed": [
+        "src/settings/dataScheduleControls.test.tsx::Data schedule controls shares one schedule read across visible consumers"
+      ],
+      "name": "schedule-cold-import",
+      "passed": 1632,
+      "skipped": 0,
+      "tests": 1633
+    }
+  ],
+  "total_sdk_submissions": 161
+}

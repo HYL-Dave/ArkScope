@@ -1,0 +1,42 @@
+{
+  "observed_at": "2026-09-05T17:03:42+00:00",
+  "source": "actual_post_disposition_universe",
+  "universe_count": 183,
+  "partial_days": [
+    {
+      "date": "2026-06-26",
+      "session_kind": "regular",
+      "expected_slot_count": 26,
+      "partial_ticker_count": 147,
+      "unmatched_rth_row_count": 0,
+      "observed_slot_counts": {
+        "3": 146,
+        "19": 1
+      }
+    },
+    {
+      "date": "2026-06-25",
+      "session_kind": "regular",
+      "expected_slot_count": 26,
+      "partial_ticker_count": 146,
+      "unmatched_rth_row_count": 0,
+      "observed_slot_counts": {
+        "5": 146
+      }
+    },
+    {
+      "date": "2026-06-05",
+      "session_kind": "regular",
+      "expected_slot_count": 26,
+      "partial_ticker_count": 145,
+      "unmatched_rth_row_count": 0,
+      "observed_slot_counts": {
+        "6": 143,
+        "7": 2
+      }
+    }
+  ],
+  "not_a_root_cause_or_provider_unavailability_inference": true,
+  "provider_requests": 0,
+  "price_writes": 0
+}

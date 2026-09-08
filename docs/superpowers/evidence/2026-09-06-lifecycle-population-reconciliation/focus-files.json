@@ -1,0 +1,25 @@
+{
+  "files": [
+    "tests/test_active_universe.py",
+    "tests/test_lifecycle_tracking_and_price_repair_routes.py",
+    "tests/test_sa_tracking_memberships.py",
+    "tests/test_security_lifecycle.py",
+    "tests/test_security_lifecycle_disposition.py",
+    "tests/test_security_lifecycle_fact_kernel.py",
+    "tests/test_security_lifecycle_investigation.py",
+    "tests/test_security_lifecycle_listing_evidence.py",
+    "tests/test_security_lifecycle_population.py",
+    "tests/test_security_lifecycle_provider_authority.py",
+    "tests/test_security_lifecycle_provider_snapshot.py",
+    "tests/test_security_lifecycle_provider_store.py",
+    "tests/test_security_lifecycle_routes.py",
+    "tests/test_security_lifecycle_schema.py",
+    "tests/test_security_lifecycle_sec_admission.py",
+    "tests/test_security_lifecycle_terminal_workflow.py",
+    "tests/test_security_lifecycle_tools.py",
+    "tests/test_security_lifecycle_tracking_policy.py",
+    "tests/test_ticker_identity_routes.py",
+    "tests/test_ticker_identity_schema.py",
+    "tests/test_ticker_identity_transition.py"
+  ]
+}

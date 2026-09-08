@@ -1,0 +1,122 @@
+{
+  "lifecycle-attended-maximum-green-r1": {
+    "action": "terminal_delisting",
+    "active_tickers": [
+      "LIVE"
+    ],
+    "child_ru_maxrss_bytes": 1908039680,
+    "confirmation_elapsed_seconds": 20.653,
+    "decoded_source_bytes": 134217728,
+    "human_write_transactions_seconds": [
+      0.698,
+      0.379
+    ],
+    "max_heartbeat_seconds": 1.347,
+    "max_poll_seconds": 12.423,
+    "passed": true,
+    "scope": "historical_not_current_source_admission",
+    "source_counts": [
+      4,
+      4
+    ],
+    "statuses": [
+      [
+        "succeeded",
+        null
+      ],
+      [
+        "succeeded",
+        null
+      ]
+    ],
+    "supervisor": {
+      "elapsed_seconds": 148.746,
+      "exit_code": 0,
+      "failure": null,
+      "rss_guard_bytes": 4294967296,
+      "runner_sha256": "356d15c9440123c7b6556f7889a82c458fbdbd5e275c37489709014f7e7d5586",
+      "sampled_peak_rss_bytes": 1888817152,
+      "source_unchanged": true
+    }
+  },
+  "lifecycle-attended-maximum-red-r1": {
+    "action": "terminal_delisting",
+    "active_tickers": [
+      "LIVE"
+    ],
+    "child_ru_maxrss_bytes": 1905868800,
+    "confirmation_elapsed_seconds": 73.992,
+    "decoded_source_bytes": 134217728,
+    "human_write_transactions_seconds": [
+      43.071,
+      30.865
+    ],
+    "max_heartbeat_seconds": 45.526,
+    "max_poll_seconds": 0.494,
+    "passed": false,
+    "scope": "historical_not_current_source_admission",
+    "source_counts": [
+      4,
+      0
+    ],
+    "statuses": [
+      [
+        "succeeded",
+        null
+      ],
+      [
+        "reading_sources",
+        null
+      ]
+    ],
+    "supervisor": {
+      "elapsed_seconds": 138.344,
+      "exit_code": 1,
+      "failure": null,
+      "rss_guard_bytes": 4294967296,
+      "runner_sha256": "356d15c9440123c7b6556f7889a82c458fbdbd5e275c37489709014f7e7d5586",
+      "sampled_peak_rss_bytes": 1905016832,
+      "source_unchanged": true
+    }
+  },
+  "lifecycle-attended-small-r1": {
+    "action": "terminal_delisting",
+    "active_tickers": [
+      "LIVE"
+    ],
+    "child_ru_maxrss_bytes": 115085312,
+    "confirmation_elapsed_seconds": 0.66,
+    "decoded_source_bytes": 1048576,
+    "human_write_transactions_seconds": [
+      0.377,
+      0.272
+    ],
+    "max_heartbeat_seconds": 0.002,
+    "max_poll_seconds": 0.116,
+    "passed": true,
+    "scope": "historical_not_current_source_admission",
+    "source_counts": [
+      4,
+      4
+    ],
+    "statuses": [
+      [
+        "succeeded",
+        null
+      ],
+      [
+        "succeeded",
+        null
+      ]
+    ],
+    "supervisor": {
+      "elapsed_seconds": 3.716,
+      "exit_code": 0,
+      "failure": null,
+      "rss_guard_bytes": 4294967296,
+      "runner_sha256": "356d15c9440123c7b6556f7889a82c458fbdbd5e275c37489709014f7e7d5586",
+      "sampled_peak_rss_bytes": 118890496,
+      "source_unchanged": true
+    }
+  }
+}

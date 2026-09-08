@@ -1,0 +1,60 @@
+{
+  "document_links": [
+    "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+  ],
+  "harness_sha256": "c113185e6f4b55a3b36fb1bb4244578be78bd0c988c18431bf0fde2bb43e0075",
+  "no_login_or_paywall_bypass": true,
+  "observations": [
+    {
+      "content_encoding": "gzip",
+      "declared_body_bytes": 3316,
+      "decoded_body_bytes": 11195,
+      "framing": "content_length",
+      "received_body_bytes": 3316,
+      "request_index": 1,
+      "result_code": "complete",
+      "status": 200
+    },
+    {
+      "content_encoding": "gzip",
+      "declared_body_bytes": 9529,
+      "decoded_body_bytes": 64749,
+      "framing": "content_length",
+      "received_body_bytes": 9529,
+      "request_index": 2,
+      "result_code": "complete",
+      "status": 200
+    }
+  ],
+  "prior_receipt_sha256": "0e2884d1d854582758e82adb93bf9f0746e9fb4327e42bfa46792ae2e5860a6f",
+  "prior_source_http_attempts": 7,
+  "production_writes": false,
+  "purpose": "Inspect the publicly linked 8-K body after the prior original link resolved only to filing metadata",
+  "reads": [
+    {
+      "body_sha256": "ab0414e3988d2b1b710631c0ac3d38fdfdd9de868dd991bef01bf08c95cb8440",
+      "capture_sha256": "a1c5b4976e7908fe649edf7960b7225e3a1969c6c9ceb2696fc1ea5285333947",
+      "text_characters": 2013,
+      "text_sha256": "2f3a3218f6ee48a5aa84212947bb1f2f74685877b691f17a735a57f6bf8317cc",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/0001104659-23-060301-index.htm"
+    },
+    {
+      "body_sha256": "37185e6954a01a9bfb4a4943bb51e98515536b9027b1d971aa5ff91173982998",
+      "capture_sha256": "9b57f6eb8db2b974deca3efb38dad2faaeffa90fea299089f02e15418f4dc47e",
+      "text_characters": 15873,
+      "text_sha256": "7340ff9e481a6b37f4e3de516a7cc20ea004fecb9d110fcd6cef403fb6133437",
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    }
+  ],
+  "sdk_submissions": 0,
+  "source_checkpoint": {
+    "manifest_sha256": "5ec0d8b7852c102d5765ab8575c6c38d35287d38caef62be96444b503927e76e",
+    "matched_files": 1113,
+    "seal_sha256": "05a81e10133bbd66fe14b42fed636d4b2cd6f629cef4c379dda43000ce7d7781"
+  },
+  "source_http_attempts": 2,
+  "source_http_campaign_remaining": 15,
+  "source_http_campaign_used": 9,
+  "source_http_limit": 24,
+  "status": "captured_primary_document"
+}

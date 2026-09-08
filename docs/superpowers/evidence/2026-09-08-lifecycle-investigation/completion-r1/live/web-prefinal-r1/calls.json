@@ -1,0 +1,37 @@
+[
+  {
+    "call_id": "step-1",
+    "remote_id": "d91d4217-85e6-493b-97e1-159c3e0469e1",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-2",
+    "remote_id": "f99f79e6-f964-4901-83e3-8f4ddd918723",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-3",
+    "remote_id": "910a0d46-b6b9-4b51-a526-b72c952e6458",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-4",
+    "remote_id": "b5b8be35-e3d8-4622-8251-4db1fb717116",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-5",
+    "remote_id": "7153f29e-dec1-4eb3-8a6d-1194c48fd0ae",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-6",
+    "remote_id": "47f577b4-c554-4116-8c6f-413e24debb34",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-7",
+    "remote_id": "1c382055-59a0-4754-bfd7-6d609ec373b1",
+    "terminal": "completed"
+  }
+]

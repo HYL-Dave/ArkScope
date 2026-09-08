@@ -1,0 +1,24 @@
+{
+  "correspondence": {
+    "case_count": 39,
+    "case_identity_sha256": "920ff70d71d105473c2ca71bef36991871407644635cd0c252242ac0bb485ebb",
+    "case_sources": {
+      "listing_authority": 3,
+      "sec_edgar": 36
+    },
+    "case_without_observation_count": 0,
+    "expected_identity_sha256": "920ff70d71d105473c2ca71bef36991871407644635cd0c252242ac0bb485ebb",
+    "expected_provider_observation_count": 3,
+    "expected_provider_without_case_count": 0,
+    "market_identity_sha256": "874c269651b5e1df59ba42ba23ece872780883419eeb96832674674cb968b55c",
+    "market_observation_count": 36,
+    "market_only_count": 0,
+    "provider_case_count": 3
+  },
+  "differences": [
+    "observed_at"
+  ],
+  "observed_after": "2026-09-07T00:41:42.303918+00:00",
+  "observed_before": "2026-09-07T00:27:08.113271+00:00",
+  "scope": "authorized_metadata_only_not_full_database_byte_equality"
+}

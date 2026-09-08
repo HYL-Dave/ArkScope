@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="6" time="0.282" timestamp="2026-09-06T23:06:54.901597+08:00" hostname="ais"><testcase classname="tests.test_codex_web_runtime" name="test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_search-live]" time="0.136"><failure message="TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7742/test_only_explicit_web_runtime0')
+purpose = 'lifecycle_web_search', web = 'live'
+
+    @pytest.mark.parametrize("purpose,web", [("lifecycle_web_search", "live"), ("lifecycle_web_analysis", "disabled")])
+    def test_only_explicit_web_runtime_purposes_change_codex_command(tmp_path, purpose, web):
+        from src.auth_drivers.codex_app_server_runtime import run_authenticated_codex_operation
+    
+        executable, transcript, pid_path = _write_codex_fixture(tmp_path)
+&gt;       run_authenticated_codex_operation(
+            record=_token_record(), client_name="web-runtime-test", timeout_seconds=3, executable=executable,
+            purpose=purpose, allowed_notifications=frozenset(),
+            operation=lambda session, context: session.request(4, "model/list", {"cursor": None, "limit": 1}),
+        )
+E       TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'
+
+tests/test_codex_web_runtime.py:22: TypeError</failure></testcase><testcase classname="tests.test_codex_web_runtime" name="test_only_explicit_web_runtime_purposes_change_codex_command[lifecycle_web_analysis-disabled]" time="0.002"><failure message="TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7742/test_only_explicit_web_runtime1')
+purpose = 'lifecycle_web_analysis', web = 'disabled'
+
+    @pytest.mark.parametrize("purpose,web", [("lifecycle_web_search", "live"), ("lifecycle_web_analysis", "disabled")])
+    def test_only_explicit_web_runtime_purposes_change_codex_command(tmp_path, purpose, web):
+        from src.auth_drivers.codex_app_server_runtime import run_authenticated_codex_operation
+    
+        executable, transcript, pid_path = _write_codex_fixture(tmp_path)
+&gt;       run_authenticated_codex_operation(
+            record=_token_record(), client_name="web-runtime-test", timeout_seconds=3, executable=executable,
+            purpose=purpose, allowed_notifications=frozenset(),
+            operation=lambda session, context: session.request(4, "model/list", {"cursor": None, "limit": 1}),
+        )
+E       TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'
+
+tests/test_codex_web_runtime.py:22: TypeError</failure></testcase><testcase classname="tests.test_codex_web_runtime" name="test_codex_unknown_purpose_fails_before_starting_binary" time="0.002"><failure message="TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7742/test_codex_unknown_purpose_fai0')
+
+    def test_codex_unknown_purpose_fails_before_starting_binary(tmp_path):
+        from src.auth_drivers.codex_app_server_runtime import run_authenticated_codex_operation
+    
+        executable, _, pid_path = _write_codex_fixture(tmp_path)
+        with pytest.raises(ValueError, match="codex_purpose_unsupported"):
+&gt;           run_authenticated_codex_operation(
+                record=_token_record(), client_name="web-runtime-test", timeout_seconds=3, executable=executable,
+                purpose="unrestricted", allowed_notifications=frozenset(), operation=lambda session, context: None,
+            )
+E           TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'
+
+tests/test_codex_web_runtime.py:40: TypeError</failure></testcase><testcase classname="tests.test_codex_web_runtime" name="test_codex_poll_checks_stop_while_peer_is_silent_and_reaps_process" time="0.002"><failure message="TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7742/test_codex_poll_checks_stop_wh0')
+
+    def test_codex_poll_checks_stop_while_peer_is_silent_and_reaps_process(tmp_path):
+        from src.auth_drivers.codex_app_server_runtime import run_authenticated_codex_operation
+    
+        executable, _, pid_path = _write_codex_fixture(tmp_path, hang_method="model/list")
+        entered = None
+    
+        class StopRequested(Exception):
+            pass
+    
+        def poll():
+            if entered is not None and time.monotonic() - entered &gt; 0.1:
+                raise StopRequested
+    
+        def operation(session, context):
+            nonlocal entered
+            entered = time.monotonic()
+            return session.request(4, "model/list", {})
+    
+        started = time.monotonic()
+        with pytest.raises(StopRequested):
+&gt;           run_authenticated_codex_operation(
+                record=_token_record(), client_name="web-runtime-test", timeout_seconds=5, executable=executable,
+                purpose="lifecycle_web_search", poll_check=poll, allowed_notifications=frozenset(), operation=operation,
+            )
+E           TypeError: run_authenticated_codex_operation() got an unexpected keyword argument 'purpose'
+
+tests/test_codex_web_runtime.py:67: TypeError</failure></testcase><testcase classname="tests.test_codex_web_runtime" name="test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[search]" time="0.027"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7742/test_codex_web_real_jsonl_tran0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7af1f4201fc0&gt;
+phase = 'search'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child(tmp_path, monkeypatch, phase):
+        from src.auth_drivers import codex_app_server_runtime as runtime
+        from src.auth_drivers.lifecycle_web_codex import call_codex_web
+        from src.auth_drivers.lifecycle_web_models import ModelCall, WebCredential
+        from src.security_lifecycle_web_contract import RunControl, validate_selection
+    
+        executable = tmp_path / "web-peer"
+        fixture = Path(__file__).parent / "fixtures" / "lifecycle_web_codex_process.py"
+        executable.write_text(f"#!{sys.executable}\n" + fixture.read_text())
+        executable.chmod(0o700)
+        monkeypatch.setattr(runtime, "_default_codex_executable", lambda: executable)
+        monkeypatch.setenv("OPENAI_API_KEY", "ambient-key-not-used")
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "ambient-token-not-used")
+        selection = validate_selection("openai", "chatgpt_oauth", "gpt-5.6-luna", "local:7")
+        schema = {"type": "object", "properties": {"sources": {"type": "array", "items": {"type": "string"}}},
+                  "required": ["sources"], "additionalProperties": False}
+        call = ModelCall(selection, "call-1", phase, "Public issuer question", schema, "high", None, 2, 5)
+        control = RunControl(selection=selection, max_model_requests=1)
+&gt;       result = await call_codex_web(call, WebCredential(selection, token_record=_token_record()), control)
+
+tests/test_codex_web_runtime.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_codex.py:255: in call_codex_web
+    return await asyncio.shield(future)
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def run():
+        try:
+            _, result = run_authenticated_codex_operation(
+                record=credential.token_record, client_name="arkscope-lifecycle-web",
+                timeout_seconds=call.timeout_seconds, executable=None, purpose=purpose, poll_check=check_stop,
+                allowed_notifications=_ALLOWED_NOTIFICATIONS, rejected_notifications=_REJECTED_NOTIFICATIONS,
+                max_request_bytes=max(65536, 2 * len(json.dumps({"prompt": call.prompt, "schema": call.output_schema}).encode())),
+                max_stdout_bytes=16 * 1024 * 1024, max_stderr_bytes=256 * 1024,
+                operation=lambda session, context: _run_turn(session, context, call=call, control=control,
+                                                              purpose=purpose, polling=polling),
+            )
+            return result
+        except Exception as exc:
+&gt;           raise _failure(exc) from None
+E           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_codex.py:250: WebModelError</failure></testcase><testcase classname="tests.test_codex_web_runtime" name="test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child[analysis]" time="0.005"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible">tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7742/test_codex_web_real_jsonl_tran1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7af1f40d81f0&gt;
+phase = 'analysis'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_codex_web_real_jsonl_transport_uses_selected_auth_and_closed_child(tmp_path, monkeypatch, phase):
+        from src.auth_drivers import codex_app_server_runtime as runtime
+        from src.auth_drivers.lifecycle_web_codex import call_codex_web
+        from src.auth_drivers.lifecycle_web_models import ModelCall, WebCredential
+        from src.security_lifecycle_web_contract import RunControl, validate_selection
+    
+        executable = tmp_path / "web-peer"
+        fixture = Path(__file__).parent / "fixtures" / "lifecycle_web_codex_process.py"
+        executable.write_text(f"#!{sys.executable}\n" + fixture.read_text())
+        executable.chmod(0o700)
+        monkeypatch.setattr(runtime, "_default_codex_executable", lambda: executable)
+        monkeypatch.setenv("OPENAI_API_KEY", "ambient-key-not-used")
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "ambient-token-not-used")
+        selection = validate_selection("openai", "chatgpt_oauth", "gpt-5.6-luna", "local:7")
+        schema = {"type": "object", "properties": {"sources": {"type": "array", "items": {"type": "string"}}},
+                  "required": ["sources"], "additionalProperties": False}
+        call = ModelCall(selection, "call-1", phase, "Public issuer question", schema, "high", None, 2, 5)
+        control = RunControl(selection=selection, max_model_requests=1)
+&gt;       result = await call_codex_web(call, WebCredential(selection, token_record=_token_record()), control)
+
+tests/test_codex_web_runtime.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_codex.py:255: in call_codex_web
+    return await asyncio.shield(future)
+/usr/lib/python3.10/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def run():
+        try:
+            _, result = run_authenticated_codex_operation(
+                record=credential.token_record, client_name="arkscope-lifecycle-web",
+                timeout_seconds=call.timeout_seconds, executable=None, purpose=purpose, poll_check=check_stop,
+                allowed_notifications=_ALLOWED_NOTIFICATIONS, rejected_notifications=_REJECTED_NOTIFICATIONS,
+                max_request_bytes=max(65536, 2 * len(json.dumps({"prompt": call.prompt, "schema": call.output_schema}).encode())),
+                max_stdout_bytes=16 * 1024 * 1024, max_stderr_bytes=256 * 1024,
+                operation=lambda session, context: _run_turn(session, context, call=call, control=control,
+                                                              purpose=purpose, polling=polling),
+            )
+            return result
+        except Exception as exc:
+&gt;           raise _failure(exc) from None
+E           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_codex.py:250: WebModelError</failure></testcase></testsuite></testsuites>

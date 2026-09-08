@@ -1,0 +1,187 @@
+{
+  "backend": [
+    {
+      "name": "normal_window_regressed_to_five",
+      "edits": [
+        {
+          "path": "src/price_defaults.py",
+          "before": "DEFAULT_PRICE_LOOKBACK_DAYS = 15",
+          "after": "DEFAULT_PRICE_LOOKBACK_DAYS = 5"
+        }
+      ],
+      "owner": "test_default_topup_fills_fifteen_days_without_overwriting_existing_prices"
+    },
+    {
+      "name": "status_opens_writable_journal",
+      "edits": [
+        {
+          "path": "src/price_repair_status.py",
+          "before": "RepairJournal(directory, plan, readonly=True)",
+          "after": "RepairJournal(directory, plan, readonly=False)"
+        }
+      ],
+      "owner": "test_operation_status_is_readonly_and_does_not_project_cached_provider_material"
+    },
+    {
+      "name": "responses_imply_complete_prices",
+      "edits": [
+        {
+          "path": "src/price_repair_status.py",
+          "before": "if not gaps:",
+          "after": "if received == len(plan[\"requests\"]):"
+        }
+      ],
+      "owner": "test_received_empty_history_is_not_completion_or_an_effective_cache_resume"
+    },
+    {
+      "name": "cached_rows_cannot_resume",
+      "edits": [
+        {
+          "path": "src/price_repair_status.py",
+          "before": "return bool(timestamps - stored)",
+          "after": "return False"
+        }
+      ],
+      "owner": "test_cached_but_uncommitted_repair_can_resume_with_zero_new_requests"
+    },
+    {
+      "name": "unknown_dispatch_becomes_unattempted",
+      "edits": [
+        {
+          "path": "src/price_repair_execution.py",
+          "before": "if self.conn.execute(\"SELECT 1 FROM dispatches WHERE request_key=?\", (key,)).fetchone():\n            raise PriceRepairError(\"price_repair_dispatch_unknown\")",
+          "after": "if False:\n            raise PriceRepairError(\"price_repair_dispatch_unknown\")"
+        }
+      ],
+      "owner": "test_unanswered_request_stays_explicit_and_cannot_be_reissued"
+    },
+    {
+      "name": "ignore_removed_target_scope",
+      "edits": [
+        {
+          "path": "src/price_repair_status.py",
+          "before": "if not set(preview[\"tickers\"]).issubset(set(universe)):",
+          "after": "if False:"
+        }
+      ],
+      "owner": "test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations"
+    },
+    {
+      "name": "corrupt_row_breaks_entire_history",
+      "edits": [
+        {
+          "path": "src/price_repair_status.py",
+          "before": "# A corrupt operation must not suppress other operations in the history.\n        return row",
+          "after": "# A corrupt operation must not suppress other operations in the history.\n        raise"
+        }
+      ],
+      "owner": "test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations"
+    },
+    {
+      "name": "resume_ignores_current_eligibility",
+      "edits": [
+        {
+          "path": "src/api/routes/market_data.py",
+          "before": "if not state[\"resume\"][\"available\"]:",
+          "after": "if False:"
+        }
+      ],
+      "owner": "test_resume_rechecks_coverage_and_scope_before_dispatch"
+    },
+    {
+      "name": "readonly_snapshot_can_drift",
+      "edits": [
+        {
+          "path": "src/price_repair_execution.py",
+          "before": "self.conn.execute(\"PRAGMA query_only=ON\")\n                self.conn.execute(\"BEGIN\")",
+          "after": "self.conn.execute(\"PRAGMA query_only=ON\")"
+        }
+      ],
+      "owner": "test_readonly_journal_holds_one_verified_snapshot"
+    }
+  ],
+  "frontend": [
+    {
+      "name": "client_window_regressed_to_ten",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/api.ts",
+          "before": "export const DEFAULT_PRICE_LOOKBACK_DAYS = 15;",
+          "after": "export const DEFAULT_PRICE_LOOKBACK_DAYS = 10;"
+        }
+      ],
+      "owner": "uses fifteen calendar days for a direct coverage read and preserves explicit overrides"
+    },
+    {
+      "name": "worker_success_bypasses_bar_readback",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/settings/PriceCoverageRepair.tsx",
+          "before": "confirmed = operation?.state === \"complete\" ? \"succeeded\" : operation?.state === \"incomplete\" ? \"partial\" : \"unconfirmed\";",
+          "after": "confirmed = \"succeeded\";"
+        }
+      ],
+      "owner": "checks real coverage before accepting a succeeded worker result (incomplete)"
+    },
+    {
+      "name": "resume_click_skips_confirmation",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/settings/PriceRepairHistory.tsx",
+          "before": "onClick={(event) => { trigger.current = event.currentTarget; setSelection(row); }}",
+          "after": "onClick={(event) => { trigger.current = event.currentTarget; setSelection(row); void resumePriceRepair(row.repair_id); }}"
+        }
+      ],
+      "owner": "reloads an unfinished operation and asks before a cache-only resume"
+    },
+    {
+      "name": "status_payload_cast_without_validation",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/api.ts",
+          "before": "export function parsePriceRepairOperations(value: unknown): PriceRepairOperations {\n  const row = coverageRecord(value);",
+          "after": "export function parsePriceRepairOperations(value: unknown): PriceRepairOperations {\n  return value as PriceRepairOperations;\n  const row = coverageRecord(value);"
+        }
+      ],
+      "owner": "projects durable operation facts without passing internal material to the view"
+    },
+    {
+      "name": "activity_failure_retains_running_claim",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/settings/PriceRepairHistory.tsx",
+          "before": "setRunning(null); callbacks.current.onRunningChange(null);",
+          "after": "setRunning(true); callbacks.current.onRunningChange(true);"
+        }
+      ],
+      "owner": "does not leave a stale running claim when collection status cannot be read"
+    },
+    {
+      "name": "completion_limited_to_first_history_page",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/settings/PriceCoverageRepair.tsx",
+          "before": "import { getPriceRepairOperation, getPriceRepairPreview, getSchedule, startPriceRepair, type TradingDayCoverage, type PriceRepairPreview } from \"../api\";",
+          "after": "import { getPriceRepairOperations, getPriceRepairPreview, getSchedule, startPriceRepair, type TradingDayCoverage, type PriceRepairPreview } from \"../api\";"
+        },
+        {
+          "path": "apps/arkscope-web/src/settings/PriceCoverageRepair.tsx",
+          "before": "const operation = await getPriceRepairOperation(activeRepairId);",
+          "after": "const operation = (await getPriceRepairOperations()).operations.find((row) => row.repair_id === activeRepairId);"
+        }
+      ],
+      "owner": "confirms a resumed operation outside the first history page"
+    },
+    {
+      "name": "single_operation_accepts_another_id",
+      "edits": [
+        {
+          "path": "apps/arkscope-web/src/api.ts",
+          "before": "if (result.repair_id !== repairId) throw new Error(\"price_coverage_payload_invalid\");",
+          "after": "if (false) throw new Error(\"price_coverage_payload_invalid\");"
+        }
+      ],
+      "owner": "reads one operation by its exact ID and rejects mismatched or malformed results"
+    }
+  ]
+}

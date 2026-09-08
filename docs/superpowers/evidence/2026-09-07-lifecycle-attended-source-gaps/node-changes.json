@@ -1,0 +1,923 @@
+{
+  "backend": {
+    "added": [
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False]",
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]",
+      "tests.test_lifecycle_web_gaps::test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[1]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[False]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[None]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[true]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change0-material_contradiction]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change2-effective_date_missing]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change3-security_identity_mismatch]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change4-source_passage_missing]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[False]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[True]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures0-urls0]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures1-urls1]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures2-urls2]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures3-urls3]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures4-urls4]",
+      "tests.test_lifecycle_web_gaps::test_legacy_read_gap_is_visible_without_inventing_a_source_url",
+      "tests.test_lifecycle_web_gaps::test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[None]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls1]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls2]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls3]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[True]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[None]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value1]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value2]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value3]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_unread_source_cannot_be_cited_or_replace_all_missing_evidence",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]"
+    ],
+    "after": 6784,
+    "before": 6714,
+    "net_added_count": 70,
+    "replaced": {
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-claude_code_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-chatgpt_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[1]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[2]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]"
+        ],
+        "reason": "expanded_pipeline_owner_to_all_four_auth_combinations"
+      }
+    },
+    "unexplained_removed": []
+  },
+  "baseline": {
+    "added": [
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False]",
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]",
+      "tests.test_lifecycle_web_gaps::test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[1]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[False]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[None]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[true]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change0-material_contradiction]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change2-effective_date_missing]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change3-security_identity_mismatch]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change4-source_passage_missing]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[False]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[True]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures0-urls0]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures1-urls1]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures2-urls2]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures3-urls3]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures4-urls4]",
+      "tests.test_lifecycle_web_gaps::test_legacy_read_gap_is_visible_without_inventing_a_source_url",
+      "tests.test_lifecycle_web_gaps::test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[None]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls1]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls2]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls3]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[True]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[None]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value1]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value2]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value3]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_unread_source_cannot_be_cited_or_replace_all_missing_evidence",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]"
+    ],
+    "after": 2107,
+    "before": 2037,
+    "net_added_count": 70,
+    "replaced": {
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-claude_code_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-chatgpt_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[1]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[2]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]"
+        ],
+        "reason": "expanded_pipeline_owner_to_all_four_auth_combinations"
+      }
+    },
+    "unexplained_removed": []
+  },
+  "frontend": {
+    "added": [
+      "src/lifecycle/LifecycleWebPanel.test.tsx::an unrecognized source reason does not turn a complete finding into a failed investigation (en)",
+      "src/lifecycle/LifecycleWebPanel.test.tsx::an unrecognized source reason does not turn a complete finding into a failed investigation (zh-Hant)",
+      "src/lifecycle/LifecycleWebPanel.test.tsx::does not offer human confirmation when a read gap accompanies a material conflict",
+      "src/lifecycle/LifecycleWebPanel.test.tsx::keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps",
+      "src/lifecycle/LifecycleWebPanel.test.tsx::shows unread references and the reviewed conclusion at the last confirmation (en)",
+      "src/lifecycle/LifecycleWebPanel.test.tsx::shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)",
+      "src/lifecycle/webApi.test.ts::acknowledges only the validated source gaps shown with the confirmed packet",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs preserves the same closed source gap disclosure in result and confirmation",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'URL credentials'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'empty entry'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'internal field'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'javascript URL'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'null reason'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'object instead of list'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'raw error'",
+      "src/lifecycle/webContract.test.ts::Lifecycle Web DTOs rejects malformed gap metadata rather than hiding it: 'string instead of list'"
+    ],
+    "after": 1578,
+    "before": 1562,
+    "net_added_count": 16,
+    "replaced": {},
+    "unexplained_removed": []
+  },
+  "integration": {
+    "added": [
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False]",
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]",
+      "tests.test_lifecycle_web_gaps::test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[1]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[False]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[None]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[true]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change0-material_contradiction]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change2-effective_date_missing]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change3-security_identity_mismatch]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change4-source_passage_missing]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[False]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[True]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures0-urls0]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures1-urls1]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures2-urls2]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures3-urls3]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures4-urls4]",
+      "tests.test_lifecycle_web_gaps::test_legacy_read_gap_is_visible_without_inventing_a_source_url",
+      "tests.test_lifecycle_web_gaps::test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[None]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls1]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls2]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls3]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[True]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[None]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value1]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value2]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value3]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_unread_source_cannot_be_cited_or_replace_all_missing_evidence",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]"
+    ],
+    "after": 2926,
+    "before": 2856,
+    "net_added_count": 70,
+    "replaced": {
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-claude_code_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-chatgpt_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[1]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[2]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]"
+        ],
+        "reason": "expanded_pipeline_owner_to_all_four_auth_combinations"
+      }
+    },
+    "unexplained_removed": []
+  },
+  "restored": {
+    "added": [
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False]",
+      "tests.test_lifecycle_web_gaps::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]",
+      "tests.test_lifecycle_web_gaps::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]",
+      "tests.test_lifecycle_web_gaps::test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[1]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[False]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[None]",
+      "tests.test_lifecycle_web_gaps::test_direct_adoption_requires_literal_gap_acknowledgement[true]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change0-material_contradiction]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change2-effective_date_missing]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change3-security_identity_mismatch]",
+      "tests.test_lifecycle_web_gaps::test_disclosed_read_gap_does_not_override_missing_essential_proof[change4-source_passage_missing]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[False]",
+      "tests.test_lifecycle_web_gaps::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[True]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]",
+      "tests.test_lifecycle_web_gaps::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures0-urls0]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures1-urls1]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures2-urls2]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures3-urls3]",
+      "tests.test_lifecycle_web_gaps::test_gap_metadata_cannot_relabel_read_pages_exceed_source_count_or_export_raw_errors[failures4-urls4]",
+      "tests.test_lifecycle_web_gaps::test_legacy_read_gap_is_visible_without_inventing_a_source_url",
+      "tests.test_lifecycle_web_gaps::test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]",
+      "tests.test_lifecycle_web_gaps::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[None]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls1]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls2]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls3]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5]",
+      "tests.test_lifecycle_web_gaps::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False]",
+      "tests.test_lifecycle_web_gaps::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[True]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[None]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value1]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value2]",
+      "tests.test_lifecycle_web_gaps::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value3]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]",
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]",
+      "tests.test_security_lifecycle_web_finding::test_unread_source_cannot_be_cited_or_replace_all_missing_evidence",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]",
+      "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]"
+    ],
+    "after": 2107,
+    "before": 2037,
+    "net_added_count": 70,
+    "replaced": {
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[anthropic-claude_code_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-anthropic-claude_code_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-api_key]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-api_key]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[openai-chatgpt_oauth]": {
+        "current_owners": [
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[False-openai-chatgpt_oauth]",
+          "tests.test_lifecycle_web_read::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]"
+        ],
+        "reason": "preserved_shared_projection_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change0-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change0-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change1-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change1-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change10-event_timing_unknown]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change10-event_timing_unknown]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change2-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change2-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change3-security_identity_mismatch]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change3-security_identity_mismatch]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change4-effective_date_not_supported]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change4-effective_date_not_supported]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change5-effective_date_missing]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change5-effective_date_missing]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change6-material_contradiction]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change6-material_contradiction]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change8-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change8-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[0-change9-event_not_actionable]",
+          "tests.test_security_lifecycle_web_finding::test_incomplete_web_finding_is_readable_but_has_no_action[1-change9-event_not_actionable]"
+        ],
+        "reason": "preserved_material_blockers_with_and_without_read_gaps"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[1]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_finding::test_unread_candidate_is_visible_incompleteness_not_absence[2]": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_finding::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]"
+        ],
+        "reason": "approved_unread_supplement_contract_change"
+      },
+      "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries": {
+        "current_owners": [
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+          "tests.test_security_lifecycle_web_pipeline::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]"
+        ],
+        "reason": "expanded_pipeline_owner_to_all_four_auth_combinations"
+      }
+    },
+    "unexplained_removed": []
+  }
+}

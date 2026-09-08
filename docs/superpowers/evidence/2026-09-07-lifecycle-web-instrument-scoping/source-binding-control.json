@@ -1,0 +1,20 @@
+{
+  "actual_selected_context": {
+    "action": "terminal_delisting",
+    "block_reasons": []
+  },
+  "citation_lengths": [
+    1000,
+    2380
+  ],
+  "full_capture": {
+    "action": "terminal_delisting",
+    "block_reasons": []
+  },
+  "kind": "offline_manual_verbatim_positive_control_not_model_output",
+  "no_live_finding_changed": true,
+  "profile_actions": 0,
+  "provider_calls": 0,
+  "source_capture_sha256": "9b57f6eb8db2b974deca3efb38dad2faaeffa90fea299089f02e15418f4dc47e",
+  "source_http_requests": 0
+}

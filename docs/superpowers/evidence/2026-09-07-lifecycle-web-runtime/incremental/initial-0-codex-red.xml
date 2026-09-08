@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="16" skipped="0" tests="16" time="0.364" timestamp="2026-09-06T23:03:19.363121+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_oauth_web_binds_exact_model_and_restricted_thread" time="0.003"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd8998b80&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_oauth_web_binds_exa0')
+
+    @pytest.mark.anyio
+    async def test_codex_oauth_web_binds_exact_model_and_restricted_thread(monkeypatch, tmp_path):
+&gt;       mod, runs, sessions = _setup(monkeypatch, tmp_path)
+
+tests/test_lifecycle_web_codex.py:116: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd8998b80&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_oauth_web_binds_exa0')
+changes = {}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_analysis_uses_closed_purpose_and_no_new_tool" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876ff70&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_analysis_uses_close0')
+
+    @pytest.mark.anyio
+    async def test_codex_analysis_uses_closed_purpose_and_no_new_tool(monkeypatch, tmp_path):
+&gt;       mod, runs, sessions = _setup(monkeypatch, tmp_path)
+
+tests/test_lifecycle_web_codex.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876ff70&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_analysis_uses_close0')
+changes = {}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_invalid_preflight_never_dispatches_a_model[change0]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879bcd0&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig0')
+change = {'listed_model': 'other'}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("change", [
+        {"listed_model": "other"}, {"config": True}, {"thread": {"model": "gpt-5.6-terra"}},
+        {"thread": {"instructionSources": ["/private/AGENTS.md"]}},
+        {"thread": {"sandbox": {"type": "dangerFullAccess"}}},
+    ])
+    async def test_codex_web_invalid_preflight_never_dispatches_a_model(monkeypatch, tmp_path, change):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change=change)
+
+tests/test_lifecycle_web_codex.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879bcd0&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig0')
+changes = {'change': {'listed_model': 'other'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_invalid_preflight_never_dispatches_a_model[change1]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876c850&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig1')
+change = {'config': True}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("change", [
+        {"listed_model": "other"}, {"config": True}, {"thread": {"model": "gpt-5.6-terra"}},
+        {"thread": {"instructionSources": ["/private/AGENTS.md"]}},
+        {"thread": {"sandbox": {"type": "dangerFullAccess"}}},
+    ])
+    async def test_codex_web_invalid_preflight_never_dispatches_a_model(monkeypatch, tmp_path, change):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change=change)
+
+tests/test_lifecycle_web_codex.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876c850&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig1')
+changes = {'change': {'config': True}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_invalid_preflight_never_dispatches_a_model[change2]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899a080&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig2')
+change = {'thread': {'model': 'gpt-5.6-terra'}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("change", [
+        {"listed_model": "other"}, {"config": True}, {"thread": {"model": "gpt-5.6-terra"}},
+        {"thread": {"instructionSources": ["/private/AGENTS.md"]}},
+        {"thread": {"sandbox": {"type": "dangerFullAccess"}}},
+    ])
+    async def test_codex_web_invalid_preflight_never_dispatches_a_model(monkeypatch, tmp_path, change):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change=change)
+
+tests/test_lifecycle_web_codex.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899a080&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig2')
+changes = {'change': {'thread': {'model': 'gpt-5.6-terra'}}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_invalid_preflight_never_dispatches_a_model[change3]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899b760&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig3')
+change = {'thread': {'instructionSources': ['/private/AGENTS.md']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("change", [
+        {"listed_model": "other"}, {"config": True}, {"thread": {"model": "gpt-5.6-terra"}},
+        {"thread": {"instructionSources": ["/private/AGENTS.md"]}},
+        {"thread": {"sandbox": {"type": "dangerFullAccess"}}},
+    ])
+    async def test_codex_web_invalid_preflight_never_dispatches_a_model(monkeypatch, tmp_path, change):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change=change)
+
+tests/test_lifecycle_web_codex.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899b760&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig3')
+changes = {'change': {'thread': {'instructionSources': ['/private/AGENTS.md']}}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_invalid_preflight_never_dispatches_a_model[change4]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879c040&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig4')
+change = {'thread': {'sandbox': {'type': 'dangerFullAccess'}}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("change", [
+        {"listed_model": "other"}, {"config": True}, {"thread": {"model": "gpt-5.6-terra"}},
+        {"thread": {"instructionSources": ["/private/AGENTS.md"]}},
+        {"thread": {"sandbox": {"type": "dangerFullAccess"}}},
+    ])
+    async def test_codex_web_invalid_preflight_never_dispatches_a_model(monkeypatch, tmp_path, change):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change=change)
+
+tests/test_lifecycle_web_codex.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879c040&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_invalid_preflig4')
+changes = {'change': {'thread': {'sandbox': {'type': 'dangerFullAccess'}}}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_denies_all_non_web_tool_items_and_interrupts[commandExecution]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd8998ac0&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_0')
+kind = 'commandExecution'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("kind", ["commandExecution", "fileChange", "mcpToolCall", "collabAgentToolCall", "dynamicToolCall", "imageView"])
+    async def test_codex_web_denies_all_non_web_tool_items_and_interrupts(monkeypatch, tmp_path, kind):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"tool": kind})
+
+tests/test_lifecycle_web_codex.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd8998ac0&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_0')
+changes = {'change': {'tool': 'commandExecution'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_denies_all_non_web_tool_items_and_interrupts[fileChange]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879ee00&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_1')
+kind = 'fileChange'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("kind", ["commandExecution", "fileChange", "mcpToolCall", "collabAgentToolCall", "dynamicToolCall", "imageView"])
+    async def test_codex_web_denies_all_non_web_tool_items_and_interrupts(monkeypatch, tmp_path, kind):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"tool": kind})
+
+tests/test_lifecycle_web_codex.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879ee00&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_1')
+changes = {'change': {'tool': 'fileChange'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_denies_all_non_web_tool_items_and_interrupts[mcpToolCall]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876c460&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_2')
+kind = 'mcpToolCall'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("kind", ["commandExecution", "fileChange", "mcpToolCall", "collabAgentToolCall", "dynamicToolCall", "imageView"])
+    async def test_codex_web_denies_all_non_web_tool_items_and_interrupts(monkeypatch, tmp_path, kind):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"tool": kind})
+
+tests/test_lifecycle_web_codex.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876c460&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_2')
+changes = {'change': {'tool': 'mcpToolCall'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_denies_all_non_web_tool_items_and_interrupts[collabAgentToolCall]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899ae90&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_3')
+kind = 'collabAgentToolCall'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("kind", ["commandExecution", "fileChange", "mcpToolCall", "collabAgentToolCall", "dynamicToolCall", "imageView"])
+    async def test_codex_web_denies_all_non_web_tool_items_and_interrupts(monkeypatch, tmp_path, kind):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"tool": kind})
+
+tests/test_lifecycle_web_codex.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899ae90&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_3')
+changes = {'change': {'tool': 'collabAgentToolCall'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_denies_all_non_web_tool_items_and_interrupts[dynamicToolCall]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876d000&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_4')
+kind = 'dynamicToolCall'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("kind", ["commandExecution", "fileChange", "mcpToolCall", "collabAgentToolCall", "dynamicToolCall", "imageView"])
+    async def test_codex_web_denies_all_non_web_tool_items_and_interrupts(monkeypatch, tmp_path, kind):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"tool": kind})
+
+tests/test_lifecycle_web_codex.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd876d000&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_4')
+changes = {'change': {'tool': 'dynamicToolCall'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_web_denies_all_non_web_tool_items_and_interrupts[imageView]" time="0.002"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879ff10&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_5')
+kind = 'imageView'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("kind", ["commandExecution", "fileChange", "mcpToolCall", "collabAgentToolCall", "dynamicToolCall", "imageView"])
+    async def test_codex_web_denies_all_non_web_tool_items_and_interrupts(monkeypatch, tmp_path, kind):
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"tool": kind})
+
+tests/test_lifecycle_web_codex.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879ff10&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_web_denies_all_non_5')
+changes = {'change': {'tool': 'imageView'}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_interrupt_ack_without_matching_terminal_stays_unknown[False]" time="0.007"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899a560&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_interrupt_ack_witho0')
+missing = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("missing", [False, True])
+    async def test_codex_interrupt_ack_without_matching_terminal_stays_unknown(monkeypatch, tmp_path, missing):
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=2)
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"missing_terminal": missing}, stop=control.request_stop)
+
+tests/test_lifecycle_web_codex.py:182: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd899a560&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_interrupt_ack_witho0')
+changes = {'change': {'missing_terminal': False}, 'stop': &lt;bound method RunControl.request_stop of &lt;src.security_lifecycle_web_contract.RunControl object at 0x706bd8998bb0&gt;&gt;}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_interrupt_ack_without_matching_terminal_stays_unknown[True]" time="0.005"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879fe50&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_interrupt_ack_witho1')
+missing = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("missing", [False, True])
+    async def test_codex_interrupt_ack_without_matching_terminal_stays_unknown(monkeypatch, tmp_path, missing):
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=2)
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"missing_terminal": missing}, stop=control.request_stop)
+
+tests/test_lifecycle_web_codex.py:182: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd879fe50&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_interrupt_ack_witho1')
+changes = {'change': {'missing_terminal': True}, 'stop': &lt;bound method RunControl.request_stop of &lt;src.security_lifecycle_web_contract.RunControl object at 0x706bd879c5b0&gt;&gt;}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase><testcase classname="tests.test_lifecycle_web_codex" name="test_codex_foreign_turn_cannot_supply_result" time="0.003"><failure message="ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd8999d20&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_foreign_turn_cannot0')
+
+    @pytest.mark.anyio
+    async def test_codex_foreign_turn_cannot_supply_result(monkeypatch, tmp_path):
+        event = _event("turn/completed", turnId="foreign", turn={"id": "foreign", "status": "completed", "items": []})
+&gt;       mod, _, sessions = _setup(monkeypatch, tmp_path, change={"extra_events": [event]})
+
+tests/test_lifecycle_web_codex.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x706bd8999d20&gt;
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7740/test_codex_foreign_turn_cannot0')
+changes = {'change': {'extra_events': [{'method': 'turn/completed', 'params': {'threadId': 'thread-1', 'turn': {'id': 'foreign', 'items': [], 'status': 'completed'}, 'turnId': 'foreign'}}]}}
+
+    def _setup(monkeypatch, tmp_path, **changes):
+&gt;       from src.auth_drivers import lifecycle_web_codex as mod
+E       ImportError: cannot import name 'lifecycle_web_codex' from 'src.auth_drivers' (/tmp/arkscope-lifecycle-terminal-membership/src/auth_drivers/__init__.py)
+
+tests/test_lifecycle_web_codex.py:99: ImportError</failure></testcase></testsuite></testsuites>

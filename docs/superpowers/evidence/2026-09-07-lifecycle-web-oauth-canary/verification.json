@@ -1,0 +1,76 @@
+{
+  "app_restart": false,
+  "changed_code_files": [
+    "src/auth_drivers/lifecycle_web_claude.py",
+    "tests/test_lifecycle_web_claude.py"
+  ],
+  "commit": false,
+  "corrected_live_verified": false,
+  "correction_provider_calls": 0,
+  "frontend_bytes_unchanged": true,
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6605
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "03e01429db9ce23192048c206b4ce8e9d926e6eab87ad923f91a6b5018507ad0"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1928
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "d2b08eb95d2259ed41d0572fbebfe2d14e07cd6066b707d677632bb6ac33620a"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2747
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "6972f811a12ae2b0f7844540e89a99ca5b3681ed74282af4fbafc750e2e5d8bb"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1928
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "5b6b80b981745f9afd068c27532135d931362574755911835f0163ad8b0e382f"
+    }
+  },
+  "merge": false,
+  "mutations": 5,
+  "mutations_scope": "five_incremental_mutations_against_whole_affected_focus",
+  "offline_correction_complete": true,
+  "prior_backend_mutants_not_rerun": 23,
+  "prior_files_verified": 240,
+  "prior_frontend_mutants_not_rerun": 11,
+  "prior_seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa",
+  "production_migration": false,
+  "production_writes": false,
+  "push": false,
+  "remaining": [
+    "corrected_claude_live_canary",
+    "other_channel_live_gates",
+    "authorized_web_journal_installation",
+    "complete_population_cutover",
+    "merge_and_handtest"
+  ],
+  "source_files_verified": 1061
+}

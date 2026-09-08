@@ -1,0 +1,67 @@
+{
+  "files": {
+    "lifecycle-attended-initial-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 95
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-attended-initial-green.xml",
+      "sha256": "c5270c3cf7c37dcf20be9f478fa54aa30254186a4189a23ab5b943a53978bdf9"
+    },
+    "lifecycle-attended-owners-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 26
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-attended-owners-green.xml",
+      "sha256": "b7827e87bf6fbb85e999b3d533815c874532d332b598f9202d0a711f40edeec2"
+    },
+    "lifecycle-attended-race-green-r2.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 121
+      },
+      "failed_nodes": [],
+      "file": "lifecycle-attended-race-green-r2.xml",
+      "sha256": "e003dd0021bd9316495118df96665d1f38fca709f6ecf37be6f541195e515e03"
+    },
+    "lifecycle-attended-race-green.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 121
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_review::test_lost_readback_reports_unavailable_not_unverified_success"
+      ],
+      "file": "lifecycle-attended-race-green.xml",
+      "sha256": "b0ca6b00d1b9382edd802b202e061a0c5c86f0c56817b6866ddab9f2211e75a5"
+    },
+    "lifecycle-attended-red.xml": {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 6
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_attended_concurrency::test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-decode]",
+        "tests.test_lifecycle_web_attended_concurrency::test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-finding]",
+        "tests.test_lifecycle_web_attended_concurrency::test_attended_web_source_validation_leaves_other_profile_writers_available[execute-decode]",
+        "tests.test_lifecycle_web_attended_concurrency::test_attended_web_source_validation_leaves_other_profile_writers_available[execute-finding]"
+      ],
+      "file": "lifecycle-attended-red.xml",
+      "sha256": "6dbfba888463d7c04572949bf65e90b013d0434ba05ab9cfac8bef43dbf400a3"
+    }
+  },
+  "scope": "historical_red_green_not_final_admission"
+}

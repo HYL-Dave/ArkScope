@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="7" time="6.588" timestamp="2026-09-07T12:41:06.631196+08:00" hostname="ais"><testcase classname="lifecycle_source_progress_red" name="test_progress_poll_does_not_decode_running_source_bodies" time="0.114"><failure message="AssertionError: progress must not decode uncompleted source bodies">tmp_path = PosixPath('/tmp/lifecycle-source-progress-red-data/test_progress_poll_does_not_de0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x792a3a2dc9a0&gt;
+
+    def test_progress_poll_does_not_decode_running_source_bodies(tmp_path, monkeypatch):
+        from src.lifecycle_web_controller import LifecycleWebController
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page("Retained source."))
+    
+        def forbidden(row):
+            raise AssertionError("progress must not decode uncompleted source bodies")
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(forbidden))
+        controller = LifecycleWebController(store, credential_loader=lambda _: pytest.fail("provider-free read"))
+&gt;       result = controller.read(identity)
+
+../lifecycle_source_progress_red.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_controller.py:143: in read
+    return project_web_run(self.store.read(identity), at=self.store._now())
+src/lifecycle_web_store.py:284: in read
+    return self.read_on_connection(conn, run_id)
+src/lifecycle_web_store.py:296: in read_on_connection
+    "pages": cls._pages(conn, run_id)}
+src/lifecycle_web_store.py:202: in _pages
+    return {row["source_id"]: cls._decode_page(row)
+src/lifecycle_web_store.py:202: in &lt;dictcomp&gt;
+    return {row["source_id"]: cls._decode_page(row)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = &lt;sqlite3.Row object at 0x792a3a6d1e10&gt;
+
+    def forbidden(row):
+&gt;       raise AssertionError("progress must not decode uncompleted source bodies")
+E       AssertionError: progress must not decode uncompleted source bodies
+
+../lifecycle_source_progress_red.py:18: AssertionError</failure></testcase><testcase classname="lifecycle_source_progress_red" name="test_source_read_decoding_releases_its_owned_read_transaction" time="0.111"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tmp_path = PosixPath('/tmp/lifecycle-source-progress-red-data/test_source_read_decoding_rele0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x792a3a2dd900&gt;
+
+    def test_source_read_decoding_releases_its_owned_read_transaction(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        identity = completed(store)
+        original, observed = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            with sqlite3.connect(path, timeout=0) as conn:
+                conn.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+&gt;       assert store.read(identity)["finding"].action == "terminal_delisting"
+
+../lifecycle_source_progress_red.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:283: in read
+    with self.connection() as conn:
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.LifecycleWebStore object at 0x792a3a2dcfd0&gt;
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+&gt;           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError</failure></testcase><testcase classname="lifecycle_source_progress_red" name="test_source_read_validation_releases_its_owned_read_transaction" time="0.106"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tmp_path = PosixPath('/tmp/lifecycle-source-progress-red-data/test_source_read_validation_re0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x792a3a8807f0&gt;
+
+    def test_source_read_validation_releases_its_owned_read_transaction(tmp_path, monkeypatch):
+        from src import lifecycle_web_store as journal
+    
+        path, store = setup_store(tmp_path)
+        identity = completed(store)
+        original, observed = journal.validate_finding, []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(path, timeout=0) as conn:
+                conn.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(*args, **kwargs)
+    
+        monkeypatch.setattr(journal, "validate_finding", validate)
+&gt;       assert store.read(identity)["finding"].action == "terminal_delisting"
+
+../lifecycle_source_progress_red.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:283: in read
+    with self.connection() as conn:
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.LifecycleWebStore object at 0x792a3a880d00&gt;
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+&gt;           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError</failure></testcase><testcase classname="lifecycle_source_progress_red" name="test_transaction_bound_adoption_read_retains_caller_atomicity" time="0.105" /><testcase classname="lifecycle_source_progress_red" name="test_connection_reader_does_not_hold_page_cursor_during_decoding" time="0.074"><failure message="sqlite3.OperationalError: database is locked">tmp_path = PosixPath('/tmp/lifecycle-source-progress-red-data/test_connection_reader_does_no0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x792a3a6b93f0&gt;
+
+    def test_connection_reader_does_not_hold_page_cursor_during_decoding(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        for index in (1, 2):
+            store.add_page(identity, owner="worker-1", source_id=f"source-{index}", page=source_page("Retained source."))
+        original, observed = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            with sqlite3.connect(path, timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+&gt;           result = store.read_on_connection(conn, identity)
+
+../lifecycle_source_progress_red.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:296: in read_on_connection
+    "pages": cls._pages(conn, run_id)}
+src/lifecycle_web_store.py:202: in _pages
+    return {row["source_id"]: cls._decode_page(row)
+src/lifecycle_web_store.py:202: in &lt;dictcomp&gt;
+    return {row["source_id"]: cls._decode_page(row)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = &lt;sqlite3.Row object at 0x792a3a6ba5f0&gt;
+
+    def decode(row):
+&gt;       with sqlite3.connect(path, timeout=0) as other:
+E       sqlite3.OperationalError: database is locked
+
+../lifecycle_source_progress_red.py:95: OperationalError</failure></testcase><testcase classname="lifecycle_source_progress_red" name="test_source_read_keeps_snapshot_when_worker_adds_a_later_source" time="5.083"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tmp_path = PosixPath('/tmp/lifecycle-source-progress-red-data/test_source_read_keeps_snapsho0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x792a3a67cfa0&gt;
+
+    def test_source_read_keeps_snapshot_when_worker_adds_a_later_source(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page("First source."))
+        original, added = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            if not added:
+                added.append(True)
+                store.add_page(identity, owner="worker-1", source_id="source-2", page=source_page("Later source."))
+                store.set_phase(identity, owner="worker-1", phase="reading_sources")
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+&gt;       before = store.read(identity)
+
+../lifecycle_source_progress_red.py:124: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:284: in read
+    return self.read_on_connection(conn, run_id)
+src/lifecycle_web_store.py:296: in read_on_connection
+    "pages": cls._pages(conn, run_id)}
+src/lifecycle_web_store.py:202: in _pages
+    return {row["source_id"]: cls._decode_page(row)
+src/lifecycle_web_store.py:202: in &lt;dictcomp&gt;
+    return {row["source_id"]: cls._decode_page(row)
+../lifecycle_source_progress_red.py:119: in decode
+    store.add_page(identity, owner="worker-1", source_id="source-2", page=source_page("Later source."))
+src/lifecycle_web_store.py:182: in add_page
+    with self.connection(write=True) as conn:
+/usr/lib/python3.10/contextlib.py:142: in __exit__
+    next(self.gen)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.LifecycleWebStore object at 0x792a3a67d7e0&gt;
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+&gt;           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError</failure></testcase><testcase classname="lifecycle_source_progress_red" name="test_terminal_progress_read_still_validates_source_integrity" time="0.107" /></testsuite></testsuites>

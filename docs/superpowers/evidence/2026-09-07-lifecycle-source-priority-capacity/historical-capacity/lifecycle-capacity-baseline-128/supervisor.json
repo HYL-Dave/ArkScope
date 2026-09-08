@@ -1,0 +1,7 @@
+{
+  "exit_code": -15,
+  "sampled_peak_rss_bytes": 4314103808,
+  "rss_guard_bytes": 4294967296,
+  "terminated_by_supervisor": true,
+  "elapsed_seconds": 107.278
+}

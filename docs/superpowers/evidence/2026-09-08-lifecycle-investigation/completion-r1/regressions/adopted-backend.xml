@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="4" time="1.696" timestamp="2026-09-08T02:30:44.415297+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_investigation_routes" name="test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue" time="0.466"><failure message="AssertionError: assert ('terminal_delisting' is None)">client = {'calls': [], 'case_id': 'slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c', 'checks': &lt;src.securi...roviderCheckStore object at 0x72e964b7cf70&gt;, 'client': &lt;starlette.testclient.TestClient object at 0x72e962107a60&gt;, ...}
+
+    def test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue(client):
+        c = client
+        base = "/security-lifecycle/investigations"
+        targets = c["client"].get(base + "/targets").json()
+        assert "OLD" in [row["ticker"] for row in targets["targets"]]
+        result = c["client"].get(base + "/runs/" + c["run_id"])
+        assert result.status_code == 200 and result.json()["status"] == "succeeded"
+        assert result.json()["action"] == "terminal_delisting"
+        assert "local:" not in result.text and "header_json" not in result.text
+        assert c["client"].get(base + "/targets/OLD/latest").json()["run_id"] == c["run_id"]
+        packet = c["client"].get(base + "/runs/" + c["run_id"] + "/review").json()
+        assert packet["ready"], packet
+        response = c["client"].post(base + "/runs/" + c["run_id"] + "/confirm", json={
+            "packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]})
+        assert response.status_code == 200 and response.json()["status"] == "applied", response.text
+        reloaded = c["client"].get(base + "/runs/" + c["run_id"]).json()
+&gt;       assert reloaded["action"] is None and reloaded["finding"] == result.json()["finding"]
+E       AssertionError: assert ('terminal_delisting' is None)
+
+tests/test_lifecycle_investigation_routes.py:46: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_routes" name="test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]" time="0.194"><failure message="AssertionError: assert 'terminal_delisting' is None">client = {'calls': [], 'case_id': 'slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c', 'checks': &lt;src.securi...roviderCheckStore object at 0x72e95f701f90&gt;, 'client': &lt;starlette.testclient.TestClient object at 0x72e962169a20&gt;, ...}
+later_change = 'none'
+
+    @pytest.mark.parametrize("later_change", ("none", "unrelated", "affected"))
+    def test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases(client, later_change):
+        from src.profile_state import ProfileStateStore
+        c = client
+        base = "/security-lifecycle/investigations/runs/" + c["run_id"]
+        packet = c["client"].get(base + "/review").json()
+        applied = c["client"].post(base + "/confirm", json={
+            "packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]})
+        assert applied.status_code == 200 and applied.json()["status"] == "applied"
+        if later_change != "none":
+            ProfileStateStore(c["profile"]).set_priority("OLD" if later_change == "affected" else "LIVE", "high")
+        response = c["client"].get("/security-lifecycle/transition-activity")
+        assert response.status_code == 200
+        item, = response.json()["items"]
+        assert item["reverse_readiness"] == {
+            "reversible": later_change != "affected",
+            "block_reasons": ["reverse_state_changed"] if later_change == "affected" else [],
+        }
+        reversed_response = c["client"].post("/security-lifecycle/transitions/" + item["transition_id"] + "/reverse")
+        assert reversed_response.status_code == 200
+        assert reversed_response.json()["status"] == ("blocked" if later_change == "affected" else "reversed")
+        assert ("OLD" in c["sources"]()) is (later_change != "affected")
+        assert "LIVE" in c["sources"]() and c["calls"] == []
+        if later_change != "affected":
+            history = c["client"].get("/security-lifecycle/transition-activity").json()["items"]
+            assert {row["activity_type"] for row in history} == {"applied", "reversed"}
+            assert all(row["reverse_readiness"] == {"reversible": False, "block_reasons": []} for row in history)
+&gt;           assert c["client"].get(base).json()["action"] is None
+E           AssertionError: assert 'terminal_delisting' is None
+
+tests/test_lifecycle_investigation_routes.py:78: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_routes" name="test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]" time="0.192"><failure message="AssertionError: assert 'terminal_delisting' is None">client = {'calls': [], 'case_id': 'slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c', 'checks': &lt;src.securi...roviderCheckStore object at 0x72e96211a380&gt;, 'client': &lt;starlette.testclient.TestClient object at 0x72e95f71ecb0&gt;, ...}
+later_change = 'unrelated'
+
+    @pytest.mark.parametrize("later_change", ("none", "unrelated", "affected"))
+    def test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases(client, later_change):
+        from src.profile_state import ProfileStateStore
+        c = client
+        base = "/security-lifecycle/investigations/runs/" + c["run_id"]
+        packet = c["client"].get(base + "/review").json()
+        applied = c["client"].post(base + "/confirm", json={
+            "packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]})
+        assert applied.status_code == 200 and applied.json()["status"] == "applied"
+        if later_change != "none":
+            ProfileStateStore(c["profile"]).set_priority("OLD" if later_change == "affected" else "LIVE", "high")
+        response = c["client"].get("/security-lifecycle/transition-activity")
+        assert response.status_code == 200
+        item, = response.json()["items"]
+        assert item["reverse_readiness"] == {
+            "reversible": later_change != "affected",
+            "block_reasons": ["reverse_state_changed"] if later_change == "affected" else [],
+        }
+        reversed_response = c["client"].post("/security-lifecycle/transitions/" + item["transition_id"] + "/reverse")
+        assert reversed_response.status_code == 200
+        assert reversed_response.json()["status"] == ("blocked" if later_change == "affected" else "reversed")
+        assert ("OLD" in c["sources"]()) is (later_change != "affected")
+        assert "LIVE" in c["sources"]() and c["calls"] == []
+        if later_change != "affected":
+            history = c["client"].get("/security-lifecycle/transition-activity").json()["items"]
+            assert {row["activity_type"] for row in history} == {"applied", "reversed"}
+            assert all(row["reverse_readiness"] == {"reversible": False, "block_reasons": []} for row in history)
+&gt;           assert c["client"].get(base).json()["action"] is None
+E           AssertionError: assert 'terminal_delisting' is None
+
+tests/test_lifecycle_investigation_routes.py:78: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_investigation_routes" name="test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]" time="0.182" /></testsuite></testsuites>

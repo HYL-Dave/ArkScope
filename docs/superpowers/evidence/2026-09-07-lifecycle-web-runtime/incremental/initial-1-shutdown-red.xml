@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.283" timestamp="2026-09-06T23:56:21.460035+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_controller" name="test_shutdown_still_joins_worker_when_cancellation_recording_is_unavailable" time="0.024"><failure message="src.lifecycle_web_schema.WebJournalError: web_recording_unavailable">tests/test_lifecycle_web_controller.py:239: in test_shutdown_still_joins_worker_when_cancellation_recording_is_unavailable
+    service.close()
+src/lifecycle_web_controller.py:195: in close
+    self.store.request_cancel(identity)
+tests/test_lifecycle_web_controller.py:236: in unavailable
+    raise WebJournalError("web_recording_unavailable")
+E   src.lifecycle_web_schema.WebJournalError: web_recording_unavailable</failure></testcase></testsuite></testsuites>

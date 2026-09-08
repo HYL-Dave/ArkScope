@@ -1,0 +1,122 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6714
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "13f9e9ba486b1db4805e518033aade4367c9187b57dfd07afb942c291259a6a5"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2037
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "399cadc5d0b208ed60986a9a918bec4b408386307fd8a03690e53c17c42e79cf"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2856
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "499fcca52a6e31176c5c744c3826840c3670c8851f5ea1748788c79a078a8e3e"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2037
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "b0a8fcc9103bac7f8f2e3627db8c51bcca460a1b0f1ae13c042bbec844967b69"
+    }
+  },
+  "browser_scenarios": 12,
+  "browser_screenshots": 24,
+  "capacity_includes_real_progress_reads": true,
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1562
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "662e055df6703f16d7aab629702075aff40b260fb11576b145ca2c623167a03d"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1562
+      },
+      "failed_nodes": [],
+      "file": "restored.json",
+      "sha256": "040cd38dec604c045400909f6818a81027856abad3ffdda7ea9e2a18b65feb2e"
+    }
+  },
+  "general_request_timeout_seconds": 15,
+  "journal_busy_timeout_seconds": 45,
+  "lease_seconds": 60,
+  "local_receipt_timeout_seconds": 180,
+  "merge": false,
+  "migration": false,
+  "model_timeout_seconds": 180,
+  "mutations": {
+    "backend": 29,
+    "frontend": 6
+  },
+  "prior_packets": {
+    "2026-09-07-lifecycle-source-context": {
+      "files_verified": 227,
+      "seal_sha256": "52e68716d4117886934a56eff69376235851da85d9f0bb25659e13a0584f064f"
+    },
+    "2026-09-07-lifecycle-web-runtime": {
+      "files_verified": 240,
+      "seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa"
+    },
+    "2026-09-07-lifecycle-web-sonnet-canary": {
+      "files_verified": 108,
+      "seal_sha256": "70db6a06341e77128a402c443ad44d007a6138270e552c63a51bb8e836392d05"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "unread_supplementary_reference_product_decision",
+    "authorized_fresh_live_canary",
+    "model_usage_calibration",
+    "maximum_source_attended_write_concurrency_measurement",
+    "authorized_journal_installation_and_population_cutover",
+    "merge_and_handtest"
+  ],
+  "shared_source_timeout_seconds": 180,
+  "synthetic_commit_hold_seconds": 29,
+  "unchanged_schemas": {
+    "src/lifecycle_web_schema.py": "490ca24b56cdf29731aef12430bf30da2e63866594bbd323203bda326437ece7",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "whole_workflow_complete": false
+}

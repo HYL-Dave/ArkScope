@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.221" timestamp="2026-09-07T11:24:15.316673+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_source_compatibility" name="test_form25_xml_preserves_security_class_and_named_fields" time="0.067"><failure message="xml.etree.ElementTree.ParseError: syntax error: line 1, column 0">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7b7b84b8e350&gt;
+
+    def test_form25_xml_preserves_security_class_and_named_fields(monkeypatch):
+        body = b'''&lt;?xml version="1.0"?&gt;&lt;edgarSubmission xmlns="urn:sec:test"&gt;
+          &lt;issuerName&gt;Example Inc.&lt;/issuerName&gt;&lt;exchange&gt;NASDAQ&lt;/exchange&gt;
+          &lt;descriptionClassSecurity&gt;8.25% Senior Notes due 2028&lt;/descriptionClassSecurity&gt;
+          &lt;effectiveDate&gt;2026-09-01&lt;/effectiveDate&gt;&lt;/edgarSubmission&gt;'''
+        reader, _, _, _ = _reader(monkeypatch, [Response(body, headers={"Content-Type": "application/xml"})])
+        text = reader.read("https://ir.example.com/notice").text
+&gt;       root = ET.fromstring(text)
+
+tests/test_lifecycle_source_compatibility.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+text = 'issuerName: Example Inc.\nexchange: NASDAQ\ndescriptionClassSecurity: 8.25% Senior Notes due 2028\neffectiveDate: 2026-09-01'
+parser = &lt;xml.etree.ElementTree.XMLParser object at 0x7b7b84167370&gt;
+
+    def XML(text, parser=None):
+        """Parse XML document from string constant.
+    
+        This function can be used to embed "XML Literals" in Python code.
+    
+        *text* is a string containing XML data, *parser* is an
+        optional parser instance, defaulting to the standard XMLParser.
+    
+        Returns an Element instance.
+    
+        """
+        if not parser:
+            parser = XMLParser(target=TreeBuilder())
+&gt;       parser.feed(text)
+E       xml.etree.ElementTree.ParseError: syntax error: line 1, column 0
+
+/usr/lib/python3.10/xml/etree/ElementTree.py:1342: ParseError</failure></testcase><testcase classname="tests.test_lifecycle_source_compatibility" name="test_xml_normalization_preserves_record_boundaries_without_repeating_long_names" time="0.044"><failure message="AssertionError: assert 2120086 &lt;= (20468 * 2)&#10; +  where 2120086 = len(b'longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: delisted.\nclass: notes\nstatus: delisted\nclass: common stock\nstatus: active')&#10; +    where b'longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: delisted.\nclass: notes\nstatus: delisted\nclass: common stock\nstatus: active' = &lt;built-in method encode of str object at 0x7b7b82ecd010&gt;()&#10; +      where &lt;built-in method encode of str object at 0x7b7b82ecd010&gt; = 'longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: delisted.\nclass: notes\nstatus: delisted\nclass: common stock\nstatus: active'.encode&#10; +  and   20468 = len(b'&lt;root&gt;&lt;longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...ass&gt;&lt;status&gt;delisted&lt;/status&gt;&lt;/security&gt;&lt;security&gt;&lt;class&gt;common stock&lt;/class&gt;&lt;status&gt;active&lt;/status&gt;&lt;/security&gt;&lt;/root&gt;')">def test_xml_normalization_preserves_record_boundaries_without_repeating_long_names():
+        from src.lifecycle_public_sources import _page_text
+        name = "longField" + "x" * 8192
+        attributes = " ".join(f'a{index}="value{index}"' for index in range(256))
+        body = (f'&lt;root&gt;&lt;{name} {attributes}&gt;Before &lt;child&gt;not&lt;/child&gt; delisted.&lt;/{name}&gt;'
+                '&lt;security&gt;&lt;class&gt;notes&lt;/class&gt;&lt;status&gt;delisted&lt;/status&gt;&lt;/security&gt;'
+                '&lt;security&gt;&lt;class&gt;common stock&lt;/class&gt;&lt;status&gt;active&lt;/status&gt;&lt;/security&gt;&lt;/root&gt;').encode()
+        text, _ = _page_text(body, "application/xml")
+&gt;       assert len(text.encode()) &lt;= len(body) * 2
+E       AssertionError: assert 2120086 &lt;= (20468 * 2)
+E        +  where 2120086 = len(b'longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: delisted.\nclass: notes\nstatus: delisted\nclass: common stock\nstatus: active')
+E        +    where b'longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: delisted.\nclass: notes\nstatus: delisted\nclass: common stock\nstatus: active' = &lt;built-in method encode of str object at 0x7b7b82ecd010&gt;()
+E        +      where &lt;built-in method encode of str object at 0x7b7b82ecd010&gt; = 'longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: delisted.\nclass: notes\nstatus: delisted\nclass: common stock\nstatus: active'.encode
+E        +  and   20468 = len(b'&lt;root&gt;&lt;longFieldxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...ass&gt;&lt;status&gt;delisted&lt;/status&gt;&lt;/security&gt;&lt;security&gt;&lt;class&gt;common stock&lt;/class&gt;&lt;status&gt;active&lt;/status&gt;&lt;/security&gt;&lt;/root&gt;')
+
+tests/test_lifecycle_source_compatibility.py:172: AssertionError</failure></testcase></testsuite></testsuites>

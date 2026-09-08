@@ -1,0 +1,1032 @@
+{
+  "version": 2,
+  "run_id": "li_1447fa6da0844a579d8188c68800f225",
+  "ticker": "TA",
+  "status": "incomplete",
+  "phase": "rejected_finding",
+  "created_at": "2026-09-07T16:46:50.583390+00:00",
+  "finished_at": "2026-09-07T16:57:47.701519+00:00",
+  "cancel_requested": false,
+  "failure_code": null,
+  "stop_reason": "investigation_budget_exhausted",
+  "target": {
+    "as_of": "2026-09-07",
+    "composite_figi": null,
+    "identity_status": "needs_lookup",
+    "issuer_cik": null,
+    "issuer_name": "TravelCenters of America Inc.",
+    "security_class": "common stock",
+    "ticker": "TA",
+    "venue": "NASDAQ"
+  },
+  "execution": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "auth_mode": "claude_code_oauth",
+    "effort": "high"
+  },
+  "stats": {
+    "elapsed_seconds": 657.083,
+    "http_requests": 3,
+    "input_tokens": 301824,
+    "local_queries": 1,
+    "model_submissions": 24,
+    "output_tokens": 62333,
+    "retained_source_bytes": 20541,
+    "source_reads": 3,
+    "sources": 2,
+    "web_actions": 6
+  },
+  "finding": {
+    "announcement_date": "2023-02-15",
+    "announcement_date_text": "February 15, 2023",
+    "citations": [
+      {
+        "passage_id": "source-2:p255",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-2:p68",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-2:p69",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-2:p70",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-2:p125",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-2:p126",
+        "supports": [
+          "security_identity"
+        ]
+      },
+      {
+        "passage_id": "source-2:p144",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-2:p145",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-2:p146",
+        "supports": [
+          "listing_ended",
+          "effective_date"
+        ]
+      },
+      {
+        "passage_id": "source-2:p159",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-2:p160",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-2:p161",
+        "supports": [
+          "listing_ended"
+        ]
+      },
+      {
+        "passage_id": "source-2:p86",
+        "supports": [
+          "announcement_date"
+        ]
+      },
+      {
+        "passage_id": "source-2:p87",
+        "supports": [
+          "announcement_date"
+        ]
+      },
+      {
+        "passage_id": "source-2:p88",
+        "supports": [
+          "announcement_date"
+        ]
+      }
+    ],
+    "contradictions": [],
+    "effective_date": "2023-05-15",
+    "effective_date_text": "May 15, 2023",
+    "event_kind": "listing_ended",
+    "issuer_name": "TravelCenters of America Inc.",
+    "security_class": "common stock",
+    "source_ticker": "TA",
+    "successor_ticker": null,
+    "summary": "TravelCenters of America Inc.（Nasdaq: TA）普通股因與BP p.l.c.子公司之合併已完成而下市。根據BP完成收購後申報之SEC 8-K（source-2），合併協議於2023年2月15日簽署，合併於稍後完成，導致Company Stock（即TA普通股，par value $0.001）已於2023年5月15日開盤前停止在Nasdaq Stock Market LLC交易，並依合併條款於生效時全數取消、註銷。發行人名稱、股票代碼TA、普通股類別與Nasdaq交易所均於同一來源內確立，事件性質為已完成之下市（listing_ended/completed），無矛盾證據。",
+    "timing": "completed",
+    "unresolved_conditions": [],
+    "venue": "NASDAQ",
+    "version": 2
+  },
+  "action": null,
+  "block_reasons": [
+    "effective_date_not_supported"
+  ],
+  "passages": [
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 15791,
+      "passage_id": "source-2:p255",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 15762,
+      "text": "TRAVELCENTERS OF AMERICA INC.",
+      "text_sha256": "0da1b5c7b7a232f0d867694c2b8a08928aa9ed527669ea3fbba420de448e306c",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 1794,
+      "passage_id": "source-2:p68",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 1744,
+      "text": "Shares of Common Stock, $0.001 Par Value Per Share",
+      "text_sha256": "2ed4ebb2714e69a08f4e034f1e6f81c7d63c720356de600c91e039217a5b6f15",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 1797,
+      "passage_id": "source-2:p69",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 1795,
+      "text": "TA",
+      "text_sha256": "034fc48ba584fc2a8b0b40c727e4ce36b79845d7ed910c63abfb2c22e630382c",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 1825,
+      "passage_id": "source-2:p70",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 1798,
+      "text": "The NASDAQ Stock Market LLC",
+      "text_sha256": "dbfcf97442467cd73ebb36459c1c980c466a3a93d2921fbb3b523da17817a4e1",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 6109,
+      "passage_id": "source-2:p125",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 6036,
+      "text": "at the effective time of the Merger (the “Effective Time”), each share of",
+      "text_sha256": "c77e01c796dfb407290f1b6ea668347bd5ecf1618697cee38cbe5b15966ac5b4",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 6182,
+      "passage_id": "source-2:p126",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 6110,
+      "text": "Company common stock, par value $0.001 per share (“Company Stock”), that",
+      "text_sha256": "d5da4844515c6987b44dd019f426e9c548bdf168744749d457d011a4e44d1b4e",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 7731,
+      "passage_id": "source-2:p144",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 7729,
+      "text": "In",
+      "text_sha256": "8bc1d53cc57c24b79bf7c260b1f3b29973caab7b8f501c33016b321ebfc274f1",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 7865,
+      "passage_id": "source-2:p145",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 7732,
+      "text": "connection with and as a result of the consummation of the Merger, shares of Company Stock ceased to trade on the Nasdaq Stock Market",
+      "text_sha256": "61664f0e7c6dafce6b42f84e33265ab1f75628ecc45b3e8331f1821e4331f801",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 7980,
+      "passage_id": "source-2:p146",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 7866,
+      "text": "LLC (“Nasdaq”) prior to market open on May 15, 2023, and became eligible for delisting from Nasdaq and termination",
+      "text_sha256": "091f041558bcb6eca75852cac1f07130182b555ace497f985558f651221d45b6",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 8993,
+      "passage_id": "source-2:p159",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 8896,
+      "text": "the Merger Agreement), each share of Company Stock outstanding immediately prior to the Effective",
+      "text_sha256": "480ea25eaa9ce280710c2f1d1d2ff0aacc49ca57e2b278f98c9b4cdd5f8cea15",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 9127,
+      "passage_id": "source-2:p160",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 8994,
+      "text": "Time, was cancelled and converted into the right to receive the Merger Consideration. As of the Effective Time, all shares of Company",
+      "text_sha256": "cc20612e9d10f88e143de030c3c3ae94dcdcdeb2013b1cfcccae119e46a4c237",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 9270,
+      "passage_id": "source-2:p161",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 9128,
+      "text": "Stock shall no longer be outstanding and shall automatically be canceled and retired and shall cease to exist, and each share shall thereafter",
+      "text_sha256": "2ca2b204add1bd3a9462b8c71b1a3ef7551fd67a62c4ecba904a994ea96a105d",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 2584,
+      "passage_id": "source-2:p86",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 2557,
+      "text": "As previously disclosed, on",
+      "text_sha256": "08d86dda98a6ec6095d5c7403ed76504886d46f0b1511043b02c39ef42e6ce03",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 2700,
+      "passage_id": "source-2:p87",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 2585,
+      "text": "February 15, 2023, TravelCenters of America Inc., a Maryland corporation (the “Company”), entered into an Agreement",
+      "text_sha256": "938739f27c1f5962cf4005733eed3f6b1aebc993faa98b20b8aac5d4b916cbf5",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    },
+    {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "end_char": 2826,
+      "passage_id": "source-2:p88",
+      "published_at": null,
+      "publisher": "www.sec.gov",
+      "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+      "source_id": "source-2",
+      "start_char": 2701,
+      "text": "and Plan of Merger (the “Merger Agreement”), by and among the Company, BP Products North America Inc., a Maryland corporation",
+      "text_sha256": "3d912f6f653d3d34d1d4999624e85fd0dfa03286590ae146326a51515e5b007f",
+      "title": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm"
+    }
+  ],
+  "gaps": [
+    {
+      "corpus": "news",
+      "reason": "local_news_unavailable",
+      "url": null
+    },
+    {
+      "corpus": null,
+      "reason": "source_unavailable",
+      "url": "https://www.bp.com/en/global/bp-supply-trading-and-shipping/news/press-releases/bp-expands-mobility-and-convenience-network-completing-the-purchase-of-leading-travel-center-operator-travelcenters-of-america2.html"
+    }
+  ],
+  "steps": [
+    {
+      "ordinal": 1,
+      "kind": "local_search",
+      "at": "2026-09-07T16:46:50.617823+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 2,
+      "kind": "model_request",
+      "at": "2026-09-07T16:46:50.640752+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 3,
+      "kind": "model_result",
+      "at": "2026-09-07T16:46:57.002843+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 4,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:46:57.016986+00:00",
+      "reason": "需要確認TravelCenters of America (TA) 在那斯達克的普通股是否因被BP收購而已下市，並取得具體生效日期等資訊，因目前無本地來源。",
+      "code": null
+    },
+    {
+      "ordinal": 5,
+      "kind": "model_request",
+      "at": "2026-09-07T16:46:57.029138+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 6,
+      "kind": "web_action",
+      "at": "2026-09-07T16:46:59.608084+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 7,
+      "kind": "web_action",
+      "at": "2026-09-07T16:47:00.231482+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 8,
+      "kind": "model_result",
+      "at": "2026-09-07T16:47:20.153988+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 9,
+      "kind": "model_request",
+      "at": "2026-09-07T16:47:20.212833+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 10,
+      "kind": "model_result",
+      "at": "2026-09-07T16:47:26.979250+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 11,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:47:26.993199+00:00",
+      "reason": "需要取得BP完成收購TravelCenters of America的官方新聞稿內容，以確認TA普通股是否因合併下市及生效日期，作為結論的引用依據。",
+      "code": null
+    },
+    {
+      "ordinal": 12,
+      "kind": "source_read",
+      "at": "2026-09-07T16:47:27.574869+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 13,
+      "kind": "model_request",
+      "at": "2026-09-07T16:47:27.631108+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 14,
+      "kind": "model_result",
+      "at": "2026-09-07T16:47:32.816770+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 15,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:47:32.833003+00:00",
+      "reason": "BP新聞稿無法讀取，需尋找其他來源(如SEC 8-K、Nasdaq公告或財經媒體)確認TravelCenters of America (TA) 普通股是否已因BP收購完成而下市及其生效日期。",
+      "code": null
+    },
+    {
+      "ordinal": 16,
+      "kind": "model_request",
+      "at": "2026-09-07T16:47:32.844267+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 17,
+      "kind": "web_action",
+      "at": "2026-09-07T16:47:35.310143+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 18,
+      "kind": "web_action",
+      "at": "2026-09-07T16:47:36.060512+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 19,
+      "kind": "model_result",
+      "at": "2026-09-07T16:48:10.679389+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 20,
+      "kind": "model_request",
+      "at": "2026-09-07T16:48:10.734209+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 21,
+      "kind": "model_result",
+      "at": "2026-09-07T16:48:18.182376+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 22,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:48:18.199452+00:00",
+      "reason": "需要查閱SEC 8-K附件新聞稿內容，以確認BP完成收購TravelCenters of America後，TA普通股是否已從那斯達克下市及其生效日期，作為結論的具體引用依據。",
+      "code": null
+    },
+    {
+      "ordinal": 23,
+      "kind": "source_captured",
+      "at": "2026-09-07T16:48:18.523366+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 24,
+      "kind": "source_read",
+      "at": "2026-09-07T16:48:18.531894+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 25,
+      "kind": "model_request",
+      "at": "2026-09-07T16:48:18.573370+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 26,
+      "kind": "model_result",
+      "at": "2026-09-07T16:48:28.672191+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 27,
+      "kind": "rejected_output",
+      "at": "2026-09-07T16:48:28.687801+00:00",
+      "reason": null,
+      "code": "model_output_invalid"
+    },
+    {
+      "ordinal": 28,
+      "kind": "model_request",
+      "at": "2026-09-07T16:48:28.724109+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 29,
+      "kind": "model_result",
+      "at": "2026-09-07T16:48:38.834493+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 30,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:48:38.852362+00:00",
+      "reason": "目前source-1新聞稿僅顯示合併「預期於2023年5月15日完成」，尚未證實實際完成下市。需搜尋確認BP收購TravelCenters of America是否已於2023年5月15日或稍後實際完成、TA普通股正式從Nasdaq下市的公告或SEC Form 25/8-K，以取得決定性生效日期證據。",
+      "code": null
+    },
+    {
+      "ordinal": 31,
+      "kind": "model_request",
+      "at": "2026-09-07T16:48:38.866068+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 32,
+      "kind": "web_action",
+      "at": "2026-09-07T16:48:42.643573+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 33,
+      "kind": "web_action",
+      "at": "2026-09-07T16:48:42.652835+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 34,
+      "kind": "model_result",
+      "at": "2026-09-07T16:49:06.281514+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 35,
+      "kind": "model_request",
+      "at": "2026-09-07T16:49:06.325586+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 36,
+      "kind": "model_result",
+      "at": "2026-09-07T16:49:14.356938+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 37,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:49:14.365813+00:00",
+      "reason": "需要查閱BP收購TravelCenters of America交易實際完成的8-K申報內容（accession 000110465923060301），以確認TA普通股下市的實際生效日期，而非僅「預期」完成日期。",
+      "code": null
+    },
+    {
+      "ordinal": 38,
+      "kind": "source_captured",
+      "at": "2026-09-07T16:49:14.788047+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 39,
+      "kind": "source_read",
+      "at": "2026-09-07T16:49:14.800761+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 40,
+      "kind": "model_request",
+      "at": "2026-09-07T16:49:14.832674+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 41,
+      "kind": "model_result",
+      "at": "2026-09-07T16:49:22.758697+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 42,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:49:22.775648+00:00",
+      "reason": "source-2 為BP完成收購TravelCenters of America後所申報的8-K，需要找出其中確認合併已完成、TA普通股下市生效日期的具體段落，而非僅先前預期日期，以取得決定性引用依據。",
+      "code": null
+    },
+    {
+      "ordinal": 43,
+      "kind": "model_request",
+      "at": "2026-09-07T16:49:22.822525+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 44,
+      "kind": "model_result",
+      "at": "2026-09-07T16:49:43.638947+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 45,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:49:43.656160+00:00",
+      "reason": "已有充分且一致的一手來源（BP完成收購後所申報之8-K，source-2）明確敘述合併已完成、TA普通股已停止在那斯達克交易並將被除牌，且source-1確立TA的Nasdaq代碼與發行人身分，足以下結論，無需再搜尋。",
+      "code": null
+    },
+    {
+      "ordinal": 46,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:49:43.667588+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 47,
+      "kind": "model_request",
+      "at": "2026-09-07T16:49:43.702950+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 48,
+      "kind": "model_result",
+      "at": "2026-09-07T16:50:06.324119+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 49,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:50:06.342172+00:00",
+      "reason": "先前結論被拒因識別欄位分散於兩個來源：source-2 缺少發行人名稱/交易所/股票代碼與source-1的security_class。8-K封面通常有「Title of each class / Trading Symbol / Name of exchange」表格，同時列出普通股(Common Stock)、代碼TA與Nasdaq，需在source-2內部找到此段落以在單一來源內完整建立證券身分，同時關聯下市與生效日期段落。",
+      "code": null
+    },
+    {
+      "ordinal": 50,
+      "kind": "model_request",
+      "at": "2026-09-07T16:50:06.391998+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 51,
+      "kind": "model_result",
+      "at": "2026-09-07T16:50:13.497781+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 52,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:50:13.512629+00:00",
+      "reason": "source-2 的封面表格已包含 TITLE OF EACH CLASS / TRADING SYMBOL / NAME OF EXCHANGE 標題列（p65-p67），需要找到緊接其後的實際欄位值（如「Common Stock」、「TA」、「The Nasdaq Stock Market LLC」），以便在同一來源內完整建立證券身分（發行人、股票代碼、股份類別、交易所），並與下市/生效日期段落（p145-p146）串聯。",
+      "code": null
+    },
+    {
+      "ordinal": 53,
+      "kind": "model_request",
+      "at": "2026-09-07T16:50:13.547692+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 54,
+      "kind": "model_result",
+      "at": "2026-09-07T16:50:22.884096+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 55,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:50:22.899583+00:00",
+      "reason": "封面表格已知標題列 p65(TITLE OF EACH CLASS)/p66(TRADING SYMBOL)/p67(NAME OF EXCHANGE)及數值列 p69(TA)、p70(The NASDAQ Stock Market LLC)，唯獨缺少「TITLE OF EACH CLASS」對應的實際數值（p68，應為普通股名稱如「Common Stock, par value $0.001 per share」），需在同一來源(source-2)內取得此段落，以完整建立「發行人-股票代碼TA-證券類別-Nasdaq交易所」的單一來源身分連結，並與p145-146下市段落及p255發行人全名段落合併引用。",
+      "code": null
+    },
+    {
+      "ordinal": 56,
+      "kind": "model_request",
+      "at": "2026-09-07T16:50:22.943344+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 57,
+      "kind": "model_result",
+      "at": "2026-09-07T16:50:55.468753+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 58,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:50:55.486791+00:00",
+      "reason": "已在單一來源 source-2（BP完成收購後申報的8-K）內完整建立TA的證券身分（發行人名稱、股票代碼、證券類別、交易所）並確認合併完成後TA普通股已於2023年5月15日開盤前停止在那斯達克交易並符合下市/註銷條件，證據充分且無矛盾，可提交結論。",
+      "code": null
+    },
+    {
+      "ordinal": 59,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:50:55.498695+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 60,
+      "kind": "model_request",
+      "at": "2026-09-07T16:50:55.538118+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 61,
+      "kind": "model_result",
+      "at": "2026-09-07T16:51:15.995868+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 62,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:51:16.014350+00:00",
+      "reason": "已於單一來源 source-2（BP完成收購TravelCenters of America後申報的8-K）內完整建立TA之證券身分（發行人名稱、股票代碼TA、普通股類別、Nasdaq交易所）及下市生效日期段落：p144-p146明確敘述「因合併完成，Company Stock已於2023年5月15日開盤前停止在那斯達克交易，並符合下市及註冊終止資格」，提供具體生效日期文字'May 15, 2023'，與p125-p128、p158-p161合併股份轉換/註銷之敘述一致，無矛盾。可提交結論。",
+      "code": null
+    },
+    {
+      "ordinal": 63,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:51:16.027278+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 64,
+      "kind": "model_request",
+      "at": "2026-09-07T16:51:16.070012+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 65,
+      "kind": "model_result",
+      "at": "2026-09-07T16:51:44.678394+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 66,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:51:44.695096+00:00",
+      "reason": "在單一來源 source-2（BP完成收購TravelCenters of America後申報的8-K）封面表格中同時確立發行人名稱(p255)、股票代碼TA(p69)、普通股類別(p68)及Nasdaq交易所(p70)，並於同文件p144-p146明確敘述：因合併完成，Company Stock已於2023年5月15日開盤前停止在那斯達克交易並符合下市及註冊終止資格，提供具體生效日期'May 15, 2023'。證據充分、來源一致、無矛盾，足以提交結論。",
+      "code": null
+    },
+    {
+      "ordinal": 67,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:51:44.705037+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 68,
+      "kind": "model_request",
+      "at": "2026-09-07T16:51:44.739738+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 69,
+      "kind": "model_result",
+      "at": "2026-09-07T16:52:51.148721+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 70,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:52:51.164783+00:00",
+      "reason": "已在單一來源 source-2（BP完成收購TravelCenters of America後申報的8-K）內同時建立完整的證券身分（發行人全名p255、普通股類別p68、股票代碼TA p69、Nasdaq交易所p70、Company Stock定義p125-p126）與確定性的下市事實：p144-p146敘明因合併完成，Company Stock已於2023年5月15日開盤前停止在Nasdaq交易；p159-p161進一步敘明依合併條款，生效時間時所有已發行普通股一律取消、註銷並不再存在。announcement_date取自p87-p88所載合併協議簽署日2023年2月15日。證據充分、一致且來自單一權威來源，無矛盾，可提交結論。",
+      "code": null
+    },
+    {
+      "ordinal": 71,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:52:51.175495+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 72,
+      "kind": "model_request",
+      "at": "2026-09-07T16:52:51.210056+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 73,
+      "kind": "model_result",
+      "at": "2026-09-07T16:53:39.042307+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 74,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:53:39.058571+00:00",
+      "reason": "已於單一來源 source-2（BP完成收購TravelCenters of America後申報的8-K）內同時建立完整證券身分（發行人全名p255、普通股類別p68、股票代碼TA p69、Nasdaq交易所p70、Company Stock定義p125-p126）及交易終止事實：p144-p146敘明因合併完成，Company Stock已停止在Nasdaq交易。由於連續多次嘗試以'May 15, 2023'作為生效日期均被判定effective_date_not_supported（該日期文字在p146中緊接「became eligible for delisting」而非明確繫於「ceased to trade」一句），為避免臆測，本次改為將effective_date與effective_date_text留空，並於摘要中揭露此限制，僅以合併協議簽署日2023年2月15日（p86-p88）作為announcement_date，事件性質維持listing_ended/completed。",
+      "code": null
+    },
+    {
+      "ordinal": 75,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:53:39.071756+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 76,
+      "kind": "model_request",
+      "at": "2026-09-07T16:53:39.117771+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 77,
+      "kind": "model_result",
+      "at": "2026-09-07T16:54:16.088328+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 78,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:54:16.103492+00:00",
+      "reason": "已於單一來源 source-2（BP完成收購TravelCenters of America後申報的8-K）內完整建立證券身分並確認下市生效事實：p255確立發行人全名，p68/p69/p70確立普通股類別、股票代碼TA與Nasdaq交易所，p125-p126定義Company Stock即普通股；p144-p146為連續一句敘明「因合併完成，Company Stock已於2023年5月15日開盤前停止在那斯達克交易，並符合下市及註冊終止資格」，p159-p161進一步敘明依合併條款生效時所有已發行普通股一律取消、註銷並不再存在。announcement_date取自p86-p88所載合併協議簽署日2023年2月15日。證據充分、一致且來自單一權威來源，無矛盾，提交最終結論。",
+      "code": null
+    },
+    {
+      "ordinal": 79,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:54:16.113087+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 80,
+      "kind": "model_request",
+      "at": "2026-09-07T16:54:16.140143+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 81,
+      "kind": "model_result",
+      "at": "2026-09-07T16:55:09.210464+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 82,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:55:09.215843+00:00",
+      "reason": "已在單一權威來源 source-2（BP完成收購TravelCenters of America後申報的8-K）內完整建立證券身分並確認下市生效事實：p255確立發行人全名TravelCenters of America Inc.，p68/p69/p70確立普通股類別(Common Stock)、股票代碼TA與交易所The Nasdaq Stock Market LLC，p125-p126明確將「Company Stock」定義為該普通股。p144-p145-p146為連續同一句子，明確敘明：因合併完成之結果，Company Stock已於2023年5月15日開盤前停止在那斯達克交易，並符合下市及註冊終止資格；p159-p161進一步確認依合併條款，生效時所有已發行普通股一律取消、註銷並不再存在，與下市事實一致無矛盾。announcement_date取自p86-p88，即合併協議簽署日2023年2月15日。證據來自單一SEC申報文件，內部一致，足以支持結論。",
+      "code": null
+    },
+    {
+      "ordinal": 83,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:55:09.221937+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 84,
+      "kind": "model_request",
+      "at": "2026-09-07T16:55:09.254597+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 85,
+      "kind": "model_result",
+      "at": "2026-09-07T16:56:50.563356+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 86,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:56:50.569976+00:00",
+      "reason": "已於單一來源 source-2（BP完成收購TravelCenters of America後申報之8-K）內完整建立證券身分（發行人全名p255、普通股類別p68、股票代碼TA p69、Nasdaq交易所p70、Company Stock定義p125-p126）並確認交易終止事實：p144-p146同一句敘明因合併完成，Company Stock已於2023年5月15日開盤前停止在Nasdaq交易；p159-p161進一步確認依合併條款生效時所有已發行普通股一律取消、註銷並不再存在。惟p146同句僅稱因此'符合下市及註冊終止資格'（became eligible for delisting...），並未以獨立語句明確確認正式下市/註冊終止之生效日期本身，為避免臆測，本次改將effective_date欄位留空並於摘要及unresolved_conditions揭露此限制，僅保留可驗證的停止交易事實與合併協議簽署公告日（2023年2月15日，p86-p88）。此為本輪修正之具體差異，非重複先前被拒之提交。",
+      "code": null
+    },
+    {
+      "ordinal": 87,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:56:50.575269+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 88,
+      "kind": "model_request",
+      "at": "2026-09-07T16:56:50.599782+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 89,
+      "kind": "model_result",
+      "at": "2026-09-07T16:57:47.661938+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 90,
+      "kind": "agent_action",
+      "at": "2026-09-07T16:57:47.678560+00:00",
+      "reason": "已達最後一次結論機會。單一權威來源 source-2（BP完成收購TravelCenters of America後所申報之8-K）內同時完整建立證券身分與下市生效事實：p255確立發行人全名，p68/p69/p70分別確立普通股類別、股票代碼TA與交易所The Nasdaq Stock Market LLC，p125-p126將「Company Stock」明確定義為該普通股；p144-p146為連續同一句敘述：因合併完成之結果，Company Stock已於2023年5月15日開盤前停止在那斯達克交易，該日期'May 15, 2023'為p146中逐字出現之具體日期，可作為effective_date；p159-p161進一步確認依合併條款，生效時所有已發行普通股一律取消、註銷並不再存在，與下市事實一致。announcement_date取自p86-p88所載合併協議簽署日2023年2月15日。本次明確將p146同時標註listing_ended與effective_date兩項支持標籤，以符合先前被拒可能之引用標記缺失。",
+      "code": null
+    },
+    {
+      "ordinal": 91,
+      "kind": "rejected_finding",
+      "at": "2026-09-07T16:57:47.689361+00:00",
+      "reason": null,
+      "code": null
+    }
+  ]
+}

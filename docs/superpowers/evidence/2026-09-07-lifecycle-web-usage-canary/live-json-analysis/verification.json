@@ -1,0 +1,93 @@
+{
+  "action_ready_findings": 0,
+  "analysis_checks": [
+    {
+      "action": null,
+      "capture": "R3",
+      "child_reaped": true,
+      "finding": {
+        "action": null,
+        "block_reasons": [
+          "event_not_actionable",
+          "finding_incomplete",
+          "security_identity_not_supported"
+        ],
+        "event_kind": "acquisition_announced",
+        "unique_passage_count": 5
+      },
+      "http_attempts": 0,
+      "literal_api_key_source": "none",
+      "metadata_unchanged": true,
+      "protocol": "completed",
+      "raw_files_sha256": {
+        "analysis-output.json": "82e681302aa6c0f766160a08f3b453f8390e1ebce92bb575ebd1821013ccd693",
+        "metrics.json": "f2f547059c15b3c9a0324b091b32b14fb37ece3cc5a92a43a8f8f10fb8f59cf1",
+        "prepared.json": "f693fdc083ffe70beddafebb95c5e7807aa8f767f917d556bb16ffcdcbafdddf"
+      },
+      "sdk_submissions": 1,
+      "tool_names": [],
+      "usage": {
+        "input_tokens": 10450,
+        "output_tokens": 1204
+      }
+    },
+    {
+      "action": null,
+      "capture": "R1",
+      "child_reaped": true,
+      "finding": {
+        "action": null,
+        "block_reasons": [
+          "announcement_date_not_supported",
+          "effective_date_not_supported",
+          "finding_incomplete",
+          "security_identity_not_supported",
+          "source_citation_mismatch"
+        ],
+        "event_kind": "listing_ended",
+        "unique_passage_count": 2
+      },
+      "http_attempts": 0,
+      "literal_api_key_source": "none",
+      "metadata_unchanged": true,
+      "protocol": "completed",
+      "raw_files_sha256": {
+        "analysis-output.json": "081d585c4b307f55e89e17c72fca15b8b3805afa7adca16320dc97fe3bc36add",
+        "metrics.json": "b5ffa31a181eec4dc3a22bdfd473daddfda00e54c2c247e1f3bd787396c6c9da",
+        "prepared.json": "5de8db860b3c6ef7acf16068ccaf3393fd88d63514916ba44eeb5d374fa52d22"
+      },
+      "sdk_submissions": 1,
+      "tool_names": [],
+      "usage": {
+        "input_tokens": 8340,
+        "output_tokens": 1102
+      }
+    }
+  ],
+  "app_restart": false,
+  "commit": false,
+  "finding_quality_gap": "R1 abbreviated quotations and imprecise date text correctly prevent adoption; R3 lacks common-stock listing proof",
+  "fresh_complete_live_investigation_verified": false,
+  "historical_seals": {
+    "failed-live-r1": "a7df8829579c6069ae4b5b2136f825864aead543b6a5caf1ee20b170c9d50093",
+    "failed-renewed-r3": "79711c3a3a147242f748b58cc765ab7cf5d3a0dca2335296f4100b02648c2422",
+    "host-rejected-replay-r2": "3baa4ea61a1ca1ff918689a5b4e75166f42615a0438ff62eee6509ebd8cf23ac"
+  },
+  "merge": false,
+  "native_structured_output_prompt_alone_was_insufficient": true,
+  "no_automatic_retry_or_billing_fallback": true,
+  "observed_rate_limit_failure": false,
+  "production_migration": false,
+  "profile_actions": 0,
+  "push": false,
+  "quotations_published_as_hashes": true,
+  "raw_observations_retained_in_private_temporary_directories": true,
+  "sdk_submissions_campaign": 8,
+  "source_checkpoint": {
+    "manifest_sha256": "bc0b382b3e517e992a4818c839157e9a9c850986bdbb88f56d7c50a582c799bf",
+    "matched_files": 1101,
+    "seal_sha256": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60"
+  },
+  "source_http_attempts_campaign": 8,
+  "source_http_budget_remaining": 0
+}

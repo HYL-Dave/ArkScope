@@ -1,0 +1,61 @@
+{
+  "observations": [
+    {
+      "elapsed_seconds": 1.439,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 1.44,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 0.033,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 2.882,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 2.883,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 2.777,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 2.794,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 5.098,
+      "error": "web_recording_unavailable",
+      "status": null
+    },
+    {
+      "elapsed_seconds": 6.003,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "elapsed_seconds": 3.814,
+      "error": null,
+      "status": "failed"
+    }
+  ],
+  "production_data_access": false,
+  "provider_calls": 0
+}

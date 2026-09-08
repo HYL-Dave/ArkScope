@@ -1,0 +1,597 @@
+"""
+Agent configuration with model selection.
+
+Models can be configured via:
+1. Default values in AgentConfig
+2. config/user_profile.yaml under llm_preferences
+3. Runtime override via model parameter in queries
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, Literal, Optional
+
+import yaml
+from pydantic import BaseModel
+
+from src.env_keys import ensure_env_loaded
+from src.model_routing import (
+    ModelRouteUnavailable,
+    Provider,
+    TaskId,
+    TaskRoute,
+    default_model_for,
+    is_valid_effort,
+    model_provider,
+)
+from src.model_capabilities import capability_for
+
+logger = logging.getLogger(__name__)
+
+# Valid reasoning effort levels for GPT-5.x / o-series
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
+class AgentConfig(BaseModel):
+    """Agent model and behavior configuration."""
+
+    # OpenAI models — default tier = everyday/cheaper, advanced = frontier
+    openai_model: str = "gpt-5.6-luna"
+    openai_model_advanced: str = "gpt-5.6-sol"
+
+    # Anthropic models — default tier = everyday/cheaper, advanced = frontier
+    anthropic_model: str = "claude-sonnet-5"
+    anthropic_model_advanced: str = "claude-opus-5"
+
+    # Per-task model routing (minimal; full Settings UI later). Empty string =
+    # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
+    card_synthesis_provider: str = "anthropic"
+    card_synthesis_model: str = "claude-opus-5"
+    card_synthesis_effort: str = "high"
+    card_translation_provider: str = "anthropic"
+    card_translation_model: str = "claude-sonnet-5"
+    card_translation_effort: str = "medium"
+    # AI 研究 (Research) surface route. Empty = use the request provider's
+    # default-tier agent model (today's behavior). Honored only when its provider
+    # matches the request provider (see resolve_research_route).
+    ai_research_provider: str = "openai"
+    ai_research_model: str = "gpt-5.6-luna"
+    ai_research_effort: str = "xhigh"
+
+    lifecycle_investigation_provider: str = "anthropic"
+    lifecycle_investigation_model: str = "claude-sonnet-5"
+    lifecycle_investigation_effort: str = "high"
+
+    # Reasoning (GPT-5.x / o-series)
+    reasoning_effort: ReasoningEffort = "xhigh"
+
+    # Anthropic effort (Opus 4.5+, no beta header needed)
+    # None = don't send (server default "high")
+    anthropic_effort: Optional[str] = None
+
+    # Anthropic extended thinking (Phase 8)
+    # 開啟後根據模型自動選擇模式：
+    #   Opus 4.7: adaptive (Claude 自動判斷思考深度，不需 budget)
+    #   其他模型: enabled + budget_tokens (自動推導)
+    # max_tokens 和 budget_tokens 全自動：
+    #   effective_max_tokens = 模型最大 output (128K/64K)
+    #   budget_tokens = effective_max_tokens - config.max_tokens (留 max_tokens 給 response)
+    # 這樣不需手動配置，且效果最好
+    anthropic_thinking: bool = False
+
+    # Limits
+    max_tool_calls: int = 60
+    max_tokens: int = 16384
+    # Claude subscription Agent-SDK Research session wall-clock timeout.
+    # 0 disables the overall session timeout; per-tool timeouts still apply.
+    claude_subscription_timeout_s: float = 900.0
+
+    # Context management (Phase 3)
+    # Compact old tool results when input_tokens > model_context_limit * ratio
+    context_threshold_ratio: float = 0.7
+    # Number of recent turns to always preserve fully (each turn = assistant + tool_result)
+    context_keep_recent_turns: int = 2
+    # Characters to keep as preview in compacted results
+    context_preview_chars: int = 200
+
+    # 1M extended context beta (Anthropic only, Opus 4.7 + Sonnet 4.5)
+    extended_context: bool = False
+
+    # Subagent model overrides (Phase 6)
+    # Keys: subagent names (code_analyst, deep_researcher, data_summarizer, reviewer)
+    # Values: model IDs to override the default
+    subagent_models: Dict[str, str] = {}
+    # Subagent max_turns overrides
+    # Keys: subagent names, Values: max tool call turns
+    subagent_max_turns: Dict[str, int] = {}
+
+    # Server-side compaction L2 (Phase 7a)
+    # Anthropic: beta compact-2026-01-12, Opus 4.7 + Sonnet 4.6, context_management param
+    # OpenAI: CompactionSession for within-run context compaction
+    # Both work on top of L1 client-side compaction (ContextManager)
+    server_compaction: bool = False
+
+    # Data freshness in system prompt (default: off, preserves prompt cache hit rate)
+    freshness_in_prompt: bool = False
+
+    # Web search providers (Phase 10)
+    # Each can be independently enabled/disabled for cost control
+    web_claude_search: bool = False   # Claude server-side web search ($10/1K, off by default)
+    web_openai_search: bool = True    # OpenAI SDK WebSearchTool (included in API cost)
+    web_playwright: bool = True       # Playwright headless browser (free, local)
+    web_claude_max_uses: int = 5      # Max web searches per conversation (Claude only)
+
+    # Seeking Alpha Alpha Picks (Phase 11c)
+    sa_enabled: bool = False
+    sa_cache_hours: int = 24
+    sa_detail_cache_days: int = 7
+    sa_comments_cache_days: int = 7
+    sa_comments_backfill_per_full_scan: int = 10
+    sa_comments_backfill_per_backfill_scan: int = 50
+
+    # Free macro/calendar layer (FRED + Finnhub calendars).
+    # Gates registration of fetch_fred_series / fetch_fred_release_dates jobs
+    # so an environment without FRED_API_KEY doesn't get them surfaced via
+    # /jobs/status. Local calendar storage is always available; the flag only
+    # controls ingestion jobs.
+    macro_calendar_enabled: bool = False
+
+    # P1.4 Phase B client-side compaction (separate from server_compaction).
+    # When False (default), the legacy ContextManager path runs unchanged.
+    # When True, ContextManager delegates Layers 0-3 to ContextCompressor.
+    # Loaded from a top-level compaction: section in user_profile.yaml.
+    compaction_enabled: bool = False
+    compaction_layer_0_budget_chars: int = 8000
+    compaction_layer_2_threshold_chars: int = 100_000
+    compaction_layer_3_threshold_chars: int = 150_000
+    compaction_overflow_dir: str = "data/overflow"
+    # Layer 5 (LLM full compact, commit 5). Default OFF; when enabled it
+    # remains threshold-driven and protected by the circuit breaker.
+    compaction_layer_5_enabled: bool = False
+    compaction_layer_5_threshold_chars: int = 250_000
+    compaction_layer_5_model_anthropic: str = "claude-sonnet-5"
+
+
+_LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
+_MAIN_CONFIG_PATH = Path("config/user_profile.yaml")
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Deep merge override into base (override wins). Returns new dict."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def _load_user_profile() -> dict:
+    """Load user_profile.yaml, then deep-merge user_profile.local.yaml on top."""
+    base = {}
+    if _MAIN_CONFIG_PATH.exists():
+        with open(_MAIN_CONFIG_PATH) as f:
+            base = yaml.safe_load(f) or {}
+
+    if _LOCAL_CONFIG_PATH.exists():
+        with open(_LOCAL_CONFIG_PATH) as f:
+            local = yaml.safe_load(f) or {}
+        base = _deep_merge(base, local)
+
+    return base
+
+
+def save_local_override(section: str, key: str, value) -> None:
+    """Save a single setting to user_profile.local.yaml (persists across sessions).
+
+    Args:
+        section: Top-level YAML key (e.g. "llm_preferences")
+        key: Setting key within section (e.g. "subagent_models")
+        value: Setting value
+
+    The local file is deep-merged on top of the main config, so only
+    overridden settings need to be stored here.
+    """
+    local = {}
+    if _LOCAL_CONFIG_PATH.exists():
+        with open(_LOCAL_CONFIG_PATH) as f:
+            local = yaml.safe_load(f) or {}
+
+    # Coerce a missing OR non-dict section (a hand-edited `llm_preferences:` parses to
+    # None) to a fresh dict — symmetric with clear_local_overrides' guard — so a malformed
+    # local file can't crash the write path mid-export.
+    if not isinstance(local.get(section), dict):
+        local[section] = {}
+    local[section][key] = value
+
+    _LOCAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(_LOCAL_CONFIG_PATH, "w") as f:
+        yaml.dump(local, f, default_flow_style=False, allow_unicode=True)
+
+    # Clear cached config so next call picks up the change
+    get_agent_config.cache_clear()
+
+
+def clear_local_overrides(section: str, *keys: str) -> bool:
+    """Remove keys from a section of user_profile.local.yaml, preserving every other key.
+    Idempotent (absent keys / missing section / missing file are no-ops). Drops the section
+    if it becomes empty. Returns True iff a key was actually removed (so callers can report
+    what was really cleared, not just what they attempted). Used by route export to mirror DB
+    absence into the yaml fallback so a stale local override can't keep resolving after its
+    DB row is gone."""
+    if not _LOCAL_CONFIG_PATH.exists():
+        return False
+    with open(_LOCAL_CONFIG_PATH) as f:
+        local = yaml.safe_load(f) or {}
+    sect = local.get(section)
+    if not isinstance(sect, dict):
+        return False
+    if not any(key in sect for key in keys):
+        return False  # nothing to remove → don't rewrite the file
+    for key in keys:
+        sect.pop(key, None)
+    if not sect:
+        del local[section]
+    with open(_LOCAL_CONFIG_PATH, "w") as f:
+        yaml.dump(local, f, default_flow_style=False, allow_unicode=True)
+    get_agent_config.cache_clear()
+    return True
+
+
+@lru_cache(maxsize=1)
+def get_agent_config() -> AgentConfig:
+    """
+    Get agent configuration, merging defaults with user_profile.yaml.
+
+    user_profile.yaml can override under llm_preferences:
+        agent_model: "gpt-5.5"
+        agent_model_advanced: "gpt-5.5"
+        anthropic_model: "claude-opus-4-7"
+        anthropic_model_advanced: "claude-opus-4-7"
+        reasoning_effort: "xhigh"
+        max_tool_calls: 60
+        claude_subscription_timeout_s: 900
+        max_tokens: 16384
+        anthropic_effort: "high"
+        anthropic_thinking: false
+    """
+    config = AgentConfig()
+
+    profile = _load_user_profile()
+    llm_prefs = profile.get("llm_preferences", {})
+
+    # Override from profile
+    if "agent_model" in llm_prefs:
+        config.openai_model = llm_prefs["agent_model"]
+    if "agent_model_advanced" in llm_prefs:
+        config.openai_model_advanced = llm_prefs["agent_model_advanced"]
+    if "anthropic_model" in llm_prefs:
+        config.anthropic_model = llm_prefs["anthropic_model"]
+    if "anthropic_model_advanced" in llm_prefs:
+        config.anthropic_model_advanced = llm_prefs["anthropic_model_advanced"]
+    if "card_synthesis_provider" in llm_prefs:
+        config.card_synthesis_provider = llm_prefs["card_synthesis_provider"]
+    if "card_synthesis_model" in llm_prefs:
+        config.card_synthesis_model = llm_prefs["card_synthesis_model"]
+    if "card_synthesis_effort" in llm_prefs:
+        config.card_synthesis_effort = llm_prefs["card_synthesis_effort"]
+    if "card_translation_provider" in llm_prefs:
+        config.card_translation_provider = llm_prefs["card_translation_provider"]
+    if "card_translation_model" in llm_prefs:
+        config.card_translation_model = llm_prefs["card_translation_model"]
+    if "card_translation_effort" in llm_prefs:
+        config.card_translation_effort = llm_prefs["card_translation_effort"]
+    if "ai_research_provider" in llm_prefs:
+        config.ai_research_provider = llm_prefs["ai_research_provider"]
+    if "ai_research_model" in llm_prefs:
+        config.ai_research_model = llm_prefs["ai_research_model"]
+    if "ai_research_effort" in llm_prefs:
+        config.ai_research_effort = llm_prefs["ai_research_effort"]
+    if "lifecycle_investigation_provider" in llm_prefs:
+        config.lifecycle_investigation_provider = llm_prefs["lifecycle_investigation_provider"]
+    if "lifecycle_investigation_model" in llm_prefs:
+        config.lifecycle_investigation_model = llm_prefs["lifecycle_investigation_model"]
+    if "lifecycle_investigation_effort" in llm_prefs:
+        config.lifecycle_investigation_effort = llm_prefs["lifecycle_investigation_effort"]
+    if "reasoning_effort" in llm_prefs:
+        config.reasoning_effort = llm_prefs["reasoning_effort"]
+    if "max_tool_calls" in llm_prefs:
+        config.max_tool_calls = llm_prefs["max_tool_calls"]
+    if "max_tokens" in llm_prefs:
+        config.max_tokens = llm_prefs["max_tokens"]
+    if "claude_subscription_timeout_s" in llm_prefs:
+        config.claude_subscription_timeout_s = llm_prefs["claude_subscription_timeout_s"]
+
+    # Anthropic effort/thinking overrides
+    if "anthropic_effort" in llm_prefs:
+        config.anthropic_effort = llm_prefs["anthropic_effort"]
+    if "anthropic_thinking" in llm_prefs:
+        config.anthropic_thinking = llm_prefs["anthropic_thinking"]
+
+    # Freshness in prompt
+    if "freshness_in_prompt" in llm_prefs:
+        config.freshness_in_prompt = llm_prefs["freshness_in_prompt"]
+
+    # 1M extended context beta
+    if "extended_context" in llm_prefs:
+        config.extended_context = llm_prefs["extended_context"]
+
+    # Subagent model overrides
+    if "subagent_models" in llm_prefs:
+        config.subagent_models = llm_prefs["subagent_models"]
+    if "subagent_max_turns" in llm_prefs:
+        config.subagent_max_turns = llm_prefs["subagent_max_turns"]
+
+    # Web search overrides (Phase 10)
+    web_prefs = profile.get("web_search", {})
+    if "claude_search" in web_prefs:
+        config.web_claude_search = web_prefs["claude_search"]
+    if "claude_search_max_uses" in web_prefs:
+        config.web_claude_max_uses = web_prefs["claude_search_max_uses"]
+    if "openai_search" in web_prefs:
+        config.web_openai_search = web_prefs["openai_search"]
+    if "playwright" in web_prefs:
+        config.web_playwright = web_prefs["playwright"]
+
+    # Server-side compaction (Phase 7a)
+    if "server_compaction" in llm_prefs:
+        config.server_compaction = llm_prefs["server_compaction"]
+
+    # Seeking Alpha overrides (Phase 11c)
+    sa_prefs = profile.get("seeking_alpha", {})
+    if "enabled" in sa_prefs:
+        config.sa_enabled = sa_prefs["enabled"]
+    if "comments_cache_days" in sa_prefs:
+        config.sa_comments_cache_days = sa_prefs["comments_cache_days"]
+    if "comments_backfill_per_full_scan" in sa_prefs:
+        config.sa_comments_backfill_per_full_scan = sa_prefs["comments_backfill_per_full_scan"]
+    if "comments_backfill_per_backfill_scan" in sa_prefs:
+        config.sa_comments_backfill_per_backfill_scan = sa_prefs["comments_backfill_per_backfill_scan"]
+    if "cache_hours" in sa_prefs:
+        config.sa_cache_hours = sa_prefs["cache_hours"]
+    if "detail_cache_days" in sa_prefs:
+        config.sa_detail_cache_days = sa_prefs["detail_cache_days"]
+
+    # Free macro/calendar layer
+    mc_prefs = profile.get("macro_calendar", {})
+    if "enabled" in mc_prefs:
+        config.macro_calendar_enabled = mc_prefs["enabled"]
+
+    # Context management overrides
+    ctx_prefs = profile.get("context_management", {})
+    if "threshold_ratio" in ctx_prefs:
+        config.context_threshold_ratio = ctx_prefs["threshold_ratio"]
+    if "keep_recent_turns" in ctx_prefs:
+        config.context_keep_recent_turns = ctx_prefs["keep_recent_turns"]
+    if "preview_chars" in ctx_prefs:
+        config.context_preview_chars = ctx_prefs["preview_chars"]
+
+    # P1.4 client-side compaction overrides (top-level "compaction:" section)
+    compaction_prefs = profile.get("compaction", {})
+    if "enabled" in compaction_prefs:
+        config.compaction_enabled = compaction_prefs["enabled"]
+    if "layer_0_budget_chars" in compaction_prefs:
+        config.compaction_layer_0_budget_chars = compaction_prefs["layer_0_budget_chars"]
+    if "layer_2_threshold_chars" in compaction_prefs:
+        config.compaction_layer_2_threshold_chars = compaction_prefs["layer_2_threshold_chars"]
+    if "layer_3_threshold_chars" in compaction_prefs:
+        config.compaction_layer_3_threshold_chars = compaction_prefs["layer_3_threshold_chars"]
+    if "overflow_dir" in compaction_prefs:
+        config.compaction_overflow_dir = compaction_prefs["overflow_dir"]
+    # Layer 5 opt-in (commit 5)
+    if "layer_5_enabled" in compaction_prefs:
+        config.compaction_layer_5_enabled = compaction_prefs["layer_5_enabled"]
+    if "layer_5_threshold_chars" in compaction_prefs:
+        config.compaction_layer_5_threshold_chars = compaction_prefs["layer_5_threshold_chars"]
+    if "layer_5_model_anthropic" in compaction_prefs:
+        config.compaction_layer_5_model_anthropic = compaction_prefs["layer_5_model_anthropic"]
+
+    return config
+
+
+# Per-task model routing. Resolution: env override → user_profile → built-in
+# default. Lets card synthesis stay Opus-class while translation (and future
+# chat/deep-research) route to cheaper/faster models, without a full Settings UI.
+_DEFAULT_TRANSLATION_MODEL = "claude-sonnet-5"
+_BUILTIN_TASK_DEFAULTS = {
+    "card_synthesis": ("anthropic", "claude-opus-5", "high"),
+    "card_translation": ("anthropic", "claude-sonnet-5", "medium"),
+    "ai_research": ("openai", "gpt-5.6-luna", "xhigh"),
+    "lifecycle_investigation": ("anthropic", "claude-sonnet-5", "high"),
+}
+_TASK_ENV = {
+    "card_synthesis": (
+        "ARKSCOPE_CARD_SYNTHESIS_PROVIDER",
+        "ARKSCOPE_CARD_SYNTHESIS_MODEL",
+        "ARKSCOPE_CARD_SYNTHESIS_EFFORT",
+    ),
+    "card_translation": (
+        "ARKSCOPE_CARD_TRANSLATION_PROVIDER",
+        "ARKSCOPE_CARD_TRANSLATION_MODEL",
+        "ARKSCOPE_CARD_TRANSLATION_EFFORT",
+    ),
+    "ai_research": (
+        "ARKSCOPE_AI_RESEARCH_PROVIDER",
+        "ARKSCOPE_AI_RESEARCH_MODEL",
+        "ARKSCOPE_AI_RESEARCH_EFFORT",
+    ),
+    "lifecycle_investigation": (
+        "ARKSCOPE_LIFECYCLE_INVESTIGATION_PROVIDER",
+        "ARKSCOPE_LIFECYCLE_INVESTIGATION_MODEL",
+        "ARKSCOPE_LIFECYCLE_INVESTIGATION_EFFORT",
+    ),
+}
+_TASK_PROFILE_FIELDS = {
+    task: frozenset(
+        field.removeprefix("ARKSCOPE_").lower()
+        for field in env_fields
+    )
+    for task, env_fields in _TASK_ENV.items()
+}
+
+
+def _clean_provider(value: str | None) -> Provider | None:
+    if value in ("anthropic", "openai"):
+        return value
+    return None
+
+
+def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str, str]:
+    if task == "card_synthesis":
+        return (
+            config.card_synthesis_provider,
+            config.card_synthesis_model,
+            config.card_synthesis_effort,
+        )
+    if task == "card_translation":
+        return (
+            config.card_translation_provider,
+            config.card_translation_model,
+            config.card_translation_effort,
+        )
+    if task == "ai_research":
+        return (
+            config.ai_research_provider,
+            config.ai_research_model,
+            config.ai_research_effort,
+        )
+    if task == "lifecycle_investigation":
+        return (
+            config.lifecycle_investigation_provider,
+            config.lifecycle_investigation_model,
+            config.lifecycle_investigation_effort,
+        )
+    raise ValueError(f"unknown task: {task}")
+
+
+def _default_route_store():
+    """The app-managed route store on the profile DB (path from ARKSCOPE_PROFILE_DB).
+    Constructed fresh so the path resolves at call time — tests inject their own."""
+    from src.model_route_store import ModelRouteStore
+
+    return ModelRouteStore()
+
+
+def _db_route(task: str, route_store):
+    """The app-managed route for ``task`` from the profile DB (a single atomic row),
+    or None if no route was saved. Older tasks retain their legacy DB-error
+    fallback; Lifecycle Investigation must not change billing on a read error."""
+    try:
+        store = route_store if route_store is not None else _default_route_store()
+        return store.get(task)
+    except Exception:
+        if task == "lifecycle_investigation":
+            raise ModelRouteUnavailable() from None
+        logger.warning("model_route DB read failed for task %r; using yaml/default", task, exc_info=True)
+        return None
+
+
+def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
+    """Resolve provider + model for a per-task LLM operation.
+
+    Resolution is **real env override → profile DB → user_profile(.local) yaml →
+    built-in default**. The profile-DB route is the app-managed authority (Settings
+    writes it; CONFIG_AUTHORITY_PLAN §2); yaml is fallback + import/export. A DB route
+    is taken as a UNIT (provider/model/effort together) — yaml is NOT field-merged
+    beneath it, so a saved route can never go half-applied. real env stays the top
+    operator escape hatch. If only a model is given, known prefixes infer provider
+    (``claude-*`` → Anthropic, ``gpt-*``/``o*`` → OpenAI).
+    """
+    ensure_env_loaded()
+    config = get_agent_config()
+    env_provider_key, env_model_key, env_effort_key = _TASK_ENV[task]
+    env_provider = _clean_provider(os.environ.get(env_provider_key))
+    env_model = (os.environ.get(env_model_key) or "").strip()
+    env_effort = (os.environ.get(env_effort_key) or "").strip()
+
+    db_row = _db_route(task, route_store)
+    if db_row is not None:
+        base_provider, base_model, base_effort, from_db = (
+            db_row.provider, db_row.model, db_row.effort, True)
+    else:
+        base_provider, base_model, base_effort = _configured_task_values(config, task)
+        from_db = False
+
+    base_effort = base_effort.strip()
+    provider = env_provider or _clean_provider(base_provider)
+    model = env_model or base_model.strip()
+    effort = env_effort or base_effort or "default"
+    if env_provider or env_model or env_effort:
+        source = "env"
+    elif from_db:
+        source = "db"
+    else:
+        profile_fields = _TASK_PROFILE_FIELDS[task]
+        source = (
+            "profile"
+            if profile_fields.intersection(config.model_fields_set)
+            else "default"
+        )
+
+    if env_model and not env_provider:
+        provider = model_provider(env_model) or provider
+    elif not provider and model:
+        provider = model_provider(model)
+    if not provider:
+        provider = "anthropic"
+
+    if not model:
+        if task == "card_synthesis" and provider == "anthropic":
+            model = config.anthropic_model_advanced
+        elif task == "card_synthesis" and provider == "openai":
+            model = config.openai_model_advanced
+        elif task == "card_translation" and provider == "anthropic":
+            model = _DEFAULT_TRANSLATION_MODEL
+        elif task == "ai_research" and provider == "anthropic":
+            model = config.anthropic_model       # Research default tier (not advanced)
+        elif task == "ai_research" and provider == "openai":
+            model = config.openai_model
+        else:
+            model = default_model_for(provider, task)
+
+    warning = None
+    if not is_valid_effort(provider, effort, model=model):
+        warning = f"unsupported_effort:{effort}"
+
+    return TaskRoute(
+        task=task,
+        provider=provider,
+        model=model,
+        effort=effort,
+        source=source,
+        custom=capability_for(model) is None,
+        warning=warning,
+    )
+
+
+def task_model(task: TaskId) -> str:
+    """Resolve the model id for a per-task LLM operation."""
+    return task_route(task).model
+
+
+def task_provider(task: TaskId) -> Provider:
+    """Resolve the provider for a per-task LLM operation."""
+    return task_route(task).provider
+
+
+def resolve_research_route(provider: Provider, *, route_store=None) -> tuple[str, Optional[str]]:
+    """Model + effort the AI 研究 surface should use for ``provider`` when the
+    request specifies neither. Honors a configured ``ai_research`` route ONLY when
+    its provider matches the request provider; otherwise the request provider's
+    current built-in model and explicit research effort are used. A matching
+    stored legacy ``default``/empty effort remains ``None`` so shared admission
+    rejects it for explicit correction; this resolver never rewrites stored
+    authority. The Research page picks the provider, so model/effort resolution
+    remains scoped to that provider."""
+    route = task_route("ai_research", route_store=route_store)
+    if route.provider == provider and route.source != "default":
+        effort = None if route.effort in ("", "default") else route.effort
+        return route.model, effort
+    config = get_agent_config()
+    model = config.anthropic_model if provider == "anthropic" else config.openai_model
+    return model, "xhigh"

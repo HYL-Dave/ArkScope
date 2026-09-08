@@ -1,0 +1,128 @@
+{
+  "failure_code": "execution_identity_changed",
+  "finished_at": "2026-09-07T00:33:36.811880+00:00",
+  "human_adoptions_created": 0,
+  "human_assessments_created": 0,
+  "journal_calls": {
+    "search-1": {
+      "terminal": null
+    }
+  },
+  "journal_model_submissions": 1,
+  "local_children_reaped": [
+    true
+  ],
+  "phase_replies": [],
+  "result_status": "remote_outcome_unknown",
+  "sdk_query_submissions": 1,
+  "sec_contact_configured": true,
+  "sessions": [
+    {
+      "allowed_tools": [
+        "WebSearch"
+      ],
+      "api_key_env_empty": true,
+      "api_token_env_empty": true,
+      "auto_compact_disabled": "1",
+      "cli_max_retries": "0",
+      "disallowed_tools": [
+        "Bash",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Skill",
+        "Task",
+        "WebFetch",
+        "Write"
+      ],
+      "events": [
+        {
+          "api_key_source": "none",
+          "kind": "init",
+          "mcp_server_count": 0,
+          "model": "claude-sonnet-5",
+          "tools": [
+            "StructuredOutput",
+            "WebSearch"
+          ]
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": [
+            "WebSearch"
+          ]
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": [
+            "WebSearch"
+          ]
+        },
+        {
+          "kind": "RateLimitEvent"
+        },
+        {
+          "kind": "UserMessage"
+        },
+        {
+          "kind": "UserMessage"
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": []
+        },
+        {
+          "error_present": false,
+          "kind": "assistant",
+          "model": "claude-sonnet-5",
+          "tool_names": [
+            "StructuredOutput"
+          ]
+        },
+        {
+          "kind": "UserMessage"
+        },
+        {
+          "has_structured_output": true,
+          "is_error": false,
+          "kind": "result",
+          "model_usage_models": [
+            "claude-haiku-4-5-20251001",
+            "claude-sonnet-5"
+          ],
+          "num_turns": 4,
+          "permission_denial_count": 0,
+          "subtype": "success",
+          "terminal_reason": "completed"
+        }
+      ],
+      "fallback_model": null,
+      "max_turns": 6,
+      "model": "claude-sonnet-5",
+      "permission_mode": "dontAsk",
+      "setting_sources": [],
+      "strict_mcp_config": true,
+      "tools": [
+        "WebSearch"
+      ]
+    }
+  ],
+  "source_http_requests": 0,
+  "source_reads": [],
+  "stages": [
+    "searching"
+  ],
+  "started_at": "2026-09-07T00:33:15.754366+00:00",
+  "token_backend": "keyring",
+  "token_loads": 1
+}

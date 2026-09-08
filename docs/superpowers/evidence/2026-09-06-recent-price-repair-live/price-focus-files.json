@@ -1,0 +1,32 @@
+{
+  "count": 27,
+  "files": [
+    "docs/superpowers/evidence/2026-09-06-recent-price-repair-live/scripts/test_run_repair.py",
+    "docs/superpowers/evidence/2026-09-06-recent-price-repair/scripts/test_recent_scope.py",
+    "tests/test_data_coverage_tools.py",
+    "tests/test_data_scheduler.py",
+    "tests/test_ibkr_gateway_lock.py",
+    "tests/test_ibkr_source_event_loop.py",
+    "tests/test_ibkr_source_import_safety.py",
+    "tests/test_ibkr_source_intraday.py",
+    "tests/test_lifecycle_tracking_and_price_repair_routes.py",
+    "tests/test_market_coverage_boundaries.py",
+    "tests/test_market_coverage_calendar.py",
+    "tests/test_market_coverage_classifier.py",
+    "tests/test_market_coverage_dependencies.py",
+    "tests/test_market_coverage_observations.py",
+    "tests/test_market_data_admin.py",
+    "tests/test_market_data_direct.py",
+    "tests/test_price_coverage_history_gaps.py",
+    "tests/test_price_coverage_multiday_regression.py",
+    "tests/test_price_coverage_repair.py",
+    "tests/test_price_coverage_repair_workflow.py",
+    "tests/test_prices_quote_route.py",
+    "tests/test_prices_runtime.py",
+    "tests/test_recent_price_repair.py",
+    "tests/test_recent_price_repair_routes.py",
+    "tests/test_security_lifecycle_ibkr_evidence.py",
+    "tests/test_security_lifecycle_routes.py",
+    "tests/test_trading_day_coverage.py"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "added": {
+    "apps/arkscope-web/src/lifecycle/webUsageContract.test.ts": "4e8a08a86c816c06143d8d34645585da03fab3aeccdbaca322df1020176f741b",
+    "src/auth_drivers/lifecycle_web_usage.py": "811984a403ea06844ed35def92e10038ff52881b1a7bf202c0d5d3171df49639",
+    "tests/test_lifecycle_web_usage.py": "7776f2d5b80537999e7b9c5dcae7806ec0c0ed1f6fbe7e760f7e457d02dd591e",
+    "tests/test_lifecycle_web_usage_journal.py": "800b58e335b5516ba0e3344345dc0fbe524b27bf345cfc7cc3f6391c94024c18"
+  },
+  "changed": {
+    "apps/arkscope-web/src/i18n/resources.test.ts": {
+      "after": "18146260b0219653563dd52d550f266c328ef41113fb0e1e4c7dc8ddcbcba681",
+      "before": "4ceefcd01bf9a2739c4f2701eee925e630fd8f909e618ef5953c5307b265aba2"
+    },
+    "apps/arkscope-web/src/i18n/resources/en/explore.ts": {
+      "after": "2c02f74b8733576c019e0f264c65f36c074c277b73f695c6b0e64a56e1bffebc",
+      "before": "37440c674f5249b77e9c5143c313bf3aedf26288f7e694dcbf6a19a93b60968d"
+    },
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts": {
+      "after": "b9a64ad0a3b8ea734f447c042bc3ae2c756993585204bb5ef7bc41a3a19d8114",
+      "before": "a96ba4aac50398a11e8fc5386b39cb884bbe03820f58ba427bd2606e7fc0a6a7"
+    },
+    "apps/arkscope-web/src/lifecycle/LifecycleWebPanel.test.tsx": {
+      "after": "396f4c9f39878c514ebd1c3c5f95ab2baece5dd5d79b66c807344efa55a9efea",
+      "before": "2eea6abb982c46db2077757cb3d79dff2e535ee70d4192b7d5bbb59d5f42a027"
+    },
+    "apps/arkscope-web/src/lifecycle/LifecycleWebPanel.tsx": {
+      "after": "8b4c95acf4b51b9e9fbd6a98778df038f329b3caf7fde953da1176b85e9ad4e1",
+      "before": "b4153465453b7d6dde544de1d9e5e91c544a851ce8726d6a32a6bc1dd4b7c586"
+    },
+    "apps/arkscope-web/src/lifecycle/webContract.ts": {
+      "after": "2f42f3e719fe524db5e8d8958bc0c6d3718cf85a8062d928406cdd135770b523",
+      "before": "39c3ee7f8d0cd5df7f0f118129e40f0462c3ddadaa03fe38048778b9ab417c39"
+    },
+    "apps/arkscope-web/src/lifecycle/webFixtures.ts": {
+      "after": "b5111dccfcd352755b7598ab03747ba56cb51aab8a1e102db046f463d18e02f5",
+      "before": "2e1c082fda3d3835bda8867775ff78550469b8f234eca202bbd34653a74cba26"
+    },
+    "apps/arkscope-web/src/lifecycle/webPresentation.test.ts": {
+      "after": "33d8867da88bd794b394a1b54d748d08b969c662542ae5f9ab1252c985186a46",
+      "before": "863ad7c6232fee6de89741231c5a9a5ec0a1c2c16902c6e0a86a378595367e06"
+    },
+    "apps/arkscope-web/src/styles.css": {
+      "after": "c5356e82337f8d5b57713de30a933698570ad1df2bcf666a46dc06949f6c3709",
+      "before": "ebf820d3a80fa722d7f6ec2d376334302b25539e8a66a8bdb8c69e97f10f2c1d"
+    },
+    "src/auth_drivers/lifecycle_web_claude.py": {
+      "after": "75c771c20f8d15c259992340ad853f9eefdeb96aea3b22ab48ae59bf6591e2e9",
+      "before": "e10f318d1ea418908a944b020e5fdcd06411adcffdb8489bfbb449d6a740ff48"
+    },
+    "src/auth_drivers/lifecycle_web_models.py": {
+      "after": "224bdf755b12012c1ff83fedac7268343d91d60088b2bfc66b671242c4c719e8",
+      "before": "2c2e2312464cb1d4ce75e7565000bffc0d582cf0475a2422bfee5a275af2845c"
+    },
+    "src/lifecycle_web_controller.py": {
+      "after": "53ea4742202a5838df96297cd79d27399a2e861a827ac6540c316eccecc26cf8",
+      "before": "ffbf4acd9d5aedeaa31755e5e41e2020f2f954a04c47d1c47c391d6650fed5db"
+    },
+    "src/lifecycle_web_projection.py": {
+      "after": "d1d1bef42deea9c22dc256b3b9ffa6066b0b8330bf1337ebe654bac5090572e3",
+      "before": "f9814424f27e1829de6ee1453b4a1544ef1eb1d4662180694bf6259570165658"
+    },
+    "src/lifecycle_web_store.py": {
+      "after": "c1da9c0de042e78c5f1f95d964abc429ebf51383163803846e66401de736155f",
+      "before": "0f9a82d6ec1bca169a182577c92a25a3dda5875c1badf70903be5c1c6f4471cd"
+    },
+    "tests/test_lifecycle_web_frontend_contract.py": {
+      "after": "b0aa233a95200b85e1a3624da22976ffb7f76a63e462c51e170cb36c40e4d1ea",
+      "before": "5b8aa78147f5af4718327c91b1c6a59dc0a09b5e5405705c947f6f22ab507ee4"
+    }
+  }
+}

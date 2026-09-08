@@ -1,0 +1,17 @@
+[
+  {
+    "call_id": "step-1",
+    "remote_id": "94da180e-00a7-4d26-9b19-95d6bc59e951",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-2",
+    "remote_id": "c9df4513-0d3d-473d-be84-eaaac9ea9da9",
+    "terminal": "completed"
+  },
+  {
+    "call_id": "step-3",
+    "remote_id": "6fe85f8b-ef00-42c0-a688-d2400909163f",
+    "terminal": "completed"
+  }
+]

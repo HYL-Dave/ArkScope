@@ -1,0 +1,200 @@
+{
+  "capture_files_sha256": {
+    "authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+    "metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+    "profile.sqlite": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+    "result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+    "search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a"
+  },
+  "capture_source_checkpoint": {
+    "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+    "matched_files": 1084,
+    "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+  },
+  "events": [
+    {
+      "api_key_source": "none",
+      "kind": "init",
+      "mcp_server_count": 0,
+      "model": "claude-sonnet-5",
+      "session_matches_request": true,
+      "tools": []
+    },
+    {
+      "kind": "RateLimitEvent"
+    },
+    {
+      "error_present": false,
+      "kind": "assistant",
+      "model": "claude-sonnet-5",
+      "structured_output_attempts": [],
+      "tool_names": []
+    },
+    {
+      "errors": [],
+      "final_json_schema_valid": true,
+      "has_structured_output": false,
+      "is_error": false,
+      "kind": "result",
+      "model_usage": {
+        "models": [
+          {
+            "cache_creation_input_tokens": 7319,
+            "cache_read_input_tokens": 1217,
+            "input_tokens": 8340,
+            "invalid_fields": [],
+            "model": "claude-sonnet-5",
+            "output_tokens": 1102,
+            "shape": "object",
+            "web_search_requests": 0
+          }
+        ],
+        "shape": "object"
+      },
+      "model_usage_models": [
+        "claude-sonnet-5"
+      ],
+      "native_output_is_observation_not_host_acceptance": true,
+      "native_output_projection": {
+        "announcement_date": "2023-05-10",
+        "announcement_date_text": "Published May 10, 2023 1:30pm EDT",
+        "citations": [
+          {
+            "quote_sha256": "43093735f53b7450e9d3761de2019bc11977b543277a30b286d310f59c7dedb2",
+            "quote_utf8_bytes": 183,
+            "source_id": "source-4",
+            "supports": [
+              "listing_ended",
+              "acquisition_announced"
+            ]
+          },
+          {
+            "quote_sha256": "ff6ad07b618e3e3711ac35127ed7fd98f6f3a4158e2d5bf5fb0b796672ea3f18",
+            "quote_utf8_bytes": 120,
+            "source_id": "source-4",
+            "supports": [
+              "effective_date",
+              "announcement_date"
+            ]
+          },
+          {
+            "quote_sha256": "e7f8888506087c6dfb4a570eaef4c6795e7642ea572829fe57a8d0ff98432538",
+            "quote_utf8_bytes": 149,
+            "source_id": "source-1",
+            "supports": [
+              "listing_ended",
+              "acquisition_announced",
+              "security_identity"
+            ]
+          },
+          {
+            "quote_sha256": "f09ef32bfc4261b4ac5d5a5f5efd179c83b82704ab5b2775563e4bf018623a68",
+            "quote_utf8_bytes": 82,
+            "source_id": "source-1",
+            "supports": [
+              "contradiction"
+            ]
+          },
+          {
+            "quote_sha256": "04348b3a8c5d65f211a6c920b559247f4ac8b69228fd8703d0014adff1e3ecee",
+            "quote_utf8_bytes": 191,
+            "source_id": "source-2",
+            "supports": [
+              "listing_ended"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": "2023-05-15",
+        "effective_date_text": "expected to occur on May 15, 2023",
+        "event_kind": "listing_ended",
+        "issuer_name": "TravelCenters of America Inc.",
+        "security_class": "common stock",
+        "source_ticker": "TA",
+        "successor_ticker": null,
+        "summary": "TravelCenters of America Inc. (Nasdaq: TA) common stock ceased trading on Nasdaq upon completion of its all-cash acquisition by BP. Stockholders approved the merger on May 10, 2023, with closing expected May 15, 2023; a subsequent press release confirms the acquisition closed and TA common stock was acquired by BP. Upon closing, TA shares were canceled and no longer traded on Nasdaq. Separately, TA's senior notes (TANNI, TANNL, TANNZ) were voluntarily delisted from Nasdaq via Form 25 filed May 26, 2023, effective on or about June 5, 2023, and redeemed June 15, 2023 \u2014 this pertains to debt securities, not the common stock. No successor ticker exists; TA became a wholly-owned subsidiary of BP, which is an acquirer, not a continuation of the same listed security.",
+        "timing": "completed",
+        "unresolved_conditions": [
+          "The exact confirmed closing date of the BP-TA merger (common stock) is based on a pre-closing expectation of May 15, 2023 rather than a post-closing confirmation notice within the reviewed passages; a definitive same-day completion notice for the common stock (as opposed to the notes) was not present in the read sources."
+        ],
+        "venue": "NASDAQ"
+      },
+      "num_turns": 1,
+      "permission_denial_count": 0,
+      "session_matches_request": true,
+      "subtype": "success",
+      "terminal_reason": "completed"
+    }
+  ],
+  "finished_at": "2026-09-07T12:24:26.416585+00:00",
+  "harness_sha256": "e85b5adeda59d34a02409104d2f304ffb9cb173f97c1ee9df4f1ee6c46cb3412",
+  "kind": "analysis_only_diagnostic_not_new_end_to_end_run",
+  "local_children_reaped": [
+    true
+  ],
+  "model_requests": 1,
+  "options": {
+    "cli_max_retries": "0",
+    "fallback_model": null,
+    "max_turns": 2,
+    "model": "claude-sonnet-5",
+    "native_output_format": null,
+    "output_mode": "final_json",
+    "output_schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+    "prompt_schema_matches_contract": true,
+    "system_prompt_sha256": "94fabbc661d1b74408657a8a89140697b7e0a5e239215608b438cb0bf953ed71",
+    "tools": []
+  },
+  "original_capture_unchanged": true,
+  "prompt_sha256": "99847cf20e3610345feb1376602778bda0940453eb6bff285f8a55dd863181eb",
+  "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+  "sdk_submissions": 1,
+  "search_submissions": 0,
+  "selected_metadata_unchanged": true,
+  "source_checkpoint": {
+    "manifest_sha256": "bc0b382b3e517e992a4818c839157e9a9c850986bdbb88f56d7c50a582c799bf",
+    "matched_files": 1101,
+    "seal_sha256": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60"
+  },
+  "source_http_requests": 0,
+  "started_at": "2026-09-07T12:24:14.278089+00:00",
+  "status": "completed",
+  "stop_state": "running",
+  "terminal_statuses": {
+    "analysis-1": "completed"
+  },
+  "token_loads": 1,
+  "usage": {
+    "input_tokens": 8340,
+    "output_tokens": 1102
+  },
+  "usage_observation": {
+    "basis": "claude_model_usage",
+    "main_loop": {
+      "cache_creation_input_tokens": 7319,
+      "cache_read_input_tokens": 1217,
+      "input_tokens": 2,
+      "output_tokens": 1078,
+      "web_search_requests": null
+    },
+    "values": {
+      "cache_creation_input_tokens": 7319,
+      "cache_read_input_tokens": 1217,
+      "input_tokens": 8340,
+      "output_tokens": 1102,
+      "web_search_requests": 0
+    }
+  },
+  "validated_finding": {
+    "action": null,
+    "block_reasons": [
+      "announcement_date_not_supported",
+      "effective_date_not_supported",
+      "finding_incomplete",
+      "security_identity_not_supported",
+      "source_citation_mismatch"
+    ],
+    "event_kind": "listing_ended",
+    "unique_passage_count": 2
+  }
+}

@@ -1,0 +1,129 @@
+[
+  {
+    "name": "borrow_research_route",
+    "owner": "test_web_preflight_factory_uses_dedicated_profile_route",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_web_preflight_factory_uses_dedicated_profile_route"
+    ],
+    "errors": []
+  },
+  {
+    "name": "route_read_failure_falls_back",
+    "owner": "test_investigation_route_read_error_is_not_a_billing_fallback",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_investigation_route_read_error_is_not_a_billing_fallback"
+    ],
+    "errors": []
+  },
+  {
+    "name": "unknown_model_eligible",
+    "owner": "test_unknown_discovered_models_stay_visible_but_not_executable_for_investigation",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_unknown_discovered_models_stay_visible_but_not_executable_for_investigation"
+    ],
+    "errors": []
+  },
+  {
+    "name": "ignore_result_schema",
+    "owner": "test_investigation_schema_check_does_not_accept_malformed_success",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_investigation_schema_check_does_not_accept_malformed_success[output1]"
+    ],
+    "errors": []
+  },
+  {
+    "name": "ignore_terminal_witness",
+    "owner": "test_investigation_schema_check_requires_completed_tool_free_witness[missing_terminal]",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_investigation_schema_check_requires_completed_tool_free_witness[missing_terminal]"
+    ],
+    "errors": []
+  },
+  {
+    "name": "ignore_unexpected_search",
+    "owner": "test_investigation_schema_check_requires_completed_tool_free_witness[unexpected_search]",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_investigation_schema_check_requires_completed_tool_free_witness[unexpected_search]"
+    ],
+    "errors": []
+  },
+  {
+    "name": "use_generic_test_transport",
+    "owner": "test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[anthropic-api_key-claude-sonnet-5]",
+      "test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[anthropic-claude_code_oauth-claude-sonnet-5]",
+      "test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[openai-api_key-gpt-5.6-luna]",
+      "test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[openai-chatgpt_oauth-gpt-5.6-luna]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-credential_rejected]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-provider_rate_limited]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-timeout]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-model_output_invalid]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-credential_rejected]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-provider_rate_limited]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-timeout]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-model_output_invalid]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-credential_rejected]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-provider_rate_limited]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-timeout]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-model_output_invalid]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-credential_rejected]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-provider_rate_limited]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-timeout]",
+      "test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-model_output_invalid]",
+      "test_investigation_schema_check_does_not_accept_malformed_success[output0]",
+      "test_investigation_schema_check_does_not_accept_malformed_success[output1]",
+      "test_investigation_schema_check_does_not_accept_malformed_success[output2]",
+      "test_investigation_schema_check_does_not_accept_malformed_success[output3]",
+      "test_investigation_schema_check_requires_completed_tool_free_witness[missing_terminal]",
+      "test_investigation_schema_check_requires_completed_tool_free_witness[unexpected_search]",
+      "test_investigation_schema_check_missing_selected_credential_never_dispatches"
+    ],
+    "errors": []
+  },
+  {
+    "name": "custom_model_save_bypass",
+    "owner": "test_investigation_save_rejects_unsupported_models_before_writing[gpt-unknown-custom-model_not_in_registry]",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_investigation_save_rejects_unsupported_models_before_writing[gpt-unknown-custom-model_not_in_registry]",
+      "test_investigation_import_does_not_accept_models_save_would_reject",
+      "test_investigation_schema_check_cannot_bypass_model_policy[openai-api_key-gpt-unknown-custom]"
+    ],
+    "errors": []
+  },
+  {
+    "name": "share_generic_task_authority",
+    "owner": "test_runtime_selection_checks_new_task_not_borrowed_research",
+    "owned": true,
+    "exit_code": 1,
+    "nodes": 976,
+    "failed": [
+      "test_runtime_selection_checks_new_task_not_borrowed_research"
+    ],
+    "errors": []
+  }
+]

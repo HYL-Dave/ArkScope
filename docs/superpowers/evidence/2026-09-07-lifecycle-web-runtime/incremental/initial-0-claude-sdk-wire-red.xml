@@ -1,0 +1,1111 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="25" time="0.927" timestamp="2026-09-06T23:15:03.692787+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness" time="0.011" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_analysis_has_no_web_or_filesystem_tools" time="0.006"><failure message="AssertionError: assert 4 == 2&#10; +  where 4 = ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).max_turns&#10; +    where ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None) = &lt;tests.test_lifecycle_web_claude.Client object at 0x7895536a4130&gt;.options">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7895536a4430&gt;
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_has_no_web_or_filesystem_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        assert clients[0].options.tools == [] and "WebSearch" in clients[0].options.disallowed_tools
+&gt;       assert clients[0].options.max_turns == 2
+E       AssertionError: assert 4 == 2
+E        +  where 4 = ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).max_turns
+E        +    where ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None) = &lt;tests.test_lifecycle_web_claude.Client object at 0x7895536a4130&gt;.options
+
+tests/test_lifecycle_web_claude.py:145: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init0]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init1]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init2]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init3]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init4]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_rejects_changed_init_and_never_falls_back[init5]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result0-execution_identity_changed]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result1-model_result_incomplete]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result2-model_result_incomplete]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result3-execution_identity_changed]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_requires_owned_terminal_and_exact_output[result4-model_output_invalid]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_observed_web_call_without_pretool_reservation_is_rejected" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_pretool_gate_denies_files_subagents_and_budget_excess" time="0.004" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[True]" time="0.057" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_interrupt_ack_and_local_cleanup_are_not_remote_cancellation[False]" time="0.157" /><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[allowed-None-None]" time="0.006"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7895536a0430&gt;
+status = 'allowed', session = None, code = None
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("status,session,code", [
+        ("allowed", None, None), ("allowed_warning", None, None),
+        ("rejected", None, "provider_rate_limited"),
+        ("allowed", "foreign-session", "execution_identity_changed"),
+        ("unknown", None, "protocol_incompatible"),
+    ])
+    async def test_claude_web_handles_owned_rate_limit_events(monkeypatch, status, session, code):
+        from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    
+        async def events(client):
+            yield RateLimitEvent(rate_limit_info=RateLimitInfo(status=status), uuid="limit-1",
+                                 session_id=session or client.options.session_id)
+            yield _result(client.options.session_id)
+    
+        mod, clients = _setup(monkeypatch, before_result=events)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if code is None:
+&gt;           assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude.py:265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:264: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:250: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:234: in call_claude_web
+    raise failure
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', cre...'), call_id='search-1', phase='search', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=5.0)
+credential = WebCredential(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', credential_id='local:7'))
+control = &lt;src.security_lifecycle_web_contract.RunControl object at 0x7895536a0c70&gt;
+
+    async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -&gt; ModelReply:
+        call.__post_init__()
+        token = getattr(credential.token_record, "access_token", None)
+        if (call.selection != credential.selection or call.selection != control.selection
+                or call.selection.provider != "anthropic" or call.selection.auth_mode != "claude_code_oauth"
+                or credential.api_key is not None or not isinstance(token, str) or not token):
+            raise WebModelError("execution_identity_changed")
+        if control.stop_state != "running":
+            raise WebModelError("stop_requested")
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except Exception:
+            raise WebModelError("adapter_unavailable") from None
+        deadline = time.monotonic() + call.timeout_seconds
+        session_id = str(uuid4())
+        gate = WebToolGate(call, control, session_id)
+        with tempfile.TemporaryDirectory(prefix="ark-lifecycle-web-claude-") as directory:
+            config = Path(directory) / "config"
+            cwd = Path(directory) / "work"
+            config.mkdir(mode=0o700)
+            cwd.mkdir(mode=0o700)
+            environment = build_claude_child_environment(token=token, config_dir=str(config))
+            environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
+            tools = ["WebSearch"] if call.phase == "search" else []
+            disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+            options = ClaudeAgentOptions(
+                model=call.selection.model, effort=call.effort, fallback_model=None,
+                system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
+                output_format={"type": "json_schema", "schema": call.output_schema},
+                tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+                mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+                hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+                max_turns=call.max_search_uses + 2, session_id=session_id,
+                cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+                stderr=discard_claude_sdk_stderr,
+            )
+            client = _client(options)
+            dispatched = False
+            initialized = False
+            stop_sent = False
+            stop_deadline = None
+            failure: WebModelError | None = None
+            pending = None
+            iterator = None
+            observed_search = set()
+            try:
+                await asyncio.wait_for(client.connect(), max(0.01, deadline - time.monotonic()))
+                control.reserve_model_request(call.call_id)
+                dispatched = True
+                await asyncio.wait_for(client.query(call.prompt, session_id=session_id), max(0.01, deadline - time.monotonic()))
+                iterator = client.receive_response().__aiter__()
+                while True:
+                    if gate.failure is not None and failure is None:
+                        failure = WebModelError(gate.failure)
+                    if control.stop_state != "running" or time.monotonic() &gt;= deadline or failure is not None:
+                        if failure is None:
+                            failure = WebModelError("stop_requested" if control.stop_state != "running" else "timeout")
+                        control.request_stop()
+                        if not stop_sent:
+                            stop_sent = True
+                            stop_deadline = time.monotonic() + _STOP_GRACE_SECONDS
+                            try:
+                                await asyncio.wait_for(client.interrupt(), _STOP_GRACE_SECONDS)
+                                if initialized:
+                                    control.observe_interrupt_ack(call.call_id, session_id)
+                            except Exception:
+                                pass
+                        if time.monotonic() &gt;= stop_deadline:
+                            raise failure
+                    if pending is None:
+                        pending = asyncio.create_task(iterator.__anext__())
+                    done, _ = await asyncio.wait({pending}, timeout=0.05)
+                    if not done:
+                        continue
+                    try:
+                        message = pending.result()
+                    except StopAsyncIteration:
+                        raise failure or WebModelError("model_result_incomplete") from None
+                    finally:
+                        pending = None
+                    try:
+                        if isinstance(message, SystemMessage):
+                            if message.subtype == "init":
+                                _validate_init(message, call=call, session_id=session_id)
+                                control.bind_remote_id(call.call_id, session_id)
+                                initialized = True
+                            elif message.subtype.startswith(("task_", "compact")):
+                                raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, AssistantMessage):
+                            if not initialized or message.parent_tool_use_id is not None:
+                                raise WebModelError("execution_identity_changed")
+                            require_response_model(message, call.selection.model)
+                            if message.error is not None:
+                                raise WebModelError("provider_call_failed")
+                            for block in message.content:
+                                if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                    observed_search.add(block.id)
+                                    control.observe_web_action(call.call_id, block.id, "search")
+                                elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                                    continue
+                                elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                    raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, ResultMessage):
+                            if not initialized:
+                                raise WebModelError("subscription_auth_unverified")
+                            status = _result_status(message, call=call, session_id=session_id)
+                            control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
+                            if failure is not None:
+                                raise failure
+                            if not observed_search.issubset(gate.search_reservations):
+                                raise WebModelError("tool_admission_missing")
+                            if status != "completed":
+                                raise WebModelError("model_result_incomplete")
+                            output = validate_output(message.structured_output, call.output_schema)
+                            return ModelReply(session_id, output, normalized_usage(message.usage))
+                        elif isinstance(message, UserMessage):
+                            if message.parent_tool_use_id is not None:
+                                raise WebModelError("unexpected_tool_activity")
+                        else:
+&gt;                           raise WebModelError("protocol_incompatible")
+E                           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_claude.py:245: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[allowed_warning-None-None]" time="0.006"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7895536a07c0&gt;
+status = 'allowed_warning', session = None, code = None
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("status,session,code", [
+        ("allowed", None, None), ("allowed_warning", None, None),
+        ("rejected", None, "provider_rate_limited"),
+        ("allowed", "foreign-session", "execution_identity_changed"),
+        ("unknown", None, "protocol_incompatible"),
+    ])
+    async def test_claude_web_handles_owned_rate_limit_events(monkeypatch, status, session, code):
+        from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    
+        async def events(client):
+            yield RateLimitEvent(rate_limit_info=RateLimitInfo(status=status), uuid="limit-1",
+                                 session_id=session or client.options.session_id)
+            yield _result(client.options.session_id)
+    
+        mod, clients = _setup(monkeypatch, before_result=events)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if code is None:
+&gt;           assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude.py:265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:264: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:250: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:234: in call_claude_web
+    raise failure
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', cre...'), call_id='search-1', phase='search', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=5.0)
+credential = WebCredential(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', credential_id='local:7'))
+control = &lt;src.security_lifecycle_web_contract.RunControl object at 0x7895536a1240&gt;
+
+    async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -&gt; ModelReply:
+        call.__post_init__()
+        token = getattr(credential.token_record, "access_token", None)
+        if (call.selection != credential.selection or call.selection != control.selection
+                or call.selection.provider != "anthropic" or call.selection.auth_mode != "claude_code_oauth"
+                or credential.api_key is not None or not isinstance(token, str) or not token):
+            raise WebModelError("execution_identity_changed")
+        if control.stop_state != "running":
+            raise WebModelError("stop_requested")
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except Exception:
+            raise WebModelError("adapter_unavailable") from None
+        deadline = time.monotonic() + call.timeout_seconds
+        session_id = str(uuid4())
+        gate = WebToolGate(call, control, session_id)
+        with tempfile.TemporaryDirectory(prefix="ark-lifecycle-web-claude-") as directory:
+            config = Path(directory) / "config"
+            cwd = Path(directory) / "work"
+            config.mkdir(mode=0o700)
+            cwd.mkdir(mode=0o700)
+            environment = build_claude_child_environment(token=token, config_dir=str(config))
+            environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
+            tools = ["WebSearch"] if call.phase == "search" else []
+            disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+            options = ClaudeAgentOptions(
+                model=call.selection.model, effort=call.effort, fallback_model=None,
+                system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
+                output_format={"type": "json_schema", "schema": call.output_schema},
+                tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+                mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+                hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+                max_turns=call.max_search_uses + 2, session_id=session_id,
+                cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+                stderr=discard_claude_sdk_stderr,
+            )
+            client = _client(options)
+            dispatched = False
+            initialized = False
+            stop_sent = False
+            stop_deadline = None
+            failure: WebModelError | None = None
+            pending = None
+            iterator = None
+            observed_search = set()
+            try:
+                await asyncio.wait_for(client.connect(), max(0.01, deadline - time.monotonic()))
+                control.reserve_model_request(call.call_id)
+                dispatched = True
+                await asyncio.wait_for(client.query(call.prompt, session_id=session_id), max(0.01, deadline - time.monotonic()))
+                iterator = client.receive_response().__aiter__()
+                while True:
+                    if gate.failure is not None and failure is None:
+                        failure = WebModelError(gate.failure)
+                    if control.stop_state != "running" or time.monotonic() &gt;= deadline or failure is not None:
+                        if failure is None:
+                            failure = WebModelError("stop_requested" if control.stop_state != "running" else "timeout")
+                        control.request_stop()
+                        if not stop_sent:
+                            stop_sent = True
+                            stop_deadline = time.monotonic() + _STOP_GRACE_SECONDS
+                            try:
+                                await asyncio.wait_for(client.interrupt(), _STOP_GRACE_SECONDS)
+                                if initialized:
+                                    control.observe_interrupt_ack(call.call_id, session_id)
+                            except Exception:
+                                pass
+                        if time.monotonic() &gt;= stop_deadline:
+                            raise failure
+                    if pending is None:
+                        pending = asyncio.create_task(iterator.__anext__())
+                    done, _ = await asyncio.wait({pending}, timeout=0.05)
+                    if not done:
+                        continue
+                    try:
+                        message = pending.result()
+                    except StopAsyncIteration:
+                        raise failure or WebModelError("model_result_incomplete") from None
+                    finally:
+                        pending = None
+                    try:
+                        if isinstance(message, SystemMessage):
+                            if message.subtype == "init":
+                                _validate_init(message, call=call, session_id=session_id)
+                                control.bind_remote_id(call.call_id, session_id)
+                                initialized = True
+                            elif message.subtype.startswith(("task_", "compact")):
+                                raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, AssistantMessage):
+                            if not initialized or message.parent_tool_use_id is not None:
+                                raise WebModelError("execution_identity_changed")
+                            require_response_model(message, call.selection.model)
+                            if message.error is not None:
+                                raise WebModelError("provider_call_failed")
+                            for block in message.content:
+                                if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                    observed_search.add(block.id)
+                                    control.observe_web_action(call.call_id, block.id, "search")
+                                elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                                    continue
+                                elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                    raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, ResultMessage):
+                            if not initialized:
+                                raise WebModelError("subscription_auth_unverified")
+                            status = _result_status(message, call=call, session_id=session_id)
+                            control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
+                            if failure is not None:
+                                raise failure
+                            if not observed_search.issubset(gate.search_reservations):
+                                raise WebModelError("tool_admission_missing")
+                            if status != "completed":
+                                raise WebModelError("model_result_incomplete")
+                            output = validate_output(message.structured_output, call.output_schema)
+                            return ModelReply(session_id, output, normalized_usage(message.usage))
+                        elif isinstance(message, UserMessage):
+                            if message.parent_tool_use_id is not None:
+                                raise WebModelError("unexpected_tool_activity")
+                        else:
+&gt;                           raise WebModelError("protocol_incompatible")
+E                           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_claude.py:245: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[rejected-None-provider_rate_limited]" time="0.006"><failure message="AssertionError: Regex pattern did not match.&#10; Regex: 'provider_rate_limited'&#10; Input: 'protocol_incompatible'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x789553418190&gt;
+status = 'rejected', session = None, code = 'provider_rate_limited'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("status,session,code", [
+        ("allowed", None, None), ("allowed_warning", None, None),
+        ("rejected", None, "provider_rate_limited"),
+        ("allowed", "foreign-session", "execution_identity_changed"),
+        ("unknown", None, "protocol_incompatible"),
+    ])
+    async def test_claude_web_handles_owned_rate_limit_events(monkeypatch, status, session, code):
+        from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    
+        async def events(client):
+            yield RateLimitEvent(rate_limit_info=RateLimitInfo(status=status), uuid="limit-1",
+                                 session_id=session or client.options.session_id)
+            yield _result(client.options.session_id)
+    
+        mod, clients = _setup(monkeypatch, before_result=events)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if code is None:
+            assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        else:
+            with pytest.raises(WebModelError, match=code):
+&gt;               await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude.py:268: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:264: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:250: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:234: in call_claude_web
+    raise failure
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', cre...'), call_id='search-1', phase='search', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=5.0)
+credential = WebCredential(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', credential_id='local:7'))
+control = &lt;src.security_lifecycle_web_contract.RunControl object at 0x789553418ac0&gt;
+
+    async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -&gt; ModelReply:
+        call.__post_init__()
+        token = getattr(credential.token_record, "access_token", None)
+        if (call.selection != credential.selection or call.selection != control.selection
+                or call.selection.provider != "anthropic" or call.selection.auth_mode != "claude_code_oauth"
+                or credential.api_key is not None or not isinstance(token, str) or not token):
+            raise WebModelError("execution_identity_changed")
+        if control.stop_state != "running":
+            raise WebModelError("stop_requested")
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except Exception:
+            raise WebModelError("adapter_unavailable") from None
+        deadline = time.monotonic() + call.timeout_seconds
+        session_id = str(uuid4())
+        gate = WebToolGate(call, control, session_id)
+        with tempfile.TemporaryDirectory(prefix="ark-lifecycle-web-claude-") as directory:
+            config = Path(directory) / "config"
+            cwd = Path(directory) / "work"
+            config.mkdir(mode=0o700)
+            cwd.mkdir(mode=0o700)
+            environment = build_claude_child_environment(token=token, config_dir=str(config))
+            environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
+            tools = ["WebSearch"] if call.phase == "search" else []
+            disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+            options = ClaudeAgentOptions(
+                model=call.selection.model, effort=call.effort, fallback_model=None,
+                system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
+                output_format={"type": "json_schema", "schema": call.output_schema},
+                tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+                mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+                hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+                max_turns=call.max_search_uses + 2, session_id=session_id,
+                cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+                stderr=discard_claude_sdk_stderr,
+            )
+            client = _client(options)
+            dispatched = False
+            initialized = False
+            stop_sent = False
+            stop_deadline = None
+            failure: WebModelError | None = None
+            pending = None
+            iterator = None
+            observed_search = set()
+            try:
+                await asyncio.wait_for(client.connect(), max(0.01, deadline - time.monotonic()))
+                control.reserve_model_request(call.call_id)
+                dispatched = True
+                await asyncio.wait_for(client.query(call.prompt, session_id=session_id), max(0.01, deadline - time.monotonic()))
+                iterator = client.receive_response().__aiter__()
+                while True:
+                    if gate.failure is not None and failure is None:
+                        failure = WebModelError(gate.failure)
+                    if control.stop_state != "running" or time.monotonic() &gt;= deadline or failure is not None:
+                        if failure is None:
+                            failure = WebModelError("stop_requested" if control.stop_state != "running" else "timeout")
+                        control.request_stop()
+                        if not stop_sent:
+                            stop_sent = True
+                            stop_deadline = time.monotonic() + _STOP_GRACE_SECONDS
+                            try:
+                                await asyncio.wait_for(client.interrupt(), _STOP_GRACE_SECONDS)
+                                if initialized:
+                                    control.observe_interrupt_ack(call.call_id, session_id)
+                            except Exception:
+                                pass
+                        if time.monotonic() &gt;= stop_deadline:
+                            raise failure
+                    if pending is None:
+                        pending = asyncio.create_task(iterator.__anext__())
+                    done, _ = await asyncio.wait({pending}, timeout=0.05)
+                    if not done:
+                        continue
+                    try:
+                        message = pending.result()
+                    except StopAsyncIteration:
+                        raise failure or WebModelError("model_result_incomplete") from None
+                    finally:
+                        pending = None
+                    try:
+                        if isinstance(message, SystemMessage):
+                            if message.subtype == "init":
+                                _validate_init(message, call=call, session_id=session_id)
+                                control.bind_remote_id(call.call_id, session_id)
+                                initialized = True
+                            elif message.subtype.startswith(("task_", "compact")):
+                                raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, AssistantMessage):
+                            if not initialized or message.parent_tool_use_id is not None:
+                                raise WebModelError("execution_identity_changed")
+                            require_response_model(message, call.selection.model)
+                            if message.error is not None:
+                                raise WebModelError("provider_call_failed")
+                            for block in message.content:
+                                if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                    observed_search.add(block.id)
+                                    control.observe_web_action(call.call_id, block.id, "search")
+                                elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                                    continue
+                                elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                    raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, ResultMessage):
+                            if not initialized:
+                                raise WebModelError("subscription_auth_unverified")
+                            status = _result_status(message, call=call, session_id=session_id)
+                            control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
+                            if failure is not None:
+                                raise failure
+                            if not observed_search.issubset(gate.search_reservations):
+                                raise WebModelError("tool_admission_missing")
+                            if status != "completed":
+                                raise WebModelError("model_result_incomplete")
+                            output = validate_output(message.structured_output, call.output_schema)
+                            return ModelReply(session_id, output, normalized_usage(message.usage))
+                        elif isinstance(message, UserMessage):
+                            if message.parent_tool_use_id is not None:
+                                raise WebModelError("unexpected_tool_activity")
+                        else:
+&gt;                           raise WebModelError("protocol_incompatible")
+E                           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_claude.py:245: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x789553418190&gt;
+status = 'rejected', session = None, code = 'provider_rate_limited'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("status,session,code", [
+        ("allowed", None, None), ("allowed_warning", None, None),
+        ("rejected", None, "provider_rate_limited"),
+        ("allowed", "foreign-session", "execution_identity_changed"),
+        ("unknown", None, "protocol_incompatible"),
+    ])
+    async def test_claude_web_handles_owned_rate_limit_events(monkeypatch, status, session, code):
+        from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    
+        async def events(client):
+            yield RateLimitEvent(rate_limit_info=RateLimitInfo(status=status), uuid="limit-1",
+                                 session_id=session or client.options.session_id)
+            yield _result(client.options.session_id)
+    
+        mod, clients = _setup(monkeypatch, before_result=events)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if code is None:
+            assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        else:
+&gt;           with pytest.raises(WebModelError, match=code):
+E           AssertionError: Regex pattern did not match.
+E            Regex: 'provider_rate_limited'
+E            Input: 'protocol_incompatible'
+
+tests/test_lifecycle_web_claude.py:267: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[allowed-foreign-session-execution_identity_changed]" time="0.006"><failure message="AssertionError: Regex pattern did not match.&#10; Regex: 'execution_identity_changed'&#10; Input: 'protocol_incompatible'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x78955352e080&gt;
+status = 'allowed', session = 'foreign-session'
+code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("status,session,code", [
+        ("allowed", None, None), ("allowed_warning", None, None),
+        ("rejected", None, "provider_rate_limited"),
+        ("allowed", "foreign-session", "execution_identity_changed"),
+        ("unknown", None, "protocol_incompatible"),
+    ])
+    async def test_claude_web_handles_owned_rate_limit_events(monkeypatch, status, session, code):
+        from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    
+        async def events(client):
+            yield RateLimitEvent(rate_limit_info=RateLimitInfo(status=status), uuid="limit-1",
+                                 session_id=session or client.options.session_id)
+            yield _result(client.options.session_id)
+    
+        mod, clients = _setup(monkeypatch, before_result=events)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if code is None:
+            assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        else:
+            with pytest.raises(WebModelError, match=code):
+&gt;               await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude.py:268: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:264: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:250: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:234: in call_claude_web
+    raise failure
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', cre...'), call_id='search-1', phase='search', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=5.0)
+credential = WebCredential(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', credential_id='local:7'))
+control = &lt;src.security_lifecycle_web_contract.RunControl object at 0x78955352c9d0&gt;
+
+    async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -&gt; ModelReply:
+        call.__post_init__()
+        token = getattr(credential.token_record, "access_token", None)
+        if (call.selection != credential.selection or call.selection != control.selection
+                or call.selection.provider != "anthropic" or call.selection.auth_mode != "claude_code_oauth"
+                or credential.api_key is not None or not isinstance(token, str) or not token):
+            raise WebModelError("execution_identity_changed")
+        if control.stop_state != "running":
+            raise WebModelError("stop_requested")
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except Exception:
+            raise WebModelError("adapter_unavailable") from None
+        deadline = time.monotonic() + call.timeout_seconds
+        session_id = str(uuid4())
+        gate = WebToolGate(call, control, session_id)
+        with tempfile.TemporaryDirectory(prefix="ark-lifecycle-web-claude-") as directory:
+            config = Path(directory) / "config"
+            cwd = Path(directory) / "work"
+            config.mkdir(mode=0o700)
+            cwd.mkdir(mode=0o700)
+            environment = build_claude_child_environment(token=token, config_dir=str(config))
+            environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
+            tools = ["WebSearch"] if call.phase == "search" else []
+            disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+            options = ClaudeAgentOptions(
+                model=call.selection.model, effort=call.effort, fallback_model=None,
+                system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
+                output_format={"type": "json_schema", "schema": call.output_schema},
+                tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+                mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+                hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+                max_turns=call.max_search_uses + 2, session_id=session_id,
+                cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+                stderr=discard_claude_sdk_stderr,
+            )
+            client = _client(options)
+            dispatched = False
+            initialized = False
+            stop_sent = False
+            stop_deadline = None
+            failure: WebModelError | None = None
+            pending = None
+            iterator = None
+            observed_search = set()
+            try:
+                await asyncio.wait_for(client.connect(), max(0.01, deadline - time.monotonic()))
+                control.reserve_model_request(call.call_id)
+                dispatched = True
+                await asyncio.wait_for(client.query(call.prompt, session_id=session_id), max(0.01, deadline - time.monotonic()))
+                iterator = client.receive_response().__aiter__()
+                while True:
+                    if gate.failure is not None and failure is None:
+                        failure = WebModelError(gate.failure)
+                    if control.stop_state != "running" or time.monotonic() &gt;= deadline or failure is not None:
+                        if failure is None:
+                            failure = WebModelError("stop_requested" if control.stop_state != "running" else "timeout")
+                        control.request_stop()
+                        if not stop_sent:
+                            stop_sent = True
+                            stop_deadline = time.monotonic() + _STOP_GRACE_SECONDS
+                            try:
+                                await asyncio.wait_for(client.interrupt(), _STOP_GRACE_SECONDS)
+                                if initialized:
+                                    control.observe_interrupt_ack(call.call_id, session_id)
+                            except Exception:
+                                pass
+                        if time.monotonic() &gt;= stop_deadline:
+                            raise failure
+                    if pending is None:
+                        pending = asyncio.create_task(iterator.__anext__())
+                    done, _ = await asyncio.wait({pending}, timeout=0.05)
+                    if not done:
+                        continue
+                    try:
+                        message = pending.result()
+                    except StopAsyncIteration:
+                        raise failure or WebModelError("model_result_incomplete") from None
+                    finally:
+                        pending = None
+                    try:
+                        if isinstance(message, SystemMessage):
+                            if message.subtype == "init":
+                                _validate_init(message, call=call, session_id=session_id)
+                                control.bind_remote_id(call.call_id, session_id)
+                                initialized = True
+                            elif message.subtype.startswith(("task_", "compact")):
+                                raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, AssistantMessage):
+                            if not initialized or message.parent_tool_use_id is not None:
+                                raise WebModelError("execution_identity_changed")
+                            require_response_model(message, call.selection.model)
+                            if message.error is not None:
+                                raise WebModelError("provider_call_failed")
+                            for block in message.content:
+                                if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                    observed_search.add(block.id)
+                                    control.observe_web_action(call.call_id, block.id, "search")
+                                elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                                    continue
+                                elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                    raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, ResultMessage):
+                            if not initialized:
+                                raise WebModelError("subscription_auth_unverified")
+                            status = _result_status(message, call=call, session_id=session_id)
+                            control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
+                            if failure is not None:
+                                raise failure
+                            if not observed_search.issubset(gate.search_reservations):
+                                raise WebModelError("tool_admission_missing")
+                            if status != "completed":
+                                raise WebModelError("model_result_incomplete")
+                            output = validate_output(message.structured_output, call.output_schema)
+                            return ModelReply(session_id, output, normalized_usage(message.usage))
+                        elif isinstance(message, UserMessage):
+                            if message.parent_tool_use_id is not None:
+                                raise WebModelError("unexpected_tool_activity")
+                        else:
+&gt;                           raise WebModelError("protocol_incompatible")
+E                           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_claude.py:245: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x78955352e080&gt;
+status = 'allowed', session = 'foreign-session'
+code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("status,session,code", [
+        ("allowed", None, None), ("allowed_warning", None, None),
+        ("rejected", None, "provider_rate_limited"),
+        ("allowed", "foreign-session", "execution_identity_changed"),
+        ("unknown", None, "protocol_incompatible"),
+    ])
+    async def test_claude_web_handles_owned_rate_limit_events(monkeypatch, status, session, code):
+        from claude_agent_sdk import RateLimitEvent, RateLimitInfo
+    
+        async def events(client):
+            yield RateLimitEvent(rate_limit_info=RateLimitInfo(status=status), uuid="limit-1",
+                                 session_id=session or client.options.session_id)
+            yield _result(client.options.session_id)
+    
+        mod, clients = _setup(monkeypatch, before_result=events)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if code is None:
+            assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        else:
+&gt;           with pytest.raises(WebModelError, match=code):
+E           AssertionError: Regex pattern did not match.
+E            Regex: 'execution_identity_changed'
+E            Input: 'protocol_incompatible'
+
+tests/test_lifecycle_web_claude.py:267: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude" name="test_claude_web_handles_owned_rate_limit_events[unknown-None-protocol_incompatible]" time="0.006" /><testcase classname="tests.test_lifecycle_web_claude_wire" name="test_actual_claude_sdk_serializes_web_hook_and_owned_result[search-False]" time="0.006"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x78955369fd30&gt;
+phase = 'search', forbidden = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True)])
+    async def test_actual_claude_sdk_serializes_web_hook_and_owned_result(monkeypatch, phase, forbidden):
+        from src.auth_drivers import lifecycle_web_claude as mod
+    
+        peers = []
+        commands = []
+    
+        def client(options):
+            peer = Peer(options, forbidden)
+            peers.append(peer)
+            transport = SubprocessCLITransport(prompt="", options=options)
+            commands.append(transport._build_command())
+            return ClaudeSDKClient(options=options, transport=peer)
+    
+        monkeypatch.setattr(mod, "_client", client)
+        monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime",
+                            lambda: SimpleNamespace(cli_path=Path("/reviewed/bundled/claude")))
+        request = _request(phase=phase)
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if forbidden:
+            with pytest.raises(WebModelError, match="unexpected_tool_activity"):
+                await mod.call_claude_web(request, credential, control)
+        else:
+&gt;           assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_wire.py:121: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:264: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:250: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:234: in call_claude_web
+    raise failure
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', cre...'), call_id='search-1', phase='search', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=5.0)
+credential = WebCredential(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', credential_id='local:7'))
+control = &lt;src.security_lifecycle_web_contract.RunControl object at 0x78955369cdf0&gt;
+
+    async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -&gt; ModelReply:
+        call.__post_init__()
+        token = getattr(credential.token_record, "access_token", None)
+        if (call.selection != credential.selection or call.selection != control.selection
+                or call.selection.provider != "anthropic" or call.selection.auth_mode != "claude_code_oauth"
+                or credential.api_key is not None or not isinstance(token, str) or not token):
+            raise WebModelError("execution_identity_changed")
+        if control.stop_state != "running":
+            raise WebModelError("stop_requested")
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except Exception:
+            raise WebModelError("adapter_unavailable") from None
+        deadline = time.monotonic() + call.timeout_seconds
+        session_id = str(uuid4())
+        gate = WebToolGate(call, control, session_id)
+        with tempfile.TemporaryDirectory(prefix="ark-lifecycle-web-claude-") as directory:
+            config = Path(directory) / "config"
+            cwd = Path(directory) / "work"
+            config.mkdir(mode=0o700)
+            cwd.mkdir(mode=0o700)
+            environment = build_claude_child_environment(token=token, config_dir=str(config))
+            environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
+            tools = ["WebSearch"] if call.phase == "search" else []
+            disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+            options = ClaudeAgentOptions(
+                model=call.selection.model, effort=call.effort, fallback_model=None,
+                system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
+                output_format={"type": "json_schema", "schema": call.output_schema},
+                tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+                mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+                hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+                max_turns=call.max_search_uses + 2, session_id=session_id,
+                cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+                stderr=discard_claude_sdk_stderr,
+            )
+            client = _client(options)
+            dispatched = False
+            initialized = False
+            stop_sent = False
+            stop_deadline = None
+            failure: WebModelError | None = None
+            pending = None
+            iterator = None
+            observed_search = set()
+            try:
+                await asyncio.wait_for(client.connect(), max(0.01, deadline - time.monotonic()))
+                control.reserve_model_request(call.call_id)
+                dispatched = True
+                await asyncio.wait_for(client.query(call.prompt, session_id=session_id), max(0.01, deadline - time.monotonic()))
+                iterator = client.receive_response().__aiter__()
+                while True:
+                    if gate.failure is not None and failure is None:
+                        failure = WebModelError(gate.failure)
+                    if control.stop_state != "running" or time.monotonic() &gt;= deadline or failure is not None:
+                        if failure is None:
+                            failure = WebModelError("stop_requested" if control.stop_state != "running" else "timeout")
+                        control.request_stop()
+                        if not stop_sent:
+                            stop_sent = True
+                            stop_deadline = time.monotonic() + _STOP_GRACE_SECONDS
+                            try:
+                                await asyncio.wait_for(client.interrupt(), _STOP_GRACE_SECONDS)
+                                if initialized:
+                                    control.observe_interrupt_ack(call.call_id, session_id)
+                            except Exception:
+                                pass
+                        if time.monotonic() &gt;= stop_deadline:
+                            raise failure
+                    if pending is None:
+                        pending = asyncio.create_task(iterator.__anext__())
+                    done, _ = await asyncio.wait({pending}, timeout=0.05)
+                    if not done:
+                        continue
+                    try:
+                        message = pending.result()
+                    except StopAsyncIteration:
+                        raise failure or WebModelError("model_result_incomplete") from None
+                    finally:
+                        pending = None
+                    try:
+                        if isinstance(message, SystemMessage):
+                            if message.subtype == "init":
+                                _validate_init(message, call=call, session_id=session_id)
+                                control.bind_remote_id(call.call_id, session_id)
+                                initialized = True
+                            elif message.subtype.startswith(("task_", "compact")):
+                                raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, AssistantMessage):
+                            if not initialized or message.parent_tool_use_id is not None:
+                                raise WebModelError("execution_identity_changed")
+                            require_response_model(message, call.selection.model)
+                            if message.error is not None:
+                                raise WebModelError("provider_call_failed")
+                            for block in message.content:
+                                if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                    observed_search.add(block.id)
+                                    control.observe_web_action(call.call_id, block.id, "search")
+                                elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                                    continue
+                                elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                    raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, ResultMessage):
+                            if not initialized:
+                                raise WebModelError("subscription_auth_unverified")
+                            status = _result_status(message, call=call, session_id=session_id)
+                            control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
+                            if failure is not None:
+                                raise failure
+                            if not observed_search.issubset(gate.search_reservations):
+                                raise WebModelError("tool_admission_missing")
+                            if status != "completed":
+                                raise WebModelError("model_result_incomplete")
+                            output = validate_output(message.structured_output, call.output_schema)
+                            return ModelReply(session_id, output, normalized_usage(message.usage))
+                        elif isinstance(message, UserMessage):
+                            if message.parent_tool_use_id is not None:
+                                raise WebModelError("unexpected_tool_activity")
+                        else:
+&gt;                           raise WebModelError("protocol_incompatible")
+E                           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_claude.py:245: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_wire" name="test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False]" time="0.006"><failure message="src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7895536895d0&gt;
+phase = 'analysis', forbidden = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True)])
+    async def test_actual_claude_sdk_serializes_web_hook_and_owned_result(monkeypatch, phase, forbidden):
+        from src.auth_drivers import lifecycle_web_claude as mod
+    
+        peers = []
+        commands = []
+    
+        def client(options):
+            peer = Peer(options, forbidden)
+            peers.append(peer)
+            transport = SubprocessCLITransport(prompt="", options=options)
+            commands.append(transport._build_command())
+            return ClaudeSDKClient(options=options, transport=peer)
+    
+        monkeypatch.setattr(mod, "_client", client)
+        monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime",
+                            lambda: SimpleNamespace(cli_path=Path("/reviewed/bundled/claude")))
+        request = _request(phase=phase)
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if forbidden:
+            with pytest.raises(WebModelError, match="unexpected_tool_activity"):
+                await mod.call_claude_web(request, credential, control)
+        else:
+&gt;           assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_wire.py:121: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:264: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:250: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:234: in call_claude_web
+    raise failure
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', cre..., call_id='search-1', phase='analysis', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=5.0)
+credential = WebCredential(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-opus-5', credential_id='local:7'))
+control = &lt;src.security_lifecycle_web_contract.RunControl object at 0x78955368ace0&gt;
+
+    async def call_claude_web(call: ModelCall, credential: WebCredential, control: RunControl) -&gt; ModelReply:
+        call.__post_init__()
+        token = getattr(credential.token_record, "access_token", None)
+        if (call.selection != credential.selection or call.selection != control.selection
+                or call.selection.provider != "anthropic" or call.selection.auth_mode != "claude_code_oauth"
+                or credential.api_key is not None or not isinstance(token, str) or not token):
+            raise WebModelError("execution_identity_changed")
+        if control.stop_state != "running":
+            raise WebModelError("stop_requested")
+        try:
+            runtime = require_reviewed_claude_agent_runtime()
+        except Exception:
+            raise WebModelError("adapter_unavailable") from None
+        deadline = time.monotonic() + call.timeout_seconds
+        session_id = str(uuid4())
+        gate = WebToolGate(call, control, session_id)
+        with tempfile.TemporaryDirectory(prefix="ark-lifecycle-web-claude-") as directory:
+            config = Path(directory) / "config"
+            cwd = Path(directory) / "work"
+            config.mkdir(mode=0o700)
+            cwd.mkdir(mode=0o700)
+            environment = build_claude_child_environment(token=token, config_dir=str(config))
+            environment.update(CLAUDE_CODE_MAX_RETRIES="0", DISABLE_AUTO_COMPACT="1")
+            tools = ["WebSearch"] if call.phase == "search" else []
+            disallowed = set(REVIEWED_DISALLOWED_TOOLS) - set(tools)
+            options = ClaudeAgentOptions(
+                model=call.selection.model, effort=call.effort, fallback_model=None,
+                system_prompt="Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.",
+                output_format={"type": "json_schema", "schema": call.output_schema},
+                tools=tools, allowed_tools=tools, disallowed_tools=sorted(disallowed),
+                mcp_servers={}, setting_sources=[], strict_mcp_config=True, permission_mode="dontAsk",
+                hooks={"PreToolUse": [HookMatcher(hooks=[gate.pre_tool], timeout=1.0)]},
+                max_turns=call.max_search_uses + 2, session_id=session_id,
+                cli_path=str(runtime.cli_path), cwd=str(cwd), env=environment,
+                stderr=discard_claude_sdk_stderr,
+            )
+            client = _client(options)
+            dispatched = False
+            initialized = False
+            stop_sent = False
+            stop_deadline = None
+            failure: WebModelError | None = None
+            pending = None
+            iterator = None
+            observed_search = set()
+            try:
+                await asyncio.wait_for(client.connect(), max(0.01, deadline - time.monotonic()))
+                control.reserve_model_request(call.call_id)
+                dispatched = True
+                await asyncio.wait_for(client.query(call.prompt, session_id=session_id), max(0.01, deadline - time.monotonic()))
+                iterator = client.receive_response().__aiter__()
+                while True:
+                    if gate.failure is not None and failure is None:
+                        failure = WebModelError(gate.failure)
+                    if control.stop_state != "running" or time.monotonic() &gt;= deadline or failure is not None:
+                        if failure is None:
+                            failure = WebModelError("stop_requested" if control.stop_state != "running" else "timeout")
+                        control.request_stop()
+                        if not stop_sent:
+                            stop_sent = True
+                            stop_deadline = time.monotonic() + _STOP_GRACE_SECONDS
+                            try:
+                                await asyncio.wait_for(client.interrupt(), _STOP_GRACE_SECONDS)
+                                if initialized:
+                                    control.observe_interrupt_ack(call.call_id, session_id)
+                            except Exception:
+                                pass
+                        if time.monotonic() &gt;= stop_deadline:
+                            raise failure
+                    if pending is None:
+                        pending = asyncio.create_task(iterator.__anext__())
+                    done, _ = await asyncio.wait({pending}, timeout=0.05)
+                    if not done:
+                        continue
+                    try:
+                        message = pending.result()
+                    except StopAsyncIteration:
+                        raise failure or WebModelError("model_result_incomplete") from None
+                    finally:
+                        pending = None
+                    try:
+                        if isinstance(message, SystemMessage):
+                            if message.subtype == "init":
+                                _validate_init(message, call=call, session_id=session_id)
+                                control.bind_remote_id(call.call_id, session_id)
+                                initialized = True
+                            elif message.subtype.startswith(("task_", "compact")):
+                                raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, AssistantMessage):
+                            if not initialized or message.parent_tool_use_id is not None:
+                                raise WebModelError("execution_identity_changed")
+                            require_response_model(message, call.selection.model)
+                            if message.error is not None:
+                                raise WebModelError("provider_call_failed")
+                            for block in message.content:
+                                if isinstance(block, ToolUseBlock) and block.name == "WebSearch" and call.phase == "search":
+                                    observed_search.add(block.id)
+                                    control.observe_web_action(call.call_id, block.id, "search")
+                                elif isinstance(block, ToolUseBlock) and block.name == "StructuredOutput":
+                                    continue
+                                elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                                    raise WebModelError("unexpected_tool_activity")
+                        elif isinstance(message, ResultMessage):
+                            if not initialized:
+                                raise WebModelError("subscription_auth_unverified")
+                            status = _result_status(message, call=call, session_id=session_id)
+                            control.observe_terminal(call.call_id, response_id=session_id, status=status, selection=call.selection)
+                            if failure is not None:
+                                raise failure
+                            if not observed_search.issubset(gate.search_reservations):
+                                raise WebModelError("tool_admission_missing")
+                            if status != "completed":
+                                raise WebModelError("model_result_incomplete")
+                            output = validate_output(message.structured_output, call.output_schema)
+                            return ModelReply(session_id, output, normalized_usage(message.usage))
+                        elif isinstance(message, UserMessage):
+                            if message.parent_tool_use_id is not None:
+                                raise WebModelError("unexpected_tool_activity")
+                        else:
+&gt;                           raise WebModelError("protocol_incompatible")
+E                           src.auth_drivers.lifecycle_web_models.WebModelError: protocol_incompatible
+
+src/auth_drivers/lifecycle_web_claude.py:245: WebModelError</failure></testcase><testcase classname="tests.test_lifecycle_web_claude_wire" name="test_actual_claude_sdk_serializes_web_hook_and_owned_result[search-True]" time="0.007"><failure message="ValueError: '--setting-sources' is not in list">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x78955352ee00&gt;
+phase = 'search', forbidden = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True)])
+    async def test_actual_claude_sdk_serializes_web_hook_and_owned_result(monkeypatch, phase, forbidden):
+        from src.auth_drivers import lifecycle_web_claude as mod
+    
+        peers = []
+        commands = []
+    
+        def client(options):
+            peer = Peer(options, forbidden)
+            peers.append(peer)
+            transport = SubprocessCLITransport(prompt="", options=options)
+            commands.append(transport._build_command())
+            return ClaudeSDKClient(options=options, transport=peer)
+    
+        monkeypatch.setattr(mod, "_client", client)
+        monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime",
+                            lambda: SimpleNamespace(cli_path=Path("/reviewed/bundled/claude")))
+        request = _request(phase=phase)
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if forbidden:
+            with pytest.raises(WebModelError, match="unexpected_tool_activity"):
+                await mod.call_claude_web(request, credential, control)
+        else:
+            assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        assert len(peers) == 1 and peers[0].closed
+        assert len([message for message in peers[0].writes if message["type"] == "user"]) == 1
+        hook = next(message["response"]["response"] for message in peers[0].writes if message["type"] == "control_response")
+        assert hook["hookSpecificOutput"]["permissionDecision"] == ("deny" if forbidden else "allow")
+        if forbidden:
+            assert hook["continue"] is False and "continue_" not in hook
+            assert control.stop_state == "cancelled"
+        command = commands[0]
+        assert command[0] == "/reviewed/bundled/claude"
+        assert command[command.index("--tools") + 1] == ("WebSearch" if phase == "search" else "")
+        assert command[command.index("--permission-mode") + 1] == "dontAsk"
+&gt;       assert command[command.index("--setting-sources") + 1] == ""
+E       ValueError: '--setting-sources' is not in list
+
+tests/test_lifecycle_web_claude_wire.py:133: ValueError</failure></testcase></testsuite></testsuites>

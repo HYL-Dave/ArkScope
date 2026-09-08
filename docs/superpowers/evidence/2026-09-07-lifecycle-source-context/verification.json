@@ -1,0 +1,110 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6675
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "caa17f9432aa91e7846f01eb6ccbd93209ca79b332c672e375ee2f396c3c08df"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1998
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "2440c0af2b10d6bbea3b7426be4dee3de45a73c2fac6cd0f8baee235cf7f1b86"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2817
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "e819dc2388890fc532ed2288a039b037bbfd46063755e3a685d6d98573edd801"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1998
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "5632352d76f3e490f23dd399edfe89044fc0b2639962852562f2afee0252396c"
+    }
+  },
+  "browser_scenarios": 12,
+  "browser_screenshots": 24,
+  "capacity_peak_rss_bytes": 1530957824,
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1552
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "6b2b5a8b025faacac8be7c5396c54515b68c0cd7bd8ca418ee6b6b1c580c6574"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1552
+      },
+      "failed_nodes": [],
+      "file": "restored.json",
+      "sha256": "5d3ec193e38bce15981084f37bed4ef4e007cff37a89cb527cf0c130bcfe04c2"
+    }
+  },
+  "merge": false,
+  "migration": false,
+  "mutations": {
+    "backend": 14,
+    "frontend": 3
+  },
+  "prior_packets": {
+    "2026-09-07-lifecycle-web-runtime": {
+      "files_verified": 240,
+      "seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa"
+    },
+    "2026-09-07-lifecycle-web-sonnet-canary": {
+      "files_verified": 108,
+      "seal_sha256": "70db6a06341e77128a402c443ad44d007a6138270e552c63a51bb8e836392d05"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "authorized_fresh_live_canary",
+    "model_usage_calibration",
+    "sec_document_resolver",
+    "authorized_journal_installation_and_population_cutover",
+    "merge_and_handtest"
+  ],
+  "unchanged_schemas": {
+    "src/lifecycle_web_schema.py": "490ca24b56cdf29731aef12430bf30da2e63866594bbd323203bda326437ece7",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "whole_workflow_complete": false
+}

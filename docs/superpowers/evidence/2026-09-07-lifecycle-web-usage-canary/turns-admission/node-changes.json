@@ -1,0 +1,62 @@
+{
+  "backend": {
+    "added": [
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_max_turns_error_is_not_rescued_by_terminal_allowance",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6]"
+    ],
+    "after": 6884,
+    "before": 6876,
+    "removed": []
+  },
+  "baseline": {
+    "added": [
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_max_turns_error_is_not_rescued_by_terminal_allowance",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6]"
+    ],
+    "after": 2207,
+    "before": 2199,
+    "removed": []
+  },
+  "integration": {
+    "added": [
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_max_turns_error_is_not_rescued_by_terminal_allowance",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6]"
+    ],
+    "after": 3026,
+    "before": 3018,
+    "removed": []
+  },
+  "restored": {
+    "added": [
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_max_turns_error_is_not_rescued_by_terminal_allowance",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True]",
+      "tests.test_lifecycle_web_claude_turns::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6]"
+    ],
+    "after": 2207,
+    "before": 2199,
+    "removed": []
+  }
+}

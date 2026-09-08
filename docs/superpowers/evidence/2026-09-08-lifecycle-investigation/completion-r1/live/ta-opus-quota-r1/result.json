@@ -1,0 +1,67 @@
+{
+  "version": 2,
+  "run_id": "li_4dcd593caa8843dbade5a71e44e9134a",
+  "ticker": "TA",
+  "status": "failed",
+  "phase": "model_request",
+  "created_at": "2026-09-07T17:12:28.537482+00:00",
+  "finished_at": "2026-09-07T17:12:30.531474+00:00",
+  "cancel_requested": false,
+  "failure_code": "provider_rate_limited",
+  "stop_reason": "provider_rate_limited",
+  "target": {
+    "as_of": "2026-09-07",
+    "composite_figi": null,
+    "identity_status": "needs_lookup",
+    "issuer_cik": null,
+    "issuer_name": "TravelCenters of America Inc.",
+    "security_class": "common stock",
+    "ticker": "TA",
+    "venue": "NASDAQ"
+  },
+  "execution": {
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "auth_mode": "claude_code_oauth",
+    "effort": "high"
+  },
+  "stats": {
+    "elapsed_seconds": 1.959,
+    "http_requests": 0,
+    "input_tokens": null,
+    "local_queries": 1,
+    "model_submissions": 1,
+    "output_tokens": null,
+    "retained_source_bytes": 0,
+    "source_reads": 0,
+    "sources": 0,
+    "web_actions": 0
+  },
+  "finding": null,
+  "action": null,
+  "block_reasons": [],
+  "passages": [],
+  "gaps": [
+    {
+      "corpus": "news",
+      "reason": "local_news_unavailable",
+      "url": null
+    }
+  ],
+  "steps": [
+    {
+      "ordinal": 1,
+      "kind": "local_search",
+      "at": "2026-09-07T17:12:28.570943+00:00",
+      "reason": null,
+      "code": null
+    },
+    {
+      "ordinal": 2,
+      "kind": "model_request",
+      "at": "2026-09-07T17:12:28.594849+00:00",
+      "reason": null,
+      "code": null
+    }
+  ]
+}

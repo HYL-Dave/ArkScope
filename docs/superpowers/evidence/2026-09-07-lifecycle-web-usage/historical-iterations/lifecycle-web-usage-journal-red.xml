@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="20" skipped="0" tests="20" time="2.661" timestamp="2026-09-07T18:06:34.758672+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-api_key]" time="0.147"><failure message="AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}&#10;  &#10;  Differing items:&#10;  {'output_tokens': None} != {'output_tokens': 20}&#10;  {'input_tokens': None} != {'input_tokens': 10}&#10;  Use -v to get more diff)">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_real_pipeline_usage_survi0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d396184f0&gt;
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+&gt;       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-chatgpt_oauth]" time="0.120"><failure message="AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}&#10;  &#10;  Differing items:&#10;  {'output_tokens': None} != {'output_tokens': 20}&#10;  {'input_tokens': None} != {'input_tokens': 10}&#10;  Use -v to get more diff)">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_real_pipeline_usage_survi1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d394eff40&gt;
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+&gt;       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-api_key]" time="0.114"><failure message="AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}&#10;  &#10;  Differing items:&#10;  {'output_tokens': None} != {'output_tokens': 20}&#10;  {'input_tokens': None} != {'input_tokens': 10}&#10;  Use -v to get more diff)">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_real_pipeline_usage_survi2')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d394f6a70&gt;
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+&gt;       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-claude_code_oauth]" time="0.116"><failure message="AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}&#10;  &#10;  Differing items:&#10;  {'output_tokens': None} != {'output_tokens': 20}&#10;  {'input_tokens': None} != {'input_tokens': 10}&#10;  Use -v to get more diff)">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_real_pipeline_usage_survi3')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d394ecbb0&gt;
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+&gt;       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[analysis-failed]" time="0.141"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_unreported_analysis_is_un0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d394f57e0&gt;
+failure = 'analysis', status = 'failed'
+
+    @pytest.mark.parametrize("failure,status", [("analysis", "failed"), ("lost", "remote_outcome_unknown")])
+    def test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives(tmp_path, monkeypatch, failure, status):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        assert result["status"] == status and result["finding"] is None and len(calls) == 2
+        assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": None, "output_tokens": None}
+&gt;       report = result["usage_report"]
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:80: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[lost-remote_outcome_unknown]" time="0.143"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_unreported_analysis_is_un1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d39492950&gt;
+failure = 'lost', status = 'remote_outcome_unknown'
+
+    @pytest.mark.parametrize("failure,status", [("analysis", "failed"), ("lost", "remote_outcome_unknown")])
+    def test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives(tmp_path, monkeypatch, failure, status):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        assert result["status"] == status and result["finding"] is None and len(calls) == 2
+        assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": None, "output_tokens": None}
+&gt;       report = result["usage_report"]
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:80: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-api_key]" time="0.144"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_completed_pipeline_sums_e0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d39533b20&gt;
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+&gt;       report = result["usage_report"]
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:91: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-chatgpt_oauth]" time="0.145"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_completed_pipeline_sums_e1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d38383a30&gt;
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+&gt;       report = result["usage_report"]
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:91: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-api_key]" time="0.144"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_completed_pipeline_sums_e2')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d395322c0&gt;
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+&gt;       report = result["usage_report"]
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:91: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-claude_code_oauth]" time="0.143"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_completed_pipeline_sums_e3')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d394ed4b0&gt;
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+&gt;       report = result["usage_report"]
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:91: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown" time="0.142"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_valid_result_with_no_repo0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7a6d38383070&gt;
+
+    def test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown(tmp_path, monkeypatch):
+        result, _, _, _, _ = run_pipeline(tmp_path, monkeypatch, unknown=True)
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+&gt;       assert result["usage_report"]["coverage"] == "unknown"
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:99: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_legacy_usage_has_no_fabricated_scope_or_zero_counters" time="0.114"><failure message="KeyError: 'usage_report'">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_legacy_usage_has_no_fabri0')
+
+    def test_legacy_usage_has_no_fabricated_scope_or_zero_counters(tmp_path):
+        from src.lifecycle_web_projection import project_web_run
+    
+        _, store = setup_store(tmp_path)
+        result = project_web_run(store.read(completed(store)), at=AT)
+        assert result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+&gt;       assert result["usage_report"] is None
+E       KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:109: KeyError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;0]" time="0.072"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro0')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962dea0&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d38381de0&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;1]" time="0.072"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro1')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962df30&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d3bcafd00&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;2]" time="0.073"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro2')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962dfc0&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d3a5aacb0&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;3]" time="0.074"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro3')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962e050&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d3a5e5780&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;4]" time="0.072"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro4')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962e0e0&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d394ef040&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;5]" time="0.072"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro5')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962e170&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d3a57c370&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[&lt;lambda&gt;6]" time="0.074"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_receipt_rejects_cro6')
+mutate = &lt;function &lt;lambda&gt; at 0x7a6d3962e200&gt;
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d39515d80&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase><testcase classname="tests.test_lifecycle_web_usage_journal" name="test_usage_only_failure_receipt_is_readable_and_does_not_create_a_finding" time="0.074"><failure message="src.security_lifecycle_web_contract.WebContractError: execution_identity_changed">tmp_path = PosixPath('/tmp/lifecycle-web-usage-journal-red/test_usage_only_failure_receip0')
+
+    def test_usage_only_failure_receipt_is_readable_and_does_not_create_a_finding(tmp_path):
+        from src.lifecycle_web_projection import project_web_run
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+&gt;       control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+
+tests/test_lifecycle_web_usage_journal.py:151: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:442: in observe_terminal
+    super().observe_terminal(call_id, response_id=response_id, status=status, selection=selection)
+src/security_lifecycle_web_contract.py:244: in observe_terminal
+    call = self._bound_call(call_id, response_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;src.lifecycle_web_store.JournalControl object at 0x7a6d394ed0c0&gt;
+call_id = 'search-1', remote_id = 'remote-search'
+
+    def _bound_call(self, call_id: str, remote_id: str) -&gt; _Call:
+        call = self._call(call_id)
+        _identifier(remote_id, "execution_identity_changed")
+        if call.remote_id != remote_id:
+&gt;           raise WebContractError("execution_identity_changed")
+E           src.security_lifecycle_web_contract.WebContractError: execution_identity_changed
+
+src/security_lifecycle_web_contract.py:238: WebContractError</failure></testcase></testsuite></testsuites>

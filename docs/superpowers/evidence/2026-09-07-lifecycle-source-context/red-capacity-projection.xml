@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.830" timestamp="2026-09-07T10:59:09.778695+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_web_preflight" name="test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation" time="0.237"><failure message="KeyError: 'max_source_bytes'">tests/test_lifecycle_web_preflight.py:63: in test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation
+    assert values["options"].max_source_bytes == packet["limits"]["max_source_bytes"] == 16 * 1024 * 1024
+E   KeyError: 'max_source_bytes'</failure></testcase><testcase classname="tests.test_lifecycle_source_context" name="test_web_journal_retains_context_ranges_and_full_source_after_reopen" time="0.108"><failure message="KeyError: 'source_reading'">tests/test_lifecycle_source_context.py:109: in test_web_journal_retains_context_ranges_and_full_source_after_reopen
+    assert projected["source_reading"] == {"sources": 1, "selected_sources": 0,
+E   KeyError: 'source_reading'</failure></testcase></testsuite></testsuites>

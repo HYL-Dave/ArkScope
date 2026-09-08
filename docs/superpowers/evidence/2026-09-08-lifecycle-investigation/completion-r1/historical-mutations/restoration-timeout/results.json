@@ -1,0 +1,658 @@
+[
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [],
+    "name": "backend-baseline",
+    "layer": "backend",
+    "returncode": 0,
+    "report_sha256": "f7bb1429f5c23ddb5e9eb05a024d82564d784ffe461a5d4bec7582b3b413f9a5"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc (the \"Company\") has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock trades on NASDAQ (the \"Exchange\").-senior notes on the Exchange-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the \"Securities\").-Securities-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc (the \"Company\") has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock trades on NASDAQ (the \"Exchange\").-senior notes on the Exchange-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the \"Securities\").-Securities-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]"
+    ],
+    "name": "entity_definition_borrows_security_identity",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "2eb36237f9d62586f6fb9ea03176eac0ec4cfcb7c8f89ba6c4589a73227f39fd",
+    "owner": "test_only_security_qualified_definitions_bind_event_aliases",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "for term in _defined_security_terms(part, finding.security_class, finding.venue)}",
+    "new": "for term in re.findall(r'[\"\\u201c]([A-Za-z][A-Za-z ]{2,70})[\"\\u201d]', part)}",
+    "owner_failed": true,
+    "workspace": "backend-00"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_requested_language_is_explicit_before_source_material[en-English]",
+      "tests.test_lifecycle_investigation_agent::test_requested_language_is_explicit_before_source_material[zh-Hant-Traditional Chinese (zh-Hant)]",
+      "tests.test_lifecycle_investigation_agent::test_local_news_full_body_supports_finding_without_web_or_sec_requests[anthropic-api_key]",
+      "tests.test_lifecycle_investigation_agent::test_local_news_full_body_supports_finding_without_web_or_sec_requests[anthropic-claude_code_oauth]",
+      "tests.test_lifecycle_investigation_agent::test_local_news_full_body_supports_finding_without_web_or_sec_requests[openai-api_key]",
+      "tests.test_lifecycle_investigation_agent::test_local_news_full_body_supports_finding_without_web_or_sec_requests[openai-chatgpt_oauth]",
+      "tests.test_lifecycle_investigation_agent::test_owned_invalid_output_is_recorded_then_corrected_without_new_search",
+      "tests.test_lifecycle_investigation_agent::test_malformed_action_shape_has_safe_field_feedback",
+      "tests.test_lifecycle_investigation_agent::test_grounding_feedback_preserves_candidate_for_targeted_correction",
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+      "tests.test_lifecycle_investigation_findings::test_stock_definition_and_event_passages_jointly_support_finding",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock (the \"Shares\") on NASDAQ.-Shares-common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock, par value $0.001 per share (\"Company Stock\"), on NASDAQ.-Company Stock-common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock on NASDAQ (the \"Company Stock\").-Company Stock-common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock (the \"Class A Shares\") on NASDAQ.-Class A Shares-Class A common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock (the \"Shares\") on NASDAQ.-Shares-common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock, par value $0.001 per share (\"Company Stock\"), on NASDAQ.-Company Stock-common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock on NASDAQ (the \"Company Stock\").-Company Stock-common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock (the \"Class A Shares\") on NASDAQ.-Class A Shares-Class A common stock-True]",
+      "tests.test_lifecycle_investigation_findings::test_common_share_synonym_and_omitted_legal_suffix_keep_the_same_instrument",
+      "tests.test_lifecycle_investigation_findings::test_wrapped_event_sentence_binds_its_adjacent_date_but_not_a_new_sentence",
+      "tests.test_lifecycle_investigation_findings::test_future_scheduled_date_is_reportable_but_cannot_authorize_removal",
+      "tests.test_lifecycle_investigation_findings::test_unknown_exact_date_is_a_visible_limitation_not_a_material_conflict",
+      "tests.test_lifecycle_investigation_findings::test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[actual_public_fragments]",
+      "tests.test_lifecycle_investigation_review::test_target_finding_uses_existing_atomic_receipt_without_fabricating_a_case_at_launch",
+      "tests.test_lifecycle_investigation_review::test_failed_adoption_does_not_leave_an_anchor_or_partial_profile_change",
+      "tests.test_lifecycle_investigation_review::test_unknown_event_date_is_explicit_and_requires_an_attended_execution_date",
+      "tests.test_lifecycle_investigation_review::test_new_position_invalidates_target_review_even_with_source_gap_acknowledgement",
+      "tests.test_lifecycle_investigation_review::test_fresh_active_provider_evidence_is_not_waived_by_source_gap_acknowledgement",
+      "tests.test_lifecycle_investigation_routes::test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]",
+      "tests.test_lifecycle_investigation_routes::test_runtime_routes_roundtrip_unknown_fields_reject_and_reset",
+      "tests.test_lifecycle_investigation_routes::test_unknown_failures_are_closed_and_contain_no_private_data",
+      "tests.test_lifecycle_investigation_routes::test_saved_provider_observations_are_dated_readonly_and_refresh_is_target_scoped",
+      "tests.test_lifecycle_investigation_routes::test_pending_confirmed_actions_remain_visible_without_the_legacy_queue",
+      "tests.test_lifecycle_investigation_routes::test_provider_preparation_api_is_bound_to_the_selected_snapshot_without_dispatch"
+    ],
+    "name": "valid_security_definition_ignored",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "81a1b648149a98a1f565a0d0aef13f07b8ad04e97455faee1eaff16ed018d091",
+    "owner": "test_only_security_qualified_definitions_bind_event_aliases",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "for term in _defined_security_terms(part, finding.security_class, finding.venue)}",
+    "new": "for term in ()}",
+    "owner_failed": true,
+    "workspace": "backend-01"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[active_listing-Class B common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[listing_ended-Class B common stock]",
+      "tests.test_lifecycle_investigation_findings::test_instrument_synonyms_cannot_cross_security_classes[Class B common stock]"
+    ],
+    "name": "nominal_value_normalization_erases_named_share_class",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "4f7f24634adadc1d0f59ecc893d8861127f735c5cf491960f672847a86b680fd",
+    "owner": "test_par_value_normalization_never_discards_security_class",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "name = _PAR_VALUE_SUFFIX.sub(\"\", name.strip())",
+    "new": "name = re.sub(r\"^Class [A-Za-z0-9]+\\s+\", \"\", _PAR_VALUE_SUFFIX.sub(\"\", name.strip()), flags=re.I)",
+    "owner_failed": true,
+    "workspace": "backend-02"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-Common Stock, $0.001 par value per share-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-common shares (par value $0.001 per share)-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[active_listing-Class A common stock, $0.001 par value per share-Class A common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-Common Stock, $0.001 par value per share-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-common shares (par value $0.001 per share)-common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_does_not_change_common_stock_event_identity[listing_ended-Class A common stock, $0.001 par value per share-Class A common stock]"
+    ],
+    "name": "par_value_mistaken_for_share_class",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "ab231c740ed63e55795e7f85f5552ad15539d23dcfaa188075a25ac6c20ed000",
+    "owner": "test_par_value_does_not_change_common_stock_event_identity",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "name = _PAR_VALUE_SUFFIX.sub(\"\", name.strip())",
+    "new": "name = name.strip()",
+    "owner_failed": true,
+    "workspace": "backend-03"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_grounding_feedback_preserves_candidate_for_targeted_correction"
+    ],
+    "name": "rejected_candidate_lost_between_corrections",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "3f3534f246600c44e1d3c3a2abe77833f06ce05fff105e4e99706837e46ece5d",
+    "owner": "test_grounding_feedback_preserves_candidate_for_targeted_correction",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "\"candidate\": step.finding.model_dump()",
+    "new": "\"candidate\": None",
+    "owner_failed": true,
+    "workspace": "backend-04"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_small_fragmented_notice_initial_context_preserves_complete_document"
+    ],
+    "name": "fragment_count_starves_short_notice",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "a59606e975cbde1e2ec3d27196028e3080329f23315ea32169423257881711da",
+    "owner": "test_small_fragmented_notice_initial_context_preserves_complete_document",
+    "path": "src/lifecycle_investigation/sources.py",
+    "old": "complete = limit is None and offset == 0 and len(source[\"text\"]) <= 12 * 2000",
+    "new": "complete = False",
+    "owner_failed": true,
+    "workspace": "backend-05"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed"
+    ],
+    "name": "read_query_accepted_but_ignored",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "112c14abed45c8b5826f612135413571f3d9d6bc91c63887574203b7d09d717e",
+    "owner": "test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "last_feedback = await read_url(step.url, query=step.query)",
+    "new": "last_feedback = await read_url(step.url)",
+    "owner_failed": true,
+    "workspace": "backend-06"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed"
+    ],
+    "name": "search_date_hints_accepted_but_ignored",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "8a1d276c55bb77b434bfc27a1eb9178813ce5e2ccd9d7d173b0d57ee7ab85e8c",
+    "owner": "test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "\"publication_window_hint\": {\"since\": step.since, \"until\": step.until}",
+    "new": "\"publication_window_hint\": {\"since\": None, \"until\": None}",
+    "owner_failed": true,
+    "workspace": "backend-07"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_agent::test_search_candidates_survive_rejected_action_and_read_query_is_consumed"
+    ],
+    "name": "observed_search_candidates_disappear_after_error",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "993b93d1f39b442221979b864139f1c0afdcaf1e970f77b48488b9bdc3a9caa5",
+    "owner": "test_search_candidates_survive_rejected_action_and_read_query_is_consumed",
+    "path": "src/lifecycle_investigation/agent.py",
+    "old": "\"web_candidates\": list(web_candidates.values())",
+    "new": "\"web_candidates\": []",
+    "owner_failed": true,
+    "workspace": "backend-08"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_routes::test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]"
+    ],
+    "name": "adopted_finding_offered_as_new_action",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "1c721ac0528eb834cf3b7df6d9bebc5905e78b515b22131f2a2efa007ebf5898",
+    "owner": "test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue",
+    "path": "src/lifecycle_investigation/controller.py",
+    "old": " and not row[\"adopted\"]",
+    "new": "",
+    "owner_failed": true,
+    "workspace": "backend-09"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[unrelated]",
+      "tests.test_lifecycle_investigation_routes::test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[affected]",
+      "tests.test_security_lifecycle_current::test_frontend_fixture_is_owned_by_the_real_persisted_workflow"
+    ],
+    "name": "current_reverse_readiness_not_projected",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "80e3d3a8c348bc9394764da945e4da72bff4c45fbf9f80beb86b148308b38025",
+    "owner": "test_investigation_activity_reports_current_reverse_readiness_without_legacy_cases[none]",
+    "path": "src/ticker_identity_service.py",
+    "old": "item[\"reverse_readiness\"] = readiness_by_transition[transition_id]",
+    "new": "pass",
+    "owner_failed": true,
+    "workspace": "backend-10"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_provider::test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]"
+    ],
+    "name": "provider_preview_attempts_auto_approval",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "c1b00f9b9f0f5d79a7084007e52e6ce51e8f519de973944e3aeb8dc67dc5ef08",
+    "owner": "test_structured_provider_review_needs_no_llm_or_new_provider_read_and_keeps_confirmation_separate[2025-01-15]",
+    "path": "src/lifecycle_investigation/provider_review.py",
+    "old": "transition_mutation_allowed=lambda: False",
+    "new": "transition_mutation_allowed=lambda: True",
+    "owner_failed": true,
+    "workspace": "backend-11"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_store::test_success_requires_a_completed_owned_conclusion[no_result]",
+      "tests.test_lifecycle_investigation_store::test_success_requires_a_completed_owned_conclusion[failed_remote]"
+    ],
+    "name": "success_without_owned_conclusion",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "2d70e282bd6919802425c520273e0e1879904da790a8fd9172098ef8d0ff850b",
+    "owner": "test_success_requires_a_completed_owned_conclusion",
+    "path": "src/lifecycle_investigation/store.py",
+    "old": "self._require_success(conn, run_id, payload)",
+    "new": "pass",
+    "owner_failed": true,
+    "workspace": "backend-12"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_store::test_unknown_remote_is_not_reported_cancelled_or_successful"
+    ],
+    "name": "unknown_remote_reported_cancelled",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "1bd551dae76dcc022dfcad6794030269a6700b1efe8f459433ba72ca69ac663d",
+    "owner": "test_unknown_remote_is_not_reported_cancelled_or_successful",
+    "path": "src/lifecycle_investigation/store.py",
+    "old": "if pending:\n                status, failure_code",
+    "new": "if False:\n                status, failure_code",
+    "owner_failed": true,
+    "workspace": "backend-13"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_controller::test_pre_dispatch_rereads_stop_identity_and_permission_after_credential_load[cancel]",
+      "tests.test_lifecycle_investigation_controller::test_pre_dispatch_rereads_stop_identity_and_permission_after_credential_load[permission]"
+    ],
+    "name": "skip_post_credential_stop_and_permission",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "58e07b7d5791964121dc32a428d6ed7ab05b5fe77edc9cce92502ffc7a87ad7e",
+    "owner": "test_pre_dispatch_rereads_stop_identity_and_permission_after_credential_load",
+    "path": "src/lifecycle_investigation/controller.py",
+    "old": "            self.before_dispatch()\n            if worker.control.stop_state != \"running\":\n                raise WebModelError(\"stop_requested\")\n",
+    "new": "",
+    "owner_failed": true,
+    "workspace": "backend-14"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_runtime::test_runtime_existing_malformed_empty_table_is_not_a_default"
+    ],
+    "name": "malformed_runtime_becomes_default",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "5387716b0444e0f6acfe9d0437b45d6f05c8cac5b7f8335edf2fa55005912e0c",
+    "owner": "test_runtime_existing_malformed_empty_table_is_not_a_default",
+    "path": "src/lifecycle_investigation/runtime.py",
+    "old": "            install_runtime(conn)  # Existing tables are verified; a read never creates one.\n",
+    "new": "",
+    "owner_failed": true,
+    "workspace": "backend-15"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_news::test_archived_or_reidentified_candidate_cannot_be_used_as_the_original_source"
+    ],
+    "name": "changed_candidate_read_as_original",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "0489aef732f6e46c5ba0a7e3a436f037508717d28660b7d57e891b33af125076",
+    "owner": "test_archived_or_reidentified_candidate_cannot_be_used_as_the_original_source",
+    "path": "src/lifecycle_investigation/news.py",
+    "old": "if row is None or _metadata(row, kind) != admitted:",
+    "new": "if row is None:",
+    "owner_failed": true,
+    "workspace": "backend-16"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_unsupplied_or_changed_passage_never_authorizes_action"
+    ],
+    "name": "unsupplied_citations_admitted",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "cdc9adfbd6729811c06ed868e1f17e15f72862147220c2499aee9de012429dd4",
+    "owner": "test_unsupplied_or_changed_passage_never_authorizes_action",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "elif citation.passage_id not in supplied:",
+    "new": "elif False:",
+    "owner_failed": true,
+    "workspace": "backend-17"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_debt_event_cannot_borrow_common_stock_identity",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc (the \"Company\") has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock trades on NASDAQ (the \"Exchange\").-senior notes on the Exchange-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the \"Securities\").-Securities-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[active_listing-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc (the \"Company\") has OLD common stock listed on NASDAQ.-Company senior notes-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock trades on NASDAQ (the \"Exchange\").-senior notes on the Exchange-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD common stock on NASDAQ and senior notes (the \"Securities\").-Securities-common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_only_security_qualified_definitions_bind_event_aliases[listing_ended-Issuer Old Inc OLD Class A common stock on NASDAQ; Class B common stock (the \"Shares\").-Shares-Class A common stock-False]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[active_listing-Class B common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[active_listing-preferred shares]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[active_listing-senior notes]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[listing_ended-Class B common stock]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[listing_ended-preferred shares]",
+      "tests.test_lifecycle_investigation_findings::test_par_value_normalization_never_discards_security_class[listing_ended-senior notes]",
+      "tests.test_lifecycle_investigation_findings::test_wrapped_event_sentence_binds_its_adjacent_date_but_not_a_new_sentence",
+      "tests.test_lifecycle_investigation_findings::test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[different_security]"
+    ],
+    "name": "debt_borrows_stock_definition",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "f8bfcc5314bbfbf2cbf8aaf4e03a6039e564e83884700b7df7153e4c52614314",
+    "owner": "test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[different_security]",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "target_citations = [(item, claims) for item, claims in citations if item[\"source_id\"] in identities and\n        (_security_class(item[\"text\"], finding.security_class) or\n         any(_contains(item[\"text\"], term) for term in definitions.get(item[\"source_id\"], ())))]",
+    "new": "target_citations = [(item, claims) for item, claims in citations if item[\"source_id\"] in identities]",
+    "owner_failed": true,
+    "workspace": "backend-18"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_findings::test_wrapped_event_sentence_binds_its_adjacent_date_but_not_a_new_sentence",
+      "tests.test_lifecycle_investigation_findings::test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[unrelated_date]"
+    ],
+    "name": "unrelated_sentence_borrows_date",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "4fb86dcf095d2eee20df41adb50b8427091b4765f53d5fdc2c29091d9485ff8b",
+    "owner": "test_real_ta_notice_requires_its_stock_definition_and_wrapped_event_date[unrelated_date]",
+    "path": "src/lifecycle_investigation/findings.py",
+    "old": "and not re.search(r'[.!?][\"\\u201d)]*$', event_item[\"text\"].strip())):",
+    "new": "and True):",
+    "owner_failed": true,
+    "workspace": "backend-19"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_review::test_fresh_active_provider_evidence_is_not_waived_by_source_gap_acknowledgement",
+      "tests.test_lifecycle_web_gaps::test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps",
+      "tests.test_lifecycle_web_review::test_current_active_otc_veto_is_not_lost_when_other_provider_requests_failed"
+    ],
+    "name": "positive_active_evidence_not_vetoed",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "af8b73efb7363767b625b6a65b1e4ef5afc0a5c80bf5ab5676327e095f3b52ee",
+    "owner": "test_fresh_active_provider_evidence_is_not_waived_by_source_gap_acknowledgement",
+    "path": "src/lifecycle_web_review.py",
+    "old": "blockers.add(\"web_active_listing_conflict\")",
+    "new": "pass",
+    "owner_failed": true,
+    "workspace": "backend-20"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_retirement::test_market_dependencies_are_retained_before_profile_disposal"
+    ],
+    "name": "external_market_dependency_deleted",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "295a26f0e09b0111c6f013e48f599a1d7d43d0f7c6f43816cbf184fb48bb6bb2",
+    "owner": "test_market_dependencies_are_retained_before_profile_disposal",
+    "path": "src/lifecycle_investigation/disposal.py",
+    "old": "def market_dependency(conn, observation):\n    owned =",
+    "new": "def market_dependency(conn, observation):\n    return False\n    owned =",
+    "owner_failed": true,
+    "workspace": "backend-21"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_retirement::test_disposal_market_stage_requires_profile_receipt_and_receipts_cannot_be_forged"
+    ],
+    "name": "market_deleted_before_profile_receipt",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "55274fbdda7a84a918812963fe5b29a7b4ae08ea2bc3d223e1f20cce0bb47b7e",
+    "owner": "test_disposal_market_stage_requires_profile_receipt_and_receipts_cannot_be_forged",
+    "path": "src/lifecycle_investigation/disposal.py",
+    "old": "if _receipt(profile, approval_sha256, \"profile\") is None:",
+    "new": "if False:",
+    "owner_failed": true,
+    "workspace": "backend-22"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [
+      "tests.test_lifecycle_investigation_canary::test_live_calibration_rejects_changed_local_fixture_before_creating_corpus"
+    ],
+    "name": "calibration_source_hash_not_verified",
+    "layer": "backend",
+    "returncode": 1,
+    "report_sha256": "6762048a8c0559405897f1f6c62774b7a8c6102ee4216abb71492bbbef28cd1e",
+    "owner": "test_live_calibration_rejects_changed_local_fixture_before_creating_corpus",
+    "path": "docs/superpowers/evidence/2026-09-08-lifecycle-investigation/claude_canary.py",
+    "old": "if source[\"text_sha256\"] != original[\"text_sha256\"]:",
+    "new": "if False:",
+    "owner_failed": true,
+    "workspace": "backend-23"
+  },
+  {
+    "tests": 2675,
+    "skipped": 0,
+    "failed": [],
+    "name": "backend-restored",
+    "layer": "backend",
+    "returncode": 0,
+    "report_sha256": "e709c2df81cd8a47adbf16a740b6a726b772876c45af32a1a2a603f3ea55d4fd"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [],
+    "name": "frontend-baseline",
+    "layer": "frontend",
+    "returncode": 0,
+    "report_sha256": "836f71769a5c8b90096921cf99e45fe0772fdf9e7edb24eddd4322d1cd310a9f"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/lifecycle/InvestigationView.test.tsx::keeps a removed target readable without offering another provider removal"
+    ],
+    "name": "removed_target_offers_provider_removal",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "75cdde698bd20928cff25af59cb306316c72e923ee38328636d08d4f57ad732d",
+    "owner": "keeps a removed target readable without offering another provider removal",
+    "path": "apps/arkscope-web/src/lifecycle/InvestigationView.tsx",
+    "old": " || preflight?.reason === \"target_not_tracked\"",
+    "new": "",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/lifecycle/InvestigationView.test.tsx::confirms reversal separately and refreshes the tracked targets without launching an investigation"
+    ],
+    "name": "reverse_does_not_refresh_tracked_targets",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "894d7c05d55fb129ccb25b9c2fe94e03ab7f4bb3b93fa03c1fde04b6616a3da0",
+    "owner": "confirms reversal separately and refreshes the tracked targets without launching an investigation",
+    "path": "apps/arkscope-web/src/lifecycle/InvestigationView.tsx",
+    "old": "await read(); if (r.status !== \"reversed\") throw new Error(\"review_changed\"); onChanged();",
+    "new": "await read(); if (r.status !== \"reversed\") throw new Error(\"review_changed\");",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/lifecycle/InvestigationView.test.tsx::refreshes a reversal refused after a concurrent edit instead of leaving the stale action enabled"
+    ],
+    "name": "refused_reverse_keeps_stale_action",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "f5097eebbb6ea6912257b13d67c89b79d7236c4de19b255c1395b6b8f97ce0ea",
+    "owner": "refreshes a reversal refused after a concurrent edit instead of leaving the stale action enabled",
+    "path": "apps/arkscope-web/src/lifecycle/InvestigationView.tsx",
+    "old": "await read(); if (r.status !== \"reversed\") throw new Error(\"review_changed\"); onChanged();",
+    "new": "if (r.status !== \"reversed\") throw new Error(\"review_changed\"); await read(); onChanged();",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/settings/InvestigationRuntimeSection.test.tsx::loads only on expansion and reflects the real OAuth output control"
+    ],
+    "name": "oauth_output_limit_claimed_effective",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "cebc7fc069843e661b347a5a475b03a6ec4d4b16ecb41ef739aaa29e48d37698",
+    "owner": "loads only on expansion and reflects the real OAuth output control",
+    "path": "apps/arkscope-web/src/settings/InvestigationRuntimeSection.tsx",
+    "old": "(key === \"api_output_tokens\" && !!authMode && authMode !== \"api_key\")",
+    "new": "false",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/lifecycle/investigationContract.test.ts::independent investigation payloads > requires array passages",
+      "src/lifecycle/investigationContract.test.ts::independent investigation payloads > requires array steps",
+      "src/lifecycle/investigationContract.test.ts::independent investigation payloads > requires array gaps",
+      "src/lifecycle/investigationContract.test.ts::independent investigation payloads > requires array block_reasons",
+      "src/lifecycle/investigationContract.test.ts::independent investigation payloads > reads dated provider facts and pending actions without leaking locators",
+      "src/lifecycle/investigationContract.test.ts::independent investigation payloads > rejects contradictory or malformed provider actions instead of offering a false confirmation"
+    ],
+    "name": "malformed_arrays_become_empty",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "d620c03d1270c5ecb2ed59eb2e830d94fe75101ca8696523c7b2c3a896ff8ffa",
+    "owner": "requires array passages",
+    "path": "apps/arkscope-web/src/lifecycle/investigationContract.ts",
+    "old": "if (!Array.isArray(value)) return invalid(); return value.map(parse);",
+    "new": "if (!Array.isArray(value)) return []; return value.map(parse);",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/lifecycle/InvestigationView.test.tsx::requires explicit source-gap acknowledgement before confirmation",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > shares one schedule read across visible consumers",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > manual run sends exactly one POST and follows terminal state",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > enable and interval mutations invalidate the shared schedule key",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > successful macro sources invalidate exact stored data keys",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > failed skipped and busy macro runs do not invalidate stored data keys",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > classifies future macro sources by write target and fails closed to both macro keys",
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > mount idle focus visibility and local status reload send zero POSTs"
+    ],
+    "name": "source_gap_checkbox_not_required",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "01d46a8542b832e40f4034f0e1aac1007ba880556ae5c367094a1002d858de09",
+    "owner": "requires explicit source-gap acknowledgement before confirmation",
+    "path": "apps/arkscope-web/src/lifecycle/InvestigationView.tsx",
+    "old": "disabled={busy || dirty || !packet.ready || (!!packet.source_gaps?.length && !acknowledged)}",
+    "new": "disabled={busy || dirty || !packet.ready}",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/lifecycle/InvestigationView.test.tsx::requires a refreshed preview after changing the execution date"
+    ],
+    "name": "stale_date_preview_confirmable",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "204a8b2d2861b7e5ee557fac3c5ce47852eb57bf671de8257e37b96393a5b9c9",
+    "owner": "requires a refreshed preview after changing the execution date",
+    "path": "apps/arkscope-web/src/lifecycle/InvestigationView.tsx",
+    "old": "disabled={busy || dirty || !packet.ready || (!!packet.source_gaps?.length && !acknowledged)}",
+    "new": "disabled={busy || !packet.ready || (!!packet.source_gaps?.length && !acknowledged)}",
+    "owner_failed": true,
+    "workspace": "source"
+  },
+  {
+    "tests": 1633,
+    "skipped": 0,
+    "failed": [
+      "src/settings/dataScheduleControls.test.tsx::Data schedule controls > shares one schedule read across visible consumers"
+    ],
+    "name": "frontend-restored",
+    "layer": "frontend",
+    "returncode": 1,
+    "report_sha256": "6d23aeeb7fcf0f3e510e58611b047c8aec9c30e386ae7fe87cebed44dc1b30cf"
+  }
+]

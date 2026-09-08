@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="21" skipped="0" tests="21" time="0.229" timestamp="2026-09-06T23:20:48.954512+08:00" hostname="ais"><testcase classname="tests.test_security_lifecycle_web_finding" name="test_web_finding_requires_real_source_identity_date_and_citation" time="0.020"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">def test_web_finding_requires_real_source_identity_date_and_citation():
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:39: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change0-security_identity_mismatch]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'source_ticker': 'OTHER'}, reason = 'security_identity_mismatch'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change1-security_identity_mismatch]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'issuer_name': 'Other Issuer'}, reason = 'security_identity_mismatch'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change2-security_identity_mismatch]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'security_class': 'preferred stock'}
+reason = 'security_identity_mismatch'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change3-security_identity_mismatch]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'venue': 'NYSE'}, reason = 'security_identity_mismatch'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change4-effective_date_not_supported]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'effective_date': '2026-09-02'}
+reason = 'effective_date_not_supported'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change5-effective_date_missing]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'effective_date': None, 'effective_date_text': None}
+reason = 'effective_date_missing'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change6-material_contradiction]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'contradictions': ['A newer notice says trading continues.']}
+reason = 'material_contradiction'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change7-finding_incomplete]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'unresolved_conditions': ['The share class is unclear.']}
+reason = 'finding_incomplete'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change8-event_not_actionable]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'event_kind': 'acquisition_announced'}
+reason = 'event_not_actionable'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change9-event_not_actionable]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'event_kind': 'trading_suspended'}, reason = 'event_not_actionable'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_incomplete_web_finding_is_readable_but_has_no_action[change10-event_timing_unknown]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'timing': 'unknown'}, reason = 'event_timing_unknown'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:62: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_search_snippets_and_unknown_source_ids_cannot_support_action[change0-source_citation_unavailable]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'source_id': 'invented'}, reason = 'source_citation_unavailable'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_id": "invented"}, "source_citation_unavailable"),
+        ({"quote": "An invented search snippet."}, "source_citation_mismatch"),
+    ])
+    def test_search_snippets_and_unknown_source_ids_cannot_support_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:74: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_search_snippets_and_unknown_source_ids_cannot_support_action[change1-source_citation_mismatch]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">change = {'quote': 'An invented search snippet.'}
+reason = 'source_citation_mismatch'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_id": "invented"}, "source_citation_unavailable"),
+        ({"quote": "An invented search snippet."}, "source_citation_mismatch"),
+    ])
+    def test_search_snippets_and_unknown_source_ids_cannot_support_action(change, reason):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:74: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_short_ticker_match_without_issuer_and_share_class_never_authorizes" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">def test_short_ticker_match_without_issuer_and_share_class_never_authorizes():
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:83: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_web_continuation_is_not_inferred_from_acquirer_or_common_issuer_alone" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">def test_web_continuation_is_not_inferred_from_acquirer_or_common_issuer_alone():
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:93: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_positive_active_otc_citation_vetoes_removal_even_if_summary_ignores_it" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">def test_positive_active_otc_citation_vetoes_removal_even_if_summary_ignores_it():
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:108: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_syndicated_passages_are_not_counted_as_independent_sources" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">def test_syndicated_passages_are_not_counted_as_independent_sources():
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:118: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_candidate_is_visible_incompleteness_not_absence[1]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">unread = 1
+
+    @pytest.mark.parametrize("unread", [1, 2])
+    def test_unread_candidate_is_visible_incompleteness_not_absence(unread):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_unread_candidate_is_visible_incompleteness_not_absence[2]" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">unread = 2
+
+    @pytest.mark.parametrize("unread", [1, 2])
+    def test_unread_candidate_is_visible_incompleteness_not_absence(unread):
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:129: ModuleNotFoundError</failure></testcase><testcase classname="tests.test_security_lifecycle_web_finding" name="test_tampered_document_metadata_cannot_supply_valid_passage" time="0.002"><failure message="ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'">def test_tampered_document_metadata_cannot_supply_valid_passage():
+&gt;       from src.security_lifecycle_web_finding import validate_finding
+E       ModuleNotFoundError: No module named 'src.security_lifecycle_web_finding'
+
+tests/test_security_lifecycle_web_finding.py:136: ModuleNotFoundError</failure></testcase></testsuite></testsuites>

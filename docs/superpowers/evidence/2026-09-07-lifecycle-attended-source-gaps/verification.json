@@ -1,0 +1,120 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6784
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "cbc443be32d59311374c6a3c713db09b9ae6f7254eb3b38b97e6befd19d6bc6c"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2107
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "b1ae32fae391d1f33f3167b8cc0d8bdafbb5b3088a449f5f4b19d35105b9cbd9"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2926
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "eb864553597f4d4497d9348f830a843a9c19d571cdb882968c46dfdf1355cb65"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2107
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "b0221834213f8f9695a570fa4baea70a8a018b771c6b1fbd63847953308b5d9c"
+    }
+  },
+  "browser_scenarios": 24,
+  "browser_screenshots": 42,
+  "capacity_measurement_rerun": false,
+  "commit": false,
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1578
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "9587b94a063b227a77f11e9b437463b3f86dbbd93de06d6fa1c1c43bcf3bc808"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1578
+      },
+      "failed_nodes": [],
+      "file": "restored.json",
+      "sha256": "23144e7bde287dc1f569e7fc55c156305da170df14deeb9e44fb1a253cd7144e"
+    }
+  },
+  "merge": false,
+  "migration": false,
+  "mutations": {
+    "backend": 14,
+    "frontend": 10
+  },
+  "prior_packets": {
+    "2026-09-07-lifecycle-source-context": {
+      "files_verified": 227,
+      "seal_sha256": "52e68716d4117886934a56eff69376235851da85d9f0bb25659e13a0584f064f"
+    },
+    "2026-09-07-lifecycle-source-priority-capacity": {
+      "files_verified": 1462,
+      "seal_sha256": "be780d0a00164f47db561b16ee47c0f1d1c318b9a0ffb3091e252b191bbd32c3"
+    },
+    "2026-09-07-lifecycle-web-runtime": {
+      "files_verified": 240,
+      "seal_sha256": "4d464e372600c7253508a1f9f9f0b48579bfa414c2d8338eec82d4ae82760aaa"
+    },
+    "2026-09-07-lifecycle-web-sonnet-canary": {
+      "files_verified": 108,
+      "seal_sha256": "70db6a06341e77128a402c443ad44d007a6138270e552c63a51bb8e836392d05"
+    }
+  },
+  "product_decision": "attended_confirmation_with_disclosed_unread_supplements",
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "maximum_source_attended_write_concurrency_measurement",
+    "model_usage_calibration",
+    "authorized_fresh_live_canary",
+    "authorized_journal_installation_and_population_cutover",
+    "merge_and_handtest"
+  ],
+  "unchanged_schemas": {
+    "src/lifecycle_web_schema.py": "490ca24b56cdf29731aef12430bf30da2e63866594bbd323203bda326437ece7",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "whole_workflow_complete": false
+}

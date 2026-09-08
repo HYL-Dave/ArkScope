@@ -1,0 +1,10 @@
+{
+  "control": "changed_product_source_cannot_resume_old_campaign",
+  "staging": "/tmp/arkscope-population-admission-v3",
+  "expected_error": "campaign_source_changed",
+  "exit_code": 1,
+  "rejected_changed_source": true,
+  "report_unchanged": true,
+  "report_sha256": "1a2f0250c8929a178a37a47b8188ba681a7925df3d3fd7ea2a572673622bdab7",
+  "repair_backup_created": false
+}

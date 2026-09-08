@@ -1,0 +1,12 @@
+{
+  "sources": [
+    "https://www.sec.gov/Archives/edgar/data/1378453/000110465923061210/tm2315684d2_ex99-1.htm",
+    "https://www.sec.gov/Archives/edgar/data/1378453/000110465923065233/tm2317010d1_25.htm",
+    "https://www.sec.gov/Archives/edgar/data/1378453/000110465923058688/tm2315275d1_ex99-1.htm",
+    "https://www.bp.com/en_us/united-states/home/news/press-releases/travelcenters-of-america-inc-announces-intention-to-delist-senior-notes-from-the-nasdaq.html"
+  ],
+  "unresolved_conditions": [
+    "No explicit SEC Form 25 filing located specifically for TA common stock delisting from Nasdaq (the located Form 25 covers the Senior Notes, tickers TANNI/TANNL/TANNZ); common stock delisting is inferred from merger-closing 8-K disclosure that shares were cancelled and would cease trading \u2014 should verify a separate Form 25/deregistration (Form 15) for the common shares (CIK 1378453) if precise effective delisting date/document is required.",
+    "Whether any OTC/pink-sheet trading occurred post-merger under ticker 'TA' or a similar symbol was not found in search results and was not verified directly (expected none, since shares were converted to cash, but not explicitly confirmed by an OTC markets notice)."
+  ]
+}

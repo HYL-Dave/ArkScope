@@ -1,0 +1,266 @@
+{
+  "app_restart": false,
+  "backend": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 12,
+      "tests": 6055
+    },
+    "failed_nodes": [],
+    "report": "arkscope-price-window-backend-final-v2.xml",
+    "sha256": "b5cad47a4acce155173cb792028fc77a04fd7dbd3b1c6cef8073ed918619f763"
+  },
+  "backend_command": "python -m pytest -q tests",
+  "base_commit": "0b66732ba4a77c4ba823537001828c1a75563c5d",
+  "browser_scenarios": 18,
+  "browser_screenshots": 30,
+  "checks": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "apps/arkscope-web",
+      "exit_code": 0,
+      "output": "\n> arkscope-web@0.0.1 typecheck\n> tsc --noEmit\n\n",
+      "output_sha256": "f11cc6b081b601fbfb3d906dd86e989fdf90f9d1b527808504811363f1303fad"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": "apps/arkscope-web",
+      "exit_code": 0,
+      "output": "\n> arkscope-web@0.0.1 build\n> tsc --noEmit && vite build\n\nvite v5.4.21 building for production...\ntransforming...\n\u2713 2197 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                     0.40 kB \u2502 gzip:   0.27 kB\ndist/assets/index-D5AMU2aF.css     84.83 kB \u2502 gzip:  14.32 kB\ndist/assets/index-Dmmx_ZuE.js   1,163.92 kB \u2502 gzip: 343.17 kB\n\u2713 built in 2.84s\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n",
+      "output_sha256": "7d864fc884c3c0a594eed564a3cb4f40cf7314b094d69814c2f20057685bc8dc"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "check:i18n-literals"
+      ],
+      "cwd": "apps/arkscope-web",
+      "exit_code": 0,
+      "output": "\n> arkscope-web@0.0.1 check:i18n-literals\n> node scripts/i18n/visible-literal-scanner.mjs check\n\n{\"candidateCount\":37,\"signatureCount\":20,\"debtSignatureCount\":0,\"allowlistCount\":20,\"migratedScopes\":[\"src/**\"]}\n",
+      "output_sha256": "f3ff49dfdae1cbb61ff75d18c2a37b6dcf17abe70a175f97b5d46febdc06d0a2"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "output": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "commit": false,
+  "frontend": {
+    "counts": {
+      "failures": 0,
+      "skipped": 0,
+      "tests": 1432
+    },
+    "failed_nodes": [],
+    "report": "arkscope-price-window-frontend-final-v2.json",
+    "sha256": "edd334d468bb6959149e6d0aec041097d75460e8fa98530ba83010dfe3ed8a49"
+  },
+  "integration": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 1806
+    },
+    "failed_nodes": [],
+    "report": "arkscope-price-window-integration-final.xml",
+    "sha256": "6de0f33c9a290d1894f98ed518520ed80aaeec33cc8eb7092cd05671688d9f31"
+  },
+  "merge": false,
+  "migration": false,
+  "mutation_count": 16,
+  "prior_packets": {
+    "2026-09-05-lifecycle-tracking-first-disposition": {
+      "files_verified": 8,
+      "seal_sha256": "972d635d9277bd153709cb58300b05197a4d619a2c0dae3041a58f1e67faa6ea"
+    },
+    "2026-09-05-lifecycle-tracking-first-readonly": {
+      "files_verified": 9,
+      "seal_sha256": "310b48ca0a9b78def3a96c9d3d2007376c0933e0c5292e79a28aba99f4e05956"
+    },
+    "2026-09-06-lifecycle-target-scoped-disposition": {
+      "files_verified": 8,
+      "seal_sha256": "958248e6b5f8e5ed29d9ddfb9b8fdb8c2bcd3f22fccd78dcacf6a231cb3c3de2"
+    },
+    "2026-09-06-recent-price-repair": {
+      "files_verified": 13,
+      "seal_sha256": "3dcfa0fa12ff534e41a499b866b4ea5637e12795228777535595be94fa63dbe9"
+    },
+    "2026-09-06-recent-price-repair-live": {
+      "files_verified": 18,
+      "seal_sha256": "af64fad39be64409e382abdd98a2120329086d73bc412fb61571b6dc17d17275"
+    }
+  },
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "red": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 6,
+        "skipped": 0,
+        "tests": 7
+      },
+      "failed_nodes": [
+        "tests.test_recent_price_repair::test_default_topup_fills_fifteen_days_without_overwriting_existing_prices[worker]",
+        "tests.test_recent_price_repair::test_default_topup_fills_fifteen_days_without_overwriting_existing_prices[direct]",
+        "tests.test_prices_runtime::test_prices_worker_requires_tickers_without_source_selector",
+        "tests.test_recent_price_repair_routes::test_readonly_coverage_and_preview_default_to_fifteen_days[/market-data/trading-days]",
+        "tests.test_recent_price_repair_routes::test_readonly_coverage_and_preview_default_to_fifteen_days[/market-data/price-repair/preview]",
+        "tests.test_data_scheduler::test_p0c1_ibkr_prices_runs_prices_worker_subprocess"
+      ],
+      "report": "arkscope-price-window-red.xml",
+      "sha256": "df10d9c4dd31beec95c33b50455b9e8c32002f40d739985a32fb01a63c6a15a2"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 8
+      },
+      "failed_nodes": [
+        "tests.test_price_repair_status::test_operation_listing_is_no_create_and_never_loads_a_provider",
+        "tests.test_price_repair_status::test_operation_status_is_readonly_and_does_not_project_cached_provider_material",
+        "tests.test_price_repair_status::test_cached_but_uncommitted_repair_can_resume_with_zero_new_requests",
+        "tests.test_price_repair_status::test_received_empty_history_is_not_completion_or_an_effective_cache_resume",
+        "tests.test_price_repair_status::test_unanswered_request_stays_explicit_and_cannot_be_reissued",
+        "tests.test_price_repair_status::test_removed_scope_and_unreadable_journal_do_not_hide_healthy_operations",
+        "tests.test_price_repair_status::test_operation_history_can_page_without_silently_dropping_rows",
+        "tests.test_price_repair_status::test_operation_listing_rejects_symlinked_journals_without_reading_them"
+      ],
+      "report": "arkscope-price-status-red.xml",
+      "sha256": "50991197cdf64f7bbe79d72ee02c2ca69863941d2d377e05cfb1055e81c19b13"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 4,
+        "skipped": 0,
+        "tests": 4
+      },
+      "failed_nodes": [
+        "tests.test_recent_price_repair_routes::test_operation_route_reads_durable_history_without_write_permission_or_dispatch",
+        "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[complete]",
+        "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[scope_changed]",
+        "tests.test_recent_price_repair_routes::test_resume_rechecks_coverage_and_scope_before_dispatch[unanswered]"
+      ],
+      "report": "arkscope-price-status-routes-red-clean.xml",
+      "sha256": "0c2f42abd27d656b14f9c6134b735c582c45bd7b496ea0822a24e0724a847676"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 12,
+        "tests": 6051
+      },
+      "failed_nodes": [
+        "tests.test_security_lifecycle_routes::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes"
+      ],
+      "report": "arkscope-price-window-backend-tests.xml",
+      "sha256": "1233503bdf4a81d9d303ff6657ded55c75231d7149e1b2a057e013d0fd364a06"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1
+      },
+      "failed_nodes": [
+        "tests.test_recent_price_repair_routes::test_single_operation_read_is_independent_of_history_pagination"
+      ],
+      "report": "arkscope-price-id-read-red.xml",
+      "sha256": "1f8a97eda1b9dc45d059afbacc37987fd66bc77be97745f94d3b6632af95b8a1"
+    },
+    {
+      "counts": {
+        "failures": 1,
+        "skipped": 8,
+        "tests": 9
+      },
+      "failed_nodes": [
+        "DataStorageSection lifecycle automation controls opens the fifteen-day coverage window and preserves an explicit longer choice"
+      ],
+      "report": "arkscope-price-window-ui-red.json",
+      "sha256": "1d16498c83868511ef1a9ae18251713e4137180b617636aafd2ac6392bd603fb"
+    },
+    {
+      "counts": {
+        "failures": 21,
+        "skipped": 0,
+        "tests": 26
+      },
+      "failed_nodes": [
+        "projects durable operation facts without passing internal material to the view",
+        "rejects malformed operation facts instead of treating them as empty ({})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":null})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":{}})",
+        "rejects malformed operation facts instead of treating them as empty ({\"version\":2})",
+        "rejects malformed operation facts instead of treating them as empty ({\"has_more\":true})",
+        "rejects malformed operation facts instead of treating them as empty ({\"total\":-1})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"running\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":\"OLD\",\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":1,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":1,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OTHER\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"complete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":3}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":false,\"request_limit\":1}}]})",
+        "rejects malformed operation facts instead of treating them as empty ({\"operations\":[{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}},{\"repair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"incomplete\",\"reason\":null,\"scope\":{\"tickers\":[\"OLD\"],\"provider\":\"ibkr\",\"interval\":\"15min\",\"as_of_date\":\"2026-09-05\",\"lookback_days\":15},\"requests\":{\"planned\":2,\"dispatched\":0,\"received\":0,\"unanswered\":0},\"coverage\":{\"remaining_tickers\":[\"OLD\"],\"missing_ticker_days\":1,\"partial_ticker_days\":0},\"resume\":{\"available\":true,\"request_limit\":2}}],\"total\":2})",
+        "keeps unreadable journals visible without inventing an empty successful scope",
+        "reads history with GET and resumes only the explicitly selected operation",
+        "reloads an unfinished operation and asks before a cache-only resume",
+        "does not offer to replay an unanswered request or report all responses as complete",
+        "keeps failed history reads distinct from an empty history"
+      ],
+      "report": "arkscope-price-status-ui-red.json",
+      "sha256": "e6c43f35a2f8d9c6f2b030b9275bbe0711dc667abbd7e8c853e502b7918af6b3"
+    },
+    {
+      "counts": {
+        "failures": 1,
+        "skipped": 0,
+        "tests": 11
+      },
+      "failed_nodes": [
+        "does not leave a stale running claim when collection status cannot be read"
+      ],
+      "report": "arkscope-price-activity-red.json",
+      "sha256": "fd953ddcb2fd5ff48ffc0c982a08812e29ec27164e8e2104b24bc8f6c0fed634"
+    },
+    {
+      "counts": {
+        "failures": 2,
+        "skipped": 0,
+        "tests": 40
+      },
+      "failed_nodes": [
+        "reads one operation by its exact ID and rejects mismatched or malformed results",
+        "confirms a resumed operation outside the first history page"
+      ],
+      "report": "arkscope-price-id-read-ui-red.json",
+      "sha256": "ec61fd36c230f149f7f0b061e3b0beb30a937ec8bf72f3762ea447c8c97c99ce"
+    }
+  ]
+}

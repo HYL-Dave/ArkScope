@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="18" failures="0" errors="0" time="11.210880697">
+    <testsuite name="src/i18n/visibleLiteralScanner.test.ts" timestamp="2026-09-07T23:18:02.708Z" hostname="ais" tests="18" failures="0" errors="0" skipped="0" time="11.210880697">
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects and normalizes JSX text through the TypeScript AST" time="0.420638074">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects label title description and alt props" time="0.439627804">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects aria-label and ariaLabel props" time="0.424609628">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects placeholder props" time="0.397781749">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects direct DataTable header properties including ASCII-only copy" time="0.420654105">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects tuple-backed static column labels without treating tuple IDs as copy" time="0.425310767">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; ignores reviewed model reason operands while retaining visible reason presenters" time="0.433046274">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; ignores Research completion-state operands while retaining visible status labels" time="0.418860254">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; ignores calibration transport operands while retaining visible calibration copy" time="0.419653314">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; ignores broker day-gap comparison operands while retaining activity labels" time="0.435669505">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; requires empty debt global src scope and exact allowlist arithmetic" time="0.791468462">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; keeps real presenter returns visible after machine-operand narrowing" time="0.401961645">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects visible expression and template copy" time="0.427235895">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; detects visible objects message sinks presenter returns and conservative CJK runtime literals" time="0.409371351">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; ignores comments import paths tests resources and declarations" time="0.801639718">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; rejects dynamic keys while accepting the one reviewed typed key style" time="0.857868795">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; requires exact current allowlist entries and rejects stale entries" time="1.211704894">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/i18n/visibleLiteralScanner.test.ts" name="visible literal scanner &gt; allows legacy debt only to shrink and requires zero in migrated scopes" time="2.071511632">
+            <system-out>
+i18next: languageChanged zh-Hant
+
+            </system-out>
+        </testcase>
+    </testsuite>
+</testsuites>

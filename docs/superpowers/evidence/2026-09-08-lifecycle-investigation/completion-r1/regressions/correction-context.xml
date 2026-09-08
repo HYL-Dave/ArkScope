@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.544" timestamp="2026-09-08T05:44:33.055562+08:00" hostname="ais"><testcase classname="tests.test_lifecycle_investigation_agent" name="test_grounding_feedback_preserves_candidate_for_targeted_correction" time="0.055"><failure message="src.lifecycle_investigation.agent.AgentFailure: web_execution_failed">tests/test_lifecycle_investigation_agent.py:115: in test_grounding_feedback_preserves_candidate_for_targeted_correction
+    result = await run_agent(Target(ticker="OLD", as_of="2026-09-08"), credential, control,
+src/lifecycle_investigation/agent.py:413: in run_agent
+    raise AgentFailure(code, result("failed", code)) from None
+E   src.lifecycle_investigation.agent.AgentFailure: web_execution_failed</failure></testcase></testsuite></testsuites>

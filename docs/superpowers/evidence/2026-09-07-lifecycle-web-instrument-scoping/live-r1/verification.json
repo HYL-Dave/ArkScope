@@ -1,0 +1,109 @@
+{
+  "action": null,
+  "actual_frontend_parser_roundtrip": true,
+  "app_restart_commit_merge_push": false,
+  "captured_sources": 4,
+  "finding_block_reasons": [
+    "announcement_date_not_supported",
+    "effective_date_not_supported",
+    "finding_incomplete",
+    "listing_change_not_supported",
+    "security_identity_not_supported"
+  ],
+  "fresh_end_to_end_live_investigation_verified": true,
+  "harness_sha256": "91416d03e33afa5899f1017e73949495e8c8a44568a272d48475a066a09e159f",
+  "human_assessments_or_adoptions": 0,
+  "limitations": [
+    "One public stock case does not verify every event or instrument",
+    "SDK submissions and observed WebSearch uses are not exact hidden provider HTTP counts"
+  ],
+  "no_automatic_retry_or_billing_fallback": true,
+  "observed_api_key_source": "none",
+  "observed_model": "claude-sonnet-5",
+  "other_channels_live_verified": false,
+  "phases": [
+    {
+      "init_tools": [
+        "StructuredOutput",
+        "WebSearch"
+      ],
+      "literal_api_key_source": "none",
+      "observed_tools": [
+        "WebSearch",
+        "WebSearch",
+        "StructuredOutput"
+      ],
+      "phase": "search",
+      "reported_model_usage": {
+        "models": [
+          {
+            "cache_creation_input_tokens": 6330,
+            "cache_read_input_tokens": 2149,
+            "input_tokens": 29555,
+            "invalid_fields": [],
+            "model": "claude-sonnet-5",
+            "output_tokens": 3510,
+            "shape": "object",
+            "web_search_requests": 2
+          }
+        ],
+        "shape": "object"
+      },
+      "reported_turns": 4
+    },
+    {
+      "init_tools": [],
+      "literal_api_key_source": "none",
+      "observed_tools": [],
+      "phase": "analysis",
+      "reported_model_usage": {
+        "models": [
+          {
+            "cache_creation_input_tokens": 11398,
+            "cache_read_input_tokens": 0,
+            "input_tokens": 10773,
+            "invalid_fields": [],
+            "model": "claude-sonnet-5",
+            "output_tokens": 5230,
+            "shape": "object",
+            "web_search_requests": 0
+          }
+        ],
+        "shape": "object"
+      },
+      "reported_turns": 1
+    }
+  ],
+  "production_writes": false,
+  "quotations_published_as_hashes": true,
+  "raw_capture_unchanged": true,
+  "raw_files_sha256": {
+    "analysis-output.json": "b0dcf47b1382a6ed757e0be05b05a7a101f28d62feb44161e525d60413ced47b",
+    "authorized-plan.json": "d6b8623923b19daa20f81207a995ef5ef6c7eb9dca5eddb748deb3ada61c7864",
+    "metrics.json": "5e2dc7aeae77c15856f07b9844813070a72853768bcf5944523602dc9ec0e53e",
+    "profile.sqlite": "24e367a8cb341332b85636cfade067d91ff0356966b8c77d0182afbf58167a26",
+    "result.json": "5d651c4e832b806a6ad8b940023c4305a980b94bbe1e3d64a3d1666a221e3ab1",
+    "search-output.json": "1a0e39eeea123a23c37deaf922cc6f4a14012b1fb36d20000924c6c82f88d120"
+  },
+  "receipt_reader_correction": {
+    "corrected_wrapper_sha256": "18f1498a31c804cab7b8ce1c495c561faf6e17d09dbfa97d637514480c7fa79e",
+    "previous_failure": "Missing sqlite3.Row in the receipt reader, not stored journal corruption",
+    "product_source_or_live_output_changed": false
+  },
+  "receipt_verifier_sha256": "99c27a3008cd6c8f714c028299291d8eb154dd5abed83ab58bba987dad3380b5",
+  "reopened_result_identical": true,
+  "sdk_query_submissions": 2,
+  "source_checkpoint": {
+    "manifest_sha256": "5ec0d8b7852c102d5765ab8575c6c38d35287d38caef62be96444b503927e76e",
+    "matched_files": 1113,
+    "seal_sha256": "05a81e10133bbd66fe14b42fed636d4b2cd6f629cef4c379dda43000ce7d7781"
+  },
+  "source_gaps": [
+    {
+      "reason": "source_unavailable",
+      "url": "https://www.bp.com/en_us/united-states/home/news/press-releases/travelcenters-of-america-inc-announces-intention-to-delist-senior-notes-from-the-nasdaq.html"
+    }
+  ],
+  "source_http_attempts": 5,
+  "source_http_budget_remaining": 19
+}

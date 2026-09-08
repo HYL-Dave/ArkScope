@@ -1,0 +1,55 @@
+{
+  "concurrent_workers": 2,
+  "database_bytes": 1074716672,
+  "dense_context": false,
+  "document_decoded_bytes": 134208836,
+  "elapsed_seconds": 122.856,
+  "network_calls": 0,
+  "options": {
+    "effort": "high",
+    "max_decoded_source_bytes": 134217728,
+    "max_redirects": 2,
+    "max_search_uses": 4,
+    "max_source_bytes": 33554432,
+    "max_source_requests": 8,
+    "max_sources": 4,
+    "model_timeout_seconds": 180,
+    "output_token_limit": 16384,
+    "source_timeout_seconds": 45.0
+  },
+  "peak_rss_bytes": 2648342528,
+  "production_data_access": false,
+  "provider_calls": 0,
+  "real_controller_and_heartbeat": true,
+  "shared_journal": true,
+  "simulated_model_phases": [
+    "search",
+    "search",
+    "analysis",
+    "analysis"
+  ],
+  "source_reading": [
+    {
+      "model_text_bytes": 192796,
+      "retained_text_bytes": 536634160,
+      "selected_sources": 4,
+      "sources": 4
+    },
+    {
+      "model_text_bytes": 192796,
+      "retained_text_bytes": 536634160,
+      "selected_sources": 4,
+      "sources": 4
+    }
+  ],
+  "statuses": [
+    [
+      "succeeded",
+      null
+    ],
+    [
+      "succeeded",
+      null
+    ]
+  ]
+}

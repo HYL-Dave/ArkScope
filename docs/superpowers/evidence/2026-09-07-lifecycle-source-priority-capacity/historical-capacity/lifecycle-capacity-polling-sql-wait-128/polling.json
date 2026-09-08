@@ -1,0 +1,492 @@
+{
+  "observations": [
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 1.408,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 1.412,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.037,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.04,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.119,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.28,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.233,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.153,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.059,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.167,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.23,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.314,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.236,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.335,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.076,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.107,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.195,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.146,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.208,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.296,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.11,
+      "error": null,
+      "status": "reading_sources"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.141,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.518,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.849,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.694,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.905,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.706,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.619,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.532,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.575,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.182,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.558,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.639,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.851,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.632,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.879,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.874,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.51,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.497,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.198,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.627,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.741,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.644,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.608,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.463,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.732,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.87,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.598,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.446,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.621,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.695,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.687,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.535,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.649,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.721,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.745,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.153,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.169,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.343,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.342,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.314,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.386,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.322,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.128,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.488,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.217,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.159,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.19,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.17,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.159,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.155,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.163,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.163,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.17,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.166,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.254,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.159,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 0.294,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 0.224,
+      "error": null,
+      "status": "analyzing"
+    },
+    {
+      "case_id": "case-1",
+      "elapsed_seconds": 20.596,
+      "error": null,
+      "status": "succeeded"
+    },
+    {
+      "case_id": "case-2",
+      "elapsed_seconds": 20.95,
+      "error": null,
+      "status": "succeeded"
+    }
+  ],
+  "production_data_access": false,
+  "provider_calls": 0
+}

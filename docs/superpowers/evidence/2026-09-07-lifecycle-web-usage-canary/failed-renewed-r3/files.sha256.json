@@ -1,0 +1,16 @@
+{
+  "files": {
+    "authorized-plan.json": "97fb9f86678a811139ec006ea8988b7ce6f93fac5615bb49080db69cb03d3d1b",
+    "diagnose_analysis.py": "9eda8ccd2f06376399e37a2e51cb7ed3455880f27e87702fb44d593fe316907b",
+    "live-authorization.md": "83b27e7b50799a4f3563fdfe29c92f6f0a87154b01ddd39a4666efb8d543ca8a",
+    "metrics.json": "17c9f27aea1081674023ea9989876a2e478698f0ca4ee084d03e996f646d8455",
+    "native-diagnostics.json": "9bfe73da6ecc6665a355d5b141056920c6035c7e535eda28fb71c26bbd127402",
+    "record_renewed_failure.py": "65b0a4efb92d837632a3a3f3ac8ec7b4c5e3a56f12450f9fc209c23f0b652e64",
+    "renewed_full_canary.py": "8f18d4a72dec208cf4e322572350c6aa94a5c546459595019a8eea50758550e5",
+    "result.json": "7d1115e20d9932bfb142c492db2b2deeedfb5d2b0576109a89ee436d40885870",
+    "search-output.json": "9c5a3925314f4acc1b90d2a25d5deee824dcfc9f8837c3af16a992caf34279ff",
+    "secret-shape-scan.json": "bae0de85c60e803c145ddc09f98a48c81b058345b08bbd08daee1e204c09c424",
+    "test_analysis_diagnostic.py": "c8146b73197e618b9843165f5773e3f1ab338c4aed4b4495a2d87c4c7a15d31e",
+    "verification.json": "087b5112d20b963fae9ae6e418d90481c8f1f4ca94c168027da4a10b0504c8f1"
+  }
+}

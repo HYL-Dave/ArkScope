@@ -1,0 +1,16 @@
+{
+  "files": {
+    "claude_canary.py": "70dcb3ac6ab45d99f6829c01f3030cb944313cfa9d8f27ef2ba52ed58a851e0b",
+    "diagnose_analysis.py": "301855d8ae50dd46ce057eb50e28514cba0be946f0fdb2a81fea9aa61d899acc",
+    "diagnostic-metrics.json": "0ecd8338cc31deec8862f3fa9b4548896123c1524126c91953e29e9cb2b1d551",
+    "diagnostic-prepared.json": "0942b3e18320281f28ff445dc246dfcd74be581a163416eda850992ea72d9cb4",
+    "live-authorization.md": "83b27e7b50799a4f3563fdfe29c92f6f0a87154b01ddd39a4666efb8d543ca8a",
+    "live-authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+    "live-metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+    "live-result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+    "live-search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a",
+    "secret-shape-scan.json": "bae0de85c60e803c145ddc09f98a48c81b058345b08bbd08daee1e204c09c424",
+    "test_analysis_diagnostic.py": "afd0e777afd4199ad7d1317d4e4d62377c5884de2178ffb112be2b6095cfe408",
+    "verification.json": "875c09aad209fd6be5a92adbb2689d1c11d9c03b3c3c4662511ac65b3cb87efe"
+  }
+}

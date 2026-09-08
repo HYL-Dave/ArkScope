@@ -1,0 +1,29 @@
+{
+  "failed_attempts": [
+    {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 1547
+      },
+      "exit_code": 1,
+      "failed_nodes": [
+        "visible literal scanner allows legacy debt only to shrink and requires zero in migrated scopes"
+      ],
+      "name": "restored"
+    }
+  ],
+  "final": {
+    "counts": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 1547
+    },
+    "exit_code": 0,
+    "failed_nodes": [],
+    "name": "restored-recheck-1"
+  },
+  "scope": "same_source_full_suite_recheck_without_assertion_or_timeout_changes"
+}

@@ -1,0 +1,222 @@
+{
+  "analysis_submissions": 0,
+  "app_restart": false,
+  "backend_recheck": {
+    "assertion_or_product_timeout_changes": false,
+    "command": [
+      "/home/hyl/.virtualenvs/llm_app/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests",
+      "--junitxml=/tmp/arkscope-lifecycle-web-source-correction-r1/results/backend.xml",
+      "--basetemp=/dev/shm/arkscope-lifecycle-web-source-backend-r2/backend"
+    ],
+    "prior_report_sha256": "154e8b6b84e4c1d7516f4ae005f90b616627ed7c35037782fc1cf9d0824dbdbf",
+    "prior_timeout_receipt_sha256": "b00417b9295855027144c1b9c9c821b4281750313008f89d5bae1c90f3862d0a",
+    "provider_calls": 0,
+    "reason": "prior_runner_timeout",
+    "runner_timeout_seconds": 1200,
+    "same_product_and_tests": true,
+    "temporary_storage": "private /dev/shm directory"
+  },
+  "commit": false,
+  "complete_investigation_live_verified": false,
+  "correction_provider_calls": 0,
+  "frontend_bytes_unchanged": true,
+  "human_adoptions": 0,
+  "live_model_submissions": 1,
+  "live_source_http_requests": 4,
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6617
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "000cb9388ce24dc7c72143604c32ffe5438a716be8fce13fd84bdf5e4cb9eea5"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1940
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "8524df6d35346e5f1c915dd9a0bcdca4841d6847fac55dac056d87f7f2b58302"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2759
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "cebd6c683c025a8924ec94d97076ebd1395cd609f373883549ac9085e5d07c80"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1940
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "0d5784409f23357a12a1f90a41b24394fa3bb24718b485655f1e17270ca41ccf"
+    }
+  },
+  "merge": false,
+  "mutations": 5,
+  "mutations_scope": "five_independent_mutants_against_whole_affected_focus",
+  "offline_source_correction_complete": true,
+  "preparation": {
+    "harness-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 13
+      },
+      "failed_nodes": [],
+      "file": "harness-green.xml",
+      "sha256": "0e804e4f6ec9b4f14bc21182c2c5ec710e8a5f57fed785b0f231f126e7a4826e"
+    },
+    "harness-red": {
+      "counts": {
+        "errors": 0,
+        "failures": 13,
+        "skipped": 0,
+        "tests": 13
+      },
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_records_session_binding_without_exporting_ids[init-owned-True]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_records_session_binding_without_exporting_ids[init-foreign-False]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_records_session_binding_without_exporting_ids[init-None-False]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_records_session_binding_without_exporting_ids[result-owned-True]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_records_session_binding_without_exporting_ids[result-foreign-False]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_records_session_binding_without_exporting_ids[result-None-False]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_retains_per_model_counts_instead_of_just_a_pass_flag",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use[None-absent]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use[value1-invalid]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_usage_absence_and_invalid_shape_do_not_claim_zero_use[value2-object]",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_missing_or_malformed_counts_are_not_fabricated_or_leaked",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_source_guard_rejects_changed_or_resurrected_inputs",
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_complete_offline_rehearsal_preserves_selected_auth_and_new_witnesses"
+      ],
+      "file": "harness-red.xml",
+      "sha256": "1c5c87c6d3227a28c60455c891620b9c668c0a3f05370d34a7ae2e83f8ebec22"
+    },
+    "packet-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 30
+      },
+      "failed_nodes": [],
+      "file": "packet-green.xml",
+      "sha256": "d43219d92fed74e7b9d113ea7377a5e419d1de0c1e8417878ca40b46e023a4a1"
+    },
+    "post-correction-old-plan-rejection": {
+      "counts": {
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "tests": 29
+      },
+      "failed_nodes": [
+        "docs.superpowers.evidence.2026-09-07-lifecycle-web-sonnet-canary.test_sonnet_canary::test_canary_complete_offline_rehearsal_preserves_selected_auth_and_new_witnesses"
+      ],
+      "file": "post-correction-old-plan-rejection.xml",
+      "sha256": "66c1091cd97216fd79f3687d09c12a4556b6548d485bdb17dddcab5731851bbd"
+    },
+    "pre-live-focus": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 129
+      },
+      "failed_nodes": [],
+      "file": "pre-live-focus.xml",
+      "sha256": "512407f435adb983b51fb226ba282f08b5f679e677a2348a22a6199adfcf9601"
+    },
+    "source-tls-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 24
+      },
+      "failed_nodes": [],
+      "file": "source-tls-green.xml",
+      "sha256": "0c38221265f9bfadae8017f631f820e16797230a144ace6fcdd6ef97832fd329"
+    },
+    "source-wire-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 81
+      },
+      "failed_nodes": [],
+      "file": "source-wire-green.xml",
+      "sha256": "bddb217d972bb99fd98ef00af77b6d5c2bcbfb8832d6ef98c5aac2cef25a38a6"
+    },
+    "source-wire-red": {
+      "counts": {
+        "errors": 0,
+        "failures": 8,
+        "skipped": 0,
+        "tests": 12
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[fixed-False]",
+        "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[chunked-False]",
+        "tests.test_lifecycle_public_sources_wire::test_response_owned_body_survives_connection_close[eof-False]",
+        "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]",
+        "tests.test_lifecycle_public_sources_wire::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]",
+        "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]",
+        "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]",
+        "tests.test_lifecycle_public_sources_wire::test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]"
+      ],
+      "file": "source-wire-red.xml",
+      "sha256": "b1aea8dd5e6b5472f2594a122378847370b4567badb543ca413f322cd330d7d7"
+    }
+  },
+  "prior_files_verified": 105,
+  "prior_seal_sha256": "f26fe21ed1e7d908b17c0dc48ca4de6f67751ec1afa5a9f8c7b30d701ca5109e",
+  "production_migration": false,
+  "production_writes": false,
+  "push": false,
+  "remaining": [
+    "corrected_source_and_complete_claude_live_gate",
+    "other_channel_live_gates",
+    "multi_turn_usage_and_partial_failure_diagnostics",
+    "authorized_web_journal_installation",
+    "complete_population_cutover",
+    "merge_and_handtest"
+  ],
+  "sonnet_search_model_auth_session_live_verified": true,
+  "source_correction_code_files": [
+    "src/lifecycle_public_sources.py",
+    "tests/test_lifecycle_public_sources.py",
+    "tests/test_lifecycle_public_sources_wire.py"
+  ],
+  "source_correction_live_verified": false,
+  "source_files_verified": 1062,
+  "tls_probe": {
+    "certificate": "ephemeral_test_only_not_archived",
+    "network": "local_socketpair_only",
+    "openssl": "OpenSSL 3.0.2 15 Mar 2022",
+    "peer_verification": true
+  }
+}

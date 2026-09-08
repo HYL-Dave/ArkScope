@@ -1,0 +1,3062 @@
+[
+  {
+    "locale": "en",
+    "width": 1440,
+    "provider_calls": 0,
+    "synthetic_model_submissions": 3,
+    "requests": [
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "PUT",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8bdcb8eab1fc4f2a89a96361342b4275",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8bdcb8eab1fc4f2a89a96361342b4275/cancel",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8bdcb8eab1fc4f2a89a96361342b4275",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_a71d2954cad74bd8b72ab87d77b3e934",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_a71d2954cad74bd8b72ab87d77b3e934",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8e00afe39ef34c66886b8478eeaf87e5",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8e00afe39ef34c66886b8478eeaf87e5",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8e00afe39ef34c66886b8478eeaf87e5/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8e00afe39ef34c66886b8478eeaf87e5/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_8e00afe39ef34c66886b8478eeaf87e5/confirm",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_100e95b1d19d4bc49ee44fc612ecbb72/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers/prepare",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/cases/slc_bdb12f0a87cc39ca54714cde6659a1ad8322b550ed5a86be7f2e0a7af99c0bf2/confirm-review",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_206042d1f7ce421aa6f929fc9bf4f4bc/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "screens": [
+      {
+        "name": "completed",
+        "file": "en-1440-completed.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "citations",
+        "file": "en-1440-citations.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "settings",
+        "file": "en-1440-settings.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "running",
+        "file": "en-1440-running.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "cancelled",
+        "file": "en-1440-cancelled.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "incomplete",
+        "file": "en-1440-incomplete.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "review-gaps",
+        "file": "en-1440-review-gaps.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "confirm",
+        "file": "en-1440-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "receipt",
+        "file": "en-1440-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-confirm",
+        "file": "en-1440-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-receipt",
+        "file": "en-1440-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-decision",
+        "file": "en-1440-provider-decision.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-review",
+        "file": "en-1440-provider-review.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-receipt",
+        "file": "en-1440-provider-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-confirm",
+        "file": "en-1440-provider-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-receipt",
+        "file": "en-1440-provider-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      }
+    ]
+  },
+  {
+    "locale": "en",
+    "width": 390,
+    "provider_calls": 0,
+    "synthetic_model_submissions": 3,
+    "requests": [
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "PUT",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_9e8c73c3978c40aa9a8d153e519198cc",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_9e8c73c3978c40aa9a8d153e519198cc/cancel",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_9e8c73c3978c40aa9a8d153e519198cc",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_792ce4f6142c47ce869e529b1f88e70f",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_792ce4f6142c47ce869e529b1f88e70f",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_2a3dd834a6274e1fb8b0bbab7fd7919e",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_2a3dd834a6274e1fb8b0bbab7fd7919e",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_2a3dd834a6274e1fb8b0bbab7fd7919e/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_2a3dd834a6274e1fb8b0bbab7fd7919e/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_2a3dd834a6274e1fb8b0bbab7fd7919e/confirm",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_38a37f388e2143b4bc68cee0394b601d/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers/prepare",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/cases/slc_bdb12f0a87cc39ca54714cde6659a1ad8322b550ed5a86be7f2e0a7af99c0bf2/confirm-review",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_0845315e4e834fd3ad6f5d29663ed6f9/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "screens": [
+      {
+        "name": "completed",
+        "file": "en-390-completed.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "citations",
+        "file": "en-390-citations.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "settings",
+        "file": "en-390-settings.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "running",
+        "file": "en-390-running.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "cancelled",
+        "file": "en-390-cancelled.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "incomplete",
+        "file": "en-390-incomplete.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "review-gaps",
+        "file": "en-390-review-gaps.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "confirm",
+        "file": "en-390-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "receipt",
+        "file": "en-390-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-confirm",
+        "file": "en-390-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-receipt",
+        "file": "en-390-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-decision",
+        "file": "en-390-provider-decision.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-review",
+        "file": "en-390-provider-review.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-receipt",
+        "file": "en-390-provider-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-confirm",
+        "file": "en-390-provider-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-receipt",
+        "file": "en-390-provider-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      }
+    ]
+  },
+  {
+    "locale": "en",
+    "width": 320,
+    "provider_calls": 0,
+    "synthetic_model_submissions": 3,
+    "requests": [
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "PUT",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_48e2881c54874f8e8c0c9587adcebd32",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_48e2881c54874f8e8c0c9587adcebd32/cancel",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_48e2881c54874f8e8c0c9587adcebd32",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_ec3975efa5f74556b439b2d177c63c76",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_ec3975efa5f74556b439b2d177c63c76",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4a2a62955a664db18c6cca7abc194a02",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4a2a62955a664db18c6cca7abc194a02",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4a2a62955a664db18c6cca7abc194a02/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4a2a62955a664db18c6cca7abc194a02/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4a2a62955a664db18c6cca7abc194a02/confirm",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_fe0ca3e7d0404fd796713ee0c3bad60b/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers/prepare",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/cases/slc_bdb12f0a87cc39ca54714cde6659a1ad8322b550ed5a86be7f2e0a7af99c0bf2/confirm-review",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_0354fcbda55d46b98dfd5e592db285ea/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "screens": [
+      {
+        "name": "completed",
+        "file": "en-320-completed.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "citations",
+        "file": "en-320-citations.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "settings",
+        "file": "en-320-settings.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "running",
+        "file": "en-320-running.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "cancelled",
+        "file": "en-320-cancelled.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "incomplete",
+        "file": "en-320-incomplete.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "review-gaps",
+        "file": "en-320-review-gaps.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "confirm",
+        "file": "en-320-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "receipt",
+        "file": "en-320-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-confirm",
+        "file": "en-320-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-receipt",
+        "file": "en-320-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-decision",
+        "file": "en-320-provider-decision.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-review",
+        "file": "en-320-provider-review.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-receipt",
+        "file": "en-320-provider-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-confirm",
+        "file": "en-320-provider-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-receipt",
+        "file": "en-320-provider-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      }
+    ]
+  },
+  {
+    "locale": "zh-Hant",
+    "width": 1440,
+    "provider_calls": 0,
+    "synthetic_model_submissions": 3,
+    "requests": [
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "PUT",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_39acf9d5c77d4f0e9701dd74d9b2097c",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_39acf9d5c77d4f0e9701dd74d9b2097c/cancel",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_39acf9d5c77d4f0e9701dd74d9b2097c",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d4afe2b6e8cb4c34af36347900418293",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d4afe2b6e8cb4c34af36347900418293",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_822b3535d6dc4dd98008c20fd20c1d01",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_822b3535d6dc4dd98008c20fd20c1d01",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_822b3535d6dc4dd98008c20fd20c1d01/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_822b3535d6dc4dd98008c20fd20c1d01/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_822b3535d6dc4dd98008c20fd20c1d01/confirm",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_432d0bbb6e4342da8bf899ba0da913ee/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers/prepare",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/cases/slc_bdb12f0a87cc39ca54714cde6659a1ad8322b550ed5a86be7f2e0a7af99c0bf2/confirm-review",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_60f0dded04f14d438a037dd0f8dacd58/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "screens": [
+      {
+        "name": "completed",
+        "file": "zh-Hant-1440-completed.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "citations",
+        "file": "zh-Hant-1440-citations.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "settings",
+        "file": "zh-Hant-1440-settings.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "running",
+        "file": "zh-Hant-1440-running.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "cancelled",
+        "file": "zh-Hant-1440-cancelled.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "incomplete",
+        "file": "zh-Hant-1440-incomplete.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "review-gaps",
+        "file": "zh-Hant-1440-review-gaps.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "confirm",
+        "file": "zh-Hant-1440-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "receipt",
+        "file": "zh-Hant-1440-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-confirm",
+        "file": "zh-Hant-1440-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-receipt",
+        "file": "zh-Hant-1440-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-decision",
+        "file": "zh-Hant-1440-provider-decision.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-review",
+        "file": "zh-Hant-1440-provider-review.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-receipt",
+        "file": "zh-Hant-1440-provider-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-confirm",
+        "file": "zh-Hant-1440-provider-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-receipt",
+        "file": "zh-Hant-1440-provider-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      }
+    ]
+  },
+  {
+    "locale": "zh-Hant",
+    "width": 390,
+    "provider_calls": 0,
+    "synthetic_model_submissions": 3,
+    "requests": [
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "PUT",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_0a1cc89e758a48c5a7918a92e375c8fd",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_0a1cc89e758a48c5a7918a92e375c8fd/cancel",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_0a1cc89e758a48c5a7918a92e375c8fd",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_231d8dbbdc574470979adabdfe264bde",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_231d8dbbdc574470979adabdfe264bde",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_11063bca26574da69421c2b017a1dcde",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_11063bca26574da69421c2b017a1dcde",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_11063bca26574da69421c2b017a1dcde/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_11063bca26574da69421c2b017a1dcde/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_11063bca26574da69421c2b017a1dcde/confirm",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_da2360ba8cb144eb9831a25d1c88a5b2/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers/prepare",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/cases/slc_bdb12f0a87cc39ca54714cde6659a1ad8322b550ed5a86be7f2e0a7af99c0bf2/confirm-review",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_d6973e186f7d4ee893bff66d44c414ea/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "screens": [
+      {
+        "name": "completed",
+        "file": "zh-Hant-390-completed.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "citations",
+        "file": "zh-Hant-390-citations.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "settings",
+        "file": "zh-Hant-390-settings.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "running",
+        "file": "zh-Hant-390-running.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "cancelled",
+        "file": "zh-Hant-390-cancelled.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "incomplete",
+        "file": "zh-Hant-390-incomplete.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "review-gaps",
+        "file": "zh-Hant-390-review-gaps.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "confirm",
+        "file": "zh-Hant-390-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "receipt",
+        "file": "zh-Hant-390-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-confirm",
+        "file": "zh-Hant-390-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-receipt",
+        "file": "zh-Hant-390-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-decision",
+        "file": "zh-Hant-390-provider-decision.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-review",
+        "file": "zh-Hant-390-provider-review.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-receipt",
+        "file": "zh-Hant-390-provider-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-confirm",
+        "file": "zh-Hant-390-provider-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-receipt",
+        "file": "zh-Hant-390-provider-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      }
+    ]
+  },
+  {
+    "locale": "zh-Hant",
+    "width": 320,
+    "provider_calls": 0,
+    "synthetic_model_submissions": 3,
+    "requests": [
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runtime",
+        "method": "PUT",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4e1b066e3f7e484ab2dcf8cba11f5d1a",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4e1b066e3f7e484ab2dcf8cba11f5d1a/cancel",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_4e1b066e3f7e484ab2dcf8cba11f5d1a",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_fb1dcf2bbf994a4d93cd2c0139906a27",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_fb1dcf2bbf994a4d93cd2c0139906a27",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/runs",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d6d113679f3d4586be5fbab8c524c50c",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d6d113679f3d4586be5fbab8c524c50c",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d6d113679f3d4586be5fbab8c524c50c/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d6d113679f3d4586be5fbab8c524c50c/review",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/runs/li_d6d113679f3d4586be5fbab8c524c50c/confirm",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_216f0f7e936348b38e9dea360ada43d4/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/OLD/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers/prepare",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/cases/slc_bdb12f0a87cc39ca54714cde6659a1ad8322b550ed5a86be7f2e0a7af99c0bf2/confirm-review",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transitions/tit_4bc127c4678d493691b91dcb8f4299f9/reverse",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/providers",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/preflight",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/actions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/transition-activity",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/fixture-api/security-lifecycle/investigations/targets/CACHED/latest",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "screens": [
+      {
+        "name": "completed",
+        "file": "zh-Hant-320-completed.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "citations",
+        "file": "zh-Hant-320-citations.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "settings",
+        "file": "zh-Hant-320-settings.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "running",
+        "file": "zh-Hant-320-running.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "cancelled",
+        "file": "zh-Hant-320-cancelled.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "incomplete",
+        "file": "zh-Hant-320-incomplete.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "review-gaps",
+        "file": "zh-Hant-320-review-gaps.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "confirm",
+        "file": "zh-Hant-320-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "receipt",
+        "file": "zh-Hant-320-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-confirm",
+        "file": "zh-Hant-320-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "reverse-receipt",
+        "file": "zh-Hant-320-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-decision",
+        "file": "zh-Hant-320-provider-decision.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-review",
+        "file": "zh-Hant-320-provider-review.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-receipt",
+        "file": "zh-Hant-320-provider-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-confirm",
+        "file": "zh-Hant-320-provider-reverse-confirm.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      },
+      {
+        "name": "provider-reverse-receipt",
+        "file": "zh-Hant-320-provider-reverse-receipt.png",
+        "geometry": {
+          "bodyOverflow": false,
+          "clipped": 0,
+          "overlap": false,
+          "textOverflow": 0
+        }
+      }
+    ]
+  }
+]

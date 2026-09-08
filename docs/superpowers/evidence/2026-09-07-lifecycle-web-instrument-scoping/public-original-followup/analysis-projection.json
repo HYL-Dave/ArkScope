@@ -1,0 +1,61 @@
+{
+  "announcement_date": "2023-05-15",
+  "announcement_date_text": "May 15, 2023",
+  "citations": [
+    {
+      "quote_sha256": "cb6d0e46c94b68a45f7dc86e2ed67c884e46c1fe92680e1e07e724c951d0547b",
+      "quote_utf8_bytes": 81,
+      "source_id": "source-6",
+      "supports": [
+        "security_identity"
+      ]
+    },
+    {
+      "quote_sha256": "8e5d165e90d939a49fac9d40fe485b51980a815c21cb9a611d333939eae755e6",
+      "quote_utf8_bytes": 351,
+      "source_id": "source-6",
+      "supports": [
+        "listing_ended",
+        "effective_date"
+      ]
+    },
+    {
+      "quote_sha256": "c13720a4d190872c7307170fc8cad9ad472ddcb10cb365830843232757a95e42",
+      "quote_utf8_bytes": 321,
+      "source_id": "source-6",
+      "supports": [
+        "listing_ended"
+      ]
+    },
+    {
+      "quote_sha256": "f933b80135135c0d0adece351f770333ec645155f22b5f83265955a60880ec74",
+      "quote_utf8_bytes": 271,
+      "source_id": "source-6",
+      "supports": [
+        "acquisition_announced"
+      ]
+    },
+    {
+      "quote_sha256": "9f596b4a2d9974168f542bc336cc3e3c280617d377c63d3b969ed436f6178104",
+      "quote_utf8_bytes": 196,
+      "source_id": "source-2",
+      "supports": [
+        "contradiction"
+      ]
+    }
+  ],
+  "contradictions": [
+    "The May 16, 2023 press release (sources 2 and 5) announces intent to delist and redeem the 8.25%/8.00% Senior Notes (TANNI, TANNL, TANNZ), a different security class from TA common stock; this does not pertain to or contradict the common stock delisting evidenced in source-6."
+  ],
+  "effective_date": "2023-05-15",
+  "effective_date_text": "May 15, 2023",
+  "event_kind": "listing_ended",
+  "issuer_name": "TravelCenters of America Inc.",
+  "security_class": "common stock",
+  "source_ticker": "TA",
+  "successor_ticker": null,
+  "summary": "TravelCenters of America Inc. common stock (Nasdaq: TA) was acquired by BP Products North America Inc. via merger completed May 15, 2023. Per the company's Form 8-K, shares of Company Stock ceased trading on Nasdaq prior to market open on May 15, 2023, became eligible for delisting, and were cancelled and converted into the right to receive $86.00 cash merger consideration; the Company requested Nasdaq file a Form 25 to delist the stock. This is distinct from the separate, later notice regarding delisting/redemption of TA's senior notes (TANNI, TANNL, TANNZ), which is a different security class and not evidence about the common stock.",
+  "timing": "completed",
+  "unresolved_conditions": [],
+  "venue": "NASDAQ"
+}

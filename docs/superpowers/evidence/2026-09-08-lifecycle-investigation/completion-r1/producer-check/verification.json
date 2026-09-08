@@ -1,0 +1,24 @@
+{
+  "checker_sha256": "bc1610799cb8a1132aac78468ef891624f42cccb7a4d491da0a92470db09ffa9",
+  "checks": {
+    "different_mutation_rejected": true,
+    "expected_nine_setup_assertions": true,
+    "missing_direct_owner_rejected": true,
+    "missing_setup_error_rejected": true,
+    "unexpected_node_rejected": true,
+    "wrong_assertion_rejected": true,
+    "wrong_exception_rejected": true,
+    "wrong_fixture_rejected": true
+  },
+  "files": {
+    "different_mutation.xml": "7503f0234722e480438e76994a8db6473a4680ad8881aa3a00e575d3c007f51a",
+    "missing_direct_owner.xml": "c28fcf6649430c3439bd0d1bd39ba23782e9defd1cb914c58f2c8e6c75ddb7db",
+    "missing_setup_error.xml": "5d48c0fce98c5912cea544889d4e165f3ac8a7c4be6a0d7e2b26a13eb1d87f81",
+    "unexpected_node.xml": "350c187fb8cb45e6a2961632127ab60e8397f81c3e7d9161039e4d2cffcdffdb",
+    "wrong_assertion.xml": "e2820ed8d070f21fe35541d1e498b9df85b49dbe985d12db071dd27b222b0959",
+    "wrong_exception.xml": "e726d8556127147b7afab602bac874e3af70b8299bf84b2e45c52620c34109d0",
+    "wrong_fixture.xml": "bff0055ba39e213a71397f3902b108987af09d0ebceca0dc112788998fa1ec41"
+  },
+  "original_report_sha256": "902f6d68acd045d7a974cc68e400661de06d3ac14d0e578863ee46083baefc3a",
+  "producer_sha256": "c0eb4b0255300b180e7940d5c5083efb0dcf66f1dbb2788fff05701d456a94d1"
+}

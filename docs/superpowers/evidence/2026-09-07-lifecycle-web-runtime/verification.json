@@ -1,0 +1,114 @@
+{
+  "app_restart": false,
+  "backend": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6596
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "2e57ac1590f958ebbd21ef9c94064515bbfe06df00e7a75ae762e3349424b9f4"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1919
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "9ff43af6330fe4598354d1d52115ae222e8949aaae3b05b86b9ed49892445edc"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2738
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "cd4c6fdff3be0a4d80a572f54752d154de29d6a08366f290c3a0b520c0d3e2b1"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1919
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "d8ce9edf8ab9eea24e7afa36f36bf7339c63e4e606786a337261a0fa54f186e5"
+    }
+  },
+  "browser_scenarios": 54,
+  "browser_screenshots": 156,
+  "complete_slice": "four_channel_web_investigation_and_attended_review_offline",
+  "frontend": {
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1547
+      },
+      "failed_nodes": [],
+      "file": "baseline.json",
+      "sha256": "2257b877eb6967f86c84af0443c9589f77299076da56fc1945a8094847841f78"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1547
+      },
+      "failed_nodes": [],
+      "file": "restored-recheck-1.json",
+      "sha256": "41fe5bdddd5db781eb160399ee94b19986ecbac529be6256e3728f0a93440548"
+    }
+  },
+  "merge": false,
+  "mutations": {
+    "backend": 23,
+    "frontend": 11
+  },
+  "new_explicit_component_schema": "src/lifecycle_web_schema.py",
+  "prior_packets": {
+    "2026-09-06-lifecycle-action-review": {
+      "files_verified": 21,
+      "seal_sha256": "a213433de8ba262208439ad800255ec2ee45c22d510cc6196af444ab747fbd45"
+    },
+    "2026-09-06-lifecycle-current-review": {
+      "files_verified": 145,
+      "seal_sha256": "940223b9427c9f9122307aa5c4c39eda8ba23aaf01e6a6a71c23508729950bbe"
+    },
+    "2026-09-06-lifecycle-population-reconciliation": {
+      "files_verified": 15,
+      "seal_sha256": "5c4f702e5689cf3bd6166dd8f9c30791bb0674e4dabca5dd833e6656a50f300d"
+    }
+  },
+  "production_migration": false,
+  "production_reads": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "push": false,
+  "remaining": [
+    "authorized_web_journal_installation",
+    "authorized_live_canaries",
+    "existing_population_cutover",
+    "merge_and_handtest"
+  ],
+  "source_files_verified": 1061,
+  "unchanged_existing_schemas": {
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7"
+  },
+  "whole_workflow_complete": false
+}

@@ -1,0 +1,19 @@
+{
+  "algorithm": "sha256",
+  "scope": "this_packet_excluding_files_sha256_json",
+  "files": {
+    "README.md": "cc8e4930fab667b2eebe6f2d1d831e79b1d8d724812690b64a5ee33400a8afb5",
+    "diagnosis.json": "ef7ae993bb23a645c46c24dc5fc0d09485ed06dd6cc7e5c707bf73f3a5b5fd02",
+    "focus-files.json": "03e3d27f08b6a6336afc1563fb24442fd9234edebfe720f4ec6cbf0a32f1026e",
+    "mutation-results.json": "9faba2e1c21229d7ce1a7da7a7b5e8b3be01f91c1a4aa6fb904a449fbb52f358",
+    "mutations.json": "f824be866d07115b12a564e803dc16fcc20bba30850c8adba83a7534196d5259",
+    "price-focus-files.json": "b426f94c2b76862e1c1e84de51ed1da8f5b1593879aadde6bca7092d09d52939",
+    "request-manifest.json": "a0d2f1e679e85cb19c7e664bea756130d1479f100921fd700d4c8a6df4e9663a",
+    "scripts/inspect_recent.py": "5e6e47fc6fd3302a76e17dfd5961b73693bb4c09545c983a3204543f254af841",
+    "scripts/prepare_recent.py": "e50547218a01395db2f31ade9d8421db13ceff880b508e31ff4827d82baf15b4",
+    "scripts/run_mutations.py": "e9c94b9fa8c02a510f888d73ad2577bcd83f0ff09021ebb193ffea5eed677c29",
+    "scripts/test_recent_scope.py": "57206be669b6dd0df0a1d497cdbef877460e2beb7d73d1d54f319f5baf4314a8",
+    "source-manifest.json": "6f7edfb88bd9fa76621a5c2e9682f7024a7774b80ddc99c9f2711e481bfbd7b9",
+    "verification.json": "5c3ddb62adf012a49ca0775421d4a609e2facf0a0910c3be9bcb2d2c1034d3db"
+  }
+}

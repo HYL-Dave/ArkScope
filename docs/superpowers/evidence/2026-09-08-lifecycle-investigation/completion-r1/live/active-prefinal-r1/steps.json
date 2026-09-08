@@ -1,0 +1,3449 @@
+[
+  {
+    "ordinal": 1,
+    "kind": "local_search",
+    "at": "2026-09-07T21:45:03.428639+00:00",
+    "payload": {
+      "coverage": "available_local_corpora",
+      "gaps": [
+        {
+          "corpus": "news",
+          "reason": "local_news_unavailable"
+        }
+      ],
+      "items": [],
+      "next_offset": null,
+      "observed_at": "2026-09-07T21:45:03.426955+00:00",
+      "query": {},
+      "status": "unavailable"
+    }
+  },
+  {
+    "ordinal": 2,
+    "kind": "model_request",
+    "at": "2026-09-07T21:45:03.452566+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "phase": "analysis",
+      "prompt_sha256": "0ab24db8619f0fa6d7e6de777948ddd16dc34fb48bde0be98eb91323d194c688",
+      "remaining_seconds": 1799.9757297337055,
+      "supplied_passages": []
+    }
+  },
+  {
+    "ordinal": 3,
+    "kind": "model_result",
+    "at": "2026-09-07T21:45:08.586690+00:00",
+    "payload": {
+      "call_id": "step-1",
+      "output": {
+        "action": "search_local",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Super Micro Computer SMCI NASDAQ listing status",
+        "reason": "尚無本地候選或來源資料,先於本地語料搜尋SMCI(Super Micro Computer)上市狀態相關資訊,再決定是否需要網路搜尋。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "3ebf3317-8854-45ea-b74b-0b208eb0d897",
+      "usage": {
+        "input_tokens": 2998,
+        "output_tokens": 222
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 1977,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 202,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 1977,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2998,
+          "output_tokens": 222,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 4,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:45:08.605998+00:00",
+    "payload": {
+      "action": "search_local",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Super Micro Computer SMCI NASDAQ listing status",
+      "reason": "尚無本地候選或來源資料,先於本地語料搜尋SMCI(Super Micro Computer)上市狀態相關資訊,再決定是否需要網路搜尋。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 5,
+    "kind": "local_search",
+    "at": "2026-09-07T21:45:08.614945+00:00",
+    "payload": {
+      "coverage": "available_local_corpora",
+      "gaps": [
+        {
+          "corpus": "news",
+          "reason": "local_news_unavailable"
+        }
+      ],
+      "items": [],
+      "next_offset": null,
+      "observed_at": "2026-09-07T21:45:08.611573+00:00",
+      "query": {
+        "offset": 0,
+        "query": "Super Micro Computer SMCI NASDAQ listing status",
+        "since": null,
+        "until": null
+      },
+      "status": "unavailable"
+    }
+  },
+  {
+    "ordinal": 6,
+    "kind": "model_request",
+    "at": "2026-09-07T21:45:08.660585+00:00",
+    "payload": {
+      "call_id": "step-2",
+      "phase": "analysis",
+      "prompt_sha256": "23612dfc04cf7b9b398131b150fdab8df816f4a9d295df701429a5119e841d0d",
+      "remaining_seconds": 1794.7684912066907,
+      "supplied_passages": []
+    }
+  },
+  {
+    "ordinal": 7,
+    "kind": "model_result",
+    "at": "2026-09-07T21:45:13.510540+00:00",
+    "payload": {
+      "call_id": "step-2",
+      "output": {
+        "action": "search_web",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Super Micro Computer SMCI NASDAQ listing status 2026",
+        "reason": "本地語料無資料,需於網路查證SMCI(Super Micro Computer, Inc.)在NASDAQ的普通股目前是否仍在掛牌交易,或有無下市、更名、被收購等事件。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "d64b1ec2-215a-4c4a-9100-29472dfda37d",
+      "usage": {
+        "input_tokens": 3183,
+        "output_tokens": 195
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 2162,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 175,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 2162,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 3183,
+          "output_tokens": 195,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 8,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:45:13.515322+00:00",
+    "payload": {
+      "action": "search_web",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Super Micro Computer SMCI NASDAQ listing status 2026",
+      "reason": "本地語料無資料,需於網路查證SMCI(Super Micro Computer, Inc.)在NASDAQ的普通股目前是否仍在掛牌交易,或有無下市、更名、被收購等事件。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 9,
+    "kind": "model_request",
+    "at": "2026-09-07T21:45:13.520708+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "phase": "search",
+      "prompt_sha256": "9227122a7f2624516b9e6186c0d7babbf902a3b5cae93a305b9c3db712299112",
+      "remaining_seconds": 1789.9075359664857,
+      "supplied_passages": []
+    }
+  },
+  {
+    "ordinal": 10,
+    "kind": "web_action",
+    "at": "2026-09-07T21:45:15.957253+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "item_id": "toolu_017fVWP9Sri8j8c5MVF9Fpve",
+      "kind": "search"
+    }
+  },
+  {
+    "ordinal": 11,
+    "kind": "web_action",
+    "at": "2026-09-07T21:45:16.481753+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "item_id": "toolu_01WRKRg2KiGK1Yv124Ry2n3F",
+      "kind": "search"
+    }
+  },
+  {
+    "ordinal": 12,
+    "kind": "web_action",
+    "at": "2026-09-07T21:45:36.435788+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "item_id": "toolu_0159UXeyVgZeAn4eKf8Zwu79",
+      "kind": "search"
+    }
+  },
+  {
+    "ordinal": 13,
+    "kind": "web_action",
+    "at": "2026-09-07T21:45:36.703487+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "item_id": "toolu_01Udar7pLapZ3JzUg13E2uzy",
+      "kind": "search"
+    }
+  },
+  {
+    "ordinal": 14,
+    "kind": "model_result",
+    "at": "2026-09-07T21:46:05.548766+00:00",
+    "payload": {
+      "call_id": "step-3",
+      "output": {
+        "sources": [
+          "https://ir.supermicro.com/news/news-details/2025/Super-Micro-Computer-Inc.-is-in-Compliance-with-the-Nasdaq-Filing-Requirements/default.aspx",
+          "https://ir.supermicro.com/news/news-details/2024/Super-Micro-Computer-Inc.-Announces-Receipt-of-Non-Compliance-Letter-from-Nasdaq/default.aspx",
+          "https://ir.supermicro.com/news/news-details/2024/Super-Micro-Computer-Inc.-Nasdaq-Non-Compliance-Update/default.aspx",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000137536525000007/smci-nasdaqletterprfeb2025.htm",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000137536524000033/smci-pressreleasenasdaqdef.htm",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000137536524000042/smci-pressreleaseq12025for.htm",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm",
+          "https://www.businesswire.com/news/home/20241120071117/en/Super-Micro-Computer-Inc.-Nasdaq-Non-Compliance-Update",
+          "https://www.cfodive.com/news/nasdaq-grants-super-micro-filing-extension-request/735041/",
+          "https://finance.yahoo.com/news/super-micro-stock-rallies-after-meeting-nasdaq-deadline-to-avoid-delisting-200716288.html",
+          "https://www.cnbc.com/2025/02/11/super-micro-confident-it-will-meet-sec-deadline.html",
+          "https://markets.financialcontent.com/stocks/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility"
+        ],
+        "unresolved_conditions": [
+          "No primary Nasdaq/SEC-filed compliance notice dated 2026 was located in EDGAR; the only sources describing a 'January 27, 2026' renewed compliance event and a 'March 20, 2026' board resignation are syndicated financialcontent.com 'marketminute' articles, which appear speculative/AI-aggregated and are not corroborated by Reuters, AP, CNBC, Bloomberg, or an official Nasdaq/Supermicro IR press release.",
+          "As of the as_of date (2026-09-07), current/live SMCI Nasdaq listing status for fiscal filings due after the Feb 2025 resolution (e.g., FY2025 10-K, any FY2026 10-Q filings) was not directly confirmed via an official Nasdaq compliance letter in this search; only the FY2025 10-K SEC filing link was found, not a subsequent Nasdaq status letter."
+        ]
+      },
+      "output_error": null,
+      "phase": "search",
+      "remote_id": "b6d9370a-1fb8-43bc-8d2d-4d345c2b861f",
+      "usage": {
+        "input_tokens": 56070,
+        "output_tokens": 6931
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 9257,
+          "cache_read_input_tokens": 9044,
+          "input_tokens": 6,
+          "output_tokens": 2250,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 9257,
+          "cache_read_input_tokens": 9044,
+          "input_tokens": 56070,
+          "output_tokens": 6931,
+          "web_search_requests": 4
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 15,
+    "kind": "web_search",
+    "at": "2026-09-07T21:46:05.564922+00:00",
+    "payload": {
+      "query": "Super Micro Computer SMCI NASDAQ listing status 2026",
+      "since": null,
+      "sources": [
+        "https://ir.supermicro.com/news/news-details/2025/Super-Micro-Computer-Inc.-is-in-Compliance-with-the-Nasdaq-Filing-Requirements/default.aspx",
+        "https://ir.supermicro.com/news/news-details/2024/Super-Micro-Computer-Inc.-Announces-Receipt-of-Non-Compliance-Letter-from-Nasdaq/default.aspx",
+        "https://ir.supermicro.com/news/news-details/2024/Super-Micro-Computer-Inc.-Nasdaq-Non-Compliance-Update/default.aspx",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000137536525000007/smci-nasdaqletterprfeb2025.htm",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000137536524000033/smci-pressreleasenasdaqdef.htm",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000137536524000042/smci-pressreleaseq12025for.htm",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm",
+        "https://www.businesswire.com/news/home/20241120071117/en/Super-Micro-Computer-Inc.-Nasdaq-Non-Compliance-Update",
+        "https://www.cfodive.com/news/nasdaq-grants-super-micro-filing-extension-request/735041/",
+        "https://finance.yahoo.com/news/super-micro-stock-rallies-after-meeting-nasdaq-deadline-to-avoid-delisting-200716288.html",
+        "https://www.cnbc.com/2025/02/11/super-micro-confident-it-will-meet-sec-deadline.html",
+        "https://markets.financialcontent.com/stocks/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility"
+      ],
+      "unresolved_conditions": [
+        "No primary Nasdaq/SEC-filed compliance notice dated 2026 was located in EDGAR; the only sources describing a 'January 27, 2026' renewed compliance event and a 'March 20, 2026' board resignation are syndicated financialcontent.com 'marketminute' articles, which appear speculative/AI-aggregated and are not corroborated by Reuters, AP, CNBC, Bloomberg, or an official Nasdaq/Supermicro IR press release.",
+        "As of the as_of date (2026-09-07), current/live SMCI Nasdaq listing status for fiscal filings due after the Feb 2025 resolution (e.g., FY2025 10-K, any FY2026 10-Q filings) was not directly confirmed via an official Nasdaq compliance letter in this search; only the FY2025 10-K SEC filing link was found, not a subsequent Nasdaq status letter."
+      ],
+      "until": null
+    }
+  },
+  {
+    "ordinal": 16,
+    "kind": "model_request",
+    "at": "2026-09-07T21:46:05.605693+00:00",
+    "payload": {
+      "call_id": "step-4",
+      "phase": "analysis",
+      "prompt_sha256": "ee30c689c040c9c24e3b4b1ad245cb66e04a10818c76253bf7b879da106da4db",
+      "remaining_seconds": 1737.8233903311193,
+      "supplied_passages": []
+    }
+  },
+  {
+    "ordinal": 17,
+    "kind": "model_result",
+    "at": "2026-09-07T21:46:16.184979+00:00",
+    "payload": {
+      "call_id": "step-4",
+      "output": {
+        "action": "read_url",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Nasdaq compliance listing Super Micro Computer 2026",
+        "reason": "檢視此2026年SEC申報的新聞稿附件,以確認SMCI最新(2026年)是否有Nasdaq合規/掛牌狀態的官方揭露,而非僅依賴未經證實的財經聚合網站報導。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "c598317d-1f8d-47aa-8d37-254b4c6706a4",
+      "usage": {
+        "input_tokens": 5296,
+        "output_tokens": 715
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 4275,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 690,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 4275,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 5296,
+          "output_tokens": 715,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 18,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:46:16.201177+00:00",
+    "payload": {
+      "action": "read_url",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Nasdaq compliance listing Super Micro Computer 2026",
+      "reason": "檢視此2026年SEC申報的新聞稿附件,以確認SMCI最新(2026年)是否有Nasdaq合規/掛牌狀態的官方揭露,而非僅依賴未經證實的財經聚合網站報導。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+    }
+  },
+  {
+    "ordinal": 19,
+    "kind": "source_captured",
+    "at": "2026-09-07T21:46:17.888114+00:00",
+    "payload": {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "source_id": "source-1",
+      "text_sha256": "c2b7a88be79ad6fdee8e8599bff8acd07f1bc4569dc0740cf34cb6f80b0b8573",
+      "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+    }
+  },
+  {
+    "ordinal": 20,
+    "kind": "source_read",
+    "at": "2026-09-07T21:46:17.896867+00:00",
+    "payload": {
+      "http_requests": 1,
+      "observations": [
+        {
+          "content_encoding": "gzip",
+          "declared_body_bytes": 1844,
+          "decoded_body_bytes": 5905,
+          "framing": "content_length",
+          "received_body_bytes": 1844,
+          "request_index": 1,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+    }
+  },
+  {
+    "ordinal": 21,
+    "kind": "model_request",
+    "at": "2026-09-07T21:46:17.943563+00:00",
+    "payload": {
+      "call_id": "step-5",
+      "phase": "analysis",
+      "prompt_sha256": "4423727527a303cf1555596814eb44ba196a986eeae70c68ee98ead2fa986fe1",
+      "remaining_seconds": 1725.4855191521347,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9"
+      ]
+    }
+  },
+  {
+    "ordinal": 22,
+    "kind": "model_result",
+    "at": "2026-09-07T21:46:33.618712+00:00",
+    "payload": {
+      "call_id": "step-5",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": "2026-03-20",
+          "announcement_date_text": "March 20, 2026",
+          "citations": [
+            {
+              "passage_id": "source-1:p7",
+              "supports": [
+                "security_identity",
+                "active_listing",
+                "announcement_date"
+              ]
+            },
+            {
+              "passage_id": "source-1:p11",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": null,
+          "effective_date_text": null,
+          "event_kind": "active_listing",
+          "issuer_name": "Super Micro Computer, Inc.",
+          "limitations": [
+            "此結論主要依據2026年3月的公司新聞稿,未直接讀取2026年1月報導NASDAQ合規恢復之財經文章原文,但公司持續使用NASDAQ: SMCI標示已足以確認目前活躍掛牌狀態。"
+          ],
+          "security_class": "common stock",
+          "source_ticker": "SMCI",
+          "successor_ticker": null,
+          "summary": "2026年3月20日的官方公司公告(隨SEC 8-K附件揭露)明確標示「Super Micro Computer, Inc. (NASDAQ: SMCI)」,顯示該公司普通股仍在NASDAQ正常掛牌交易。此前2024-2025年間因財報延遲申報而收到的NASDAQ不合規通知,已於2026年初依網路報導解決並恢復合規,故目前無下市或更名證據。",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "已取得2026年3月官方SEC 8-K附件新聞稿,明確標示「Super Micro Computer, Inc. (NASDAQ: SMCI)」仍在NASDAQ掛牌交易,可確立目前仍為活躍上市證券,無需進一步查證。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "1f9dd37b-4638-4b9f-8e06-b50717fccf17",
+      "usage": {
+        "input_tokens": 5881,
+        "output_tokens": 1173
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 4860,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1153,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 4860,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 5881,
+          "output_tokens": 1173,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 23,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:46:33.642523+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": "2026-03-20",
+        "announcement_date_text": "March 20, 2026",
+        "citations": [
+          {
+            "passage_id": "source-1:p7",
+            "supports": [
+              "security_identity",
+              "active_listing",
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p11",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [
+          "此結論主要依據2026年3月的公司新聞稿,未直接讀取2026年1月報導NASDAQ合規恢復之財經文章原文,但公司持續使用NASDAQ: SMCI標示已足以確認目前活躍掛牌狀態。"
+        ],
+        "security_class": "common stock",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "2026年3月20日的官方公司公告(隨SEC 8-K附件揭露)明確標示「Super Micro Computer, Inc. (NASDAQ: SMCI)」,顯示該公司普通股仍在NASDAQ正常掛牌交易。此前2024-2025年間因財報延遲申報而收到的NASDAQ不合規通知,已於2026年初依網路報導解決並恢復合規,故目前無下市或更名證據。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "已取得2026年3月官方SEC 8-K附件新聞稿,明確標示「Super Micro Computer, Inc. (NASDAQ: SMCI)」仍在NASDAQ掛牌交易,可確立目前仍為活躍上市證券,無需進一步查證。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 24,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:46:33.657375+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [
+        {
+          "missing_identity_fields": [
+            "security_class"
+          ],
+          "source_id": "source-1"
+        }
+      ],
+      "block_reasons": [
+        "active_listing_not_supported",
+        "security_identity_not_supported"
+      ],
+      "finding": {
+        "announcement_date": "2026-03-20",
+        "announcement_date_text": "March 20, 2026",
+        "citations": [
+          {
+            "passage_id": "source-1:p7",
+            "supports": [
+              "security_identity",
+              "active_listing",
+              "announcement_date"
+            ]
+          },
+          {
+            "passage_id": "source-1:p11",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [
+          "此結論主要依據2026年3月的公司新聞稿,未直接讀取2026年1月報導NASDAQ合規恢復之財經文章原文,但公司持續使用NASDAQ: SMCI標示已足以確認目前活躍掛牌狀態。"
+        ],
+        "security_class": "common stock",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "2026年3月20日的官方公司公告(隨SEC 8-K附件揭露)明確標示「Super Micro Computer, Inc. (NASDAQ: SMCI)」,顯示該公司普通股仍在NASDAQ正常掛牌交易。此前2024-2025年間因財報延遲申報而收到的NASDAQ不合規通知,已於2026年初依網路報導解決並恢復合規,故目前無下市或更名證據。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 403,
+          "passage_id": "source-1:p7",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:46:17.865736+00:00",
+          "source_id": "source-1",
+          "start_char": 163,
+          "text": "SAN JOSE, Calif., March 20, 2026 — Super Micro Computer, Inc. (NASDAQ: SMCI) (“Supermicro” or the “Company”) today announced that Yih-Shyan “Wally” Liaw (“Mr. Liaw”) has resigned from the Company’s Board of Directors, effective immediately.",
+          "text_sha256": "48663a11206631693b5db1045c1698f0421a52e188c00532a897bfdaab380c5a",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 2426,
+          "passage_id": "source-1:p11",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:46:17.865736+00:00",
+          "source_id": "source-1",
+          "start_char": 1214,
+          "text": "Supermicro (NASDAQ: SMCI) is a global leader in Application-Optimized Total IT Solutions. Founded and operating in San Jose, California, Supermicro is committed to delivering first-to-market innovation for Enterprise, Cloud, AI, and 5G Telco/Edge IT Infrastructure. We are a Total IT Solutions provider with server, AI, storage, IoT, switch systems, software, and support services. Supermicro's motherboard, power, and chassis design expertise further enables our development and production, enabling next-generation innovation from cloud to edge for our global customers. Our products are designed and manufactured in-house (in the US, Taiwan, and the Netherlands), leveraging global operations for scale and efficiency and optimized to improve TCO and reduce environmental impact (Green Computing). The award-winning portfolio of Server Building Block Solutions® allows customers to optimize for their exact workload and application by selecting from a broad family of systems built from our flexible and reusable building blocks that support a comprehensive set of form factors, processors, memory, GPUs, storage, networking, power, and cooling solutions (air-conditioned, free air cooling or liquid cooling).",
+          "text_sha256": "607ef8bbc8642afcfd11903c4ddf04e15b10fa162167f8dbcf138c5c8ee2c1e9",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 25,
+    "kind": "model_request",
+    "at": "2026-09-07T21:46:33.699536+00:00",
+    "payload": {
+      "call_id": "step-6",
+      "phase": "analysis",
+      "prompt_sha256": "b4b454b298dca3092eee5f6a3d274e02b5c8d5a59e48d1c1f0bed28c4bdcc9c7",
+      "remaining_seconds": 1709.7298313491046,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9"
+      ]
+    }
+  },
+  {
+    "ordinal": 26,
+    "kind": "model_result",
+    "at": "2026-09-07T21:46:41.507152+00:00",
+    "payload": {
+      "call_id": "step-6",
+      "output": {
+        "action": "search_web",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Super Micro Computer Inc 10-Q cover page \"common stock\" \"Nasdaq Global Select Market\" SMCI 2026",
+        "reason": "需要一個明確揭露SMCI證券類別(如「普通股,每股面額$0.001」及NASDAQ Global Select Market掛牌)的官方文件段落,以補足security_class的身份佐證,先前的SEC 8-K新聞稿並未明確標示證券類別。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "934350fc-368b-4a5c-92be-88651d146a17",
+      "usage": {
+        "input_tokens": 6753,
+        "output_tokens": 486
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 5732,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 461,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 5732,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 6753,
+          "output_tokens": 486,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 27,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:46:41.512017+00:00",
+    "payload": {
+      "action": "search_web",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Super Micro Computer Inc 10-Q cover page \"common stock\" \"Nasdaq Global Select Market\" SMCI 2026",
+      "reason": "需要一個明確揭露SMCI證券類別(如「普通股,每股面額$0.001」及NASDAQ Global Select Market掛牌)的官方文件段落,以補足security_class的身份佐證,先前的SEC 8-K新聞稿並未明確標示證券類別。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 28,
+    "kind": "model_request",
+    "at": "2026-09-07T21:46:41.517048+00:00",
+    "payload": {
+      "call_id": "step-7",
+      "phase": "search",
+      "prompt_sha256": "e224eb2201b295af50b4d161c048aeda137fbe61d8da6aa65e5b33ef667424d4",
+      "remaining_seconds": 1701.9112080447376,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9"
+      ]
+    }
+  },
+  {
+    "ordinal": 29,
+    "kind": "web_action",
+    "at": "2026-09-07T21:46:44.873473+00:00",
+    "payload": {
+      "call_id": "step-7",
+      "item_id": "toolu_01NBHYCubPaezukHR4JD1vMu",
+      "kind": "search"
+    }
+  },
+  {
+    "ordinal": 30,
+    "kind": "web_action",
+    "at": "2026-09-07T21:46:45.274864+00:00",
+    "payload": {
+      "call_id": "step-7",
+      "item_id": "toolu_01LxyBckNJREoESUxMVxKoio",
+      "kind": "search"
+    }
+  },
+  {
+    "ordinal": 31,
+    "kind": "model_result",
+    "at": "2026-09-07T21:47:06.220970+00:00",
+    "payload": {
+      "call_id": "step-7",
+      "output": {
+        "sources": [
+          "https://www.sec.gov/Archives/edgar/data/0001375365/000137536526000014/smci-20260331.htm",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000119312526267973/d41737d424b5.htm",
+          "https://markets.financialcontent.com/franklincredit/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility",
+          "https://finance.yahoo.com/news/super-micro-computer-resolves-nasdaq-185612507.html",
+          "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+        ],
+        "unresolved_conditions": []
+      },
+      "output_error": null,
+      "phase": "search",
+      "remote_id": "8707a01e-16a0-4530-a698-9b3159eeb26a",
+      "usage": {
+        "input_tokens": 28432,
+        "output_tokens": 3428
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 5988,
+          "cache_read_input_tokens": 4788,
+          "input_tokens": 4,
+          "output_tokens": 1421,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 5988,
+          "cache_read_input_tokens": 4788,
+          "input_tokens": 28432,
+          "output_tokens": 3428,
+          "web_search_requests": 2
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 32,
+    "kind": "web_search",
+    "at": "2026-09-07T21:47:06.232127+00:00",
+    "payload": {
+      "query": "Super Micro Computer Inc 10-Q cover page \"common stock\" \"Nasdaq Global Select Market\" SMCI 2026",
+      "since": null,
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/0001375365/000137536526000014/smci-20260331.htm",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000119312526267973/d41737d424b5.htm",
+        "https://markets.financialcontent.com/franklincredit/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility",
+        "https://finance.yahoo.com/news/super-micro-computer-resolves-nasdaq-185612507.html",
+        "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000011/a992.htm"
+      ],
+      "unresolved_conditions": [],
+      "until": null
+    }
+  },
+  {
+    "ordinal": 33,
+    "kind": "model_request",
+    "at": "2026-09-07T21:47:06.276243+00:00",
+    "payload": {
+      "call_id": "step-8",
+      "phase": "analysis",
+      "prompt_sha256": "8b8c1cee3712ba96c170a4df545dad59e753b60fc42c550cd081a90c126c2d89",
+      "remaining_seconds": 1677.1526995524764,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9"
+      ]
+    }
+  },
+  {
+    "ordinal": 34,
+    "kind": "model_result",
+    "at": "2026-09-07T21:47:12.974517+00:00",
+    "payload": {
+      "call_id": "step-8",
+      "output": {
+        "action": "read_url",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "common stock par value Nasdaq Global Select Market trading symbol SMCI registered",
+        "reason": "讀取SMCI最新10-Q(2026年6月季度)之SEC申報封面頁,以取得明確揭露證券類別(如「普通股,每股面額$0.001」)與NASDAQ Global Select Market掛牌狀態的官方段落,補足身份佐證。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "a23b0890-6274-4b0a-8c82-d10ffdd08823",
+      "usage": {
+        "input_tokens": 7019,
+        "output_tokens": 450
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 5998,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 430,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 5998,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 7019,
+          "output_tokens": 450,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 35,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:47:12.989285+00:00",
+    "payload": {
+      "action": "read_url",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "common stock par value Nasdaq Global Select Market trading symbol SMCI registered",
+      "reason": "讀取SMCI最新10-Q(2026年6月季度)之SEC申報封面頁,以取得明確揭露證券類別(如「普通股,每股面額$0.001」)與NASDAQ Global Select Market掛牌狀態的官方段落,補足身份佐證。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+    }
+  },
+  {
+    "ordinal": 36,
+    "kind": "source_captured",
+    "at": "2026-09-07T21:47:14.530320+00:00",
+    "payload": {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "source_id": "source-2",
+      "text_sha256": "cb7b69ff76c067f73208846ab848ba7406c617d4b66bf3800e4b7b30bae8fce1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+    }
+  },
+  {
+    "ordinal": 37,
+    "kind": "source_read",
+    "at": "2026-09-07T21:47:14.537450+00:00",
+    "payload": {
+      "http_requests": 1,
+      "observations": [
+        {
+          "content_encoding": "gzip",
+          "declared_body_bytes": 320453,
+          "decoded_body_bytes": 3990369,
+          "framing": "content_length",
+          "received_body_bytes": 320453,
+          "request_index": 1,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+    }
+  },
+  {
+    "ordinal": 38,
+    "kind": "model_request",
+    "at": "2026-09-07T21:47:14.566194+00:00",
+    "payload": {
+      "call_id": "step-9",
+      "phase": "analysis",
+      "prompt_sha256": "612cbea2a53d017d16a477d4f49aa5fb69b1f31029432ff547b6e23f6c08d257",
+      "remaining_seconds": 1668.8656401159242,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 39,
+    "kind": "model_result",
+    "at": "2026-09-07T21:47:30.450952+00:00",
+    "payload": {
+      "call_id": "step-9",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": null,
+          "announcement_date_text": null,
+          "citations": [
+            {
+              "passage_id": "source-2:p308",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p654",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p89",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p91",
+              "supports": [
+                "active_listing"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": null,
+          "effective_date_text": null,
+          "event_kind": "active_listing",
+          "issuer_name": "Super Micro Computer, Inc.",
+          "limitations": [],
+          "security_class": "common stock",
+          "source_ticker": "SMCI",
+          "successor_ticker": null,
+          "summary": "Super Micro Computer's common stock remains actively listed and trading on the Nasdaq Global Select Market under ticker SMCI, per its own SEC 10-Q for the quarter ended June 30, 2026, which states the stock is 'listed on the Nasdaq Global Select Market under the symbol \"SMCI\"' and reports current shares outstanding as of July 31, 2026. No delisting, suspension, or ticker change has occurred; the 2024-2025 Nasdaq filing non-compliance matter was resolved and did not result in removal from the exchange.",
+          "timing": "unknown",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "Source-2 (SEC 10-Q for period ended June 30, 2026, filed 2026) explicitly identifies the issuer, security class, and exchange listing on its cover/market pages, directly confirming SMCI is still actively listed and trading as ordinary common stock on Nasdaq. This resolves the prior grounding gap (identity + active_listing) without further searching.",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "f0b8e46f-ea01-48ea-a8a5-b32b7a6af46e",
+      "usage": {
+        "input_tokens": 10504,
+        "output_tokens": 1449
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 9483,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1424,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 9483,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 10504,
+          "output_tokens": 1449,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 40,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:47:30.469238+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p89",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p91",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock remains actively listed and trading on the Nasdaq Global Select Market under ticker SMCI, per its own SEC 10-Q for the quarter ended June 30, 2026, which states the stock is 'listed on the Nasdaq Global Select Market under the symbol \"SMCI\"' and reports current shares outstanding as of July 31, 2026. No delisting, suspension, or ticker change has occurred; the 2024-2025 Nasdaq filing non-compliance matter was resolved and did not result in removal from the exchange.",
+        "timing": "unknown",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "Source-2 (SEC 10-Q for period ended June 30, 2026, filed 2026) explicitly identifies the issuer, security class, and exchange listing on its cover/market pages, directly confirming SMCI is still actively listed and trading as ordinary common stock on Nasdaq. This resolves the prior grounding gap (identity + active_listing) without further searching.",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 41,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:47:30.497426+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [
+        {
+          "missing_identity_fields": [
+            "issuer_name"
+          ],
+          "source_id": "source-2"
+        }
+      ],
+      "block_reasons": [
+        "active_listing_not_supported",
+        "security_identity_not_supported"
+      ],
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p89",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p91",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [],
+        "security_class": "common stock",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock remains actively listed and trading on the Nasdaq Global Select Market under ticker SMCI, per its own SEC 10-Q for the quarter ended June 30, 2026, which states the stock is 'listed on the Nasdaq Global Select Market under the symbol \"SMCI\"' and reports current shares outstanding as of July 31, 2026. No delisting, suspension, or ticker change has occurred; the 2024-2025 Nasdaq filing non-compliance matter was resolved and did not result in removal from the exchange.",
+        "timing": "unknown",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 112398,
+          "passage_id": "source-2:p308",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 111813,
+          "text": "We were incorporated in California in September 1993 and subsequently reincorporated in Delaware in March 2007. Our common stock is listed on the Nasdaq Global Select Market under the symbol “SMCI”. Our 7.00% Series A Mandatory Convertible Preferred Stock (the “Mandatory Convertible Preferred Stock”) in the form of depositary shares are listed on the Nasdaq Global Select Market under the ticker “SMCIP”. Our principal executive offices are located at 980 Rock Avenue, San Jose, California 95131. Our telephone number is (408) 503-8000, and our website address is www.supermicro.com.",
+          "text_sha256": "d2386c07f325e3dfe85e0eb1a0d3f3256df113eb4ef99b7d53a2f423309eb21d",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 247731,
+          "passage_id": "source-2:p654",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 247378,
+          "text": "Our common stock is traded on the Nasdaq Global Select Market under the symbol SMCI. Public trading of our common stock began on March 29, 2007. Prior to that, there was no public market for our common stock. Our Mandatory Convertible Preferred Stock in the form of depositary shares are listed on the Nasdaq Global Select Market under the symbol SMCIP.",
+          "text_sha256": "aacb108b857f24441249a28af1244cb1ab93ad5b6ff2a78b846ed477850f856c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 63339,
+          "passage_id": "source-2:p89",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 63226,
+          "text": "Indicate by check mark whether the registrant is a shell company (as defined in Rule 12b-2 of the Act) Yes ☐ No ☒",
+          "text_sha256": "a25e596087439bfc8db61bae8b1223128b7f50a52ca50d13bc61a2ab9d5d7163",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 64115,
+          "passage_id": "source-2:p91",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 63934,
+          "text": "As of July 31, 2026, there were 656,965,384 shares of the registrant’s common stock, $0.001 par value, outstanding, which is the only class of common stock of the registrant issued.",
+          "text_sha256": "a25a5359acad0848fabb080309a0c9a78c81e976f1afaf7d171e6e5c940c118c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 42,
+    "kind": "model_request",
+    "at": "2026-09-07T21:47:30.526547+00:00",
+    "payload": {
+      "call_id": "step-10",
+      "phase": "analysis",
+      "prompt_sha256": "588443434cfd2e5a441306a8709f950e822e51ff912b09bd2f3c4077ae079440",
+      "remaining_seconds": 1652.9017961025238,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 43,
+    "kind": "model_result",
+    "at": "2026-09-07T21:47:39.775014+00:00",
+    "payload": {
+      "call_id": "step-10",
+      "output": {
+        "action": "inspect_source",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Exact name of registrant as specified in its charter Title of each class Trading Symbol Name of each exchange on which registered",
+        "reason": "需要抓取10-Q封面頁明確載明「Super Micro Computer, Inc.」發行人全名與證券類別(如Common Stock, $0.001 par value)及交易所登記資訊的段落,以補足前次被拒絕的issuer_name身份佐證缺口。",
+        "since": null,
+        "source_id": "source-2",
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "1bc12697-0e7c-48ad-b4d1-087f28c50d0b",
+      "usage": {
+        "input_tokens": 11380,
+        "output_tokens": 689
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 10359,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 666,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 10359,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 11380,
+          "output_tokens": 689,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 44,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:47:39.793672+00:00",
+    "payload": {
+      "action": "inspect_source",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Exact name of registrant as specified in its charter Title of each class Trading Symbol Name of each exchange on which registered",
+      "reason": "需要抓取10-Q封面頁明確載明「Super Micro Computer, Inc.」發行人全名與證券類別(如Common Stock, $0.001 par value)及交易所登記資訊的段落,以補足前次被拒絕的issuer_name身份佐證缺口。",
+      "since": null,
+      "source_id": "source-2",
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 45,
+    "kind": "model_request",
+    "at": "2026-09-07T21:47:40.357531+00:00",
+    "payload": {
+      "call_id": "step-11",
+      "phase": "analysis",
+      "prompt_sha256": "ef673fa87053e15be6c58a113df6f5716dc9140af4bd07a1c7b8da7494a9454e",
+      "remaining_seconds": 1643.0709817418829,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p44",
+        "source-2:p45",
+        "source-2:p46",
+        "source-2:p5023",
+        "source-2:p5024",
+        "source-2:p5025",
+        "source-2:p5057",
+        "source-2:p5058",
+        "source-2:p5059",
+        "source-2:p61",
+        "source-2:p62",
+        "source-2:p63",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 46,
+    "kind": "model_result",
+    "at": "2026-09-07T21:47:57.436483+00:00",
+    "payload": {
+      "call_id": "step-11",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": null,
+          "announcement_date_text": null,
+          "citations": [
+            {
+              "passage_id": "source-2:p44",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p45",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p61",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p62",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p63",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p654",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p308",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": null,
+          "effective_date_text": null,
+          "event_kind": "active_listing",
+          "issuer_name": "Super Micro Computer, Inc.",
+          "limitations": [],
+          "security_class": "Common Stock, $0.001 par value per share",
+          "source_ticker": "SMCI",
+          "successor_ticker": null,
+          "summary": "Super Micro Computer's common stock (SMCI) remains actively listed and trading on the Nasdaq Global Select Market, as confirmed by its Form 10-Q for the quarter ended June 30, 2026, which states the stock trades under symbol SMCI and identifies the security class and exchange on its cover page. No delisting, acquisition, or ticker change has occurred; the company previously resolved a Nasdaq filing-delinquency non-compliance matter and continues normal reporting.",
+          "timing": "unknown",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ Global Select Market",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "Source-2 (SEC 10-Q for period ended June 30, 2026) jointly provides issuer legal name, security class, ticker symbol, exchange, and an explicit active-trading statement, resolving the prior identity/active-listing grounding gap without further search.",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "42dfcc92-138c-4ded-a4db-d7f98f628120",
+      "usage": {
+        "input_tokens": 12785,
+        "output_tokens": 1608
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 11764,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1588,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 11764,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 12785,
+          "output_tokens": 1608,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 47,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:47:57.452823+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p45",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p61",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p62",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p63",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [],
+        "security_class": "Common Stock, $0.001 par value per share",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock (SMCI) remains actively listed and trading on the Nasdaq Global Select Market, as confirmed by its Form 10-Q for the quarter ended June 30, 2026, which states the stock trades under symbol SMCI and identifies the security class and exchange on its cover page. No delisting, acquisition, or ticker change has occurred; the company previously resolved a Nasdaq filing-delinquency non-compliance matter and continues normal reporting.",
+        "timing": "unknown",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "Source-2 (SEC 10-Q for period ended June 30, 2026) jointly provides issuer legal name, security class, ticker symbol, exchange, and an explicit active-trading statement, resolving the prior identity/active-listing grounding gap without further search.",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 48,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:47:57.478393+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [],
+      "block_reasons": [
+        "active_listing_not_supported"
+      ],
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p45",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p61",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p62",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p63",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [],
+        "security_class": "Common Stock, $0.001 par value per share",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock (SMCI) remains actively listed and trading on the Nasdaq Global Select Market, as confirmed by its Form 10-Q for the quarter ended June 30, 2026, which states the stock trades under symbol SMCI and identifies the security class and exchange on its cover page. No delisting, acquisition, or ticker change has occurred; the company previously resolved a Nasdaq filing-delinquency non-compliance matter and continues normal reporting.",
+        "timing": "unknown",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 59776,
+          "passage_id": "source-2:p44",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 59750,
+          "text": "Super Micro Computer, Inc.",
+          "text_sha256": "8c7a91cc34506ccf402aaa2dc0c6a196a018c2dcc17716f8fec45bab4ffbb4ed",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 59831,
+          "passage_id": "source-2:p45",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 59777,
+          "text": "(Exact name of registrant as specified in its charter)",
+          "text_sha256": "83c9ba74048e5a956ba8180409324361523cafc335d3b988dae1124b8086a332",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60356,
+          "passage_id": "source-2:p61",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60342,
+          "text": "Trading Symbol",
+          "text_sha256": "ae61833d0fc33e15bc8dd256900d5f62b787d48c5a86f385f0d5359c2a373e93",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60398,
+          "passage_id": "source-2:p62",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60357,
+          "text": "Name of each exchange on which registered",
+          "text_sha256": "a9bc5233165ecd9f25b78c4d647b4714a217f42958d333764dd346ea50bde6b8",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60439,
+          "passage_id": "source-2:p63",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60399,
+          "text": "Common Stock, $0.001 par value per share",
+          "text_sha256": "1db9739420372fe2b2b750a1213fbd1ef1b8f897a7e5ee95dab15423f3cb69a6",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 247731,
+          "passage_id": "source-2:p654",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 247378,
+          "text": "Our common stock is traded on the Nasdaq Global Select Market under the symbol SMCI. Public trading of our common stock began on March 29, 2007. Prior to that, there was no public market for our common stock. Our Mandatory Convertible Preferred Stock in the form of depositary shares are listed on the Nasdaq Global Select Market under the symbol SMCIP.",
+          "text_sha256": "aacb108b857f24441249a28af1244cb1ab93ad5b6ff2a78b846ed477850f856c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 112398,
+          "passage_id": "source-2:p308",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 111813,
+          "text": "We were incorporated in California in September 1993 and subsequently reincorporated in Delaware in March 2007. Our common stock is listed on the Nasdaq Global Select Market under the symbol “SMCI”. Our 7.00% Series A Mandatory Convertible Preferred Stock (the “Mandatory Convertible Preferred Stock”) in the form of depositary shares are listed on the Nasdaq Global Select Market under the ticker “SMCIP”. Our principal executive offices are located at 980 Rock Avenue, San Jose, California 95131. Our telephone number is (408) 503-8000, and our website address is www.supermicro.com.",
+          "text_sha256": "d2386c07f325e3dfe85e0eb1a0d3f3256df113eb4ef99b7d53a2f423309eb21d",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 49,
+    "kind": "model_request",
+    "at": "2026-09-07T21:47:57.503811+00:00",
+    "payload": {
+      "call_id": "step-12",
+      "phase": "analysis",
+      "prompt_sha256": "e6255d6def5287512f61fe1e553201344e797c0b18e5dbe1589ca6ee3d93be3a",
+      "remaining_seconds": 1625.924517069012,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p44",
+        "source-2:p45",
+        "source-2:p46",
+        "source-2:p5023",
+        "source-2:p5024",
+        "source-2:p5025",
+        "source-2:p5057",
+        "source-2:p5058",
+        "source-2:p5059",
+        "source-2:p61",
+        "source-2:p62",
+        "source-2:p63",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 50,
+    "kind": "model_result",
+    "at": "2026-09-07T21:48:34.926457+00:00",
+    "payload": {
+      "call_id": "step-12",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": null,
+          "announcement_date_text": null,
+          "citations": [
+            {
+              "passage_id": "source-2:p44",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p45",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p61",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p62",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p63",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p654",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p308",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p90",
+              "supports": [
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p91",
+              "supports": [
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p663",
+              "supports": [
+                "active_listing"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": null,
+          "effective_date_text": null,
+          "event_kind": "active_listing",
+          "issuer_name": "Super Micro Computer, Inc.",
+          "limitations": [],
+          "security_class": "Common Stock, $0.001 par value per share",
+          "source_ticker": "SMCI",
+          "successor_ticker": null,
+          "summary": "Super Micro Computer's common stock (SMCI) remains actively listed and trading on the Nasdaq Global Select Market, as confirmed by its FY2026 Form 10-K (period ended June 30, 2026), which states the stock trades under symbol SMCI, reports a Nasdaq-based market value as of December 31, 2025, and shows a stock-performance chart through June 30, 2026. No delisting, acquisition, or ticker change has occurred; the company previously resolved a Nasdaq filing-delinquency non-compliance matter and continues normal reporting.",
+          "timing": "unknown",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ Global Select Market",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "The FY2026 Form 10-K (source-2, period ended June 30, 2026) provides multiple dated, explicit statements of Super Micro Computer's common stock actively trading on Nasdaq under SMCI, including a market-value calculation as of December 31, 2025 and a five-year stock-performance disclosure through June 30, 2026, strengthening the prior active_listing support beyond the generic Item 5 boilerplate that was previously rejected.",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "bbfe5da5-1662-4fd3-b8ea-cdfccdf2463e",
+      "usage": {
+        "input_tokens": 13492,
+        "output_tokens": 3631
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 12471,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 3611,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 12471,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 13492,
+          "output_tokens": 3631,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 51,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:48:34.939532+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p45",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p61",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p62",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p63",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p90",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p91",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p663",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [],
+        "security_class": "Common Stock, $0.001 par value per share",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock (SMCI) remains actively listed and trading on the Nasdaq Global Select Market, as confirmed by its FY2026 Form 10-K (period ended June 30, 2026), which states the stock trades under symbol SMCI, reports a Nasdaq-based market value as of December 31, 2025, and shows a stock-performance chart through June 30, 2026. No delisting, acquisition, or ticker change has occurred; the company previously resolved a Nasdaq filing-delinquency non-compliance matter and continues normal reporting.",
+        "timing": "unknown",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "The FY2026 Form 10-K (source-2, period ended June 30, 2026) provides multiple dated, explicit statements of Super Micro Computer's common stock actively trading on Nasdaq under SMCI, including a market-value calculation as of December 31, 2025 and a five-year stock-performance disclosure through June 30, 2026, strengthening the prior active_listing support beyond the generic Item 5 boilerplate that was previously rejected.",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 52,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:48:34.968903+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [],
+      "block_reasons": [
+        "active_listing_not_supported"
+      ],
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p45",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p61",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p62",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p63",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p90",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p91",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p663",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [],
+        "security_class": "Common Stock, $0.001 par value per share",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock (SMCI) remains actively listed and trading on the Nasdaq Global Select Market, as confirmed by its FY2026 Form 10-K (period ended June 30, 2026), which states the stock trades under symbol SMCI, reports a Nasdaq-based market value as of December 31, 2025, and shows a stock-performance chart through June 30, 2026. No delisting, acquisition, or ticker change has occurred; the company previously resolved a Nasdaq filing-delinquency non-compliance matter and continues normal reporting.",
+        "timing": "unknown",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 59776,
+          "passage_id": "source-2:p44",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 59750,
+          "text": "Super Micro Computer, Inc.",
+          "text_sha256": "8c7a91cc34506ccf402aaa2dc0c6a196a018c2dcc17716f8fec45bab4ffbb4ed",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 59831,
+          "passage_id": "source-2:p45",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 59777,
+          "text": "(Exact name of registrant as specified in its charter)",
+          "text_sha256": "83c9ba74048e5a956ba8180409324361523cafc335d3b988dae1124b8086a332",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60356,
+          "passage_id": "source-2:p61",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60342,
+          "text": "Trading Symbol",
+          "text_sha256": "ae61833d0fc33e15bc8dd256900d5f62b787d48c5a86f385f0d5359c2a373e93",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60398,
+          "passage_id": "source-2:p62",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60357,
+          "text": "Name of each exchange on which registered",
+          "text_sha256": "a9bc5233165ecd9f25b78c4d647b4714a217f42958d333764dd346ea50bde6b8",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60439,
+          "passage_id": "source-2:p63",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60399,
+          "text": "Common Stock, $0.001 par value per share",
+          "text_sha256": "1db9739420372fe2b2b750a1213fbd1ef1b8f897a7e5ee95dab15423f3cb69a6",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 247731,
+          "passage_id": "source-2:p654",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 247378,
+          "text": "Our common stock is traded on the Nasdaq Global Select Market under the symbol SMCI. Public trading of our common stock began on March 29, 2007. Prior to that, there was no public market for our common stock. Our Mandatory Convertible Preferred Stock in the form of depositary shares are listed on the Nasdaq Global Select Market under the symbol SMCIP.",
+          "text_sha256": "aacb108b857f24441249a28af1244cb1ab93ad5b6ff2a78b846ed477850f856c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 112398,
+          "passage_id": "source-2:p308",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 111813,
+          "text": "We were incorporated in California in September 1993 and subsequently reincorporated in Delaware in March 2007. Our common stock is listed on the Nasdaq Global Select Market under the symbol “SMCI”. Our 7.00% Series A Mandatory Convertible Preferred Stock (the “Mandatory Convertible Preferred Stock”) in the form of depositary shares are listed on the Nasdaq Global Select Market under the ticker “SMCIP”. Our principal executive offices are located at 980 Rock Avenue, San Jose, California 95131. Our telephone number is (408) 503-8000, and our website address is www.supermicro.com.",
+          "text_sha256": "d2386c07f325e3dfe85e0eb1a0d3f3256df113eb4ef99b7d53a2f423309eb21d",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 63933,
+          "passage_id": "source-2:p90",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 63340,
+          "text": "The aggregate market value of the registrant’s common stock held by non-affiliates, based upon the closing price of the common stock on December 31, 2025, as reported by the Nasdaq Global Select Market, was $15,104,749,459. Shares of common stock held by each executive officer and director and by each person who owns 5% or more of the outstanding common stock, based on filings with the Securities and Exchange Commission, have been excluded since such persons may be deemed affiliates. This determination of affiliate status is not necessarily a conclusive determination for other purposes.",
+          "text_sha256": "8ff21648b09c4368b2b0f0370efb3a18c98c6c7ccd87248f4a2c4f6bd15e32b1",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 64115,
+          "passage_id": "source-2:p91",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 63934,
+          "text": "As of July 31, 2026, there were 656,965,384 shares of the registrant’s common stock, $0.001 par value, outstanding, which is the only class of common stock of the registrant issued.",
+          "text_sha256": "a25a5359acad0848fabb080309a0c9a78c81e976f1afaf7d171e6e5c940c118c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 249906,
+          "passage_id": "source-2:p663",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 249318,
+          "text": "The following graph shows a comparison of the cumulative total return for our common stock, the Nasdaq 100 Index and the Standard & Poor's 500 Stock Index (the “S&P 500”) for the five years ended June 30, 2026. The annual changes for the five-year period shown in the graph assume that $100 was invested in our common stock and each index at the market close on the last trading day for the fiscal year ended June 30, 2021, and that all dividends (if any were issued) were reinvested. The stock price performance of the following graph is not indicative of future stock price performance.",
+          "text_sha256": "cb0852daf7fc6f1975aece0e92e9877976f44d9b479eb6f7f42a9ac6219fa3d7",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 53,
+    "kind": "model_request",
+    "at": "2026-09-07T21:48:35.003601+00:00",
+    "payload": {
+      "call_id": "step-13",
+      "phase": "analysis",
+      "prompt_sha256": "b600229136dc28646435f14b3511b687312fd20df59bb9a331844c00b4779395",
+      "remaining_seconds": 1588.4266230128706,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p44",
+        "source-2:p45",
+        "source-2:p46",
+        "source-2:p5023",
+        "source-2:p5024",
+        "source-2:p5025",
+        "source-2:p5057",
+        "source-2:p5058",
+        "source-2:p5059",
+        "source-2:p61",
+        "source-2:p62",
+        "source-2:p63",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 54,
+    "kind": "model_result",
+    "at": "2026-09-07T21:49:01.704519+00:00",
+    "payload": {
+      "call_id": "step-13",
+      "output": {
+        "action": "read_url",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Super Micro Computer in compliance with Nasdaq filing requirements SMCI listed",
+        "reason": "先前引用SEC 10-K段落之active_listing佐證持續被拒,嘗試補充一份獨立、明確且較晚近的官方投資人關係公告,直接說明SMCI已恢復/維持NASDAQ掛牌合規狀態,以取得更清楚且無爭議的現行掛牌證據。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": "https://ir.supermicro.com/news/news-details/2025/Super-Micro-Computer-Inc.-is-in-Compliance-with-the-Nasdaq-Filing-Requirements/default.aspx"
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "c7689abb-b6ba-4c93-abca-de28910e5ab2",
+      "usage": {
+        "input_tokens": 13812,
+        "output_tokens": 2252
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 12791,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 2232,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 12791,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 13812,
+          "output_tokens": 2252,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 55,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:49:01.721539+00:00",
+    "payload": {
+      "action": "read_url",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Super Micro Computer in compliance with Nasdaq filing requirements SMCI listed",
+      "reason": "先前引用SEC 10-K段落之active_listing佐證持續被拒,嘗試補充一份獨立、明確且較晚近的官方投資人關係公告,直接說明SMCI已恢復/維持NASDAQ掛牌合規狀態,以取得更清楚且無爭議的現行掛牌證據。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": "https://ir.supermicro.com/news/news-details/2025/Super-Micro-Computer-Inc.-is-in-Compliance-with-the-Nasdaq-Filing-Requirements/default.aspx"
+    }
+  },
+  {
+    "ordinal": 56,
+    "kind": "source_read",
+    "at": "2026-09-07T21:49:02.080262+00:00",
+    "payload": {
+      "http_requests": 1,
+      "observations": [
+        {
+          "content_encoding": null,
+          "declared_body_bytes": null,
+          "decoded_body_bytes": 0,
+          "framing": null,
+          "received_body_bytes": 0,
+          "request_index": 1,
+          "result_code": "source_unavailable",
+          "status": 403
+        }
+      ],
+      "url": "https://ir.supermicro.com/news/news-details/2025/Super-Micro-Computer-Inc.-is-in-Compliance-with-the-Nasdaq-Filing-Requirements/default.aspx"
+    }
+  },
+  {
+    "ordinal": 57,
+    "kind": "model_request",
+    "at": "2026-09-07T21:49:02.142455+00:00",
+    "payload": {
+      "call_id": "step-14",
+      "phase": "analysis",
+      "prompt_sha256": "29d88c06163860d76952b832c42e58adc842ca3c7f2c793fb6364df1acf5ac4d",
+      "remaining_seconds": 1561.286670726724,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p44",
+        "source-2:p45",
+        "source-2:p46",
+        "source-2:p5023",
+        "source-2:p5024",
+        "source-2:p5025",
+        "source-2:p5057",
+        "source-2:p5058",
+        "source-2:p5059",
+        "source-2:p61",
+        "source-2:p62",
+        "source-2:p63",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 58,
+    "kind": "model_result",
+    "at": "2026-09-07T21:49:24.603587+00:00",
+    "payload": {
+      "call_id": "step-14",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": null,
+          "announcement_date_text": null,
+          "citations": [
+            {
+              "passage_id": "source-2:p44",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p63",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p61",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p62",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p308",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p654",
+              "supports": [
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p91",
+              "supports": [
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p90",
+              "supports": [
+                "active_listing"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": null,
+          "effective_date_text": null,
+          "event_kind": "active_listing",
+          "issuer_name": "Super Micro Computer, Inc.",
+          "limitations": [
+            "未取得2026年恢復Nasdaq申報合規的獨立新聞稿(IR頁面連結目前無法讀取),但10-K/10-Q持續申報並明確聲明現行掛牌狀態已足以確立活躍上市,此限制不影響結論。"
+          ],
+          "security_class": "Common Stock, $0.001 par value per share",
+          "source_ticker": "SMCI",
+          "successor_ticker": null,
+          "summary": "Super Micro Computer的FY2026 Form 10-K(截至2026年6月30日之會計年度)封面頁與內文明確載明:發行人「Super Micro Computer, Inc.」之普通股(每股面額$0.001)於NASDAQ Global Select Market掛牌,交易代碼為SMCI,且文件多處以現在式明確聲明該股票「目前」於Nasdaq交易/掛牌(包括截至2025年12月31日之市值計算及截至2026年6月30日之五年股價表現揭露),另揭露截至2026年7月31日在外流通股數,顯示直至申報日前該證券仍持續交易。過去雖曾發生Nasdaq申報合規疑慮(2024–2025年間),但2026年之10-Q/10-K申報及新聞稿均顯示公司仍以SMCI代碼在Nasdaq正常掛牌交易,無下市、更名或被收購完成之證據。此為現行活躍上市證券,無需變更追蹤。",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ Global Select Market",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "多個交易時點皆已提供;來源已聯合揭露發行人全稱、證券類別、代碼與交易所,並多次以明確語句聲明現時掛牌及交易狀態,不需進一步查證。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "2e59c751-0af4-4864-9c85-ed23db04d1a6",
+      "usage": {
+        "input_tokens": 13368,
+        "output_tokens": 1805
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 12347,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1785,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 12347,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 13368,
+          "output_tokens": 1805,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 59,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:49:24.622031+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p63",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p61",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p62",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p91",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p90",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [
+          "未取得2026年恢復Nasdaq申報合規的獨立新聞稿(IR頁面連結目前無法讀取),但10-K/10-Q持續申報並明確聲明現行掛牌狀態已足以確立活躍上市,此限制不影響結論。"
+        ],
+        "security_class": "Common Stock, $0.001 par value per share",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer的FY2026 Form 10-K(截至2026年6月30日之會計年度)封面頁與內文明確載明:發行人「Super Micro Computer, Inc.」之普通股(每股面額$0.001)於NASDAQ Global Select Market掛牌,交易代碼為SMCI,且文件多處以現在式明確聲明該股票「目前」於Nasdaq交易/掛牌(包括截至2025年12月31日之市值計算及截至2026年6月30日之五年股價表現揭露),另揭露截至2026年7月31日在外流通股數,顯示直至申報日前該證券仍持續交易。過去雖曾發生Nasdaq申報合規疑慮(2024–2025年間),但2026年之10-Q/10-K申報及新聞稿均顯示公司仍以SMCI代碼在Nasdaq正常掛牌交易,無下市、更名或被收購完成之證據。此為現行活躍上市證券,無需變更追蹤。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "多個交易時點皆已提供;來源已聯合揭露發行人全稱、證券類別、代碼與交易所,並多次以明確語句聲明現時掛牌及交易狀態,不需進一步查證。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  },
+  {
+    "ordinal": 60,
+    "kind": "rejected_finding",
+    "at": "2026-09-07T21:49:24.662262+00:00",
+    "payload": {
+      "action": null,
+      "binding_gaps": [],
+      "block_reasons": [
+        "active_listing_not_supported"
+      ],
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p63",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p61",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p62",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p91",
+            "supports": [
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p90",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [
+          "未取得2026年恢復Nasdaq申報合規的獨立新聞稿(IR頁面連結目前無法讀取),但10-K/10-Q持續申報並明確聲明現行掛牌狀態已足以確立活躍上市,此限制不影響結論。"
+        ],
+        "security_class": "Common Stock, $0.001 par value per share",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer的FY2026 Form 10-K(截至2026年6月30日之會計年度)封面頁與內文明確載明:發行人「Super Micro Computer, Inc.」之普通股(每股面額$0.001)於NASDAQ Global Select Market掛牌,交易代碼為SMCI,且文件多處以現在式明確聲明該股票「目前」於Nasdaq交易/掛牌(包括截至2025年12月31日之市值計算及截至2026年6月30日之五年股價表現揭露),另揭露截至2026年7月31日在外流通股數,顯示直至申報日前該證券仍持續交易。過去雖曾發生Nasdaq申報合規疑慮(2024–2025年間),但2026年之10-Q/10-K申報及新聞稿均顯示公司仍以SMCI代碼在Nasdaq正常掛牌交易,無下市、更名或被收購完成之證據。此為現行活躍上市證券,無需變更追蹤。",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "passages": [
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 59776,
+          "passage_id": "source-2:p44",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 59750,
+          "text": "Super Micro Computer, Inc.",
+          "text_sha256": "8c7a91cc34506ccf402aaa2dc0c6a196a018c2dcc17716f8fec45bab4ffbb4ed",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60439,
+          "passage_id": "source-2:p63",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60399,
+          "text": "Common Stock, $0.001 par value per share",
+          "text_sha256": "1db9739420372fe2b2b750a1213fbd1ef1b8f897a7e5ee95dab15423f3cb69a6",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60356,
+          "passage_id": "source-2:p61",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60342,
+          "text": "Trading Symbol",
+          "text_sha256": "ae61833d0fc33e15bc8dd256900d5f62b787d48c5a86f385f0d5359c2a373e93",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 60398,
+          "passage_id": "source-2:p62",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 60357,
+          "text": "Name of each exchange on which registered",
+          "text_sha256": "a9bc5233165ecd9f25b78c4d647b4714a217f42958d333764dd346ea50bde6b8",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 112398,
+          "passage_id": "source-2:p308",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 111813,
+          "text": "We were incorporated in California in September 1993 and subsequently reincorporated in Delaware in March 2007. Our common stock is listed on the Nasdaq Global Select Market under the symbol “SMCI”. Our 7.00% Series A Mandatory Convertible Preferred Stock (the “Mandatory Convertible Preferred Stock”) in the form of depositary shares are listed on the Nasdaq Global Select Market under the ticker “SMCIP”. Our principal executive offices are located at 980 Rock Avenue, San Jose, California 95131. Our telephone number is (408) 503-8000, and our website address is www.supermicro.com.",
+          "text_sha256": "d2386c07f325e3dfe85e0eb1a0d3f3256df113eb4ef99b7d53a2f423309eb21d",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 247731,
+          "passage_id": "source-2:p654",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 247378,
+          "text": "Our common stock is traded on the Nasdaq Global Select Market under the symbol SMCI. Public trading of our common stock began on March 29, 2007. Prior to that, there was no public market for our common stock. Our Mandatory Convertible Preferred Stock in the form of depositary shares are listed on the Nasdaq Global Select Market under the symbol SMCIP.",
+          "text_sha256": "aacb108b857f24441249a28af1244cb1ab93ad5b6ff2a78b846ed477850f856c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 64115,
+          "passage_id": "source-2:p91",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 63934,
+          "text": "As of July 31, 2026, there were 656,965,384 shares of the registrant’s common stock, $0.001 par value, outstanding, which is the only class of common stock of the registrant issued.",
+          "text_sha256": "a25a5359acad0848fabb080309a0c9a78c81e976f1afaf7d171e6e5c940c118c",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        },
+        {
+          "corpus": "web",
+          "coverage": "captured_document",
+          "end_char": 63933,
+          "passage_id": "source-2:p90",
+          "published_at": null,
+          "publisher": "www.sec.gov",
+          "retrieved_at": "2026-09-07T21:47:14.143790+00:00",
+          "source_id": "source-2",
+          "start_char": 63340,
+          "text": "The aggregate market value of the registrant’s common stock held by non-affiliates, based upon the closing price of the common stock on December 31, 2025, as reported by the Nasdaq Global Select Market, was $15,104,749,459. Shares of common stock held by each executive officer and director and by each person who owns 5% or more of the outstanding common stock, based on filings with the Securities and Exchange Commission, have been excluded since such persons may be deemed affiliates. This determination of affiliate status is not necessarily a conclusive determination for other purposes.",
+          "text_sha256": "8ff21648b09c4368b2b0f0370efb3a18c98c6c7ccd87248f4a2c4f6bd15e32b1",
+          "title": null,
+          "url": "https://www.sec.gov/Archives/edgar/data/1375365/000137536526000022/smci-20260630.htm"
+        }
+      ]
+    }
+  },
+  {
+    "ordinal": 61,
+    "kind": "model_request",
+    "at": "2026-09-07T21:49:24.694577+00:00",
+    "payload": {
+      "call_id": "step-15",
+      "phase": "analysis",
+      "prompt_sha256": "ab22184f1c22e0aeb4dfc70e037ea197ff7ad4c3d452acfe554fb37ddaa0a4e0",
+      "remaining_seconds": 1538.733766370453,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p44",
+        "source-2:p45",
+        "source-2:p46",
+        "source-2:p5023",
+        "source-2:p5024",
+        "source-2:p5025",
+        "source-2:p5057",
+        "source-2:p5058",
+        "source-2:p5059",
+        "source-2:p61",
+        "source-2:p62",
+        "source-2:p63",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91"
+      ]
+    }
+  },
+  {
+    "ordinal": 62,
+    "kind": "model_result",
+    "at": "2026-09-07T21:49:42.944219+00:00",
+    "payload": {
+      "call_id": "step-15",
+      "output": {
+        "action": "read_url",
+        "candidate_id": null,
+        "finding": null,
+        "offset": 0,
+        "query": "Super Micro Computer regains Nasdaq compliance SMCI 2026 trading",
+        "reason": "先前引用SEC 10-K/10-Q之active_listing段落屢遭系統拒絕,嘗試讀取此篇報導SMCI於2026年初恢復Nasdaq合規之獨立財經報導,以取得明確、具體事件性佐證(而非僅財報封面樣板文字),強化現行掛牌狀態的證明。",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": "https://markets.financialcontent.com/stocks/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility"
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "4387f95b-93af-4e28-8107-794308ba26a7",
+      "usage": {
+        "input_tokens": 14442,
+        "output_tokens": 1431
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 13421,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1406,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 13421,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 14442,
+          "output_tokens": 1431,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 63,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:49:42.949093+00:00",
+    "payload": {
+      "action": "read_url",
+      "candidate_id": null,
+      "finding": null,
+      "offset": 0,
+      "query": "Super Micro Computer regains Nasdaq compliance SMCI 2026 trading",
+      "reason": "先前引用SEC 10-K/10-Q之active_listing段落屢遭系統拒絕,嘗試讀取此篇報導SMCI於2026年初恢復Nasdaq合規之獨立財經報導,以取得明確、具體事件性佐證(而非僅財報封面樣板文字),強化現行掛牌狀態的證明。",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": "https://markets.financialcontent.com/stocks/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility"
+    }
+  },
+  {
+    "ordinal": 64,
+    "kind": "source_captured",
+    "at": "2026-09-07T21:49:44.096978+00:00",
+    "payload": {
+      "corpus": "web",
+      "coverage": "captured_document",
+      "source_id": "source-3",
+      "text_sha256": "f2535d1642d690defefd0b487e8cf56a6a80844e0ca7f3effbec2d2f5bb433de",
+      "url": "https://markets.financialcontent.com/stocks/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility"
+    }
+  },
+  {
+    "ordinal": 65,
+    "kind": "source_read",
+    "at": "2026-09-07T21:49:44.105758+00:00",
+    "payload": {
+      "http_requests": 1,
+      "observations": [
+        {
+          "content_encoding": "identity",
+          "declared_body_bytes": null,
+          "decoded_body_bytes": 81236,
+          "framing": "chunked",
+          "received_body_bytes": 81236,
+          "request_index": 1,
+          "result_code": "complete",
+          "status": 200
+        }
+      ],
+      "url": "https://markets.financialcontent.com/stocks/article/marketminute-2026-1-27-super-micro-computer-smci-regains-nasdaq-compliance-after-high-stakes-accounting-saga-igniting-fresh-market-volatility"
+    }
+  },
+  {
+    "ordinal": 66,
+    "kind": "model_request",
+    "at": "2026-09-07T21:49:44.151689+00:00",
+    "payload": {
+      "call_id": "step-16",
+      "phase": "analysis",
+      "prompt_sha256": "ad92700bd7f0d276cf81c24c7f80a7bb0aac197ff2233cdb0a39a616c1423f7f",
+      "remaining_seconds": 1519.2766388785094,
+      "supplied_passages": [
+        "source-1:p1",
+        "source-1:p10",
+        "source-1:p11",
+        "source-1:p12",
+        "source-1:p13",
+        "source-1:p14",
+        "source-1:p15",
+        "source-1:p2",
+        "source-1:p3",
+        "source-1:p4",
+        "source-1:p5",
+        "source-1:p6",
+        "source-1:p7",
+        "source-1:p8",
+        "source-1:p9",
+        "source-2:p307",
+        "source-2:p308",
+        "source-2:p309",
+        "source-2:p3595",
+        "source-2:p44",
+        "source-2:p45",
+        "source-2:p46",
+        "source-2:p5023",
+        "source-2:p5024",
+        "source-2:p5025",
+        "source-2:p5057",
+        "source-2:p5058",
+        "source-2:p5059",
+        "source-2:p61",
+        "source-2:p62",
+        "source-2:p63",
+        "source-2:p653",
+        "source-2:p654",
+        "source-2:p655",
+        "source-2:p663",
+        "source-2:p7173",
+        "source-2:p89",
+        "source-2:p90",
+        "source-2:p91",
+        "source-3:p1",
+        "source-3:p10",
+        "source-3:p100",
+        "source-3:p101",
+        "source-3:p102",
+        "source-3:p103",
+        "source-3:p104",
+        "source-3:p105",
+        "source-3:p106",
+        "source-3:p107",
+        "source-3:p108",
+        "source-3:p109",
+        "source-3:p11",
+        "source-3:p110",
+        "source-3:p111",
+        "source-3:p112",
+        "source-3:p113",
+        "source-3:p114",
+        "source-3:p115",
+        "source-3:p116",
+        "source-3:p117",
+        "source-3:p118",
+        "source-3:p119",
+        "source-3:p12",
+        "source-3:p120",
+        "source-3:p121",
+        "source-3:p122",
+        "source-3:p123",
+        "source-3:p124",
+        "source-3:p125",
+        "source-3:p126",
+        "source-3:p127",
+        "source-3:p13",
+        "source-3:p14",
+        "source-3:p15",
+        "source-3:p16",
+        "source-3:p17",
+        "source-3:p18",
+        "source-3:p19",
+        "source-3:p2",
+        "source-3:p20",
+        "source-3:p21",
+        "source-3:p22",
+        "source-3:p23",
+        "source-3:p24",
+        "source-3:p25",
+        "source-3:p26",
+        "source-3:p27",
+        "source-3:p28",
+        "source-3:p29",
+        "source-3:p3",
+        "source-3:p30",
+        "source-3:p31",
+        "source-3:p32",
+        "source-3:p33",
+        "source-3:p34",
+        "source-3:p35",
+        "source-3:p36",
+        "source-3:p37",
+        "source-3:p38",
+        "source-3:p39",
+        "source-3:p4",
+        "source-3:p40",
+        "source-3:p41",
+        "source-3:p42",
+        "source-3:p43",
+        "source-3:p44",
+        "source-3:p45",
+        "source-3:p46",
+        "source-3:p47",
+        "source-3:p48",
+        "source-3:p49",
+        "source-3:p5",
+        "source-3:p50",
+        "source-3:p51",
+        "source-3:p52",
+        "source-3:p53",
+        "source-3:p54",
+        "source-3:p55",
+        "source-3:p56",
+        "source-3:p57",
+        "source-3:p58",
+        "source-3:p59",
+        "source-3:p6",
+        "source-3:p60",
+        "source-3:p61",
+        "source-3:p62",
+        "source-3:p63",
+        "source-3:p64",
+        "source-3:p65",
+        "source-3:p66",
+        "source-3:p67",
+        "source-3:p68",
+        "source-3:p69",
+        "source-3:p7",
+        "source-3:p70",
+        "source-3:p71",
+        "source-3:p72",
+        "source-3:p73",
+        "source-3:p74",
+        "source-3:p75",
+        "source-3:p76",
+        "source-3:p77",
+        "source-3:p78",
+        "source-3:p79",
+        "source-3:p8",
+        "source-3:p80",
+        "source-3:p81",
+        "source-3:p82",
+        "source-3:p83",
+        "source-3:p84",
+        "source-3:p85",
+        "source-3:p86",
+        "source-3:p87",
+        "source-3:p88",
+        "source-3:p89",
+        "source-3:p9",
+        "source-3:p90",
+        "source-3:p91",
+        "source-3:p92",
+        "source-3:p93",
+        "source-3:p94",
+        "source-3:p95",
+        "source-3:p96",
+        "source-3:p97",
+        "source-3:p98",
+        "source-3:p99"
+      ]
+    }
+  },
+  {
+    "ordinal": 67,
+    "kind": "model_result",
+    "at": "2026-09-07T21:49:57.326110+00:00",
+    "payload": {
+      "call_id": "step-16",
+      "output": {
+        "action": "conclude",
+        "candidate_id": null,
+        "finding": {
+          "announcement_date": null,
+          "announcement_date_text": null,
+          "citations": [
+            {
+              "passage_id": "source-2:p44",
+              "supports": [
+                "security_identity"
+              ]
+            },
+            {
+              "passage_id": "source-2:p308",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-2:p654",
+              "supports": [
+                "security_identity",
+                "active_listing"
+              ]
+            },
+            {
+              "passage_id": "source-3:p26",
+              "supports": [
+                "active_listing",
+                "same_security_continuation"
+              ]
+            },
+            {
+              "passage_id": "source-3:p30",
+              "supports": [
+                "active_listing"
+              ]
+            }
+          ],
+          "contradictions": [],
+          "effective_date": null,
+          "effective_date_text": null,
+          "event_kind": "active_listing",
+          "issuer_name": "Super Micro Computer, Inc.",
+          "limitations": [
+            "Company faced a 2024-2025 Nasdaq filing-delinquency non-compliance episode (resolved by February 2025 per contemporaneous reporting) and regained compliance again per a January 2026 report; exact prior compliance-restoration dates are not required since the security remained continuously listed throughout."
+          ],
+          "security_class": "common stock",
+          "source_ticker": "SMCI",
+          "successor_ticker": null,
+          "summary": "Super Micro Computer's common stock (SMCI) continues to trade actively on the Nasdaq Global Select Market. Its FY2026 Form 10-K (period ended June 30, 2026) explicitly states the registrant's name, that its common stock is listed on Nasdaq under symbol SMCI, and reports market data through fiscal 2026; a January 27, 2026 report separately confirms Nasdaq regained full compliance after resolving its prior filing-delinquency non-compliance issue, closing the earlier delisting threat. No delisting, suspension, or renaming has occurred.",
+          "timing": "completed",
+          "unresolved_conditions": [],
+          "venue": "NASDAQ Global Select Market",
+          "version": 2
+        },
+        "offset": 0,
+        "query": null,
+        "reason": "Multiple independent, dated sources jointly and explicitly confirm SMCI is Super Micro Computer, Inc.'s common stock, actively trading on Nasdaq Global Select Market as of mid-2026.",
+        "since": null,
+        "source_id": null,
+        "until": null,
+        "url": null
+      },
+      "output_error": null,
+      "phase": "analysis",
+      "remote_id": "ca50e3b9-698f-4b3d-9b8f-9a046fc4ac78",
+      "usage": {
+        "input_tokens": 20697,
+        "output_tokens": 1169
+      },
+      "usage_observation": {
+        "basis": "claude_model_usage",
+        "main_loop": {
+          "cache_creation_input_tokens": 19676,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 2,
+          "output_tokens": 1143,
+          "web_search_requests": null
+        },
+        "values": {
+          "cache_creation_input_tokens": 19676,
+          "cache_read_input_tokens": 2118,
+          "input_tokens": 20697,
+          "output_tokens": 1169,
+          "web_search_requests": 0
+        }
+      }
+    }
+  },
+  {
+    "ordinal": 68,
+    "kind": "agent_action",
+    "at": "2026-09-07T21:49:57.346927+00:00",
+    "payload": {
+      "action": "conclude",
+      "candidate_id": null,
+      "finding": {
+        "announcement_date": null,
+        "announcement_date_text": null,
+        "citations": [
+          {
+            "passage_id": "source-2:p44",
+            "supports": [
+              "security_identity"
+            ]
+          },
+          {
+            "passage_id": "source-2:p308",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-2:p654",
+            "supports": [
+              "security_identity",
+              "active_listing"
+            ]
+          },
+          {
+            "passage_id": "source-3:p26",
+            "supports": [
+              "active_listing",
+              "same_security_continuation"
+            ]
+          },
+          {
+            "passage_id": "source-3:p30",
+            "supports": [
+              "active_listing"
+            ]
+          }
+        ],
+        "contradictions": [],
+        "effective_date": null,
+        "effective_date_text": null,
+        "event_kind": "active_listing",
+        "issuer_name": "Super Micro Computer, Inc.",
+        "limitations": [
+          "Company faced a 2024-2025 Nasdaq filing-delinquency non-compliance episode (resolved by February 2025 per contemporaneous reporting) and regained compliance again per a January 2026 report; exact prior compliance-restoration dates are not required since the security remained continuously listed throughout."
+        ],
+        "security_class": "common stock",
+        "source_ticker": "SMCI",
+        "successor_ticker": null,
+        "summary": "Super Micro Computer's common stock (SMCI) continues to trade actively on the Nasdaq Global Select Market. Its FY2026 Form 10-K (period ended June 30, 2026) explicitly states the registrant's name, that its common stock is listed on Nasdaq under symbol SMCI, and reports market data through fiscal 2026; a January 27, 2026 report separately confirms Nasdaq regained full compliance after resolving its prior filing-delinquency non-compliance issue, closing the earlier delisting threat. No delisting, suspension, or renaming has occurred.",
+        "timing": "completed",
+        "unresolved_conditions": [],
+        "venue": "NASDAQ Global Select Market",
+        "version": 2
+      },
+      "offset": 0,
+      "query": null,
+      "reason": "Multiple independent, dated sources jointly and explicitly confirm SMCI is Super Micro Computer, Inc.'s common stock, actively trading on Nasdaq Global Select Market as of mid-2026.",
+      "since": null,
+      "source_id": null,
+      "until": null,
+      "url": null
+    }
+  }
+]

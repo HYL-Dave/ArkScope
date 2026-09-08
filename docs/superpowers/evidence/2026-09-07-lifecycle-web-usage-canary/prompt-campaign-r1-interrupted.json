@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-09-07T11:30:33Z",
+  "campaign": "/tmp/lifecycle-schema-prompt-campaign-r1",
+  "status": "interrupted_during_baseline_not_a_test_pass",
+  "elapsed_seconds_at_observation": 239,
+  "baseline_results_available": false,
+  "observed_worker_waits": ["jbd2_log_wait_commit", "do_select", "folio_wait_bit_common", "jbd2_log_wait_commit"],
+  "action": "SIGINT to the verified owned test process group; repeat identical sources and tests with RAM-backed temporary storage",
+  "product_changed_for_recheck": false,
+  "test_assertions_or_timeouts_changed": false,
+  "provider_calls": 0
+}

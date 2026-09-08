@@ -1,0 +1,409 @@
+{
+  "attention": {
+    "version": 1,
+    "as_of": "2026-09-05T01:00:00Z",
+    "source_context": "available",
+    "coverage": {
+      "tracked": 2,
+      "confirmed_active": 0,
+      "unconfirmed": 2
+    },
+    "counts": {
+      "attention": 1,
+      "history": 0
+    },
+    "items": [
+      {
+        "review_id": "slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4",
+        "case_ids": [
+          "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"
+        ],
+        "ticker": "OLD",
+        "issuer_name": null,
+        "bucket": "attention",
+        "finding": "old_listing_inactive",
+        "reason": "removal_requires_confirmation",
+        "collection": {
+          "state": "tracking",
+          "sources": [
+            "manual_lists",
+            "sa_alpha_picks_former"
+          ]
+        },
+        "listing": {
+          "state": "inactive",
+          "basis": "observation",
+          "ended_on": "2023-05-16"
+        },
+        "continuation": {
+          "state": "unavailable",
+          "successor_ticker": null,
+          "candidate_tickers": []
+        },
+        "observed_at": "2026-09-05T01:00:00Z",
+        "next_check_at": null,
+        "diagnostics": {
+          "code": "listing_checks",
+          "missing_checks": [
+            "continuation"
+          ],
+          "provider_issues": [
+            {
+              "provider": "massive",
+              "reason": "not_found"
+            }
+          ],
+          "manual_review_required": false
+        },
+        "next_action": {
+          "kind": "review_removal",
+          "state": "not_prepared",
+          "case_id": "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c",
+          "assessment_id": "sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "transition_id": null,
+          "preview_sha256": null,
+          "transition_kind": null,
+          "execute_on": null,
+          "current_effects_match": null,
+          "can_reverse": false,
+          "block_reasons": []
+        },
+        "source_checks": [
+          {
+            "provider": "eodhd",
+            "check": "eodhd",
+            "directory": null,
+            "status": "inactive",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "massive",
+            "check": "delisting",
+            "directory": null,
+            "status": "inactive",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "massive",
+            "check": "otc",
+            "directory": null,
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "massive",
+            "check": "stocks",
+            "directory": null,
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "nasdaq",
+            "check": "nasdaq",
+            "directory": "nasdaq_listed",
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "nasdaq",
+            "check": "nasdaq",
+            "directory": "other_listed",
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          }
+        ],
+        "source_notices": []
+      }
+    ],
+    "page": {
+      "offset": 0,
+      "limit": 50,
+      "total": 1
+    }
+  },
+  "packet": {
+    "version": 1,
+    "case_id": "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c",
+    "assessment_id": "sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "packet_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "source_ticker": "OLD",
+    "action": "terminal_delisting",
+    "execute_on": "2023-05-16",
+    "provider_observed_at": "2026-09-05T01:00:00Z",
+    "active_sources": [
+      "manual_lists",
+      "sa_alpha_picks_former"
+    ],
+    "caveats": [
+      "provider_owned_sources_retained"
+    ],
+    "ready": true,
+    "block_reasons": [],
+    "effects": {
+      "watchlists": {
+        "add": [],
+        "archive": [
+          {
+            "list_name": "Manual",
+            "ticker": "OLD"
+          }
+        ],
+        "reactivate": [],
+        "unchanged": []
+      },
+      "legacy_config_seed": {
+        "add": [],
+        "archive": [],
+        "reactivate": [],
+        "unchanged": []
+      },
+      "editable_tags_to_copy": [],
+      "priority": {
+        "resolution": null,
+        "result_value": null,
+        "source_value": null,
+        "successor_value": null,
+        "write_successor": false
+      },
+      "suppression": {
+        "hide_source": true,
+        "source_hidden": false,
+        "successor_hidden": false,
+        "unhide_successor": false
+      },
+      "sa_tracking_memberships": [
+        {
+          "ticker": "OLD",
+          "picked_date": "2023-01-01",
+          "portfolio_status": "closed",
+          "current_tracking": false,
+          "removed": false
+        }
+      ]
+    },
+    "finding": {
+      "conclusion": "Reviewed explicit delisting with current trading checks; no acquirer alias is authorized.",
+      "impact_summary": "Stop collection, preserve history.",
+      "relevance": "direct_tracked_security",
+      "confidence": "high",
+      "outcomes": [
+        "listing_ended"
+      ],
+      "successor_ticker": null,
+      "destination_venue": null,
+      "effective_date": "2023-05-16",
+      "counterparty_name": null,
+      "counterparty_ticker": null,
+      "counterparty_cik": null,
+      "consideration_currency": null,
+      "cash_per_security_decimal": null,
+      "exchange_ratio_decimal": null
+    },
+    "options": {
+      "execute_on": "2023-05-16",
+      "priority_resolution": null,
+      "unhide_successor": false
+    },
+    "source_references": []
+  },
+  "confirmation": {
+    "version": 1,
+    "status": "applied",
+    "transition_id": "slt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "case_id": "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c",
+    "packet_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "action": "terminal_delisting",
+    "source_ticker": "OLD",
+    "successor_ticker": null,
+    "execute_on": "2023-05-16",
+    "applied_at": "2026-09-05T01:00:00Z",
+    "current_effects_match": true,
+    "block_reasons": []
+  },
+  "applied": {
+    "version": 1,
+    "as_of": "2026-09-05T01:00:00Z",
+    "source_context": "available",
+    "coverage": {
+      "tracked": 1,
+      "confirmed_active": 0,
+      "unconfirmed": 1
+    },
+    "counts": {
+      "attention": 1,
+      "history": 0
+    },
+    "items": [
+      {
+        "review_id": "slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4",
+        "case_ids": [
+          "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"
+        ],
+        "ticker": "OLD",
+        "issuer_name": null,
+        "bucket": "attention",
+        "finding": "old_listing_inactive",
+        "reason": "continuation_followup_pending",
+        "collection": {
+          "state": "not_tracking",
+          "sources": []
+        },
+        "listing": {
+          "state": "inactive",
+          "basis": "observation",
+          "ended_on": "2023-05-16"
+        },
+        "continuation": {
+          "state": "unavailable",
+          "successor_ticker": null,
+          "candidate_tickers": []
+        },
+        "observed_at": "2026-09-05T01:00:00Z",
+        "next_check_at": null,
+        "diagnostics": {
+          "code": "listing_checks",
+          "missing_checks": [
+            "continuation"
+          ],
+          "provider_issues": [
+            {
+              "provider": "massive",
+              "reason": "not_found"
+            }
+          ],
+          "manual_review_required": false
+        },
+        "next_action": {
+          "kind": "recheck",
+          "state": "applied",
+          "case_id": "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c",
+          "assessment_id": "sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "transition_id": "slt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "preview_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "transition_kind": "terminal_delisting",
+          "execute_on": "2023-05-16",
+          "current_effects_match": true,
+          "can_reverse": true,
+          "block_reasons": []
+        },
+        "source_checks": [
+          {
+            "provider": "eodhd",
+            "check": "eodhd",
+            "directory": null,
+            "status": "inactive",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "massive",
+            "check": "delisting",
+            "directory": null,
+            "status": "inactive",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "massive",
+            "check": "otc",
+            "directory": null,
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "massive",
+            "check": "stocks",
+            "directory": null,
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "nasdaq",
+            "check": "nasdaq",
+            "directory": "nasdaq_listed",
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          },
+          {
+            "provider": "nasdaq",
+            "check": "nasdaq",
+            "directory": "other_listed",
+            "status": "not_found",
+            "ticker": "OLD",
+            "observed_at": "2026-09-05T01:00:00Z",
+            "url": null
+          }
+        ],
+        "source_notices": []
+      }
+    ],
+    "page": {
+      "offset": 0,
+      "limit": 50,
+      "total": 1
+    }
+  },
+  "activity": {
+    "items": [
+      {
+        "activity_id": "slta_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "transition_id": "slt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "activity_type": "applied",
+        "source_ticker": "OLD",
+        "successor_ticker": null,
+        "effective_date": "2023-05-16",
+        "state_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rule_id": null,
+        "rule_version": null,
+        "decision_provenance_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "occurred_at": "2026-09-05T01:00:00Z",
+        "acknowledged_at": null,
+        "created_at": "2026-09-05T01:00:00Z",
+        "case_id": "slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c",
+        "user_owned_changes": [
+          {
+            "change_type": "sa_membership_suppressed",
+            "count": 1
+          },
+          {
+            "change_type": "source_hidden",
+            "count": 1
+          },
+          {
+            "change_type": "watchlist_membership_archived",
+            "count": 1
+          }
+        ],
+        "provider_owned_retained": [
+          "sa_alpha_picks_former"
+        ],
+        "reverse_readiness": {
+          "reversible": true,
+          "block_reasons": []
+        }
+      }
+    ],
+    "count": 1,
+    "unacknowledged_count": 1
+  }
+}

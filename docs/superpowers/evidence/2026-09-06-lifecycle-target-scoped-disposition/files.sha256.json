@@ -1,0 +1,14 @@
+{
+  "algorithm": "sha256",
+  "scope": "Public target-scoped disposition packet; excludes this manifest and all private operational artifacts.",
+  "files": {
+    "README.md": "2b239b2282ae83ba1ad28d34f078a75cedf9119ed62858348ef2c851a0b19194",
+    "focus-files.json": "c623eb6a1c420583578d34184f186afce96d38a4213f528c9b7adaff8789ee81",
+    "price-gap-shapes.json": "cdfa025713c1de5c70b226ecf3f9cacc12385b5ae9e90c1c2aba9d496d1c9bbb",
+    "production-result.json": "ef70c636ad107efc407c309ced9dfef162768e4311636393d3faf663e694792f",
+    "scripts/disposition.py": "a91a484714ddb6af25cbf47e4f2981a9ebf0652a72a95e873ef08dae37df4249",
+    "scripts/test_target_disposition.py": "12a5c3d6f61d8acbe28586b475e6796f5e01a592c0c059a8a04f0801d604de08",
+    "source-manifest.json": "1be8ad695ee3a66084f95d92d8cf2913b5fa271687178ee55858251051ddd6b3",
+    "verification.json": "18d540730dedd50b652819874600f322015fbe879f00bfb215a1c4934ac626fe"
+  }
+}

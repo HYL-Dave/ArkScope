@@ -1,0 +1,157 @@
+{
+  "capture_files_sha256": {
+    "authorized-plan.json": "a566516427a1490c15705fcd58324033b81f60cf46de08fb12a4b4ce4d82da91",
+    "metrics.json": "2c360f44d394ccd75a55413f99d87fe4a63fb041e4789b6f961a0656f75c7448",
+    "profile.sqlite": "53669c5a117e5aa1cfe29672a062955ceb47484ddf33a23b792dce7115b1bd18",
+    "result.json": "5ef39de149b7b41447468a74da6a93be8f9c2b67b6974a2cc847ea7f5ac783e4",
+    "search-output.json": "fb7213c07968c76a39787331f1ec510efc6252cf7844797f7eee5f2b5447ec5a"
+  },
+  "capture_source_checkpoint": {
+    "manifest_sha256": "9a37b36e52a2d15c3fad78bc4fbf20d5e07ed25e874133b0b8b9ad1d15d4c5c2",
+    "matched_files": 1084,
+    "seal_sha256": "37747682f666575d7df400f8db53ed54e21d5842bef60fe7caaf2848de7f7e96"
+  },
+  "events": [
+    {
+      "api_key_source": "none",
+      "kind": "init",
+      "mcp_server_count": 0,
+      "model": "claude-sonnet-5",
+      "session_matches_request": true,
+      "tools": [
+        "StructuredOutput"
+      ]
+    },
+    {
+      "kind": "RateLimitEvent"
+    },
+    {
+      "error_present": false,
+      "kind": "assistant",
+      "model": "claude-sonnet-5",
+      "structured_output_attempts": [
+        {
+          "schema_errors": [
+            {
+              "instance_path": [
+                "effective_date_text"
+              ],
+              "keyword": "anyOf",
+              "message": "\"Transaction Expected to Close on May 15, 2023 ... Upon completion of the transaction, shares of TA's common stock will be canceled and will no longer trade on the Nasdaq\" is not valid under any of the given schemas",
+              "schema_path": [
+                "properties",
+                "effective_date_text",
+                "anyOf"
+              ]
+            }
+          ],
+          "schema_valid": false
+        }
+      ],
+      "tool_names": [
+        "StructuredOutput"
+      ]
+    },
+    {
+      "kind": "UserMessage",
+      "owned_tool_results": [
+        {
+          "content": "\"Output does not match required schema: /effective_date_text: must NOT have more than 120 characters, /effective_date_text: must be null, /effective_date_text: must match a schema in anyOf\"",
+          "is_error": true
+        }
+      ]
+    },
+    {
+      "error_present": false,
+      "kind": "assistant",
+      "model": "claude-sonnet-5",
+      "structured_output_attempts": [
+        {
+          "schema_errors": [],
+          "schema_valid": true
+        }
+      ],
+      "tool_names": [
+        "StructuredOutput"
+      ]
+    },
+    {
+      "kind": "UserMessage",
+      "owned_tool_results": [
+        {
+          "content": "\"Structured output provided [REDACTED]\"",
+          "is_error": null
+        }
+      ]
+    },
+    {
+      "kind": "RateLimitEvent"
+    },
+    {
+      "errors": [],
+      "has_structured_output": true,
+      "is_error": false,
+      "kind": "result",
+      "model_usage": {
+        "models": [
+          {
+            "cache_creation_input_tokens": 10391,
+            "cache_read_input_tokens": 11670,
+            "input_tokens": 8342,
+            "invalid_fields": [],
+            "model": "claude-sonnet-5",
+            "output_tokens": 3345,
+            "shape": "object",
+            "web_search_requests": 0
+          }
+        ],
+        "shape": "object"
+      },
+      "model_usage_models": [
+        "claude-sonnet-5"
+      ],
+      "num_turns": 3,
+      "permission_denial_count": 0,
+      "session_matches_request": true,
+      "subtype": "success",
+      "terminal_reason": "completed"
+    }
+  ],
+  "failure_code": "model_result_incomplete",
+  "finished_at": "2026-09-07T11:42:22.168135+00:00",
+  "harness_sha256": "9eda8ccd2f06376399e37a2e51cb7ed3455880f27e87702fb44d593fe316907b",
+  "kind": "analysis_only_diagnostic_not_new_end_to_end_run",
+  "local_children_reaped": [
+    true
+  ],
+  "model_requests": 1,
+  "options": {
+    "cli_max_retries": "0",
+    "fallback_model": null,
+    "max_turns": 2,
+    "model": "claude-sonnet-5",
+    "output_schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+    "prompt_schema_matches_output_format": true,
+    "system_prompt_sha256": "a5e9caeed1fc0f89241917ccf7572122de231b2464491cdd4a9ad37748c8ff75",
+    "tools": []
+  },
+  "original_capture_unchanged": true,
+  "prompt_sha256": "99847cf20e3610345feb1376602778bda0940453eb6bff285f8a55dd863181eb",
+  "schema_sha256": "dad70b58711676f032496806adb937eaf721c087f6e182610f8f2aa7eb26c19a",
+  "sdk_submissions": 1,
+  "search_submissions": 0,
+  "selected_metadata_unchanged": true,
+  "source_checkpoint": {
+    "manifest_sha256": "8096fd4f8bae3374cdbd8317c20f4cad635c8a9a43c8db6847abae1fb630dde2",
+    "matched_files": 1091,
+    "seal_sha256": "2cd4bcf60f5a9fcd4f60d91402a29bcca90e2a15c9d2bd76c1a67a61c4cb1752"
+  },
+  "source_http_requests": 0,
+  "started_at": "2026-09-07T11:41:53.921685+00:00",
+  "status": "failed",
+  "stop_state": "cancelled",
+  "terminal_statuses": {
+    "analysis-1": "completed"
+  },
+  "token_loads": 1
+}

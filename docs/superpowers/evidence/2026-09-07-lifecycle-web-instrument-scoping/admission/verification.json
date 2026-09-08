@@ -1,0 +1,170 @@
+{
+  "added": [
+    "tests/test_lifecycle_web_instrument_scope.py",
+    "tests/test_lifecycle_web_investigation_budget.py"
+  ],
+  "changed": [
+    "src/lifecycle_web_preflight.py",
+    "src/security_lifecycle_web_contract.py",
+    "src/security_lifecycle_web_finding.py",
+    "src/security_lifecycle_web_pipeline.py"
+  ],
+  "claude_oauth_envelope": {
+    "max_redirects_per_source": 2,
+    "max_search_uses": 12,
+    "max_source_requests": 24,
+    "max_sources": 8,
+    "model_timeout_seconds": 600,
+    "source_timeout_seconds": 180
+  },
+  "commit_merge_push_restart": false,
+  "database_schemas_unchanged": true,
+  "frontend_unchanged": true,
+  "independent_search_analysis_calls": 2,
+  "kind": "instrument_scoped_attended_finding_and_bounded_claude_oauth_exploration",
+  "known_limit": "Lexical citation bindings improve inspectability; neither claim labels nor exact quotes prove publisher truth or event semantics",
+  "measured": {
+    "backend": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 12,
+        "tests": 6943
+      },
+      "failed_nodes": [],
+      "file": "backend.xml",
+      "sha256": "fa362ae69d9f41b02356ec83182423896cd0c37452c7d83839a917b1586b91f7"
+    },
+    "baseline": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2266
+      },
+      "failed_nodes": [],
+      "file": "baseline.xml",
+      "sha256": "6e27d92131e981926b813406f48e5d0bb96218eac1bb15038aacde9afafae525"
+    },
+    "integration": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 3085
+      },
+      "failed_nodes": [],
+      "file": "integration.xml",
+      "sha256": "93616eb0fe35602f88defb64a68fb839bc0801dc66c84eb8abc802fa40d45d8a"
+    },
+    "restored": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2266
+      },
+      "failed_nodes": [],
+      "file": "restored.xml",
+      "sha256": "9fab5969f76541bf6217553a0c5f569c6efe4f14b4434bb7f8583789849f2143"
+    }
+  },
+  "no_automatic_retry_or_fallback": true,
+  "other_auth_execution_budgets_unchanged": true,
+  "owned_mutations": 25,
+  "persisted_finding_fields_unchanged": true,
+  "preparation": {
+    "green-first": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 177
+      },
+      "failed_nodes": [],
+      "file": "green-first.xml",
+      "sha256": "aeacde5ab4aeecbfbe800a9dffbbc26ea86345eb4c9794ce8ee7092213008eac"
+    },
+    "harness-final-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 9
+      },
+      "failed_nodes": [],
+      "file": "harness-final-green.xml",
+      "sha256": "c206181384c5a8ba259d0f03837951f4e8774671f59dae1231ab7937c81dd816"
+    },
+    "harness-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 8
+      },
+      "failed_nodes": [],
+      "file": "harness-green.xml",
+      "sha256": "dffa07d656bbda942ca9cd2b180b6ec0f9eb883b1447e01a601ea705c6c7f77a"
+    },
+    "harness-readback-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 10
+      },
+      "failed_nodes": [],
+      "file": "harness-readback-green.xml",
+      "sha256": "37e6c65df5f4b80556e1eb4dbe72208cb258f2e2788d333d3774e29e7e287719"
+    },
+    "recording-green": {
+      "counts": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 2
+      },
+      "failed_nodes": [],
+      "file": "recording-green.xml",
+      "sha256": "c5a4028b66ea010417224a8fd245ca309cf525f16b8b8a5db645d3a6ce365768"
+    },
+    "red": {
+      "counts": {
+        "errors": 0,
+        "failures": 17,
+        "skipped": 0,
+        "tests": 30
+      },
+      "failed_nodes": [
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_delisting_never_combines_with_stock_identity[False-senior notes]",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_delisting_never_combines_with_stock_identity[False-preferred stock]",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_delisting_never_combines_with_stock_identity[False-call options]",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_delisting_never_combines_with_stock_identity[True-senior notes]",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_delisting_never_combines_with_stock_identity[True-preferred stock]",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_delisting_never_combines_with_stock_identity[True-call options]",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_date_cannot_complete_a_stock_listing_event",
+        "tests.test_lifecycle_web_instrument_scope::test_other_instrument_rename_cannot_supply_a_stock_continuation",
+        "tests.test_lifecycle_web_instrument_scope::test_only_target_instrument_active_otc_evidence_vetoes_stock_removal[senior notes-False]",
+        "tests.test_lifecycle_web_instrument_scope::test_unbound_same_class_event_from_another_issuer_does_not_supply_stock_change",
+        "tests.test_lifecycle_web_instrument_scope::test_model_schema_explains_exact_citations_and_bare_verbatim_dates",
+        "tests.test_lifecycle_web_instrument_scope::test_actual_model_prompts_separate_instruments_and_explain_available_search_budget",
+        "tests.test_lifecycle_web_investigation_budget::test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[anthropic-claude_code_oauth]",
+        "tests.test_lifecycle_web_investigation_budget::test_expanded_budget_cannot_change_after_the_user_confirms_preflight[max_search_uses]",
+        "tests.test_lifecycle_web_investigation_budget::test_expanded_budget_cannot_change_after_the_user_confirms_preflight[max_sources]",
+        "tests.test_lifecycle_web_investigation_budget::test_expanded_budget_cannot_change_after_the_user_confirms_preflight[max_source_requests]",
+        "tests.test_lifecycle_web_investigation_budget::test_expanded_budget_cannot_change_after_the_user_confirms_preflight[model_timeout_seconds]"
+      ],
+      "file": "red.xml",
+      "sha256": "36d3e33bdd1e61416e855837df49b738f48210b73693b0a517ffb471bcda5eab"
+    }
+  },
+  "prior_closeout_sha256": "70e94999e247e5b81063f4d8bef6b655798cea9340d4e00ddf5e8cfc340ea7b1",
+  "prior_code_seal": "9c4f48ddc0f4bad452a93b610a610942336390f1ea761fca14bcf12e62e4ba60",
+  "production_migration": false,
+  "profile_actions": 0,
+  "provider_calls": 0,
+  "shared_finding_validation_changed": true,
+  "shared_prompt_guidance_changed": true,
+  "source_hashes_checked_before_live_authority": true
+}

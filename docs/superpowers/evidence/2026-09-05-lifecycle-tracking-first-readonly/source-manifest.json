@@ -1,0 +1,19 @@
+{
+  "baseline": "0b66732b",
+  "files": {
+    "data_sources/ibkr_source.py": "25e8e1ce9c919bd9f5abfaba7f2390a14334a9547bb771718d85c732ac9137f1",
+    "src/active_universe.py": "b83aafd801b2f2461fb293c031c4060129307f7ca87a4ac727b1a88678c220fe",
+    "src/market_coverage/observations.py": "a349a88f9c74c3f9e5fe43a77b2d8fc186db34c829c1d629b80fcc6a59f2c94d",
+    "src/market_coverage/repair.py": "982ff799450c3c7b39242928c56fee1384999d61501304e3f97196dc577f9f1c",
+    "src/market_coverage/service.py": "e59df6f0541f9e1e8137729a661c89cd63b76a2b2d8c8b3e2fde68ffa3264d76",
+    "src/market_data_direct.py": "96588ee015f357bdcf98d1fc1e272cc732b4624d8c54d532b924d92eb87f8a37",
+    "src/market_sessions.py": "4b34b351da0c617637059f113d11890bcabc63b52a1b9a2df7c65b06feb5dc41",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/security_lifecycle_provider_authority.py": "894b5cc78e7f520918c5c7c3217ab1ffb8825f7f6d5eb1fdcb7a609bbad0db48",
+    "src/security_lifecycle_provider_snapshot.py": "e267587ee4bb5c55c155102a6dc867ca04f7bc7216ef95949796cdd58e8431d3",
+    "src/security_lifecycle_provider_store.py": "f0b0bec3a93092ac427b124897ce64588384cb6f1c3a2de2b3a4f0a1aa73692f",
+    "src/ticker_identity_transition.py": "f2d188ede1c54dc46eb29f62a03aee1b2fdba1a570c6d0a6406867dad290bdb4"
+  },
+  "inventory_runner_sha256": "e9695a4d265fa0aec88087b2b65440cbdd67babc610ad95ac5fce883edeb4f20",
+  "sync_runner_sha256": "f2e35bfe2b33dc4334d0478808b152641621401d441b6fcc4859d27fbde36f66"
+}

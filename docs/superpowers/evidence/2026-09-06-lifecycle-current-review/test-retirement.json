@@ -1,0 +1,438 @@
+{
+  "version": 1,
+  "prior_packet": "2026-09-06-lifecycle-action-review",
+  "retired_file": "apps/arkscope-web/src/lifecycle/LifecycleView.test.tsx",
+  "prior_nodes": [
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow acknowledges insufficient evidence and reopens it without creating an assessment",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow adds manual URL and text evidence without network access",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow answers the seven primary questions before lazily loading audit history",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow blocks proposal controls when a portfolio position requires review",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow cancels an approved transition through its durable case state",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow collapses evidence and switches between source text and LLM translation",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow commits only the newest queue response when requests resolve out of order",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow continues polling an attended run after one status request fails",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow disables transition commands while approval is pending",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow discards an old audit response after switching cases",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow does not infer stopped checking from last check time or a monitoring reason",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow exposes the attended command in Traditional Chinese on a narrow viewport",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow filters cases by workflow relevance event kind and proposal type",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps an attended run pending while durable status is running without progress",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps automation status bound to the newest request when responses resolve out of order",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps detail bound to the currently selected case when responses resolve out of order",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps original evidence authoritative when machine translation fails",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps prior evidence and shows a typed safe historical run error",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps retry available for a retryable translation failure",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps reversal blocked when later state no longer matches",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps screened SEC candidates out of the queue while exposing their audit reason",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps source-missing history visible and marks changed source content for revalidation",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps the approved effects visible while a transition is applied",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps the approved effects visible while a transition is approved",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps the approved effects visible while a transition is needs_review",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps the newly selected case detail after a pending activity command completes",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps the newly selected case detail after a pending case command completes",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow keeps the primary case usable when the audit endpoint fails",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow lets a missing execution date be resolved through a fresh server preview",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow omits the retired search command while manual evidence remains reachable",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow opening refreshing focusing and switching tabs keep search retired",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow opens a drawer with source evidence acknowledgement assessment and proposal sections",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow polls and exposes a durable run before in-memory progress arrives",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow prefills the newest automation suggestion without rewriting its authorship",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow preserves the accepted meaning of the real migrated legacy review in both locales",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow provides reviewed bilingual presentation for every closed translation failure",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow records successful zero-result runs without claiming no impact",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow refreshes a completed command against the currently selected queue",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow refreshes only the latest selected case after an attended run completes",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders automation conclusions from structured bilingual copy",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders automation provenance grouped facts and typed blockers",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders bilingual workflow copy without translating provider evidence",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders closed proposals as unapplied explanations",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders ineligible blockers without exposing an approval command",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders only the ordered active evidence families with compact listing snapshots",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders the candidate-budget operator diagnostic in en and zh-Hant",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders the closed proposal DTO without a historical source snapshot",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders truthful dated final-History reasons in both locales without acknowledgement",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow renders unresolved investigating evidence ready inconclusive and resolved as distinct states",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow reports a changed preview and never treats the stale approval as successful",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow requires cited evidence before accepting a conclusive assessment",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow reuses a loaded audit when its disclosure is closed and reopened",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow reviews every owned effect and approves only the server preview digest",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow separates attention monitoring history and all without acknowledging history",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow shows every known structured fact on an accepted assessment",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow shows legacy reviews with limited provenance",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow shows only real lifecycle stages and prioritizes an active incident over success",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow shows the current missing listing check before opening the audit",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow submits structured facts and multiple outcomes without moving them into prose",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow summarizes the current decision and marks deterministic automation as non-LLM",
+    "src/lifecycle/LifecycleView.test.tsx::Lifecycle workflow uses the stable responsive triage and drawer structure"
+  ],
+  "prior_node_count": 61,
+  "entries": [
+    {
+      "old_test": "renders only the ordered active evidence families with compact listing snapshots",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::does not offer prose translation for a structured listing or ticker timeline",
+      "rationale": "The audit uses the closed evidence union; the primary table no longer groups legacy evidence families."
+    },
+    {
+      "old_test": "renders truthful dated final-History reasons in both locales without acknowledgement",
+      "disposition": "replacement_owner",
+      "replacement": "tests/test_security_lifecycle_current.py::test_current_review_and_list_share_one_closed_projection",
+      "rationale": "Old final-history badges are replaced by listing/continuation/action truth."
+    },
+    {
+      "old_test": "does not infer stopped checking from last check time or a monitoring reason",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::shows compact collection truth, outstanding continuation and healthy coverage without spending",
+      "rationale": "Missing next-check remains explicit; no stopped-checking inference."
+    },
+    {
+      "old_test": "acknowledges insufficient evidence and reopens it without creating an assessment",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Manual insufficient-evidence acknowledgement form is retired from the primary flow; persisted acknowledgement history remains readable."
+    },
+    {
+      "old_test": "adds manual URL and text evidence without network access",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Manual URL/text submission is no longer a primary-view form. Legacy API and backend validation remain, with Web finding entry pending Task 8."
+    },
+    {
+      "old_test": "blocks proposal controls when a portfolio position requires review",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::never offers confirm on a blocked or stale packet",
+      "rationale": "Portfolio veto is enforced by the packet and existing service owners, not proposal controls."
+    },
+    {
+      "old_test": "renders the closed proposal DTO without a historical source snapshot",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Historical proposal rendering is retired. Current UI reads Task 6 action packet, not proposals/source_snapshot."
+    },
+    {
+      "old_test": "filters cases by workflow relevance event kind and proposal type",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Workflow/event/proposal filters are retired; attention/history and ticker filtering use the population projection."
+    },
+    {
+      "old_test": "separates attention monitoring history and all without acknowledging history",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Four filing-centric queues are replaced by two current-truth views and fresh active coverage."
+    },
+    {
+      "old_test": "keeps screened SEC candidates out of the queue while exposing their audit reason",
+      "disposition": "replacement_owner",
+      "replacement": "tests/test_security_lifecycle_current.py::test_current_reviews_account_for_unpersisted_missing_and_recovered_cases",
+      "rationale": "Population reconciliation owns all old inputs. The SEC candidate filter no longer controls admission into this screen."
+    },
+    {
+      "old_test": "commits only the newest queue response when requests resolve out of order",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::keeps only the newest queue response",
+      "rationale": "Preserved out-of-order read protection."
+    },
+    {
+      "old_test": "refreshes a completed command against the currently selected queue",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::refreshes the currently selected view after a pending command completes",
+      "rationale": "Preserved latest-query refresh."
+    },
+    {
+      "old_test": "keeps detail bound to the currently selected case when responses resolve out of order",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::keeps only the selected detail response",
+      "rationale": "Preserved selected-review binding."
+    },
+    {
+      "old_test": "shows only real lifecycle stages and prioritizes an active incident over success",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::shows actual running stages, not skipped stages, while preserving active failure visibility",
+      "rationale": "Preserved real progress and incident precedence."
+    },
+    {
+      "old_test": "keeps automation status bound to the newest request when responses resolve out of order",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.test.tsx::rejects a stale status response after explicit refresh",
+      "rationale": "Preserved status generation binding."
+    },
+    {
+      "old_test": "keeps an attended run pending while durable status is running without progress",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.test.tsx::keeps an attended request pending while durable running has no memory progress",
+      "rationale": "Durable state is independent of in-memory callbacks."
+    },
+    {
+      "old_test": "polls and exposes a durable run before in-memory progress arrives",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.test.tsx::continues polling a durable running job through a temporary read failure",
+      "rationale": "Running is observed before progress arrives."
+    },
+    {
+      "old_test": "continues polling an attended run after one status request fails",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.test.tsx::keeps polling a pending request after a read failure without another POST",
+      "rationale": "GET failure cannot trigger another paid request."
+    },
+    {
+      "old_test": "refreshes only the latest selected case after an attended run completes",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/useLifecycleSourceCheck.test.tsx::checks a lost dispatch response through durable reads and never automatically retries it",
+      "rationale": "Completion invokes the current callback; view refresh uses current selected/query refs."
+    },
+    {
+      "old_test": "exposes the attended command in Traditional Chinese on a narrow viewport",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::renders Traditional Chinese without translating provider evidence",
+      "rationale": "Responsive verification is additionally owned by EN/zh-Hant 320/390/1440 browser scenarios."
+    },
+    {
+      "old_test": "keeps the newly selected case detail after a pending case command completes",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::sends only one confirmation even for two clicks in the same render",
+      "rationale": "Case-selection commands now stay disabled during a pending write; late read ownership remains separate."
+    },
+    {
+      "old_test": "keeps the newly selected case detail after a pending activity command completes",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::acknowledges activity at most once and preserves other visible case data",
+      "rationale": "Activity acknowledgement cannot replace case detail."
+    },
+    {
+      "old_test": "keeps prior evidence and shows a typed safe historical run error",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::retains historical failed and zero-result runs without claiming no impact",
+      "rationale": "Typed historical errors retained."
+    },
+    {
+      "old_test": "keeps source-missing history visible and marks changed source content for revalidation",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::shows all structured transaction facts without deriving them from prose",
+      "rationale": "Stale provenance remains explicit; source absence is owned in the current backend population test."
+    },
+    {
+      "old_test": "omits the retired search command while manual evidence remains reachable",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Manual evidence controls are intentionally retired from the main view, not restored as a workaround for the pending Web adapter."
+    },
+    {
+      "old_test": "opening refreshing focusing and switching tabs keep search retired",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::shows compact collection truth, outstanding continuation and healthy coverage without spending",
+      "rationale": "Opening the screen neither searches nor applies."
+    },
+    {
+      "old_test": "opens a drawer with source evidence acknowledgement assessment and proposal sections",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "The old acknowledgement/assessment/proposal drawer composition is retired; current finding, action and lazy audit replace it."
+    },
+    {
+      "old_test": "records successful zero-result runs without claiming no impact",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::retains historical failed and zero-result runs without claiming no impact",
+      "rationale": "Zero results never means no impact."
+    },
+    {
+      "old_test": "renders bilingual workflow copy without translating provider evidence",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::renders Traditional Chinese without translating provider evidence",
+      "rationale": "Retains bilingual operator copy and unmodified source text."
+    },
+    {
+      "old_test": "renders automation conclusions from structured bilingual copy",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::keeps deterministic automation authorship and structured bilingual meaning",
+      "rationale": "Retains authored provenance and method."
+    },
+    {
+      "old_test": "renders closed proposals as unapplied explanations",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Closed proposal prose is not the current action authority; receipt state and Task 6 packet replace that presentation."
+    },
+    {
+      "old_test": "renders unresolved investigating evidence ready inconclusive and resolved as distinct states",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::shows %s as distinct from a successful application",
+      "rationale": "Old workflow labels are replaced by explicit scheduled/blocked/cancelled/reversed/changed states."
+    },
+    {
+      "old_test": "requires cited evidence before accepting a conclusive assessment",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "The manual conclusive-assessment acceptance form is retired. Task 6 backend citation-integrity and confirmation owners retain the authority boundary."
+    },
+    {
+      "old_test": "preserves the accepted meaning of the real migrated legacy review in both locales",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::preserves the accepted legacy review meaning in both locales",
+      "rationale": "The original test used a synthetic legacy-migration-shaped assessment, not a live database fixture. Its exact bilingual relevance, outcome, acceptance and no-undetermined assertions are retained alongside source text. Actual migration is owned by the unchanged backend migration tests."
+    },
+    {
+      "old_test": "renders automation provenance grouped facts and typed blockers",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::shows all structured transaction facts without deriving them from prose",
+      "rationale": "Facts and historical automation remain in lazy audit."
+    },
+    {
+      "old_test": "renders the candidate-budget operator diagnostic in en and zh-Hant",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::keeps provider-budget diagnostics visible in the audit and marks bounded history",
+      "rationale": "Closed operator diagnostics remain visible, including provider-not-contacted."
+    },
+    {
+      "old_test": "prefills the newest automation suggestion without rewriting its authorship",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "Automation-to-manual-form prefilling is retired; one review packet preserves original authorship without re-entry."
+    },
+    {
+      "old_test": "keeps original evidence authoritative when machine translation fails",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::never automatically retries a failed translation and keeps Settings navigation local",
+      "rationale": "Source evidence remains authoritative on failure."
+    },
+    {
+      "old_test": "collapses evidence and switches between source text and LLM translation",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::switches a cached translation without invoking a model and keeps the source accessible",
+      "rationale": "Explicit source/translation switching retained."
+    },
+    {
+      "old_test": "answers the seven primary questions before lazily loading audit history",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::shows compact collection truth, outstanding continuation and healthy coverage without spending",
+      "rationale": "Finding, collection, observation, outstanding condition and next check precede lazy history."
+    },
+    {
+      "old_test": "shows the current missing listing check before opening the audit",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::shows compact collection truth, outstanding continuation and healthy coverage without spending",
+      "rationale": "The missing current check is visible before audit disclosure."
+    },
+    {
+      "old_test": "reuses a loaded audit when its disclosure is closed and reopened",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::loads once on disclosure and reuses the audit on close and reopen",
+      "rationale": "Lazy cache retained."
+    },
+    {
+      "old_test": "discards an old audit response after switching cases",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::discards a late response after switching to a different case",
+      "rationale": "Cross-case response protection retained."
+    },
+    {
+      "old_test": "keeps the primary case usable when the audit endpoint fails",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::loads audit only on disclosure and keeps the primary view usable if it fails",
+      "rationale": "History failure cannot disable a valid primary action."
+    },
+    {
+      "old_test": "summarizes the current decision and marks deterministic automation as non-LLM",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::keeps deterministic automation authorship and structured bilingual meaning",
+      "rationale": "Deterministic is not mislabeled LLM."
+    },
+    {
+      "old_test": "keeps retry available for a retryable translation failure",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::offers retry only for a reviewed retryable failure",
+      "rationale": "No automatic translation retry."
+    },
+    {
+      "old_test": "provides reviewed bilingual presentation for every closed translation failure",
+      "disposition": "moved_verbatim",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::provides reviewed bilingual presentation for every closed translation failure",
+      "rationale": "Original exact bilingual assertion body moved verbatim."
+    },
+    {
+      "old_test": "shows every known structured fact on an accepted assessment",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::shows all structured transaction facts without deriving them from prose",
+      "rationale": "All structured historical transaction fields remain readable."
+    },
+    {
+      "old_test": "submits structured facts and multiple outcomes without moving them into prose",
+      "disposition": "retired_product_contract",
+      "replacement": null,
+      "rationale": "The multiple-outcome manual data-entry form is retired; validated server packet is the single action input."
+    },
+    {
+      "old_test": "shows legacy reviews with limited provenance",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/CurrentLifecycleAudit.test.tsx::preserves original evidence and legacy assessment provenance in %s",
+      "rationale": "Limited legacy provenance remains explicit."
+    },
+    {
+      "old_test": "reviews every owned effect and approves only the server preview digest",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::requires a fresh preview after changing a missing date, priority or successor visibility",
+      "rationale": "Owned effects are reviewed together, confirmation binds the server packet digest."
+    },
+    {
+      "old_test": "renders ineligible blockers without exposing an approval command",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::never offers confirm on a blocked or stale packet",
+      "rationale": "Invalid packet cannot be confirmed."
+    },
+    {
+      "old_test": "lets a missing execution date be resolved through a fresh server preview",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::requires a fresh preview after changing a missing date, priority or successor visibility",
+      "rationale": "Changed date/options require a fresh server preview."
+    },
+    {
+      "old_test": "cancels an approved transition through its durable case state",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::cancels the exact durable scheduled action only after confirmation",
+      "rationale": "Adds explicit confirmation to preserved cancellation."
+    },
+    {
+      "old_test": "reports a changed preview and never treats the stale approval as successful",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::reports changed confirmation without displaying success or retrying",
+      "rationale": "Changed material never becomes successful application."
+    },
+    {
+      "old_test": "keeps reversal blocked when later state no longer matches",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::reports a blocked global reversal without requiring an open case",
+      "rationale": "Blocked reversal retains its actual reason; preflight refusal has its own owner."
+    },
+    {
+      "old_test": "disables transition commands while approval is pending",
+      "disposition": "replacement_owner",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::sends only one confirmation even for two clicks in the same render",
+      "rationale": "Synchronous lock and disabled controls protect pending commands."
+    },
+    {
+      "old_test": "uses the stable responsive triage and drawer structure",
+      "disposition": "replacement_owner",
+      "replacement": "browser:EN/zh-Hant x 1440/390/320",
+      "rationale": "Real component screenshots and geometry replace class-name-only responsive assertions."
+    },
+    {
+      "old_test": "keeps the approved effects visible while a transition is applied",
+      "disposition": "retired_presentation_contract",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::requires a fresh preview after changing a missing date, priority or successor visibility",
+      "rationale": "The full approved-preview object is no longer repeated on every state. Effects remain reviewed before confirmation, the durable receipt remains readable through existing read APIs, and the compact view shows state/kind/date/current-effects verification plus tracking-change history. This is an intentional presentation change, not deletion of receipts."
+    },
+    {
+      "old_test": "keeps the approved effects visible while a transition is approved",
+      "disposition": "retired_presentation_contract",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::requires a fresh preview after changing a missing date, priority or successor visibility",
+      "rationale": "The full approved-preview object is no longer repeated on every state. Effects remain reviewed before confirmation, the durable receipt remains readable through existing read APIs, and the compact view shows state/kind/date/current-effects verification plus tracking-change history. This is an intentional presentation change, not deletion of receipts."
+    },
+    {
+      "old_test": "keeps the approved effects visible while a transition is needs_review",
+      "disposition": "retired_presentation_contract",
+      "replacement": "apps/arkscope-web/src/lifecycle/LifecycleCurrentView.test.tsx::requires a fresh preview after changing a missing date, priority or successor visibility",
+      "rationale": "The full approved-preview object is no longer repeated on every state. Effects remain reviewed before confirmation, the durable receipt remains readable through existing read APIs, and the compact view shows state/kind/date/current-effects verification plus tracking-change history. This is an intentional presentation change, not deletion of receipts."
+    }
+  ],
+  "remaining": "The final source-bound 36-scenario EN/zh-Hant x 1440/390/320 browser run passed with 120 screenshots and pixel/geometry checks. Backend/frontend admission passed with 14/22 independently owned mutants and restored full frontend 1516 passed. Task 8 Web entry and validated Web-backed confirmation remain pending; legacy backend/API owners are not deleted."
+}

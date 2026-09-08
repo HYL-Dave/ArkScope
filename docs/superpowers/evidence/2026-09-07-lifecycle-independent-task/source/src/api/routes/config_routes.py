@@ -1,0 +1,1407 @@
+"""Config and overview routes."""
+
+import logging
+import os
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from src.api.dependencies import (
+    get_credential_store,
+    get_dal,
+    get_oauth_account_sync_service,
+    get_oauth_login_manager,
+    get_oauth_observation_store,
+    get_oauth_token_store,
+)
+from src.api.permissions import require_profile_state_write
+from src.agents.config import (
+    _load_user_profile,
+    clear_local_overrides,
+    save_local_override,
+    task_route,
+)
+from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
+from src.fixed_task_runtime_config import (
+    FixedTaskRuntimeStore,
+    resolve_all_fixed_task_runtime,
+    validate_fixed_task_runtime_updates,
+)
+from src.model_route_store import ModelRouteStore
+from src.model_task_canary import dispatch_task_model_test
+from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
+from src.env_keys import env_file_path
+from src.data_provider_config import MASSIVE_CONFIG_PROVIDER, provider_field_env_value
+from src.model_credentials import (
+    CredentialStore,
+    discover_models,
+    resolve_active_credential,
+    export_env_credentials,
+    import_env_credentials,
+    provider_credentials,
+    test_model,
+    write_env_export,
+)
+from src.model_routing import (
+    Provider,
+    TASK_IDS,
+    TaskId,
+    TaskRoute,
+    catalog,
+    is_valid_effort,
+    model_provider,
+    route_capability_warnings,
+    task_route_admission_detail,
+)
+from src.model_capabilities import (
+    capability_for,
+    model_auth_admission_detail,
+    model_entitlement_admission_detail,
+)
+from src.tools.data_access import DataAccessLayer
+from src.tools.analysis_tools import get_watchlist_overview, get_morning_brief
+
+router = APIRouter(tags=["config"])
+logger = logging.getLogger(__name__)
+
+# The per-task model routes this surface manages (matches model_routing.TaskId).
+_ROUTE_TASKS = TASK_IDS
+_SPARK_MODEL_ID = "gpt-5.3-codex-spark"
+
+
+def _credential_apply_enabled() -> bool:
+    """Code-enforced apply boundary. Real credential writes — a non-dry-run
+    import into the profile DB, and writing an export file — are REFUSED unless
+    ``ARKSCOPE_CREDENTIAL_APPLY_ENABLED`` is truthy. The spec's permission engine
+    is still a no-op audit log (src/api/permissions.py), so this flag is the
+    actual gate that keeps the apply step explicit/opt-in; dry-run previews stay
+    allowed so the user can inspect before enabling."""
+    return os.environ.get("ARKSCOPE_CREDENTIAL_APPLY_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _credential_store(store) -> CredentialStore:
+    return store if isinstance(store, CredentialStore) else get_credential_store()
+
+
+def _oauth_observation_store(store: CredentialStore, candidate):
+    if hasattr(candidate, "delete_credential_observations"):
+        return candidate
+    from src.auth_drivers.oauth_status import OAuthObservationStore
+
+    return OAuthObservationStore(store.db_path)
+
+
+def _subscription_entitlement_hints(observation_store, summary) -> list[dict[str, str]]:
+    """Project closed, non-authoritative model hints from cached usage only."""
+    if summary.get("auth_mode") != "chatgpt_oauth":
+        return []
+    try:
+        snapshot = observation_store.read_account_snapshot(summary["credential_id"])
+    except Exception:  # noqa: BLE001 - an optional hint must not break the catalog
+        return []
+    if (
+        snapshot is None
+        or snapshot.provider != "openai"
+        or snapshot.auth_mode != "chatgpt_oauth"
+        or snapshot.credential_id != summary["credential_id"]
+    ):
+        return []
+    capability = capability_for(_SPARK_MODEL_ID)
+    expected_label = capability.label.casefold() if capability is not None else ""
+    if not any(
+        isinstance(limit.limit_name, str)
+        and limit.limit_name.strip().casefold() == expected_label
+        for limit in snapshot.payload.rate_limits_by_limit_id.values()
+    ):
+        return []
+    return [{
+        "model_id": _SPARK_MODEL_ID,
+        "source": "subscription_usage",
+        "observed_at": snapshot.observed_at,
+    }]
+
+
+def _run_coro(coro):
+    """Drive an async driver method from a SYNC route handler. The ONE place this
+    pattern lives — sync FastAPI routes run in a threadpool (no running loop), so
+    asyncio.run is safe here. Do not scatter asyncio.run across routes."""
+    import asyncio
+
+    return asyncio.run(coro)
+
+
+def _active_auth_mode(provider: str, store: CredentialStore) -> str | None:
+    """The active credential's auth_type for ``provider`` (None if none / unresolvable).
+    Best-effort: never let a capability lookup break a route save."""
+    try:
+        active = next((c for c in store.list(provider) if c.active), None)
+        return active.auth_type if active else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _restricted_task_route_admission_detail(
+    *,
+    task: str,
+    provider: str,
+    model: str,
+    effort: str,
+    store: CredentialStore,
+    token_store,
+    observation_store,
+) -> dict[str, str] | None:
+    """Apply credential and discovery policy for restricted registry entries."""
+    capability = capability_for(model)
+    credential = None
+    if capability is not None and (
+        capability.allowed_tasks
+        or capability.allowed_auth_modes
+        or capability.required_plans
+        or capability.exact_model_id
+        or capability.unverified_auth_modes
+    ):
+        credential = resolve_active_credential(
+            provider,
+            store,
+            token_store=token_store,
+            observation_store=observation_store,
+        )
+    detail = task_route_admission_detail(
+        provider,
+        model,
+        effort,
+        task=task,
+        auth_mode=credential.auth_mode if credential is not None else None,
+        plan_type=credential.plan_type if credential is not None else None,
+    )
+    if detail is not None:
+        return detail
+    auth_detail = model_auth_admission_detail(
+        model,
+        credential.auth_mode if credential is not None else None,
+    )
+    if auth_detail is not None:
+        return auth_detail
+    if capability is None or not capability.exact_model_id:
+        return None
+    if credential is None:
+        return {"code": "task_auth_mode_unsupported", "field": "credential"}
+    scope = ModelDiscoveryCache(store.db_path).get(
+        provider=provider,
+        auth_mode=credential.auth_mode,
+        credential_id=credential.credential_id,
+        secret_fingerprint=credential.secret_fingerprint,
+    )
+    return model_entitlement_admission_detail(
+        model,
+        discovery_status=scope.status,
+        discovered_model_ids={row.model_id for row in scope.models},
+    )
+
+
+class RouteUpdate(BaseModel):
+    provider: Provider
+    model: str
+    effort: str = "default"
+
+
+class ModelRoutesUpdate(BaseModel):
+    routes: dict[TaskId, RouteUpdate]
+
+
+class ResearchRuntimeUpdate(BaseModel):
+    max_tool_calls: int
+    session_timeout_s: float
+    per_tool_timeout_s: float
+
+
+class FixedTaskRuntimeValue(BaseModel):
+    model_timeout_s: float
+
+
+class FixedTaskRuntimeUpdate(BaseModel):
+    tasks: dict[str, FixedTaskRuntimeValue]
+
+
+class ModelDiscoveryRequest(BaseModel):
+    provider: Provider
+    credential_id: str | None = None
+
+
+class ModelTestRequest(BaseModel):
+    provider: Provider
+    model: str
+    effort: str = "default"
+    credential_id: str | None = None
+
+
+class TaskModelTestRequest(BaseModel):
+    task: TaskId
+    provider: Provider
+    model: str
+    effort: str = "default"
+
+
+class CredentialCreate(BaseModel):
+    provider: Provider
+    auth_type: str = "api_key"
+    alias: str
+    secret: str
+    make_active: bool = True
+
+
+class CredentialUpdate(BaseModel):
+    alias: str | None = None
+    secret: str | None = None
+    active: bool | None = None
+    expires_at: str | None = None
+    account_label: str | None = None
+
+
+@router.get("/config/watchlist")
+def watchlist(
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Get watchlist tickers from user profile."""
+    result = dal.get_watchlist()
+    return result.model_dump()
+
+
+@router.get("/config/sectors")
+def sectors(
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Get all sector definitions."""
+    return dal.get_all_sectors()
+
+
+@router.get("/config/strategy")
+def strategy_weights(
+    strategy: str = None,
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Get strategy weights."""
+    return dal.get_strategy_weights(strategy)
+
+
+@router.get("/overview")
+def overview(
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Get watchlist overview with latest status for each ticker."""
+    return get_watchlist_overview(dal)
+
+
+@router.get("/morning-brief")
+def morning_brief(
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Generate personalized morning briefing."""
+    return get_morning_brief(dal)
+
+
+@router.get("/config/runtime")
+def runtime_config(
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """What the agent will actually use — models, effort, and which API keys are
+    present (booleans only, never the key values). Lets the UI answer "which
+    provider/model/key is active" without exposing secrets.
+    """
+    import os
+
+    from src.agents.config import get_agent_config
+    from src.env_keys import ensure_env_loaded
+
+    ensure_env_loaded()
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    runtime_store = ResearchRuntimeStore(store.db_path)
+    fixed_runtime_store = FixedTaskRuntimeStore(store.db_path)
+    cfg = get_agent_config()
+
+    def key_set(name: str) -> bool:
+        return bool(os.environ.get(name))
+    credentials = provider_credentials(
+        store, token_store=token_store, observation_store=observation_store
+    )
+
+    return {
+        "anthropic": {
+            "model": cfg.anthropic_model,
+            "model_advanced": cfg.anthropic_model_advanced,
+            "effort": cfg.anthropic_effort,
+            "thinking": cfg.anthropic_thinking,
+            "key_set": key_set("ANTHROPIC_API_KEY")
+            or any(c.available and c.can_test_models for c in credentials["anthropic"]),
+            "credentials": [c.model_dump() for c in credentials["anthropic"]],
+        },
+        "openai": {
+            "model": cfg.openai_model,
+            "model_advanced": cfg.openai_model_advanced,
+            "reasoning_effort": cfg.reasoning_effort,
+            "key_set": key_set("OPENAI_API_KEY")
+            or any(c.available and c.can_test_models for c in credentials["openai"]),
+            "credentials": [c.model_dump() for c in credentials["openai"]],
+        },
+        # Per-task model routing (so the UI can show what each operation uses).
+        "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
+        "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
+        "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
+        "lifecycle_investigation": task_route("lifecycle_investigation", route_store=route_store).model_dump(),
+        "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
+        "fixed_task_runtime": {
+            task: settings.model_dump()
+            for task, settings in resolve_all_fixed_task_runtime(
+                store=fixed_runtime_store
+            ).items()
+        },
+        "data_keys": {
+            "finnhub": key_set("FINNHUB_API_KEY"),
+            "massive": provider_field_env_value(MASSIVE_CONFIG_PROVIDER, "api_key")
+            is not None,
+            "financial_datasets": key_set("FINANCIAL_DATASETS_API_KEY"),
+            "fred": key_set("FRED_API_KEY"),
+        },
+    }
+
+
+@router.get("/config/model-catalog")
+def model_catalog(
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Seed model catalog + current task routes for Settings.
+
+    The catalog intentionally allows custom model IDs: official docs can lag
+    account entitlements, and providers roll models independently.
+    """
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    routes = {
+        task: task_route(task, route_store=route_store)
+        for task in _ROUTE_TASKS
+    }
+    credential_inventory = provider_credentials(
+        store, token_store=token_store, observation_store=observation_store
+    )
+    # P2.7/P2.8 additive `effective` block. V2 is computed once for both
+    # providers; the legacy task-level alias is folded from that same result.
+    # Best-effort: the seed catalog still renders if the cache/resolver hiccups.
+    try:
+        from src.model_effective import effective_model_view_v2, legacy_effective_alias
+
+        credentials = {
+            provider: resolve_active_credential(
+                provider,
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )
+            for provider in ("anthropic", "openai")
+        }
+        v2 = effective_model_view_v2(
+            cache=ModelDiscoveryCache(store.db_path),
+            routes=routes,
+            credentials=credentials,
+        )
+        resolved_observation_store = _oauth_observation_store(store, observation_store)
+        for provider, summary in v2["providers"].items():
+            if summary is None:
+                continue
+            inventory_row = next(
+                (
+                    row for row in credential_inventory[provider]
+                    if row.id == summary["credential_id"]
+                ),
+                None,
+            )
+            summary["label"] = inventory_row.label if inventory_row else summary["credential_id"]
+            if provider == "openai":
+                hints = _subscription_entitlement_hints(
+                    resolved_observation_store,
+                    summary,
+                )
+                if hints:
+                    summary["entitlement_hints"] = hints
+        legacy = legacy_effective_alias(v2)
+        effective = {
+            "providers": v2["providers"],
+            "tasks": {
+                task: {**v2["tasks"][task], **legacy["tasks"][task]}
+                for task in v2["tasks"]
+            },
+        }
+    except Exception:  # noqa: BLE001 - additive view only
+        logger.warning("effective model view failed", exc_info=True)
+        effective = {"tasks": {}}
+    return {
+        **catalog().model_dump(),
+        "routes": {task: route.model_dump() for task, route in routes.items()},
+        "credentials": {
+            provider: [c.model_dump() for c in creds]
+            for provider, creds in credential_inventory.items()
+        },
+        "custom_allowed": True,
+        "effective": effective,
+    }
+
+
+@router.get("/config/credentials")
+def list_credentials(
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Masked provider credentials. Secret values are never returned."""
+    store = _credential_store(store)
+    return {
+        "credentials": {
+            provider: [c.model_dump() for c in creds]
+            for provider, creds in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            ).items()
+        }
+    }
+
+
+@router.get("/config/credentials/{credential_id}/account-usage")
+def get_credential_account_usage(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Read one cached credential-bound account snapshot; never start a sync."""
+    from src.auth_drivers.oauth_status import cached_account_usage
+
+    store = _credential_store(store)
+    if store.get(credential_id) is None:
+        raise HTTPException(status_code=404, detail="credential not found")
+    return cached_account_usage(credential_id, observation_store)
+
+
+@router.post("/config/credentials/{credential_id}/account-usage/sync")
+def sync_credential_account_usage(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    sync_service=Depends(get_oauth_account_sync_service),
+):
+    """Explicit bounded ChatGPT account control-plane synchronization."""
+    store = _credential_store(store)
+    credential = store.get(credential_id)
+    if credential is None:
+        raise HTTPException(status_code=404, detail="credential not found")
+    require_profile_state_write(
+        "oauth_account_usage_sync",
+        {"credential_id": credential_id, "provider": credential.provider},
+    )
+    return sync_service.sync(
+        credential_id=credential_id,
+        provider=credential.provider,
+        auth_mode=credential.auth_type,
+    )
+
+
+@router.post("/config/credentials")
+def add_credential(
+    body: CredentialCreate,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    store = _credential_store(store)
+    auth_type = body.auth_type.strip()
+    # This route is for DIRECT API keys only. OAuth/setup-token modes carry a token
+    # that must go to the token-store (not llm_credentials.secret), so they are
+    # rejected here — use the dedicated OAuth import route.
+    if auth_type in {"chatgpt_oauth", "claude_code_oauth", "oauth", "setup_token"}:
+        raise HTTPException(status_code=400, detail=f"auth_type {auth_type!r} must use the OAuth import route, not this API-key endpoint")
+    if auth_type != "api_key":
+        raise HTTPException(status_code=400, detail=f"unsupported auth_type: {auth_type}")
+    require_profile_state_write(
+        "credential_add",
+        {"provider": body.provider, "auth_type": auth_type, "alias": body.alias},
+    )
+    try:
+        cred = store.add(
+            provider=body.provider,
+            auth_type=auth_type,  # type: ignore[arg-type]
+            alias=body.alias,
+            secret=body.secret,
+            make_active=body.make_active,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {
+        "credential": next(
+            c.model_dump()
+            for c in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )[body.provider]
+            if c.id == f"local:{cred.id}"
+        )
+    }
+
+
+class ImportEnvRequest(BaseModel):
+    dry_run: bool = False
+
+
+@router.post("/config/credentials/import-env")
+def import_env_route(
+    body: ImportEnvRequest,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Import api_key credentials from the process env (config/.env) into named
+    DB rows (explode pools, dedup by secret). ``dry_run=True`` previews without
+    writing. Returns counts/labels per provider only — never a secret."""
+    store = _credential_store(store)
+    if not body.dry_run:
+        if not _credential_apply_enabled():
+            raise HTTPException(
+                status_code=403,
+                detail="credential apply is disabled; preview with dry_run=true, or set ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1 to enable the real import",
+            )
+        require_profile_state_write("credential_import_env", {"dry_run": False})
+    summary = import_env_credentials(store, dry_run=body.dry_run)
+    return {"dry_run": body.dry_run, "providers": summary}
+
+
+class ExportEnvRequest(BaseModel):
+    path: str
+
+
+@router.post("/config/credentials/export-env")
+def export_env_route(
+    body: ExportEnvRequest,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Write the api_key credentials to a portable .env file (0600). REFUSES to
+    overwrite the live config/.env — that file holds non-credential keys (data
+    sources, DB) this export does not emit, so writing there would destroy them.
+    Returns counts/labels only — never a secret (the file holds the secrets)."""
+    store = _credential_store(store)
+    path = body.path.strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="path is required")
+    # never write THROUGH a symlink — it would clobber the link target with the
+    # export's real secrets (and relax it to 0600). Refuse any symlink path.
+    if os.path.islink(path):
+        raise HTTPException(status_code=400, detail="refusing to write the export through a symlink; choose a regular file path")
+    # realpath (not abspath) so a symlink whose target is config/.env — or a
+    # ../-relative path — is also refused; abspath would let it write through.
+    if os.path.realpath(path) == os.path.realpath(str(env_file_path())):
+        raise HTTPException(
+            status_code=400,
+            detail="refusing to overwrite the live config/.env (it holds non-credential keys); choose a separate export path",
+        )
+    if not _credential_apply_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="credential export is disabled; set ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1 to enable writing the export file",
+        )
+    require_profile_state_write("credential_export_env", {"path": path})
+    return write_env_export(path, store=store)
+
+
+class OAuthImport(BaseModel):
+    provider: Provider
+    auth_mode: str = "claude_code_oauth"
+    alias: str
+    token: str
+    account_label: str | None = None
+    expires_at: str | None = None
+    make_active: bool = True
+
+
+@router.post("/config/credentials/oauth/import")
+def import_oauth_credential(
+    body: OAuthImport,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Import a subscription OAuth/setup token. v1: anthropic + claude_code_oauth
+    (Claude setup-token) ONLY. Creates a metadata row (secret NULL) then saves the
+    token to the token-store; rolls the row back if the token-store write fails.
+    The response returns masked metadata only — the token is NEVER echoed."""
+    from src.auth_drivers import StoredTokenRecord
+    from src.model_credentials import _normalize_auth_type
+
+    store = _credential_store(store)
+    provider = body.provider
+    auth_mode = _normalize_auth_type(body.auth_mode.strip(), provider)
+    # v1 scope: Claude setup-token only. (OpenAI chatgpt_oauth import = S3.)
+    if not (provider == "anthropic" and auth_mode == "claude_code_oauth"):
+        raise HTTPException(status_code=400, detail="v1 import supports only anthropic + claude_code_oauth (Claude setup-token)")
+    token = body.token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="token is required")
+
+    # NOTE: the token is deliberately NOT included in the write-gate detail.
+    require_profile_state_write("oauth_credential_import", {"provider": provider, "auth_mode": auth_mode, "alias": body.alias})
+
+    try:
+        cred = store.add_oauth_credential(
+            provider=provider, auth_mode=auth_mode, alias=body.alias,
+            expires_at=body.expires_at, account_label=body.account_label, make_active=body.make_active,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    cid = f"local:{cred.id}"
+    try:
+        token_store.save(
+            provider=provider, auth_mode=auth_mode, credential_id=cid,
+            record=StoredTokenRecord(
+                access_token=token,
+                # Claude's optional manual expiry is owned by llm_credentials.
+                expires_at=None,
+                account_label=body.account_label,
+            ),
+        )
+    except Exception:  # noqa: BLE001 — roll back so no half-built credential remains
+        store.delete(cid)
+        logger.warning("oauth token-store save failed for %s/%s; rolled back credential row", provider, auth_mode)
+        raise HTTPException(status_code=502, detail="failed to store the token securely; nothing was saved")
+
+    # masked metadata only — never the token / token-store payload
+    return {
+        "credential": next(
+            c.model_dump()
+            for c in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )[provider]
+            if c.id == cid
+        )
+    }
+
+
+class OAuthManualComplete(BaseModel):
+    state: str
+    code: str | None = None
+    redirect_url: str | None = None
+
+
+class OAuthStartRequest(BaseModel):
+    # Default FALSE: login/setup must not silently switch the active OpenAI credential.
+    # Supported tasks use chatgpt_oauth through explicit subscription adapters;
+    # unrelated direct SDK-client sites still fail closed. Carried into pending
+    # login state so the loopback callback honors the user's explicit choice.
+    make_active: bool = False
+    # S3 re-login: when set, completion replaces THIS credential's token in place
+    # (no new row; alias/active preserved). openai chatgpt_oauth targets only.
+    relogin_credential_id: str | None = None
+
+
+@router.post("/config/credentials/openai/oauth/start")
+def start_openai_oauth(
+    body: OAuthStartRequest | None = None,
+    manager=Depends(get_oauth_login_manager),
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Begin an in-app ChatGPT (OpenAI subscription) OAuth login. Returns the
+    authorize URL + state for the browser; the loopback callback (or the manual
+    copy-code fallback) completes it. COMPATIBILITY/EXPERIMENTAL path — the
+    ChatGPT/Codex backend is not the public OpenAI API. The token never appears in
+    any response; only masked metadata is returned on completion (via /status).
+    With `relogin_credential_id` the SAME flow replaces that credential's token in
+    place — fail-fast validated here, re-validated at completion (S3 re-login)."""
+    relogin_id = body.relogin_credential_id if body else None
+    if relogin_id:
+        cred = _credential_store(store).get(relogin_id)
+        if cred is None:
+            raise HTTPException(status_code=404, detail="re-login target credential not found")
+        if cred.provider != "openai" or cred.auth_type != "chatgpt_oauth":
+            raise HTTPException(
+                status_code=400,
+                detail="re-login supports only openai chatgpt_oauth credentials (scope ruling)",
+            )
+    # Gate the credential-creating intent here (request context); the async loopback
+    # completion fulfills this gated start. The detail is token-free by construction.
+    detail = {"provider": "openai", "auth_mode": "chatgpt_oauth"}
+    if relogin_id:
+        detail["relogin_credential_id"] = relogin_id
+    require_profile_state_write("oauth_login_start", detail)
+    return manager.begin(make_active=body.make_active if body else False,
+                         relogin_credential_id=relogin_id)
+
+
+class OAuthCancelRequest(BaseModel):
+    state: str
+
+
+@router.post("/config/credentials/openai/oauth/cancel")
+def cancel_openai_oauth(body: OAuthCancelRequest, manager=Depends(get_oauth_login_manager)):
+    """Cancel an in-flight ChatGPT OAuth login. Evicts the pending login state server-side
+    so a late browser/loopback callback can no longer create a credential (UI cancel alone
+    only stops the FE poll), and frees the loopback port. Idempotent."""
+    manager.cancel_login(body.state)
+    return {"ok": True}
+
+
+@router.get("/config/credentials/openai/oauth/status")
+def openai_oauth_status(state: str, manager=Depends(get_oauth_login_manager)):
+    """Poll a login started by /start: {status: pending|success|error|unknown,
+    credential: <masked metadata>|null, detail: <message>|null}. No token."""
+    return manager.status(state)
+
+
+@router.post("/config/credentials/openai/oauth/complete-manual")
+def complete_openai_oauth_manual(body: OAuthManualComplete, manager=Depends(get_oauth_login_manager)):
+    """Copy-code fallback — ONLY for when the localhost callback never arrived. The
+    user pastes the authorization code (or the full redirect URL); this completes the
+    SAME login. It does NOT change the auth mode, store, or validation, and it MUST
+    NOT mask an OAuth/token error (a bad/expired/forged state → 400, no fallback)."""
+    from src.auth_drivers.chatgpt_oauth_login import (
+        ChatGPTOAuthLoginError,
+        extract_code_from_redirect_url,
+    )
+
+    require_profile_state_write("oauth_login_complete_manual", {"provider": "openai", "auth_mode": "chatgpt_oauth"})
+    code = (body.code or "").strip() or None
+    if body.redirect_url:
+        try:
+            parsed = extract_code_from_redirect_url(body.redirect_url)
+        except ChatGPTOAuthLoginError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        if parsed.get("state") and parsed["state"] != body.state:
+            raise HTTPException(status_code=400, detail="the redirect URL's state does not match this login")
+        code = parsed["code"]
+    if not code:
+        raise HTTPException(status_code=400, detail="code or redirect_url is required")
+    try:
+        return {"credential": manager.complete_manual(state=body.state, code=code)}
+    except ChatGPTOAuthLoginError as exc:
+        # state/PKCE/exchange failures FAIL — never a silent fallback. The message is
+        # already redacted at the source; map to a 400.
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/config/credentials/{credential_id}/probe")
+def probe_oauth_credential(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+):
+    """Run the OAuth probe for a stored credential and return redacted results.
+
+    Anthropic uses the admitted bundled Agent-SDK runtime and verifies its
+    subscription auth-source frame. OpenAI uses the bounded P1/P2 probe.
+    """
+    from src.model_credentials import valid_credential_id
+
+    store = _credential_store(store)
+    if not valid_credential_id(credential_id):  # must be local:<int>, not a thread-id rule
+        raise HTTPException(status_code=422, detail="invalid credential_id (expected local:<int>)")
+    cred = store.get(credential_id)
+    if cred is None or cred.auth_type not in ("chatgpt_oauth", "claude_code_oauth"):
+        raise HTTPException(status_code=404, detail="OAuth credential not found")
+    record = token_store.load(provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id)
+    if record is None or not record.access_token:
+        raise HTTPException(status_code=404, detail="no stored token for this credential")
+
+    if cred.provider == "anthropic" and cred.auth_type == "claude_code_oauth":
+        from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+
+        return run_claude_code_oauth_probe(
+            credential_id=credential_id,
+            token_store=token_store,
+        )
+    if cred.provider == "openai" and cred.auth_type == "chatgpt_oauth":
+        from src.auth_drivers.chatgpt_oauth_probe import run_chatgpt_oauth_probe
+
+        return run_chatgpt_oauth_probe(record.access_token)
+    raise HTTPException(status_code=400, detail="probe supports anthropic claude_code_oauth or openai chatgpt_oauth")
+
+
+@router.put("/config/credentials/{credential_id}")
+def update_credential(
+    credential_id: str,
+    body: CredentialUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    store = _credential_store(store)
+    if not credential_id.startswith("local:"):
+        raise HTTPException(status_code=400, detail="only local credentials are editable")
+    require_profile_state_write(
+        "credential_update",
+        {
+            "credential_id": credential_id,
+            "active": body.active,
+            "alias": body.alias,
+            "expires_at_set": body.expires_at is not None,
+            "account_label_set": body.account_label is not None,
+        },
+    )
+    try:
+        cred = store.update(
+            credential_id,
+            alias=body.alias,
+            secret=body.secret,
+            active=body.active,
+            expires_at=body.expires_at,
+            account_label=body.account_label,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not cred:
+        raise HTTPException(status_code=404, detail="credential not found")
+    return {
+        "credential": next(
+            c.model_dump()
+            for c in provider_credentials(
+                store,
+                token_store=token_store,
+                observation_store=observation_store,
+            )[cred.provider]
+            if c.id == f"local:{cred.id}"
+        )
+    }
+
+
+_OAUTH_AUTH_MODES = ("chatgpt_oauth", "claude_code_oauth")
+
+
+@router.delete("/config/credentials/{credential_id}")
+def delete_credential(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Delete a credential with a fail-closed cascade: clear discovery and OAuth
+    observations first, then prove the token is gone, and delete metadata last.
+    Serialized on the credential lifecycle lock so an in-flight refresh cannot
+    resurrect the token."""
+    from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
+
+    store = _credential_store(store)
+    if not credential_id.startswith("local:"):
+        raise HTTPException(status_code=400, detail="only local credentials can be deleted")
+    if store.get(credential_id) is None:
+        raise HTTPException(status_code=404, detail="credential not found")
+    observation_store = _oauth_observation_store(store, observation_store)
+    require_profile_state_write("credential_delete", {"credential_id": credential_id})
+    with oauth_credential_lock(credential_id):
+        cred = store.get(credential_id)  # re-read inside the lock
+        if cred is None:
+            raise HTTPException(status_code=404, detail="credential not found")
+        # 1) discovery cache first — a failure aborts before any mutation.
+        try:
+            cache_rows = ModelDiscoveryCache(store.db_path).delete_scope(
+                provider=cred.provider, credential_id=credential_id,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("credential delete: discovery-cache clear failed", exc_info=True)
+            raise HTTPException(status_code=502, detail="could not clear the discovery cache; nothing was deleted")
+        # 2) OAuth observations and token cleanup, proven before the row goes
+        # away. API-key deletion keeps its existing behavior and never writes
+        # the OAuth observation store.
+        token_deleted: bool | None = None
+        old_record = None
+        if cred.auth_type in _OAUTH_AUTH_MODES:
+            try:
+                observation_store.delete_credential_observations(credential_id)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "credential delete: OAuth observation cleanup failed", exc_info=True
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        "OAuth observation cleanup failed; the token and credential row "
+                        "were kept for retry"
+                    ),
+                ) from None
+            try:
+                old_record = token_store.load(
+                    provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id,
+                )
+                removed = token_store.delete(
+                    provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("credential delete: token-store cleanup failed", exc_info=True)
+                raise HTTPException(status_code=502, detail="token cleanup failed; the credential row was kept for retry")
+            if old_record is not None and not removed:
+                # KeyringTokenStore collapses backend exceptions to False — with a
+                # preloaded record, False means "cleanup not proven": keep the row.
+                raise HTTPException(status_code=502, detail="token cleanup not proven; the credential row was kept for retry")
+            # old record absent = nothing secret remained → cleanup wasn't required.
+            token_deleted = True if old_record is not None else None
+        # 3) metadata row LAST.
+        try:
+            row_deleted = store.delete(credential_id)
+        except Exception:  # noqa: BLE001
+            restored = False
+            if old_record is not None and token_deleted:
+                try:  # best-effort restore; the original error stays authoritative
+                    token_store.save(provider=cred.provider, auth_mode=cred.auth_type,
+                                     credential_id=credential_id, record=old_record)
+                    restored = True
+                except Exception:  # noqa: BLE001
+                    logger.warning("credential delete: token restore after row failure ALSO failed", exc_info=True)
+            logger.warning("credential delete: metadata row deletion failed", exc_info=True)
+            # F2: the detail reports what ACTUALLY happened — never a claimed
+            # restore that did not land.
+            if old_record is None:
+                detail = "credential row deletion failed; retry the deletion"
+            elif restored:
+                detail = "credential row deletion failed; the token was restored — retry the deletion"
+            else:
+                detail = ("credential row deletion failed and the token restore ALSO failed — "
+                          "the token-store state is unverified; retry the deletion")
+            raise HTTPException(status_code=502, detail=detail)
+        if not row_deleted:
+            # Ruling (round 4): the row was re-read inside the lifecycle lock, so a
+            # False here means another actor (cross-process) removed it mid-flight.
+            # The terminal state the user asked for IS achieved — row gone, token
+            # cleanup done, cache cleared — so report success and log the anomaly
+            # instead of a misleading 404 after real cleanup work.
+            logger.warning("credential delete: row for %s vanished concurrently", credential_id)
+    return {
+        "deleted": True,
+        "id": credential_id,
+        "token_deleted": token_deleted,
+        "discovery_cache_rows_deleted": cache_rows,
+    }
+
+
+@router.post("/config/model-discovery")
+def discover_provider_models(
+    body: ModelDiscoveryRequest,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+):
+    """Live model discovery for a selected provider credential — PER auth_mode.
+
+    api_key/api_key_pool → the provider's standard API (`/models`). An OAuth
+    credential is dispatched through its driver instead (the standard provider-API
+    path can't use an OAuth token): openai chatgpt_oauth → the live ChatGPT/Codex
+    backend list (S3 step 1); anthropic claude_code_oauth → the honest seed
+    candidate list. The token is loaded by the driver from the token-store.
+    """
+    store = _credential_store(store)
+    cred = store.get(body.credential_id) if body.credential_id else None
+    if cred is not None and cred.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
+        # API-boundary guard: the requested provider must match the credential's
+        # provider — never silently return another provider's models.
+        if cred.provider != body.provider:
+            raise HTTPException(
+                status_code=400,
+                detail=f"credential {body.credential_id} is provider {cred.provider!r}, not {body.provider!r}",
+            )
+        from src.auth_drivers.factory import build_driver
+
+        driver = build_driver(
+            provider=cred.provider, auth_mode=cred.auth_type, credential=cred, token_store=token_store,
+        )
+        # F1 (round 4): capture the lifecycle epoch BEFORE the provider call —
+        # a re-login/delete landing mid-flight bumps it, and the commit below
+        # then refuses to resurrect the old account's entitlement.
+        scope_credential_id = body.credential_id or f"local:{cred.id}"
+        epoch_captured = True
+        epoch_before = 0
+        try:
+            epoch_before = ModelDiscoveryCache(store.db_path).lifecycle_epoch(
+                provider=body.provider, credential_id=scope_credential_id,
+            )
+        except Exception:  # noqa: BLE001
+            # Round-5 MF1: without a captured epoch the stale-write guard cannot
+            # run — fail CLOSED: discovery still succeeds, the cache write is
+            # SKIPPED (expected_epoch=None would mean "validation off").
+            logger.warning("discovery epoch capture failed; skipping cache write", exc_info=True)
+            epoch_captured = False
+        result = _run_coro(driver.discover_models())
+        out = result.model_dump()
+        if out.get("status") == "ok" and epoch_captured:
+            # P2.7 write-through: live listings cache as ok; an all-seed result
+            # means this channel has no live listing → seed_only (badge in the
+            # picker, not an endless discovery nudge). Seeds are candidates,
+            # never entitlement rows. OAuth tokens rotate by design → the scope
+            # fingerprint is the constant "oauth".
+            live = [m for m in result.models if m.source == "provider_api"]
+            all_seed = not live and bool(result.models)
+            cache_status = "seed_only" if all_seed else "ok"
+            try:
+                cache = ModelDiscoveryCache(store.db_path)
+                cache.record_run(
+                    provider=body.provider,
+                    auth_mode=cred.auth_type,
+                    credential_id=scope_credential_id,
+                    secret_fingerprint="oauth",
+                    status=cache_status,
+                    models=[
+                        {"id": m.id, "label": m.label, "source": m.source} for m in live
+                    ],
+                    expected_epoch=epoch_before,
+                )
+            except StaleDiscoveryWrite:
+                logger.warning(
+                    "stale oauth discovery write skipped for %s (lifecycle op interleaved)",
+                    scope_credential_id,
+                )
+            except Exception:  # noqa: BLE001 - best-effort like the api_key path (SF1)
+                logger.warning("oauth discovery cache write failed", exc_info=True)
+            else:
+                out["cached"] = True          # round-2 MF2: only on a landed write
+                out["cache_state"] = cache_status
+                out["cached_at"] = _utc_now_iso()
+        return out
+    out = discover_models(body.provider, body.credential_id, store).model_dump()
+    if out.get("status") == "ok" and out.get("cached"):
+        # report cached-ness only when the write actually landed (SF1).
+        out["cache_state"] = "ok"
+        out["cached_at"] = _utc_now_iso()
+    return out
+
+
+def _utc_now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
+
+
+@router.post("/config/model-test")
+def run_provider_model_test(
+    body: ModelTestRequest,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Run a tiny explicit model test call for provider/model/effort access."""
+    from src.model_capabilities import model_execution_admission_detail
+
+    store = _credential_store(store)
+    model = body.model.strip()
+    detail = model_execution_admission_detail(model)
+    if detail is not None:
+        raise HTTPException(status_code=400, detail=detail)
+    effort = body.effort.strip() or "default"
+    warning = None
+    if not is_valid_effort(body.provider, effort, model=model):
+        warning = (
+            f"Requested effort '{effort}' is not known for provider '{body.provider}'; "
+            "testing with provider default."
+        )
+        effort = "default"
+    result = test_model(
+        body.provider,
+        model,
+        effort=effort,
+        credential_id=body.credential_id,
+        store=store,
+    ).model_dump()
+    if warning:
+        result["warning"] = f"{warning} {result.get('warning') or ''}".strip()
+    return result
+
+
+@router.post("/config/model-task-test")
+def run_task_model_test(
+    body: TaskModelTestRequest,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+):
+    """Run one bounded test for the selected task/provider/model route."""
+    store = _credential_store(store)
+    model = body.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required")
+    effort = body.effort.strip()
+    capability = capability_for(model)
+    detail = task_route_admission_detail(
+        body.provider,
+        model,
+        effort,
+        task=body.task,
+        # This route only validates the requested shape. The bounded dispatcher
+        # reads the active credential and verifies exact model discovery.
+        auth_mode=(
+            capability.allowed_auth_modes[0]
+            if capability is not None and capability.allowed_auth_modes
+            else None
+        ),
+        plan_type=(
+            capability.required_plans[0]
+            if capability is not None and capability.required_plans
+            else None
+        ),
+    )
+    if detail is not None:
+        raise HTTPException(status_code=400, detail=detail)
+    result = _run_coro(dispatch_task_model_test(
+        task=body.task,
+        provider=body.provider,
+        model=model,
+        effort=effort,
+        store=store,
+        token_store=token_store,
+    )).model_dump()
+    return result
+
+
+@router.put("/config/model-routes")
+def update_model_routes(
+    body: ModelRoutesUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+    observation_store=Depends(get_oauth_observation_store),
+):
+    """Persist per-task provider/model routing in the profile DB (app-managed
+    authority — CONFIG_AUTHORITY_PLAN §2). `user_profile.local.yaml` is now fallback
+    + import/export only; a save writes the DB, not the yaml.
+
+    Validation is auth-mode-aware (S3 step 2): a saved model/effort is checked against
+    the ACTIVE credential's auth_mode for that provider — e.g. the ChatGPT-backend
+    model set differs from the API-key catalog. These are non-blocking WARNINGS
+    (the catalog allows custom ids); retired models and ambiguous effort are hard 400s.
+    """
+    if not body.routes:
+        raise HTTPException(status_code=400, detail="no routes supplied")
+    store = _credential_store(store)
+
+    prepared: list[tuple[TaskId, Provider, str, str, list[str]]] = []
+    for task, update in body.routes.items():
+        model = update.model.strip()
+        if not model:
+            raise HTTPException(status_code=400, detail=f"{task}: model is required")
+        effort = update.effort.strip()
+        warnings: list[str] = []
+        detail = _restricted_task_route_admission_detail(
+            task=task,
+            provider=update.provider,
+            model=model,
+            effort=effort,
+            store=store,
+            token_store=token_store,
+            observation_store=observation_store,
+        )
+        if detail is not None:
+            raise HTTPException(status_code=400, detail=detail)
+        inferred = model_provider(model)
+        if inferred and inferred != update.provider:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{task}: model '{model}' looks like {inferred}, not {update.provider}",
+            )
+        # auth-mode-aware capability warnings (for example, OAuth model set differs
+        # from the api_key catalog). Best-effort, never blocks.
+        warnings.extend(
+            route_capability_warnings(
+                update.provider, model, effort, auth_mode=_active_auth_mode(update.provider, store),
+            )
+        )
+        prepared.append((task, update.provider, model, effort, warnings))
+
+    route_store = ModelRouteStore(store.db_path)
+    saved: dict[str, TaskRoute] = {}
+    for task, provider, model, effort, warnings in prepared:
+        require_profile_state_write(
+            "model_route_update",
+            {"task": task, "provider": provider, "model": model, "effort": effort},
+        )
+        # Atomic upsert — provider/model/effort land together, never half-applied.
+        route_store.set(task, provider, model, effort)
+        saved[task] = TaskRoute(
+            task=task,
+            provider=provider,
+            model=model,
+            effort=effort,
+            source="db",
+            custom=capability_for(model) is None,
+            warning=" ".join(warnings) or None,
+        )
+    return {"routes": {k: v.model_dump() for k, v in saved.items()}}
+
+
+@router.put("/config/research-runtime")
+def update_research_runtime(
+    body: ResearchRuntimeUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Persist AI Research runtime limits in the profile DB.
+
+    These settings are scoped to /query/stream AI 研究. `user_profile.local.yaml`
+    remains fallback; real ARKSCOPE_RESEARCH_* env vars remain the top operator
+    override.
+    """
+    store = _credential_store(store)
+    runtime_store = ResearchRuntimeStore(store.db_path)
+    try:
+        require_profile_state_write("research_runtime_update", body.model_dump())
+        runtime_store.set(
+            max_tool_calls=body.max_tool_calls,
+            session_timeout_s=body.session_timeout_s,
+            per_tool_timeout_s=body.per_tool_timeout_s,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"research_runtime": resolve_research_runtime(store=runtime_store).model_dump()}
+
+
+@router.delete("/config/research-runtime")
+def delete_research_runtime(store: CredentialStore = Depends(get_credential_store)):
+    """Reset AI Research runtime limits to yaml/default authority by deleting the DB row."""
+    store = _credential_store(store)
+    runtime_store = ResearchRuntimeStore(store.db_path)
+    require_profile_state_write("research_runtime_delete", {})
+    deleted = runtime_store.delete()
+    return {
+        "deleted": deleted,
+        "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
+    }
+
+
+@router.put("/config/fixed-task-runtime")
+def update_fixed_task_runtime(
+    body: FixedTaskRuntimeUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Atomically persist model-execution limits for recognized fixed tasks."""
+    if not body.tasks:
+        raise HTTPException(status_code=400, detail="no fixed tasks supplied")
+    raw = {
+        task: value.model_timeout_s
+        for task, value in body.tasks.items()
+    }
+    try:
+        validated = validate_fixed_task_runtime_updates(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    store = _credential_store(store)
+    runtime_store = FixedTaskRuntimeStore(store.db_path)
+    require_profile_state_write(
+        "fixed_task_runtime_update",
+        {"tasks": sorted(validated)},
+    )
+    runtime_store.set_many(validated)
+    return {
+        "fixed_task_runtime": {
+            task: settings.model_dump()
+            for task, settings in resolve_all_fixed_task_runtime(
+                store=runtime_store
+            ).items()
+        }
+    }
+
+
+@router.delete("/config/fixed-task-runtime")
+def delete_fixed_task_runtime(
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Delete all DB overrides and return the effective defaults/env values."""
+    store = _credential_store(store)
+    runtime_store = FixedTaskRuntimeStore(store.db_path)
+    require_profile_state_write("fixed_task_runtime_delete", {})
+    deleted = runtime_store.delete_all()
+    return {
+        "deleted": deleted,
+        "fixed_task_runtime": {
+            task: settings.model_dump()
+            for task, settings in resolve_all_fixed_task_runtime(
+                store=runtime_store
+            ).items()
+        },
+    }
+
+
+@router.post("/config/model-routes/import")
+def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
+    """Explicit migration: copy per-task routes configured in user_profile(.local).yaml
+    ``llm_preferences`` into the profile DB (the authority). NEVER auto-runs — only on this
+    call. yaml is left intact as fallback; importing just promotes it to DB authority.
+
+    A task is imported only when it passes the SAME guards as the save path
+    (update_model_routes): both provider and model present, a recognized provider, and a
+    provider/model that don't conflict by prefix and an explicit supported effort.
+    An inconsistent yaml route is skipped, never persisted (no half/bad routes)."""
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    llm_prefs = _load_user_profile().get("llm_preferences", {})
+    imported: list[str] = []
+    skipped: list[str] = []
+    for task in _ROUTE_TASKS:
+        provider = str(llm_prefs.get(f"{task}_provider", "") or "").strip()
+        model = str(llm_prefs.get(f"{task}_model", "") or "").strip()
+        effort = str(llm_prefs.get(f"{task}_effort", "") or "").strip()
+        if not (provider and model) or provider not in ("anthropic", "openai"):
+            skipped.append(task)
+            continue
+        inferred = model_provider(model)
+        if inferred and inferred != provider:  # same prefix-mismatch guard as update_model_routes
+            skipped.append(task)
+            continue
+        if task_route_admission_detail(
+            provider,
+            model,
+            effort,
+            task=task,
+        ) is not None:
+            skipped.append(task)
+            continue
+        require_profile_state_write("model_route_import", {"task": task})
+        route_store.set(task, provider, model, effort)
+        imported.append(task)
+    return {"imported": imported, "skipped": skipped}
+
+
+@router.post("/config/model-routes/export")
+def export_model_routes(store: CredentialStore = Depends(get_credential_store)):
+    """Snapshot the DB routes into user_profile.local.yaml ``llm_preferences`` so the yaml
+    fallback MIRRORS DB state for the known tasks: a task WITH a DB row writes its 3 keys; a
+    task WITHOUT one has its 3 keys CLEARED (so a stale local override can't keep resolving
+    after its DB row is gone). Only those keys are touched — every other yaml key, and env,
+    are preserved (save_local_override / clear_local_overrides do read-modify-write).
+
+    Scope: this writes ONLY user_profile.local.yaml (the user's mutable override). A route
+    key committed in the base user_profile.yaml is reviewed baseline config (§2 source
+    catalog) and is intentionally NOT cleared — it would re-surface as a 'profile' fallback
+    once the local key is gone. Both branches go through require_profile_state_write so the
+    write AND the destructive clear are audited/gatable alike."""
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    rows = route_store.get_all()
+    exported: list[str] = []
+    cleared: list[str] = []
+    for task in _ROUTE_TASKS:
+        row = rows.get(task)
+        if row is not None:
+            require_profile_state_write("model_route_export", {"task": task})
+            save_local_override("llm_preferences", f"{task}_provider", row.provider)
+            save_local_override("llm_preferences", f"{task}_model", row.model)
+            save_local_override("llm_preferences", f"{task}_effort", row.effort)
+            exported.append(task)
+        else:
+            require_profile_state_write("model_route_export_clear", {"task": task})
+            removed = clear_local_overrides(
+                "llm_preferences", f"{task}_provider", f"{task}_model", f"{task}_effort")
+            if removed:  # only report tasks whose stale yaml keys were actually removed
+                cleared.append(task)
+    return {"exported": exported, "cleared": cleared}
+
+
+@router.delete("/config/model-routes/{task}")
+def delete_model_route(task: str, store: CredentialStore = Depends(get_credential_store)):
+    """Reset a task's route to yaml/default authority by removing its DB row — the core
+    'revert to fallback' action of the DB-authority UI. Returns the NOW-resolved route so the
+    caller sees what it reverted to (yaml fallback or built-in default). Idempotent: deleting
+    an absent route is fine (deleted=False). Does NOT touch yaml — any fallback there remains."""
+    if task not in _ROUTE_TASKS:
+        raise HTTPException(status_code=400, detail=f"unknown task: {task}")
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    require_profile_state_write("model_route_delete", {"task": task})
+    deleted = route_store.delete(task)
+    return {"deleted": deleted, "route": task_route(task, route_store=route_store).model_dump()}
