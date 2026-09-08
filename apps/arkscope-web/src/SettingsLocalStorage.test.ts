@@ -105,7 +105,7 @@ const coverage: TradingDayCoverage = {
   market_scope: "us_listed_equity_proxy",
   coverage_session: "rth",
   interval: "15min",
-  lookback_days: 10,
+  lookback_days: 15,
   universe_count: 149,
   generated_at_et: "2026-07-03T16:00:00-04:00",
   calendar_health: {
@@ -187,6 +187,8 @@ vi.mock("./api", async (importOriginal) => {
       return mocked.macroSnapshot!;
     }),
     getTradingDayCoverage: vi.fn(async () => mocked.coverage!),
+    getPriceRepairOperations: vi.fn(async () => ({ version: 1, operations: [], total: 0, offset: 0, has_more: false })),
+    getSchedule: vi.fn(async () => ({ sources: { ibkr_prices: { running: false } } })),
     listSecurityLifecycleCases: mocked.listLifecycleCases,
     getNewsStatus: vi.fn(async () => newsStatus),
   };
@@ -296,10 +298,10 @@ describe("local storage panels", () => {
 
   it("keys_trading_day_coverage_by_lookback_and_forces_only_storage_reads", async () => {
     const cache = createSettingsReadCache();
-    const coverage15 = { ...coverage, lookback_days: 15, universe_count: 215 };
+    const coverage30 = { ...coverage, lookback_days: 30, universe_count: 215 };
     cache.replace("market_data_status", marketStatus);
-    cache.replace(tradingDayCoverageKey(10), coverage);
-    cache.replace(tradingDayCoverageKey(15), coverage15);
+    cache.replace(tradingDayCoverageKey(15), coverage);
+    cache.replace(tradingDayCoverageKey(30), coverage30);
     cache.replace("news_status", { marker: "news" });
     cache.replace("macro_status", { marker: "macro" });
     cache.replace("macro_snapshot", { marker: "snapshot" });
@@ -312,7 +314,7 @@ describe("local storage panels", () => {
     const lookback = host!.querySelector<HTMLSelectElement>("select");
     if (!lookback) throw new Error("missing coverage lookback");
     await act(async () => {
-      lookback.value = "15";
+      lookback.value = "30";
       lookback.dispatchEvent(new Event("change", { bubbles: true }));
       await Promise.resolve();
     });
@@ -326,13 +328,13 @@ describe("local storage panels", () => {
       ?.closest(".settings-section-head")?.querySelector<HTMLButtonElement>("button");
     if (!coverageRefresh || !marketRefresh) throw new Error("missing storage refresh commands");
 
-    mocked.coverage = coverage15;
+    mocked.coverage = coverage30;
     await act(async () => {
       coverageRefresh.click();
       await Promise.resolve();
     });
     expect(getTradingDayCoverage).toHaveBeenCalledOnce();
-    expect(getTradingDayCoverage).toHaveBeenCalledWith(15, "15min");
+    expect(getTradingDayCoverage).toHaveBeenCalledWith(30, "15min");
     expect(getMarketDataStatus).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -349,7 +351,7 @@ describe("local storage panels", () => {
   it("reloads_mounted_market_and_coverage_status_after_price_invalidation", async () => {
     const cache = createSettingsReadCache();
     cache.replace("market_data_status", marketStatus);
-    cache.replace(tradingDayCoverageKey(10), coverage);
+    cache.replace(tradingDayCoverageKey(15), coverage);
     mocked.marketStatus = {
       ...marketStatus,
       prices: {

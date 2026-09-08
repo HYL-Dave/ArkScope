@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { ListChecks } from "lucide-react";
+import { FlaskConical, ListChecks } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type {
   EffectiveProviderModelEntry,
@@ -34,6 +34,7 @@ import {
   taskRouteModelStatus,
 } from "../researchModels";
 import { formatSystemTimestamp } from "../timeDisplay";
+import { Button } from "../ui/Button";
 import { DeveloperDiagnostics } from "./DeveloperDiagnostics";
 import {
   settingsEffortLabel,
@@ -52,6 +53,8 @@ function taskDescription(task: ModelTask, t: SettingsT): string {
       return t(($) => $.models.tasks.cardTranslation.description);
     case "ai_research":
       return t(($) => $.models.tasks.aiResearch.description);
+    case "lifecycle_investigation":
+      return t(($) => $.models.tasks.lifecycleInvestigation.description);
   }
 }
 
@@ -170,13 +173,17 @@ export function ModelRoutingSection({
           const currentEntries = rawEntries.filter((entry) => (
             taskRouteModelStatus(catalog, row.provider, entry.id) === "current"
           ));
-          const retainedRouteEntry: EffectiveProviderModelEntry = {
+          const selectedModelStatus = taskRouteModelStatus(catalog, row.provider, row.model);
+          const retainedRouteEntry: EffectiveProviderModelEntry = (selectedModelStatus !== "retired"
+            ? rawEntries.find((entry) => entry.id === row.model)
+            : undefined) ?? {
             id: row.model,
             label: row.model,
             status: "route",
             visible_to_credential: null,
-            eligible: taskRouteModelStatus(catalog, row.provider, row.model) !== "retired",
-            reason_code: taskRouteModelStatus(catalog, row.provider, row.model) === "retired"
+            eligible: task.supports_custom_models !== false
+              && selectedModelStatus !== "retired",
+            reason_code: selectedModelStatus === "retired"
               ? "model_retired"
               : "model_not_in_registry",
             thinking_mode: "none",
@@ -208,15 +215,9 @@ export function ModelRoutingSection({
             )
           );
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
-          const selectedModelStatus = taskRouteModelStatus(catalog, row.provider, row.model);
           const selectedReason = selectedModelStatus === "retired"
             ? "model_retired"
             : selectedEntry ? optionReason(selectedEntry, providerReason) : null;
-          const disabledReasons = Array.from(new Set(
-            groups.flatMap((group) => group.entries)
-              .map((entry) => entry.disabledReason)
-              .filter((reason): reason is string => !!reason),
-          ));
           const effortOptions = effortOptionsForModel(
             catalog,
             row.provider,
@@ -386,7 +387,7 @@ export function ModelRoutingSection({
                 </p>
               ) : null}
 
-              {!row.custom ? (
+              {!row.custom || task.supports_custom_models === false ? (
                 <div className="field">
                   <span id={modelLabelId}>{t(($) => $.models.fields.model)}</span>
                   <select
@@ -429,16 +430,14 @@ export function ModelRoutingSection({
                       </optgroup>
                     ))}
                   </select>
-                  {disabledReasons.length > 0 && (
+                  {selectedReason && (
                     <p className="field-help">
                       {t(($) => $.models.compatibility.unavailableReasons, {
-                        value: disabledReasons
-                          .map((reason) => modelReasonLabel(reason, commonT))
-                          .join("; "),
+                        value: modelReasonLabel(selectedReason, commonT),
                       })}
                     </p>
                   )}
-                  <button
+                  {task.supports_custom_models !== false && <button
                     type="button"
                     className="btn-ghost small model-custom-toggle"
                     disabled={!context}
@@ -450,7 +449,7 @@ export function ModelRoutingSection({
                     })}
                   >
                     {t(($) => $.models.custom.use)}
-                  </button>
+                  </button>}
                 </div>
               ) : (
                 <div className="field">
@@ -526,16 +525,20 @@ export function ModelRoutingSection({
               />
 
               <div className="settings-actions">
-                <button
-                  type="button"
+                <Button
+                  tone="ghost"
+                  size="compact"
                   className="btn-ghost small"
+                  icon={<FlaskConical size={14} />}
                   disabled={testDisabled}
                   onClick={() => void onTest(task.id)}
                 >
                   {currentTest?.loading && testIsCurrent
                     ? t(($) => $.models.test.running)
-                    : t(($) => $.models.test.run)}
-                </button>
+                    : task.id === "lifecycle_investigation"
+                      ? t(($) => $.models.test.connectionAndFormat)
+                      : t(($) => $.models.test.run)}
+                </Button>
                 {context?.auth_mode.includes("oauth") ? (
                   <span className="muted tiny">{t(($) => $.models.test.subscriptionQuota)}</span>
                 ) : null}
@@ -584,7 +587,11 @@ function TaskModelTestStatus({
   return (
     <div className={`test-status ${ok ? "ok" : "bad"}`}>
       <strong>
-        {ok ? t(($) => $.models.test.succeeded) : action ?? modelReasonLabel("provider_call_failed", commonT)}
+        {ok
+          ? result.task === "lifecycle_investigation"
+            ? t(($) => $.models.test.connectionAndFormatSucceeded)
+            : t(($) => $.models.test.succeeded)
+          : action ?? modelReasonLabel("provider_call_failed", commonT)}
       </strong>
       {result.latency_ms != null ? (
         <span>{t(($) => $.models.metrics.latency, { value: result.latency_ms })}</span>

@@ -564,6 +564,9 @@ def _load_cases() -> tuple[dict[str, object], ...]:
     ) as conn:
         _automation_schema_state(conn)
     cases = compose_security_lifecycle(str(market_path), str(profile_path))["cases"]
+    from src.lifecycle_investigation.retirement import cutover_active
+    if cutover_active(profile_path):
+        cases = [case for case in cases if case["source"] == "listing_authority"]
     hints = _load_local_identity_hints(
         market_path=market_path,
         profile_path=profile_path,

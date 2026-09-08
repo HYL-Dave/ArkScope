@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,6 +35,25 @@ class SecTransportFailure(RuntimeError):
         super().__init__(code)
         self.code = code
         self.status_code = status_code
+
+
+def validate_sec_identity(value: str) -> None:
+    if (not isinstance(value, str) or not value or value == DEFAULT_SEC_USER_AGENT
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            or _EMAIL_TOKEN.search(value) is None):
+        raise SecTransportFailure("sec_identity_unconfigured")
+
+
+@contextmanager
+def _checked_lock(lock, check):
+    check()
+    while not lock.acquire(timeout=0.05):
+        check()
+    try:
+        check()
+        yield
+    finally:
+        lock.release()
 
 
 @dataclass
@@ -136,7 +156,7 @@ class SecRequestGovernor:
         except ValueError as exc:
             raise SecTransportFailure("sec_governor_unavailable") from exc
 
-    def reserve_request_start(self) -> int:
+    def reserve_request_start(self, *, check: Callable[[], None] | None = None) -> int:
         try:
             import fcntl
         except ImportError as exc:
@@ -144,9 +164,18 @@ class SecRequestGovernor:
 
         try:
             self.lock_dir.mkdir(parents=True, exist_ok=True)
-            with self._process_lock:
+            with (self._process_lock if check is None else _checked_lock(self._process_lock, check)):
                 with self.state_path.open("a+", encoding="ascii") as handle:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                    if check is None:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                    else:
+                        while True:
+                            check()
+                            try:
+                                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                                break
+                            except BlockingIOError:
+                                time.sleep(0.05)
                     try:
                         handle.seek(0)
                         raw = handle.read()
@@ -160,7 +189,18 @@ class SecRequestGovernor:
                             raise SecTransportFailure("sec_governor_unavailable")
                         wait = max(0.0, (previous + self.interval_seconds) - now) if previous is not None else 0.0
                         if wait:
-                            self._sleep(wait)
+                            if check is None:
+                                self._sleep(wait)
+                            else:
+                                end = now + wait
+                                while True:
+                                    check()
+                                    remaining = end - float(self._clock())
+                                    if remaining <= 0:
+                                        break
+                                    self._sleep(min(0.05, remaining))
+                        if check is not None:
+                            check()
                         started = float(self._clock())
                         if started + 1e-6 < now + wait:
                             raise SecTransportFailure("sec_governor_unavailable")
@@ -219,12 +259,7 @@ class SecTransport:
         self._rate_limit_retries = 0
 
     def _validate_identity(self) -> None:
-        if (
-            not self.user_agent
-            or self.user_agent == DEFAULT_SEC_USER_AGENT
-            or _EMAIL_TOKEN.search(self.user_agent) is None
-        ):
-            raise SecTransportFailure("sec_identity_unconfigured")
+        validate_sec_identity(self.user_agent)
 
     @staticmethod
     def _validate_url(url: str) -> None:

@@ -7,12 +7,13 @@ seed models and a custom model-id escape hatch.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
 Provider = Literal["anthropic", "openai"]
-TaskId = Literal["card_synthesis", "card_translation", "ai_research"]
+TaskId = Literal["card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"]
+TASK_IDS: tuple[TaskId, ...] = get_args(TaskId)
 RouteSource = Literal["env", "db", "profile", "default"]
 EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 TaskRouteEffortId = Literal["low", "medium", "high", "xhigh", "max"]
@@ -58,6 +59,12 @@ class TaskInfo(BaseModel):
     description: str
     default_provider: Provider
     recommended_model: str
+    supports_custom_models: bool = True
+
+
+class ModelRouteUnavailable(ValueError):
+    def __init__(self):
+        super().__init__("model_route_unavailable")
 
 
 class TaskRoute(BaseModel):
@@ -113,6 +120,14 @@ TASKS: list[TaskInfo] = [
         description="The interactive AI 研究 surface.",
         default_provider="openai",
         recommended_model="gpt-5.6-luna",
+    ),
+    TaskInfo(
+        id="lifecycle_investigation",
+        label="Lifecycle Investigation",
+        description="Establish the tracked security's trading status, symbol continuity, and effective timing.",
+        default_provider="anthropic",
+        recommended_model="claude-sonnet-5",
+        supports_custom_models=False,
     ),
 ]
 
@@ -335,6 +350,13 @@ def task_route_admission_detail(
         return execution_detail
     if capability is not None and capability.task_route_status == "retired":
         return {"code": "model_retired", "field": "model"}
+    if task == "lifecycle_investigation":
+        from src.model_effective import task_capability_ok
+
+        if capability is None:
+            return {"code": "model_not_in_registry", "field": "model"}
+        if not task_capability_ok(task, capability):
+            return {"code": "task_capability_missing", "field": "model"}
     if not effort.strip() or effort in ("default", "none"):
         return {"code": "effort_required", "field": "effort"}
     if provider not in EFFORT_OPTIONS:

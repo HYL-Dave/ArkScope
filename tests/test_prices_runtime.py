@@ -30,6 +30,8 @@ def test_prices_worker_requires_tickers_without_source_selector():
     parsed = worker.parse_args(["--tickers", "AAPL,MSFT"])
     assert parsed.tickers == "AAPL,MSFT"
     assert parsed.provider == "ibkr"
+    assert parsed.lookback_days == 15
+    assert worker.parse_args(["--tickers", "AAPL", "--lookback-days", "30"]).lookback_days == 30
     assert not hasattr(parsed, "source")
 
     with pytest.raises(SystemExit) as retired:

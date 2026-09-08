@@ -679,18 +679,18 @@ class ToolRegistry:
 
     def _register_security_lifecycle_tools(self) -> None:
         from .security_lifecycle_tools import (
-            get_security_lifecycle_case,
-            list_security_lifecycle_cases,
+            get_security_lifecycle_review,
+            list_security_lifecycle_reviews,
         )
 
         self.register(ToolDefinition(
-            name="list_security_lifecycle_cases",
+            name="list_security_lifecycle_reviews",
             description=(
-                "List local security-lifecycle cases and their current workflow state. "
-                "Reads local observation and investigation evidence only; performs no "
-                "provider request or write."
+                "List current tracking exceptions or their history, with actual collection "
+                "state, listing/continuation findings, missing checks and next actions. "
+                "Healthy listings are summarized. Performs no provider request or write."
             ),
-            function=list_security_lifecycle_cases,
+            function=list_security_lifecycle_reviews,
             category="analysis",
             requires_dal=False,
             parameters=[
@@ -701,47 +701,35 @@ class ToolRegistry:
                     required=False,
                 ),
                 ToolParameter(
-                    "workflow_state",
+                    "view",
                     "string",
-                    "Optional derived workflow-state filter.",
+                    "Attention or historical reviews (default attention).",
                     required=False,
-                    enum=[
-                        "unresolved",
-                        "investigating",
-                        "evidence_ready",
-                        "reviewed_inconclusive",
-                        "resolved",
-                    ],
-                ),
-                ToolParameter(
-                    "source_presence",
-                    "string",
-                    "Observation presence filter (default present).",
-                    required=False,
-                    default="present",
-                    enum=["present", "source_missing"],
+                    default="attention",
+                    enum=["attention", "history"],
                 ),
                 ToolParameter(
                     "limit",
                     "integer",
-                    "Maximum cases to return (1-200, default 50).",
+                    "Maximum reviews to return (1-200, default 50).",
                     required=False,
                     default=50,
                 ),
+                ToolParameter("offset", "integer", "Pagination offset (default 0).", required=False, default=0),
             ],
         ))
         self.register(ToolDefinition(
-            name="get_security_lifecycle_case",
+            name="get_security_lifecycle_review",
             description=(
-                "Read one local security-lifecycle case with source observation, "
-                "evidence, assessments, acknowledgements, and inert proposals. "
+                "Read one current review by review_id from the review list, including "
+                "source checks and current application state. Reading is not approval. "
                 "Performs no provider request or write."
             ),
-            function=get_security_lifecycle_case,
+            function=get_security_lifecycle_review,
             category="analysis",
             requires_dal=False,
             parameters=[
-                ToolParameter("case_id", "string", "Security-lifecycle case ID."),
+                ToolParameter("review_id", "string", "Security-lifecycle review ID from the review list."),
             ],
         ))
 

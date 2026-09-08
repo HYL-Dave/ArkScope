@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import hashlib
 import json
 from pathlib import Path
@@ -11,37 +11,36 @@ import re
 import sqlite3
 
 from src.security_lifecycle_provider_authority import (
-    PROVIDER_OBSERVATION_SOURCE, classify_provider_listing, evidence_dict, validate_provider_material, terminal_requires_attestation,
+    PROVIDER_OBSERVATION_SOURCE, classify_provider_listing, evidence_dict, validate_provider_material,
+)
+from src.security_lifecycle_provider_snapshot import (
+    canonical_json as _json, decode_snapshot, encode_snapshot, instant as _instant,
 )
 
 
-def _json(value):
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
-
-
-def _instant(value):
-    result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if result.tzinfo is None or result.utcoffset() is None:
-        raise ValueError("provider_snapshot_time")
-    return result.astimezone(timezone.utc)
-
-
-def _observation(payload, digest):
+def _observation(payload, result):
     ticker, at = payload["ticker"], payload["at"]
-    result = classify_provider_listing(ticker=ticker, evidence=payload["evidence"], today=_instant(at).date())
-    state = "unresolved" if payload["blockers"] else result.state
+    state = result.state
+    description = {
+        "terminal": "Listing sources confirm that the old listing stopped trading.",
+        "continuation": "A same-security ticker change needs review.",
+        "active": "Current listing sources confirm trading continues.",
+        "unresolved": "Listing status needs confirmation. Tracking has not been changed.",
+    }[state]
+    if state == "terminal":
+        description += {
+            "unavailable": " Continuation could not be checked; this does not prove that no successor exists.",
+            "candidate": " A replacement candidate needs confirmation: " + ", ".join(result.candidate_tickers) + ".",
+            "ambiguous": " Continuation evidence is ambiguous and needs review.",
+            "not_observed": " No continuation was observed in the retrieved timeline.",
+        }[result.continuation_state]
     return {
         "ticker": ticker, "cik": None, "issuer_name": ticker,
         "filing_date": _instant(at).date().isoformat(), "source": PROVIDER_OBSERVATION_SOURCE,
         "source_ref": f"listing:{ticker}", "filing_form": "LISTING_STATUS", "filing_items": [],
         "evidence_url": "https://massive.com/docs/rest/stocks/tickers/all-tickers",
-        "description": {
-            "terminal": "Listing sources confirm delisting; current trading and same-security continuation were checked.",
-            "continuation": "A same-security ticker change needs review.",
-            "active": "Current listing sources confirm trading continues.",
-            "unresolved": "Listing status needs confirmation. Tracking has not been changed.",
-        }[state],
-        "observed_at": at, "provider_snapshot_sha256": digest,
+        "description": description,
+        "observed_at": at,
         "kinds": [{"event_type": "listing_status_review", "effective_date": result.effective_date}],
     }
 
@@ -74,6 +73,7 @@ class ProviderCheckStore:
 
     @staticmethod
     def _prepare(*, ticker, at, evidence, diagnostics, blockers=()):
+        blockers = tuple(blockers)
         if not isinstance(ticker, str) or re.fullmatch(r"[A-Z][A-Z0-9. -]{0,15}", ticker) is None:
             raise ValueError("provider_snapshot_ticker")
         instant = _instant(at)
@@ -89,22 +89,16 @@ class ProviderCheckStore:
             raise ValueError("provider_snapshot_diagnostics")
         if any(not isinstance(code, str) or re.fullmatch(r"[a-z_]{1,80}", code) is None for code in blockers):
             raise ValueError("provider_snapshot_blockers")
-        result = classify_provider_listing(ticker=ticker, evidence=material, today=instant.date())
+        result = classify_provider_listing(ticker=ticker, evidence=material, today=instant.date(), provider_codes=blockers)
         payload = {"ticker": ticker, "at": at, "evidence": material, "diagnostics": dict(diagnostics),
-                   "blockers": sorted(set(blockers)), "state": "unresolved" if blockers else result.state}
-        digest = hashlib.sha256(_json(payload).encode()).hexdigest()
-        observation = _observation(payload, digest)
-        return (f"slpc_{digest}", ticker, at, _json(observation), _json(material), _json(diagnostics),
+                   "blockers": sorted(set(blockers)), "state": result.state}
+        digest, envelope = encode_snapshot(payload, _observation(payload, result))
+        return (f"slpc_{digest}", ticker, at, envelope, _json(material), _json(diagnostics),
                 _json(payload["blockers"]), payload["state"], digest, at)
 
     @staticmethod
     def _read(row):
-        payload = {"ticker": row["ticker"], "at": row["observed_at"], "evidence": json.loads(row["evidence_json"]),
-                   "diagnostics": json.loads(row["diagnostics_json"]), "blockers": json.loads(row["blockers_json"]), "state": row["state"]}
-        digest = hashlib.sha256(_json(payload).encode()).hexdigest()
-        if digest != row["content_sha256"] or _observation(payload, digest) != json.loads(row["observation_json"]):
-            raise ValueError("provider_snapshot_digest")
-        return {**payload, "digest": digest, "observation": json.loads(row["observation_json"])}
+        return decode_snapshot(row)
 
     def latest(self):
         with self._connection() as conn:
@@ -136,9 +130,8 @@ class ProviderCheckStore:
         if row is None or observation_fingerprint(row["observation"]) != observation_fingerprint(dict(case["observation"])):
             raise ValueError("provider_snapshot_changed")
         now = _instant(at)
-        result = classify_provider_listing(ticker=case["ticker"], evidence=row["evidence"], today=now.date())
-        incomplete = result.state == "unresolved" or bool(row["blockers"])
-        manual_review = terminal_requires_attestation(result) and set(row["blockers"]) <= {"massive_not_found"}
+        result = classify_provider_listing(ticker=case["ticker"], evidence=row["evidence"], today=now.date(), provider_codes=row["blockers"])
+        incomplete = result.state == "unresolved"
         facts = []
         for item in row["evidence"]:
             locator = item["source_locator"]
@@ -150,7 +143,7 @@ class ProviderCheckStore:
                                          len(item["excerpt"].encode()), item["content_sha256"], "provider_listing.exact_ticker", "1"))
         return LifecycleAutomationEvidenceBundle(
             evidence=tuple(row["evidence"]), facts=tuple(facts),
-            blockers=(AutomationBlocker("listing_status_unresolved", not manual_review, {"reasons": list(result.reasons), "provider_codes": row["blockers"], "manual_review_required": manual_review}),) if incomplete else (),
-            diagnostics=row["diagnostics"], retry_at=(now + timedelta(days=1)).isoformat() if incomplete and not manual_review else None,
+            blockers=(AutomationBlocker("listing_status_unresolved", True, {"reasons": list(result.reasons), "provider_codes": row["blockers"], "manual_review_required": False}),) if incomplete else (),
+            diagnostics=row["diagnostics"], retry_at=(now + timedelta(days=1)).isoformat() if incomplete else None,
             refreshed_source_families=("listing_authority",),
         )

@@ -67,8 +67,8 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `get_ticker_data_coverage` | analysis | ticker*, target_date? | local coverage diagnostics |
 | `get_economic_calendar` | analysis | country?, importance?, days_back?, days_forward?, as_of?, limit? | Finnhub economic calendar |
 | `get_macro_value` | analysis | series_id*, observation_date*, as_of? | point-in-time FRED value |
-| `list_security_lifecycle_cases` | analysis | ticker?, workflow_state?, source_presence?, limit? | provider-neutral local lifecycle case list |
-| `get_security_lifecycle_case` | analysis | case_id* | provider-neutral local lifecycle evidence and workflow detail |
+| `list_security_lifecycle_reviews` | analysis | ticker?, view?, limit?, offset? | current tracking exceptions or history, collection state and source checks |
+| `get_security_lifecycle_review` | analysis | review_id* | the operator's current review, including stored Web findings, exact quotations and model/auth provenance; reading never dispatches or grants action consent |
 | `get_portfolio_analysis` | portfolio | tickers?, holdings? | deterministic beta/correlation/P&L analysis |
 | `get_portfolio_holdings` | portfolio | account_id?, include_closed? | local holdings snapshot |
 | `get_sa_alpha_picks` | portfolio | status?, sector? | captured Alpha Picks portfolio |
@@ -121,6 +121,11 @@ its portable Python-analysis level does not imply terminal or workspace access.
 | future multi-step research | explicit spend and external-access approval |
 
 ### 1.4 Retire-adapt
+
+The former lifecycle case-list/detail functions remain internal compatibility
+reads for stored case/audit callers. Research advertises only the current-review
+pair above, using the same closed DTO as the operator API. Neither pair may
+dispatch providers or approve/apply a profile transition.
 
 The former ArkScope scoring, composite recommendation, offline RL, Phase D
 recommendation-shaped implementations, and Tavily search/fetch request surfaces

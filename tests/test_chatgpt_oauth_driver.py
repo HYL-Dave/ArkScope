@@ -404,6 +404,7 @@ def test_discover_keeps_reviewed_current_models_available_to_existing_task_route
         "card_synthesis",
         "card_translation",
         "ai_research",
+        "lifecycle_investigation",
     ]
 
 

@@ -128,6 +128,8 @@ vi.mock("../api", async (importOriginal) => {
     getMarketDataStatus: vi.fn(async () => EMPTY_MARKET_STATUS),
     listSecurityLifecycleCases: vi.fn(async () => CASES),
     getTradingDayCoverage: vi.fn(async () => COVERAGE),
+    getPriceRepairOperations: vi.fn(async () => ({ version: 1, operations: [], total: 0, offset: 0, has_more: false })),
+    getSchedule: vi.fn(async () => ({ sources: { ibkr_prices: { running: false } } })),
     getSecurityLifecycleAutomationStatus: vi.fn(async () => {
       if (controls.automationStatusError) {
         const error = controls.automationStatusError;
@@ -155,6 +157,7 @@ vi.mock("../api", async (importOriginal) => {
 
 import {
   getSecurityLifecycleAutomationStatus,
+  getTradingDayCoverage,
   runDueSecurityLifecycleAutomation,
   updateSecurityLifecycleAutomationConfig,
 } from "../api";
@@ -222,6 +225,16 @@ afterEach(() => {
 });
 
 describe("DataStorageSection lifecycle automation controls", () => {
+  it("opens the fifteen-day coverage window and preserves an explicit longer choice", async () => {
+    await renderSection("en");
+    expect(getTradingDayCoverage).toHaveBeenCalledWith(15, "15min");
+    const window = Array.from(host!.querySelectorAll<HTMLSelectElement>("select"))
+      .find((item) => Array.from(item.options).map((option) => option.value).join(",") === "10,15,30,60");
+    expect(window?.value).toBe("15");
+    await act(async () => { window!.value = "30"; window!.dispatchEvent(new Event("change", { bubbles: true })); });
+    await flush();
+    expect(getTradingDayCoverage).toHaveBeenLastCalledWith(30, "15min");
+  });
   it("reloads the complete schedule after each config save", async () => {
     controls.automationStatus = status({ current_progress: [] });
     vi.mocked(updateSecurityLifecycleAutomationConfig).mockImplementationOnce(async (config) => {

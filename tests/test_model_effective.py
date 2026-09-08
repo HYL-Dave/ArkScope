@@ -478,7 +478,7 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     for key in ("providers", "tasks", "models", "effort_options", "routes"):
         assert key in out
     assert set(out["effective"]["tasks"]) == {
-        "card_synthesis", "card_translation", "ai_research",
+        "card_synthesis", "card_translation", "ai_research", "lifecycle_investigation",
     }
     block = out["effective"]["tasks"]["ai_research"]
     assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)

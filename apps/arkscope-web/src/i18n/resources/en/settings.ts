@@ -87,7 +87,7 @@ const settings = {
       models: {
         title: "Model and Task Routing",
         description: "Choose the model, provider, and reasoning effort for each task.",
-        searchAliases: "model|models|task|routing|effort|reasoning|model route",
+        searchAliases: "model|models|task|routing|effort|reasoning|model route|lifecycle investigation|listing status|標的事件調查|改名|下市",
       },
       fixedTaskRuntime: {
         title: "Fixed AI Task Runtime Limits",
@@ -160,6 +160,10 @@ const settings = {
       aiResearch: {
         label: "AI Research",
         description: "Run multi-step AI research work.",
+      },
+      lifecycleInvestigation: {
+        label: "Lifecycle Investigation",
+        description: "Trading status, symbols, and effective dates.",
       },
     },
     route: {
@@ -244,6 +248,8 @@ const settings = {
     },
     test: {
       run: "Run live test",
+      connectionAndFormat: "Test connection and format",
+      connectionAndFormatSucceeded: "Connection and format check passed",
       running: "Running live test...",
       succeeded: "Live test passed",
       subscriptionQuota: "Uses subscription quota, not API billing.",
@@ -822,6 +828,23 @@ const settings = {
         skipped: "Backfill did not start because the scope changed or another collection is running.",
         unconfirmed: "The backfill outcome could not be confirmed. Check collection history before starting another request.",
         error: "The price backfill request could not be confirmed. Refresh coverage and collection status before retrying.",
+        historyTitle: "Saved backfills", refreshHistory: "Refresh backfill status", historyEmpty: "No saved backfills.",
+        historyReadError: "Repair history could not be read. Displayed records may be out of date.",
+        historyComplete: "Coverage complete", historyIncomplete: "Coverage incomplete", historyBlocked: "Scope changed", historyUnavailable: "Status unavailable",
+        historyWindow: "{{count}} tickers / {{days}}-day lookback as of {{date}}",
+        requestsSent: "Requests sent: {{count}} / {{total}}", responsesReceived: "Responses received: {{count}} / {{total}}", requestsUnanswered: "Without a recorded response: {{count}}",
+        remainingDays: "Missing ticker-days: {{missing}} / Partial ticker-days: {{partial}}",
+        unconfirmedRequests: "Request outcome unconfirmed. These requests will not be resent.",
+        responseIncomplete: "Saved responses do not cover the remaining gaps. A new request requires a new preview and confirmation.",
+        scopeChanged: "An original ticker is no longer active. This backfill cannot resume.",
+        coverageUnavailable: "Local coverage cannot currently be verified.", journalUnavailable: "The saved request record is unreadable or failed validation.",
+        collectionRunning: "IBKR price collection is running. New backfill requests are paused.",
+        collectionUnknown: "Collection activity could not be confirmed. Refresh status before starting a backfill.",
+        resume: "Resume backfill", resumeTitle: "Resume saved backfill", confirmResume: "Confirm resume",
+        resumeScope: "Continue the original {{days}}-day window through {{date}} for {{count}} tickers. Existing prices are not overwritten.",
+        cacheOnlyResume: "No new provider requests. Only already-saved responses will be applied to the remaining gaps.",
+        resumeBudget: "At most {{count}} new IBKR requests. Previously sent requests are not repeated. No other provider will be used.",
+        historyPage: "{{start}}-{{end}} of {{total}}", previousPage: "Newer backfills", nextPage: "Older backfills",
       },
       title: "Trading-day / Price Coverage",
       description: "Compares local observations with the expected 15-minute RTH grid; absent observations remain unknown without independent evidence.",

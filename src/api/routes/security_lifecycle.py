@@ -29,6 +29,7 @@ from src.card_synthesis import translate_text, translation_harness
 from src.content_translation_failures import classify_content_translation_failure
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.security_lifecycle_disposition import LIFECYCLE_QUEUE_BUCKETS
+from src.security_lifecycle_population import LifecyclePopulationUnavailable
 from src.security_lifecycle_sec_admission import SEC_ADMISSION_STATES
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable,
@@ -636,6 +637,36 @@ def run_case_automation(
         raise _not_found(exc) from None
     except (LifecycleWritesUnavailable, ValueError) as exc:
         raise _invalid(exc) from None
+
+
+@router.get("/reviews")
+def list_current_reviews(
+    view: Literal["attention", "history"] = Query(default="attention"),
+    ticker: str | None = Query(default=None),
+    case_id: str | None = Query(default=None, min_length=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    service: SecurityLifecycleReadService = Depends(get_security_lifecycle_read_service),
+):
+    try:
+        return service.list_current_reviews(at=_utc_now(), view=view, ticker=ticker, case_id=case_id, limit=limit, offset=offset)
+    except LifecyclePopulationUnavailable:
+        raise HTTPException(status_code=503, detail={"code": "lifecycle_current_unavailable"}) from None
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "current_review_filter"}) from None
+
+
+@router.get("/reviews/{review_id}")
+def get_current_review(
+    review_id: str,
+    service: SecurityLifecycleReadService = Depends(get_security_lifecycle_read_service),
+):
+    try:
+        return service.get_current_review(review_id, at=_utc_now())
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "current_review_not_found"}) from None
+    except LifecyclePopulationUnavailable:
+        raise HTTPException(status_code=503, detail={"code": "lifecycle_current_unavailable"}) from None
 
 
 @router.get("/cases")

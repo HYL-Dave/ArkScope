@@ -185,8 +185,8 @@ class TestAnthropicToolSchemas:
             "get_economic_calendar",
             "get_macro_value",
             "get_sa_digest",
-            "get_security_lifecycle_case",
-            "list_security_lifecycle_cases",
+            "get_security_lifecycle_review",
+            "list_security_lifecycle_reviews",
         }
         assert tool_names == expected
         assert {"get_iv_analysis", "get_iv_history_data", "scan_mispricing"}.isdisjoint(

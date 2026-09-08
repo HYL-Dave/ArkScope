@@ -74,23 +74,31 @@ def test_active_control_and_unknown_are_not_both_called_delisted():
     assert classify(missing).state == "unresolved"
 
 
-def test_same_figi_ticker_event_prevents_terminal_and_requires_active_successor():
+def test_same_figi_ticker_event_requires_active_successor_before_continuation():
     timeline = (("OLD", "NEW", "2026-06-22"),)
-    assert classify(event_rows=timeline).state == "unresolved"
+    unconfirmed = classify(event_rows=timeline)
+    assert unconfirmed.state == "terminal"
+    assert unconfirmed.continuation_state == "candidate"
+    assert unconfirmed.successor_ticker is None
     rows = (*terminal_records(), record("massive_reference", "active", ticker="NEW", figi=FIGI))
     result = classify(rows, timeline)
     assert result.state == "continuation"
     assert result.successor_ticker == "NEW"
     bad = (*terminal_records(), record("massive_reference", "active", ticker="NEW", figi="BBG00HC114X0"))
-    assert classify(bad, timeline).state == "unresolved"
+    conflict = classify(bad, timeline)
+    assert conflict.continuation_state == "ambiguous"
+    assert conflict.successor_ticker is None
 
 
 def test_unavailable_event_check_is_not_evidence_of_no_successor():
     from src.security_lifecycle_provider_authority import classify_provider_listing
 
     result = classify_provider_listing(ticker="OLD", evidence=tuple(_evidence(row) for row in terminal_records()), today=date(2026, 9, 5))
-    assert result.state == "unresolved"
-    assert "successor_check_unavailable" in result.reasons
+    assert result.state == "terminal"
+    assert result.continuation_state == "unavailable"
+    assert result.successor_ticker is None
+    assert result.listing_reasons == ()
+    assert result.continuation_reasons == ("successor_check_unavailable",)
 
 
 @pytest.mark.parametrize("field,value", [

@@ -86,6 +86,21 @@ def test_empty_or_changed_universe_does_not_infer_terminal_from_absence(tmp_path
     assert store.latest() == before
 
 
+def test_explicit_recheck_of_removed_symbol_is_not_lost_from_the_universe_filter(tmp_path):
+    from src.security_lifecycle_provider_scan import refresh_provider_checks
+    from src.security_lifecycle_provider_store import ProviderCheckStore
+    profile = tmp_path / "profile.db"
+    with sqlite3.connect(profile) as conn:
+        create_profile_schema(conn)
+    store = ProviderCheckStore(profile)
+    store.record(ticker="OLD", at=NOW, evidence=tuple(_evidence(row) for row in terminal_records()), diagnostics={})
+    provider = Provider()
+    result = refresh_provider_checks(store, tickers=("LIVE",), target_ticker="OLD", at=NOW, provider=provider)
+    assert result["exact_ticker"] == "OLD"
+    assert provider.exact_calls == ["OLD"]
+    assert provider.directory_calls == [("LIVE", "OLD")]
+
+
 @pytest.mark.parametrize("configured", (True, False))
 def test_runtime_scan_uses_only_the_selected_profile_credentials(tmp_path, monkeypatch, configured):
     from src.data_provider_config import DataProviderConfigStore
@@ -129,9 +144,16 @@ def test_owned_transport_construction_and_close_do_not_require_a_provider_call(m
     assert all(session.closed and not session.calls for session in sessions)
 
 
-@pytest.mark.parametrize("scenario,expected,count", [("terminal", "terminal", 4), ("rename", "continuation", 5),
-                                                     ("404", "unresolved", 4), ("429", "unresolved", 4), ("otc", "unresolved", 2)])
-def test_real_http_parsers_and_scan_obey_one_attempt_pacing_and_terminal_vetoes(scenario, expected, count):
+@pytest.mark.parametrize("scenario,expected,count,expected_code", [
+    ("terminal", "terminal", 4, None), ("rename", "continuation", 5, None),
+    ("404", "terminal", 4, "massive_timeline_not_found"),
+    ("429", "terminal", 4, "massive_timeline_rate_limited"),
+    ("required404", "unresolved", 1, "massive_not_found"),
+    ("required429", "unresolved", 3, "massive_rate_limited"),
+    ("successor404", "terminal", 5, "massive_successor_not_found"),
+    ("otc", "unresolved", 2, None),
+])
+def test_real_http_parsers_and_scan_obey_one_attempt_pacing_and_terminal_vetoes(scenario, expected, count, expected_code):
     from tests.test_lifecycle_provider_census_transport import FakeSession, FakeResponse, json_response, event_fixture
     from tests.test_security_lifecycle_listing_evidence import _fixture
     from data_sources.listing_authority_transport import ListingAuthorityTransport
@@ -150,9 +172,13 @@ def test_real_http_parsers_and_scan_obey_one_attempt_pacing_and_terminal_vetoes(
     listing_responses = [json_response(empty), json_response(listing("OLD", True, "otc") if scenario == "otc" else empty)]
     if scenario != "otc":
         listing_responses.append(json_response(listing("OLD", False)))
-    if scenario == "rename":
-        listing_responses.append(json_response(listing("NEW", True)))
-    timeline = event_fixture("OLD", "NEW") if scenario == "rename" else {
+    if scenario in {"rename", "successor404"}:
+        listing_responses.append(json_response(listing("NEW", True), status_code=404 if scenario == "successor404" else 200))
+    if scenario == "required404":
+        listing_responses = [json_response({}, status_code=404)]
+    elif scenario == "required429":
+        listing_responses[-1] = json_response({}, status_code=429)
+    timeline = event_fixture("OLD", "NEW") if scenario in {"rename", "successor404"} else {
         "status": "OK", "results": {"events": [{"type": "ticker_change", "date": "2020-01-01", "ticker_change": {"ticker": "OLD"}}]}}
     http_listing = FakeSession(directory_responses + listing_responses)
     http_events = FakeSession([json_response([]), json_response([{"Code": "OLD", "Exchange": "NYSE", "Country": "USA", "Type": "Common Stock"}]),
@@ -167,12 +193,16 @@ def test_real_http_parsers_and_scan_obey_one_attempt_pacing_and_terminal_vetoes(
     directories, directory_codes = scanner.directories(("OLD", "UNREPORTED"))
     material, codes = scanner.exact("OLD")
     assert directory_codes == ()
-    result = classify_provider_listing(ticker="OLD", evidence=directories["OLD"] + material, today=date(2026, 9, 5))
+    result = classify_provider_listing(ticker="OLD", evidence=directories["OLD"] + material, today=date(2026, 9, 5), provider_codes=codes)
     assert result.state == expected, result
     assert len(http_listing.calls) + len(http_events.calls) == count + 4
     assert scanner.diagnostics() == {"massive_requests": count, "nasdaq_requests": 2, "eodhd_requests": 2}
     assert sleeps == [12.5] * (count - 1)
-    assert codes == ((f"massive_{'not_found' if scenario == '404' else 'rate_limited'}",) if scenario in {"404", "429"} else ())
+    assert codes == ((expected_code,) if expected_code else ())
+    if scenario == "successor404":
+        assert result.continuation_state == "unavailable"
+        assert result.candidate_tickers == ("NEW",)
+        assert result.successor_ticker is None
     eodhd = next(row for row in directories["OLD"] if row.adapter == "eodhd_symbol_directory")
     assert "delisted=1" in eodhd.source_url
     scanner.close()

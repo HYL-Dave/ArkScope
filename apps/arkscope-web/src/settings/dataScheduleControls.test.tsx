@@ -14,6 +14,11 @@ import {
   type ScheduleRunResult,
   type ScheduleSourceState,
 } from "../api";
+import {
+  DataScheduleControlsProvider,
+  DataScheduleTable,
+  useSharedDataScheduleControls,
+} from "./dataScheduleControls";
 import { createSettingsReadCache, type SettingsReadCache } from "./settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
@@ -111,11 +116,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-async function controlsModule() {
-  const path = "./dataScheduleControls";
-  return import(/* @vite-ignore */ path);
-}
-
 async function settle(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -140,11 +140,6 @@ async function renderControls({
   scopes?: Array<"macro" | "non_macro">;
   externalBusy?: boolean;
 } = {}): Promise<Harness> {
-  const {
-    DataScheduleControlsProvider,
-    DataScheduleTable,
-    useSharedDataScheduleControls,
-  } = await controlsModule();
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -169,9 +164,11 @@ async function renderControls({
   await act(async () => {
     root.render(React.createElement(
       DataScheduleControlsProvider,
-      { settingsReadCache: cache },
-      ...Array.from({ length: consumers }, (_, index) =>
-        React.createElement(Consumer, { key: index, index })),
+      {
+        settingsReadCache: cache,
+        children: Array.from({ length: consumers }, (_, index) =>
+          React.createElement(Consumer, { key: index, index })),
+      },
     ));
   });
   await settle();
@@ -252,7 +249,6 @@ afterEach(() => {
 
 describe("Data schedule controls", () => {
   it("shares one schedule read across visible consumers", async () => {
-    await controlsModule();
     vi.useFakeTimers();
     const harness = await renderControls({ consumers: 2 });
     const dataSourcesOwner = readFileSync("src/settings/DataSourcesSection.tsx", "utf8");

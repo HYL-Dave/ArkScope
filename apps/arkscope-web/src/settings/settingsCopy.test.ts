@@ -211,10 +211,10 @@ describe("Settings static copy authority", () => {
   });
 
   it("maps every model task without backend labels", () => {
-    const tasks: ModelTask[] = ["card_synthesis", "card_translation", "ai_research"];
+    const tasks: ModelTask[] = ["card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"];
     const cases = [
-      { locale: "zh-Hant" as const, labels: ["AI 卡片生成", "內容翻譯", "AI 研究"] },
-      { locale: "en" as const, labels: ["AI Card Synthesis", "Content Translation", "AI Research"] },
+      { locale: "zh-Hant" as const, labels: ["AI 卡片生成", "內容翻譯", "AI 研究", "標的事件調查"] },
+      { locale: "en" as const, labels: ["AI Card Synthesis", "Content Translation", "AI Research", "Lifecycle Investigation"] },
     ];
 
     for (const expected of cases) {

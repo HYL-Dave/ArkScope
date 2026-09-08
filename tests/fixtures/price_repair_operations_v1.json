@@ -1,0 +1,53 @@
+{
+  "pending": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "incomplete", "reason": null,
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 0, "received": 0, "unanswered": 0},
+    "coverage": {"remaining_tickers": ["FORMER"], "missing_ticker_days": 11, "partial_ticker_days": 0},
+    "resume": {"available": true, "request_limit": 2}
+  },
+  "cached": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "incomplete", "reason": null,
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 2, "received": 2, "unanswered": 0},
+    "coverage": {"remaining_tickers": ["FORMER"], "missing_ticker_days": 11, "partial_ticker_days": 0},
+    "resume": {"available": true, "request_limit": 0}
+  },
+  "complete": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "complete", "reason": null,
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 2, "received": 2, "unanswered": 0},
+    "coverage": {"remaining_tickers": [], "missing_ticker_days": 0, "partial_ticker_days": 0},
+    "resume": {"available": false, "request_limit": 0}
+  },
+  "empty_response": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "incomplete", "reason": "response_incomplete",
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 2, "received": 2, "unanswered": 0},
+    "coverage": {"remaining_tickers": ["FORMER"], "missing_ticker_days": 11, "partial_ticker_days": 0},
+    "resume": {"available": false, "request_limit": 0}
+  },
+  "unanswered": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "incomplete", "reason": "unconfirmed_requests",
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 1, "received": 0, "unanswered": 1},
+    "coverage": {"remaining_tickers": ["FORMER"], "missing_ticker_days": 11, "partial_ticker_days": 0},
+    "resume": {"available": false, "request_limit": 0}
+  },
+  "scope_changed": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "blocked", "reason": "scope_changed",
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 0, "received": 0, "unanswered": 0},
+    "coverage": null, "resume": {"available": false, "request_limit": 0}
+  },
+  "journal_unavailable": {
+    "repair_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "state": "unavailable", "reason": "journal_unavailable",
+    "scope": null, "requests": null, "coverage": null, "resume": {"available": false, "request_limit": 0}
+  },
+  "coverage_unavailable": {
+    "repair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "unavailable", "reason": "coverage_unavailable",
+    "scope": {"tickers": ["FORMER"], "provider": "ibkr", "interval": "15min", "as_of_date": "2026-09-05", "lookback_days": 15},
+    "requests": {"planned": 2, "dispatched": 0, "received": 0, "unanswered": 0},
+    "coverage": null, "resume": {"available": false, "request_limit": 0}
+  }
+}

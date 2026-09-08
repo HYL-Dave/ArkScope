@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from src.env_keys import ensure_env_loaded
 from src.model_routing import (
+    ModelRouteUnavailable,
     Provider,
     TaskId,
     TaskRoute,
@@ -60,6 +61,10 @@ class AgentConfig(BaseModel):
     ai_research_provider: str = "openai"
     ai_research_model: str = "gpt-5.6-luna"
     ai_research_effort: str = "xhigh"
+
+    lifecycle_investigation_provider: str = "anthropic"
+    lifecycle_investigation_model: str = "claude-sonnet-5"
+    lifecycle_investigation_effort: str = "high"
 
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
@@ -287,6 +292,12 @@ def get_agent_config() -> AgentConfig:
         config.ai_research_model = llm_prefs["ai_research_model"]
     if "ai_research_effort" in llm_prefs:
         config.ai_research_effort = llm_prefs["ai_research_effort"]
+    if "lifecycle_investigation_provider" in llm_prefs:
+        config.lifecycle_investigation_provider = llm_prefs["lifecycle_investigation_provider"]
+    if "lifecycle_investigation_model" in llm_prefs:
+        config.lifecycle_investigation_model = llm_prefs["lifecycle_investigation_model"]
+    if "lifecycle_investigation_effort" in llm_prefs:
+        config.lifecycle_investigation_effort = llm_prefs["lifecycle_investigation_effort"]
     if "reasoning_effort" in llm_prefs:
         config.reasoning_effort = llm_prefs["reasoning_effort"]
     if "max_tool_calls" in llm_prefs:
@@ -391,6 +402,7 @@ _BUILTIN_TASK_DEFAULTS = {
     "card_synthesis": ("anthropic", "claude-opus-5", "high"),
     "card_translation": ("anthropic", "claude-sonnet-5", "medium"),
     "ai_research": ("openai", "gpt-5.6-luna", "xhigh"),
+    "lifecycle_investigation": ("anthropic", "claude-sonnet-5", "high"),
 }
 _TASK_ENV = {
     "card_synthesis": (
@@ -407,6 +419,11 @@ _TASK_ENV = {
         "ARKSCOPE_AI_RESEARCH_PROVIDER",
         "ARKSCOPE_AI_RESEARCH_MODEL",
         "ARKSCOPE_AI_RESEARCH_EFFORT",
+    ),
+    "lifecycle_investigation": (
+        "ARKSCOPE_LIFECYCLE_INVESTIGATION_PROVIDER",
+        "ARKSCOPE_LIFECYCLE_INVESTIGATION_MODEL",
+        "ARKSCOPE_LIFECYCLE_INVESTIGATION_EFFORT",
     ),
 }
 _TASK_PROFILE_FIELDS = {
@@ -443,6 +460,12 @@ def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str
             config.ai_research_model,
             config.ai_research_effort,
         )
+    if task == "lifecycle_investigation":
+        return (
+            config.lifecycle_investigation_provider,
+            config.lifecycle_investigation_model,
+            config.lifecycle_investigation_effort,
+        )
     raise ValueError(f"unknown task: {task}")
 
 
@@ -456,12 +479,14 @@ def _default_route_store():
 
 def _db_route(task: str, route_store):
     """The app-managed route for ``task`` from the profile DB (a single atomic row),
-    or None to fall back to yaml/default. Never raises into resolution: a DB error
-    logs and degrades to the file/env authority (CONFIG_AUTHORITY_PLAN §3 gate 3)."""
+    or None if no route was saved. Older tasks retain their legacy DB-error
+    fallback; Lifecycle Investigation must not change billing on a read error."""
     try:
         store = route_store if route_store is not None else _default_route_store()
         return store.get(task)
-    except Exception:  # pragma: no cover - defensive fallback
+    except Exception:
+        if task == "lifecycle_investigation":
+            raise ModelRouteUnavailable() from None
         logger.warning("model_route DB read failed for task %r; using yaml/default", task, exc_info=True)
         return None
 

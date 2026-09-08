@@ -102,7 +102,7 @@ def _visibility_matches(requested_model: str, discovered_model: str) -> bool:
 def _auth_veto(task: str, provider: str, auth_mode: str) -> str | None:
     if auth_mode == "api_key_pool":
         return "task_test_unsupported"
-    if task in _CARD_TASKS:
+    if task in _CARD_TASKS or task == "lifecycle_investigation":
         if auth_mode == "api_key":
             return None
         if provider == "openai" and auth_mode == "chatgpt_oauth":
@@ -345,6 +345,17 @@ async def dispatch_task_model_test(
         )
 
     capability = capability_for(model)
+    if task == "lifecycle_investigation":
+        from src.model_routing import task_route_admission_detail
+
+        detail = task_route_admission_detail(
+            provider, model, effort, task=task, auth_mode=active.auth_mode,
+        )
+        if detail is not None:
+            return _result(
+                task=task, provider=provider, model=model, effort=effort,
+                active=active, status="unsupported", error_code=detail["code"],
+            )
     inferred_provider = model_provider(model)
     if inferred_provider is not None and inferred_provider != provider:
         return _result(
@@ -427,6 +438,12 @@ async def dispatch_task_model_test(
             active=active, status="unsupported", error_code="model_not_visible",
         )
 
+    if task == "lifecycle_investigation":
+        return await _run_lifecycle_canary(
+            task=task, provider=provider, model=model, effort=effort,
+            active=active, store=store, token_store=token_store, timeout_s=timeout_s,
+        )
+
     if active.auth_mode == "api_key":
         raw = test_model(
             provider,
@@ -474,3 +491,57 @@ async def dispatch_task_model_test(
         token_store=token_store,
         timeout_s=timeout_s,
     )
+
+
+async def _run_lifecycle_canary(
+    *, task: str, provider: str, model: str, effort: str, active: Any,
+    store: Any, token_store: Any, timeout_s: float,
+) -> TaskModelTestResult:
+    """A schema check, not an investigation; reuse the selected task transport."""
+    from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
+    from src.auth_drivers.lifecycle_web_models import (
+        ModelCall, WebModelError, resolve_web_credential, validate_output,
+    )
+    from src.security_lifecycle_web_contract import RunControl, validate_selection
+
+    started = time.perf_counter()
+    try:
+        selection = validate_selection(provider, active.auth_mode, model, active.credential_id)
+        credential = resolve_web_credential(selection, store=store, token_store=token_store)
+        capability = capability_for(model)
+        schema = {
+            "type": "object", "additionalProperties": False,
+            "properties": {"ok": {"type": "boolean"}}, "required": ["ok"],
+        }
+        call = ModelCall(
+            selection=selection, call_id="connection-check", phase="analysis",
+            prompt="Return the requested object with ok=true. Do not search or use tools.",
+            output_schema=schema, effort=effort,
+            output_token_limit=(
+                min(8192, capability.max_output) if active.auth_mode == "api_key" and capability.max_output else None
+            ),
+            max_search_uses=1, timeout_seconds=timeout_s,
+        )
+        control = RunControl(selection=selection, max_model_requests=1)
+        reply = await call_lifecycle_web_model(call, credential, control)
+        validate_output(reply.output, schema)
+        if (reply.output.get("ok") is not True
+                or control.model_requests != 1
+                or control.terminal_statuses != {call.call_id: "completed"}
+                or any(control.observed_web_actions.values())):
+            raise WebModelError("model_result_incomplete")
+        return _result(
+            task=task, provider=provider, model=model, effort=effort,
+            active=active, status="ok", latency_ms=round((time.perf_counter() - started) * 1000),
+        )
+    except Exception as exc:  # noqa: BLE001 - no fallback or provider text in the response
+        code = getattr(exc, "code", None)
+        public_code = code if code in {
+            "reauth_required", "context_window_exceeded", "timeout", "version_incompatible",
+            "protocol_incompatible", "subscription_usage_unavailable",
+        } else "provider_call_failed"
+        return _result(
+            task=task, provider=provider, model=model, effort=effort,
+            active=active, status="error", error_code=public_code,
+            latency_ms=round((time.perf_counter() - started) * 1000),
+        )

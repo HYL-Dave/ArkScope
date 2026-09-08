@@ -210,8 +210,8 @@ class TestRegistry:
             "get_fundamentals_analysis", "get_sec_filings",
             "get_watchlist_overview", "get_morning_brief",
             "get_portfolio_holdings",
-            "get_security_lifecycle_case",
-            "list_security_lifecycle_cases",
+            "get_security_lifecycle_review",
+            "list_security_lifecycle_reviews",
         }
         retired = {"get_iv_analysis", "get_iv_history_data", "scan_mispricing"}
         assert expected <= set(names)

@@ -96,7 +96,7 @@ class TickerIdentityService:
                 raise TickerIdentityStoreUnavailable(reason="profile_store_missing")
             mode = "rw" if write else "ro"
             conn = sqlite3.connect(
-                f"file:{path.resolve()}?mode={mode}",
+                f"{path.resolve().as_uri()}?mode={mode}",
                 uri=True,
                 timeout=10.0,
                 check_same_thread=False,
@@ -188,6 +188,26 @@ class TickerIdentityService:
                 options=options,
             )
 
+    def _review_step(self, step: str) -> None:
+        """Fault-injection boundary; no production side effect."""
+
+    def prepare_review(self, case_id: str, *, assessment_id: str, options: TransitionOptions) -> dict:
+        from src.security_lifecycle_review import prepare
+
+        return prepare(self, case_id, assessment_id=assessment_id, options=options)
+
+    def confirm_review(self, case_id: str, *, assessment_id: str, packet_sha256: str,
+                       action: str, options: TransitionOptions, before_write: Callable[[], None]) -> dict:
+        from src.security_lifecycle_review import confirm
+
+        return confirm(self, case_id, assessment_id=assessment_id, packet_sha256=packet_sha256,
+                       action=action, options=options, before_write=before_write)
+
+    def get_review_confirmation(self, transition_id: str) -> dict:
+        from src.security_lifecycle_review import _result
+
+        return _result(self, transition_id)
+
     def list_due_transitions(
         self,
         *,
@@ -209,10 +229,23 @@ class TickerIdentityService:
         unacknowledged_only: bool = False,
     ) -> dict:
         with self._profile_connection(write=False) as conn:
-            return self._store(conn).list_activity(
+            conn.execute("BEGIN")
+            store = self._store(conn)
+            result = store.list_activity(
                 limit=limit,
                 unacknowledged_only=unacknowledged_only,
             )
+            readiness_by_transition = {}
+            for item in result["items"]:
+                transition_id = item["transition_id"]
+                if transition_id not in readiness_by_transition:
+                    readiness = {"reversible": False, "block_reasons": []}
+                    if store.get(transition_id)["status"] == "applied":
+                        current = store.reverse_readiness(transition_id)
+                        readiness = {key: current[key] for key in ("reversible", "block_reasons")}
+                    readiness_by_transition[transition_id] = readiness
+                item["reverse_readiness"] = readiness_by_transition[transition_id]
+            return result
 
     def acknowledge_transition_activity(
         self,
@@ -342,6 +375,13 @@ class TickerIdentityService:
         with self._profile_connection(write=True) as conn:
             store = self._store(conn)
             transition = store.get(transition_id)
+            if "review_confirmation" in transition["approved_preview"]:
+                if preview_sha256 != transition["approved_preview_sha256"]:
+                    raise TickerIdentityConflict("transition_preview_changed")
+                from src.security_lifecycle_review import execute
+
+                result = execute(self, transition_id, before_write=before_write, trigger=trigger)
+                return {**result, "transition": store.get(transition_id)}
             if transition["status"] not in {"approved", "applied"}:
                 raise ValueError("transition_not_retryable")
             if preview_sha256 != transition["approved_preview_sha256"]:

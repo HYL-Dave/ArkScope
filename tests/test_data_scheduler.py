@@ -2562,6 +2562,7 @@ def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
         parsed = prices_runtime.parse_args(argv[3:])
         assert parsed.provider == "ibkr"
         assert parsed.tickers == "AAPL,NVDA"
+        assert parsed.lookback_days == 15
         assert "--source" not in argv
         return {
             "returncode": 0,
@@ -2621,9 +2622,18 @@ def test_price_repair_rechecks_membership_after_waiting_for_gateway(monkeypatch)
 
 @pytest.mark.parametrize("remaining", [[], ["AAPL"]])
 @pytest.mark.parametrize("calendar_available", [True, False])
-def test_price_repair_verifies_the_approved_window_and_persists_its_identity(monkeypatch, remaining, calendar_available):
+def test_price_repair_verifies_the_approved_window_and_persists_its_identity(monkeypatch, tmp_path, remaining, calendar_available):
+    from src import price_repair_execution as execution
     from src.market_coverage.models import CalendarHealth, ObservationHealth
     from src.market_coverage.service import TradingDayCoverageService
+    from tests.test_price_coverage_repair import coverage as repair_fixture
+    initial = repair_fixture(tickers=("AAPL",))
+    initial.lookback_days = 30
+    initial.generated_at_et = "2026-08-31T09:00:00-04:00"
+    plan = execution.build_repair_plan(initial, tmp_path / "market_data.db")
+    repair_id = "b" * 32
+    journal = execution.RepairJournal(execution.repair_directory(tmp_path / "market_data.db", repair_id), plan)
+    journal.close()
     store = _install_recording_job_store(monkeypatch)
     clocks = []
     def verified(self, **kwargs):
@@ -2639,7 +2649,9 @@ def test_price_repair_verifies_the_approved_window_and_persists_its_identity(mon
         assert args.lookback_days == 30
         assert str(args.as_of_date) == "2026-08-31"
         assert args.tickers == "AAPL"
-        return {"returncode": 0, "payload": _scheduled_price_payload()}
+        return {"returncode": 0, "payload": {**_scheduled_price_payload(), "repair_execution": {
+            "plan_sha256": plan["plan_sha256"], "request_budget": plan["request_budget"],
+            "requests_total": 0, "requests_this_execution": 0, "retry": False, "fallback": False}}}
     monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", worker)
     result = ds.run_source("ibkr_prices", "api", tickers=["AAPL"], price_lookback_days=30,
                            price_as_of_date="2026-08-31", price_repair_id="b" * 32)
@@ -2647,6 +2659,54 @@ def test_price_repair_verifies_the_approved_window_and_persists_its_identity(mon
     assert str(clocks[0].date()) == "2026-08-31"
     assert ds._state_store().get("ibkr_prices")["last_result"]["price_repair_id"] == "b" * 32
     assert store.finished[-1][1]["status"] == ("failed" if remaining or not calendar_available else "succeeded")
+
+
+@pytest.mark.parametrize("error_code", ("price_repair_integrity", "price_repair_not_prepared", "price_repair_plan_changed"))
+def test_bounded_price_repair_failure_reason_survives_job_and_scheduler_recording(monkeypatch, error_code):
+    from src.price_repair_execution import PriceRepairError
+    store = _install_recording_job_store(monkeypatch)
+    payload = ds._parse_sanitized_prices_worker_stdout(json.dumps(prices_runtime.sanitize_error(PriceRepairError(error_code))))
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", lambda argv: {"returncode": 1, "payload": payload})
+    result = ds.run_source("ibkr_prices", "api", tickers=["AAPL"], price_lookback_days=15,
+                           price_as_of_date="2026-09-05", price_repair_id="d" * 32)
+    assert result["error"] == error_code
+    assert ds._state_store().get("ibkr_prices")["last_error"] == error_code
+    assert store.finished[-1][1]["error"] == error_code
+
+
+@pytest.mark.parametrize("changed", (False, True))
+def test_scheduler_repair_readback_is_bound_to_prepared_clock_and_measured_plan(monkeypatch, tmp_path, changed):
+    from src import price_repair_execution as execution
+    from src.market_coverage.models import CalendarHealth, ObservationHealth
+    from src.market_coverage.service import TradingDayCoverageService
+    from tests.test_price_coverage_repair import coverage
+    source = coverage(tickers=("AAPL",))
+    source.generated_at_et = "2026-09-04T11:00:00-04:00"
+    plan = execution.build_repair_plan(source, tmp_path / "market_data.db")
+    repair_id = "e" * 32
+    journal = execution.RepairJournal(execution.repair_directory(tmp_path / "market_data.db", repair_id), plan)
+    journal.close()
+    clocks = []
+    def verified(self, **kwargs):
+        clocks.append(self._clock())
+        return SimpleNamespace(history_gaps=[], observation_health=SimpleNamespace(status=ObservationHealth.OK),
+                               calendar_health=SimpleNamespace(status=CalendarHealth.OK), days=[])
+    monkeypatch.setattr(TradingDayCoverageService, "get_coverage", verified)
+    report = {"plan_sha256": "f" * 64 if changed else plan["plan_sha256"], "request_budget": plan["request_budget"],
+              "requests_total": 0, "requests_this_execution": 0, "retry": False, "fallback": False}
+    def worker(argv):
+        assert prices_runtime.parse_args(argv[3:]).repair_id == repair_id
+        return {"returncode": 0, "payload": {**_scheduled_price_payload(scanned=1), "repair_execution": report}}
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", worker)
+    result = ds.run_source("ibkr_prices", "api", tickers=["AAPL"], price_lookback_days=15,
+                           price_as_of_date="2026-09-04", price_repair_id=repair_id)
+    if changed:
+        assert result["status"] == "failed" and result["error"] == "price_repair_plan_changed"
+        assert clocks == []
+    else:
+        assert result["status"] == "succeeded"
+        assert clocks == [datetime.fromisoformat(source.generated_at_et)]
+        assert ds._state_store().get("ibkr_prices")["last_result"]["collect"]["repair_execution"] == report
 
 
 def test_prices_partial_persists_durable_partial_failed_audit_and_no_continuation(

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Download, Menu, Save, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { InvestigationRuntimeSection } from "./settings/InvestigationRuntimeSection";
 import {
   discoverModels,
   deleteModelRoute,
@@ -319,6 +320,7 @@ export function SettingsView({
   const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
   const [providerGuard, setProviderGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [fixedRuntimeGuard, setFixedRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [investigationGuard, setInvestigationGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [researchRuntimeGuard, setResearchRuntimeGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [dataSourcesGuard, setDataSourcesGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [investorGuard, setInvestorGuard] = useState<SettingsNavigationGuard>(CLEAR_SETTINGS_NAVIGATION_GUARD);
@@ -384,6 +386,7 @@ export function SettingsView({
           : CLEAR_SETTINGS_NAVIGATION_GUARD,
         providerGuard,
         fixedRuntimeGuard,
+        investigationGuard,
         researchRuntimeGuard,
       ]);
     }
@@ -395,6 +398,7 @@ export function SettingsView({
     activeGroup,
     dataSourcesGuard,
     fixedRuntimeGuard,
+    investigationGuard,
     investorGuard,
     providerGuard,
     researchRuntimeGuard,
@@ -1028,14 +1032,15 @@ export function SettingsView({
 
     if (id === "fixed_task_runtime") {
       return runtime?.fixed_task_runtime ? (
-        <FixedTaskRuntimeSection
+        <><FixedTaskRuntimeSection
           settings={runtime.fixed_task_runtime}
           saving={saving}
           onSave={saveFixedTaskLimits}
           onReset={resetFixedTaskLimits}
           onNavigationGuardChange={setFixedRuntimeGuard}
           developerMode={developerMode}
-        />
+        /><InvestigationRuntimeSection authMode={modelProviderContexts[draft.lifecycle_investigation?.provider ?? "anthropic"]?.auth_mode}
+          onNavigationGuardChange={setInvestigationGuard} /></>
       ) : null;
     }
 
@@ -1221,14 +1226,15 @@ export function SettingsView({
 
 // ---- Data Sources: provider health + per-source app-owned scheduling (3e) ----
 
-function fromRoutes(routes: Record<ModelTask, TaskRoute>): Partial<Record<ModelTask, DraftRoute>> {
+function fromRoutes(routes: ModelCatalog["routes"]): Partial<Record<ModelTask, DraftRoute>> {
   const out: Partial<Record<ModelTask, DraftRoute>> = {};
-  for (const task of Object.keys(routes) as ModelTask[]) {
+  for (const [key, route] of Object.entries(routes)) {
+    const task = key as ModelTask;
     out[task] = {
-      provider: routes[task].provider,
-      model: routes[task].model,
-      effort: routes[task].effort,
-      custom: routes[task].custom,
+      provider: route.provider,
+      model: route.model,
+      effort: route.effort,
+      custom: route.custom,
     };
   }
   return out;

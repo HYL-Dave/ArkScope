@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
-import { getPriceRepairPreview, getSchedule, startPriceRepair, type TradingDayCoverage, type PriceRepairPreview } from "../api";
+import { getPriceRepairOperation, getPriceRepairPreview, getSchedule, startPriceRepair, type TradingDayCoverage, type PriceRepairPreview } from "../api";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import type { SettingsT } from "./settingsCopy";
+import { PriceRepairHistory } from "./PriceRepairHistory";
 
 type Outcome = "accepted" | "succeeded" | "partial" | "failed" | "skipped" | "unconfirmed" | "nothing_to_repair";
 
@@ -13,6 +14,7 @@ export function PriceCoverageRepair({ coverage, t, onCompleted }: { coverage: Tr
   const [error, setError] = useState(false);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [collectionRunning, setCollectionRunning] = useState<boolean | null>(null);
   const mounted = useRef(true);
   const completed = useRef(onCompleted);
   completed.current = onCompleted;
@@ -20,6 +22,7 @@ export function PriceCoverageRepair({ coverage, t, onCompleted }: { coverage: Tr
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     if (!requestId) return;
+    const activeRepairId = requestId;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const started = Date.now();
@@ -27,9 +30,15 @@ export function PriceCoverageRepair({ coverage, t, onCompleted }: { coverage: Tr
       try {
         const source = (await getSchedule()).sources.ibkr_prices;
         if (cancelled) return;
-        const result = [source?.last_result, source?.durable_state?.last_result].find((row) => row?.price_repair_id === requestId);
+        const result = [source?.last_result, source?.durable_state?.last_result].find((row) => row?.price_repair_id === activeRepairId);
         if (result && ["succeeded", "partial", "failed", "skipped"].includes(result.status)) {
-          setOutcome(result.status as Outcome); setRequestId(null); completed.current(); return;
+          let confirmed = result.status as Outcome;
+          if (confirmed === "succeeded") {
+            const operation = await getPriceRepairOperation(activeRepairId);
+            if (cancelled) return;
+            confirmed = operation?.state === "complete" ? "succeeded" : operation?.state === "incomplete" ? "partial" : "unconfirmed";
+          }
+          setOutcome(confirmed); setRequestId(null); completed.current(); return;
         }
         if (!source?.running && Date.now() - started > 60_000) {
           setOutcome("unconfirmed"); setRequestId(null); completed.current(); return;
@@ -82,7 +91,7 @@ export function PriceCoverageRepair({ coverage, t, onCompleted }: { coverage: Tr
   return <section style={{ marginBlock: 12 }}>
     <p className="muted tiny">{t(($) => $.dataStorage.coverage.repair.scope)}</p>
     {gaps.length > 0 && <>
-      <Button ref={trigger} tone="ghost" icon={<Download size={16} />} busy={busy} disabled={Boolean(requestId) || coverage.observation_health.status !== "ok"} onClick={() => void inspect()}>
+      <Button ref={trigger} tone="ghost" icon={<Download size={16} />} busy={busy} disabled={collectionRunning !== false || Boolean(requestId) || coverage.observation_health.status !== "ok"} onClick={() => void inspect()}>
         {t(($) => $.dataStorage.coverage.repair.preview)}
       </Button>
       <details style={{ marginBlock: 8 }}><summary>{t(($) => $.dataStorage.coverage.repair.gaps, { count: gaps.length })}</summary>
@@ -98,6 +107,8 @@ export function PriceCoverageRepair({ coverage, t, onCompleted }: { coverage: Tr
     </>}
     {status && <p className="tiny" role="status">{status}</p>}
     {error && <p className="tiny refresh-err" role="alert">{t(($) => $.dataStorage.coverage.repair.error)}</p>}
+    <PriceRepairHistory t={t} pending={Boolean(requestId)} refreshKey={`${requestId ?? ""}:${outcome ?? ""}`}
+      onAccepted={(repairId) => { setRequestId(repairId); setOutcome("accepted"); }} onCompleted={onCompleted} onRunningChange={setCollectionRunning} />
     <ConfirmDialog open={preview !== null} title={t(($) => $.dataStorage.coverage.repair.confirmTitle)} tone="primary" busy={busy}
       confirmLabel={preview?.tickers.length === 0 ? t(($) => $.dataStorage.coverage.repair.close) : t(($) => $.dataStorage.coverage.repair.confirm)} returnFocusRef={trigger}
       onConfirm={() => void confirm()} onCancel={() => setPreview(null)}

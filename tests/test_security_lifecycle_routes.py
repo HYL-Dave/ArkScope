@@ -433,11 +433,23 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
     }
     expected = {
         ("GET", "/security-lifecycle/automation"),
+        ("GET", "/market-data/price-repair/operations"),
+        ("GET", "/market-data/price-repair/{repair_id}"),
+        ("POST", "/market-data/price-repair/{repair_id}/resume"),
         ("PUT", "/security-lifecycle/automation"),
         ("GET", "/security-lifecycle/cases"),
+        ("GET", "/security-lifecycle/reviews"),
+        ("GET", "/security-lifecycle/reviews/{review_id}"),
         ("GET", "/security-lifecycle/candidates"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
         ("GET", "/security-lifecycle/cases/{case_id}/audit"),
+        ("GET", "/security-lifecycle/cases/{case_id}/web-preflight"),
+        ("GET", "/security-lifecycle/cases/{case_id}/web-runs/latest"),
+        ("POST", "/security-lifecycle/cases/{case_id}/web-runs"),
+        ("GET", "/security-lifecycle/web-runs/{run_id}"),
+        ("POST", "/security-lifecycle/web-runs/{run_id}/cancel"),
+        ("GET", "/security-lifecycle/web-runs/{run_id}/review"),
+        ("POST", "/security-lifecycle/web-runs/{run_id}/confirm"),
         ("POST", "/security-lifecycle/automation/run"),
         ("POST", "/security-lifecycle/cases/{case_id}/automation/run"),
         ("GET", "/security-lifecycle/investigations/{run_id}"),
@@ -449,6 +461,9 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("POST", "/security-lifecycle/cases/{case_id}/evidence"),
         ("GET", "/security-lifecycle/cases/{case_id}/transition-preview"),
         ("POST", "/security-lifecycle/cases/{case_id}/approve-transition"),
+        ("GET", "/security-lifecycle/cases/{case_id}/review"),
+        ("POST", "/security-lifecycle/cases/{case_id}/confirm-review"),
+        ("GET", "/security-lifecycle/review-confirmations/{transition_id}"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/cancel"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/retry"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/reverse"),
@@ -463,7 +478,26 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 198
+    assert len(rows) == 228
+    assert {row for row in rows if row[1].startswith("/security-lifecycle/investigations/")} == {
+        ("GET", "/security-lifecycle/investigations/{run_id}"),  # Retained historical audit read.
+        ("GET", "/security-lifecycle/investigations/targets"),
+        ("GET", "/security-lifecycle/investigations/runtime"),
+        ("PUT", "/security-lifecycle/investigations/runtime"),
+        ("POST", "/security-lifecycle/investigations/runtime/reset"),
+        ("GET", "/security-lifecycle/investigations/targets/{ticker}/preflight"),
+        ("GET", "/security-lifecycle/investigations/targets/{ticker}/providers"),
+        ("POST", "/security-lifecycle/investigations/targets/{ticker}/providers/check"),
+        ("POST", "/security-lifecycle/investigations/targets/{ticker}/providers/prepare"),
+        ("GET", "/security-lifecycle/investigations/actions"),
+        ("POST", "/security-lifecycle/investigations/targets/{ticker}/runs"),
+        ("GET", "/security-lifecycle/investigations/targets/{ticker}/latest"),
+        ("GET", "/security-lifecycle/investigations/runs/{run_id}"),
+        ("POST", "/security-lifecycle/investigations/runs/{run_id}/cancel"),
+        ("GET", "/security-lifecycle/investigations/runs/{run_id}/review"),
+        ("POST", "/security-lifecycle/investigations/runs/{run_id}/confirm"),
+    }
+    assert {row for row in rows if "/web-" in row[1]} == {row for row in expected if "/web-" in row[1]}
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",

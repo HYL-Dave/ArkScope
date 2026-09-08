@@ -8,6 +8,15 @@ import { SSEFrameParser, type SSEFrame } from "./sse";
 import type { UiLocale } from "./i18n/locale";
 import { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./lifecycle/listingContract";
 export { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./lifecycle/listingContract";
+import {
+  invalidCurrentPayload, parseCurrentReviewList, parseCurrentReviewDetail,
+  parseLifecycleReviewPacket, parseLifecycleReviewConfirmation, parseCurrentActivity, parseCurrentActivityList,
+  type LifecycleReviewPacket,
+} from "./lifecycle/currentReviewContract";
+export { parseCurrentReviewList, parseLifecycleReviewPacket, parseLifecycleReviewConfirmation } from "./lifecycle/currentReviewContract";
+export type { CurrentLifecycleReview, CurrentLifecycleReviewList, LifecycleReviewPacket, LifecycleReviewConfirmation } from "./lifecycle/currentReviewContract";
+import { parseWebPreflight, parseWebRun, parseWebStart, type WebQuestion } from "./lifecycle/webContract";
+import { parseInvestigationTargets, parseInvestigationRuntime, parseInvestigationRun, parseInvestigationPreflight, parseInvestigationProviders, parseInvestigationActions, type InvestigationRuntime } from "./lifecycle/investigationContract";
 
 export interface ApiStatus {
   status: string;
@@ -51,6 +60,8 @@ export interface RuntimeConfig {
   card_synthesis: TaskRoute;
   card_translation: TaskRoute;
   ai_research: TaskRoute;
+  // An older sidecar does not advertise the independent investigation task.
+  lifecycle_investigation?: TaskRoute;
   research_runtime: ResearchRuntimeSettings;
   // Optional while the desktop UI and sidecar can be on adjacent versions.
   fixed_task_runtime?: FixedTaskRuntimeMap;
@@ -67,7 +78,7 @@ export interface ResearchRuntimeSettings {
 }
 
 export type ModelProvider = "anthropic" | "openai";
-export type ModelTask = "card_synthesis" | "card_translation" | "ai_research";
+export type ModelTask = "card_synthesis" | "card_translation" | "ai_research" | "lifecycle_investigation";
 
 export interface TaskRoute {
   task: ModelTask;
@@ -118,6 +129,7 @@ export interface TaskInfo {
   description: string;
   default_provider: ModelProvider;
   recommended_model: string;
+  supports_custom_models?: boolean;
 }
 
 export interface EffectiveModelEntry {
@@ -212,7 +224,9 @@ export interface ModelCatalog {
   current_model_ids?: string[];
   retired_model_ids?: string[];
   model_lifecycle?: ModelLifecycleFact[];
-  routes: Record<ModelTask, TaskRoute>;
+  routes: Record<Exclude<ModelTask, "lifecycle_investigation">, TaskRoute> & {
+    lifecycle_investigation?: TaskRoute;
+  };
   credentials: Record<ModelProvider, ProviderCredential[]>;
   custom_allowed: boolean;
   // P2.7 additive: per-task verified/advanced partition (may be absent on old
@@ -862,6 +876,8 @@ export const apiBase: string =
 
 const apiToken: string | undefined = window.arkscope?.apiToken;
 const DEFAULT_TIMEOUT_MS = 15_000;
+// Local journal readback may revalidate four large retained sources.
+const LIFECYCLE_RECEIPT_TIMEOUT_MS = 180_000;
 
 function authHeaders(): Record<string, string> {
   return apiToken ? { "x-arkscope-token": apiToken } : {};
@@ -4350,6 +4366,138 @@ function lifecycleQuery(filters: object): string {
   return query ? `?${query}` : "";
 }
 
+export async function listCurrentLifecycleReviews(filters: { view?: "attention" | "history"; ticker?: string; case_id?: string; limit?: number; offset?: number } = {}) {
+  return parseCurrentReviewList(await getJSON<unknown>(`/security-lifecycle/reviews${lifecycleQuery(filters)}`));
+}
+
+export async function getCurrentLifecycleReview(reviewId: string) {
+  const result = parseCurrentReviewDetail(await getJSON<unknown>(`/security-lifecycle/reviews/${encodeURIComponent(reviewId)}`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
+  if (result.item.review_id !== reviewId) return invalidCurrentPayload();
+  return result;
+}
+
+export async function getLifecycleReviewPacket(caseId: string, assessmentId: string, options: TickerIdentityTransitionPreviewOptions = {}) {
+  const result = parseLifecycleReviewPacket(await getJSON<unknown>(
+    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/review${lifecycleQuery({ assessment_id: assessmentId, ...options })}`));
+  if (result.case_id !== caseId || result.assessment_id !== assessmentId) return invalidCurrentPayload();
+  return result;
+}
+
+export async function confirmLifecycleReview(value: LifecycleReviewPacket) {
+  const packet = parseLifecycleReviewPacket(value);
+  if (!packet.ready || !packet.action) return invalidCurrentPayload();
+  const result = parseLifecycleReviewConfirmation(await sendJSON<unknown>(
+    `/security-lifecycle/cases/${encodeURIComponent(packet.case_id)}/confirm-review`, "POST",
+    { assessment_id: packet.assessment_id, packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options }));
+  if (result.case_id !== packet.case_id || result.packet_sha256 !== packet.packet_sha256 || result.action !== packet.action
+      || result.source_ticker !== packet.source_ticker || result.execute_on !== packet.execute_on) return invalidCurrentPayload();
+  return result;
+}
+
+export async function getLifecycleReviewConfirmation(transitionId: string) {
+  const result = parseLifecycleReviewConfirmation(await getJSON<unknown>(`/security-lifecycle/review-confirmations/${encodeURIComponent(transitionId)}`));
+  if (result.transition_id !== transitionId) return invalidCurrentPayload();
+  return result;
+}
+
+export async function getInvestigationTargets() {
+  return parseInvestigationTargets(await getJSON<unknown>("/security-lifecycle/investigations/targets"));
+}
+export async function getInvestigationPreflight(ticker: string, language: string) {
+  const result = parseInvestigationPreflight(await getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/preflight${lifecycleQuery({ language })}`));
+  if (result.ticker !== ticker) return invalidCurrentPayload(); return result;
+}
+export async function latestInvestigation(ticker: string) {
+  const value = await getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/latest`);
+  if (value === null) return null; const result = parseInvestigationRun(value);
+  if (result.ticker !== ticker) return invalidCurrentPayload(); return result;
+}
+export async function startInvestigation(ticker: string, body: { preflight_sha256: string; request_key: string; language: string }) {
+  return parseWebStart(await sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, "POST", body));
+}
+export async function getInvestigation(runId: string) {
+  const result = parseInvestigationRun(await getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}`));
+  if (result.run_id !== runId) return invalidCurrentPayload(); return result;
+}
+export async function cancelInvestigation(runId: string) {
+  const result = parseInvestigationRun(await sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/cancel`, "POST"));
+  if (result.run_id !== runId) return invalidCurrentPayload(); return result;
+}
+export async function getInvestigationReview(runId: string, options: TickerIdentityTransitionPreviewOptions = {}) {
+  return parseLifecycleReviewPacket(await getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`));
+}
+export async function confirmInvestigation(runId: string, value: LifecycleReviewPacket, acknowledgeSourceGaps: boolean) {
+  const packet = parseLifecycleReviewPacket(value);
+  if (!packet.ready || !packet.action) return invalidCurrentPayload();
+  const result = parseLifecycleReviewConfirmation(await sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/confirm`, "POST",
+    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options, acknowledge_source_gaps: acknowledgeSourceGaps }));
+  if (result.case_id !== packet.case_id || result.packet_sha256 !== packet.packet_sha256 || result.action !== packet.action
+    || result.source_ticker !== packet.source_ticker || result.execute_on !== packet.execute_on) return invalidCurrentPayload();
+  return result;
+}
+export async function getInvestigationRuntime() { return parseInvestigationRuntime(await getJSON<unknown>("/security-lifecycle/investigations/runtime")); }
+export async function saveInvestigationRuntime(value: InvestigationRuntime) {
+  return parseInvestigationRuntime(await sendJSON<unknown>("/security-lifecycle/investigations/runtime", "PUT", parseInvestigationRuntime(value)));
+}
+export async function resetInvestigationRuntime() { return parseInvestigationRuntime(await sendJSON<unknown>("/security-lifecycle/investigations/runtime/reset", "POST")); }
+export async function getInvestigationProviders(ticker: string) {
+  const result = parseInvestigationProviders(await getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers`));
+  if (result.ticker !== ticker) throw new Error("investigation_payload_invalid"); return result;
+}
+export async function checkInvestigationProviders(ticker: string) {
+  const result = parseInvestigationProviders(await sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/check`, "POST", undefined, 300_000));
+  if (result.ticker !== ticker) throw new Error("investigation_payload_invalid"); return result;
+}
+export async function prepareInvestigationProviders(ticker: string, checkSha256: string, options: TickerIdentityTransitionPreviewOptions = {}) {
+  const result = parseLifecycleReviewPacket(await sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/prepare`,
+    "POST", { check_sha256: checkSha256, ...options }));
+  if (result.source_ticker !== ticker) throw new Error("investigation_payload_invalid"); return result;
+}
+export async function getInvestigationActions() { return parseInvestigationActions(await getJSON<unknown>("/security-lifecycle/investigations/actions")); }
+
+export async function getLifecycleWebPreflight(caseId: string, question: WebQuestion) {
+  const result = parseWebPreflight(await getJSON<unknown>(`/security-lifecycle/cases/${encodeURIComponent(caseId)}/web-preflight${lifecycleQuery({ question })}`));
+  if (result.case_id !== caseId || (result.public_identity && result.public_identity.question !== question)) return invalidCurrentPayload();
+  return result;
+}
+
+export async function latestLifecycleWebRun(caseId: string) {
+  const result = parseWebRun(await getJSON<unknown>(`/security-lifecycle/cases/${encodeURIComponent(caseId)}/web-runs/latest`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
+  if (result && result.case_id !== caseId) return invalidCurrentPayload();
+  return result;
+}
+
+export async function startLifecycleWebRun(caseId: string, body: { question: WebQuestion; preflight_sha256: string; request_key: string }) {
+  return parseWebStart(await sendJSON<unknown>(`/security-lifecycle/cases/${encodeURIComponent(caseId)}/web-runs`, "POST", body));
+}
+
+export async function getLifecycleWebRun(runId: string) {
+  const result = parseWebRun(await getJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
+  if (!result || result.run_id !== runId) return invalidCurrentPayload();
+  return result;
+}
+
+export async function cancelLifecycleWebRun(runId: string) {
+  const result = parseWebRun(await sendJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}/cancel`, "POST", undefined, LIFECYCLE_RECEIPT_TIMEOUT_MS));
+  if (!result || result.run_id !== runId) return invalidCurrentPayload();
+  return result;
+}
+
+export async function getLifecycleWebReview(runId: string, options: TickerIdentityTransitionPreviewOptions = {}) {
+  return parseLifecycleReviewPacket(await getJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
+}
+
+export async function confirmLifecycleWebReview(runId: string, value: LifecycleReviewPacket) {
+  const packet = parseLifecycleReviewPacket(value);
+  if (!packet.ready || !packet.action) return invalidCurrentPayload();
+  const result = parseLifecycleReviewConfirmation(await sendJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}/confirm`, "POST",
+    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options,
+      ...(packet.source_gaps?.length ? { acknowledge_source_gaps: true } : {}) }, LIFECYCLE_RECEIPT_TIMEOUT_MS));
+  if (result.case_id !== packet.case_id || result.packet_sha256 !== packet.packet_sha256 || result.action !== packet.action
+      || result.source_ticker !== packet.source_ticker || result.execute_on !== packet.execute_on) return invalidCurrentPayload();
+  return result;
+}
+
 export function listSecurityLifecycleCases(
   filters: SecurityLifecycleCaseFilters = {},
 ): Promise<SecurityLifecycleCaseListResponse> {
@@ -4418,11 +4566,13 @@ export async function getSecurityLifecycleCase(
 export async function getSecurityLifecycleCaseAudit(
   caseId: string,
 ): Promise<SecurityLifecycleCaseAudit> {
-  return parseLifecycleCaseAudit(
+  const result = parseLifecycleCaseAudit(
     await getJSON<unknown>(
       `/security-lifecycle/cases/${encodeURIComponent(caseId)}/audit`,
     ),
   );
+  if (result.case_id !== caseId) return lifecycleCaseContractError();
+  return result;
 }
 
 export function getSecurityLifecycleInvestigation(
@@ -4444,17 +4594,19 @@ export function addSecurityLifecycleEvidence(
   );
 }
 
-export function translateSecurityLifecycleEvidence(
+export async function translateSecurityLifecycleEvidence(
   evidenceId: string,
   locale: "en" | "zh-Hant",
   runtime?: RuntimeConfig | null,
 ): Promise<SecurityLifecycleEvidenceTranslation> {
-  return sendJSON<SecurityLifecycleEvidenceTranslation>(
+  const result = parseLifecycleEvidenceTranslation(await sendJSON<unknown>(
     `/security-lifecycle/evidence/${encodeURIComponent(evidenceId)}/translations`,
     "POST",
     { locale },
     fixedTaskRequestTimeoutMs(runtime, "card_translation"),
-  );
+  ));
+  if (result.evidence_id !== evidenceId || result.locale !== locale) return lifecycleCaseContractError();
+  return result;
 }
 
 export interface SecurityLifecycleCitationInput {
@@ -4603,7 +4755,7 @@ export function reverseTickerIdentityTransition(
   );
 }
 
-export function listTickerIdentityTransitionActivity(
+export async function listTickerIdentityTransitionActivity(
   options: { limit?: number; unacknowledged_only?: boolean } = {},
 ): Promise<TickerIdentityTransitionActivityResponse> {
   const params = new URLSearchParams();
@@ -4612,18 +4764,20 @@ export function listTickerIdentityTransitionActivity(
     params.set("unacknowledged_only", String(options.unacknowledged_only));
   }
   const query = params.toString();
-  return getJSON<TickerIdentityTransitionActivityResponse>(
+  return parseCurrentActivityList(await getJSON<unknown>(
     `/security-lifecycle/transition-activity${query ? `?${query}` : ""}`,
-  );
+  ));
 }
 
-export function acknowledgeTickerIdentityTransitionActivity(
+export async function acknowledgeTickerIdentityTransitionActivity(
   activityId: string,
 ): Promise<TickerIdentityTransitionActivity> {
-  return sendJSON<TickerIdentityTransitionActivity>(
+  const result = parseCurrentActivity(await sendJSON<unknown>(
     `/security-lifecycle/transition-activity/${encodeURIComponent(activityId)}/acknowledge`,
     "POST",
-  );
+  ));
+  if (result.activity_id !== activityId || result.acknowledged_at === null) return invalidCurrentPayload();
+  return result;
 }
 
 export function getNewsStatus(): Promise<NewsStatus> {
@@ -4837,17 +4991,124 @@ export function parsePriceRepairPreview(value: unknown): PriceRepairPreview {
 export async function getPriceRepairPreview(lookbackDays: number): Promise<PriceRepairPreview> {
   return parsePriceRepairPreview(await getJSON<unknown>(`/market-data/price-repair/preview?lookback_days=${lookbackDays}`));
 }
-export async function startPriceRepair(preview: PriceRepairPreview): Promise<{ status: "accepted" | "nothing_to_repair"; repair_id: string | null }> {
-  const row = coverageRecord(await sendJSON<unknown>("/market-data/price-repair", "POST", {
-    lookback_days: preview.lookback_days, preview_sha256: preview.preview_sha256,
-  }));
+type PriceRepairAccepted = { status: "accepted" | "nothing_to_repair"; repair_id: string | null };
+function parsePriceRepairAccepted(value: unknown): PriceRepairAccepted {
+  const row = coverageRecord(value);
   if (row.status === "nothing_to_repair") return { status: row.status, repair_id: null };
   if (row.status !== "accepted" || typeof row.repair_id !== "string" || !/^[a-f0-9]{32}$/.test(row.repair_id)) throw new Error("price_coverage_payload_invalid");
   return { status: row.status, repair_id: row.repair_id };
 }
+export async function startPriceRepair(preview: PriceRepairPreview): Promise<PriceRepairAccepted> {
+  return parsePriceRepairAccepted(await sendJSON<unknown>("/market-data/price-repair", "POST", {
+    lookback_days: preview.lookback_days, preview_sha256: preview.preview_sha256,
+  }));
+}
+export async function resumePriceRepair(repairId: string): Promise<PriceRepairAccepted> {
+  if (!/^[a-f0-9]{32}$/.test(repairId)) throw new Error("price_coverage_payload_invalid");
+  const result = parsePriceRepairAccepted(await sendJSON<unknown>(`/market-data/price-repair/${repairId}/resume`, "POST"));
+  if (result.repair_id !== null && result.repair_id !== repairId) throw new Error("price_coverage_payload_invalid");
+  return result;
+}
+
+export interface PriceRepairOperation {
+  repair_id: string;
+  state: "complete" | "incomplete" | "blocked" | "unavailable";
+  reason: "unconfirmed_requests" | "response_incomplete" | "scope_changed" | "coverage_unavailable" | "journal_unavailable" | null;
+  scope: { tickers: string[]; provider: "ibkr"; interval: "15min"; as_of_date: string; lookback_days: number } | null;
+  requests: { planned: number; dispatched: number; received: number; unanswered: number } | null;
+  coverage: { remaining_tickers: string[]; missing_ticker_days: number; partial_ticker_days: number } | null;
+  resume: { available: boolean; request_limit: number };
+}
+export interface PriceRepairOperations {
+  version: 1;
+  operations: PriceRepairOperation[];
+  total: number;
+  offset: number;
+  has_more: boolean;
+}
+function priceRepairCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new Error("price_coverage_payload_invalid");
+  return value;
+}
+function priceRepairTickers(value: unknown): string[] {
+  const tickers = coverageStrings(value);
+  if (new Set(tickers).size !== tickers.length || tickers.some((ticker) => !/^[A-Z0-9][A-Z0-9 ._-]{0,11}$/.test(ticker))) throw new Error("price_coverage_payload_invalid");
+  return tickers;
+}
+function parsePriceRepairOperation(value: unknown): PriceRepairOperation {
+  const row = coverageRecord(value);
+  const resume = coverageRecord(row.resume);
+  const states = ["complete", "incomplete", "blocked", "unavailable"];
+  const reasons = [null, "unconfirmed_requests", "response_incomplete", "scope_changed", "coverage_unavailable", "journal_unavailable"];
+  if (typeof row.repair_id !== "string" || !/^[a-f0-9]{32}$/.test(row.repair_id)
+    || !states.includes(row.state as string) || !reasons.includes(row.reason as string | null)
+    || typeof resume.available !== "boolean") throw new Error("price_coverage_payload_invalid");
+  const requestLimit = priceRepairCount(resume.request_limit);
+  let scope: PriceRepairOperation["scope"] = null;
+  if (row.scope !== null) {
+    const item = coverageRecord(row.scope);
+    const tickers = priceRepairTickers(item.tickers);
+    const days = priceRepairCount(item.lookback_days);
+    if (!tickers.length || item.provider !== "ibkr" || item.interval !== "15min" || days < 1 || days > 120
+      || typeof item.as_of_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(item.as_of_date)
+      || !Number.isFinite(Date.parse(item.as_of_date)) || new Date(item.as_of_date).toISOString().slice(0, 10) !== item.as_of_date) throw new Error("price_coverage_payload_invalid");
+    scope = { tickers, provider: item.provider, interval: item.interval, lookback_days: days, as_of_date: item.as_of_date };
+  }
+  let requests: PriceRepairOperation["requests"] = null;
+  if (row.requests !== null) {
+    const item = coverageRecord(row.requests);
+    requests = { planned: priceRepairCount(item.planned), dispatched: priceRepairCount(item.dispatched),
+      received: priceRepairCount(item.received), unanswered: priceRepairCount(item.unanswered) };
+    if (requests.planned < 1 || requests.received > requests.dispatched || requests.dispatched > requests.planned
+      || requests.unanswered !== requests.dispatched - requests.received) throw new Error("price_coverage_payload_invalid");
+  }
+  let coverage: PriceRepairOperation["coverage"] = null;
+  if (row.coverage !== null) {
+    const item = coverageRecord(row.coverage);
+    coverage = { remaining_tickers: priceRepairTickers(item.remaining_tickers), missing_ticker_days: priceRepairCount(item.missing_ticker_days),
+      partial_ticker_days: priceRepairCount(item.partial_ticker_days) };
+    const count = coverage.missing_ticker_days + coverage.partial_ticker_days;
+    if (!scope || coverage.remaining_tickers.some((ticker) => !scope.tickers.includes(ticker))
+      || (coverage.remaining_tickers.length === 0) !== (count === 0) || count < coverage.remaining_tickers.length) throw new Error("price_coverage_payload_invalid");
+  }
+  if ((scope === null) !== (requests === null)
+    || requestLimit > (requests ? requests.planned - requests.dispatched : 0)
+    || (!resume.available && requestLimit !== 0)
+    || (resume.available && (row.state !== "incomplete" || !scope || !coverage))
+    || (row.state === "complete" && (!coverage || coverage.remaining_tickers.length || row.reason !== null || resume.available))
+    || (row.state === "incomplete" && (!coverage?.remaining_tickers.length || ![null, "unconfirmed_requests", "response_incomplete"].includes(row.reason as string | null)))
+    || (row.state === "blocked" && (row.reason !== "scope_changed" || !scope || coverage !== null || resume.available))
+    || (row.reason === "unconfirmed_requests" && !requests?.unanswered)
+    || (row.state === "unavailable" && (resume.available || !["journal_unavailable", "coverage_unavailable"].includes(row.reason as string)))
+    || (row.reason === "journal_unavailable" && (scope !== null || requests !== null || coverage !== null))) throw new Error("price_coverage_payload_invalid");
+  return { repair_id: row.repair_id, state: row.state as PriceRepairOperation["state"], reason: row.reason as PriceRepairOperation["reason"],
+    scope, requests, coverage, resume: { available: resume.available, request_limit: requestLimit } };
+}
+export function parsePriceRepairOperations(value: unknown): PriceRepairOperations {
+  const row = coverageRecord(value);
+  if (row.version !== 1 || !Array.isArray(row.operations) || row.operations.length > 20 || typeof row.has_more !== "boolean") throw new Error("price_coverage_payload_invalid");
+  const operations = row.operations.map(parsePriceRepairOperation);
+  const total = priceRepairCount(row.total), offset = priceRepairCount(row.offset);
+  if (new Set(operations.map((item) => item.repair_id)).size !== operations.length
+    || (operations.length > 0 && offset + operations.length > total)
+    || row.has_more !== (offset + operations.length < total)) throw new Error("price_coverage_payload_invalid");
+  return { version: row.version, operations, total, offset, has_more: row.has_more };
+}
+export async function getPriceRepairOperations(offset = 0): Promise<PriceRepairOperations> {
+  priceRepairCount(offset);
+  return parsePriceRepairOperations(await getJSON<unknown>(`/market-data/price-repair/operations?limit=5&offset=${offset}`));
+}
+export async function getPriceRepairOperation(repairId: string): Promise<PriceRepairOperation> {
+  if (!/^[a-f0-9]{32}$/.test(repairId)) throw new Error("price_coverage_payload_invalid");
+  const result = parsePriceRepairOperation(await getJSON<unknown>(`/market-data/price-repair/${repairId}`));
+  if (result.repair_id !== repairId) throw new Error("price_coverage_payload_invalid");
+  return result;
+}
+
+export const DEFAULT_PRICE_LOOKBACK_DAYS = 15;
 
 export async function getTradingDayCoverage(
-  lookbackDays = 10,
+  lookbackDays = DEFAULT_PRICE_LOOKBACK_DAYS,
   interval = "15min",
 ): Promise<TradingDayCoverage> {
   const result = await getJSON<TradingDayCoverage>(

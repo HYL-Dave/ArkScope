@@ -1,0 +1,15 @@
+{
+  "fixture_kind": "public_calibration_excerpt_not_full_document",
+  "url": "https://www.sec.gov/Archives/edgar/data/1378453/000110465923060301/tm2315684d1_8k.htm",
+  "retrieved_at": "2026-09-07T16:49:14.761495+00:00",
+  "original_text_sha256": "7340ff9e481a6b37f4e3de516a7cc20ea004fecb9d110fcd6cef403fb6133437",
+  "fragments": [
+    {"original_passage": "p68", "text": "Shares of Common Stock, $0.001 Par Value Per Share"},
+    {"original_passage": "p69", "text": "TA"},
+    {"original_passage": "p70", "text": "The NASDAQ Stock Market LLC"},
+    {"original_passage": "p126", "text": "Company common stock, par value $0.001 per share (\u201cCompany Stock\u201d), that"},
+    {"original_passage": "p145", "text": "connection with and as a result of the consummation of the Merger, shares of Company Stock ceased to trade on the Nasdaq Stock Market"},
+    {"original_passage": "p146", "text": "LLC (\u201cNasdaq\u201d) prior to market open on May 15, 2023, and became eligible for delisting from Nasdaq and termination"},
+    {"original_passage": "p255", "text": "TRAVELCENTERS OF AMERICA INC."}
+  ]
+}

@@ -15,7 +15,7 @@ from data_sources.listing_authority_transport import (
 from src.security_lifecycle_listing_evidence import (
     ListingEvidenceFailure, ListingRecord, _evidence, parse_massive_ticker, parse_nasdaq_directories,
 )
-from src.security_lifecycle_provider_authority import evidence_dict, ticker_event_evidence
+from src.security_lifecycle_provider_authority import classify_provider_listing, evidence_dict, ticker_event_evidence
 from src.security_lifecycle_provider_store import ProviderCheckStore, _instant
 
 
@@ -28,7 +28,7 @@ MASSIVE_REQUEST_SPACING_SECONDS = 12.5
 
 def refresh_provider_checks(store, *, tickers, at, provider, target_ticker=None):
     """One shared directory pass per day and at most one exact check per tick."""
-    tickers = tuple(sorted(set(tickers)))
+    tickers = tuple(sorted(set(tickers) | ({target_ticker} if target_ticker is not None else set())))
     if not tickers:
         return {"exact_ticker": None, "directory_refreshed": False, "diagnostics": {}}
     epoch = int(_instant(at).timestamp())
@@ -48,10 +48,13 @@ def refresh_provider_checks(store, *, tickers, at, provider, target_ticker=None)
     candidates = []
     for ticker in tickers:
         row = latest.get(ticker)
-        if row is None or row["state"] == "active":
+        if row is None:
+            continue
+        decision = classify_provider_listing(ticker=ticker, evidence=row["evidence"], today=_instant(at).date(), provider_codes=row["blockers"])
+        if decision.state == "active" and target_ticker != ticker:
             continue
         last_exact = row["diagnostics"].get("exact_checked_epoch_s", 0)
-        interval = FAILED_EXACT_REFRESH_SECONDS if row["blockers"] else EXACT_REFRESH_SECONDS
+        interval = FAILED_EXACT_REFRESH_SECONDS if decision.listing_state == "unresolved" else EXACT_REFRESH_SECONDS
         if target_ticker == ticker or epoch - last_exact >= interval:
             candidates.append((last_exact, ticker))
     candidates.sort()
@@ -154,14 +157,20 @@ class ProviderScanSession:
             material.append(_evidence(old))
             if old.listing_status != "inactive" or not old.composite_figi:
                 return tuple(material), ()
+        except (ListingTransportFailure, ListingEvidenceFailure) as exc:
+            return tuple(material), (exc.code,)
+        try:
             self._pace()
             timeline = self.events.fetch_massive_ticker_events(stable_id=old.composite_figi, api_key=self.massive_key, budget=self.event_budget)
             material.append(ticker_event_evidence(ticker, timeline, at=self.at))
-            successors = {new for old_ticker, new, _ in timeline.events if old_ticker == ticker}
-            if len(successors) == 1:
+        except CensusTransportFailure as exc:
+            return tuple(material), ("massive_timeline_" + exc.code.removeprefix("massive_"),)
+        successors = {new for old_ticker, new, _ in timeline.events if old_ticker == ticker}
+        if len(successors) == 1:
+            try:
                 material.append(_evidence(self._massive(next(iter(successors)), active=True, market="stocks")))
-        except (ListingTransportFailure, ListingEvidenceFailure, CensusTransportFailure) as exc:
-            return tuple(material), (exc.code,)
+            except (ListingTransportFailure, ListingEvidenceFailure) as exc:
+                return tuple(material), ("massive_successor_" + exc.code.removeprefix("massive_"),)
         return tuple(material), ()
 
 

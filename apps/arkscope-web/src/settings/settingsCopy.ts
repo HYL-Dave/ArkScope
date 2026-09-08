@@ -156,6 +156,8 @@ export function settingsTaskLabel(task: ModelTask, t: SettingsT): string {
       return t(($) => $.models.tasks.cardTranslation.label);
     case "ai_research":
       return t(($) => $.models.tasks.aiResearch.label);
+    case "lifecycle_investigation":
+      return t(($) => $.models.tasks.lifecycleInvestigation.label);
   }
 }
 

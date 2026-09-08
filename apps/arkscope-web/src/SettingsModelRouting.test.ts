@@ -117,7 +117,7 @@ const catalog: ModelCatalog = {
       openai: { credential_id: "local:7", auth_mode: "api_key", label: "OpenAI API" },
       anthropic: null,
     },
-    tasks: Object.fromEntries((Object.keys(routes) as ModelTask[]).map((task) => [task, {
+    tasks: Object.fromEntries((Object.keys(routes) as (keyof typeof routes)[]).map((task) => [task, {
       verified: [], advanced: [], cache_state: "ok", discovered_at: null,
       current_provider: routes[task].provider,
       providers: {
@@ -1285,7 +1285,7 @@ describe("Settings model route save gate", () => {
             label: credential.label,
           },
         },
-        tasks: Object.fromEntries((Object.keys(routes) as ModelTask[]).map((task) => [task, {
+        tasks: Object.fromEntries((Object.keys(routes) as (keyof typeof routes)[]).map((task) => [task, {
           verified: [],
           advanced: [],
           cache_state: "ok",

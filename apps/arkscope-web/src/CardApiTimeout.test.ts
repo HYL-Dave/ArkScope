@@ -41,7 +41,9 @@ describe("card API timeouts", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response("{}", {
+        new Response(JSON.stringify({ evidence_id: "evidence-1", evidence_content_sha256: "a".repeat(64), locale: "zh-Hant",
+          translated_text: "Translated excerpt", provider: "openai", model: "gpt-5.3-codex-spark", harness: "codex-app-server",
+          translated_at: "2026-09-06T00:00:00Z" }), {
           status: 200,
           headers: { "content-type": "application/json" },
         }),

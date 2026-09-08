@@ -18,6 +18,7 @@ requests
 pydantic>=2.0
 pyyaml
 jsonschema>=4.0
+defusedxml==0.7.1  # Public filing XML: prohibit DTDs, entities and external resources.
 
 # HTTP API
 fastapi>=0.110.0
