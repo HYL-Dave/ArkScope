@@ -1,5 +1,17 @@
 # Lifecycle Investigation Completion
 
+## Deployment Follow-Up
+
+The subsequent user authorization has now been executed: local fast-forward
+integration, fresh merged-tree full tests/build, a private consistent backup and
+production journal v2 installation. All 71 original profile tables and 72,471
+rows remain unchanged. The 36 old SEC cases are retired from the work queue,
+not physically deleted. No App restart, provider call or push occurred in this
+deployment; restart and manual acceptance belong to the user. See
+`docs/superpowers/evidence/2026-09-08-lifecycle-investigation-deployment/README.md`
+for receipts, scope and the manual checklist. The original implementation
+authorization and sealed review record below remain historical provenance.
+
 The September 8 authorization requests a complete reviewable implementation and
 permits Claude OAuth calibration with the existing Sonnet/Opus subscription.
 It does not install a production migration, delete production rows, restart the
