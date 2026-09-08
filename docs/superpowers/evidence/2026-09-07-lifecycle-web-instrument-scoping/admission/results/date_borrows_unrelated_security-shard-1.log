@@ -1,0 +1,170 @@
+........................................................................ [ 16%]
+.................................................................FFFFFFF [ 32%]
+........................................................................ [ 49%]
+........................................................................ [ 65%]
+........................................................................ [ 82%]
+........................................................................ [ 98%]
+.....                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_other_instrument_delisting_never_combines_with_stock_identity[False-senior notes] _
+
+other_class = 'senior notes', same_source = False
+
+    @pytest.mark.parametrize("other_class", ["senior notes", "preferred stock", "call options"])
+    @pytest.mark.parametrize("same_source", [False, True])
+    def test_other_instrument_delisting_never_combines_with_stock_identity(other_class, same_source):
+        event = f"Issuer Old Inc {other_class} (OLDX) were delisted from NASDAQ effective September 1, 2026."
+        source_id = "source-1" if same_source else "source-2"
+        pages = {"source-1": source_page(IDENTITY + "\n" + event if same_source else IDENTITY)}
+        if not same_source:
+            pages[source_id] = source_page(event, "https://ir.example.com/other-security")
+        payload = finding_payload(citations=[citation(IDENTITY, ["security_identity"]),
+            citation(event, ["listing_ended", "effective_date"], source_id)])
+        result = validate_finding(public_input(), payload, pages)
+        assert result.action is None
+>       assert {"listing_change_not_supported", "effective_date_not_supported"} <= set(result.block_reasons)
+E       AssertionError: assert {'effective_d...ot_supported'} <= {'listing_cha...ot_supported'}
+E         
+E         Extra items in the left set:
+E         'effective_date_not_supported'
+
+tests/test_lifecycle_web_instrument_scope.py:35: AssertionError
+_ test_other_instrument_delisting_never_combines_with_stock_identity[False-preferred stock] _
+
+other_class = 'preferred stock', same_source = False
+
+    @pytest.mark.parametrize("other_class", ["senior notes", "preferred stock", "call options"])
+    @pytest.mark.parametrize("same_source", [False, True])
+    def test_other_instrument_delisting_never_combines_with_stock_identity(other_class, same_source):
+        event = f"Issuer Old Inc {other_class} (OLDX) were delisted from NASDAQ effective September 1, 2026."
+        source_id = "source-1" if same_source else "source-2"
+        pages = {"source-1": source_page(IDENTITY + "\n" + event if same_source else IDENTITY)}
+        if not same_source:
+            pages[source_id] = source_page(event, "https://ir.example.com/other-security")
+        payload = finding_payload(citations=[citation(IDENTITY, ["security_identity"]),
+            citation(event, ["listing_ended", "effective_date"], source_id)])
+        result = validate_finding(public_input(), payload, pages)
+        assert result.action is None
+>       assert {"listing_change_not_supported", "effective_date_not_supported"} <= set(result.block_reasons)
+E       AssertionError: assert {'effective_d...ot_supported'} <= {'listing_cha...ot_supported'}
+E         
+E         Extra items in the left set:
+E         'effective_date_not_supported'
+
+tests/test_lifecycle_web_instrument_scope.py:35: AssertionError
+_ test_other_instrument_delisting_never_combines_with_stock_identity[False-call options] _
+
+other_class = 'call options', same_source = False
+
+    @pytest.mark.parametrize("other_class", ["senior notes", "preferred stock", "call options"])
+    @pytest.mark.parametrize("same_source", [False, True])
+    def test_other_instrument_delisting_never_combines_with_stock_identity(other_class, same_source):
+        event = f"Issuer Old Inc {other_class} (OLDX) were delisted from NASDAQ effective September 1, 2026."
+        source_id = "source-1" if same_source else "source-2"
+        pages = {"source-1": source_page(IDENTITY + "\n" + event if same_source else IDENTITY)}
+        if not same_source:
+            pages[source_id] = source_page(event, "https://ir.example.com/other-security")
+        payload = finding_payload(citations=[citation(IDENTITY, ["security_identity"]),
+            citation(event, ["listing_ended", "effective_date"], source_id)])
+        result = validate_finding(public_input(), payload, pages)
+        assert result.action is None
+>       assert {"listing_change_not_supported", "effective_date_not_supported"} <= set(result.block_reasons)
+E       AssertionError: assert {'effective_d...ot_supported'} <= {'listing_cha...ot_supported'}
+E         
+E         Extra items in the left set:
+E         'effective_date_not_supported'
+
+tests/test_lifecycle_web_instrument_scope.py:35: AssertionError
+_ test_other_instrument_delisting_never_combines_with_stock_identity[True-senior notes] _
+
+other_class = 'senior notes', same_source = True
+
+    @pytest.mark.parametrize("other_class", ["senior notes", "preferred stock", "call options"])
+    @pytest.mark.parametrize("same_source", [False, True])
+    def test_other_instrument_delisting_never_combines_with_stock_identity(other_class, same_source):
+        event = f"Issuer Old Inc {other_class} (OLDX) were delisted from NASDAQ effective September 1, 2026."
+        source_id = "source-1" if same_source else "source-2"
+        pages = {"source-1": source_page(IDENTITY + "\n" + event if same_source else IDENTITY)}
+        if not same_source:
+            pages[source_id] = source_page(event, "https://ir.example.com/other-security")
+        payload = finding_payload(citations=[citation(IDENTITY, ["security_identity"]),
+            citation(event, ["listing_ended", "effective_date"], source_id)])
+        result = validate_finding(public_input(), payload, pages)
+        assert result.action is None
+>       assert {"listing_change_not_supported", "effective_date_not_supported"} <= set(result.block_reasons)
+E       AssertionError: assert {'effective_d...ot_supported'} <= {'listing_cha...ot_supported'}
+E         
+E         Extra items in the left set:
+E         'effective_date_not_supported'
+
+tests/test_lifecycle_web_instrument_scope.py:35: AssertionError
+_ test_other_instrument_delisting_never_combines_with_stock_identity[True-preferred stock] _
+
+other_class = 'preferred stock', same_source = True
+
+    @pytest.mark.parametrize("other_class", ["senior notes", "preferred stock", "call options"])
+    @pytest.mark.parametrize("same_source", [False, True])
+    def test_other_instrument_delisting_never_combines_with_stock_identity(other_class, same_source):
+        event = f"Issuer Old Inc {other_class} (OLDX) were delisted from NASDAQ effective September 1, 2026."
+        source_id = "source-1" if same_source else "source-2"
+        pages = {"source-1": source_page(IDENTITY + "\n" + event if same_source else IDENTITY)}
+        if not same_source:
+            pages[source_id] = source_page(event, "https://ir.example.com/other-security")
+        payload = finding_payload(citations=[citation(IDENTITY, ["security_identity"]),
+            citation(event, ["listing_ended", "effective_date"], source_id)])
+        result = validate_finding(public_input(), payload, pages)
+        assert result.action is None
+>       assert {"listing_change_not_supported", "effective_date_not_supported"} <= set(result.block_reasons)
+E       AssertionError: assert {'effective_d...ot_supported'} <= {'listing_cha...ot_supported'}
+E         
+E         Extra items in the left set:
+E         'effective_date_not_supported'
+
+tests/test_lifecycle_web_instrument_scope.py:35: AssertionError
+_ test_other_instrument_delisting_never_combines_with_stock_identity[True-call options] _
+
+other_class = 'call options', same_source = True
+
+    @pytest.mark.parametrize("other_class", ["senior notes", "preferred stock", "call options"])
+    @pytest.mark.parametrize("same_source", [False, True])
+    def test_other_instrument_delisting_never_combines_with_stock_identity(other_class, same_source):
+        event = f"Issuer Old Inc {other_class} (OLDX) were delisted from NASDAQ effective September 1, 2026."
+        source_id = "source-1" if same_source else "source-2"
+        pages = {"source-1": source_page(IDENTITY + "\n" + event if same_source else IDENTITY)}
+        if not same_source:
+            pages[source_id] = source_page(event, "https://ir.example.com/other-security")
+        payload = finding_payload(citations=[citation(IDENTITY, ["security_identity"]),
+            citation(event, ["listing_ended", "effective_date"], source_id)])
+        result = validate_finding(public_input(), payload, pages)
+        assert result.action is None
+>       assert {"listing_change_not_supported", "effective_date_not_supported"} <= set(result.block_reasons)
+E       AssertionError: assert {'effective_d...ot_supported'} <= {'listing_cha...ot_supported'}
+E         
+E         Extra items in the left set:
+E         'effective_date_not_supported'
+
+tests/test_lifecycle_web_instrument_scope.py:35: AssertionError
+_______ test_other_instrument_date_cannot_complete_a_stock_listing_event _______
+
+    def test_other_instrument_date_cannot_complete_a_stock_listing_event():
+        stock = "Issuer Old Inc Class A common stock (OLD) was delisted from NASDAQ."
+        notes = "Issuer Old Inc senior notes (OLDN) were delisted effective September 1, 2026."
+        payload = finding_payload(citations=[citation(stock, ["security_identity", "listing_ended"]),
+            citation(notes, ["effective_date"], "source-2")])
+        result = validate_finding(public_input(), payload, {"source-1": source_page(stock),
+            "source-2": source_page(notes, "https://ir.example.com/notes")})
+>       assert result.action is None and "effective_date_not_supported" in result.block_reasons
+E       AssertionError: assert ('terminal_delisting' is None)
+E        +  where 'terminal_delisting' = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...1:00:00+00:00')), action='terminal_delisting', block_reasons=(), unique_passage_count=2, independent_source_count=None).action
+
+tests/test_lifecycle_web_instrument_scope.py:47: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/date_borrows_unrelated_security-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_delisting_never_combines_with_stock_identity[False-senior notes]
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_delisting_never_combines_with_stock_identity[False-preferred stock]
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_delisting_never_combines_with_stock_identity[False-call options]
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_delisting_never_combines_with_stock_identity[True-senior notes]
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_delisting_never_combines_with_stock_identity[True-preferred stock]
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_delisting_never_combines_with_stock_identity[True-call options]
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_other_instrument_date_cannot_complete_a_stock_listing_event
+7 failed, 430 passed in 18.50s

@@ -1,0 +1,23 @@
+........................................................................ [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 77%]
+.............F.......................................................... [ 96%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+_________ test_tampered_document_metadata_cannot_supply_valid_passage __________
+
+    def test_tampered_document_metadata_cannot_supply_valid_passage():
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        page = replace(source_page(NOTICE), url="https://www.sec.gov/not-the-original")
+        result = validate_finding(public_input(), finding_payload(), {"source-1": page})
+>       assert result.action is None and "source_integrity" in result.block_reasons
+E       AssertionError: assert ('terminal_delisting' is None)
+E        +  where 'terminal_delisting' = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00:00+00:00'),), action='terminal_delisting', block_reasons=(), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:180: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r4/results/hash_chunk_dropped-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_security_lifecycle_web_finding.py::test_tampered_document_metadata_cannot_supply_valid_passage
+1 failed, 373 passed in 21.65s

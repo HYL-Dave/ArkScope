@@ -1,0 +1,43 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+..............F......................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[source_added] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/source_index_not_rechecked-shard-2/test_validated_web_read_rechec0')
+change = 'source_added'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/source_index_not_rechecked-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[source_added]
+1 failed, 462 passed in 22.40s

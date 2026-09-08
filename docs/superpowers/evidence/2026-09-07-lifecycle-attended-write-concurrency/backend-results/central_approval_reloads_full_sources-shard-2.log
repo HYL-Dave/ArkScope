@@ -1,0 +1,171 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+..........FF..................F......................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-decode] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/central_approval_reloads_full_sources-shard-2/test_attended_web_source_valid2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e503d5ab400>
+command = 'confirm', phase = 'decode'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+>           result = confirm(c, packet)
+
+tests/test_lifecycle_web_attended_concurrency.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:264: in confirm
+    transition = store._approve(preview=preview, approved_preview_sha256=preview["preview_sha256"], automation=False,
+src/ticker_identity_transition.py:1564: in _approve
+    if self._provider_guard(preview, at=now, automation=automation, web_read=web_read):
+src/ticker_identity_transition.py:1456: in _provider_guard
+    return web_transition_guard(self.conn, assessment=assessment,
+src/lifecycle_web_review.py:185: in web_transition_guard
+    run = LifecycleWebStore.read_on_connection(conn, accepted["run_id"], validated=web_read)
+src/lifecycle_web_store.py:380: in read_on_connection
+    pages = (cls._pages(conn, run_id)
+src/lifecycle_web_store.py:248: in _pages
+    pages[source_id] = cls._decode_page(saved)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<sqlite3.Row object at 0x7e503d5aa920>,), kwargs = {}
+other = <sqlite3.Connection object at 0x7e503eb17140>
+
+    def validate(*args, **kwargs):
+        with sqlite3.connect(c["profile"], timeout=0) as other:
+>           other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+E           sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_web_attended_concurrency.py:31: OperationalError
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-finding] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/central_approval_reloads_full_sources-shard-2/test_attended_web_source_valid3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e503de8e7a0>
+command = 'confirm', phase = 'finding'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+>           result = confirm(c, packet)
+
+tests/test_lifecycle_web_attended_concurrency.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:264: in confirm
+    transition = store._approve(preview=preview, approved_preview_sha256=preview["preview_sha256"], automation=False,
+src/ticker_identity_transition.py:1564: in _approve
+    if self._provider_guard(preview, at=now, automation=automation, web_read=web_read):
+src/ticker_identity_transition.py:1456: in _provider_guard
+    return web_transition_guard(self.conn, assessment=assessment,
+src/lifecycle_web_review.py:185: in web_transition_guard
+    run = LifecycleWebStore.read_on_connection(conn, accepted["run_id"], validated=web_read)
+src/lifecycle_web_store.py:382: in read_on_connection
+    return cls._read_material(row, header, calls, saved, pages)
+src/lifecycle_web_store.py:414: in _read_material
+    result["finding"] = validate_finding(result["request"], value["finding"], result["pages"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PublicInvestigationInput(ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common stock', venue='NA...ed_at='2026-09-06T01:00:00+00:00', capture_sha256='89aa8702de01547a471370a10196a4cc73a905f4a3220dc3b2ef93c4eac25d78')})
+kwargs = {'source_context': None, 'unread_source_count': 0}
+other = <sqlite3.Connection object at 0x7e503eb17a40>
+
+    def validate(*args, **kwargs):
+        with sqlite3.connect(c["profile"], timeout=0) as other:
+>           other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+E           sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_web_attended_concurrency.py:31: OperationalError
+__________ test_source_validation_is_not_cached_between_user_commands __________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/central_approval_reloads_full_sources-shard-2/test_source_validation_is_not_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e503d4eeb00>
+
+    def test_source_validation_is_not_cached_between_user_commands(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path)
+        original, decoded = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            decoded.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+        packet = prepare(c)
+        assert decoded == [True]
+        assert confirm(c, packet)["status"] == "applied"
+>       assert decoded == [True, True]
+E       assert [True, True, True] == [True, True]
+E         
+E         Left contains one more item: True
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_attended_concurrency.py:229: AssertionError
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/central_approval_reloads_full_sources-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-decode]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-finding]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_source_validation_is_not_cached_between_user_commands
+3 failed, 460 passed in 22.03s

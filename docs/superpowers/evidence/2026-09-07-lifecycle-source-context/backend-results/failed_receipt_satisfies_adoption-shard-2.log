@@ -1,0 +1,40 @@
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+F....................................................................... [ 50%]
+........................................................................ [ 66%]
+........................................................................ [ 83%]
+......................................................................   [100%]
+=================================== FAILURES ===================================
+_ test_population_retains_failure_receipts_without_accepting_them_as_findings __
+
+tmp_path = PosixPath('/dev/shm/arkscope-source-context-backend-r2/failed_receipt_satisfies_adoption-shard-2/test_population_retains_failur0')
+
+    def test_population_retains_failure_receipts_without_accepting_them_as_findings(tmp_path):
+        from src.lifecycle_public_sources import SourceReadObservation
+        from src.security_lifecycle_population import read_population_snapshot, build_population_manifest, _digest, LifecyclePopulationUnavailable
+        from tests.test_lifecycle_web_review import context, confirm, prepare
+    
+        c = context(tmp_path)
+        confirm(c, prepare(c))
+        store = c["web"]
+        original = store.read(c["run_id"])
+        run = store.start(case_id=c["case_id"], observation_sha256=original["observation_sha256"], request=original["request"],
+                          selection=original["selection"], options=original["options"], owner="worker-1", request_key="failed-read")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        store.fail(run["run_id"], owner="worker-1", code="source_read_incomplete",
+                   control=store.control(run["run_id"], owner="worker-1"), source_read_report=report)
+        snapshot = read_population_snapshot(c["market"], c["profile"], at=c["now"][0])
+        retained = build_population_manifest(snapshot)["retention"]["web_journal"]
+        assert run["run_id"] in {item["run_id"] for item in retained["results"]}
+        assert len(retained["acceptances"]) == 1
+        # A receipt for a failed read must never satisfy an adoption dependency.
+        snapshot["material"]["web_journal_inventory"]["acceptances"][0]["run_id"] = run["run_id"]
+        snapshot["sha256"] = _digest({key: snapshot[key] for key in ("version", "at", "material")})
+>       with pytest.raises(LifecyclePopulationUnavailable, match="population_web_dependency_invalid"):
+E       Failed: DID NOT RAISE <class 'src.security_lifecycle_population.LifecyclePopulationUnavailable'>
+
+tests/test_lifecycle_source_read_report.py:97: Failed
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/failed_receipt_satisfies_adoption-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_read_report.py::test_population_retains_failure_receipts_without_accepting_them_as_findings
+1 failed, 429 passed in 18.09s

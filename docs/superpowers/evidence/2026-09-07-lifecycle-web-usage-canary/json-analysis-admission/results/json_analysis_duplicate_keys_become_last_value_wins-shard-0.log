@@ -1,0 +1,55 @@
+........................................................................ [  9%]
+........................................................................ [ 19%]
+...........................................F.....F...................... [ 28%]
+........................................................................ [ 38%]
+........................................................................ [ 48%]
+........................................................................ [ 57%]
+........................................................................ [ 67%]
+........................................................................ [ 77%]
+........................................................................ [ 86%]
+........................................................................ [ 96%]
+............................                                             [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{"sources":[],"sources":["valid"]}] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75df405c0910>
+value = '{"sources":[],"sources":["valid"]}'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [
+        None, OUTPUT, "", "null", "[]", "true", "{", json.dumps({"result": OUTPUT}),
+        "```json\n" + json.dumps(OUTPUT) + "\n```", json.dumps(OUTPUT) + " explanation",
+        json.dumps(OUTPUT) + json.dumps(OUTPUT), '{"sources":[],"sources":["valid"]}',
+        '{"sources":[],"number":NaN}', '{"sources":[],"number":Infinity}',
+        json.dumps({"sources": [], "write_profile": True}), '{"sources":"wrong shape"}',
+    ])
+    async def test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry(monkeypatch, value):
+        mod, clients = setup(monkeypatch, result={"result": value})
+        call = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=call.selection, max_model_requests=1)
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_json_analysis.py:78: Failed
+_ test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins[True] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75df439ed240>
+duplicate = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("duplicate", [False, True])
+    async def test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins(monkeypatch, duplicate):
+        schema = {"type": "object", "properties": {"nested": {"type": "object", "properties": {"value": {"type": "string"}},
+            "required": ["value"], "additionalProperties": False}}, "required": ["nested"], "additionalProperties": False}
+        value = '{"nested":{"value":"first","value":"last"}}' if duplicate else '{"nested":{"value":"last"}}'
+        mod, _ = setup(monkeypatch, result={"result": value})
+        if duplicate:
+>           with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E           Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_json_analysis.py:92: Failed
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/json_analysis_duplicate_keys_become_last_value_wins-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[{"sources":[],"sources":["valid"]}]
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_nested_json_duplicate_keys_are_not_last_value_wins[True]
+2 failed, 746 passed in 27.43s

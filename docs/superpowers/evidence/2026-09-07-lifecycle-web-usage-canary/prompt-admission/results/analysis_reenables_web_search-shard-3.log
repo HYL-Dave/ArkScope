@@ -1,0 +1,101 @@
+........................................F.F............................. [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 43%]
+........................................................................ [ 58%]
+........................................................................ [ 73%]
+........................................................................ [ 87%]
+...........................................................              [100%]
+=================================== FAILURES ===================================
+_____________ test_claude_analysis_has_no_web_or_filesystem_tools ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74e1971ce860>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_has_no_web_or_filesystem_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=1)
+>       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:298: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:284: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:231: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '27b702b1-d690-42b9-9c4c-2a684421ac9f', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['WebSearch', 'StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+_ test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74e197159b10>
+phase = 'analysis'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(monkeypatch, phase):
+        monkeypatch.setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "ambient-helper-model")
+        monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "ambient-legacy-helper")
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase=phase, call_id=phase + "-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+>       await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:298: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:284: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:231: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '56dee92a-7edd-4d33-afc8-69a304abfc7b', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['WebSearch', 'StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+- generated xml file: /dev/shm/lifecycle-schema-prompt-campaign-r2/results/analysis_reenables_web_search-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_analysis_has_no_web_or_filesystem_tools
+FAILED tests/test_lifecycle_web_claude.py::test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]
+2 failed, 489 passed in 22.24s

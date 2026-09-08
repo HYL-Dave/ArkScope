@@ -1,0 +1,85 @@
+........................................F...................F..........F [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 60%]
+........................................................................ [ 80%]
+.....................................................................    [100%]
+=================================== FAILURES ===================================
+_____________ test_claude_analysis_has_no_web_or_filesystem_tools ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70573337f460>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_has_no_web_or_filesystem_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=1)
+>       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+E       assert '{"sources": ["https://ir.example.com/notice"]}' == {'sources': ['https://ir.example.com/notice']}
+E        +  where '{"sources": ["https://ir.example.com/notice"]}' = ModelReply(remote_id='a3e88038-ccd0-4ae1-833b-b90bc03e3092', output='{"sources": ["https://ir.example.com/notice"]}', ...utput_tokens': 50, 'cache_creation_input_tokens': None, 'cache_read_input_tokens': None, 'web_search_requests': None}}).output
+
+tests/test_lifecycle_web_claude.py:145: AssertionError
+_ test_claude_web_requires_owned_terminal_and_exact_output[result4-model_output_invalid] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70573af2abf0>
+result = {'structured_output': {'sources': [], 'write_profile': True}}
+code = 'model_output_invalid'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+>       with pytest.raises(WebModelError, match=code):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude.py:253: Failed
+_ test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70573337f070>
+phase = 'analysis', forbidden = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True), ("analysis", True)])
+    async def test_actual_claude_sdk_serializes_web_hook_and_owned_result(monkeypatch, phase, forbidden):
+        from src.auth_drivers import lifecycle_web_claude as mod
+    
+        peers = []
+        commands = []
+    
+        def client(options):
+            peer = Peer(options, forbidden)
+            peers.append(peer)
+            transport = SubprocessCLITransport(prompt="", options=options)
+            commands.append(transport._build_command())
+            return ClaudeSDKClient(options=options, transport=peer)
+    
+        monkeypatch.setattr(mod, "_client", client)
+        monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime",
+                            lambda: SimpleNamespace(cli_path=Path("/reviewed/bundled/claude")))
+        request = _request(phase=phase)
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if forbidden:
+            with pytest.raises(WebModelError, match="unexpected_tool_activity"):
+                await mod.call_claude_web(request, credential, control)
+        else:
+>           assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+E           assert '{"sources": ["https://ir.example.com/notice"]}' == {'sources': ['https://ir.example.com/notice']}
+E            +  where '{"sources": ["https://ir.example.com/notice"]}' = ModelReply(remote_id='f80d6a30-2a17-48b5-89ed-c6cf813439ed', output='{"sources": ["https://ir.example.com/notice"]}', ...output_tokens': 2, 'cache_creation_input_tokens': None, 'cache_read_input_tokens': None, 'web_search_requests': None}}).output
+
+tests/test_lifecycle_web_claude_wire.py:133: AssertionError
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/json_analysis_skips_output_validation-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_analysis_has_no_web_or_filesystem_tools
+FAILED tests/test_lifecycle_web_claude.py::test_claude_web_requires_owned_terminal_and_exact_output[result4-model_output_invalid]
+FAILED tests/test_lifecycle_web_claude_wire.py::test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False]
+3 failed, 354 passed in 16.02s

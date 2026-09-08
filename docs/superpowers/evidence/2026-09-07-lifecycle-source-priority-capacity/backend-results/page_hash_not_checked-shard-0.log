@@ -1,0 +1,35 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+.............F.......................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+................................                                         [100%]
+=================================== FAILURES ===================================
+_ test_source_journal_still_rejects_changed_page_and_capture_fingerprints[page_sha256] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/page_hash_not_checked-shard-0/test_source_journal_still_reje0')
+field = 'page_sha256'
+
+    @pytest.mark.parametrize("field", ["page_sha256", "capture_sha256"])
+    def test_source_journal_still_rejects_changed_page_and_capture_fingerprints(tmp_path, field):
+        from src.lifecycle_web_store import _json, _sha
+        from src.lifecycle_web_schema import WebJournalError
+        from tests.test_lifecycle_web_store import setup_store, start
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        material = asdict(source_page("\u4e0b\u5e02 \U00020000"))
+        if field == "capture_sha256":
+            material[field] = "0" * 64
+        digest = "0" * 64 if field == "page_sha256" else _sha(material)
+        with store.connection(write=True) as conn:
+            conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (identity, "source-1", _json(material), digest))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_source_capacity.py:82: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/page_hash_not_checked-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_capacity.py::test_source_journal_still_rejects_changed_page_and_capture_fingerprints[page_sha256]
+1 failed, 463 passed in 28.97s

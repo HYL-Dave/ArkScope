@@ -1,0 +1,61 @@
+..................................F..................................... [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 77%]
+........................................................................ [ 96%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+_______ test_source_read_validation_releases_its_owned_read_transaction ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/result_read_validation_holds_lock-shard-3/test_source_read_validation_re0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e652a54b580>
+
+    def test_source_read_validation_releases_its_owned_read_transaction(tmp_path, monkeypatch):
+        from src import lifecycle_web_store as journal
+    
+        path, store = setup_store(tmp_path)
+        identity = completed(store)
+        original, observed = journal.validate_finding, []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(path, timeout=0) as conn:
+                conn.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(*args, **kwargs)
+    
+        monkeypatch.setattr(journal, "validate_finding", validate)
+>       assert store.read(identity)["finding"].action == "terminal_delisting"
+
+tests/test_lifecycle_source_progress.py:114: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:301: in read
+    with self.connection() as conn:
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_web_store.LifecycleWebStore object at 0x7e6549df9fc0>
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=JOURNAL_BUSY_SECONDS)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+>           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:64: WebJournalError
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/result_read_validation_holds_lock-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_progress.py::test_source_read_validation_releases_its_owned_read_transaction
+1 failed, 373 passed in 21.09s

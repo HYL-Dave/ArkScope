@@ -1,0 +1,57 @@
+................................F....................................... [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 77%]
+........................................................................ [ 96%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+___ test_progress_poll_does_not_decode_running_source_bodies[current_review] ___
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/current_view_loads_full_sources-shard-3/test_progress_poll_does_not_de1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7db34ddaa7a0>
+entrypoint = 'current_review'
+
+    @pytest.mark.parametrize("entrypoint", ["controller", "current_review"])
+    def test_progress_poll_does_not_decode_running_source_bodies(tmp_path, monkeypatch, entrypoint):
+        from src.lifecycle_web_controller import LifecycleWebController
+        from src.lifecycle_web_projection import latest_web_runs
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page("Retained source."))
+    
+        def forbidden(row):
+            raise AssertionError("progress must not decode uncompleted source bodies")
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(forbidden))
+        if entrypoint == "controller":
+            controller = LifecycleWebController(store, credential_loader=lambda _: pytest.fail("provider-free read"))
+            result = controller.read(identity)
+        else:
+            with sqlite3.connect(path) as conn:
+>               rows = latest_web_runs(conn, ["case-1"], at=AT)
+
+tests/test_lifecycle_source_progress.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_projection.py:63: in latest_web_runs
+    return [project_web_run(LifecycleWebStore.read_on_connection(conn, row[0], include_running_sources=True), at=at) for row in rows]
+src/lifecycle_web_projection.py:63: in <listcomp>
+    return [project_web_run(LifecycleWebStore.read_on_connection(conn, row[0], include_running_sources=True), at=at) for row in rows]
+src/lifecycle_web_store.py:315: in read_on_connection
+    pages = (cls._pages(conn, run_id)
+src/lifecycle_web_store.py:208: in _pages
+    pages[source_id] = cls._decode_page(saved)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = <sqlite3.Row object at 0x7db34dda8e50>
+
+    def forbidden(row):
+>       raise AssertionError("progress must not decode uncompleted source bodies")
+E       AssertionError: progress must not decode uncompleted source bodies
+
+tests/test_lifecycle_source_progress.py:66: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/current_view_loads_full_sources-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_progress.py::test_progress_poll_does_not_decode_running_source_bodies[current_review]
+1 failed, 373 passed in 22.24s

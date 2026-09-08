@@ -1,0 +1,92 @@
+........................................................................ [ 13%]
+........................................................................ [ 26%]
+....................F................................................... [ 40%]
+........................................................................ [ 53%]
+........................................................................ [ 66%]
+........................................................................ [ 80%]
+.........F..........F................................................... [ 93%]
+..................................                                       [100%]
+=================================== FAILURES ===================================
+_ test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/essential_uncertainty_overridden-shard-1/test_disclosed_read_gap_does_n1')
+change = {'unresolved_conditions': ['The effective date cannot be established.']}
+reason = 'finding_incomplete'
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"contradictions": ["The exchange reports continued trading."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The effective date cannot be established."]}, "finding_incomplete"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"citations": []}, "source_passage_missing"),
+    ])
+    def test_disclosed_read_gap_does_not_override_missing_essential_proof(tmp_path, change, reason):
+        c = context(tmp_path, completion={**COMPLETION, "payload": finding_payload(**change)})
+        before = rows(c)
+        packet = prepare(c)
+>       assert not packet["ready"] and reason in packet["block_reasons"]
+E       assert (not True)
+
+tests/test_lifecycle_web_gaps.py:132: AssertionError
+_ test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete] _
+
+change = {'unresolved_conditions': ['The share class is unclear.']}
+reason = 'finding_incomplete', unread = 0
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    @pytest.mark.parametrize("unread", [0, 1])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason, unread):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        result = validate_finding(public_input(), finding_payload(**change), {"source-1": source_page(NOTICE)}, unread_source_count=unread)
+>       assert result.action is None and reason in result.block_reasons
+E       AssertionError: assert ('terminal_delisting' is None)
+E        +  where 'terminal_delisting' = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00:00+00:00'),), action='terminal_delisting', block_reasons=(), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:106: AssertionError
+_ test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete] _
+
+change = {'unresolved_conditions': ['The share class is unclear.']}
+reason = 'finding_incomplete', unread = 1
+
+    @pytest.mark.parametrize("change,reason", [
+        ({"source_ticker": "OTHER"}, "security_identity_mismatch"),
+        ({"issuer_name": "Other Issuer"}, "security_identity_mismatch"),
+        ({"security_class": "preferred stock"}, "security_identity_mismatch"),
+        ({"venue": "NYSE"}, "security_identity_mismatch"),
+        ({"effective_date": "2026-09-02"}, "effective_date_not_supported"),
+        ({"effective_date": None, "effective_date_text": None}, "effective_date_missing"),
+        ({"contradictions": ["A newer notice says trading continues."]}, "material_contradiction"),
+        ({"unresolved_conditions": ["The share class is unclear."]}, "finding_incomplete"),
+        ({"event_kind": "acquisition_announced"}, "event_not_actionable"),
+        ({"event_kind": "trading_suspended"}, "event_not_actionable"),
+        ({"timing": "unknown"}, "event_timing_unknown"),
+    ])
+    @pytest.mark.parametrize("unread", [0, 1])
+    def test_incomplete_web_finding_is_readable_but_has_no_action(change, reason, unread):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        result = validate_finding(public_input(), finding_payload(**change), {"source-1": source_page(NOTICE)}, unread_source_count=unread)
+>       assert result.action is None and reason in result.block_reasons
+E       AssertionError: assert ('terminal_delisting' is None)
+E        +  where 'terminal_delisting' = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00:00+00:00'),), action='terminal_delisting', block_reasons=(), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:106: AssertionError
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/essential_uncertainty_overridden-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_disclosed_read_gap_does_not_override_missing_essential_proof[change1-finding_incomplete]
+FAILED tests/test_security_lifecycle_web_finding.py::test_incomplete_web_finding_is_readable_but_has_no_action[0-change7-finding_incomplete]
+FAILED tests/test_security_lifecycle_web_finding.py::test_incomplete_web_finding_is_readable_but_has_no_action[1-change7-finding_incomplete]
+3 failed, 535 passed in 27.27s

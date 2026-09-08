@@ -1,0 +1,159 @@
+........................................................................ [ 15%]
+...................................................FFFF......F.F........ [ 30%]
+........................................................................ [ 45%]
+........................................................................ [ 61%]
+........................................................................ [ 76%]
+........................................................................ [ 91%]
+.......................................                                  [100%]
+=================================== FAILURES ===================================
+__ test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes ___
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7689ac75f5e0>
+
+    @pytest.mark.anyio
+    async def test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes(monkeypatch):
+        mod, clients = _setup(monkeypatch, result={
+            "num_turns": 4, "usage": {"input_tokens": 4, "output_tokens": 1036},
+            "model_usage": {"claude-opus-5": MODEL_COUNTS},
+        })
+        call = _request(max_search_uses=4)
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+>       assert reply.usage == {"input_tokens": 29706, "output_tokens": 3228}
+E       AssertionError: assert {'input_token...tokens': 1036} == {'input_token...tokens': 3228}
+E         
+E         Differing items:
+E         {'output_tokens': 1036} != {'output_tokens': 3228}
+E         {'input_tokens': 4} != {'input_tokens': 29706}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:34: AssertionError
+___ test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[None] ___
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7689a493eef0>
+aggregate = None
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+    async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
+        mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+>       assert reply.usage == {"input_tokens": None, "output_tokens": None}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}
+E         
+E         Differing items:
+E         {'output_tokens': 50} != {'output_tokens': None}
+E         {'input_tokens': 100} != {'input_tokens': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:52: AssertionError
+_ test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate1] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7689ac706410>
+aggregate = {}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+    async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
+        mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+>       assert reply.usage == {"input_tokens": None, "output_tokens": None}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}
+E         
+E         Differing items:
+E         {'output_tokens': 50} != {'output_tokens': None}
+E         {'input_tokens': 100} != {'input_tokens': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:52: AssertionError
+_ test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate2] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7689ed977970>
+aggregate = {'claude-opus-5': {}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+    async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
+        mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+>       assert reply.usage == {"input_tokens": None, "output_tokens": None}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...tokens': None}
+E         
+E         Differing items:
+E         {'output_tokens': 50} != {'output_tokens': None}
+E         {'input_tokens': 100} != {'input_tokens': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:52: AssertionError
+___________ test_reported_zero_is_not_replaced_by_nonzero_main_loop ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7689a737a530>
+
+    @pytest.mark.anyio
+    async def test_reported_zero_is_not_replaced_by_nonzero_main_loop(monkeypatch):
+        mod, _ = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": dict.fromkeys(MODEL_COUNTS, 0)}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+>       assert reply.usage == {"input_tokens": 0, "output_tokens": 0}
+E       AssertionError: assert {'input_token...t_tokens': 50} == {'input_token...ut_tokens': 0}
+E         
+E         Differing items:
+E         {'output_tokens': 50} != {'output_tokens': 0}
+E         {'input_tokens': 100} != {'input_tokens': 0}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:75: AssertionError
+_ test_sonnet_live_counter_shape_replays_through_actual_sdk_parser_without_dispatch _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7689ac705b40>
+
+    @pytest.mark.anyio
+    async def test_sonnet_live_counter_shape_replays_through_actual_sdk_parser_without_dispatch(monkeypatch):
+        from claude_agent_sdk import ClaudeSDKClient
+        from src.auth_drivers import lifecycle_web_claude as mod
+        from src.security_lifecycle_web_contract import validate_selection
+        from tests.test_lifecycle_web_claude_wire import Peer
+    
+        class UsagePeer(Peer):
+            async def read_messages(self):
+                async for message in super().read_messages():
+                    if message["type"] == "result":
+                        message.update(num_turns=4, usage={"input_tokens": 4, "output_tokens": 1036},
+                                       modelUsage={"claude-sonnet-5": {**MODEL_COUNTS, "costUSD": 0.123}})
+                    yield message
+    
+        peers = []
+        def client(options):
+            peer = UsagePeer(options, False)
+            peers.append(peer)
+            return ClaudeSDKClient(options=options, transport=peer)
+        monkeypatch.setattr(mod, "_client", client)
+        monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime", lambda: SimpleNamespace(cli_path=Path("/reviewed/bundled/claude")))
+        call = replace(_request(max_search_uses=4), selection=validate_selection("anthropic", "claude_code_oauth", "claude-sonnet-5", "local:7"))
+        control = RunControl(selection=call.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
+>       assert reply.usage == {"input_tokens": 29706, "output_tokens": 3228}
+E       AssertionError: assert {'input_token...tokens': 1036} == {'input_token...tokens': 3228}
+E         
+E         Differing items:
+E         {'output_tokens': 1036} != {'output_tokens': 3228}
+E         {'input_tokens': 4} != {'input_tokens': 29706}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_usage.py:113: AssertionError
+- generated xml file: /tmp/lifecycle-usage-backend-r1/results/main_loop_substituted_for_model_aggregate-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage.py::test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes
+FAILED tests/test_lifecycle_web_usage.py::test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[None]
+FAILED tests/test_lifecycle_web_usage.py::test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate1]
+FAILED tests/test_lifecycle_web_usage.py::test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage[aggregate2]
+FAILED tests/test_lifecycle_web_usage.py::test_reported_zero_is_not_replaced_by_nonzero_main_loop
+FAILED tests/test_lifecycle_web_usage.py::test_sonnet_live_counter_shape_replays_through_actual_sdk_parser_without_dispatch
+6 failed, 465 passed in 18.05s

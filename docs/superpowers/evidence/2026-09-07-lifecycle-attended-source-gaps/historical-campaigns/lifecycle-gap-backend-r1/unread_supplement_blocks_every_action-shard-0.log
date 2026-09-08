@@ -1,0 +1,866 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+....................................................FFFFFFFFFFFFFFFFFFFF [ 36%]
+F.......................FF...F.....FFFF................................. [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+..............FF........................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi0')
+provider = 'openai', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi1')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi2')
+provider = 'anthropic', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi3')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi4')
+provider = 'openai', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi5')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi6')
+provider = 'anthropic', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_gap_disclosure_follows_fi7')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+>       assert packet["ready"] and packet["block_reasons"] == []
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:32: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di0')
+change = 'omitted'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fcf333a6b0>
+run_id = 'lwr_cbb6dbca123b417f84306637a1fdff63'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di0')
+change = 'omitted'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'review_action'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di1')
+change = 'empty'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fcfd903970>
+run_id = 'lwr_619cdfced83649ecacdb834d46948e27'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di1')
+change = 'empty'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'review_action'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di2')
+change = 'reason'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fd0a11df00>
+run_id = 'lwr_3e1a4eb3740c49db83dee0b6a2a5054c'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di2')
+change = 'reason'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'review_action'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url] __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di3')
+change = 'url'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fd7d00b160>
+run_id = 'lwr_46f8579a9def4279a331bb29562c2a3c'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_confirmation_rejects_a_di3')
+change = 'url'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'review_action'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+____ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted] _____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_old_or_malformed_confirma0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd0cb6d7e0>
+acknowledgement = 'omitted'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           assert (False)
+
+tests/test_lifecycle_web_gaps.py:78: AssertionError
+_____ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_old_or_malformed_confirma1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fcfd988dc0>
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           assert (False)
+
+tests/test_lifecycle_web_gaps.py:78: AssertionError
+______ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_old_or_malformed_confirma2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd7ce6f160>
+acknowledgement = None
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           assert (False)
+
+tests/test_lifecycle_web_gaps.py:78: AssertionError
+_______ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_old_or_malformed_confirma3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd023252d0>
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           assert (False)
+
+tests/test_lifecycle_web_gaps.py:78: AssertionError
+______ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_old_or_malformed_confirma4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fcfd9548e0>
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           assert (False)
+
+tests/test_lifecycle_web_gaps.py:78: AssertionError
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[False] _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_direct_adoption_requires_0')
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+
+tests/test_lifecycle_web_gaps.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fd7ce6c190>
+run_id = 'lwr_e55993b47ee84c2a8c9d8d180550e4bd'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[None] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_direct_adoption_requires_1')
+acknowledgement = None
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+
+tests/test_lifecycle_web_gaps.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fd02327b20>
+run_id = 'lwr_3eb60ca91cae4ca48fb5496d6b360f2d'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+_________ test_direct_adoption_requires_literal_gap_acknowledgement[1] _________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_direct_adoption_requires_2')
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+
+tests/test_lifecycle_web_gaps.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fcf81a2a70>
+run_id = 'lwr_d91d7a8158924697b68f8c4ba767f5a0'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[true] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_direct_adoption_requires_3')
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+        with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=acknowledgement)
+
+tests/test_lifecycle_web_gaps.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fcf333aa70>
+run_id = 'lwr_2fb3faa6489542388e1c17e70c124706'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+_ test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_central_writer_rechecks_g0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd02325c30>
+strip = False
+
+    @pytest.mark.parametrize("strip", [False, True])
+    def test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned(tmp_path, monkeypatch, strip):
+        from src import lifecycle_web_review as mod
+        from src.ticker_identity_transition import TickerIdentityTransitionStore
+        c = context(tmp_path, future=True, completion=COMPLETION)
+>       result = confirm(c, prepare(c))
+
+tests/test_lifecycle_web_gaps.py:180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fd02325840>
+run_id = 'lwr_5cdab861f5574f818d1f2b154a2bfb5e'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+_ test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_central_writer_rechecks_g1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd0a17ef80>
+strip = True
+
+    @pytest.mark.parametrize("strip", [False, True])
+    def test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned(tmp_path, monkeypatch, strip):
+        from src import lifecycle_web_review as mod
+        from src.ticker_identity_transition import TickerIdentityTransitionStore
+        c = context(tmp_path, future=True, completion=COMPLETION)
+>       result = confirm(c, prepare(c))
+
+tests/test_lifecycle_web_gaps.py:180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x76fd0a17e4d0>
+run_id = 'lwr_b42128d377dd4909b35b401973cf6f28'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+>           raise ValueError("review_action")
+E           ValueError: review_action
+
+src/lifecycle_web_review.py:208: ValueError
+________ test_legacy_read_gap_is_visible_without_inventing_a_source_url ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_legacy_read_gap_is_visibl0')
+
+    def test_legacy_read_gap_is_visible_without_inventing_a_source_url(tmp_path):
+        c = context(tmp_path, completion={"source_failures": {"source-2": "source_unavailable"}, "source_requests": 2})
+        packet = prepare(c)
+>       assert packet["ready"] and packet["source_gaps"] == [{"url": None, "reason": "source_unavailable"}]
+E       assert (False)
+
+tests/test_lifecycle_web_gaps.py:248: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_research_and_current_deta4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd0a12b5b0>
+provider = 'openai', auth = 'api_key', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+>       assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+E       AssertionError: assert ('lwr_ee18857b...94311ba3fed0b' == 'lwr_ee18857b...94311ba3fed0b'
+E         
+E           lwr_ee18857b411846f0b3b94311ba3fed0b and None == 'terminal_delisting')
+
+tests/test_lifecycle_web_read.py:37: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_research_and_current_deta5')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd04d7b5b0>
+provider = 'openai', auth = 'chatgpt_oauth', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+>       assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+E       AssertionError: assert ('lwr_56727f93...0751fa8626581' == 'lwr_56727f93...0751fa8626581'
+E         
+E           lwr_56727f93d1394cbc8490751fa8626581 and None == 'terminal_delisting')
+
+tests/test_lifecycle_web_read.py:37: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_research_and_current_deta6')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fcf333ca00>
+provider = 'anthropic', auth = 'api_key', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+>       assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+E       AssertionError: assert ('lwr_c50e9640...1a73e0d1c635a' == 'lwr_c50e9640...1a73e0d1c635a'
+E         
+E           lwr_c50e964048744b279291a73e0d1c635a and None == 'terminal_delisting')
+
+tests/test_lifecycle_web_read.py:37: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unread_supplement_blocks_every_action-shard-0/test_research_and_current_deta7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76fd0cb1f430>
+provider = 'anthropic', auth = 'claude_code_oauth', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+>       assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+E       AssertionError: assert ('lwr_1fc80e90...46940de86f97f' == 'lwr_1fc80e90...46940de86f97f'
+E         
+E           lwr_1fc80e90b075482e99146940de86f97f and None == 'terminal_delisting')
+
+tests/test_lifecycle_web_read.py:37: AssertionError
+_ test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1] _
+
+unread = 1
+
+    @pytest.mark.parametrize("unread", [1, 2])
+    def test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding(unread):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        result = validate_finding(public_input(), finding_payload(), {"source-1": source_page(NOTICE)}, unread_source_count=unread)
+>       assert result.action == "terminal_delisting" and result.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:173: AssertionError
+_ test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2] _
+
+unread = 2
+
+    @pytest.mark.parametrize("unread", [1, 2])
+    def test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding(unread):
+        from src.security_lifecycle_web_finding import validate_finding
+    
+        result = validate_finding(public_input(), finding_payload(), {"source-1": source_page(NOTICE)}, unread_source_count=unread)
+>       assert result.action == "terminal_delisting" and result.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_security_lifecycle_web_finding.py:173: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/unread_supplement_blocks_every_action-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[None]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[1]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[true]
+FAILED tests/test_lifecycle_web_gaps.py::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True]
+FAILED tests/test_lifecycle_web_gaps.py::test_legacy_read_gap_is_visible_without_inventing_a_source_url
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]
+FAILED tests/test_security_lifecycle_web_finding.py::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[1]
+FAILED tests/test_security_lifecycle_web_finding.py::test_unread_supplement_does_not_block_an_otherwise_supported_attended_finding[2]
+30 failed, 564 passed in 28.68s

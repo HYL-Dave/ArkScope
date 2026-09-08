@@ -1,0 +1,48 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+...........................F............................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_urls_dropped_at_controller-shard-0/test_real_controller_persists_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71cc979c3dc0>
+malformed = False
+
+    @pytest.mark.parametrize("malformed", [False, True])
+    def test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record(tmp_path, monkeypatch, malformed):
+        from src import security_lifecycle_web_pipeline as mod
+        from tests.test_security_lifecycle_web_pipeline import Reader, _fake_model
+        from tests.test_lifecycle_web_controller import controller, launch, wait_done
+        calls, reader = [], Reader(fail=True)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=["https://ir.example.com/notice", URL]))
+    
+        async def run(*args, **kwargs):
+            result = await mod.investigate(*args, **kwargs)
+            return replace(result, source_failure_urls=None) if malformed else result
+    
+        service, store, credentials = controller(tmp_path, runner=run, reader_factory=lambda limits: reader)
+        try:
+            identity = launch(service)["run_id"]
+            result = wait_done(service, identity)
+            assert len(calls) == 2 and len(reader.urls) == 2 and len(credentials) == 1
+            if malformed:
+                assert result["status"] == "failed" and result["failure_code"] == "web_source_gaps_invalid"
+                assert result["finding"] is None
+            else:
+>               assert result["status"] == "succeeded" and result["source_gaps"] == GAPS
+E               AssertionError: assert ('failed' == 'succeeded'
+E                 
+E                 - succeeded
+E                 + failed)
+
+tests/test_lifecycle_web_gaps.py:239: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/gap_urls_dropped_at_controller-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False]
+1 failed, 593 passed in 30.71s

@@ -1,0 +1,347 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+....................................................FFFFFFFFFFF......... [ 46%]
+.....FFFFF.............................................................. [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_real_pipeline_usage_survi0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7117a4584070>
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+>       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError
+_ test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_real_pipeline_usage_survi1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa6ff10>
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+>       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError
+_ test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_real_pipeline_usage_survi2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa6f8e0>
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+>       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError
+_ test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_real_pipeline_usage_survi3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa6f880>
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel(tmp_path, monkeypatch, provider, auth):
+        from src.lifecycle_web_projection import latest_web_runs, project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        result, store, calls, credentials, reader = run_pipeline(
+            tmp_path, monkeypatch, failure="sources", selected=selection(provider, auth))
+        assert result["status"] == "failed" and result["failure_code"] == "source_read_incomplete"
+        assert result["model_submissions"] == 1 and result["source_requests"] == 1
+        assert len(calls) == len(credentials) == len(reader.urls) == 1
+>       assert result["finding"] is None and result["usage"] == {"input_tokens": 10, "output_tokens": 20}
+E       AssertionError: assert (None is None and {'input_token...tokens': None} == {'input_token...t_tokens': 20}
+E         
+E         Differing items:
+E         {'output_tokens': None} != {'output_tokens': 20}
+E         {'input_tokens': None} != {'input_tokens': 10}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_usage_journal.py:62: AssertionError
+_ test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[analysis-failed] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_unreported_analysis_is_un0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa9ed40>
+failure = 'analysis', status = 'failed'
+
+    @pytest.mark.parametrize("failure,status", [("analysis", "failed"), ("lost", "remote_outcome_unknown")])
+    def test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives(tmp_path, monkeypatch, failure, status):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        assert result["status"] == status and result["finding"] is None and len(calls) == 2
+        assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": None, "output_tokens": None}
+        report = result["usage_report"]
+>       assert report["coverage"] == "partial" and report["recorded_submissions"] == 1
+E       AssertionError: assert ('unknown' == 'partial'
+E         
+E         - partial
+E         + unknown)
+
+tests/test_lifecycle_web_usage_journal.py:81: AssertionError
+_ test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[lost-remote_outcome_unknown] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_unreported_analysis_is_un1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f968160>
+failure = 'lost', status = 'remote_outcome_unknown'
+
+    @pytest.mark.parametrize("failure,status", [("analysis", "failed"), ("lost", "remote_outcome_unknown")])
+    def test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives(tmp_path, monkeypatch, failure, status):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        assert result["status"] == status and result["finding"] is None and len(calls) == 2
+        assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": None, "output_tokens": None}
+        report = result["usage_report"]
+>       assert report["coverage"] == "partial" and report["recorded_submissions"] == 1
+E       AssertionError: assert ('unknown' == 'partial'
+E         
+E         - partial
+E         + unknown)
+
+tests/test_lifecycle_web_usage_journal.py:81: AssertionError
+_ test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_completed_pipeline_sums_e0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa6f280>
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+        report = result["usage_report"]
+>       assert report["coverage"] == "complete" and report["recorded_submissions"] == 2
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_lifecycle_web_usage_journal.py:92: TypeError
+_ test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_completed_pipeline_sums_e1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f965a50>
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+        report = result["usage_report"]
+>       assert report["coverage"] == "complete" and report["recorded_submissions"] == 2
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_lifecycle_web_usage_journal.py:92: TypeError
+_ test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_completed_pipeline_sums_e2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f96a6b0>
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+        report = result["usage_report"]
+>       assert report["coverage"] == "complete" and report["recorded_submissions"] == 2
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_lifecycle_web_usage_journal.py:92: TypeError
+_ test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_completed_pipeline_sums_e3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa9c3a0>
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", CHANNELS)
+    def test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action(tmp_path, monkeypatch, provider, auth):
+        result, _, calls, _, _ = run_pipeline(tmp_path, monkeypatch, selected=selection(provider, auth))
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+        assert len(calls) == 2 and result["usage"] == {"input_tokens": 20, "output_tokens": 40}
+        report = result["usage_report"]
+>       assert report["coverage"] == "complete" and report["recorded_submissions"] == 2
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_lifecycle_web_usage_journal.py:92: TypeError
+_ test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_valid_result_with_no_repo0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f96aa70>
+
+    def test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown(tmp_path, monkeypatch):
+        result, _, _, _, _ = run_pipeline(tmp_path, monkeypatch, unknown=True)
+        assert result["status"] == "succeeded" and result["finding"]["action"] == "terminal_delisting"
+>       assert result["usage_report"]["coverage"] == "unknown"
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests/test_lifecycle_web_usage_journal.py:99: TypeError
+_ test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[None] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_reopened_usage_receipt_re0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178fa9f790>
+failure = None
+
+    @pytest.mark.parametrize("failure", [None, "sources", "lost"])
+    def test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash(tmp_path, monkeypatch, failure):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+>       rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+
+tests/test_lifecycle_web_usage_journal.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_usage_journal.py:166: in rewrite_result
+    mutate(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+material = {'finding': {'announcement_date': None, 'announcement_date_text': None, 'citations': [{'quote': 'Issuer Old Inc Class ...5a9cfa65d95dc322fdc884e741d791bd91fe35cb73da90', 'version': 1}}, 'source_failure_urls': {}, 'source_failures': {}, ...}
+
+>   rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+E   KeyError: 'usage_report'
+
+tests/test_lifecycle_web_usage_journal.py:189: KeyError
+_ test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[sources] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_reopened_usage_receipt_re1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f96a410>
+failure = 'sources'
+
+    @pytest.mark.parametrize("failure", [None, "sources", "lost"])
+    def test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash(tmp_path, monkeypatch, failure):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+>       rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+
+tests/test_lifecycle_web_usage_journal.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_usage_journal.py:166: in rewrite_result
+    mutate(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+material = {'failure_source_read_report': {'observations': [], 'requests': 1}, 'usage_report': {'phases': [], 'version': 1}}
+
+>   rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+E   IndexError: list index out of range
+
+tests/test_lifecycle_web_usage_journal.py:189: IndexError
+_ test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[lost] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_reopened_usage_receipt_re2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f969f90>
+failure = 'lost'
+
+    @pytest.mark.parametrize("failure", [None, "sources", "lost"])
+    def test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash(tmp_path, monkeypatch, failure):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+>       rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+
+tests/test_lifecycle_web_usage_journal.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_usage_journal.py:166: in rewrite_result
+    mutate(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+material = {'failure_source_read_report': {'observations': [], 'requests': 1}, 'usage_report': {'phases': [], 'version': 1}}
+
+>   rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+E   IndexError: list index out of range
+
+tests/test_lifecycle_web_usage_journal.py:189: IndexError
+__________ test_completed_result_rechecks_aggregate_agreement_on_read __________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_completed_result_rechecks0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f96b790>
+
+    def test_completed_result_rechecks_aggregate_agreement_on_read(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch)
+        rewrite_result(store, lambda material: material["usage"].update(input_tokens=4))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:199: Failed
+_ test_inconsistent_pipeline_total_is_rejected_before_success_but_phase_usage_is_retained _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/controller_never_observes_accepted_usage-shard-0/test_inconsistent_pipeline_tot0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71178f969a80>
+
+    def test_inconsistent_pipeline_total_is_rejected_before_success_but_phase_usage_is_retained(tmp_path, monkeypatch):
+        from src import security_lifecycle_web_pipeline as pipeline
+    
+        monkeypatch.setattr(pipeline, "_sum_usage", lambda replies: {"input_tokens": 4, "output_tokens": 1036})
+        result, store, calls, _, _ = run_pipeline(tmp_path, monkeypatch)
+>       assert result["status"] == "failed" and result["failure_code"] == "web_result_invalid"
+E       AssertionError: assert ('succeeded' == 'failed'
+E         
+E         - failed
+E         + succeeded)
+
+tests/test_lifecycle_web_usage_journal.py:208: AssertionError
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/controller_never_observes_accepted_usage-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-api_key]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-api_key]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_real_pipeline_usage_survives_source_failure_and_reopen_for_each_channel[anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[analysis-failed]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_unreported_analysis_is_unknown_not_zero_or_success_while_search_usage_survives[lost-remote_outcome_unknown]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-api_key]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-api_key]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_completed_pipeline_sums_each_accepted_phase_once_without_changing_action[anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_valid_result_with_no_reported_counters_remains_success_but_usage_unknown
+FAILED tests/test_lifecycle_web_usage_journal.py::test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[None]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[sources]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[lost]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_completed_result_rechecks_aggregate_agreement_on_read
+FAILED tests/test_lifecycle_web_usage_journal.py::test_inconsistent_pipeline_total_is_rejected_before_success_but_phase_usage_is_retained
+16 failed, 445 passed in 21.94s

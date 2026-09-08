@@ -1,0 +1,41 @@
+........................................................................ [  9%]
+........................................................................ [ 19%]
+....................................................F................... [ 28%]
+........................................................................ [ 38%]
+........................................................................ [ 48%]
+........................................................................ [ 57%]
+........................................................................ [ 67%]
+........................................................................ [ 77%]
+........................................................................ [ 86%]
+........................................................................ [ 96%]
+............................                                             [100%]
+=================================== FAILURES ===================================
+__ test_claude_analysis_denies_structured_output_tool_at_every_boundary[init] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72f99c951a50>
+boundary = 'init'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+            assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert gate.failure == "unexpected_tool_activity"
+        else:
+            mod, _ = setup(monkeypatch, init={"tools": ["StructuredOutput"]} if boundary == "init" else None,
+                           tool="StructuredOutput" if boundary == "notification" else None)
+>           with pytest.raises(WebModelError, match="^unexpected_tool_activity$"):
+E           Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_json_analysis.py:122: Failed
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/json_analysis_init_allows_native_output-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_denies_structured_output_tool_at_every_boundary[init]
+1 failed, 747 passed in 27.15s

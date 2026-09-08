@@ -1,0 +1,5 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/LifecycleWebPanel.test.tsx --maxWorkers=4 --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/compact-links-green.json
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/compact-links-green.json

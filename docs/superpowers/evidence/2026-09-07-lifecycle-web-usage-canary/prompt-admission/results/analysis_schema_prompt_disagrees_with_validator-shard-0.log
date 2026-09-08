@@ -1,0 +1,38 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+...............................F........................................ [ 37%]
+........................................................................ [ 49%]
+........................................................................ [ 62%]
+........................................................................ [ 74%]
+........................................................................ [ 86%]
+........................................................................ [ 99%]
+....                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x792316b7b8b0>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1", prompt="Public evidence only; do not invoke any tool.")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        result = await mod.call_claude_web(request, credential, control)
+        options = clients[0].options
+        instructions, separator, schema = options.system_prompt.partition("\nOutput schema:\n")
+>       assert separator and json.loads(schema) == options.output_format["schema"] == SCHEMA
+E       AssertionError: assert ('\nOutput schema:\n' and {} == {'additionalP...pe': 'object'}
+E         
+E         Right contains 4 more items:
+E         {'additionalProperties': False,
+E          'properties': {'sources': {'items': {'type': 'string'}, 'type': 'array'}},
+E          'required': ['sources'],
+E          'type': 'object'}
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_claude_output_contract.py:25: AssertionError
+- generated xml file: /dev/shm/lifecycle-schema-prompt-campaign-r2/results/analysis_schema_prompt_disagrees_with_validator-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools
+1 failed, 579 passed in 22.36s

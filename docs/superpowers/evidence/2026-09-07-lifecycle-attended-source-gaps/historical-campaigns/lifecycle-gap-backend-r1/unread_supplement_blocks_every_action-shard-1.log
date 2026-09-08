@@ -1,0 +1,118 @@
+........................................................................ [ 17%]
+........................................................................ [ 35%]
+........................................................................ [ 53%]
+........................................................................ [ 71%]
+........................................................................ [ 89%]
+.................FFFF.......................                             [100%]
+=================================== FAILURES ===================================
+__ test_source_read_failure_remains_visible_and_never_retries[openai-api_key] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7853f7e48be0>
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+>       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...d_report={'requests': 2, 'observations': []}, source_failure_urls={'source-2': 'https://news.example.com/unavailable'}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError
+_ test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78540414fee0>
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+>       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...d_report={'requests': 2, 'observations': []}, source_failure_urls={'source-2': 'https://news.example.com/unavailable'}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError
+_ test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7853f7f4b190>
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+>       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...d_report={'requests': 2, 'observations': []}, source_failure_urls={'source-2': 'https://news.example.com/unavailable'}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError
+_ test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78540418d9c0>
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+>       assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+E       AssertionError: assert (None == 'terminal_delisting')
+E        +  where None = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None).action
+E        +    where ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00'),), action=None, block_reasons=('source_read_incomplete',), unique_passage_count=1, independent_source_count=None) = InvestigationResult(finding=ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', sec...d_report={'requests': 2, 'observations': []}, source_failure_urls={'source-2': 'https://news.example.com/unavailable'}).finding
+
+tests/test_security_lifecycle_web_pipeline.py:112: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/unread_supplement_blocks_every_action-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]
+4 failed, 400 passed in 19.66s

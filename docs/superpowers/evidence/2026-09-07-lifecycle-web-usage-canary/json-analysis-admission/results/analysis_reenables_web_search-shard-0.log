@@ -1,0 +1,34 @@
+........................................................................ [  9%]
+........................................................................ [ 19%]
+...............................F........................................ [ 28%]
+........................................................................ [ 38%]
+........................................................................ [ 48%]
+........................................................................ [ 57%]
+........................................................................ [ 67%]
+........................................................................ [ 77%]
+........................................................................ [ 86%]
+........................................................................ [ 96%]
+............................                                             [100%]
+=================================== FAILURES ===================================
+_____ test_claude_analysis_declares_final_json_without_native_output_tool ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x705b321bf5e0>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_declares_final_json_without_native_output_tool(monkeypatch):
+        mod, clients = setup(monkeypatch)
+        reply, control = await invoke(mod)
+        assert reply.output == OUTPUT and control.terminal_statuses == {"analysis-1": "completed"}
+        options = clients[0].options
+        assert options.output_format is None
+>       assert options.tools == options.allowed_tools == [] and "StructuredOutput" in options.disallowed_tools
+E       AssertionError: assert (['WebSearch'] == []
+E         
+E         Left contains one more item: 'WebSearch'
+E         Use -v to get more diff)
+
+tests/test_lifecycle_web_claude_json_analysis.py:55: AssertionError
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/analysis_reenables_web_search-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_declares_final_json_without_native_output_tool
+1 failed, 747 passed in 26.45s

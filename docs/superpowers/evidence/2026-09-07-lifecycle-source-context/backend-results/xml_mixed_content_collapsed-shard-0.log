@@ -1,0 +1,36 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+..........................F............................................. [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+_ test_xml_normalization_preserves_record_boundaries_without_repeating_long_names _
+
+    def test_xml_normalization_preserves_record_boundaries_without_repeating_long_names():
+        from src.lifecycle_public_sources import _page_text
+        name = "longField" + "x" * 8192
+        attributes = " ".join(f'a{index}="value{index}"' for index in range(256))
+        body = (f'<root><{name} {attributes}>Before <child>not</child> delisted.</{name}>'
+                '<security><class>notes</class><status>delisted</status></security>'
+                '<security><class>common stock</class><status>active</status></security></root>').encode()
+        text, _ = _page_text(body, "application/xml")
+        assert len(text.encode()) <= len(body) * 2
+        root = ET.fromstring(text)
+        field = root.find(name)
+        assert field.attrib["a255"] == "value255"
+>       assert "".join(field.itertext()) == "Before not delisted."
+E       AssertionError: assert 'Beforenotdelisted.' == 'Before not delisted.'
+E         
+E         - Before not delisted.
+E         ?       -   -
+E         + Beforenotdelisted.
+
+tests/test_lifecycle_source_compatibility.py:176: AssertionError
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/xml_mixed_content_collapsed-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_compatibility.py::test_xml_normalization_preserves_record_boundaries_without_repeating_long_names
+1 failed, 595 passed in 24.03s

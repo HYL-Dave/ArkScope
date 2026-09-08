@@ -1,0 +1,40 @@
+..............................................................F......... [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 44%]
+........................................................................ [ 59%]
+........................................................................ [ 74%]
+........................................................................ [ 89%]
+.....................................................                    [100%]
+=================================== FAILURES ===================================
+______ test_claude_pretool_gate_denies_files_subagents_and_budget_excess _______
+
+    @pytest.mark.anyio
+    async def test_claude_pretool_gate_denies_files_subagents_and_budget_excess():
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        request = _request(max_search_uses=1)
+        for forbidden in ("Bash", "Read", "WebFetch", "Task", "Skill", "mcp__foreign__read"):
+            control = RunControl(selection=request.selection, max_model_requests=1)
+            gate = WebToolGate(request, control, "session-1")
+            result = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "session-1",
+                                         "tool_name": forbidden, "tool_input": {}, "tool_use_id": "bad"}, "bad", {})
+            assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert gate.failure == "unexpected_tool_activity"
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        gate = WebToolGate(request, control, "session-1")
+        args = {"hook_event_name": "PreToolUse", "session_id": "session-1", "tool_name": "WebSearch",
+                "tool_input": {"query": "Issuer Old Inc listing"}, "tool_use_id": "web-1"}
+        assert (await gate.pre_tool(args, "web-1", {}))["hookSpecificOutput"]["permissionDecision"] == "allow"
+        assert (await gate.pre_tool(args, "web-1", {}))["hookSpecificOutput"]["permissionDecision"] == "allow"
+        args["tool_use_id"] = "web-2"
+>       assert (await gate.pre_tool(args, "web-2", {}))["hookSpecificOutput"]["permissionDecision"] == "deny"
+E       AssertionError: assert 'allow' == 'deny'
+E         
+E         - deny
+E         + allow
+
+tests/test_lifecycle_web_claude.py:288: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/expanded_search_has_no_upper_bound-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_pretool_gate_denies_files_subagents_and_budget_excess
+1 failed, 484 passed in 23.31s

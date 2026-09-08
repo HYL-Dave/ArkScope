@@ -1,0 +1,858 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/webContract.test.ts src/lifecycle/LifecycleWebPanel.test.tsx src/lifecycle/currentReviewContract.test.ts --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/target-frontend.json
+
+
+ RUN  v4.1.8 /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+
+stdout | src/lifecycle/webContract.test.ts
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > reads known four-channel provenance without exporting extra internal fields
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > keeps unknown identity details and usage unknown
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > keeps older source size declarations unknown across repeated parsing
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > keeps legacy source coverage unknown but validates every new coverage field
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > reads bounded source diagnostics without accepting header blobs or fake counts
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > preserves the same closed source gap disclosure in result and confirmation
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: "unknown"
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":null}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"javascript:alert(1)","reason":"source_unavailable"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://user:secret@example.com","reason":"source_unavailable"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"raw server error"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"source_unavailable","source_id":"private-binding"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real citations array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real contradictions array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real unresolved_conditions array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real block_reasons array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL javascript:alert(1)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL https://name:password@issuer.example/notices
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL file:///home/private
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL http://issuer.example/notices
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > does not treat a cancellation acknowledgment or unknown outcome as success
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > binds actionable findings to the run ticker and supported evidence
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a complete launch preview or an explicit unavailable reason
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > validates request receipts rather than trusting an HTTP success cast
+i18next: languageChanged zh-Hant
+
+ ✓ src/lifecycle/webContract.test.ts (26 tests) 22ms
+stdout | src/lifecycle/currentReviewContract.test.ts
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/currentReviewContract.test.ts > keeps validated Web findings in current detail but rejects malformed or cross-case journals
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > parses the backend-owned persisted current projection: attention
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > parses the backend-owned persisted current projection: applied
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > parses the public action packet and committed readback without internal material
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":null})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":{}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"version":2})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"as_of":"2026-02-30T01:00:00Z"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"coverage":{"tracked":2,"confirmed_active":3,"unconfirmed":-1}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"counts":{"attention":-1,"history":0}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"page":{"offset":0,"limit":50,"total":0}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":null,"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":[],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":"manual_lists"},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"not_tracking","sources":["manual_lists"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"automatically_safe","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"future_reason","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":{}},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[null],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":null}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2026-02-30"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"applied","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"resume","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"scheduled","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":"slt_existing","preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":true,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":"slt_unexpected","preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":true,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":"unexpected","status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":"unexpected","status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":null,"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"ready":"true"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"action":"acquisition"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"effects":null})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"block_reasons":null})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"ready":true,"block_reasons":["listing_authority_required"]})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"execute_on":"2026-02-30"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"effects":{"watchlists":{},"legacy_config_seed":{"add":[],"archive":[],"reactivate":[],"unchanged":[]},"editable_tags_to_copy":[],"priority":{"resolution":null,"result_value":null,"source_value":null,"successor_value":null,"write_successor":false},"suppression":{"hide_source":true,"source_hidden":false,"successor_hidden":false,"unhide_successor":false},"sa_tracking_memberships":[{"ticker":"OLD","picked_date":"2023-01-01","portfolio_status":"closed","current_tracking":false,"removed":false}]}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"finding":{"conclusion":"Reviewed explicit delisting with current trading checks; no acquirer alias is authorized.","impact_summary":"Stop collection, preserve history.","relevance":"direct_tracked_security","confidence":"high","outcomes":null,"successor_ticker":null,"destination_venue":null,"effective_date":"2023-05-16","counterparty_name":null,"counterparty_ticker":null,"counterparty_cik":null,"consideration_currency":null,"cash_per_security_decimal":null,"exchange_ratio_decimal":null}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"source_references":null})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed action packets before a confirmation can be offered ({"options":{"execute_on":"2026-09-05","priority_resolution":null,"unhide_successor":false}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects false applied readbacks and preserves approved, scheduled and blocked states
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not attach checked applied effects to approved
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not attach checked applied effects to scheduled
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not attach checked applied effects to blocked
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not attach checked applied effects to cancelled
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not attach checked applied effects to reversed
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > reads with GET, checks result identity and submits exactly one confirmation command
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects a different review or receipt instead of applying its result to the selected row
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > checks the case identity returned by a lazy audit request
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > validates the explicit translation response ({"evidence_id":"other"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > validates the explicit translation response ({"locale":"zh-Hant"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > validates the explicit translation response ({"translated_text":null})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed tracking activity before opening its UI (null)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed tracking activity before opening its UI ({})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed tracking activity before opening its UI ({"items":null,"count":0,"unacknowledged_count":0})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed tracking activity before opening its UI ({"items":[null],"count":1,"unacknowledged_count":1})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > rejects malformed tracking activity before opening its UI ({"items":[{"activity_type":"applied","user_owned_changes":null}],"count":1,"unacknowledged_count":1})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > reads the actual persisted tracking receipt through a closed activity projection
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > binds activity acknowledgement to the requested receipt
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > checks the nested tracking receipt used by the audit ({"user_owned_changes":null})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > checks the nested tracking receipt used by the audit ({"provider_owned_retained":{}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > checks the nested tracking receipt used by the audit ({"effective_date":"2026-02-30"})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > checks the nested tracking receipt used by the audit ({"reverse_readiness":{"reversible":true,"block_reasons":["reverse_state_changed"]}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > checks the nested tracking receipt used by the audit ({"reverse_readiness":{"reversible":"true","block_reasons":[]}})
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not claim an unacknowledged receipt has been acknowledged
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/currentReviewContract.test.ts > does not bypass current-list parsing at the real API boundary
+i18next: languageChanged zh-Hant
+
+ ❯ src/lifecycle/currentReviewContract.test.ts (68 tests | 2 failed) 44ms
+   × keeps validated Web findings in current detail but rejects malformed or cross-case journals 12ms
+   ✓ parses the backend-owned persisted current projection: attention 1ms
+   ✓ parses the backend-owned persisted current projection: applied 1ms
+   × parses the public action packet and committed readback without internal material 2ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({}) 1ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":null}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":{}}) 1ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"version":2}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"as_of":"2026-02-30T01:00:00Z"}) 1ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"coverage":{"tracked":2,"confirmed_active":3,"unconfirmed":-1}}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"counts":{"attention":-1,"history":0}}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"page":{"offset":0,"limit":50,"total":0}}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":null,"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":[],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":"manual_lists"},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"not_tracking","sources":["manual_lists"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"automatically_safe","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"future_reason","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":{}},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[null],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":null}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2026-02-30"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"applied","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"resume","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"scheduled","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":"slt_existing","preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":true,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":"slt_unexpected","preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":true,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":"unexpected","status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":"unexpected","status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"unexpected","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":["continuation"],"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed current data instead of displaying a healthy empty view ({"items":[{"review_id":"slpr_8bbfc1abdcbc2ef1c6d21f26d070d5e8fd7c94a07d011859c047cc7bc07c06f4","case_ids":["slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c"],"ticker":"OLD","issuer_name":null,"bucket":"attention","finding":"old_listing_inactive","reason":"removal_requires_confirmation","collection":{"state":"tracking","sources":["manual_lists","sa_alpha_picks_former"]},"listing":{"state":"inactive","basis":"observation","ended_on":"2023-05-16"},"continuation":{"state":"unavailable","successor_ticker":null,"candidate_tickers":[]},"observed_at":"2026-09-05T01:00:00Z","next_check_at":null,"diagnostics":{"code":"listing_checks","missing_checks":null,"provider_issues":[{"provider":"massive","reason":"not_found"}],"manual_review_required":false},"next_action":{"kind":"review_removal","state":"not_prepared","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","assessment_id":"sla_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","transition_id":null,"preview_sha256":null,"transition_kind":null,"execute_on":null,"current_effects_match":null,"can_reverse":false,"block_reasons":[]},"source_checks":[{"provider":"eodhd","check":"eodhd","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"delisting","directory":null,"status":"inactive","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"otc","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"massive","check":"stocks","directory":null,"status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"nasdaq_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null},{"provider":"nasdaq","check":"nasdaq","directory":"other_listed","status":"not_found","ticker":"OLD","observed_at":"2026-09-05T01:00:00Z","url":null}],"source_notices":[]}]}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"ready":"true"}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"action":"acquisition"}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"effects":null}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"block_reasons":null}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"ready":true,"block_reasons":["listing_authority_required"]}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"execute_on":"2026-02-30"}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"effects":{"watchlists":{},"legacy_config_seed":{"add":[],"archive":[],"reactivate":[],"unchanged":[]},"editable_tags_to_copy":[],"priority":{"resolution":null,"result_value":null,"source_value":null,"successor_value":null,"write_successor":false},"suppression":{"hide_source":true,"source_hidden":false,"successor_hidden":false,"unhide_successor":false},"sa_tracking_memberships":[{"ticker":"OLD","picked_date":"2023-01-01","portfolio_status":"closed","current_tracking":false,"removed":false}]}}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"finding":{"conclusion":"Reviewed explicit delisting with current trading checks; no acquirer alias is authorized.","impact_summary":"Stop collection, preserve history.","relevance":"direct_tracked_security","confidence":"high","outcomes":null,"successor_ticker":null,"destination_venue":null,"effective_date":"2023-05-16","counterparty_name":null,"counterparty_ticker":null,"counterparty_cik":null,"consideration_currency":null,"cash_per_security_decimal":null,"exchange_ratio_decimal":null}}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"source_references":null}) 0ms
+   ✓ rejects malformed action packets before a confirmation can be offered ({"options":{"execute_on":"2026-09-05","priority_resolution":null,"unhide_successor":false}}) 0ms
+   ✓ rejects false applied readbacks and preserves approved, scheduled and blocked states 1ms
+   ✓ does not attach checked applied effects to approved 0ms
+   ✓ does not attach checked applied effects to scheduled 0ms
+   ✓ does not attach checked applied effects to blocked 0ms
+   ✓ does not attach checked applied effects to cancelled 0ms
+   ✓ does not attach checked applied effects to reversed 0ms
+   ✓ reads with GET, checks result identity and submits exactly one confirmation command 4ms
+   ✓ rejects a different review or receipt instead of applying its result to the selected row 1ms
+   ✓ checks the case identity returned by a lazy audit request 1ms
+   ✓ validates the explicit translation response ({"evidence_id":"other"}) 1ms
+   ✓ validates the explicit translation response ({"locale":"zh-Hant"}) 1ms
+   ✓ validates the explicit translation response ({"translated_text":null}) 0ms
+   ✓ rejects malformed tracking activity before opening its UI (null) 0ms
+   ✓ rejects malformed tracking activity before opening its UI ({}) 0ms
+   ✓ rejects malformed tracking activity before opening its UI ({"items":null,"count":0,"unacknowledged_count":0}) 0ms
+   ✓ rejects malformed tracking activity before opening its UI ({"items":[null],"count":1,"unacknowledged_count":1}) 0ms
+   ✓ rejects malformed tracking activity before opening its UI ({"items":[{"activity_type":"applied","user_owned_changes":null}],"count":1,"unacknowledged_count":1}) 0ms
+   ✓ reads the actual persisted tracking receipt through a closed activity projection 0ms
+   ✓ binds activity acknowledgement to the requested receipt 1ms
+   ✓ checks the nested tracking receipt used by the audit ({"user_owned_changes":null}) 0ms
+   ✓ checks the nested tracking receipt used by the audit ({"provider_owned_retained":{}}) 0ms
+   ✓ checks the nested tracking receipt used by the audit ({"effective_date":"2026-02-30"}) 0ms
+   ✓ checks the nested tracking receipt used by the audit ({"reverse_readiness":{"reversible":true,"block_reasons":["reverse_state_changed"]}}) 0ms
+   ✓ checks the nested tracking receipt used by the audit ({"reverse_readiness":{"reversible":"true","block_reasons":[]}}) 0ms
+   ✓ does not claim an unacknowledged receipt has been acknowledged 0ms
+   ✓ does not bypass current-list parsing at the real API boundary 0ms
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > opening, reloading and reading a saved investigation never dispatch a model
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > opening, reloading and reading a saved investigation never dispatch a model
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > opening, reloading and reading a saved investigation never dispatch a model
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows measured source failure details instead of guessing a document or model failure
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows measured source failure details instead of guessing a document or model failure
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows measured source failure details instead of guessing a document or model failure
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected OAuth and cost before one explicit launch
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected OAuth and cost before one explicit launch
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected OAuth and cost before one explicit launch
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > requires action-specific confirmation after reading sources and exact effects
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > requires action-specific confirmation after reading sources and exact effects
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > requires action-specific confirmation after reading sources and exact effects
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not offer human confirmation when a read gap accompanies a material conflict
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not offer human confirmation when a read gap accompanies a material conflict
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not offer human confirmation when a read gap accompanies a material conflict
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > invalidates Web confirmation immediately when its reviewed execution date changes
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > invalidates Web confirmation immediately when its reviewed execution date changes
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > invalidates Web confirmation immediately when its reviewed execution date changes
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > makes an unavailable credential visible without another credential choice or silent retry
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > makes an unavailable credential visible without another credential choice or silent retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > makes an unavailable credential visible without another credential choice or silent retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps changed effects blocked and offers a fresh review, not another provider call
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps changed effects blocked and offers a fresh review, not another provider call
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps changed effects blocked and offers a fresh review, not another provider call
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > localizes the whole web surface and its OAuth provenance
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > localizes the whole web surface and its OAuth provenance
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > localizes the whole web surface and its OAuth provenance
+i18next: languageChanged zh-Hant
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx (15 tests | 1 failed) 186ms
+   ✓ opening, reloading and reading a saved investigation never dispatch a model 42ms
+   ✓ shows selected context honestly without claiming the model read the complete source 12ms
+   ✓ shows measured source failure details instead of guessing a document or model failure 7ms
+   ✓ shows selected OAuth and cost before one explicit launch 23ms
+   ✓ requires action-specific confirmation after reading sources and exact effects 17ms
+   ✓ shows unread references and the reviewed conclusion at the last confirmation (en) 17ms
+   × shows unread references and the reviewed conclusion at the last confirmation (zh-Hant) 10ms
+   ✓ keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps 7ms
+   ✓ does not offer human confirmation when a read gap accompanies a material conflict 7ms
+   ✓ invalidates Web confirmation immediately when its reviewed execution date changes 11ms
+   ✓ cancel acknowledgment stays pending, then an unknown outcome stays visible without retry 7ms
+   ✓ does not show another case's late response or reuse its launch confirmation 6ms
+   ✓ makes an unavailable credential visible without another credential choice or silent retry 3ms
+   ✓ keeps changed effects blocked and offers a fresh review, not another provider call 11ms
+   ✓ localizes the whole web surface and its OAuth provenance 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+AssertionError: expected '1 份補充來源未能讀取，未列為判斷依據。news.example.com/…' to contain '來源伺服器未回傳要求的文件'
+
+Expected: "來源伺服器未回傳要求的文件"
+Received: "1 份補充來源未能讀取，未列為判斷依據。news.example.com/unread-notice來源伺服器未回傳所要求的文件。"
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx:109:35
+    107|   expect(disclosure?.querySelector("a")?.getAttribute("href")).toBe(ga…
+    108|   expect(disclosure?.textContent).toContain(locale === "en" ? "not use…
+    109|   expect(disclosure?.textContent).toContain(locale === "en" ? "did not…
+       |                                   ^
+    110|   await click(locale === "en" ? "Review removal" : "\u6aa2\u8996\u79fb…
+    111|   await click(locale === "en" ? "Confirm and apply" : "\u78ba\u8a8d\u4…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/lifecycle/currentReviewContract.test.ts > keeps validated Web findings in current detail but rejects malformed or cross-case journals
+AssertionError: expected [ { version: 1, …(17) } ] to deeply equal [ { version: 1, …(16) } ]
+
+- Expected
++ Received
+
+@@ -36,10 +36,11 @@
+      },
+      "finished_at": "2026-09-06T01:02:00Z",
+      "model_submissions": 2,
+      "phase": null,
+      "run_id": "run-1",
++     "source_gaps": null,
+      "source_reading": null,
+      "source_reads": null,
+      "source_requests": 1,
+      "status": "succeeded",
+      "ticker": "OLD",
+
+ ❯ src/lifecycle/currentReviewContract.test.ts:19:74
+     17|     finding: { ...webRunFixture.finding, source_ticker: row.ticker } };
+     18|   expect(parseCurrentReviewDetail(old).web_runs).toEqual([]);
+     19|   expect(parseCurrentReviewDetail({ ...old, web_runs: [run] }).web_run…
+       |                                                                          ^
+     20|   for (const web_runs of [null, {}, [null], [run, run], [{ ...run, cas…
+     21|     expect(() => parseCurrentReviewDetail({ ...old, web_runs })).toThr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/lifecycle/currentReviewContract.test.ts > parses the public action packet and committed readback without internal material
+AssertionError: expected { version: 1, …(16) } to deeply equal { version: 1, …(15) }
+
+- Expected
++ Received
+
+@@ -77,9 +77,10 @@
+      "unhide_successor": false,
+    },
+    "packet_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "provider_observed_at": "2026-09-05T01:00:00Z",
+    "ready": true,
++   "source_gaps": null,
+    "source_references": [],
+    "source_ticker": "OLD",
+    "version": 1,
+  }
+
+ ❯ src/lifecycle/currentReviewContract.test.ts:29:58
+     27| });
+     28| it("parses the public action packet and committed readback without int…
+     29|   expect(api.parseLifecycleReviewPacket(fixture.packet)).toEqual(fixtu…
+       |                                                          ^
+     30|   expect(api.parseLifecycleReviewConfirmation(fixture.confirmation)).t…
+     31|   expect(api.parseCurrentReviewList({ ...page, private_column: "hidden…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  3 failed | 106 passed (109)
+   Start at  14:56:21
+   Duration  1.12s (transform 558ms, setup 449ms, import 395ms, tests 251ms, environment 964ms)
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/target-frontend.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run src/lifecycle/webContract.test.ts src/lifecycle/LifecycleWebPanel.test.tsx src/lifecycle/currentReviewContract.test.ts --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/target-frontend.json

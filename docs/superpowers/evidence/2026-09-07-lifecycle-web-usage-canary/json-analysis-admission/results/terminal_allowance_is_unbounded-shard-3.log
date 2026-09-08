@@ -1,0 +1,31 @@
+.............................................F.......................... [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 60%]
+........................................................................ [ 80%]
+.....................................................................    [100%]
+=================================== FAILURES ===================================
+_ test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79e2d43791e0>
+result = {'num_turns': 100}, code = 'model_result_incomplete'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+        ({"model_usage": []}, "model_usage_invalid"),
+        ({"num_turns": 100}, "model_result_incomplete"),
+        ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
+    ])
+    async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+>       with pytest.raises(WebModelError, match=code):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude.py:179: Failed
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/terminal_allowance_is_unbounded-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result2-model_result_incomplete]
+1 failed, 356 passed in 16.18s

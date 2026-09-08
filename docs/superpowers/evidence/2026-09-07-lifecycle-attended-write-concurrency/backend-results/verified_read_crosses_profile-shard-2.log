@@ -1,0 +1,39 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+....................F................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_ test_verified_web_material_cannot_cross_its_profile_run_or_transaction[profile] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_crosses_profile-shard-2/test_verified_web_material_can0')
+wrong = 'profile'
+
+    @pytest.mark.parametrize("wrong", ["profile", "run", "transaction", "unvalidated_dict"])
+    def test_verified_web_material_cannot_cross_its_profile_run_or_transaction(tmp_path, wrong):
+        from src.lifecycle_web_schema import WebJournalError
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        path = c["profile"]
+        if wrong == "profile":
+            path = tmp_path / "copied-profile.db"
+            with sqlite3.connect(c["profile"]) as source, sqlite3.connect(path) as target:
+                source.backup(target)
+                target.execute(f"PRAGMA schema_version={read.binding[-1]}")
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            if wrong != "transaction":
+                conn.execute("BEGIN IMMEDIATE")
+            if wrong == "profile":
+                assert c["web"]._review_binding(conn, c["run_id"]) == read.binding
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:131: Failed
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/verified_read_crosses_profile-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_verified_web_material_cannot_cross_its_profile_run_or_transaction[profile]
+1 failed, 462 passed in 22.12s

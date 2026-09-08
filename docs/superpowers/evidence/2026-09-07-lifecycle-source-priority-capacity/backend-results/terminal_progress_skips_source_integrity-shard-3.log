@@ -1,0 +1,32 @@
+......................................F................................. [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 77%]
+........................................................................ [ 96%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+_________ test_terminal_progress_read_still_validates_source_integrity _________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/terminal_progress_skips_source_integrity-shard-3/test_terminal_progress_read_st0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77301d9e0be0>
+
+    def test_terminal_progress_read_still_validates_source_integrity(tmp_path, monkeypatch):
+        from src.lifecycle_web_controller import LifecycleWebController
+        from src.lifecycle_web_store import LifecycleWebStore, WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+    
+        def corrupted(row):
+            raise WebJournalError("web_journal_integrity")
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(corrupted))
+        controller = LifecycleWebController(store, credential_loader=lambda _: pytest.fail("provider-free read"))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_source_progress.py:196: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/terminal_progress_skips_source_integrity-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_progress.py::test_terminal_progress_read_still_validates_source_integrity
+1 failed, 373 passed in 18.90s

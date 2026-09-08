@@ -1,0 +1,255 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/webApi.test.ts --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-acknowledgement-frontend.json
+
+
+ RUN  v4.1.8 /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+
+stdout | src/lifecycle/webApi.test.ts
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/webApi.test.ts > validates Web run shape at the actual read boundary and never dispatches on read
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > binds Web reads and cancellation receipts to the exact requested run or case
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > binds the launch preview to its exact case and public question
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > validates an explicit Web start receipt without retrying malformed success
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > checks the exact Web confirmation receipt and never turns a rejection into another execution
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > acknowledges only the validated source gaps shown with the confirmed packet
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > gives retained-source validation its own receipt budget: 'current detail'
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > gives retained-source validation its own receipt budget: 'latest result'
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > gives retained-source validation its own receipt budget: 'run result'
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > gives retained-source validation its own receipt budget: 'cancel receipt'
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > gives retained-source validation its own receipt budget: 'review packet'
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > gives retained-source validation its own receipt budget: 'confirm receipt'
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > accepts a slow verified local result without retrying or starting another investigation
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > still bounds a stalled receipt read and never retries it
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > does not increase the unrelated dispatch/default request budget: preflight
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webApi.test.ts > does not increase the unrelated dispatch/default request budget: start
+i18next: languageChanged zh-Hant
+
+ ❯ src/lifecycle/webApi.test.ts (16 tests | 3 failed) 40ms
+   × validates Web run shape at the actual read boundary and never dispatches on read 18ms
+   ✓ binds Web reads and cancellation receipts to the exact requested run or case 4ms
+   ✓ binds the launch preview to its exact case and public question 2ms
+   ✓ validates an explicit Web start receipt without retrying malformed success 1ms
+   ✓ checks the exact Web confirmation receipt and never turns a rejection into another execution 3ms
+   × acknowledges only the validated source gaps shown with the confirmed packet 1ms
+   ✓ gives retained-source validation its own receipt budget: 'current detail' 1ms
+   ✓ gives retained-source validation its own receipt budget: 'latest result' 1ms
+   ✓ gives retained-source validation its own receipt budget: 'run result' 1ms
+   ✓ gives retained-source validation its own receipt budget: 'cancel receipt' 1ms
+   ✓ gives retained-source validation its own receipt budget: 'review packet' 1ms
+   ✓ gives retained-source validation its own receipt budget: 'confirm receipt' 0ms
+   × accepts a slow verified local result without retrying or starting another investigation 3ms
+   ✓ still bounds a stalled receipt read and never retries it 1ms
+   ✓ does not increase the unrelated dispatch/default request budget: preflight 0ms
+   ✓ does not increase the unrelated dispatch/default request budget: start 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lifecycle/webApi.test.ts > validates Web run shape at the actual read boundary and never dispatches on read
+AssertionError: expected { version: 1, run_id: 'run-1', …(16) } to deeply equal { version: 1, run_id: 'run-1', …(15) }
+
+- Expected
++ Received
+
+@@ -35,10 +35,11 @@
+    },
+    "finished_at": "2026-09-06T01:02:00Z",
+    "model_submissions": 2,
+    "phase": null,
+    "run_id": "run-1",
++   "source_gaps": null,
+    "source_reading": null,
+    "source_reads": null,
+    "source_requests": 1,
+    "status": "succeeded",
+    "ticker": "OLD",
+
+ ❯ src/lifecycle/webApi.test.ts:18:49
+     16| it("validates Web run shape at the actual read boundary and never disp…
+     17|   const fetch = response(webRunFixture);
+     18|   expect(await api.getLifecycleWebRun("run-1")).toEqual(webRunFixture);
+       |                                                 ^
+     19|   expect(fetch.mock.calls[0][1]?.method ?? "GET").toBe("GET");
+     20|   response({ ...webRunFixture, finding: { ...webRunFixture.finding, ci…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/lifecycle/webApi.test.ts > acknowledges only the validated source gaps shown with the confirmed packet
+AssertionError: expected { …(5) } to deeply equal { …(6) }
+
+- Expected
++ Received
+
+@@ -1,7 +1,6 @@
+  {
+-   "acknowledge_source_gaps": true,
+    "action": "terminal_delisting",
+    "execute_on": "2023-05-16",
+    "packet_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "priority_resolution": null,
+    "unhide_successor": false,
+
+ ❯ src/lifecycle/webApi.test.ts:63:52
+     61|   await api.confirmLifecycleWebReview("run-1", packet);
+     62|   expect(fetch).toHaveBeenCalledOnce();
+     63|   expect(JSON.parse(fetch.mock.calls[0][1]?.body)).toEqual({ packet_sh…
+       |                                                    ^
+     64|     action: packet.action, ...packet.options, acknowledge_source_gaps:…
+     65| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/lifecycle/webApi.test.ts > accepts a slow verified local result without retrying or starting another investigation
+AssertionError: expected { value: { version: 1, …(17) } } to deeply equal { value: { version: 1, …(16) } }
+
+- Expected
++ Received
+
+@@ -36,10 +36,11 @@
+      },
+      "finished_at": "2026-09-06T01:02:00Z",
+      "model_submissions": 2,
+      "phase": null,
+      "run_id": "run-1",
++     "source_gaps": null,
+      "source_reading": null,
+      "source_reads": null,
+      "source_requests": 1,
+      "status": "succeeded",
+      "ticker": "OLD",
+
+ ❯ src/lifecycle/webApi.test.ts:92:24
+     90|   const result = api.getLifecycleWebRun("run-1").then((value) => ({ va…
+     91|   await vi.advanceTimersByTimeAsync(80_000);
+     92|   expect(await result).toEqual({ value: webRunFixture });
+       |                        ^
+     93|   expect(fetch).toHaveBeenCalledOnce();
+     94|   expect(fetch.mock.calls[0][1].method ?? "GET").toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 13 passed (16)
+   Start at  15:04:00
+   Duration  956ms (transform 261ms, setup 201ms, import 125ms, tests 40ms, environment 491ms)
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/red-acknowledgement-frontend.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run src/lifecycle/webApi.test.ts --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-acknowledgement-frontend.json

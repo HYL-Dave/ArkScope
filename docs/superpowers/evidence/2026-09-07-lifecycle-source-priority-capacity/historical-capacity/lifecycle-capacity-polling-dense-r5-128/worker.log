@@ -1,0 +1,5 @@
+{"stage": "search", "calls": 1}
+{"stage": "search", "calls": 2}
+{"stage": "analysis", "calls": 3}
+{"stage": "analysis", "calls": 4}
+{"provider_calls": 0, "network_calls": 0, "production_data_access": false, "shared_journal": true, "real_controller_and_heartbeat": true, "concurrent_workers": 2, "dense_context": true, "simulated_model_phases": ["search", "search", "analysis", "analysis"], "statuses": [["succeeded", null], ["succeeded", null]], "options": {"max_sources": 4, "max_source_requests": 8, "max_redirects": 2, "max_source_bytes": 33554432, "source_timeout_seconds": 45.0, "model_timeout_seconds": 180, "max_search_uses": 4, "output_token_limit": 16384, "effort": "high", "max_decoded_source_bytes": 134217728}, "document_decoded_bytes": 134211005, "database_bytes": 806121472, "source_reading": [{"sources": 3, "selected_sources": 0, "retained_text_bytes": 402482181, "model_text_bytes": 402482181}, {"sources": 3, "selected_sources": 0, "retained_text_bytes": 402482181, "model_text_bytes": 402482181}], "peak_rss_bytes": 2616508416, "elapsed_seconds": 194.585}

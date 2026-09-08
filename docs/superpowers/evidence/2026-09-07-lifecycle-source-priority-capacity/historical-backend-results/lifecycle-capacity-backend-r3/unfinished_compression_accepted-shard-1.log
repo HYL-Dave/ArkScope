@@ -1,0 +1,32 @@
+........................................................................ [ 11%]
+.............................F.......................................... [ 22%]
+........................................................................ [ 34%]
+........................................................................ [ 45%]
+........................................................................ [ 57%]
+........................................................................ [ 68%]
+........................................................................ [ 80%]
+........................................................................ [ 91%]
+...................................................                      [100%]
+=================================== FAILURES ===================================
+_ test_complete_wire_body_does_not_hide_damaged_gzip[<lambda>-source_compression_incomplete] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b268cf5d300>
+change = <function <lambda> at 0x7b274f16bd90>
+reason = 'source_compression_incomplete'
+
+    @pytest.mark.parametrize("change,reason", [
+        (lambda value: value[:-8], "source_compression_incomplete"),
+        (lambda value: value[:-8] + b"bad-crc!", "source_compression_invalid"),
+        (lambda value: b"not gzip", "source_compression_invalid"),
+    ])
+    def test_complete_wire_body_does_not_hide_damaged_gzip(monkeypatch, change, reason):
+        payload = change(gzip.compress(b"Complete notice."))
+        reader = _wire_reader(monkeypatch, payload, f"Content-Length: {len(payload)}", "Content-Encoding: gzip")
+>       with pytest.raises(SourceReadError, match=f"^{reason}$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_source_compatibility.py:113: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r3/results/unfinished_compression_accepted-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_compatibility.py::test_complete_wire_body_does_not_hide_damaged_gzip[<lambda>-source_compression_incomplete]
+1 failed, 626 passed in 17.98s

@@ -1,0 +1,40 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+......................F................................................. [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+___ test_all_source_failures_keep_measured_diagnostics_after_journal_reopen ____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/no_complete_source_still_runs_analysis-shard-0/test_all_source_failures_keep_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d579fb4ddb0>
+
+    @pytest.mark.anyio
+    async def test_all_source_failures_keep_measured_diagnostics_after_journal_reopen(tmp_path, monkeypatch):
+        from src import security_lifecycle_web_pipeline as pipeline
+        from src.lifecycle_web_projection import project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        reader, connections, _, _ = _reader(monkeypatch, [
+            Response(b"short", headers={"Content-Length": "1000"}),
+            Response(status=403, headers={"Set-Cookie": "do-not-retain-this-secret"}),
+        ])
+        calls = []
+        monkeypatch.setattr(pipeline, "call_lifecycle_web_model", _fake_model(calls, sources=[
+            "https://ir.example.com/notice", "https://news.example.com/notice",
+        ]))
+>       with pytest.raises(WebModelError, match="^source_read_incomplete$") as caught:
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_source_read_report.py:35: Failed
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/no_complete_source_still_runs_analysis-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_read_report.py::test_all_source_failures_keep_measured_diagnostics_after_journal_reopen
+1 failed, 593 passed in 29.43s

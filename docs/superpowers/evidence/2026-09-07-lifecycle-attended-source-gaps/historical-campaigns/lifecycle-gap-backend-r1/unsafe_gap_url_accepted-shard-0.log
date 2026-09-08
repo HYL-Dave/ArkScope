@@ -1,0 +1,77 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+............FFF...F..................................................... [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4] __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unsafe_gap_url_accepted-shard-0/test_present_malformed_gap_met4')
+urls = {'source-2': None}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:142: Failed
+_ test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5] __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unsafe_gap_url_accepted-shard-0/test_present_malformed_gap_met5')
+urls = {'source-2': 'https://127.0.0.1/private'}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:142: Failed
+_ test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6] __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unsafe_gap_url_accepted-shard-0/test_present_malformed_gap_met6')
+urls = {'source-2': 'https://user:secret@example.com/private'}
+
+    @pytest.mark.parametrize("urls", [None, [], {}, {"source-3": URL}, {"source-2": None},
+                                     {"source-2": "https://127.0.0.1/private"},
+                                     {"source-2": "https://user:secret@example.com/private"}])
+    def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_path, urls):
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:142: Failed
+_ test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value3] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/unsafe_gap_url_accepted-shard-0/test_reopened_journal_rejects_3')
+value = {'source-2': 'http://plain.example.com/notice'}
+
+    @pytest.mark.parametrize("value", [None, [], {}, {"source-2": "http://plain.example.com/notice"}])
+    def test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash(tmp_path, value):
+        from src.lifecycle_web_schema import TRIGGERS
+        from src.lifecycle_web_store import _json, _sha
+        c = context(tmp_path, completion=COMPLETION)
+        with c["web"].connection(write=True) as conn:
+            saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_web_results").fetchone()[0])
+            saved["source_failure_urls"] = value
+            trigger = "lifecycle_web_results_update_immutable"
+            conn.execute("DROP TRIGGER " + trigger)
+            conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (_json(saved), _sha(saved)))
+            conn.execute(TRIGGERS[trigger])
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:158: Failed
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/unsafe_gap_url_accepted-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls4]
+FAILED tests/test_lifecycle_web_gaps.py::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls5]
+FAILED tests/test_lifecycle_web_gaps.py::test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence[urls6]
+FAILED tests/test_lifecycle_web_gaps.py::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value3]
+4 failed, 590 passed in 31.35s

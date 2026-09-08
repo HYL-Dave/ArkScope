@@ -1,0 +1,101 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+...................................................FFF.................. [ 31%]
+........................................................................ [ 42%]
+........................................................................ [ 53%]
+........................................................................ [ 63%]
+........................................................................ [ 74%]
+........................................................................ [ 85%]
+........................................................................ [ 95%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-instrument-campaign-temp-r1/other_transports_expanded_without_admission-shard-2/test_only_claude_oauth_gets_th0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x793425bdb3d0>
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget(tmp_path, monkeypatch, provider, auth):
+        c = context(tmp_path)
+        service, _, _ = setup(c, provider=provider, auth=auth)
+        monkeypatch.setattr(service, "_public_input", lambda *args, **kwargs: public_input())
+        packet = service.prepare(c["case_id"], question="listing_status")
+        values = service.validate_start(c["case_id"], question="listing_status", preflight_sha256=packet["preflight_sha256"])
+        expanded = auth == "claude_code_oauth"
+        expected = {"search_uses": 12 if expanded else 4, "sources": 8 if expanded else 4,
+                    "source_requests": 24 if expanded else 8, "model_timeout_seconds": 600 if expanded else 180}
+>       assert {key: packet["limits"][key] for key in expected} == expected
+E       AssertionError: assert {'model_timeo... 'sources': 8} == {'model_timeo... 'sources': 4}
+E         
+E         Differing items:
+E         {'search_uses': 12} != {'search_uses': 4}
+E         {'model_timeout_seconds': 600} != {'model_timeout_seconds': 180}
+E         {'source_requests': 24} != {'source_requests': 8}
+E         {'sources': 8} != {'sources': 4}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_investigation_budget.py:26: AssertionError
+_ test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-instrument-campaign-temp-r1/other_transports_expanded_without_admission-shard-2/test_only_claude_oauth_gets_th1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7934af44a110>
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget(tmp_path, monkeypatch, provider, auth):
+        c = context(tmp_path)
+        service, _, _ = setup(c, provider=provider, auth=auth)
+        monkeypatch.setattr(service, "_public_input", lambda *args, **kwargs: public_input())
+        packet = service.prepare(c["case_id"], question="listing_status")
+        values = service.validate_start(c["case_id"], question="listing_status", preflight_sha256=packet["preflight_sha256"])
+        expanded = auth == "claude_code_oauth"
+        expected = {"search_uses": 12 if expanded else 4, "sources": 8 if expanded else 4,
+                    "source_requests": 24 if expanded else 8, "model_timeout_seconds": 600 if expanded else 180}
+>       assert {key: packet["limits"][key] for key in expected} == expected
+E       AssertionError: assert {'model_timeo... 'sources': 8} == {'model_timeo... 'sources': 4}
+E         
+E         Differing items:
+E         {'search_uses': 12} != {'search_uses': 4}
+E         {'model_timeout_seconds': 600} != {'model_timeout_seconds': 180}
+E         {'source_requests': 24} != {'source_requests': 8}
+E         {'sources': 8} != {'sources': 4}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_investigation_budget.py:26: AssertionError
+_ test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-instrument-campaign-temp-r1/other_transports_expanded_without_admission-shard-2/test_only_claude_oauth_gets_th2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x793425bb7fa0>
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget(tmp_path, monkeypatch, provider, auth):
+        c = context(tmp_path)
+        service, _, _ = setup(c, provider=provider, auth=auth)
+        monkeypatch.setattr(service, "_public_input", lambda *args, **kwargs: public_input())
+        packet = service.prepare(c["case_id"], question="listing_status")
+        values = service.validate_start(c["case_id"], question="listing_status", preflight_sha256=packet["preflight_sha256"])
+        expanded = auth == "claude_code_oauth"
+        expected = {"search_uses": 12 if expanded else 4, "sources": 8 if expanded else 4,
+                    "source_requests": 24 if expanded else 8, "model_timeout_seconds": 600 if expanded else 180}
+>       assert {key: packet["limits"][key] for key in expected} == expected
+E       AssertionError: assert {'model_timeo... 'sources': 8} == {'model_timeo... 'sources': 4}
+E         
+E         Differing items:
+E         {'search_uses': 12} != {'search_uses': 4}
+E         {'model_timeout_seconds': 600} != {'model_timeout_seconds': 180}
+E         {'source_requests': 24} != {'source_requests': 8}
+E         {'sources': 8} != {'sources': 4}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_investigation_budget.py:26: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/other_transports_expanded_without_admission-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_investigation_budget.py::test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[openai-api_key]
+FAILED tests/test_lifecycle_web_investigation_budget.py::test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_investigation_budget.py::test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[anthropic-api_key]
+3 failed, 674 passed in 23.12s

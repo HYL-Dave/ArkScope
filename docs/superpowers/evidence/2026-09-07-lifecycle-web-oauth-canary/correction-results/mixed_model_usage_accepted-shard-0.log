@@ -1,0 +1,85 @@
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+...........F.....F.........F............................................ [ 38%]
+........................................................................ [ 50%]
+........................................................................ [ 63%]
+........................................................................ [ 76%]
+........................................................................ [ 88%]
+................................................................         [100%]
+=================================== FAILURES ===================================
+_ test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ac09c6f2140>
+result = {'model_usage': {'claude-haiku-4-5-20251001': {}, 'claude-opus-5': {}}}
+code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+        ({"model_usage": []}, "model_usage_invalid"),
+        ({"num_turns": 100}, "model_result_incomplete"),
+        ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
+    ])
+    async def test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+>       with pytest.raises(WebModelError, match=code):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude.py:177: Failed
+_ test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ac09cb1a050>
+tmp_path = PosixPath('/dev/shm/arkscope-lifecycle-web-oauth-correction-r1/mixed_model_usage_accepted-shard-0/test_claude_mixed_model_result0')
+
+    def test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback(monkeypatch, tmp_path):
+        from src.security_lifecycle_web_pipeline import investigate
+        from tests.test_lifecycle_web_controller import controller, launch, wait_done
+    
+        mod, clients = _setup(monkeypatch, result={
+            "model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}})
+        selected = _request().selection
+        service, store, loads = controller(tmp_path, runner=investigate,
+            loader=lambda selected: WebCredential(selected, token_record=StoredTokenRecord("selected-token")))
+        try:
+            run = launch(service, selected=selected)
+            result = wait_done(service, run["run_id"])
+            assert result["status"] == "failed"
+>           assert result["failure_code"] == "execution_identity_changed"
+E           AssertionError: assert 'model_output_invalid' == 'execution_identity_changed'
+E             
+E             - execution_identity_changed
+E             + model_output_invalid
+
+tests/test_lifecycle_web_claude.py:213: AssertionError
+_ test_claude_web_requires_owned_terminal_and_exact_output[result3-execution_identity_changed] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ac09cf888b0>
+result = {'model_usage': {'claude-sonnet-5': {}}}
+code = 'execution_identity_changed'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("result,code", [
+        ({"session_id": "foreign"}, "execution_identity_changed"),
+        ({"terminal_reason": "max_turns", "is_error": True}, "model_result_incomplete"),
+        ({"terminal_reason": None}, "model_result_incomplete"),
+        ({"model_usage": {"claude-sonnet-5": {}}}, "execution_identity_changed"),
+        ({"structured_output": {"sources": [], "write_profile": True}}, "model_output_invalid"),
+    ])
+    async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, result, code):
+        mod, clients = _setup(monkeypatch, result=result)
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+>       with pytest.raises(WebModelError, match=code):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude.py:251: Failed
+- generated xml file: /tmp/arkscope-lifecycle-web-oauth-correction-r1/results/mixed_model_usage_accepted-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_owned_completed_result_rejection_does_not_erase_remote_terminal[result0-execution_identity_changed]
+FAILED tests/test_lifecycle_web_claude.py::test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback
+FAILED tests/test_lifecycle_web_claude.py::test_claude_web_requires_owned_terminal_and_exact_output[result3-execution_identity_changed]
+3 failed, 565 passed in 22.80s

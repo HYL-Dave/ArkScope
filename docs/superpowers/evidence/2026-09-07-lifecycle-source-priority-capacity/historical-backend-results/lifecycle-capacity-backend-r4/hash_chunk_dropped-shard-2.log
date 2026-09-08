@@ -1,0 +1,100 @@
+........................................................................ [ 12%]
+...............................................FFF.F.................... [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 62%]
+........................................................................ [ 75%]
+........................................................................ [ 88%]
+....................................................................     [100%]
+=================================== FAILURES ===================================
+________ test_citation_cannot_rebind_captured_source_metadata[change0] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x771f6bcd6080>
+change = {'url': 'https://other.example.com/false'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+>       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_public_sources.py:398: Failed
+________ test_citation_cannot_rebind_captured_source_metadata[change1] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x771f6bed7c40>
+change = {'body_sha256': '0000000000000000000000000000000000000000000000000000000000000000'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+>       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_public_sources.py:398: Failed
+________ test_citation_cannot_rebind_captured_source_metadata[change2] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x771f6bcd5ae0>
+change = {'retrieved_at': '2030-01-01T00:00:00+00:00'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+>       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_public_sources.py:398: Failed
+________ test_citation_cannot_rebind_captured_source_metadata[change4] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x771f6bed5780>
+change = {'mime_type': 'text/html'}
+
+    @pytest.mark.parametrize("change", [
+        {"url": "https://other.example.com/false"}, {"body_sha256": "0" * 64},
+        {"retrieved_at": "2030-01-01T00:00:00+00:00"},
+        {"redirect_chain": ("https://elsewhere.example.com",)},
+        {"mime_type": "text/html"},
+    ])
+    def test_citation_cannot_rebind_captured_source_metadata(monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_public_sources import cite_passage, SourceReadError
+    
+        reader, _, _, _ = _reader(monkeypatch)
+        page = reader.read("https://ir.example.com/notice")
+>       with pytest.raises(SourceReadError, match="source_integrity"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_public_sources.py:398: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r4/results/hash_chunk_dropped-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_public_sources.py::test_citation_cannot_rebind_captured_source_metadata[change0]
+FAILED tests/test_lifecycle_public_sources.py::test_citation_cannot_rebind_captured_source_metadata[change1]
+FAILED tests/test_lifecycle_public_sources.py::test_citation_cannot_rebind_captured_source_metadata[change2]
+FAILED tests/test_lifecycle_public_sources.py::test_citation_cannot_rebind_captured_source_metadata[change4]
+4 failed, 568 passed in 26.64s

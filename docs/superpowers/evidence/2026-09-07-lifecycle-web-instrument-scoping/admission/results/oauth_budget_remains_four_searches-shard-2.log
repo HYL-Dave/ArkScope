@@ -1,0 +1,41 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+......................................................F................. [ 31%]
+........................................................................ [ 42%]
+........................................................................ [ 53%]
+........................................................................ [ 63%]
+........................................................................ [ 74%]
+........................................................................ [ 85%]
+........................................................................ [ 95%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-instrument-campaign-temp-r1/oauth_budget_remains_four_searches-shard-2/test_only_claude_oauth_gets_th3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b163ec16410>
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget(tmp_path, monkeypatch, provider, auth):
+        c = context(tmp_path)
+        service, _, _ = setup(c, provider=provider, auth=auth)
+        monkeypatch.setattr(service, "_public_input", lambda *args, **kwargs: public_input())
+        packet = service.prepare(c["case_id"], question="listing_status")
+        values = service.validate_start(c["case_id"], question="listing_status", preflight_sha256=packet["preflight_sha256"])
+        expanded = auth == "claude_code_oauth"
+        expected = {"search_uses": 12 if expanded else 4, "sources": 8 if expanded else 4,
+                    "source_requests": 24 if expanded else 8, "model_timeout_seconds": 600 if expanded else 180}
+>       assert {key: packet["limits"][key] for key in expected} == expected
+E       AssertionError: assert {'model_timeo... 'sources': 8} == {'model_timeo... 'sources': 8}
+E         
+E         Omitting 3 identical items, use -vv to show
+E         Differing items:
+E         {'search_uses': 4} != {'search_uses': 12}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_investigation_budget.py:26: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/oauth_budget_remains_four_searches-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_investigation_budget.py::test_only_claude_oauth_gets_the_larger_preflight_and_execution_budget[anthropic-claude_code_oauth]
+1 failed, 676 passed in 22.78s

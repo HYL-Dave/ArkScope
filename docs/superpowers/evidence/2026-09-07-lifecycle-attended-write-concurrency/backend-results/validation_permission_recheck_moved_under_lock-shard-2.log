@@ -1,0 +1,54 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+.............................F.......................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+________ test_permission_is_rechecked_after_expensive_source_validation ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/validation_permission_recheck_moved_under_lock-shard-2/test_permission_is_rechecked_a0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x791f0debc790>
+
+    def test_permission_is_rechecked_after_expensive_source_validation(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path)
+        packet = prepare(c)
+        original, verified, permission_checks = LifecycleWebStore.validated_read, [], []
+        connection, opened_writers = c["service"]._profile_connection, []
+    
+        @contextmanager
+        def profile_connection(*, write):
+            if write:
+                opened_writers.append(True)
+            with connection(write=write) as conn:
+                yield conn
+    
+        def read(store, identity):
+            result = original(store, identity)
+            verified.append(True)
+            return result
+    
+        def before_write():
+            permission_checks.append(bool(verified))
+            if verified:
+                raise PermissionError("permission_revoked_during_validation")
+    
+        monkeypatch.setattr(LifecycleWebStore, "validated_read", read)
+        monkeypatch.setattr(c["service"], "_profile_connection", profile_connection)
+        with pytest.raises(PermissionError, match="permission_revoked_during_validation"):
+            confirm(c, packet, before_write=before_write)
+        assert permission_checks == [False, True]
+>       assert opened_writers == []
+E       assert [True] == []
+E         
+E         Left contains one more item: True
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_attended_concurrency.py:209: AssertionError
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/validation_permission_recheck_moved_under_lock-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_permission_is_rechecked_after_expensive_source_validation
+1 failed, 462 passed in 22.09s

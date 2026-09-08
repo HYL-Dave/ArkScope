@@ -1,0 +1,48 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+....................................FF.................................. [ 31%]
+........................................................................ [ 42%]
+........................................................................ [ 53%]
+........................................................................ [ 63%]
+........................................................................ [ 74%]
+........................................................................ [ 85%]
+........................................................................ [ 95%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71a140ff2f50>
+phase = 'analysis', bad_turns = 4
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_turns.py:34: Failed
+_ test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71a1caaf23b0>
+phase = 'search', bad_turns = 6
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_turns.py:34: Failed
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/terminal_allowance_is_unbounded-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[search-6]
+2 failed, 675 passed in 22.28s

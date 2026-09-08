@@ -1,0 +1,41 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+....................................................................F... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>4] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/extra_usage_fields_silently_discarded-shard-0/test_usage_receipt_rejects_cro4')
+mutate = <function <lambda> at 0x7f6a8291d6c0>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+        control.bind_remote_id("search-1", "remote-search")
+        control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+        report = _report()
+        mutate(report)
+>       with pytest.raises(WebJournalError, match="^web_result_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:138: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/extra_usage_fields_silently_discarded-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>4]
+1 failed, 460 passed in 21.38s

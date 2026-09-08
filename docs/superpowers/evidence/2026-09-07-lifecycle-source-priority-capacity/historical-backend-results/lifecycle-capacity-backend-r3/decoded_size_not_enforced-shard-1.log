@@ -1,0 +1,27 @@
+........................................................................ [ 11%]
+................................F....................................... [ 22%]
+........................................................................ [ 34%]
+........................................................................ [ 45%]
+........................................................................ [ 57%]
+........................................................................ [ 68%]
+........................................................................ [ 80%]
+........................................................................ [ 91%]
+...................................................                      [100%]
+=================================== FAILURES ===================================
+_______ test_decoded_size_budget_is_separate_and_never_returns_a_prefix ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72baa64db6d0>
+
+    def test_decoded_size_budget_is_separate_and_never_returns_a_prefix(monkeypatch):
+        body = b"A" * 100000
+        encoded = gzip.compress(body)
+        reader = _wire_reader(monkeypatch, encoded, f"Content-Length: {len(encoded)}", "Content-Encoding: gzip",
+                              max_response_bytes=1000, max_decoded_bytes=99999)
+>       with pytest.raises(SourceReadError, match="^source_decoded_body_too_large$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_source_compatibility.py:122: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r3/results/decoded_size_not_enforced-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_compatibility.py::test_decoded_size_budget_is_separate_and_never_returns_a_prefix
+1 failed, 626 passed in 18.17s

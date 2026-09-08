@@ -1,0 +1,138 @@
+........................................................................ [ 13%]
+........................................................................ [ 26%]
+........FF...FFFF....................................................... [ 40%]
+........................................................................ [ 53%]
+........................................................................ [ 66%]
+........................................................................ [ 80%]
+........................................................................ [ 93%]
+..................................                                       [100%]
+=================================== FAILURES ===================================
+____ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted] _____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/old_client_can_confirm_unseen_gaps-shard-1/test_old_or_malformed_confirma0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76943513ac20>
+acknowledgement = 'omitted'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+>           assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+E           AssertionError: {"version":1,"status":"applied","transition_id":"tit_c844ac64bdc241ce89217b72aabdad39","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","packet_sha256":"c13f7e93d43874abfbf4664c1e3cc46c998c8f7ffebcc100180e241260e34870","action":"terminal_delisting","source_ticker":"OLD","successor_ticker":null,"execute_on":"2026-09-01","applied_at":"2026-09-06T01:00:00Z","current_effects_match":true,"block_reasons":[]}
+E           assert 200 == 409
+E            +  where 200 = <Response [200 OK]>.status_code
+
+tests/test_lifecycle_web_gaps.py:84: AssertionError
+_____ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/old_client_can_confirm_unseen_gaps-shard-1/test_old_or_malformed_confirma1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7694351045b0>
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+            assert packet["ready"] and packet["source_gaps"] == GAPS
+            body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
+            if acknowledgement != "omitted":
+                body["acknowledge_source_gaps"] = acknowledgement
+            before = rows(c)
+            response = client.post(route + "/confirm", json=body)
+>           assert response.status_code == (409 if acknowledgement in ("omitted", False) else 422), response.text
+E           AssertionError: {"version":1,"status":"applied","transition_id":"tit_b75fb8aff8444da5bc0bc9aa753a170b","case_id":"slc_c32970319a94016ddf258a0252d2ca09f4356f830993df66f0569563d1c8b28c","packet_sha256":"8625215e5042b0d8c194f658ae86b185b60fa1270bb42486140e9b7214e0c58b","action":"terminal_delisting","source_ticker":"OLD","successor_ticker":null,"execute_on":"2026-09-01","applied_at":"2026-09-06T01:00:00Z","current_effects_match":true,"block_reasons":[]}
+E           assert 200 == 409
+E            +  where 200 = <Response [200 OK]>.status_code
+
+tests/test_lifecycle_web_gaps.py:84: AssertionError
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[False] _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/old_client_can_confirm_unseen_gaps-shard-1/test_direct_adoption_requires_0')
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+>       with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:99: Failed
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[None] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/old_client_can_confirm_unseen_gaps-shard-1/test_direct_adoption_requires_1')
+acknowledgement = None
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+>       with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:99: Failed
+_________ test_direct_adoption_requires_literal_gap_acknowledgement[1] _________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/old_client_can_confirm_unseen_gaps-shard-1/test_direct_adoption_requires_2')
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+>       with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:99: Failed
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[true] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/old_client_can_confirm_unseen_gaps-shard-1/test_direct_adoption_requires_3')
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+>       with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:99: Failed
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/old_client_can_confirm_unseen_gaps-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[None]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[1]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[true]
+6 failed, 532 passed in 27.28s

@@ -1,0 +1,29 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+........F............................................................... [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+_ test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation _
+
+tmp_path = PosixPath('/dev/shm/arkscope-source-context-backend-r2/old_source_cap_restored-shard-0/test_source_capacity_is_separa0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7db8b88489a0>
+
+    def test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation(tmp_path, monkeypatch):
+        c = context(tmp_path)
+        service, _, _ = setup(c)
+        monkeypatch.setattr(service, "_public_input", lambda *args, **kwargs: public_input())
+        packet = service.prepare(c["case_id"], question="listing_status")
+        values = service.validate_start(c["case_id"], question="listing_status", preflight_sha256=packet["preflight_sha256"])
+>       assert values["options"].max_source_bytes == packet["limits"]["max_source_bytes"] == 16 * 1024 * 1024
+E       assert 2097152 == ((16 * 1024) * 1024)
+
+tests/test_lifecycle_web_preflight.py:63: AssertionError
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/old_source_cap_restored-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_preflight.py::test_source_capacity_is_separate_from_model_tokens_and_bound_to_confirmation
+1 failed, 595 passed in 23.71s

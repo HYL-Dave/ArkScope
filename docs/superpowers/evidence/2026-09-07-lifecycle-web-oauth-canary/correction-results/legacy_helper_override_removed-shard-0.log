@@ -1,0 +1,60 @@
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+.........FF............................................................. [ 38%]
+........................................................................ [ 50%]
+........................................................................ [ 63%]
+........................................................................ [ 76%]
+........................................................................ [ 88%]
+................................................................         [100%]
+=================================== FAILURES ===================================
+_ test_claude_web_pins_internal_helper_models_to_exact_selected_model[search] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e1e23bd4130>
+phase = 'search'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(monkeypatch, phase):
+        monkeypatch.setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "ambient-helper-model")
+        monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "ambient-legacy-helper")
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase=phase, call_id=phase + "-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        await mod.call_claude_web(request, credential, control)
+        environment = clients[0].options.env
+        assert environment["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == request.selection.model
+>       assert environment["ANTHROPIC_SMALL_FAST_MODEL"] == request.selection.model
+E       AssertionError: assert '' == 'claude-opus-5'
+E         
+E         - claude-opus-5
+
+tests/test_lifecycle_web_claude.py:161: AssertionError
+_ test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e1e23f13400>
+phase = 'analysis'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase", ["search", "analysis"])
+    async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(monkeypatch, phase):
+        monkeypatch.setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "ambient-helper-model")
+        monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "ambient-legacy-helper")
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase=phase, call_id=phase + "-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        await mod.call_claude_web(request, credential, control)
+        environment = clients[0].options.env
+        assert environment["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == request.selection.model
+>       assert environment["ANTHROPIC_SMALL_FAST_MODEL"] == request.selection.model
+E       AssertionError: assert '' == 'claude-opus-5'
+E         
+E         - claude-opus-5
+
+tests/test_lifecycle_web_claude.py:161: AssertionError
+- generated xml file: /tmp/arkscope-lifecycle-web-oauth-correction-r1/results/legacy_helper_override_removed-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_web_pins_internal_helper_models_to_exact_selected_model[search]
+FAILED tests/test_lifecycle_web_claude.py::test_claude_web_pins_internal_helper_models_to_exact_selected_model[analysis]
+2 failed, 566 passed in 22.30s

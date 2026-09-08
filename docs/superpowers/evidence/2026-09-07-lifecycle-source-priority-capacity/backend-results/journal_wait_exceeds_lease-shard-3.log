@@ -1,0 +1,115 @@
+..........................FF..F......................................... [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 77%]
+........................................................................ [ 96%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+______ test_web_journal_wait_is_bounded_below_the_unchanged_lease[False] _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/journal_wait_exceeds_lease-shard-3/test_web_journal_wait_is_bound0')
+write = False
+
+    @pytest.mark.parametrize("write", [False, True])
+    def test_web_journal_wait_is_bounded_below_the_unchanged_lease(tmp_path, write):
+        from src.lifecycle_web_store import LEASE_SECONDS
+    
+        _, store = setup_store(tmp_path)
+        with store.connection(write=write) as conn:
+>           assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 45_000
+E           assert 600000 == 45000
+
+tests/test_lifecycle_source_progress.py:18: AssertionError
+_______ test_web_journal_wait_is_bounded_below_the_unchanged_lease[True] _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/journal_wait_exceeds_lease-shard-3/test_web_journal_wait_is_bound1')
+write = True
+
+    @pytest.mark.parametrize("write", [False, True])
+    def test_web_journal_wait_is_bounded_below_the_unchanged_lease(tmp_path, write):
+        from src.lifecycle_web_store import LEASE_SECONDS
+    
+        _, store = setup_store(tmp_path)
+        with store.connection(write=write) as conn:
+>           assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 45_000
+E           assert 600000 == 45000
+
+tests/test_lifecycle_source_progress.py:18: AssertionError
+_____ test_web_journal_wait_preserves_owner_cancellation_and_failure[busy] _____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/journal_wait_exceeds_lease-shard-3/test_web_journal_wait_preserve2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7faa5b1f3880>
+competing_write = 'busy'
+
+    @pytest.mark.parametrize("competing_write", ["commit", "cancel", "busy"])
+    def test_web_journal_wait_preserves_owner_cancellation_and_failure(tmp_path, monkeypatch, competing_write):
+        from src.lifecycle_web_store import WebJournalError
+    
+        path, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        connect, waiting = sqlite3.connect, Event()
+    
+        def scaled_connection(*args, **kwargs):
+            # Exercise real SQLite contention at 1/100 of the configured wait.
+            kwargs["timeout"] *= 0.01
+            conn = connect(*args, **kwargs)
+            conn.set_trace_callback(lambda sql: waiting.set() if sql == "BEGIN IMMEDIATE" else None)
+            return conn
+    
+        with connect(path) as competing:
+            competing.execute("BEGIN IMMEDIATE")
+            if competing_write == "cancel":
+                competing.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (AT, identity))
+            monkeypatch.setattr(sqlite3, "connect", scaled_connection)
+            with ThreadPoolExecutor(max_workers=1) as worker:
+                future = worker.submit(store.heartbeat, identity, owner="worker-1")
+                assert waiting.wait(5)
+                if competing_write == "busy":
+                    with pytest.raises(WebJournalError, match="^web_recording_unavailable$"):
+>                       future.result(timeout=2)
+
+tests/test_lifecycle_source_progress.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None, timeout = 2
+
+    def result(self, timeout=None):
+        """Return the result of the call that the future represents.
+    
+        Args:
+            timeout: The number of seconds to wait for the result if the future
+                isn't done. If None, then there is no limit on the wait time.
+    
+        Returns:
+            The result of the call that the future represents.
+    
+        Raises:
+            CancelledError: If the future was cancelled.
+            TimeoutError: If the future didn't finish executing before the given
+                timeout.
+            Exception: If the call raised then that exception will be raised.
+        """
+        try:
+            with self._condition:
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+                    return self.__get_result()
+    
+                self._condition.wait(timeout)
+    
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+                    return self.__get_result()
+                else:
+>                   raise TimeoutError()
+E                   concurrent.futures._base.TimeoutError
+
+/usr/lib/python3.10/concurrent/futures/_base.py:460: TimeoutError
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/journal_wait_exceeds_lease-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_progress.py::test_web_journal_wait_is_bounded_below_the_unchanged_lease[False]
+FAILED tests/test_lifecycle_source_progress.py::test_web_journal_wait_is_bounded_below_the_unchanged_lease[True]
+FAILED tests/test_lifecycle_source_progress.py::test_web_journal_wait_preserves_owner_cancellation_and_failure[busy]
+3 failed, 371 passed in 24.37s

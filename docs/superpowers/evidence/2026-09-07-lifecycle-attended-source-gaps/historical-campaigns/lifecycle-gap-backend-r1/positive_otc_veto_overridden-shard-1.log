@@ -1,0 +1,26 @@
+........................................................................ [ 17%]
+........................................................................ [ 35%]
+.........F.............................................................. [ 53%]
+........................................................................ [ 71%]
+........................................................................ [ 89%]
+............................................                             [100%]
+=================================== FAILURES ===================================
+_ test_current_active_otc_veto_is_not_lost_when_other_provider_requests_failed _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/positive_otc_veto_overridden-shard-1/test_current_active_otc_veto_i0')
+
+    def test_current_active_otc_veto_is_not_lost_when_other_provider_requests_failed(tmp_path):
+        from src.security_lifecycle_listing_evidence import _evidence
+        from tests.test_security_lifecycle_provider_authority import record
+        c = context(tmp_path)
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=[_evidence(record("massive_reference", "active", market="otc"))],
+                           diagnostics={}, blockers=("massive_unavailable",))
+        packet = prepare(c)
+>       assert packet["ready"] is False and "web_active_listing_conflict" in packet["block_reasons"]
+E       AssertionError: assert (False is False and 'web_active_listing_conflict' in ['web_observation_changed'])
+
+tests/test_lifecycle_web_review.py:151: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/positive_otc_veto_overridden-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_review.py::test_current_active_otc_veto_is_not_lost_when_other_provider_requests_failed
+1 failed, 403 passed in 18.70s

@@ -1,0 +1,10 @@
+{"stage": "model", "at_seconds": 1.876, "job": "first", "phase": "search"}
+{"stage": "model", "at_seconds": 42.424, "job": "first", "phase": "analysis"}
+{"stage": "first_completed", "at_seconds": 53.668}
+{"stage": "packet_prepared", "at_seconds": 64.192}
+{"stage": "model", "at_seconds": 64.237, "job": "second", "phase": "search"}
+{"stage": "human_confirmation_started", "at_seconds": 64.244}
+{"stage": "human_confirmation_finished", "at_seconds": 84.311, "error": null}
+{"stage": "model", "at_seconds": 109.54, "job": "second", "phase": "analysis"}
+{"stage": "second_worker_finished", "at_seconds": 133.545}
+{"stage": "measurement_finished", "at_seconds": 146.771, "passed": true}

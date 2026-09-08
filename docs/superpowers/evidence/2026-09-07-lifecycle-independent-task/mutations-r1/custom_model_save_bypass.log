@@ -1,0 +1,36 @@
+........................................................................ [  7%]
+........................................................................ [ 14%]
+.......FF.................................F............................. [ 22%]
+........................................................................ [ 29%]
+........................................................................ [ 36%]
+........................................................................ [ 44%]
+........................................................................ [ 51%]
+........................................................................ [ 59%]
+........................................................................ [ 66%]
+........................................................................ [ 73%]
+........................................................................ [ 81%]
+........................................................................ [ 88%]
+........................................................................ [ 95%]
+........................................                                 [100%]
+=================================== FAILURES ===================================
+_ test_investigation_save_rejects_unsupported_models_before_writing[gpt-unknown-custom-model_not_in_registry] _
+tests/test_lifecycle_investigation_routing.py:172: in test_investigation_save_rejects_unsupported_models_before_writing
+    with pytest.raises(HTTPException) as caught:
+E   Failed: DID NOT RAISE <class 'fastapi.exceptions.HTTPException'>
+______ test_investigation_import_does_not_accept_models_save_would_reject ______
+tests/test_lifecycle_investigation_routing.py:183: in test_investigation_import_does_not_accept_models_save_would_reject
+    assert TASK in config_routes.import_model_routes(store=credentials)["skipped"]
+E   AssertionError: assert 'lifecycle_investigation' in ['card_synthesis', 'card_translation', 'ai_research']
+_ test_investigation_schema_check_cannot_bypass_model_policy[openai-api_key-gpt-unknown-custom] _
+tests/test_lifecycle_investigation_task_test.py:129: in test_investigation_schema_check_cannot_bypass_model_policy
+    assert result.status == "unsupported"
+E   AssertionError: assert 'error' == 'unsupported'
+E     
+E     - unsupported
+E     + error
+- generated xml file: /tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/mutations-r1/custom_model_save_bypass.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_investigation_routing.py::test_investigation_save_rejects_unsupported_models_before_writing[gpt-unknown-custom-model_not_in_registry]
+FAILED tests/test_lifecycle_investigation_routing.py::test_investigation_import_does_not_accept_models_save_would_reject
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_cannot_bypass_model_policy[openai-api_key-gpt-unknown-custom]
+3 failed, 973 passed in 246.41s (0:04:06)

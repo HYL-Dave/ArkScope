@@ -1,0 +1,99 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+..................................FF.................................... [ 36%]
+........................................................................ [ 49%]
+........................................................................ [ 61%]
+........................................................................ [ 73%]
+........................................................................ [ 85%]
+........................................................................ [ 98%]
+...........                                                              [100%]
+=================================== FAILURES ===================================
+_ test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cab83b81240>
+phase = 'analysis', tool_budget = 2
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_turns.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:263: in call_claude_web
+    _validate_result(message, call=call, status=status)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = ResultMessage(subtype='success', duration_ms=100, duration_api_ms=50, is_error=False, num_turns=3, session_id='aeea3dd...=None, deferred_tool_use=None, errors=None, api_error_status=None, uuid=None, terminal_reason='completed', origin=None)
+
+    def _validate_result(message: ResultMessage, *, call: ModelCall, status: str) -> None:
+        usage = message.model_usage
+        if usage is not None:
+            if not isinstance(usage, dict):
+                raise WebModelError("model_usage_invalid")
+            for model in usage:
+                require_response_model({"model": model}, call.selection.model)
+        if status != "completed":
+            return
+        # max_turns bounds tool round trips; num_turns also includes completion.
+        max_total_turns = _tool_round_trip_limit(call)
+        if type(message.num_turns) is not int or not 0 < message.num_turns <= max_total_turns:
+>           raise WebModelError("model_result_incomplete")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_result_incomplete
+
+src/auth_drivers/lifecycle_web_claude.py:133: WebModelError
+_ test_claude_completed_result_includes_final_turn_after_tool_budget[search-4] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cac071cc610>
+phase = 'search', tool_budget = 4
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_turns.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:263: in call_claude_web
+    _validate_result(message, call=call, status=status)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = ResultMessage(subtype='success', duration_ms=100, duration_api_ms=50, is_error=False, num_turns=5, session_id='ea87cf3...=None, deferred_tool_use=None, errors=None, api_error_status=None, uuid=None, terminal_reason='completed', origin=None)
+
+    def _validate_result(message: ResultMessage, *, call: ModelCall, status: str) -> None:
+        usage = message.model_usage
+        if usage is not None:
+            if not isinstance(usage, dict):
+                raise WebModelError("model_usage_invalid")
+            for model in usage:
+                require_response_model({"model": model}, call.selection.model)
+        if status != "completed":
+            return
+        # max_turns bounds tool round trips; num_turns also includes completion.
+        max_total_turns = _tool_round_trip_limit(call)
+        if type(message.num_turns) is not int or not 0 < message.num_turns <= max_total_turns:
+>           raise WebModelError("model_result_incomplete")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: model_result_incomplete
+
+src/auth_drivers/lifecycle_web_claude.py:133: WebModelError
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/completion_is_mistaken_for_extra_tool_round_trip-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]
+2 failed, 585 passed in 23.78s

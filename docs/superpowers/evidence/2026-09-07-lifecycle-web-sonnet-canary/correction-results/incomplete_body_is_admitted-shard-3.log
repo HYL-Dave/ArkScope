@@ -1,0 +1,23 @@
+..................F..................................................... [ 23%]
+........................................................................ [ 47%]
+........................................................................ [ 70%]
+........................................................................ [ 94%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+________________ test_real_truncated_response_remains_rejected _________________
+
+wire = (<function wire.<locals>.start at 0x766cb0f82050>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+
+    def test_real_truncated_response_remains_rejected(wire):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Incomplete notice", length=1000)
+>       with pytest.raises(SourceReadError, match="^source_body_incomplete$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_public_sources_wire.py:154: Failed
+- generated xml file: /tmp/arkscope-lifecycle-web-source-correction-r1/results/incomplete_body_is_admitted-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_public_sources_wire.py::test_real_truncated_response_remains_rejected
+1 failed, 305 passed in 45.55s

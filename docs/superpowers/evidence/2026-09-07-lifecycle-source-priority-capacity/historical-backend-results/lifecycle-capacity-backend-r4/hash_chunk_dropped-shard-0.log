@@ -1,0 +1,152 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+.......FFFFFF........................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+................................                                         [100%]
+=================================== FAILURES ===================================
+___ test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[ascii] ___
+
+text = 'plain ASCII'
+
+    @pytest.mark.parametrize("text", [
+        "plain ASCII", "quoted \"value\" \\ tab\tline\n", "\u4e0b\u5e02 / \U00020000",
+        "x" * 65535 + "\U00020000\"\\" + "\u4e2d" * 70000,
+    ], ids=["ascii", "escapes", "unicode", "chunk_boundary"])
+    def test_streamed_page_fingerprints_are_byte_identical_to_legacy_json(text):
+        from src.lifecycle_public_sources import _capture_digest, _page_material_digest
+    
+        page = source_page(text)
+        material = asdict(page)
+        expected = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+>       assert _page_material_digest(material) == expected(material)
+E       AssertionError: assert '762846854e20...4ed5fa9c9dda0' == '0b900a39c1bb...7555d72974dae'
+E         
+E         - 0b900a39c1bb3b7be2e2de89fbc5a639bd7b56228f43cd8f33d7555d72974dae
+E         + 762846854e20ea6a3f01f81112664c6c27c2af69ffed56d81cf4ed5fa9c9dda0
+
+tests/test_lifecycle_source_capacity.py:20: AssertionError
+__ test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[escapes] __
+
+text = 'quoted "value" \\ tab\tline\n'
+
+    @pytest.mark.parametrize("text", [
+        "plain ASCII", "quoted \"value\" \\ tab\tline\n", "\u4e0b\u5e02 / \U00020000",
+        "x" * 65535 + "\U00020000\"\\" + "\u4e2d" * 70000,
+    ], ids=["ascii", "escapes", "unicode", "chunk_boundary"])
+    def test_streamed_page_fingerprints_are_byte_identical_to_legacy_json(text):
+        from src.lifecycle_public_sources import _capture_digest, _page_material_digest
+    
+        page = source_page(text)
+        material = asdict(page)
+        expected = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+>       assert _page_material_digest(material) == expected(material)
+E       AssertionError: assert '762846854e20...4ed5fa9c9dda0' == 'd053e0259766...11818a026dc38'
+E         
+E         - d053e02597663c098c7932045c0f99f95e0a73e13b9ed20070a11818a026dc38
+E         + 762846854e20ea6a3f01f81112664c6c27c2af69ffed56d81cf4ed5fa9c9dda0
+
+tests/test_lifecycle_source_capacity.py:20: AssertionError
+__ test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[unicode] __
+
+text = '下市 / 𠀀'
+
+    @pytest.mark.parametrize("text", [
+        "plain ASCII", "quoted \"value\" \\ tab\tline\n", "\u4e0b\u5e02 / \U00020000",
+        "x" * 65535 + "\U00020000\"\\" + "\u4e2d" * 70000,
+    ], ids=["ascii", "escapes", "unicode", "chunk_boundary"])
+    def test_streamed_page_fingerprints_are_byte_identical_to_legacy_json(text):
+        from src.lifecycle_public_sources import _capture_digest, _page_material_digest
+    
+        page = source_page(text)
+        material = asdict(page)
+        expected = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+>       assert _page_material_digest(material) == expected(material)
+E       AssertionError: assert '762846854e20...4ed5fa9c9dda0' == '104d13c44641...a873feeb5a3d9'
+E         
+E         - 104d13c446418e72a739d75e113ec4ba7e3046d19dc4c95b1dfa873feeb5a3d9
+E         + 762846854e20ea6a3f01f81112664c6c27c2af69ffed56d81cf4ed5fa9c9dda0
+
+tests/test_lifecycle_source_capacity.py:20: AssertionError
+_ test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[chunk_boundary] _
+
+text = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中'
+
+    @pytest.mark.parametrize("text", [
+        "plain ASCII", "quoted \"value\" \\ tab\tline\n", "\u4e0b\u5e02 / \U00020000",
+        "x" * 65535 + "\U00020000\"\\" + "\u4e2d" * 70000,
+    ], ids=["ascii", "escapes", "unicode", "chunk_boundary"])
+    def test_streamed_page_fingerprints_are_byte_identical_to_legacy_json(text):
+        from src.lifecycle_public_sources import _capture_digest, _page_material_digest
+    
+        page = source_page(text)
+        material = asdict(page)
+        expected = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+>       assert _page_material_digest(material) == expected(material)
+E       AssertionError: assert '70b29c097ebb...4abff83192de6' == 'fe6f218d2eee...8a2b2d2f9843b'
+E         
+E         - fe6f218d2eee76768483e98999683b0573ea8d948fd67c7afad8a2b2d2f9843b
+E         + 70b29c097ebb77a31e78a38ba9acae678e464399baf94ef6a634abff83192de6
+
+tests/test_lifecycle_source_capacity.py:20: AssertionError
+________ test_large_page_hash_never_serializes_the_whole_source_at_once ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70f93c12c580>
+
+    def test_large_page_hash_never_serializes_the_whole_source_at_once(monkeypatch):
+        from src import lifecycle_public_sources as sources
+    
+        page = source_page("\U00020000" * (512 * 1024))
+        expected = page.capture_sha256
+        original = json.dumps
+        chunks = []
+    
+        def bounded(value, **kwargs):
+            if isinstance(value, dict):
+                assert len(value.get("text", "")) <= 65536
+            if isinstance(value, str):
+                assert len(value) <= 65536
+                chunks.append(len(value))
+            return original(value, **kwargs)
+    
+        monkeypatch.setattr(sources.json, "dumps", bounded)
+        assert sources._capture_digest(page) == expected
+>       assert len([length for length in chunks if length == 65536]) == 8
+E       assert 7 == 8
+E        +  where 7 = len([65536, 65536, 65536, 65536, 65536, 65536, ...])
+
+tests/test_lifecycle_source_capacity.py:44: AssertionError
+_ test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r4/hash_chunk_dropped-shard-0/test_unicode_source_journal_av0')
+
+    def test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests(tmp_path):
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_lifecycle_web_store import setup_store, start
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        text = "\u6539\u540d \U00020000\n" * 10000
+        page = source_page(text)
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=page)
+        material = asdict(page)
+        with store.connection(write=True) as conn:
+            row = conn.execute("SELECT page_json,page_sha256 FROM lifecycle_web_pages WHERE run_id=?", (identity,)).fetchone()
+            assert len(row["page_json"].encode()) < len(text.encode()) * 1.2
+>           assert row["page_sha256"] == _sha(material)
+E           AssertionError: assert '762846854e20...4ed5fa9c9dda0' == '59a07d09bdf3...dd735d36f4d7f'
+E             
+E             - 59a07d09bdf3317e4ea72055a1f8becbe9b66d9333f9b31fac4dd735d36f4d7f
+E             + 762846854e20ea6a3f01f81112664c6c27c2af69ffed56d81cf4ed5fa9c9dda0
+
+tests/test_lifecycle_source_capacity.py:60: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r4/results/hash_chunk_dropped-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_capacity.py::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[ascii]
+FAILED tests/test_lifecycle_source_capacity.py::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[escapes]
+FAILED tests/test_lifecycle_source_capacity.py::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[unicode]
+FAILED tests/test_lifecycle_source_capacity.py::test_streamed_page_fingerprints_are_byte_identical_to_legacy_json[chunk_boundary]
+FAILED tests/test_lifecycle_source_capacity.py::test_large_page_hash_never_serializes_the_whole_source_at_once
+FAILED tests/test_lifecycle_source_capacity.py::test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests
+6 failed, 458 passed in 25.71s

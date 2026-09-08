@@ -1,0 +1,72 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 46%]
+.........F.............................................................. [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_inconsistent_pipeline_total_is_rejected_before_success_but_phase_usage_is_retained _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/pipeline_total_not_bound_before_write-shard-0/test_inconsistent_pipeline_tot0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71b933b142e0>
+
+    def test_inconsistent_pipeline_total_is_rejected_before_success_but_phase_usage_is_retained(tmp_path, monkeypatch):
+        from src import security_lifecycle_web_pipeline as pipeline
+    
+        monkeypatch.setattr(pipeline, "_sum_usage", lambda replies: {"input_tokens": 4, "output_tokens": 1036})
+>       result, store, calls, _, _ = run_pipeline(tmp_path, monkeypatch)
+
+tests/test_lifecycle_web_usage_journal.py:207: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_usage_journal.py:46: in run_pipeline
+    result = wait_done(service, launch(service, selected=selected)["run_id"])
+tests/test_lifecycle_web_controller.py:65: in wait_done
+    return service.read(identity)
+src/lifecycle_web_controller.py:159: in read
+    return project_web_run(self.store.read(identity, include_running_sources=False), at=self.store._now())
+src/lifecycle_web_store.py:355: in read
+    return self._read_material(row, header, calls, saved, pages)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = {'cancel_requested_at': None, 'case_id': 'case-1', 'created_at': '2026-09-06T01:00:00+00:00', 'failure_code': None, ...}
+header = {'case_id': 'case-1', 'credential_generation': None, 'observation_sha256': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...', 'options': {'effort': 'high', 'max_decoded_source_bytes': None, 'max_redirects': 1, 'max_search_uses': 2, ...}, ...}
+calls = {'analysis-1': {'remote_id': 'remote-analysis', 'terminal': 'completed'}, 'search-1': {'remote_id': 'remote-search', 'terminal': 'completed'}}
+saved = <sqlite3.Row object at 0x71b933b150c0>
+pages = {'source-1': PublicSourcePage(url='https://ir.example.com/notice', redirect_chain=(), body_sha256='b3194862545ec09f0a5...ved_at='2026-09-06T01:00:00+00:00', capture_sha256='89aa8702de01547a471370a10196a4cc73a905f4a3220dc3b2ef93c4eac25d78')}
+
+    @staticmethod
+    def _read_material(row, header, calls, saved, pages):
+        result = {**row, "request": PublicInvestigationInput.model_validate(header["request"]),
+                  "selection": ExecutionSelection(**header["selection"]), "options": WebInvestigationOptions(**header["options"]),
+                  "observation_sha256": header["observation_sha256"], "finding": None,
+                  "credential_generation": header.get("credential_generation"),
+                  "calls": calls, "pages": pages}
+        if saved is not None:
+            value = json.loads(saved["payload_json"])
+            if type(value) is not dict or _sha(value) != saved["result_sha256"]:
+                raise WebJournalError("web_journal_integrity")
+            if "usage_report" in value:
+                _, report = LifecycleWebStore._usage_report(value["usage_report"], calls, "web_journal_integrity")
+                result.update(usage_report=report, usage=report["totals"])
+            if row["status"] != "succeeded":
+                if (row["status"] not in TERMINAL or not value
+                        or set(value) - {"failure_source_read_report", "usage_report"}):
+                    raise WebJournalError("web_journal_integrity")
+                if "failure_source_read_report" in value:
+                    report = validate_source_read_report(value["failure_source_read_report"], max_requests=header["options"]["max_source_requests"])
+                    result.update(source_read_report=report, source_requests=report["requests"])
+                return result
+            try:
+                value["usage"] = token_totals(value.get("usage"))
+            except WebModelError:
+                raise WebJournalError("web_journal_integrity") from None
+            if "usage_report" in value and result["usage"] != value["usage"]:
+>               raise WebJournalError("web_journal_integrity")
+E               src.lifecycle_web_schema.WebJournalError: web_journal_integrity
+
+src/lifecycle_web_store.py:435: WebJournalError
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/pipeline_total_not_bound_before_write-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_inconsistent_pipeline_total_is_rejected_before_success_but_phase_usage_is_retained
+1 failed, 460 passed in 21.14s

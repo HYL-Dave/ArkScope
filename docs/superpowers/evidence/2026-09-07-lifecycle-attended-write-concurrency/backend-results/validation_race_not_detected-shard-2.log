@@ -1,0 +1,44 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+..................F..................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_ test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read[during_validation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/validation_race_not_detected-shard-2/test_page_rewrite_with_unchang0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76447bff90c0>
+when = 'during_validation'
+
+    @pytest.mark.parametrize("when", ["during_validation", "after_validation"])
+    def test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read(tmp_path, monkeypatch, when):
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path)
+        original, changed = LifecycleWebStore._decode_page, []
+    
+        def rewrite():
+            with sqlite3.connect(c["profile"]) as conn:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute("UPDATE lifecycle_web_pages SET page_json='{}' WHERE run_id=?", (c["run_id"],))
+                conn.execute(TRIGGERS[trigger])
+            changed.append(True)
+    
+        if when == "during_validation":
+            def decode(row):
+                result = original(row)
+                rewrite()
+                return result
+            monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:102: Failed
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/validation_race_not_detected-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read[during_validation]
+1 failed, 462 passed in 22.16s

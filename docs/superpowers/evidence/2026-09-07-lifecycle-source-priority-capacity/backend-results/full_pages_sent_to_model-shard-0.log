@@ -1,0 +1,40 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+..............F.................                                         [100%]
+=================================== FAILURES ===================================
+__ test_large_source_is_saved_whole_but_analysis_receives_traceable_passages ___
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79dde906a2f0>
+
+    @pytest.mark.anyio
+    async def test_large_source_is_saved_whole_but_analysis_receives_traceable_passages(monkeypatch):
+        from src import security_lifecycle_web_pipeline as mod
+        from tests.test_lifecycle_source_context import long_source
+    
+        selection = validate_selection("openai", "api_key", "gpt-5.6-luna", "local:7")
+        control = RunControl(selection=selection, max_model_requests=2)
+        reader, calls, saved = Reader(), [], []
+        page = source_page(long_source())
+        monkeypatch.setattr(reader, "read", lambda url: page)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
+        result = await mod.investigate(public_input(), WebCredential(selection, api_key="selected"), control,
+                                        options=_options("api_key"), reader_factory=lambda limits: reader,
+                                        on_source=lambda identity, value: saved.append(value))
+        assert saved == [page] and result.pages["source-1"].text == long_source()
+        prompt = calls[1][0].prompt
+        assert NOTICE in prompt and "remain actively traded OTC" in prompt
+>       assert len(prompt) < len(page.text) / 10
+E       assert 390169 < (381952 / 10)
+E        +  where 390169 = len('Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...ormation.\\nHowever, the ordinary shares remain actively traded OTC."}]}],"unread_sources":[],"search_uncertainty":[]}')
+E        +  and   381952 = len('Public announcement\nUnrelated navigation entry 0: decorative layout information.\nUnrelated navigation entry 1: deco...elated navigation entry 2999: decorative layout information.\nHowever, the ordinary shares remain actively traded OTC.')
+E        +    where 'Public announcement\nUnrelated navigation entry 0: decorative layout information.\nUnrelated navigation entry 1: deco...elated navigation entry 2999: decorative layout information.\nHowever, the ordinary shares remain actively traded OTC.' = PublicSourcePage(url='https://ir.example.com/notice', redirect_chain=(), body_sha256='248573b0d242fef497a819114d683a5b...eved_at='2026-09-06T01:00:00+00:00', capture_sha256='b9c781d3808685d05be071f4d0a0559e358e5f703e4b37b157004db71896f055').text
+
+tests/test_security_lifecycle_web_pipeline.py:189: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/full_pages_sent_to_model-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_large_source_is_saved_whole_but_analysis_receives_traceable_passages
+1 failed, 463 passed in 42.59s

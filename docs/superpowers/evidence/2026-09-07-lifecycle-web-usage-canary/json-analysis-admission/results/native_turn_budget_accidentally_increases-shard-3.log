@@ -1,0 +1,62 @@
+.......................................FF............................... [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 60%]
+........................................................................ [ 80%]
+.....................................................................    [100%]
+=================================== FAILURES ===================================
+___ test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a68c7fd2950>
+
+    @pytest.mark.anyio
+    async def test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "ambient-key")
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "ambient-token")
+        request = _request()
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=2)
+        reply = await mod.call_claude_web(request, credential, control)
+        client = clients[0]
+        options = client.options
+        assert reply.output == OUTPUT and control.all_requests_terminal
+        assert options.tools == ["WebSearch"] and options.allowed_tools == ["WebSearch"]
+        assert {"Bash", "Read", "Write", "Edit", "WebFetch", "Task", "Skill"}.issubset(options.disallowed_tools)
+        assert "WebSearch" not in options.disallowed_tools
+        assert options.permission_mode == "dontAsk" and options.strict_mcp_config is True
+        assert options.setting_sources == [] and options.mcp_servers == {}
+        assert options.cli_path == "/reviewed/bundled/claude"
+        assert options.env["CLAUDE_CODE_OAUTH_TOKEN"] == "selected-token"
+        assert options.env.get("ANTHROPIC_API_KEY", "") == ""
+        assert options.env["CLAUDE_CODE_MAX_RETRIES"] == "0"
+        assert options.env["DISABLE_AUTO_COMPACT"] == "1"
+        assert options.model == "claude-opus-5" and options.effort == "high" and options.fallback_model is None
+        assert options.output_format == {"type": "json_schema", "schema": SCHEMA}
+>       assert options.max_turns == 4
+E       AssertionError: assert 5 == 4
+E        +  where 5 = ClaudeAgentOptions(tools=['WebSearch'], allowed_tools=['WebSearch'], system_prompt='Investigate only the supplied publ...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).max_turns
+
+tests/test_lifecycle_web_claude.py:132: AssertionError
+_____________ test_claude_analysis_has_no_web_or_filesystem_tools ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a68b2f8bbb0>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_has_no_web_or_filesystem_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1")
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+        assert clients[0].options.tools == [] and "WebSearch" in clients[0].options.disallowed_tools
+>       assert clients[0].options.max_turns == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).max_turns
+E        +    where ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None) = <tests.test_lifecycle_web_claude.Client object at 0x7a68c2b192a0>.options
+
+tests/test_lifecycle_web_claude.py:147: AssertionError
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/native_turn_budget_accidentally_increases-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude.py::test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witness
+FAILED tests/test_lifecycle_web_claude.py::test_claude_analysis_has_no_web_or_filesystem_tools
+2 failed, 355 passed in 16.01s

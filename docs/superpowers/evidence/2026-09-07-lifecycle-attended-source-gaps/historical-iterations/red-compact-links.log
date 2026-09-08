@@ -1,0 +1,12 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/LifecycleWebPanel.test.tsx -t shows unread references --maxWorkers=4 --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-compact-links.json
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/red-compact-links.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run src/lifecycle/LifecycleWebPanel.test.tsx -t 'shows unread references' --maxWorkers=4 --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-compact-links.json

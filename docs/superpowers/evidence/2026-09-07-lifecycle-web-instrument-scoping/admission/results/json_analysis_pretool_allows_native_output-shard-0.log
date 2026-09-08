@@ -1,0 +1,38 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+...................................................F.................... [ 32%]
+........................................................................ [ 43%]
+........................................................................ [ 53%]
+........................................................................ [ 64%]
+........................................................................ [ 75%]
+........................................................................ [ 86%]
+........................................................................ [ 97%]
+...................                                                      [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_denies_structured_output_tool_at_every_boundary[pretool] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc2e810f070>
+boundary = 'pretool'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("boundary", ["pretool", "init", "notification"])
+    async def test_claude_analysis_denies_structured_output_tool_at_every_boundary(monkeypatch, boundary):
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate
+    
+        call = _request(phase="analysis", call_id="analysis-1")
+        if boundary == "pretool":
+            control = RunControl(selection=call.selection, max_model_requests=1)
+            gate = WebToolGate(call, control, "owned")
+            reply = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned",
+                "tool_name": "StructuredOutput", "tool_use_id": "invalid", "tool_input": OUTPUT}, "invalid", {})
+>           assert reply["hookSpecificOutput"]["permissionDecision"] == "deny"
+E           AssertionError: assert 'allow' == 'deny'
+E             
+E             - deny
+E             + allow
+
+tests/test_lifecycle_web_claude_json_analysis.py:117: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/json_analysis_pretool_allows_native_output-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_denies_structured_output_tool_at_every_boundary[pretool]
+1 failed, 666 passed in 29.66s

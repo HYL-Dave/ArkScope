@@ -1,0 +1,90 @@
+........................................................................ [ 13%]
+........................................................................ [ 26%]
+........................................FF.............................. [ 40%]
+........................................................................ [ 53%]
+........................................................................ [ 66%]
+........................................................................ [ 80%]
+........................................................................ [ 93%]
+..................................                                       [100%]
+=================================== FAILURES ===================================
+_ test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False] _
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/resigned_acceptance_loses_gap_binding-shard-1/test_central_writer_rechecks_g0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73d78dc77580>
+strip = False
+
+    @pytest.mark.parametrize("strip", [False, True])
+    def test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned(tmp_path, monkeypatch, strip):
+        from src import lifecycle_web_review as mod
+        from src.ticker_identity_transition import TickerIdentityTransitionStore
+        c = context(tmp_path, future=True, completion=COMPLETION)
+        result = confirm(c, prepare(c))
+        read_acceptance = mod.acceptance_for
+    
+        def changed(conn, assessment_id):
+            accepted = read_acceptance(conn, assessment_id)
+            packet = accepted["packet"]
+            if strip:
+                packet.pop("source_gaps")
+            else:
+                packet["source_gaps"] = []
+            accepted["packet_sha256"] = packet["packet_sha256"] = packet_digest(packet)
+            return accepted
+    
+        with sqlite3.connect(c["profile"]) as conn:
+            store = TickerIdentityTransitionStore(conn, clock=lambda: c["now"][0])
+            preview = store.get(result["transition_id"])["approved_preview"]
+            assert store._provider_guard(preview, at=c["now"][0], automation=False) == ()
+            monkeypatch.setattr(mod, "acceptance_for", changed)
+            # No confirmation argument here: the stored disclosure must stand on
+            # its own at the writer, not merely rely on a UI-supplied digest.
+            assessment = mod.SecurityLifecycleInvestigationStore(conn).get_assessment(preview["assessment_id"])
+            blockers = mod.web_transition_guard(conn, assessment=assessment, observation_sha256=preview["observation_fingerprint_sha256"],
+                transition_kind=preview["transition_kind"], successor_ticker=preview["successor_ticker"], at=c["now"][0])
+>           assert "web_acceptance_invalid" in blockers
+E           AssertionError: assert 'web_acceptance_invalid' in ()
+
+tests/test_lifecycle_web_gaps.py:203: AssertionError
+_ test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True] _
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/resigned_acceptance_loses_gap_binding-shard-1/test_central_writer_rechecks_g1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73d78ddc9510>
+strip = True
+
+    @pytest.mark.parametrize("strip", [False, True])
+    def test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned(tmp_path, monkeypatch, strip):
+        from src import lifecycle_web_review as mod
+        from src.ticker_identity_transition import TickerIdentityTransitionStore
+        c = context(tmp_path, future=True, completion=COMPLETION)
+        result = confirm(c, prepare(c))
+        read_acceptance = mod.acceptance_for
+    
+        def changed(conn, assessment_id):
+            accepted = read_acceptance(conn, assessment_id)
+            packet = accepted["packet"]
+            if strip:
+                packet.pop("source_gaps")
+            else:
+                packet["source_gaps"] = []
+            accepted["packet_sha256"] = packet["packet_sha256"] = packet_digest(packet)
+            return accepted
+    
+        with sqlite3.connect(c["profile"]) as conn:
+            store = TickerIdentityTransitionStore(conn, clock=lambda: c["now"][0])
+            preview = store.get(result["transition_id"])["approved_preview"]
+            assert store._provider_guard(preview, at=c["now"][0], automation=False) == ()
+            monkeypatch.setattr(mod, "acceptance_for", changed)
+            # No confirmation argument here: the stored disclosure must stand on
+            # its own at the writer, not merely rely on a UI-supplied digest.
+            assessment = mod.SecurityLifecycleInvestigationStore(conn).get_assessment(preview["assessment_id"])
+            blockers = mod.web_transition_guard(conn, assessment=assessment, observation_sha256=preview["observation_fingerprint_sha256"],
+                transition_kind=preview["transition_kind"], successor_ticker=preview["successor_ticker"], at=c["now"][0])
+>           assert "web_acceptance_invalid" in blockers
+E           AssertionError: assert 'web_acceptance_invalid' in ()
+
+tests/test_lifecycle_web_gaps.py:203: AssertionError
+- generated xml file: /tmp/lifecycle-attended-backend-r1/results/resigned_acceptance_loses_gap_binding-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_central_writer_rechecks_gap_disclosure_even_if_an_acceptance_is_resigned[True]
+2 failed, 536 passed in 65.22s (0:01:05)

@@ -1,0 +1,92 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+................................................................F....... [ 46%]
+.....FFF................................................................ [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>0] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/another_remote_call_supplies_usage-shard-0/test_usage_receipt_rejects_cro0')
+mutate = <function <lambda> at 0x731a48d41360>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+        control.bind_remote_id("search-1", "remote-search")
+        control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+        report = _report()
+        mutate(report)
+>       with pytest.raises(WebJournalError, match="^web_result_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:138: Failed
+_ test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[None] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/another_remote_call_supplies_usage-shard-0/test_reopened_usage_receipt_re0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x731a274b6f20>
+failure = None
+
+    @pytest.mark.parametrize("failure", [None, "sources", "lost"])
+    def test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash(tmp_path, monkeypatch, failure):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:190: Failed
+_ test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[sources] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/another_remote_call_supplies_usage-shard-0/test_reopened_usage_receipt_re1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x731a274bb400>
+failure = 'sources'
+
+    @pytest.mark.parametrize("failure", [None, "sources", "lost"])
+    def test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash(tmp_path, monkeypatch, failure):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:190: Failed
+_ test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[lost] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/another_remote_call_supplies_usage-shard-0/test_reopened_usage_receipt_re2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x731a274b5f90>
+failure = 'lost'
+
+    @pytest.mark.parametrize("failure", [None, "sources", "lost"])
+    def test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash(tmp_path, monkeypatch, failure):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+        rewrite_result(store, lambda material: material["usage_report"]["phases"][0].update(remote_id="another-run"))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:190: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/another_remote_call_supplies_usage-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>0]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[None]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[sources]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_reopened_usage_receipt_rechecks_remote_binding_even_with_valid_hash[lost]
+4 failed, 457 passed in 21.41s

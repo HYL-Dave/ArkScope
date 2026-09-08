@@ -1,0 +1,122 @@
+............................F...F....................................... [ 19%]
+........................................................................ [ 39%]
+........................................................................ [ 58%]
+........................................................................ [ 78%]
+........................................................................ [ 97%]
+.........                                                                [100%]
+=================================== FAILURES ===================================
+________ test_source_read_decoding_releases_its_owned_read_transaction _________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r2/decode_holds_read_lock-shard-3/test_source_read_decoding_rele0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7dbb627e6bc0>
+
+    def test_source_read_decoding_releases_its_owned_read_transaction(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        identity = completed(store)
+        original, observed = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            with sqlite3.connect(path, timeout=0) as conn:
+                conn.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+>       assert store.read(identity)["finding"].action == "terminal_delisting"
+
+tests/test_lifecycle_source_progress.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:298: in read
+    pages = (self._read_pages(run_id, source_index)
+src/lifecycle_web_store.py:220: in _read_pages
+    with self.connection() as conn:
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_web_store.LifecycleWebStore object at 0x7dbb627e58d0>
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+>           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError
+_______ test_source_read_keeps_snapshot_when_worker_adds_a_later_source ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r2/decode_holds_read_lock-shard-3/test_source_read_keeps_snapsho0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7dbb81171ba0>
+
+    def test_source_read_keeps_snapshot_when_worker_adds_a_later_source(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=source_page("First source."))
+        original, added = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            if not added:
+                added.append(True)
+                store.add_page(identity, owner="worker-1", source_id="source-2", page=source_page("Later source."))
+                store.set_phase(identity, owner="worker-1", phase="reading_sources")
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+>       before = store.read(identity)
+
+tests/test_lifecycle_source_progress.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:298: in read
+    pages = (self._read_pages(run_id, source_index)
+src/lifecycle_web_store.py:224: in _read_pages
+    pages[source_id] = self._decode_page(saved)
+tests/test_lifecycle_source_progress.py:127: in decode
+    store.add_page(identity, owner="worker-1", source_id="source-2", page=source_page("Later source."))
+src/lifecycle_web_store.py:182: in add_page
+    with self.connection(write=True) as conn:
+/usr/lib/python3.10/contextlib.py:142: in __exit__
+    next(self.gen)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_web_store.LifecycleWebStore object at 0x7dbb81172050>
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+>           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:63: WebJournalError
+- generated xml file: /tmp/lifecycle-capacity-backend-r2/results/decode_holds_read_lock-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_progress.py::test_source_read_decoding_releases_its_owned_read_transaction
+FAILED tests/test_lifecycle_source_progress.py::test_source_read_keeps_snapshot_when_worker_adds_a_later_source
+2 failed, 367 passed in 21.16s

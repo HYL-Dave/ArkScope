@@ -1,0 +1,73 @@
+........................................................................ [ 17%]
+................................................F....................... [ 35%]
+........................................................................ [ 53%]
+........................................................................ [ 71%]
+........................................................................ [ 88%]
+.............................................                            [100%]
+=================================== FAILURES ===================================
+_ test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74d533f998d0>
+phase = 'analysis', forbidden = False
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,forbidden", [("search", False), ("analysis", False), ("search", True)])
+    async def test_actual_claude_sdk_serializes_web_hook_and_owned_result(monkeypatch, phase, forbidden):
+        from src.auth_drivers import lifecycle_web_claude as mod
+    
+        peers = []
+        commands = []
+    
+        def client(options):
+            peer = Peer(options, forbidden)
+            peers.append(peer)
+            transport = SubprocessCLITransport(prompt="", options=options)
+            commands.append(transport._build_command())
+            return ClaudeSDKClient(options=options, transport=peer)
+    
+        monkeypatch.setattr(mod, "_client", client)
+        monkeypatch.setattr(mod, "require_reviewed_claude_agent_runtime",
+                            lambda: SimpleNamespace(cli_path=Path("/reviewed/bundled/claude")))
+        request = _request(phase=phase)
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        if forbidden:
+            with pytest.raises(WebModelError, match="unexpected_tool_activity"):
+                await mod.call_claude_web(request, credential, control)
+        else:
+>           assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_wire.py:121: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:298: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:284: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:231: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'type': 'system', 'subtype': 'init', 'session_id': '7d50c54b-9c79-472b-942e-d76109c4b243', 'model': 'claude-opus-5', 'apiKeySource': 'none', 'tools': ['WebSearch', 'StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+- generated xml file: /dev/shm/lifecycle-schema-prompt-campaign-r2/results/analysis_reenables_web_search-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_wire.py::test_actual_claude_sdk_serializes_web_hook_and_owned_result[analysis-False]
+1 failed, 404 passed in 17.82s

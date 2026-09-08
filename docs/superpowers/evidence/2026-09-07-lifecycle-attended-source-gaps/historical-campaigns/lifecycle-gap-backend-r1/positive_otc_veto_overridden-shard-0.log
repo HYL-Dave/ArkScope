@@ -1,0 +1,29 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+..........................F............................................. [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/positive_otc_veto_overridden-shard-0/test_current_active_otc_eviden0')
+
+    def test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps(tmp_path):
+        from src.security_lifecycle_listing_evidence import _evidence
+        from tests.test_security_lifecycle_provider_authority import record
+        c = context(tmp_path, completion=COMPLETION)
+        c["checks"].record(ticker="OLD", at=c["now"][0], evidence=[_evidence(record("massive_reference", "active", market="otc"))],
+                           diagnostics={}, blockers=("massive_unavailable",))
+        packet = prepare(c)
+>       assert not packet["ready"] and "web_active_listing_conflict" in packet["block_reasons"]
+E       AssertionError: assert (not False and 'web_active_listing_conflict' in ['web_observation_changed'])
+
+tests/test_lifecycle_web_gaps.py:214: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/positive_otc_veto_overridden-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_gaps
+1 failed, 593 passed in 29.37s

@@ -1,0 +1,53 @@
+....................................F................................... [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 77%]
+........................................................................ [ 96%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+_______ test_connection_reader_does_not_hold_page_cursor_during_decoding _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/source_cursor_holds_lock-shard-3/test_connection_reader_does_no0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x785886d496f0>
+
+    def test_connection_reader_does_not_hold_page_cursor_during_decoding(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        for index in (1, 2):
+            store.add_page(identity, owner="worker-1", source_id=f"source-{index}", page=source_page("Retained source."))
+        original, observed = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            with sqlite3.connect(path, timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+>           result = store.read_on_connection(conn, identity)
+
+tests/test_lifecycle_source_progress.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:309: in read_on_connection
+    pages = (cls._pages(conn, run_id)
+src/lifecycle_web_store.py:203: in _pages
+    return {row["source_id"]: cls._decode_page(row)
+src/lifecycle_web_store.py:203: in <dictcomp>
+    return {row["source_id"]: cls._decode_page(row)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = <sqlite3.Row object at 0x785886d49b40>
+
+    def decode(row):
+>       with sqlite3.connect(path, timeout=0) as other:
+E       sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_source_progress.py:149: OperationalError
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/source_cursor_holds_lock-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_progress.py::test_connection_reader_does_not_hold_page_cursor_during_decoding
+1 failed, 373 passed in 20.06s

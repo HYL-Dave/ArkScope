@@ -1,0 +1,198 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+...............................F.FF..................................... [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b51ef3da470>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1", prompt="Public evidence only; do not invoke any tool.")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       result = await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_output_contract.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:236: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '828a2478-3879-4dc5-aa8c-15d7d95bbc86', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['WebSearch', 'StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+___ test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b51f47801c0>
+wrapped = {'$FUNCTION_NAME': 'StructuredOutput', '$PARAMETER_NAME': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_output_invalid$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_output_contract.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:236: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '68ae542c-9251-4fc9-bcb5-25568b90c2a1', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['WebSearch', 'StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b51f47801c0>
+wrapped = {'$FUNCTION_NAME': 'StructuredOutput', '$PARAMETER_NAME': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_output_invalid
+
+tests/test_lifecycle_web_claude_output_contract.py:55: AssertionError
+___ test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b51ef3d8b50>
+wrapped = {'result': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_output_invalid$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_output_contract.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:303: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:289: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:236: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '544ad1f5-e3d5-4f11-80b8-c3618721d23d', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['WebSearch', 'StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else {"StructuredOutput"}
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b51ef3d8b50>
+wrapped = {'result': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_output_invalid
+
+tests/test_lifecycle_web_claude_output_contract.py:55: AssertionError
+- generated xml file: /dev/shm/lifecycle-turns-campaign-r1/results/analysis_reenables_web_search-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]
+3 failed, 597 passed in 27.13s

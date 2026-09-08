@@ -1,0 +1,534 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/webContract.test.ts src/lifecycle/LifecycleWebPanel.test.tsx --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-frontend.json
+
+
+ RUN  v4.1.8 /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+
+stdout | src/lifecycle/webContract.test.ts
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > reads known four-channel provenance without exporting extra internal fields
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > keeps unknown identity details and usage unknown
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > keeps older source size declarations unknown across repeated parsing
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > keeps legacy source coverage unknown but validates every new coverage field
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > reads bounded source diagnostics without accepting header blobs or fake counts
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > preserves the same closed source gap disclosure in result and confirmation
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: "unknown"
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":null}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"javascript:alert(1)","reason":"source_unavailable"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://user:secret@example.com","reason":"source_unavailable"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"raw server error"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"source_unavailable","source_id":"private-binding"}
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real citations array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real contradictions array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real unresolved_conditions array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a real block_reasons array
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL javascript:alert(1)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL https://name:password@issuer.example/notices
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL file:///home/private
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects unsafe citation URL http://issuer.example/notices
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > does not treat a cancellation acknowledgment or unknown outcome as success
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > binds actionable findings to the run ticker and supported evidence
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > requires a complete launch preview or an explicit unavailable reason
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > validates request receipts rather than trusting an HTTP success cast
+i18next: languageChanged zh-Hant
+
+ ❯ src/lifecycle/webContract.test.ts (26 tests | 9 failed) 28ms
+     ✓ reads known four-channel provenance without exporting extra internal fields 5ms
+     ✓ keeps unknown identity details and usage unknown 1ms
+     ✓ keeps older source size declarations unknown across repeated parsing 1ms
+     ✓ keeps legacy source coverage unknown but validates every new coverage field 2ms
+     ✓ reads bounded source diagnostics without accepting header blobs or fake counts 2ms
+     × preserves the same closed source gap disclosure in result and confirmation 6ms
+     × rejects malformed gap metadata rather than hiding it: {} 1ms
+     × rejects malformed gap metadata rather than hiding it: "unknown" 1ms
+     × rejects malformed gap metadata rather than hiding it: {} 2ms
+     × rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":null} 1ms
+     × rejects malformed gap metadata rather than hiding it: {"url":"javascript:alert(1)","reason":"source_unavailable"} 0ms
+     × rejects malformed gap metadata rather than hiding it: {"url":"https://user:secret@example.com","reason":"source_unavailable"} 0ms
+     × rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"raw server error"} 0ms
+     × rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"source_unavailable","source_id":"private-binding"} 0ms
+     ✓ requires a real citations array 0ms
+     ✓ requires a real contradictions array 0ms
+     ✓ requires a real unresolved_conditions array 0ms
+     ✓ requires a real block_reasons array 0ms
+     ✓ rejects unsafe citation URL javascript:alert(1) 0ms
+     ✓ rejects unsafe citation URL https://name:password@issuer.example/notices 0ms
+     ✓ rejects unsafe citation URL file:///home/private 0ms
+     ✓ rejects unsafe citation URL http://issuer.example/notices 0ms
+     ✓ does not treat a cancellation acknowledgment or unknown outcome as success 0ms
+     ✓ binds actionable findings to the run ticker and supported evidence 0ms
+     ✓ requires a complete launch preview or an explicit unavailable reason 0ms
+     ✓ validates request receipts rather than trusting an HTTP success cast 0ms
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > opening, reloading and reading a saved investigation never dispatch a model
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > opening, reloading and reading a saved investigation never dispatch a model
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > opening, reloading and reading a saved investigation never dispatch a model
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected context honestly without claiming the model read the complete source
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows measured source failure details instead of guessing a document or model failure
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows measured source failure details instead of guessing a document or model failure
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows measured source failure details instead of guessing a document or model failure
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected OAuth and cost before one explicit launch
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected OAuth and cost before one explicit launch
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows selected OAuth and cost before one explicit launch
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > requires action-specific confirmation after reading sources and exact effects
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > requires action-specific confirmation after reading sources and exact effects
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > requires action-specific confirmation after reading sources and exact effects
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not offer human confirmation when a read gap accompanies a material conflict
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not offer human confirmation when a read gap accompanies a material conflict
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not offer human confirmation when a read gap accompanies a material conflict
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > invalidates Web confirmation immediately when its reviewed execution date changes
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > invalidates Web confirmation immediately when its reviewed execution date changes
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > invalidates Web confirmation immediately when its reviewed execution date changes
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > does not show another case's late response or reuse its launch confirmation
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > makes an unavailable credential visible without another credential choice or silent retry
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > makes an unavailable credential visible without another credential choice or silent retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > makes an unavailable credential visible without another credential choice or silent retry
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps changed effects blocked and offers a fresh review, not another provider call
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps changed effects blocked and offers a fresh review, not another provider call
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > keeps changed effects blocked and offers a fresh review, not another provider call
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > localizes the whole web surface and its OAuth provenance
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > localizes the whole web surface and its OAuth provenance
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > localizes the whole web surface and its OAuth provenance
+i18next: languageChanged zh-Hant
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx (15 tests | 3 failed) 187ms
+   ✓ opening, reloading and reading a saved investigation never dispatch a model 44ms
+   ✓ shows selected context honestly without claiming the model read the complete source 14ms
+   ✓ shows measured source failure details instead of guessing a document or model failure 7ms
+   ✓ shows selected OAuth and cost before one explicit launch 25ms
+   ✓ requires action-specific confirmation after reading sources and exact effects 19ms
+   × shows unread references and the reviewed conclusion at the last confirmation (en) 9ms
+   × shows unread references and the reviewed conclusion at the last confirmation (zh-Hant) 6ms
+   × keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps 8ms
+   ✓ does not offer human confirmation when a read gap accompanies a material conflict 6ms
+   ✓ invalidates Web confirmation immediately when its reviewed execution date changes 13ms
+   ✓ cancel acknowledgment stays pending, then an unknown outcome stays visible without retry 9ms
+   ✓ does not show another case's late response or reuse its launch confirmation 6ms
+   ✓ makes an unavailable credential visible without another credential choice or silent retry 3ms
+   ✓ keeps changed effects blocked and offers a fresh review, not another provider call 11ms
+   ✓ localizes the whole web surface and its OAuth provenance 5ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (en)
+ FAIL  src/lifecycle/LifecycleWebPanel.test.tsx > shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+AssertionError: expected undefined to be 'https://news.example.com/unread-notice' // Object.is equality
+
+- Expected:
+"https://news.example.com/unread-notice"
+
++ Received:
+undefined
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx:107:64
+    105|   await render("case-1", locale);
+    106|   const disclosure = container.querySelector(".lifecycle-web-gaps");
+    107|   expect(disclosure?.querySelector("a")?.getAttribute("href")).toBe(ga…
+       |                                                                ^
+    108|   expect(disclosure?.textContent).toContain(locale === "en" ? "not use…
+    109|   expect(disclosure?.textContent).toContain(locale === "en" ? "did not…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  src/lifecycle/LifecycleWebPanel.test.tsx > keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx:126:35
+    124|   await render();
+    125|   const disclosure = container.querySelector(".lifecycle-web-gaps");
+    126|   expect(disclosure?.textContent).toContain("Source URL was not record…
+       |                                   ^
+    127|   expect(disclosure?.querySelector("a")).toBeNull();
+    128|   api.latestLifecycleWebRun.mockResolvedValue({ ...webRunFixture, sour…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > preserves the same closed source gap disclosure in result and confirmation
+AssertionError: expected undefined to deeply equal [ { …(2) }, { url: null, …(1) } ]
+
+- Expected:
+[
+  {
+    "reason": "source_unavailable",
+    "url": "https://news.example.com/notice",
+  },
+  {
+    "reason": "source_timeout",
+    "url": null,
+  },
+]
+
++ Received:
+undefined
+
+ ❯ src/lifecycle/webContract.test.ts:54:79
+     52|   it("preserves the same closed source gap disclosure in result and co…
+     53|     const gaps = [{ url: "https://news.example.com/notice", reason: "s…
+     54|     expect(parseWebRun({ ...webRunFixture, source_gaps: gaps })?.sourc…
+       |                                                                               ^
+     55|     expect(parseLifecycleReviewPacket({ ...reviewPacket, source_gaps: …
+     56|     const legacy = { ...webRunFixture } as any; delete legacy.source_g…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {}
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: "unknown"
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {}
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":null}
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"javascript:alert(1)","reason":"source_unavailable"}
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://user:secret@example.com","reason":"source_unavailable"}
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"raw server error"}
+ FAIL  src/lifecycle/webContract.test.ts > Lifecycle Web DTOs > rejects malformed gap metadata rather than hiding it: {"url":"https://news.example.com","reason":"source_unavailable","source_id":"private-binding"}
+AssertionError: expected [Function] to throw an error
+ ❯ src/lifecycle/webContract.test.ts:67:66
+     65|     [{ url: "https://news.example.com", reason: "source_unavailable", …
+     66|   ])("rejects malformed gap metadata rather than hiding it: %j", (sour…
+     67|     expect(() => parseWebRun({ ...webRunFixture, source_gaps })).toThr…
+       |                                                                  ^
+     68|     expect(() => parseLifecycleReviewPacket({ ...reviewPacket, source_…
+     69|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  12 failed | 29 passed (41)
+   Start at  14:54:21
+   Duration  1.22s (transform 417ms, setup 346ms, import 294ms, tests 216ms, environment 506ms)
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/red-frontend.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run src/lifecycle/webContract.test.ts src/lifecycle/LifecycleWebPanel.test.tsx --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-frontend.json

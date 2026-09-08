@@ -1,0 +1,213 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+..............FFFFFF.................................................... [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+.......................                                                  [100%]
+=================================== FAILURES ===================================
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[source_added] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r1/changed_journal_binding_accepted-shard-2/test_validated_web_read_rechec0')
+change = 'source_added'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[terminal_state] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r1/changed_journal_binding_accepted-shard-2/test_validated_web_read_rechec1')
+change = 'terminal_state'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[cancellation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r1/changed_journal_binding_accepted-shard-2/test_validated_web_read_rechec2')
+change = 'cancellation'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[schema_generation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r1/changed_journal_binding_accepted-shard-2/test_validated_web_read_rechec3')
+change = 'schema_generation'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read[during_validation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r1/changed_journal_binding_accepted-shard-2/test_page_rewrite_with_unchang0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b9a1eb52590>
+when = 'during_validation'
+
+    @pytest.mark.parametrize("when", ["during_validation", "after_validation"])
+    def test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read(tmp_path, monkeypatch, when):
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path)
+        original, changed = LifecycleWebStore._decode_page, []
+    
+        def rewrite():
+            with sqlite3.connect(c["profile"]) as conn:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute("UPDATE lifecycle_web_pages SET page_json='{}' WHERE run_id=?", (c["run_id"],))
+                conn.execute(TRIGGERS[trigger])
+            changed.append(True)
+    
+        if when == "during_validation":
+            def decode(row):
+                result = original(row)
+                rewrite()
+                return result
+            monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:102: Failed
+_ test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read[after_validation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r1/changed_journal_binding_accepted-shard-2/test_page_rewrite_with_unchang1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b9a1ed1d0f0>
+when = 'after_validation'
+
+    @pytest.mark.parametrize("when", ["during_validation", "after_validation"])
+    def test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read(tmp_path, monkeypatch, when):
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path)
+        original, changed = LifecycleWebStore._decode_page, []
+    
+        def rewrite():
+            with sqlite3.connect(c["profile"]) as conn:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute("UPDATE lifecycle_web_pages SET page_json='{}' WHERE run_id=?", (c["run_id"],))
+                conn.execute(TRIGGERS[trigger])
+            changed.append(True)
+    
+        if when == "during_validation":
+            def decode(row):
+                result = original(row)
+                rewrite()
+                return result
+            monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+            with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+                c["web"].validated_read(c["run_id"])
+        else:
+            read = c["web"].validated_read(c["run_id"])
+            rewrite()
+            with c["web"].connection(write=True) as conn:
+>               with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E               Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:108: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r1/results/changed_journal_binding_accepted-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[source_added]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[terminal_state]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[cancellation]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[schema_generation]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read[during_validation]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_page_rewrite_with_unchanged_digest_cannot_reuse_a_verified_read[after_validation]
+6 failed, 593 passed in 27.66s

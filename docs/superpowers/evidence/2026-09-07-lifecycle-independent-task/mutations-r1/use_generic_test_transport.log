@@ -1,0 +1,274 @@
+........................................................................ [  7%]
+........................................................................ [ 14%]
+............FFFFFFFFFFFFFFFFFFFFFFFFFFF................................. [ 22%]
+........................................................................ [ 29%]
+........................................................................ [ 36%]
+........................................................................ [ 44%]
+........................................................................ [ 51%]
+........................................................................ [ 59%]
+........................................................................ [ 66%]
+........................................................................ [ 73%]
+........................................................................ [ 81%]
+........................................................................ [ 88%]
+........................................................................ [ 95%]
+........................................                                 [100%]
+=================================== FAILURES ===================================
+_ test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[anthropic-api_key-claude-sonnet-5] _
+tests/test_lifecycle_investigation_task_test.py:70: in test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[anthropic-claude_code_oauth-claude-sonnet-5] _
+tests/test_lifecycle_investigation_task_test.py:71: in test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels
+    assert result.status == "ok"
+E   AssertionError: assert 'error' == 'ok'
+E     
+E     - ok
+E     + error
+_ test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[openai-api_key-gpt-5.6-luna] _
+tests/test_lifecycle_investigation_task_test.py:70: in test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[openai-chatgpt_oauth-gpt-5.6-luna] _
+tests/test_lifecycle_investigation_task_test.py:71: in test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels
+    assert result.status == "ok"
+E   AssertionError: assert 'error' == 'ok'
+E     
+E     - ok
+E     + error
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-credential_rejected] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-provider_rate_limited] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-timeout] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-model_output_invalid] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-credential_rejected] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-provider_rate_limited] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-timeout] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-model_output_invalid] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-credential_rejected] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-provider_rate_limited] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-timeout] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-model_output_invalid] _
+tests/test_lifecycle_investigation_task_test.py:90: in test_investigation_schema_check_never_retries_or_switches_credentials
+    result, credentials, calls = _check(monkeypatch, tmp_path, provider, auth_mode, model, error=code)
+tests/test_lifecycle_investigation_task_test.py:63: in _check
+    result = asyncio.run(canary.dispatch_task_model_test(task=TASK, provider=provider, model=model,
+/usr/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/model_task_canary.py:448: in dispatch_task_model_test
+    raw = test_model(
+tests/test_lifecycle_investigation_task_test.py:31: in <lambda>
+    forbidden = lambda *a, **kw: pytest.fail("different transport/billing fallback")
+E   Failed: different transport/billing fallback
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-credential_rejected] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-provider_rate_limited] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-timeout] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-model_output_invalid] _
+tests/test_lifecycle_investigation_task_test.py:92: in test_investigation_schema_check_never_retries_or_switches_credentials
+    assert len(credentials) == len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+__ test_investigation_schema_check_does_not_accept_malformed_success[output0] __
+tests/test_lifecycle_investigation_task_test.py:100: in test_investigation_schema_check_does_not_accept_malformed_success
+    assert len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+__ test_investigation_schema_check_does_not_accept_malformed_success[output1] __
+tests/test_lifecycle_investigation_task_test.py:100: in test_investigation_schema_check_does_not_accept_malformed_success
+    assert len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+__ test_investigation_schema_check_does_not_accept_malformed_success[output2] __
+tests/test_lifecycle_investigation_task_test.py:100: in test_investigation_schema_check_does_not_accept_malformed_success
+    assert len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+__ test_investigation_schema_check_does_not_accept_malformed_success[output3] __
+tests/test_lifecycle_investigation_task_test.py:100: in test_investigation_schema_check_does_not_accept_malformed_success
+    assert len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_requires_completed_tool_free_witness[missing_terminal] _
+tests/test_lifecycle_investigation_task_test.py:109: in test_investigation_schema_check_requires_completed_tool_free_witness
+    assert len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_requires_completed_tool_free_witness[unexpected_search] _
+tests/test_lifecycle_investigation_task_test.py:109: in test_investigation_schema_check_requires_completed_tool_free_witness
+    assert len(calls) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_ test_investigation_schema_check_missing_selected_credential_never_dispatches _
+tests/test_lifecycle_investigation_task_test.py:115: in test_investigation_schema_check_missing_selected_credential_never_dispatches
+    assert len(credentials) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+- generated xml file: /tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/mutations-r1/use_generic_test_transport.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[anthropic-api_key-claude-sonnet-5]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[anthropic-claude_code_oauth-claude-sonnet-5]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[openai-api_key-gpt-5.6-luna]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_uses_same_adapter_once_on_all_four_channels[openai-chatgpt_oauth-gpt-5.6-luna]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-credential_rejected]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-provider_rate_limited]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-timeout]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-api_key-claude-sonnet-5-model_output_invalid]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-credential_rejected]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-provider_rate_limited]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-timeout]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[anthropic-claude_code_oauth-claude-sonnet-5-model_output_invalid]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-credential_rejected]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-provider_rate_limited]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-timeout]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-api_key-gpt-5.6-luna-model_output_invalid]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-credential_rejected]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-provider_rate_limited]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-timeout]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_never_retries_or_switches_credentials[openai-chatgpt_oauth-gpt-5.6-luna-model_output_invalid]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_does_not_accept_malformed_success[output0]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_does_not_accept_malformed_success[output1]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_does_not_accept_malformed_success[output2]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_does_not_accept_malformed_success[output3]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_requires_completed_tool_free_witness[missing_terminal]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_requires_completed_tool_free_witness[unexpected_search]
+FAILED tests/test_lifecycle_investigation_task_test.py::test_investigation_schema_check_missing_selected_credential_never_dispatches
+27 failed, 949 passed in 74.67s (0:01:14)

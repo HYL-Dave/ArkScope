@@ -1,0 +1,130 @@
+F.....FFF                                                                [100%]
+=================================== FAILURES ===================================
+______ test_canary_source_admission_precedes_any_credential_metadata_read ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x768a60f9d9c0>
+
+    def test_canary_source_admission_precedes_any_credential_metadata_read(monkeypatch):
+        api = module()
+        def rejected():
+            raise ValueError("offline_checkpoint_changed")
+        monkeypatch.setattr(api, "source_identity", rejected)
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_metadata_read_before_source_admission"))
+        with pytest.raises(ValueError, match="^offline_checkpoint_changed$"):
+>           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:90: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+>   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_metadata_read_before_source_admission"))
+E   Failed: production_metadata_read_before_source_admission
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:41: Failed
+_____ test_canary_checkpoint_drift_stops_before_runtime_or_profile[source] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x768a5570c4c0>
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7827/test_canary_checkpoint_drift_s0')
+change = 'source'
+
+    @pytest.mark.parametrize("change", ["source", "seal", "resurrection"])
+    def test_canary_checkpoint_drift_stops_before_runtime_or_profile(monkeypatch, tmp_path, change):
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        if change == "source":
+            (api.ROOT / "owned.py").write_text("changed")
+        elif change == "seal":
+            monkeypatch.setattr(api, "CHECKPOINT_SEAL", "0" * 64)
+        else:
+            (api.ROOT / "removed.py").write_text("resurrected")
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+        with pytest.raises(ValueError, match="^offline_(admitted_source|checkpoint)_changed$"):
+>           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:178: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:90: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+>   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+E   Failed: production_profile_read
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:176: Failed
+______ test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x768a5a05a530>
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7827/test_canary_checkpoint_drift_s1')
+change = 'seal'
+
+    @pytest.mark.parametrize("change", ["source", "seal", "resurrection"])
+    def test_canary_checkpoint_drift_stops_before_runtime_or_profile(monkeypatch, tmp_path, change):
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        if change == "source":
+            (api.ROOT / "owned.py").write_text("changed")
+        elif change == "seal":
+            monkeypatch.setattr(api, "CHECKPOINT_SEAL", "0" * 64)
+        else:
+            (api.ROOT / "removed.py").write_text("resurrected")
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+        with pytest.raises(ValueError, match="^offline_(admitted_source|checkpoint)_changed$"):
+>           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:178: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:90: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+>   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+E   Failed: production_profile_read
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:176: Failed
+__ test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x768a5a05abc0>
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7827/test_canary_checkpoint_drift_s2')
+change = 'resurrection'
+
+    @pytest.mark.parametrize("change", ["source", "seal", "resurrection"])
+    def test_canary_checkpoint_drift_stops_before_runtime_or_profile(monkeypatch, tmp_path, change):
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        if change == "source":
+            (api.ROOT / "owned.py").write_text("changed")
+        elif change == "seal":
+            monkeypatch.setattr(api, "CHECKPOINT_SEAL", "0" * 64)
+        else:
+            (api.ROOT / "removed.py").write_text("resurrected")
+        monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+        with pytest.raises(ValueError, match="^offline_(admitted_source|checkpoint)_changed$"):
+>           api.prepared_plan(Path("unused.sqlite"), "2026-09-07")
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:178: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/claude_canary.py:90: in prepared_plan
+    metadata = selected_metadata(profile)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('unused.sqlite')
+
+>   monkeypatch.setattr(api, "selected_metadata", lambda path: pytest.fail("production_profile_read"))
+E   Failed: production_profile_read
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:176: Failed
+- generated xml file: /tmp/lifecycle-usage-canary-admission/metadata_before_source_admission.xml -
+=========================== short test summary info ============================
+FAILED ::test_canary_source_admission_precedes_any_credential_metadata_read
+FAILED ::test_canary_checkpoint_drift_stops_before_runtime_or_profile[source]
+FAILED ::test_canary_checkpoint_drift_stops_before_runtime_or_profile[seal]
+FAILED ::test_canary_checkpoint_drift_stops_before_runtime_or_profile[resurrection]
+4 failed, 5 passed in 2.64s

@@ -1,0 +1,370 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+....................................................FFFFFFFF............ [ 36%]
+...........................F.F.....FFFF................................. [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi0')
+provider = 'openai', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi1')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi2')
+provider = 'anthropic', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi3')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi4')
+provider = 'openai', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi5')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi6')
+provider = 'anthropic', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_gap_disclosure_follows_fi7')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:33: AssertionError
+_ test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_real_controller_persists_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x795365f6e290>
+malformed = False
+
+    @pytest.mark.parametrize("malformed", [False, True])
+    def test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record(tmp_path, monkeypatch, malformed):
+        from src import security_lifecycle_web_pipeline as mod
+        from tests.test_security_lifecycle_web_pipeline import Reader, _fake_model
+        from tests.test_lifecycle_web_controller import controller, launch, wait_done
+        calls, reader = [], Reader(fail=True)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=["https://ir.example.com/notice", URL]))
+    
+        async def run(*args, **kwargs):
+            result = await mod.investigate(*args, **kwargs)
+            return replace(result, source_failure_urls=None) if malformed else result
+    
+        service, store, credentials = controller(tmp_path, runner=run, reader_factory=lambda limits: reader)
+        try:
+            identity = launch(service)["run_id"]
+            result = wait_done(service, identity)
+            assert len(calls) == 2 and len(reader.urls) == 2 and len(credentials) == 1
+            if malformed:
+                assert result["status"] == "failed" and result["failure_code"] == "web_source_gaps_invalid"
+                assert result["finding"] is None
+            else:
+>               assert result["status"] == "succeeded" and result["source_gaps"] == GAPS
+E               AssertionError: assert ('succeeded' == 'succeeded'
+E                 
+E                   succeeded and [] == [{'reason': '...ting-update'}]
+E                 
+E                 Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E                 Use -v to get more diff)
+
+tests/test_lifecycle_web_gaps.py:239: AssertionError
+________ test_legacy_read_gap_is_visible_without_inventing_a_source_url ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_legacy_read_gap_is_visibl0')
+
+    def test_legacy_read_gap_is_visible_without_inventing_a_source_url(tmp_path):
+        c = context(tmp_path, completion={"source_failures": {"source-2": "source_unavailable"}, "source_requests": 2})
+        packet = prepare(c)
+        assert packet["ready"] and packet["source_gaps"] == [{"url": None, "reason": "source_unavailable"}]
+>       assert project_web_run(c["web"].read(c["run_id"]), at=c["now"][0])["source_gaps"] == packet["source_gaps"]
+E       AssertionError: assert [] == [{'reason': '... 'url': None}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': None}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_gaps.py:249: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_research_and_current_deta4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79536b3d3a90>
+provider = 'openai', auth = 'api_key', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+        assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+        assert result["finding"]["citations"][0]["quote"]
+        assert result["model_submissions"] == 2
+>       assert result["source_gaps"] == (GAPS if with_gap else [])
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_read.py:40: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_research_and_current_deta5')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79534f196b90>
+provider = 'openai', auth = 'chatgpt_oauth', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+        assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+        assert result["finding"]["citations"][0]["quote"]
+        assert result["model_submissions"] == 2
+>       assert result["source_gaps"] == (GAPS if with_gap else [])
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_read.py:40: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_research_and_current_deta6')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7953635d2cb0>
+provider = 'anthropic', auth = 'api_key', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+        assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+        assert result["finding"]["citations"][0]["quote"]
+        assert result["model_submissions"] == 2
+>       assert result["source_gaps"] == (GAPS if with_gap else [])
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_read.py:40: AssertionError
+_ test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/gap_disclosure_dropped_from_readback-shard-0/test_research_and_current_deta7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79534f1951b0>
+provider = 'anthropic', auth = 'claude_code_oauth', with_gap = True
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("with_gap", [False, True])
+    def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
+        from src.tools import security_lifecycle_tools as tools
+        from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
+        c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+        before = rows(c)
+        detail = current(c)
+        result = detail["web_runs"][0]
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": c["web"].read(c["run_id"])["selection"].model}
+        assert result["run_id"] == c["run_id"] and result["finding"]["action"] == "terminal_delisting"
+        assert result["finding"]["citations"][0]["quote"]
+        assert result["model_submissions"] == 2
+>       assert result["source_gaps"] == (GAPS if with_gap else [])
+E       AssertionError: assert [] == [{'reason': '...ting-update'}]
+E         
+E         Right contains one more item: {'reason': 'source_unavailable', 'url': 'https://financial-news.example.com/old-listing-update'}
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_read.py:40: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r2/results/gap_disclosure_dropped_from_readback-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_legacy_read_gap_is_visible_without_inventing_a_source_url
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-api_key]
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-api_key]
+FAILED tests/test_lifecycle_web_read.py::test_research_and_current_detail_share_readonly_web_findings_for_every_auth[True-anthropic-claude_code_oauth]
+14 failed, 580 passed in 34.26s

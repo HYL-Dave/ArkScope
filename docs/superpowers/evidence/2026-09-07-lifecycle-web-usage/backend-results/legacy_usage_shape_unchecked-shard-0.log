@@ -1,0 +1,101 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 46%]
+..........FFFFF......................................................... [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[None] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/legacy_usage_shape_unchecked-shard-0/test_legacy_usage_pair_rejects0')
+value = None
+
+    @pytest.mark.parametrize("value", [None, {}, "unknown", {"input_tokens": True, "output_tokens": 40},
+                                       {"input_tokens": 20, "output_tokens": 40, "secret": "forbidden"}])
+    def test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it(tmp_path, value):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+        rewrite_result(store, lambda material: material.update(usage=value))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:223: Failed
+_ test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value1] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/legacy_usage_shape_unchecked-shard-0/test_legacy_usage_pair_rejects1')
+value = {}
+
+    @pytest.mark.parametrize("value", [None, {}, "unknown", {"input_tokens": True, "output_tokens": 40},
+                                       {"input_tokens": 20, "output_tokens": 40, "secret": "forbidden"}])
+    def test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it(tmp_path, value):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+        rewrite_result(store, lambda material: material.update(usage=value))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:223: Failed
+_ test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[unknown] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/legacy_usage_shape_unchecked-shard-0/test_legacy_usage_pair_rejects2')
+value = 'unknown'
+
+    @pytest.mark.parametrize("value", [None, {}, "unknown", {"input_tokens": True, "output_tokens": 40},
+                                       {"input_tokens": 20, "output_tokens": 40, "secret": "forbidden"}])
+    def test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it(tmp_path, value):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+        rewrite_result(store, lambda material: material.update(usage=value))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:223: Failed
+_ test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value3] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/legacy_usage_shape_unchecked-shard-0/test_legacy_usage_pair_rejects3')
+value = {'input_tokens': True, 'output_tokens': 40}
+
+    @pytest.mark.parametrize("value", [None, {}, "unknown", {"input_tokens": True, "output_tokens": 40},
+                                       {"input_tokens": 20, "output_tokens": 40, "secret": "forbidden"}])
+    def test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it(tmp_path, value):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+        rewrite_result(store, lambda material: material.update(usage=value))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:223: Failed
+_ test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value4] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/legacy_usage_shape_unchecked-shard-0/test_legacy_usage_pair_rejects4')
+value = {'input_tokens': 20, 'output_tokens': 40, 'secret': 'forbidden'}
+
+    @pytest.mark.parametrize("value", [None, {}, "unknown", {"input_tokens": True, "output_tokens": 40},
+                                       {"input_tokens": 20, "output_tokens": 40, "secret": "forbidden"}])
+    def test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it(tmp_path, value):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+        rewrite_result(store, lambda material: material.update(usage=value))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:223: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/legacy_usage_shape_unchecked-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[None]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value1]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[unknown]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value3]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value4]
+5 failed, 456 passed in 21.42s

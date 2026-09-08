@@ -1,0 +1,31 @@
+........................................................................ [  9%]
+........................................................................ [ 19%]
+...............................F........................................ [ 28%]
+........................................................................ [ 38%]
+........................................................................ [ 48%]
+........................................................................ [ 57%]
+........................................................................ [ 67%]
+........................................................................ [ 77%]
+........................................................................ [ 86%]
+........................................................................ [ 96%]
+............................                                             [100%]
+=================================== FAILURES ===================================
+_____ test_claude_analysis_declares_final_json_without_native_output_tool ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fbfeed38a00>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_declares_final_json_without_native_output_tool(monkeypatch):
+        mod, clients = setup(monkeypatch)
+        reply, control = await invoke(mod)
+        assert reply.output == OUTPUT and control.terminal_statuses == {"analysis-1": "completed"}
+        options = clients[0].options
+>       assert options.output_format is None
+E       AssertionError: assert {'schema': {'additionalProperties': False, 'properties': {'sources': {'items': {'type': 'string'}, 'type': 'array'}}, 'required': ['sources'], 'type': 'object'}, 'type': 'json_schema'} is None
+E        +  where {'schema': {'additionalProperties': False, 'properties': {'sources': {'items': {'type': 'string'}, 'type': 'array'}}, 'required': ['sources'], 'type': 'object'}, 'type': 'json_schema'} = ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).output_format
+
+tests/test_lifecycle_web_claude_json_analysis.py:54: AssertionError
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/json_analysis_reenables_native_schema-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_declares_final_json_without_native_output_tool
+1 failed, 747 passed in 26.98s

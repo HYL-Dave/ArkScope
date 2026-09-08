@@ -1,0 +1,255 @@
+..........................FFFFFFFFF..................................... [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 66%]
+........................................................................ [ 88%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+___ test_all_source_failures_keep_measured_diagnostics_after_journal_reopen ____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_all_source_failures_keep_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b295911e470>
+
+    @pytest.mark.anyio
+    async def test_all_source_failures_keep_measured_diagnostics_after_journal_reopen(tmp_path, monkeypatch):
+        from src import security_lifecycle_web_pipeline as pipeline
+        from src.lifecycle_web_projection import project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        reader, connections, _, _ = _reader(monkeypatch, [
+            Response(b"short", headers={"Content-Length": "1000"}),
+            Response(status=403, headers={"Set-Cookie": "do-not-retain-this-secret"}),
+        ])
+        calls = []
+        monkeypatch.setattr(pipeline, "call_lifecycle_web_model", _fake_model(calls, sources=[
+            "https://ir.example.com/notice", "https://news.example.com/notice",
+        ]))
+        with pytest.raises(WebModelError, match="^source_read_incomplete$") as caught:
+            await pipeline.investigate(public_input(), WebCredential(control.selection, api_key="selected-key"), control,
+                                       options=_options("api_key"), reader_factory=lambda limits: reader)
+        assert len(calls) == 1 and len(connections) == 2
+        report = caught.value.source_read_report
+        assert report == {"requests": 2, "observations": [asdict(value) for value in reader.observations]}
+        assert report["observations"][0]["declared_body_bytes"] == 1000
+        assert report["observations"][0]["received_body_bytes"] == 5
+        assert report["observations"][1]["status"] == 403
+        store.fail(run["run_id"], owner="worker-1", code=str(caught.value), control=control, source_read_report=report)
+        row = LifecycleWebStore(path).read(run["run_id"])
+        assert row["status"] == "failed" and row["finding"] is None
+>       assert row["source_read_report"] == report and row["source_requests"] == 2
+E       KeyError: 'source_read_report'
+
+tests/test_lifecycle_source_read_report.py:47: KeyError
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>0] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo0')
+mutate = <function <lambda> at 0x7b2985ff9cf0>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>1] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo1')
+mutate = <function <lambda> at 0x7b2985ff9d80>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>2] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo2')
+mutate = <function <lambda> at 0x7b2985ff9e10>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>3] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo3')
+mutate = <function <lambda> at 0x7b2985ff9ea0>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>4] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo4')
+mutate = <function <lambda> at 0x7b2985ff9f30>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>5] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo5')
+mutate = <function <lambda> at 0x7b2985ff9fc0>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_____ test_read_report_rejects_malformed_or_extraneous_details[<lambda>6] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_read_report_rejects_malfo6')
+mutate = <function <lambda> at 0x7b2985ffa050>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report.update(requests=True),
+        lambda report: report.update(requests=9),
+        lambda report: report.update(observations={}),
+        lambda report: report["observations"][0].update(status="200"),
+        lambda report: report["observations"][0].update(headers={"Authorization": "secret"}),
+        lambda report: report["observations"][0].update(received_body_bytes=-1),
+        lambda report: report["observations"].append(dict(report["observations"][0])),
+    ])
+    def test_read_report_rejects_malformed_or_extraneous_details(tmp_path, mutate):
+        from src.lifecycle_public_sources import SourceReadObservation
+        _, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        mutate(report)
+>       with pytest.raises(ValueError, match="^source_read_report_invalid$"):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lifecycle_source_read_report.py:71: Failed
+_ test_population_retains_failure_receipts_without_accepting_them_as_findings __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r1/failed_read_receipt_not_saved-shard-3/test_population_retains_failur0')
+
+    def test_population_retains_failure_receipts_without_accepting_them_as_findings(tmp_path):
+        from src.lifecycle_public_sources import SourceReadObservation
+        from src.security_lifecycle_population import read_population_snapshot, build_population_manifest, _digest, LifecyclePopulationUnavailable
+        from tests.test_lifecycle_web_review import context, confirm, prepare
+    
+        c = context(tmp_path)
+        confirm(c, prepare(c))
+        store = c["web"]
+        original = store.read(c["run_id"])
+        run = store.start(case_id=c["case_id"], observation_sha256=original["observation_sha256"], request=original["request"],
+                          selection=original["selection"], options=original["options"], owner="worker-1", request_key="failed-read")
+        report = {"requests": 1, "observations": [asdict(SourceReadObservation(1, 403, None, None, None, 0, 0, "source_unavailable"))]}
+        store.fail(run["run_id"], owner="worker-1", code="source_read_incomplete",
+                   control=store.control(run["run_id"], owner="worker-1"), source_read_report=report)
+        snapshot = read_population_snapshot(c["market"], c["profile"], at=c["now"][0])
+        retained = build_population_manifest(snapshot)["retention"]["web_journal"]
+>       assert run["run_id"] in {item["run_id"] for item in retained["results"]}
+E       AssertionError: assert 'lwr_48722842016d47c38b7d37a6521bb740' in {'lwr_ffa65fe97bc74139868ab2da3cf3d951'}
+
+tests/test_lifecycle_source_read_report.py:92: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r1/results/failed_read_receipt_not_saved-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_read_report.py::test_all_source_failures_keep_measured_diagnostics_after_journal_reopen
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>0]
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>1]
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>2]
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>3]
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>4]
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>5]
+FAILED tests/test_lifecycle_source_read_report.py::test_read_report_rejects_malformed_or_extraneous_details[<lambda>6]
+FAILED tests/test_lifecycle_source_read_report.py::test_population_retains_failure_receipts_without_accepting_them_as_findings
+9 failed, 315 passed in 14.78s

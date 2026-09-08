@@ -1,0 +1,175 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/LifecycleWebPanel.test.tsx -t unrecognized source reason --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-unknown-reason.json
+
+
+ RUN  v4.1.8 /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx
+i18next: languageChanged zh-Hant
+i18next: initialized {
+  debug: true,
+  initAsync: false,
+  ns: [
+    'common',
+    'shell',
+    'settings',
+    'research',
+    'explore',
+    'portfolio',
+    'system'
+  ],
+  defaultNS: 'common',
+  fallbackLng: [ 'zh-Hant' ],
+  fallbackNS: false,
+  supportedLngs: [ 'zh-Hant', 'en', 'cimode' ],
+  nonExplicitSupportedLngs: false,
+  load: 'currentOnly',
+  preload: false,
+  keySeparator: '.',
+  nsSeparator: ':',
+  pluralSeparator: '_',
+  contextSeparator: '_',
+  enableSelector: false,
+  partialBundledLanguages: false,
+  saveMissing: false,
+  updateMissing: false,
+  saveMissingTo: 'fallback',
+  saveMissingPlurals: true,
+  missingKeyHandler: false,
+  missingInterpolationHandler: false,
+  postProcess: false,
+  postProcessPassResolved: false,
+  returnNull: false,
+  returnEmptyString: false,
+  returnObjects: false,
+  joinArrays: false,
+  returnedObjectHandler: false,
+  parseMissingKeyHandler: [Function: parseMissingKeyHandler],
+  appendNamespaceToMissingKey: false,
+  appendNamespaceToCIMode: false,
+  overloadTranslationOptionHandler: [Function: overloadTranslationOptionHandler],
+  interpolation: {
+    escapeValue: false,
+    prefix: '{{',
+    suffix: '}}',
+    formatSeparator: ',',
+    unescapePrefix: '-',
+    nestingPrefix: '$t(',
+    nestingSuffix: ')',
+    nestingOptionsSeparator: ',',
+    maxReplaces: 1000,
+    skipOnVariables: true,
+    format: [Function: bound format]
+  },
+  cacheInBuiltFormats: true,
+  resources: {
+    'zh-Hant': {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    },
+    en: {
+      common: [Object],
+      shell: [Object],
+      settings: [Object],
+      research: [Object],
+      explore: [Object],
+      portfolio: [Object],
+      system: [Object]
+    }
+  },
+  lng: 'zh-Hant',
+  react: { useSuspense: false },
+  ignoreJSONStructure: true
+}
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (en)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (en)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (en)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (zh-Hant)
+i18next: languageChanged zh-Hant
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (zh-Hant)
+i18next: languageChanged en
+
+stdout | src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (zh-Hant)
+i18next: languageChanged zh-Hant
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx (17 tests | 2 failed | 15 skipped) 52ms
+   ↓ opening, reloading and reading a saved investigation never dispatch a model
+   ↓ shows selected context honestly without claiming the model read the complete source
+   ↓ shows measured source failure details instead of guessing a document or model failure
+   ↓ shows selected OAuth and cost before one explicit launch
+   ↓ requires action-specific confirmation after reading sources and exact effects
+   ↓ shows unread references and the reviewed conclusion at the last confirmation (en)
+   ↓ shows unread references and the reviewed conclusion at the last confirmation (zh-Hant)
+   ↓ keeps a legacy missing URL explicit instead of inventing a link or claiming no gaps
+   × an unrecognized source reason does not turn a complete finding into a failed investigation (en) 43ms
+   × an unrecognized source reason does not turn a complete finding into a failed investigation (zh-Hant) 9ms
+   ↓ does not offer human confirmation when a read gap accompanies a material conflict
+   ↓ invalidates Web confirmation immediately when its reviewed execution date changes
+   ↓ cancel acknowledgment stays pending, then an unknown outcome stays visible without retry
+   ↓ does not show another case's late response or reuse its launch confirmation
+   ↓ makes an unavailable credential visible without another credential choice or silent retry
+   ↓ keeps changed effects blocked and offers a fresh review, not another provider call
+   ↓ localizes the whole web surface and its OAuth provenance
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (en)
+AssertionError: expected '1 additional source(s) could not be r…' to contain 'This source could not be read'
+
+Expected: "This source could not be read"
+Received: "1 additional source(s) could not be read and were not used as evidence.news.example.com/noticeThe investigation could not complete. Tracking has not changed."
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx:138:35
+    136|   await render("case-1", locale);
+    137|   const disclosure = container.querySelector(".lifecycle-web-gaps");
+    138|   expect(disclosure?.textContent).toContain(locale === "en" ? "This so…
+       |                                   ^
+    139|   expect(disclosure?.textContent).not.toContain(locale === "en" ? "inv…
+    140|   expect(disclosure?.textContent).not.toContain("future_source_read_fa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lifecycle/LifecycleWebPanel.test.tsx > an unrecognized source reason does not turn a complete finding into a failed investigation (zh-Hant)
+AssertionError: expected '1 份補充來源未能讀取，未列為判斷依據。news.example.com/…' to contain '此來源未能讀取'
+
+Expected: "此來源未能讀取"
+Received: "1 份補充來源未能讀取，未列為判斷依據。news.example.com/notice調查未能完成，追蹤狀態未變更。"
+
+ ❯ src/lifecycle/LifecycleWebPanel.test.tsx:138:35
+    136|   await render("case-1", locale);
+    137|   const disclosure = container.querySelector(".lifecycle-web-gaps");
+    138|   expect(disclosure?.textContent).toContain(locale === "en" ? "This so…
+       |                                   ^
+    139|   expect(disclosure?.textContent).not.toContain(locale === "en" ? "inv…
+    140|   expect(disclosure?.textContent).not.toContain("future_source_read_fa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 15 skipped (17)
+   Start at  15:08:16
+   Duration  1.11s (transform 310ms, setup 204ms, import 261ms, tests 52ms, environment 489ms)
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/red-unknown-reason.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /tmp/arkscope-lifecycle-terminal-membership/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run src/lifecycle/LifecycleWebPanel.test.tsx -t 'unrecognized source reason' --reporter=default --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/red-unknown-reason.json

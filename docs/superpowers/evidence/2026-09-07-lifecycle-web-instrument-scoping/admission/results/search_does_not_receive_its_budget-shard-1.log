@@ -1,0 +1,37 @@
+........................................................................ [ 16%]
+........................................................................ [ 32%]
+.............F.......................................................... [ 49%]
+........................................................................ [ 65%]
+........................................................................ [ 82%]
+........................................................................ [ 98%]
+.....                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_actual_model_prompts_separate_instruments_and_explain_available_search_budget _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77449058a500>
+
+    @pytest.mark.anyio
+    async def test_actual_model_prompts_separate_instruments_and_explain_available_search_budget(monkeypatch):
+        from src import security_lifecycle_web_pipeline as mod
+        from src.auth_drivers.lifecycle_web_models import WebCredential
+        from src.auth_drivers.token_store import StoredTokenRecord
+        from src.security_lifecycle_web_contract import RunControl, validate_selection
+        from tests.test_security_lifecycle_web_pipeline import Reader, _fake_model, _options
+    
+        selected = validate_selection("anthropic", "claude_code_oauth", "claude-sonnet-5", "local:7")
+        credential = WebCredential(selected, token_record=StoredTokenRecord("private-token"))
+        control = RunControl(selection=selected, max_model_requests=2)
+        calls, reader = [], Reader()
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
+        result = await mod.investigate(public_input(), credential, control,
+            options=replace(_options("claude_code_oauth"), max_search_uses=12), reader_factory=lambda limits: reader)
+        assert result.finding.action == "terminal_delisting" and len(calls) == 2
+        search, analysis = [call.prompt for call, _ in calls]
+>       assert "at most 12 WebSearch calls" in search
+E       assert 'at most 12 WebSearch calls' in 'Investigate only this public security identity and question: {"ticker":"OLD","issuer_name":"Issuer Old Inc","security...nstrument or event, then return within the budget. It is an upper bound, not a required number of searches or sources.'
+
+tests/test_lifecycle_web_instrument_scope.py:145: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/search_does_not_receive_its_budget-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_instrument_scope.py::test_actual_model_prompts_separate_instruments_and_explain_available_search_budget
+1 failed, 436 passed in 18.55s

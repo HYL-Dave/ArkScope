@@ -1,0 +1,31 @@
+........................................................................ [  7%]
+......................................................................F. [ 14%]
+........................................................................ [ 22%]
+........................................................................ [ 29%]
+........................................................................ [ 36%]
+........................................................................ [ 44%]
+........................................................................ [ 51%]
+........................................................................ [ 59%]
+........................................................................ [ 66%]
+........................................................................ [ 73%]
+........................................................................ [ 81%]
+........................................................................ [ 88%]
+........................................................................ [ 95%]
+........................................                                 [100%]
+=================================== FAILURES ===================================
+________ test_investigation_route_read_error_is_not_a_billing_fallback _________
+tests/test_lifecycle_investigation_routing.py:113: in test_investigation_route_read_error_is_not_a_billing_fallback
+    with pytest.raises(ValueError, match="^model_route_unavailable$"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+------------------------------ Captured log call -------------------------------
+WARNING  src.agents.config:config.py:488 model_route DB read failed for task 'lifecycle_investigation'; using yaml/default
+Traceback (most recent call last):
+  File "/tmp/arkscope-independent-task-mutation-vg203w9j/src/agents/config.py", line 486, in _db_route
+    return store.get(task)
+  File "/tmp/arkscope-independent-task-mutation-vg203w9j/tests/test_lifecycle_investigation_routing.py", line 111, in get
+    raise OSError("database unavailable")
+OSError: database unavailable
+- generated xml file: /tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/mutations-r1/route_read_failure_falls_back.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_investigation_routing.py::test_investigation_route_read_error_is_not_a_billing_fallback
+1 failed, 975 passed in 75.08s (0:01:15)

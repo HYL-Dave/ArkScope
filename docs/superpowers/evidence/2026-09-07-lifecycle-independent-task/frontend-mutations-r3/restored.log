@@ -1,0 +1,5 @@
+
+> arkscope-web@0.0.1 test
+> vitest run --maxWorkers=4 --reporter=json --outputFile=/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/frontend-mutations-r3/restored.json
+
+JSON report written to /tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/frontend-mutations-r3/restored.json

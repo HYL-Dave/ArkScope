@@ -1,0 +1,117 @@
+........................................................................ [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 66%]
+........................................................................ [ 88%]
+...................FFFF.............                                     [100%]
+=================================== FAILURES ===================================
+_ test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-api_key] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7643757af0>
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selected = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selected, api_key="chosen") if auth == "api_key" else WebCredential(selected, token_record=StoredTokenRecord("chosen"))
+        control, calls, reader = RunControl(selection=selected, max_model_requests=2), [], Reader()
+        text = ("Shares remain active: " + "\U00020000" * 400 + "\n") * 100 + NOTICE
+        page = source_page(text)
+        monkeypatch.setattr(reader, "read", lambda url: page)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
+        result = await mod.investigate(public_input(), credential, control, options=_options(auth), reader_factory=lambda limits: reader)
+        prompt = calls[1][0].prompt
+        material = json.loads(prompt.split("\n", 1)[1])
+        assert material["sources"][0]["passages"][0]["text"] == text
+>       assert "\U00020000" in prompt and "\\ud840\\udc00" not in prompt
+E       assert ('𠀀' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...on stock (OLD) was delisted from NASDAQ effective September 1, 2026."}]}],"unread_sources":[],"search_uncertainty":[]}')
+
+tests/test_security_lifecycle_web_pipeline.py:211: AssertionError
+_ test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-chatgpt_oauth] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7643965d50>
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selected = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selected, api_key="chosen") if auth == "api_key" else WebCredential(selected, token_record=StoredTokenRecord("chosen"))
+        control, calls, reader = RunControl(selection=selected, max_model_requests=2), [], Reader()
+        text = ("Shares remain active: " + "\U00020000" * 400 + "\n") * 100 + NOTICE
+        page = source_page(text)
+        monkeypatch.setattr(reader, "read", lambda url: page)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
+        result = await mod.investigate(public_input(), credential, control, options=_options(auth), reader_factory=lambda limits: reader)
+        prompt = calls[1][0].prompt
+        material = json.loads(prompt.split("\n", 1)[1])
+        assert material["sources"][0]["passages"][0]["text"] == text
+>       assert "\U00020000" in prompt and "\\ud840\\udc00" not in prompt
+E       assert ('𠀀' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...on stock (OLD) was delisted from NASDAQ effective September 1, 2026."}]}],"unread_sources":[],"search_uncertainty":[]}')
+
+tests/test_security_lifecycle_web_pipeline.py:211: AssertionError
+_ test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-api_key] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7643706cb0>
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selected = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selected, api_key="chosen") if auth == "api_key" else WebCredential(selected, token_record=StoredTokenRecord("chosen"))
+        control, calls, reader = RunControl(selection=selected, max_model_requests=2), [], Reader()
+        text = ("Shares remain active: " + "\U00020000" * 400 + "\n") * 100 + NOTICE
+        page = source_page(text)
+        monkeypatch.setattr(reader, "read", lambda url: page)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
+        result = await mod.investigate(public_input(), credential, control, options=_options(auth), reader_factory=lambda limits: reader)
+        prompt = calls[1][0].prompt
+        material = json.loads(prompt.split("\n", 1)[1])
+        assert material["sources"][0]["passages"][0]["text"] == text
+>       assert "\U00020000" in prompt and "\\ud840\\udc00" not in prompt
+E       assert ('𠀀' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...on stock (OLD) was delisted from NASDAQ effective September 1, 2026."}]}],"unread_sources":[],"search_uncertainty":[]}')
+
+tests/test_security_lifecycle_web_pipeline.py:211: AssertionError
+_ test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-claude_code_oauth] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7643966080>
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selected = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selected, api_key="chosen") if auth == "api_key" else WebCredential(selected, token_record=StoredTokenRecord("chosen"))
+        control, calls, reader = RunControl(selection=selected, max_model_requests=2), [], Reader()
+        text = ("Shares remain active: " + "\U00020000" * 400 + "\n") * 100 + NOTICE
+        page = source_page(text)
+        monkeypatch.setattr(reader, "read", lambda url: page)
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
+        result = await mod.investigate(public_input(), credential, control, options=_options(auth), reader_factory=lambda limits: reader)
+        prompt = calls[1][0].prompt
+        material = json.loads(prompt.split("\n", 1)[1])
+        assert material["sources"][0]["passages"][0]["text"] == text
+>       assert "\U00020000" in prompt and "\\ud840\\udc00" not in prompt
+E       assert ('𠀀' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...on stock (OLD) was delisted from NASDAQ effective September 1, 2026."}]}],"unread_sources":[],"search_uncertainty":[]}')
+
+tests/test_security_lifecycle_web_pipeline.py:211: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r1/results/model_json_escape_expansion-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-api_key]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-chatgpt_oauth]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-api_key]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-claude_code_oauth]
+4 failed, 320 passed in 14.81s

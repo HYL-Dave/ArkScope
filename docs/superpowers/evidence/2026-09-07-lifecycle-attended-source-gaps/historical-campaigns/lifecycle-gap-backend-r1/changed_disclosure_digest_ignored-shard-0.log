@@ -1,0 +1,329 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+............................................................FFFF........ [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di0')
+change = 'omitted'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_review.py:248: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:864: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:168: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x750ec5db7e40>
+assessment_id = 'sla_web_62dbb86e04829b2e3c91d6c4221f222d'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di0')
+change = 'omitted'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di1')
+change = 'empty'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_review.py:248: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:864: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:168: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x750ebdf70340>
+assessment_id = 'sla_web_0b84db86ae13a09e794a1dd9122dae40'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di1')
+change = 'empty'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di2')
+change = 'reason'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_review.py:248: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:864: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:168: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x750ebdf70f40>
+assessment_id = 'sla_web_75f2715e0b1342734af41d22e9f3a0fd'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di2')
+change = 'reason'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+_ test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url] __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di3')
+change = 'url'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+>           adopt(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+                  options=c["options"], before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_review.py:248: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:864: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:168: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x750ec5db7e40>
+assessment_id = 'sla_web_569fdd1280eae8793a9e9a96a34ed63b'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/changed_disclosure_digest_ignored-shard-0/test_confirmation_rejects_a_di3')
+change = 'url'
+
+    @pytest.mark.parametrize("change", ["omitted", "empty", "reason", "url"])
+    def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_path, change):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        if change == "omitted":
+            packet.pop("source_gaps")
+        elif change == "empty":
+            packet["source_gaps"] = []
+        else:
+            packet["source_gaps"][0][change] = "source_timeout" if change == "reason" else "https://different.example.com/notice"
+        packet["packet_sha256"] = packet_digest(packet)
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_gaps.py:60: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/changed_disclosure_digest_ignored-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[omitted]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[empty]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[reason]
+FAILED tests/test_lifecycle_web_gaps.py::test_confirmation_rejects_a_different_gap_disclosure_without_any_write[url]
+4 failed, 590 passed in 29.74s

@@ -1,0 +1,319 @@
+..............FFF..F.F.................................................. [ 13%]
+........................................................................ [ 26%]
+........................................................................ [ 40%]
+........................................................................ [ 53%]
+........................................................................ [ 67%]
+........................................................................ [ 80%]
+........................................................................ [ 93%]
+.................................                                        [100%]
+=================================== FAILURES ===================================
+_______ test_response_owned_body_survives_connection_close[fixed-False] ________
+
+wire = (<function wire.<locals>.start at 0x7d477a703d00>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...ion/json\r\nAccept-Encoding: gzip, identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+framing = 'fixed', keep_alive = False
+
+    @pytest.mark.parametrize("framing,keep_alive", [
+        ("fixed", False), ("chunked", False), ("eof", False), ("fixed", True),
+    ])
+    def test_response_owned_body_survives_connection_close(wire, framing, keep_alive):
+        start, state = wire
+        body = ("A public common-stock notice. " * 600 + "Complete final sentence.").encode()
+        reader = start(body=body, framing=framing, keep_alive=keep_alive)
+>       page = reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources_wire.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:435: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:497: in _read
+    body = self._body(response, observed)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_public_sources.PublicSourceReader object at 0x7d4785f54ac0>
+response = <tests.test_lifecycle_public_sources_wire.wire.<locals>.ObservedResponse object at 0x7d4785f54a60>
+observed = {'content_encoding': 'identity', 'declared_body_bytes': 18024, 'decoded_body_bytes': 0, 'framing': 'content_length', ...}
+
+    def _body(self, response, observed) -> bytes:
+        transfer = response.getheader("Transfer-Encoding")
+        length_header = response.getheader("Content-Length")
+        if transfer is not None and (transfer.strip().lower() != "chunked" or length_header is not None):
+            raise SourceReadError("source_framing_invalid")
+        observed["framing"] = "chunked" if transfer is not None else "close_delimited"
+        if transfer is not None and isinstance(response, http.client.HTTPResponse) and not response.chunked:
+            # The stdlib does not strip trailing OWS when recognising chunked.
+            response.chunked, response.chunk_left, response.length = True, None, None
+        length = None
+        if length_header is not None:
+            parts = [part.strip() for part in length_header.split(",")]
+            if any(not part.isascii() or not part.isdecimal() for part in parts):
+                raise SourceReadError("source_response_invalid")
+            normalized = {part.lstrip("0") or "0" for part in parts}
+            if len(normalized) != 1:
+                raise SourceReadError("source_framing_invalid")
+            value = normalized.pop()
+            if len(value) > 20:
+                raise SourceReadError("source_body_too_large")
+            length = int(value)
+            observed.update(framing="content_length", declared_body_bytes=length if length < 2 ** 53 else None)
+            if length > self.limits.max_response_bytes:
+                raise SourceReadError("source_body_too_large")
+        encoding = response.getheader("Content-Encoding", "identity").strip().lower()
+        observed["content_encoding"] = encoding if encoding in {"identity", "gzip"} else "unsupported"
+        if encoding not in {"identity", "gzip"}:
+            raise SourceReadError("source_encoding_unsupported")
+        body = bytearray()
+        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS) if encoding == "gzip" else None
+        decoded_limit = self.limits.decoded_byte_limit
+        while True:
+            self._remaining()
+            if length is not None and observed["received_body_bytes"] == length:
+                break
+            try:
+                remaining = self.limits.max_response_bytes + 1 - observed["received_body_bytes"]
+                if length is not None:
+                    remaining = min(remaining, length - observed["received_body_bytes"])
+                chunk = response.read(min(65536, remaining))
+            except http.client.IncompleteRead as exc:
+                self._remaining()
+                observed["received_body_bytes"] += len(exc.partial)
+                raise SourceReadError("source_body_incomplete") from None
+            self._remaining()
+            observed["received_body_bytes"] += len(chunk)
+            if observed["received_body_bytes"] > self.limits.max_response_bytes:
+                raise SourceReadError("source_body_too_large")
+            if not chunk:
+                break
+            while chunk:
+                self._remaining()
+                if decoder is None:
+                    decoded, chunk = chunk, b""
+                else:
+                    if decoder.eof:
+                        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                    try:
+                        decoded = decoder.decompress(chunk, min(65536, decoded_limit + 1 - len(body)))
+                    except zlib.error:
+                        raise SourceReadError("source_compression_invalid") from None
+                    chunk = decoder.unused_data if decoder.eof else decoder.unconsumed_tail
+                observed["decoded_body_bytes"] += len(decoded)
+                if observed["decoded_body_bytes"] > decoded_limit:
+                    raise SourceReadError("source_decoded_body_too_large")
+                body.extend(decoded)
+        if length is not None and observed["received_body_bytes"] != length:
+>           raise SourceReadError("source_body_incomplete")
+E           src.lifecycle_public_sources.SourceReadError: source_body_incomplete
+
+src/lifecycle_public_sources.py:603: SourceReadError
+______ test_response_owned_body_survives_connection_close[chunked-False] _______
+
+wire = (<function wire.<locals>.start at 0x7d4785f15000>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...ion/json\r\nAccept-Encoding: gzip, identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+framing = 'chunked', keep_alive = False
+
+    @pytest.mark.parametrize("framing,keep_alive", [
+        ("fixed", False), ("chunked", False), ("eof", False), ("fixed", True),
+    ])
+    def test_response_owned_body_survives_connection_close(wire, framing, keep_alive):
+        start, state = wire
+        body = ("A public common-stock notice. " * 600 + "Complete final sentence.").encode()
+        reader = start(body=body, framing=framing, keep_alive=keep_alive)
+>       page = reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources_wire.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:435: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:497: in _read
+    body = self._body(response, observed)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_public_sources.PublicSourceReader object at 0x7d477a7150f0>
+response = <tests.test_lifecycle_public_sources_wire.wire.<locals>.ObservedResponse object at 0x7d477a7155d0>
+observed = {'content_encoding': 'identity', 'declared_body_bytes': None, 'decoded_body_bytes': 0, 'framing': 'chunked', ...}
+
+    def _body(self, response, observed) -> bytes:
+        transfer = response.getheader("Transfer-Encoding")
+        length_header = response.getheader("Content-Length")
+        if transfer is not None and (transfer.strip().lower() != "chunked" or length_header is not None):
+            raise SourceReadError("source_framing_invalid")
+        observed["framing"] = "chunked" if transfer is not None else "close_delimited"
+        if transfer is not None and isinstance(response, http.client.HTTPResponse) and not response.chunked:
+            # The stdlib does not strip trailing OWS when recognising chunked.
+            response.chunked, response.chunk_left, response.length = True, None, None
+        length = None
+        if length_header is not None:
+            parts = [part.strip() for part in length_header.split(",")]
+            if any(not part.isascii() or not part.isdecimal() for part in parts):
+                raise SourceReadError("source_response_invalid")
+            normalized = {part.lstrip("0") or "0" for part in parts}
+            if len(normalized) != 1:
+                raise SourceReadError("source_framing_invalid")
+            value = normalized.pop()
+            if len(value) > 20:
+                raise SourceReadError("source_body_too_large")
+            length = int(value)
+            observed.update(framing="content_length", declared_body_bytes=length if length < 2 ** 53 else None)
+            if length > self.limits.max_response_bytes:
+                raise SourceReadError("source_body_too_large")
+        encoding = response.getheader("Content-Encoding", "identity").strip().lower()
+        observed["content_encoding"] = encoding if encoding in {"identity", "gzip"} else "unsupported"
+        if encoding not in {"identity", "gzip"}:
+            raise SourceReadError("source_encoding_unsupported")
+        body = bytearray()
+        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS) if encoding == "gzip" else None
+        decoded_limit = self.limits.decoded_byte_limit
+        while True:
+            self._remaining()
+            if length is not None and observed["received_body_bytes"] == length:
+                break
+            try:
+                remaining = self.limits.max_response_bytes + 1 - observed["received_body_bytes"]
+                if length is not None:
+                    remaining = min(remaining, length - observed["received_body_bytes"])
+                chunk = response.read(min(65536, remaining))
+            except http.client.IncompleteRead as exc:
+                self._remaining()
+                observed["received_body_bytes"] += len(exc.partial)
+>               raise SourceReadError("source_body_incomplete") from None
+E               src.lifecycle_public_sources.SourceReadError: source_body_incomplete
+
+src/lifecycle_public_sources.py:579: SourceReadError
+________ test_response_owned_body_survives_connection_close[eof-False] _________
+
+wire = (<function wire.<locals>.start at 0x7d47fefbab90>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...ion/json\r\nAccept-Encoding: gzip, identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+framing = 'eof', keep_alive = False
+
+    @pytest.mark.parametrize("framing,keep_alive", [
+        ("fixed", False), ("chunked", False), ("eof", False), ("fixed", True),
+    ])
+    def test_response_owned_body_survives_connection_close(wire, framing, keep_alive):
+        start, state = wire
+        body = ("A public common-stock notice. " * 600 + "Complete final sentence.").encode()
+        reader = start(body=body, framing=framing, keep_alive=keep_alive)
+>       page = reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_public_sources_wire.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:435: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:498: in _read
+    text, mime = _page_text(body, response.getheader("Content-Type", "application/octet-stream"), check=self._remaining)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+body = b'', content_type = 'text/plain; charset=utf-8'
+
+    def _page_text(body: bytes, content_type: str, *, check=lambda: None) -> tuple[str, str]:
+        header = Message()
+        header["Content-Type"] = content_type
+        mime = header.get_content_type()
+        if mime not in {"text/plain", "text/html", "application/xhtml+xml", "application/xml", "text/xml", "application/json"}:
+            raise SourceReadError("source_format_unsupported")
+        if mime in {"application/xml", "text/xml"}:
+            text = _xml_text(body, check)
+        else:
+            charset = header.get_content_charset() or "utf-8-sig"
+            try:
+                text = body.decode(charset, errors="strict")
+            except (LookupError, UnicodeError):
+                raise SourceReadError("source_encoding_unsupported") from None
+            if mime == "application/json":
+                _json_document(text)
+            elif mime != "text/plain":
+                parser = _SourceTextParser(check)
+                for offset in range(0, len(text), 65536):
+                    check()
+                    parser.feed(text[offset:offset + 65536])
+                parser.close()
+                text = "".join(parser.parts)
+        text = text.strip() if mime in {"application/json", "application/xml", "text/xml"} else _normalize_text(text)
+        check()
+        if not text:
+>           raise SourceReadError("source_text_empty")
+E           src.lifecycle_public_sources.SourceReadError: source_text_empty
+
+src/lifecycle_public_sources.py:344: SourceReadError
+_ test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False] _
+
+wire = (<function wire.<locals>.start at 0x7d477a703f40>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...ion/json\r\nAccept-Encoding: gzip, identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+cancel = False, framing = 'fixed'
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    @pytest.mark.parametrize("framing", ["fixed", "chunked"])
+    def test_stop_interrupts_response_after_connection_ownership_transfer(wire, cancel, framing):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"A delayed notice", framing=framing, stall_body=True,
+                       timeout_seconds=5 if cancel else 0.15)
+        errors = []
+    
+        def run():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                errors.append(exc)
+    
+        worker = Thread(target=run)
+        worker.start()
+        try:
+            assert state["response_returned"].wait(1)
+            assert state["read_entered"].wait(1)
+            if cancel:
+                assert worker.is_alive()
+                reader.request_stop()
+            worker.join(1)
+            assert not worker.is_alive(), "response-owned socket outlived cancellation/deadline"
+            assert len(errors) == 1 and isinstance(errors[0], SourceReadError)
+>           assert str(errors[0]) == ("source_read_cancelled" if cancel else "source_read_timeout")
+E           AssertionError: assert 'source_body_incomplete' == 'source_read_timeout'
+E             
+E             - source_read_timeout
+E             + source_body_incomplete
+
+tests/test_lifecycle_public_sources_wire.py:188: AssertionError
+_ test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False] _
+
+wire = (<function wire.<locals>.start at 0x7d4785f16050>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...ion/json\r\nAccept-Encoding: gzip, identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+cancel = False, framing = 'chunked'
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    @pytest.mark.parametrize("framing", ["fixed", "chunked"])
+    def test_stop_interrupts_response_after_connection_ownership_transfer(wire, cancel, framing):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"A delayed notice", framing=framing, stall_body=True,
+                       timeout_seconds=5 if cancel else 0.15)
+        errors = []
+    
+        def run():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                errors.append(exc)
+    
+        worker = Thread(target=run)
+        worker.start()
+        try:
+            assert state["response_returned"].wait(1)
+            assert state["read_entered"].wait(1)
+            if cancel:
+                assert worker.is_alive()
+                reader.request_stop()
+            worker.join(1)
+            assert not worker.is_alive(), "response-owned socket outlived cancellation/deadline"
+            assert len(errors) == 1 and isinstance(errors[0], SourceReadError)
+>           assert str(errors[0]) == ("source_read_cancelled" if cancel else "source_read_timeout")
+E           AssertionError: assert 'source_body_incomplete' == 'source_read_timeout'
+E             
+E             - source_read_timeout
+E             + source_body_incomplete
+
+tests/test_lifecycle_public_sources_wire.py:188: AssertionError
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/normal_close_aborts_response-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_public_sources_wire.py::test_response_owned_body_survives_connection_close[fixed-False]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_response_owned_body_survives_connection_close[chunked-False]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_response_owned_body_survives_connection_close[eof-False]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-False]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-False]
+5 failed, 532 passed in 13.64s

@@ -1,0 +1,5 @@
+
+> arkscope-web@0.0.1 test
+> vitest run src/lifecycle/webContract.test.ts --maxWorkers=4 --reporter=json --outputFile=/tmp/lifecycle-gap-adoption-r1/named-gap-fixtures-green.json
+
+JSON report written to /tmp/lifecycle-gap-adoption-r1/named-gap-fixtures-green.json

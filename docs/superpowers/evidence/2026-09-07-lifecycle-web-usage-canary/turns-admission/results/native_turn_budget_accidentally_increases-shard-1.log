@@ -1,0 +1,52 @@
+........................................................................ [ 13%]
+...............................................FF....................... [ 27%]
+........................................................................ [ 40%]
+........................................................................ [ 54%]
+........................................................................ [ 68%]
+........................................................................ [ 81%]
+........................................................................ [ 95%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+_ test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70e91faedcf0>
+phase = 'analysis', tool_budget = 2
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+>       assert clients[0].options.max_turns == tool_budget
+E       AssertionError: assert 3 == 2
+E        +  where 3 = ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).max_turns
+E        +    where ClaudeAgentOptions(tools=[], allowed_tools=[], system_prompt='Investigate only the supplied public listing question. R...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None) = <tests.test_lifecycle_web_claude.Client object at 0x70e91f97f190>.options
+
+tests/test_lifecycle_web_claude_turns.py:22: AssertionError
+_ test_claude_completed_result_includes_final_turn_after_tool_budget[search-4] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70e91f85ba60>
+phase = 'search', tool_budget = 4
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+>       assert clients[0].options.max_turns == tool_budget
+E       AssertionError: assert 5 == 4
+E        +  where 5 = ClaudeAgentOptions(tools=['WebSearch'], allowed_tools=['WebSearch'], system_prompt='Investigate only the supplied publ...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None).max_turns
+E        +    where ClaudeAgentOptions(tools=['WebSearch'], allowed_tools=['WebSearch'], system_prompt='Investigate only the supplied publ...e_file_checkpointing=False, session_store=None, session_store_flush='batched', load_timeout_ms=60000, task_budget=None) = <tests.test_lifecycle_web_claude.Client object at 0x70e91f858e80>.options
+
+tests/test_lifecycle_web_claude_turns.py:22: AssertionError
+- generated xml file: /dev/shm/lifecycle-turns-campaign-r1/results/native_turn_budget_accidentally_increases-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_completed_result_includes_final_turn_after_tool_budget[search-4]
+2 failed, 526 passed in 20.40s

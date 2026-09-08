@@ -1,0 +1,38 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+............F........................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+................................                                         [100%]
+=================================== FAILURES ===================================
+_ test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r4/source_json_escape_expansion-shard-0/test_unicode_source_journal_av0')
+
+    def test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests(tmp_path):
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_lifecycle_web_store import setup_store, start
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        text = "\u6539\u540d \U00020000\n" * 10000
+        page = source_page(text)
+        store.add_page(identity, owner="worker-1", source_id="source-1", page=page)
+        material = asdict(page)
+        with store.connection(write=True) as conn:
+            row = conn.execute("SELECT page_json,page_sha256 FROM lifecycle_web_pages WHERE run_id=?", (identity,)).fetchone()
+>           assert len(row["page_json"].encode()) < len(text.encode()) * 1.2
+E           assert 270383 < (120000 * 1.2)
+E            +  where 270383 = len(b'{"body_sha256":"02695d31ef90f5b6c69f94bebece01a4c244741e2cf4420ffbadea6dadeb9bb2","capture_sha256":"a34cf00a0a6e6ce7...text_sha256":"02695d31ef90f5b6c69f94bebece01a4c244741e2cf4420ffbadea6dadeb9bb2","url":"https://ir.example.com/notice"}')
+E            +    where b'{"body_sha256":"02695d31ef90f5b6c69f94bebece01a4c244741e2cf4420ffbadea6dadeb9bb2","capture_sha256":"a34cf00a0a6e6ce7...text_sha256":"02695d31ef90f5b6c69f94bebece01a4c244741e2cf4420ffbadea6dadeb9bb2","url":"https://ir.example.com/notice"}' = <built-in method encode of str object at 0x591d3d343c50>()
+E            +      where <built-in method encode of str object at 0x591d3d343c50> = '{"body_sha256":"02695d31ef90f5b6c69f94bebece01a4c244741e2cf4420ffbadea6dadeb9bb2","capture_sha256":"a34cf00a0a6e6ce7d...text_sha256":"02695d31ef90f5b6c69f94bebece01a4c244741e2cf4420ffbadea6dadeb9bb2","url":"https://ir.example.com/notice"}'.encode
+E            +  and   120000 = len(b'\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\...9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n')
+E            +    where b'\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\...9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n\xe6\x94\xb9\xe5\x90\x8d \xf0\xa0\x80\x80\n' = <built-in method encode of str object at 0x591d3d2d0e60>()
+E            +      where <built-in method encode of str object at 0x591d3d2d0e60> = '改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 ... 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n改名 𠀀\n'.encode
+
+tests/test_lifecycle_source_capacity.py:59: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r4/results/source_json_escape_expansion-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_capacity.py::test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests
+1 failed, 463 passed in 24.56s

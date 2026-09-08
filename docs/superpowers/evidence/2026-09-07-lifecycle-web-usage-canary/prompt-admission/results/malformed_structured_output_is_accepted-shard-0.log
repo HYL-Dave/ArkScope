@@ -1,0 +1,53 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+.................................FF..................................... [ 37%]
+........................................................................ [ 49%]
+........................................................................ [ 62%]
+........................................................................ [ 74%]
+........................................................................ [ 86%]
+........................................................................ [ 99%]
+....                                                                     [100%]
+=================================== FAILURES ===================================
+___ test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x759ce4103d90>
+wrapped = {'$FUNCTION_NAME': 'StructuredOutput', '$PARAMETER_NAME': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_output_contract.py:55: Failed
+___ test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x759cea7f6920>
+wrapped = {'result': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"structured_output": wrapped})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_output_contract.py:55: Failed
+- generated xml file: /dev/shm/lifecycle-schema-prompt-campaign-r2/results/malformed_structured_output_is_accepted-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]
+2 failed, 578 passed in 22.53s

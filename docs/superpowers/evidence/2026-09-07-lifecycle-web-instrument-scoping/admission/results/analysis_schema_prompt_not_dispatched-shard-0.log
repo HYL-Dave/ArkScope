@@ -1,0 +1,35 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+...............................F........................................ [ 32%]
+........................................................................ [ 43%]
+........................................................................ [ 53%]
+........................................................................ [ 64%]
+........................................................................ [ 75%]
+........................................................................ [ 86%]
+........................................................................ [ 97%]
+...................                                                      [100%]
+=================================== FAILURES ===================================
+_____ test_claude_analysis_declares_final_json_without_native_output_tool ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ecfaa391a80>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_declares_final_json_without_native_output_tool(monkeypatch):
+        mod, clients = setup(monkeypatch)
+        reply, control = await invoke(mod)
+        assert reply.output == OUTPUT and control.terminal_statuses == {"analysis-1": "completed"}
+        options = clients[0].options
+        assert options.output_format is None
+        assert options.tools == options.allowed_tools == [] and "StructuredOutput" in options.disallowed_tools
+        assert options.mcp_servers == {} and options.setting_sources == [] and options.strict_mcp_config is True
+        assert options.fallback_model is None and options.max_turns == 2
+        assert options.env["CLAUDE_CODE_MAX_RETRIES"] == "0"
+        instructions, separator, encoded = options.system_prompt.partition("\nOutput schema:\n")
+>       assert separator and json.loads(encoded) == SCHEMA
+E       AssertionError: assert ('')
+
+tests/test_lifecycle_web_claude_json_analysis.py:60: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/analysis_schema_prompt_not_dispatched-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_declares_final_json_without_native_output_tool
+1 failed, 666 passed in 29.03s

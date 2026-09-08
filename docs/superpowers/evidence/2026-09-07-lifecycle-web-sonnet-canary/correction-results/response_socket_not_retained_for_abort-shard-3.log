@@ -1,0 +1,85 @@
+....................F.F................................................. [ 23%]
+........................................................................ [ 47%]
+........................................................................ [ 70%]
+........................................................................ [ 94%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True] _
+
+wire = (<function wire.<locals>.start at 0x7e9a85501fc0>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+cancel = True, framing = 'fixed'
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    @pytest.mark.parametrize("framing", ["fixed", "chunked"])
+    def test_stop_interrupts_response_after_connection_ownership_transfer(wire, cancel, framing):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"A delayed notice", framing=framing, stall_body=True,
+                       timeout_seconds=5 if cancel else 0.15)
+        errors = []
+    
+        def run():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                errors.append(exc)
+    
+        worker = Thread(target=run)
+        worker.start()
+        try:
+            assert state["response_returned"].wait(1)
+            assert state["read_entered"].wait(1)
+            if cancel:
+                assert worker.is_alive()
+                reader.request_stop()
+            worker.join(1)
+>           assert not worker.is_alive(), "response-owned socket outlived cancellation/deadline"
+E           AssertionError: response-owned socket outlived cancellation/deadline
+E           assert not True
+E            +  where True = is_alive()
+E            +    where is_alive = <Thread(Thread-15 (run), started 139200399140416)>.is_alive
+
+tests/test_lifecycle_public_sources_wire.py:186: AssertionError
+_ test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True] _
+
+wire = (<function wire.<locals>.start at 0x7e9a7b794820>, {'client': <socket.socket [closed] fd=-1, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+cancel = True, framing = 'chunked'
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    @pytest.mark.parametrize("framing", ["fixed", "chunked"])
+    def test_stop_interrupts_response_after_connection_ownership_transfer(wire, cancel, framing):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"A delayed notice", framing=framing, stall_body=True,
+                       timeout_seconds=5 if cancel else 0.15)
+        errors = []
+    
+        def run():
+            try:
+                reader.read("https://ir.example.com/notice")
+            except Exception as exc:
+                errors.append(exc)
+    
+        worker = Thread(target=run)
+        worker.start()
+        try:
+            assert state["response_returned"].wait(1)
+            assert state["read_entered"].wait(1)
+            if cancel:
+                assert worker.is_alive()
+                reader.request_stop()
+            worker.join(1)
+>           assert not worker.is_alive(), "response-owned socket outlived cancellation/deadline"
+E           AssertionError: response-owned socket outlived cancellation/deadline
+E           assert not True
+E            +  where True = is_alive()
+E            +    where is_alive = <Thread(Thread-21 (run), started 139200382355008)>.is_alive
+
+tests/test_lifecycle_public_sources_wire.py:186: AssertionError
+- generated xml file: /tmp/arkscope-lifecycle-web-source-correction-r1/results/response_socket_not_retained_for_abort-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_public_sources_wire.py::test_stop_interrupts_response_after_connection_ownership_transfer[fixed-True]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_stop_interrupts_response_after_connection_ownership_transfer[chunked-True]
+2 failed, 304 passed in 256.93s (0:04:16)

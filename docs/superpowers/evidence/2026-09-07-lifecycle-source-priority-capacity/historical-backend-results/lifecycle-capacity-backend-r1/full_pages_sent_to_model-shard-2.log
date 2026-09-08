@@ -1,0 +1,30 @@
+........................................................................ [ 14%]
+................................................................F....... [ 29%]
+........................................................................ [ 44%]
+........................................................................ [ 59%]
+........................................................................ [ 73%]
+........................................................................ [ 88%]
+.......................................................                  [100%]
+=================================== FAILURES ===================================
+____ test_context_keeps_tail_negation_and_dates_without_sending_whole_page _____
+
+    def test_context_keeps_tail_negation_and_dates_without_sending_whole_page():
+        from src.lifecycle_source_context import select_source_context
+    
+        page = source_page(long_source())
+        context = select_source_context(public_input(), page)
+        material = context.prompt_material(page)
+        sent = "\n".join(part["text"] for part in material["passages"])
+        assert NOTICE in sent
+        assert "However, the ordinary shares remain actively traded OTC." in sent
+>       assert material["coverage"] == "selected_passages"
+E       AssertionError: assert 'full_text' == 'selected_passages'
+E         
+E         - selected_passages
+E         + full_text
+
+tests/test_lifecycle_source_context.py:25: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r1/results/full_pages_sent_to_model-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_context.py::test_context_keeps_tail_negation_and_dates_without_sending_whole_page
+1 failed, 486 passed in 22.35s

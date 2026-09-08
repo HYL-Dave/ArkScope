@@ -1,0 +1,32 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+..................................F..................................... [ 31%]
+........................................................................ [ 42%]
+........................................................................ [ 53%]
+........................................................................ [ 63%]
+........................................................................ [ 74%]
+........................................................................ [ 85%]
+........................................................................ [ 95%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a65353d4fd0>
+phase = 'analysis', tool_budget = 2
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+E       assert '{"sources": ["https://ir.example.com/notice"]}' == {'sources': ['https://ir.example.com/notice']}
+E        +  where '{"sources": ["https://ir.example.com/notice"]}' = ModelReply(remote_id='05e7c752-839b-4a3f-8a46-eead5b2dd28b', output='{"sources": ["https://ir.example.com/notice"]}', ...utput_tokens': 50, 'cache_creation_input_tokens': None, 'cache_read_input_tokens': None, 'web_search_requests': None}}).output
+
+tests/test_lifecycle_web_claude_turns.py:21: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/json_analysis_skips_output_validation-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]
+1 failed, 676 passed in 22.33s

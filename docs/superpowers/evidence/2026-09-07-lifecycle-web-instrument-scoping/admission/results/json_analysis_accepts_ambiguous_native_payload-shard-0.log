@@ -1,0 +1,26 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+..................................................F..................... [ 32%]
+........................................................................ [ 43%]
+........................................................................ [ 53%]
+........................................................................ [ 64%]
+........................................................................ [ 75%]
+........................................................................ [ 86%]
+........................................................................ [ 97%]
+...................                                                      [100%]
+=================================== FAILURES ===================================
+_______ test_claude_analysis_never_chooses_between_native_and_final_json _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x752949136d10>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_never_chooses_between_native_and_final_json(monkeypatch):
+        mod, _ = setup(monkeypatch, result={"structured_output": OUTPUT})
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_json_analysis.py:102: Failed
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/json_analysis_accepts_ambiguous_native_payload-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_never_chooses_between_native_and_final_json
+1 failed, 666 passed in 29.48s

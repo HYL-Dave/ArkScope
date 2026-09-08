@@ -1,0 +1,59 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+...................................................................F.... [ 46%]
+.............F.......................................................... [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>3] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/boolean_counter_is_a_token-shard-0/test_usage_receipt_rejects_cro3')
+mutate = <function <lambda> at 0x7442151b5480>
+
+    @pytest.mark.parametrize("mutate", [
+        lambda report: report["phases"][0].update(remote_id="another-run"),
+        lambda report: report["phases"].append(deepcopy(report["phases"][0])),
+        lambda report: report["phases"][0].update(call_id="analysis-1"),
+        lambda report: report["phases"][0]["observation"]["values"].update(input_tokens=True),
+        lambda report: report["phases"][0]["observation"].update(secret="not-public"),
+        lambda report: report.update(phases=None),
+        lambda report: report.update(version=True),
+    ])
+    def test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write(tmp_path, mutate):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = start(store)["run_id"]
+        control = store.control(identity, owner="worker-1")
+        control.reserve_model_request("search-1")
+        control.bind_remote_id("search-1", "remote-search")
+        control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+        report = _report()
+        mutate(report)
+>       with pytest.raises(WebJournalError, match="^web_result_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:138: Failed
+_ test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value3] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/boolean_counter_is_a_token-shard-0/test_legacy_usage_pair_rejects3')
+value = {'input_tokens': True, 'output_tokens': 40}
+
+    @pytest.mark.parametrize("value", [None, {}, "unknown", {"input_tokens": True, "output_tokens": 40},
+                                       {"input_tokens": 20, "output_tokens": 40, "secret": "forbidden"}])
+    def test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it(tmp_path, value):
+        from src.lifecycle_web_store import WebJournalError
+    
+        _, store = setup_store(tmp_path)
+        identity = completed(store)
+        rewrite_result(store, lambda material: material.update(usage=value))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:223: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/boolean_counter_is_a_token-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_usage_receipt_rejects_cross_call_duplicate_and_malformed_observations_before_write[<lambda>3]
+FAILED tests/test_lifecycle_web_usage_journal.py::test_legacy_usage_pair_rejects_malformed_shape_instead_of_exporting_it[value3]
+2 failed, 459 passed in 22.74s

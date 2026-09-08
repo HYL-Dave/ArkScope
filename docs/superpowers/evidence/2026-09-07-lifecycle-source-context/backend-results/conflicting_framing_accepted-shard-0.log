@@ -1,0 +1,131 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+..............F......................................................... [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+_____ test_ambiguous_framing_is_not_reported_as_a_short_document[headers0] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7dc36f86ac80>
+headers = ('Transfer-Encoding: chunked', 'Content-Length: 200')
+
+    @pytest.mark.parametrize("headers", [
+        ("Transfer-Encoding: chunked", "Content-Length: 200"),
+        ("Content-Length: 16", "Content-Length: 17"),
+        ("Transfer-Encoding: gzip, chunked",),
+    ])
+    def test_ambiguous_framing_is_not_reported_as_a_short_document(monkeypatch, headers):
+        reader = _wire_reader(monkeypatch, b"10\r\nComplete notice.\r\n0\r\n\r\n", *headers)
+        with pytest.raises(SourceReadError, match="^source_framing_invalid$"):
+>           reader.read("https://ir.example.com/notice")
+
+tests/test_lifecycle_source_compatibility.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_public_sources.py:431: in read
+    return self._read(url)
+src/lifecycle_public_sources.py:493: in _read
+    body = self._body(response, observed)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_public_sources.PublicSourceReader object at 0x7dc36f68a860>
+response = <http.client.HTTPResponse object at 0x7dc36f68a770>
+observed = {'content_encoding': 'identity', 'declared_body_bytes': 200, 'decoded_body_bytes': 16, 'framing': 'content_length', ...}
+
+    def _body(self, response, observed) -> bytes:
+        transfer = response.getheader("Transfer-Encoding")
+        length_header = response.getheader("Content-Length")
+        if transfer is not None and transfer.strip().lower() != "chunked":
+            raise SourceReadError("source_framing_invalid")
+        observed["framing"] = "chunked" if transfer is not None else "close_delimited"
+        if transfer is not None and isinstance(response, http.client.HTTPResponse) and not response.chunked:
+            # The stdlib does not strip trailing OWS when recognising chunked.
+            response.chunked, response.chunk_left, response.length = True, None, None
+        length = None
+        if length_header is not None:
+            parts = [part.strip() for part in length_header.split(",")]
+            if any(not part.isascii() or not part.isdecimal() for part in parts):
+                raise SourceReadError("source_response_invalid")
+            normalized = {part.lstrip("0") or "0" for part in parts}
+            if len(normalized) != 1:
+                raise SourceReadError("source_framing_invalid")
+            value = normalized.pop()
+            if len(value) > 20:
+                raise SourceReadError("source_body_too_large")
+            length = int(value)
+            observed.update(framing="content_length", declared_body_bytes=length if length < 2 ** 53 else None)
+            if length > self.limits.max_response_bytes:
+                raise SourceReadError("source_body_too_large")
+        encoding = response.getheader("Content-Encoding", "identity").strip().lower()
+        observed["content_encoding"] = encoding if encoding in {"identity", "gzip"} else "unsupported"
+        if encoding not in {"identity", "gzip"}:
+            raise SourceReadError("source_encoding_unsupported")
+        body = bytearray()
+        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS) if encoding == "gzip" else None
+        decoded_limit = self.limits.decoded_byte_limit
+        while True:
+            self._remaining()
+            if length is not None and observed["received_body_bytes"] == length:
+                break
+            try:
+                remaining = self.limits.max_response_bytes + 1 - observed["received_body_bytes"]
+                if length is not None:
+                    remaining = min(remaining, length - observed["received_body_bytes"])
+                chunk = response.read(min(65536, remaining))
+            except http.client.IncompleteRead as exc:
+                self._remaining()
+                observed["received_body_bytes"] += len(exc.partial)
+                raise SourceReadError("source_body_incomplete") from None
+            self._remaining()
+            observed["received_body_bytes"] += len(chunk)
+            if observed["received_body_bytes"] > self.limits.max_response_bytes:
+                raise SourceReadError("source_body_too_large")
+            if not chunk:
+                break
+            while chunk:
+                self._remaining()
+                if decoder is None:
+                    decoded, chunk = chunk, b""
+                else:
+                    if decoder.eof:
+                        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                    try:
+                        decoded = decoder.decompress(chunk, min(65536, decoded_limit + 1 - len(body)))
+                    except zlib.error:
+                        raise SourceReadError("source_compression_invalid") from None
+                    chunk = decoder.unused_data if decoder.eof else decoder.unconsumed_tail
+                observed["decoded_body_bytes"] += len(decoded)
+                if observed["decoded_body_bytes"] > decoded_limit:
+                    raise SourceReadError("source_decoded_body_too_large")
+                body.extend(decoded)
+        if length is not None and observed["received_body_bytes"] != length:
+>           raise SourceReadError("source_body_incomplete")
+E           src.lifecycle_public_sources.SourceReadError: source_body_incomplete
+
+src/lifecycle_public_sources.py:599: SourceReadError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7dc36f86ac80>
+headers = ('Transfer-Encoding: chunked', 'Content-Length: 200')
+
+    @pytest.mark.parametrize("headers", [
+        ("Transfer-Encoding: chunked", "Content-Length: 200"),
+        ("Content-Length: 16", "Content-Length: 17"),
+        ("Transfer-Encoding: gzip, chunked",),
+    ])
+    def test_ambiguous_framing_is_not_reported_as_a_short_document(monkeypatch, headers):
+        reader = _wire_reader(monkeypatch, b"10\r\nComplete notice.\r\n0\r\n\r\n", *headers)
+>       with pytest.raises(SourceReadError, match="^source_framing_invalid$"):
+E       AssertionError: 
+E       - source_body_incomplete
+E       + source_framing_invalid
+
+tests/test_lifecycle_source_compatibility.py:91: AssertionError
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/conflicting_framing_accepted-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_compatibility.py::test_ambiguous_framing_is_not_reported_as_a_short_document[headers0]
+1 failed, 595 passed in 25.16s

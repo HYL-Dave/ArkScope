@@ -1,0 +1,89 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[False] _
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7814/test_gap_acknowledgement_never0')
+failed = False
+
+    @pytest.mark.parametrize("failed", [False, True])
+    def test_gap_acknowledgement_never_substitutes_for_a_completed_investigation(tmp_path, failed):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path)
+        row = c["web"].read(c["run_id"])
+        identity = c["web"].start(case_id=c["case_id"], observation_sha256=row["observation_sha256"], request=row["request"],
+            selection=row["selection"], options=row["options"], owner="worker-2", request_key="no-finding")["run_id"]
+        if failed:
+            c["web"].fail(identity, owner="worker-2", code="source_read_incomplete", control=c["web"].control(identity, owner="worker-2"))
+        before = rows(c)
+        with pytest.raises(ValueError, match="web_finding_not_complete"):
+>           adopt(c["service"], identity, packet_sha256="a" * 64, action="terminal_delisting", options=c["options"],
+                  before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:116: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x7ed15f172d70>
+run_id = 'lwr_9c71c348d905473c915b61190f5d3a80'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+            raise ValueError("review_action")
+        before_write()
+        with service._profile_connection(write=True) as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                run = LifecycleWebStore.read_on_connection(conn, run_id)
+>               if run["source_gaps"] and acknowledge_source_gaps is not True:
+E               KeyError: 'source_gaps'
+
+src/lifecycle_web_review.py:215: KeyError
+_ test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[True] _
+
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7814/test_gap_acknowledgement_never1')
+failed = True
+
+    @pytest.mark.parametrize("failed", [False, True])
+    def test_gap_acknowledgement_never_substitutes_for_a_completed_investigation(tmp_path, failed):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path)
+        row = c["web"].read(c["run_id"])
+        identity = c["web"].start(case_id=c["case_id"], observation_sha256=row["observation_sha256"], request=row["request"],
+            selection=row["selection"], options=row["options"], owner="worker-2", request_key="no-finding")["run_id"]
+        if failed:
+            c["web"].fail(identity, owner="worker-2", code="source_read_incomplete", control=c["web"].control(identity, owner="worker-2"))
+        before = rows(c)
+        with pytest.raises(ValueError, match="web_finding_not_complete"):
+>           adopt(c["service"], identity, packet_sha256="a" * 64, action="terminal_delisting", options=c["options"],
+                  before_write=lambda: None, acknowledge_source_gaps=True)
+
+tests/test_lifecycle_web_gaps.py:116: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <src.ticker_identity_service.TickerIdentityService object at 0x7ed15a72f5e0>
+run_id = 'lwr_202a3b824eed412990cdea33185bbe14'
+
+    def confirm(service, run_id, *, packet_sha256, action, options, before_write, acknowledge_source_gaps=False):
+        from src.ticker_identity_service import TickerIdentityConflict
+    
+        _sha256("review_digest", packet_sha256)
+        if action not in {"terminal_delisting", "symbol_continuation"}:
+            raise ValueError("review_action")
+        before_write()
+        with service._profile_connection(write=True) as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                run = LifecycleWebStore.read_on_connection(conn, run_id)
+>               if run["source_gaps"] and acknowledge_source_gaps is not True:
+E               KeyError: 'source_gaps'
+
+src/lifecycle_web_review.py:215: KeyError
+- generated xml file: /tmp/lifecycle-gap-adoption-r1/red-incomplete-confirmation.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_acknowledgement_never_substitutes_for_a_completed_investigation[True]
+2 failed, 49 deselected in 1.07s

@@ -1,0 +1,68 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+.................F...................................................... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+................................                                         [100%]
+=================================== FAILURES ===================================
+_______ test_final_source_decoding_does_not_keep_a_read_transaction_open _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r5/decode_holds_read_lock-shard-0/test_final_source_decoding_doe0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72d77bbe6d10>
+
+    def test_final_source_decoding_does_not_keep_a_read_transaction_open(tmp_path, monkeypatch):
+        import sqlite3
+        from src.lifecycle_web_store import LifecycleWebStore
+        from tests.test_lifecycle_web_store import setup_store, completed
+    
+        path, store = setup_store(tmp_path)
+        original, observed = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            with sqlite3.connect(path, timeout=0) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                conn.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observed.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(store, "_decode_page", decode)
+>       completed(store)
+
+tests/test_lifecycle_source_capacity.py:135: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_store.py:53: in completed
+    store.complete(run["run_id"], owner="worker-1", payload=finding_payload(), source_failures={},
+src/lifecycle_web_store.py:246: in complete
+    pages = self._read_pages(run_id, source_index)
+src/lifecycle_web_store.py:221: in _read_pages
+    with self.connection() as conn:
+/usr/lib/python3.10/contextlib.py:153: in __exit__
+    self.gen.throw(typ, value, traceback)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <src.lifecycle_web_store.LifecycleWebStore object at 0x72d77bbe4070>
+
+    @contextmanager
+    def connection(self, *, write=False):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True, timeout=JOURNAL_BUSY_SECONDS)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            verify_web_journal(conn)
+            if write:
+                assert_lifecycle_writes_available(conn)
+            conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield conn
+            if write:
+                conn.commit()
+        except sqlite3.Error:
+>           raise WebJournalError("web_recording_unavailable") from None
+E           src.lifecycle_web_schema.WebJournalError: web_recording_unavailable
+
+src/lifecycle_web_store.py:64: WebJournalError
+- generated xml file: /tmp/lifecycle-capacity-backend-r5/results/decode_holds_read_lock-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_capacity.py::test_final_source_decoding_does_not_keep_a_read_transaction_open
+1 failed, 463 passed in 23.95s

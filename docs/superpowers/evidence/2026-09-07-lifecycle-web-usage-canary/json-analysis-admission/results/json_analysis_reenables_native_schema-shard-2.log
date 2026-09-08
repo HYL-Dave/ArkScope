@@ -1,0 +1,379 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+..................................F.F.FFFF.............................. [ 36%]
+........................................................................ [ 49%]
+........................................................................ [ 61%]
+........................................................................ [ 73%]
+........................................................................ [ 85%]
+........................................................................ [ 98%]
+...........                                                              [100%]
+=================================== FAILURES ===================================
+_ test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fed4610f0>
+phase = 'analysis', tool_budget = 2
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,tool_budget", [("analysis", 2), ("search", 4)])
+    async def test_claude_completed_result_includes_final_turn_after_tool_budget(monkeypatch, phase, tool_budget):
+        mod, clients = _setup(monkeypatch, result={"num_turns": tool_budget + 1})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       assert (await mod.call_claude_web(request, credential, control)).output == OUTPUT
+
+tests/test_lifecycle_web_claude_turns.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:237: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '93c37de4-d9b4-444e-a3b6-8b08f6583ae6', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+_ test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718074293760>
+phase = 'analysis', bad_turns = 4
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_turns.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:237: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': 'c946eca8-b8a5-4157-9f99-edb9caa2492b', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718074293760>
+phase = 'analysis', bad_turns = 4
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_result_incomplete
+
+tests/test_lifecycle_web_claude_turns.py:34: AssertionError
+_ test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fec23c670>
+phase = 'analysis', bad_turns = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_turns.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:237: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '15cdad2a-2cc8-4b2c-b42a-328a0b3a4740', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fec23c670>
+phase = 'analysis', bad_turns = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_result_incomplete
+
+tests/test_lifecycle_web_claude_turns.py:34: AssertionError
+_ test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718074293490>
+phase = 'analysis', bad_turns = '3'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_turns.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:237: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': 'b0f0f03d-019e-447d-a740-e6d5819d53cb', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718074293490>
+phase = 'analysis', bad_turns = '3'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_result_incomplete
+
+tests/test_lifecycle_web_claude_turns.py:34: AssertionError
+_ test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fed4c6500>
+phase = 'analysis', bad_turns = 0
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_turns.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:237: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': 'eeb1c05e-f404-4ed4-b95b-d2b83a5cc571', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fed4c6500>
+phase = 'analysis', bad_turns = 0
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("phase,bad_turns", [("analysis", 4), ("search", 6), ("analysis", True), ("analysis", "3"), ("analysis", 0)])
+    async def test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns(monkeypatch, phase, bad_turns):
+        mod, clients = _setup(monkeypatch, result={"num_turns": bad_turns})
+        request = _request(phase=phase, call_id=phase + "-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_result_incomplete
+
+tests/test_lifecycle_web_claude_turns.py:34: AssertionError
+_______ test_claude_max_turns_error_is_not_rescued_by_terminal_allowance _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fec256560>
+
+    @pytest.mark.anyio
+    async def test_claude_max_turns_error_is_not_rescued_by_terminal_allowance(monkeypatch):
+        mod, clients = _setup(monkeypatch, result={"num_turns": 3, "subtype": "error_max_turns", "terminal_reason": "max_turns", "is_error": True})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+>           await mod.call_claude_web(request, credential, control)
+
+tests/test_lifecycle_web_claude_turns.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/auth_drivers/lifecycle_web_claude.py:310: in call_claude_web
+    raise exc if isinstance(exc, WebModelError) else WebModelError("provider_call_failed") from None
+src/auth_drivers/lifecycle_web_claude.py:296: in call_claude_web
+    raise failure
+src/auth_drivers/lifecycle_web_claude.py:237: in call_claude_web
+    _validate_init(message, call=call, session_id=session_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+message = SystemMessage(subtype='init', data={'session_id': '571e7700-1885-44c3-a062-2cbc5a401d9f', 'apiKeySource': 'none', 'model': 'claude-opus-5', 'tools': ['StructuredOutput'], 'mcp_servers': []})
+
+    def _validate_init(message: SystemMessage, *, call: ModelCall, session_id: str) -> None:
+        data = message.data
+        if not isinstance(data, dict) or data.get("session_id") != session_id:
+            raise WebModelError("execution_identity_changed")
+        try:
+            require_subscription_auth_source(data)
+        except Exception:
+            raise WebModelError("subscription_auth_unverified") from None
+        require_response_model(data, call.selection.model)
+        tools = data.get("tools")
+        expected = {"StructuredOutput", "WebSearch"} if call.phase == "search" else set()
+        if (not isinstance(tools, list) or any(not isinstance(name, str) for name in tools)
+                or not set(tools).issubset(expected) or (call.phase == "search" and "WebSearch" not in tools)
+                or data.get("mcp_servers") != []):
+>           raise WebModelError("unexpected_tool_activity")
+E           src.auth_drivers.lifecycle_web_models.WebModelError: unexpected_tool_activity
+
+src/auth_drivers/lifecycle_web_claude.py:101: WebModelError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x717fec256560>
+
+    @pytest.mark.anyio
+    async def test_claude_max_turns_error_is_not_rescued_by_terminal_allowance(monkeypatch):
+        mod, clients = _setup(monkeypatch, result={"num_turns": 3, "subtype": "error_max_turns", "terminal_reason": "max_turns", "is_error": True})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_result_incomplete$"):
+E       AssertionError: 
+E       - unexpected_tool_activity
+E       + model_result_incomplete
+
+tests/test_lifecycle_web_claude_turns.py:46: AssertionError
+- generated xml file: /dev/shm/lifecycle-json-analysis-campaign-r1/results/json_analysis_reenables_native_schema-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_completed_result_includes_final_turn_after_tool_budget[analysis-2]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-4]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-True]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-3]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_terminal_allowance_does_not_accept_extra_or_malformed_turns[analysis-0]
+FAILED tests/test_lifecycle_web_claude_turns.py::test_claude_max_turns_error_is_not_rescued_by_terminal_allowance
+6 failed, 581 passed in 24.03s

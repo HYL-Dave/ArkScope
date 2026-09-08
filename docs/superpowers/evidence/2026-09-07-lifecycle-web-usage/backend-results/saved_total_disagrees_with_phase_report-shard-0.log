@@ -1,0 +1,26 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 46%]
+........F............................................................... [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 93%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+__________ test_completed_result_rechecks_aggregate_agreement_on_read __________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-usage-backend-r2/saved_total_disagrees_with_phase_report-shard-0/test_completed_result_rechecks0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d018c1cb400>
+
+    def test_completed_result_rechecks_aggregate_agreement_on_read(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import WebJournalError
+    
+        result, store, _, _, _ = run_pipeline(tmp_path, monkeypatch)
+        rewrite_result(store, lambda material: material["usage"].update(input_tokens=4))
+>       with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_usage_journal.py:199: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/saved_total_disagrees_with_phase_report-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage_journal.py::test_completed_result_rechecks_aggregate_agreement_on_read
+1 failed, 460 passed in 21.15s

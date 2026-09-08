@@ -1,0 +1,26 @@
+........................................................................ [ 15%]
+.....................................................................F.. [ 30%]
+........................................................................ [ 45%]
+........................................................................ [ 61%]
+........................................................................ [ 76%]
+........................................................................ [ 91%]
+.......................................                                  [100%]
+=================================== FAILURES ===================================
+______ test_model_rows_sum_only_equal_scopes_and_missing_row_is_not_zero _______
+
+    def test_model_rows_sum_only_equal_scopes_and_missing_row_is_not_zero():
+        from src.auth_drivers.lifecycle_web_usage import claude_usage_observation
+    
+        message = SimpleNamespace(usage={"input_tokens": 999, "output_tokens": 888}, model_usage={
+            "claude-opus-5": {"inputTokens": 10, "outputTokens": 20},
+            "CLAUDE-OPUS-5": {"inputTokens": 5},
+        })
+        result = claude_usage_observation(message, "claude-opus-5")
+>       assert result["values"]["input_tokens"] == 15 and result["values"]["output_tokens"] is None
+E       assert (15 == 15 and 20 is None)
+
+tests/test_lifecycle_web_usage.py:145: AssertionError
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/partial_rows_claim_complete_total-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage.py::test_model_rows_sum_only_equal_scopes_and_missing_row_is_not_zero
+1 failed, 470 passed in 19.80s

@@ -1,0 +1,308 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+....................................................FFFFFFFF....FFFFF... [ 36%]
+..............................F......................................... [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi0')
+provider = 'openai', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi1')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi2')
+provider = 'anthropic', auth = 'api_key', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi3')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'terminal_delisting'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi4')
+provider = 'openai', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi5')
+provider = 'openai', auth = 'chatgpt_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi6')
+provider = 'anthropic', auth = 'api_key', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+_ test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_gap_disclosure_follows_fi7')
+provider = 'anthropic', auth = 'claude_code_oauth', kind = 'symbol_continuation'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
+    def test_gap_disclosure_follows_finding_review_and_explicit_human_receipt(tmp_path, provider, auth, kind):
+        c = context(tmp_path, provider=provider, auth=auth, kind=kind, completion=COMPLETION)
+        before = rows(c)
+        run = c["web"].read(c["run_id"])
+        assert run["source_failure_urls"] == COMPLETION["source_failure_urls"]
+        public = project_web_run(run, at=c["now"][0])
+        packet = prepare(c)
+        assert packet["ready"] and packet["block_reasons"] == []
+>       assert public["source_gaps"] == packet["source_gaps"] == project_packet(packet)["source_gaps"] == GAPS
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:33: KeyError
+____ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted] _____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_old_or_malformed_confirma0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78f61040bb50>
+acknowledgement = 'omitted'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:78: KeyError
+_____ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_old_or_malformed_confirma1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78f6946f7d30>
+acknowledgement = False
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:78: KeyError
+______ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_old_or_malformed_confirma2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78f6123518a0>
+acknowledgement = None
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:78: KeyError
+_______ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_old_or_malformed_confirma3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78f612373520>
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:78: KeyError
+______ test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true] ______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_old_or_malformed_confirma4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78f610fae980>
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
+    def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
+        from src.api.routes import lifecycle_web as api
+        c = context(tmp_path, completion=COMPLETION)
+        app = FastAPI()
+        app.include_router(api.router)
+        app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
+        monkeypatch.setattr(api, "require_db_write", lambda *args: None)
+        monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
+        with TestClient(app) as client:
+            route = f"/security-lifecycle/web-runs/{c['run_id']}"
+            packet = client.get(route + "/review").json()
+>           assert packet["ready"] and packet["source_gaps"] == GAPS
+E           KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:78: KeyError
+_ test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r1/gap_disclosure_dropped_from_public_review-shard-0/test_no_gaps_is_an_empty_list_0')
+
+    def test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape(tmp_path):
+        c = context(tmp_path, completion={"source_failure_urls": {}})
+        run = project_web_run(c["web"].read(c["run_id"]), at=c["now"][0])
+>       assert run["source_gaps"] == [] and project_packet(prepare(c))["source_gaps"] == []
+E       KeyError: 'source_gaps'
+
+tests/test_lifecycle_web_gaps.py:256: KeyError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/gap_disclosure_dropped_from_public_review-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[terminal_delisting-anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-api_key]
+FAILED tests/test_lifecycle_web_gaps.py::test_gap_disclosure_follows_finding_review_and_explicit_human_receipt[symbol_continuation-anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[omitted]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[False]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[None]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[1]
+FAILED tests/test_lifecycle_web_gaps.py::test_old_or_malformed_confirmation_cannot_apply_unshown_gaps[true]
+FAILED tests/test_lifecycle_web_gaps.py::test_no_gaps_is_an_empty_list_not_unknown_and_no_extra_internal_fields_escape
+14 failed, 580 passed in 30.41s

@@ -1,0 +1,649 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........FFFFFFF.FF..FFFF......FF........................................ [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[prepare-decode] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_attended_web_source_valid0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784ac0a5c0>
+command = 'prepare', phase = 'decode'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+            result = confirm(c, packet)
+            assert result["status"] == "applied" and "OLD" not in c["sources"]()
+        else:
+            result = c["service"].execute_transition(scheduled["transition_id"], preview_sha256=preview, before_write=lambda: None)
+            assert result["status"] == "applied" and "OLD" not in c["sources"]()
+>       assert observations == ["other_writer_committed"]
+E       AssertionError: assert ['other_write...er_committed'] == ['other_writer_committed']
+E         
+E         Left contains one more item: 'other_writer_committed'
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_attended_concurrency.py:48: AssertionError
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[prepare-finding] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_attended_web_source_valid1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784b6bf340>
+command = 'prepare', phase = 'finding'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+            result = confirm(c, packet)
+            assert result["status"] == "applied" and "OLD" not in c["sources"]()
+        else:
+            result = c["service"].execute_transition(scheduled["transition_id"], preview_sha256=preview, before_write=lambda: None)
+            assert result["status"] == "applied" and "OLD" not in c["sources"]()
+>       assert observations == ["other_writer_committed"]
+E       AssertionError: assert ['other_write...er_committed'] == ['other_writer_committed']
+E         
+E         Left contains one more item: 'other_writer_committed'
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_attended_concurrency.py:48: AssertionError
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-decode] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_attended_web_source_valid2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784ad59240>
+command = 'confirm', phase = 'decode'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+>           result = confirm(c, packet)
+
+tests/test_lifecycle_web_attended_concurrency.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:229: in confirm
+    run = LifecycleWebStore.read_on_connection(conn, run_id, validated=web_read)
+src/lifecycle_web_store.py:380: in read_on_connection
+    pages = (cls._pages(conn, run_id)
+src/lifecycle_web_store.py:248: in _pages
+    pages[source_id] = cls._decode_page(saved)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<sqlite3.Row object at 0x7c784ad591e0>,), kwargs = {}
+other = <sqlite3.Connection object at 0x7c78d0097440>
+
+    def validate(*args, **kwargs):
+        with sqlite3.connect(c["profile"], timeout=0) as other:
+>           other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+E           sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_web_attended_concurrency.py:31: OperationalError
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-finding] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_attended_web_source_valid3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784adbdba0>
+command = 'confirm', phase = 'finding'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+>           result = confirm(c, packet)
+
+tests/test_lifecycle_web_attended_concurrency.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:229: in confirm
+    run = LifecycleWebStore.read_on_connection(conn, run_id, validated=web_read)
+src/lifecycle_web_store.py:382: in read_on_connection
+    return cls._read_material(row, header, calls, saved, pages)
+src/lifecycle_web_store.py:414: in _read_material
+    result["finding"] = validate_finding(result["request"], value["finding"], result["pages"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PublicInvestigationInput(ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common stock', venue='NA...ed_at='2026-09-06T01:00:00+00:00', capture_sha256='89aa8702de01547a471370a10196a4cc73a905f4a3220dc3b2ef93c4eac25d78')})
+kwargs = {'source_context': None, 'unread_source_count': 0}
+other = <sqlite3.Connection object at 0x7c78d0097940>
+
+    def validate(*args, **kwargs):
+        with sqlite3.connect(c["profile"], timeout=0) as other:
+>           other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+E           sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_web_attended_concurrency.py:31: OperationalError
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[execute-decode] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_attended_web_source_valid4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784b60b580>
+command = 'execute', phase = 'decode'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+            result = confirm(c, packet)
+            assert result["status"] == "applied" and "OLD" not in c["sources"]()
+        else:
+>           result = c["service"].execute_transition(scheduled["transition_id"], preview_sha256=preview, before_write=lambda: None)
+
+tests/test_lifecycle_web_attended_concurrency.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/ticker_identity_service.py:370: in execute_transition
+    result = execute(self, transition_id, before_write=before_write, trigger=trigger)
+src/security_lifecycle_review.py:307: in execute
+    packet, case, assessment = prepare_on_connection(service, conn, case_id=transition["case_id"],
+src/security_lifecycle_review.py:125: in prepare_on_connection
+    return prepare_web(service, conn, run_id=adoption["run_id"], options=options, web_read=web_read)
+src/lifecycle_web_review.py:100: in prepare_on_connection
+    run = LifecycleWebStore.read_on_connection(conn, run_id, validated=web_read)
+src/lifecycle_web_store.py:380: in read_on_connection
+    pages = (cls._pages(conn, run_id)
+src/lifecycle_web_store.py:248: in _pages
+    pages[source_id] = cls._decode_page(saved)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<sqlite3.Row object at 0x7c784b6089a0>,), kwargs = {}
+other = <sqlite3.Connection object at 0x7c78d0097440>
+
+    def validate(*args, **kwargs):
+        with sqlite3.connect(c["profile"], timeout=0) as other:
+>           other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+E           sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_web_attended_concurrency.py:31: OperationalError
+_ test_attended_web_source_validation_leaves_other_profile_writers_available[execute-finding] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_attended_web_source_valid5')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784ad4bd60>
+command = 'execute', phase = 'finding'
+
+    @pytest.mark.parametrize("phase", ["decode", "finding"])
+    @pytest.mark.parametrize("command", ["prepare", "confirm", "execute"])
+    def test_attended_web_source_validation_leaves_other_profile_writers_available(tmp_path, monkeypatch, command, phase):
+        from src import lifecycle_web_store as journal
+    
+        c = context(tmp_path, future=command == "execute")
+        packet = prepare(c)
+        if command == "execute":
+            scheduled = confirm(c, packet)
+            c["now"][0] = "2026-09-07T15:00:00Z"
+            with sqlite3.connect(c["profile"]) as conn:
+                preview = conn.execute("SELECT approved_preview_sha256 FROM ticker_identity_transitions WHERE transition_id=?",
+                                       (scheduled["transition_id"],)).fetchone()[0]
+        original = journal.LifecycleWebStore._decode_page if phase == "decode" else journal.validate_finding
+        observations = []
+    
+        def validate(*args, **kwargs):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            observations.append("other_writer_committed")
+            return original(*args, **kwargs)
+    
+        if phase == "decode":
+            monkeypatch.setattr(journal.LifecycleWebStore, "_decode_page", staticmethod(validate))
+        else:
+            monkeypatch.setattr(journal, "validate_finding", validate)
+        if command == "prepare":
+            result = prepare(c)
+            assert result["ready"] and "OLD" in c["sources"]()
+        elif command == "confirm":
+            result = confirm(c, packet)
+            assert result["status"] == "applied" and "OLD" not in c["sources"]()
+        else:
+>           result = c["service"].execute_transition(scheduled["transition_id"], preview_sha256=preview, before_write=lambda: None)
+
+tests/test_lifecycle_web_attended_concurrency.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/ticker_identity_service.py:370: in execute_transition
+    result = execute(self, transition_id, before_write=before_write, trigger=trigger)
+src/security_lifecycle_review.py:307: in execute
+    packet, case, assessment = prepare_on_connection(service, conn, case_id=transition["case_id"],
+src/security_lifecycle_review.py:125: in prepare_on_connection
+    return prepare_web(service, conn, run_id=adoption["run_id"], options=options, web_read=web_read)
+src/lifecycle_web_review.py:100: in prepare_on_connection
+    run = LifecycleWebStore.read_on_connection(conn, run_id, validated=web_read)
+src/lifecycle_web_store.py:382: in read_on_connection
+    return cls._read_material(row, header, calls, saved, pages)
+src/lifecycle_web_store.py:414: in _read_material
+    result["finding"] = validate_finding(result["request"], value["finding"], result["pages"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PublicInvestigationInput(ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common stock', venue='NA...ed_at='2026-09-06T01:00:00+00:00', capture_sha256='c8f14af09fda882f9d0c2697092ea1c11dc765263b271d0b4e5d11e66482bf91')})
+kwargs = {'source_context': None, 'unread_source_count': 0}
+other = <sqlite3.Connection object at 0x7c78d4450040>
+
+    def validate(*args, **kwargs):
+        with sqlite3.connect(c["profile"], timeout=0) as other:
+>           other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+E           sqlite3.OperationalError: database is locked
+
+tests/test_lifecycle_web_attended_concurrency.py:31: OperationalError
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[source_added] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_validated_web_read_rechec0')
+change = 'source_added'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[cancellation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_validated_web_read_rechec2')
+change = 'cancellation'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_validated_web_read_rechecks_its_binding_inside_the_transaction[schema_generation] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_validated_web_read_rechec3')
+change = 'schema_generation'
+
+    @pytest.mark.parametrize("change", ["source_added", "terminal_state", "cancellation", "schema_generation"])
+    def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
+        from dataclasses import asdict
+        from src.lifecycle_web_schema import TRIGGERS, WebJournalError
+        from src.lifecycle_web_store import _json, _sha
+        from tests.test_security_lifecycle_web_finding import source_page
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        with c["web"].connection(write=True) as conn:
+            if change == "source_added":
+                material = asdict(source_page("A new source not covered by the verified read."))
+                conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            elif change == "terminal_state":
+                conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
+            elif change == "cancellation":
+                conn.execute("UPDATE lifecycle_web_runs SET cancel_requested_at=? WHERE run_id=?", (c["now"][0], c["run_id"]))
+            else:
+                trigger = "lifecycle_web_pages_update_immutable"
+                conn.execute("DROP TRIGGER " + trigger)
+                conn.execute(TRIGGERS[trigger])
+        with c["web"].connection(write=True) as conn:
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:74: Failed
+_ test_verified_web_material_cannot_cross_its_profile_run_or_transaction[profile] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_verified_web_material_can0')
+wrong = 'profile'
+
+    @pytest.mark.parametrize("wrong", ["profile", "run", "transaction", "unvalidated_dict"])
+    def test_verified_web_material_cannot_cross_its_profile_run_or_transaction(tmp_path, wrong):
+        from src.lifecycle_web_schema import WebJournalError
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        path = c["profile"]
+        if wrong == "profile":
+            path = tmp_path / "copied-profile.db"
+            with sqlite3.connect(c["profile"]) as source, sqlite3.connect(path) as target:
+                source.backup(target)
+                target.execute(f"PRAGMA schema_version={read.binding[-1]}")
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            if wrong != "transaction":
+                conn.execute("BEGIN IMMEDIATE")
+            if wrong == "profile":
+                assert c["web"]._review_binding(conn, c["run_id"]) == read.binding
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:131: Failed
+_ test_verified_web_material_cannot_cross_its_profile_run_or_transaction[run] __
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_verified_web_material_can1')
+wrong = 'run'
+
+    @pytest.mark.parametrize("wrong", ["profile", "run", "transaction", "unvalidated_dict"])
+    def test_verified_web_material_cannot_cross_its_profile_run_or_transaction(tmp_path, wrong):
+        from src.lifecycle_web_schema import WebJournalError
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        path = c["profile"]
+        if wrong == "profile":
+            path = tmp_path / "copied-profile.db"
+            with sqlite3.connect(c["profile"]) as source, sqlite3.connect(path) as target:
+                source.backup(target)
+                target.execute(f"PRAGMA schema_version={read.binding[-1]}")
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            if wrong != "transaction":
+                conn.execute("BEGIN IMMEDIATE")
+            if wrong == "profile":
+                assert c["web"]._review_binding(conn, c["run_id"]) == read.binding
+            with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+>               c["web"].read_on_connection(conn, "other-run" if wrong == "run" else c["run_id"],
+                    validated=read.material if wrong == "unvalidated_dict" else read)
+
+tests/test_lifecycle_web_attended_concurrency.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/lifecycle_web_store.py:379: in read_on_connection
+    row, header, calls, saved = cls._read_record(conn, run_id)
+src/lifecycle_web_store.py:367: in _read_record
+    row, header = cls._row(conn, run_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x7c78d4450840>, run_id = 'other-run'
+
+    @staticmethod
+    def _row(conn, run_id):
+        row = conn.execute("SELECT * FROM lifecycle_web_runs WHERE run_id=?", (_identity(run_id),)).fetchone()
+        if row is None:
+>           raise KeyError(run_id)
+E           KeyError: 'other-run'
+
+src/lifecycle_web_store.py:113: KeyError
+_ test_verified_web_material_cannot_cross_its_profile_run_or_transaction[transaction] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_verified_web_material_can2')
+wrong = 'transaction'
+
+    @pytest.mark.parametrize("wrong", ["profile", "run", "transaction", "unvalidated_dict"])
+    def test_verified_web_material_cannot_cross_its_profile_run_or_transaction(tmp_path, wrong):
+        from src.lifecycle_web_schema import WebJournalError
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        path = c["profile"]
+        if wrong == "profile":
+            path = tmp_path / "copied-profile.db"
+            with sqlite3.connect(c["profile"]) as source, sqlite3.connect(path) as target:
+                source.backup(target)
+                target.execute(f"PRAGMA schema_version={read.binding[-1]}")
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            if wrong != "transaction":
+                conn.execute("BEGIN IMMEDIATE")
+            if wrong == "profile":
+                assert c["web"]._review_binding(conn, c["run_id"]) == read.binding
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:131: Failed
+_ test_verified_web_material_cannot_cross_its_profile_run_or_transaction[unvalidated_dict] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_verified_web_material_can3')
+wrong = 'unvalidated_dict'
+
+    @pytest.mark.parametrize("wrong", ["profile", "run", "transaction", "unvalidated_dict"])
+    def test_verified_web_material_cannot_cross_its_profile_run_or_transaction(tmp_path, wrong):
+        from src.lifecycle_web_schema import WebJournalError
+    
+        c = context(tmp_path)
+        read = c["web"].validated_read(c["run_id"])
+        path = c["profile"]
+        if wrong == "profile":
+            path = tmp_path / "copied-profile.db"
+            with sqlite3.connect(c["profile"]) as source, sqlite3.connect(path) as target:
+                source.backup(target)
+                target.execute(f"PRAGMA schema_version={read.binding[-1]}")
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            if wrong != "transaction":
+                conn.execute("BEGIN IMMEDIATE")
+            if wrong == "profile":
+                assert c["web"]._review_binding(conn, c["run_id"]) == read.binding
+>           with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+E           Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_attended_concurrency.py:131: Failed
+__________ test_source_validation_is_not_cached_between_user_commands __________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_source_validation_is_not_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784ad58430>
+
+    def test_source_validation_is_not_cached_between_user_commands(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path)
+        original, decoded = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            decoded.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+        packet = prepare(c)
+>       assert decoded == [True]
+E       assert [True, True] == [True]
+E         
+E         Left contains one more item: True
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_attended_concurrency.py:227: AssertionError
+______ test_generic_review_of_a_web_adoption_uses_the_same_verified_read _______
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/verified_read_discarded_under_write_lock-shard-2/test_generic_review_of_a_web_a0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c784b74f2b0>
+
+    def test_generic_review_of_a_web_adoption_uses_the_same_verified_read(tmp_path, monkeypatch):
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        c = context(tmp_path, future=True)
+        packet = prepare(c)
+        assert confirm(c, packet)["status"] == "scheduled"
+        original, decoded = LifecycleWebStore._decode_page, []
+    
+        def decode(row):
+            with sqlite3.connect(c["profile"], timeout=0) as other:
+                other.execute("UPDATE lifecycle_web_runs SET lease_until=lease_until")
+            decoded.append(True)
+            return original(row)
+    
+        monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(decode))
+        current = c["service"].prepare_review(c["case_id"], assessment_id=packet["assessment_id"], options=c["options"])
+        assert current["packet_sha256"] == packet["packet_sha256"]
+        repeated = c["service"].confirm_review(c["case_id"], assessment_id=packet["assessment_id"],
+            packet_sha256=packet["packet_sha256"], action=packet["action"], options=c["options"], before_write=lambda: None)
+        assert repeated["status"] == "scheduled" and "OLD" in c["sources"]()
+>       assert decoded == [True, True]
+E       assert [True, True, True] == [True, True]
+E         
+E         Left contains one more item: True
+E         Use -v to get more diff
+
+tests/test_lifecycle_web_attended_concurrency.py:254: AssertionError
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/verified_read_discarded_under_write_lock-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[prepare-decode]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[prepare-finding]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-decode]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[confirm-finding]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[execute-decode]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_attended_web_source_validation_leaves_other_profile_writers_available[execute-finding]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[source_added]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[cancellation]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_validated_web_read_rechecks_its_binding_inside_the_transaction[schema_generation]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_verified_web_material_cannot_cross_its_profile_run_or_transaction[profile]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_verified_web_material_cannot_cross_its_profile_run_or_transaction[run]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_verified_web_material_cannot_cross_its_profile_run_or_transaction[transaction]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_verified_web_material_cannot_cross_its_profile_run_or_transaction[unvalidated_dict]
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_source_validation_is_not_cached_between_user_commands
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_generic_review_of_a_web_adoption_uses_the_same_verified_read
+15 failed, 448 passed in 22.09s

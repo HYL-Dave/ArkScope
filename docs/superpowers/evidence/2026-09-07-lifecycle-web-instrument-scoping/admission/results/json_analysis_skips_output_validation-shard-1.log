@@ -1,0 +1,79 @@
+........................................................................ [ 16%]
+...............................................F.FF..................... [ 32%]
+........................................................................ [ 49%]
+........................................................................ [ 65%]
+........................................................................ [ 82%]
+........................................................................ [ 98%]
+.....                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ce9477928c0>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1", prompt="Public evidence only; do not invoke any tool.")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        result = await mod.call_claude_web(request, credential, control)
+        options = clients[0].options
+        instructions, separator, schema = options.system_prompt.partition("\nOutput schema:\n")
+        assert separator and json.loads(schema) == request.output_schema == SCHEMA
+        assert options.output_format is None
+        assert "final response" in instructions and "one JSON object" in instructions
+        assert "Do not wrap the object in a function call" in instructions
+        assert options.tools == [] and "WebSearch" in options.disallowed_tools
+        assert options.max_turns == 2 and len(clients[0].queries) == control.model_requests == 1
+>       assert clients[0].queries[0][0] == request.prompt and result.output == OUTPUT
+E       assert ('Public evide...oke any tool.' == 'Public evide...oke any tool.'
+E         
+E         Skipping 34 identical leading characters in diff, use -v to show
+E           e any tool. and '{"sources": ["https://ir.example.com/notice"]}' == {'sources': ['https://ir.example.com/notice']})
+E        +  where '{"sources": ["https://ir.example.com/notice"]}' = ModelReply(remote_id='6712b125-7d85-4d83-9e25-4799ba99d658', output='{"sources": ["https://ir.example.com/notice"]}', ...utput_tokens': 50, 'cache_creation_input_tokens': None, 'cache_read_input_tokens': None, 'web_search_requests': None}}).output
+
+tests/test_lifecycle_web_claude_output_contract.py:31: AssertionError
+___ test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ce947613910>
+wrapped = {'$FUNCTION_NAME': 'StructuredOutput', '$PARAMETER_NAME': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"result": json.dumps(wrapped)})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_output_contract.py:56: Failed
+___ test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ce9476c9bd0>
+wrapped = {'result': {'sources': ['https://ir.example.com/notice']}}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("wrapped", [
+        {"$FUNCTION_NAME": "StructuredOutput", "$PARAMETER_NAME": OUTPUT},
+        {"result": OUTPUT},
+    ])
+    async def test_claude_analysis_never_unwraps_invalid_provider_arguments(monkeypatch, wrapped):
+        mod, clients = _setup(monkeypatch, result={"result": json.dumps(wrapped)})
+        request = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_output_contract.py:56: Failed
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/json_analysis_skips_output_validation-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped0]
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_never_unwraps_invalid_provider_arguments[wrapped1]
+3 failed, 434 passed in 18.38s

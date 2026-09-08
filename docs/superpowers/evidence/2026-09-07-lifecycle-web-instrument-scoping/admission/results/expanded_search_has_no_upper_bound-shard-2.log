@@ -1,0 +1,40 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+...........................................................F............ [ 31%]
+........................................................................ [ 42%]
+........................................................................ [ 53%]
+........................................................................ [ 63%]
+........................................................................ [ 74%]
+........................................................................ [ 85%]
+........................................................................ [ 95%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+_ test_expanded_claude_search_allows_twelve_and_denies_the_thirteenth_before_execution _
+
+    @pytest.mark.anyio
+    async def test_expanded_claude_search_allows_twelve_and_denies_the_thirteenth_before_execution():
+        from src.auth_drivers.lifecycle_web_claude import WebToolGate, _tool_round_trip_limit
+        from src.auth_drivers.lifecycle_web_models import ModelCall
+        from src.security_lifecycle_web_contract import RunControl, validate_selection
+    
+        selected = validate_selection("anthropic", "claude_code_oauth", "claude-sonnet-5", "local:7")
+        control = RunControl(selection=selected, max_model_requests=2)
+        call = ModelCall(selected, "search-1", "search", "Investigate this exact security.", {"type": "object"},
+            "medium", None, 12, 600)
+        gate = WebToolGate(call, control, "owned-session")
+        assert _tool_round_trip_limit(call) == 14
+        for index in range(1, 14):
+            identity = "query-" + str(index)
+            result = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned-session",
+                "tool_use_id": identity, "tool_name": "WebSearch", "tool_input": {"query": "public listing " + str(index)}}, identity, {})
+>           assert result["hookSpecificOutput"]["permissionDecision"] == ("allow" if index <= 12 else "deny")
+E           AssertionError: assert 'allow' == 'deny'
+E             
+E             - deny
+E             + allow
+
+tests/test_lifecycle_web_investigation_budget.py:70: AssertionError
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/expanded_search_has_no_upper_bound-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_investigation_budget.py::test_expanded_claude_search_allows_twelve_and_denies_the_thirteenth_before_execution
+1 failed, 676 passed in 23.02s

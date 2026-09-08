@@ -1,0 +1,27 @@
+........................................................................ [ 15%]
+.......................................................F................ [ 30%]
+........................................................................ [ 45%]
+........................................................................ [ 61%]
+........................................................................ [ 76%]
+........................................................................ [ 91%]
+.......................................                                  [100%]
+=================================== FAILURES ===================================
+_____ test_malformed_reported_model_counter_is_not_silently_unknown[True] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ae82b717310>
+value = True
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
+    async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
+        mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+        call = _request()
+        control = RunControl(selection=call.selection, max_model_requests=2)
+>       with pytest.raises(WebModelError, match="^model_usage_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_usage.py:63: Failed
+- generated xml file: /tmp/lifecycle-usage-backend-r2/results/boolean_counter_is_a_token-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_usage.py::test_malformed_reported_model_counter_is_not_silently_unknown[True]
+1 failed, 470 passed in 19.73s

@@ -1,0 +1,26 @@
+........................................................................ [ 16%]
+...........................F............................................ [ 33%]
+........................................................................ [ 49%]
+........................................................................ [ 66%]
+........................................................................ [ 82%]
+........................................................................ [ 99%]
+...                                                                      [100%]
+=================================== FAILURES ===================================
+___________ test_json_metadata_cannot_stand_in_for_a_listing_notice ____________
+
+    def test_json_metadata_cannot_stand_in_for_a_listing_notice():
+        from src.security_lifecycle_web_finding import validate_finding
+        from src.lifecycle_public_sources import _capture_digest
+    
+        page = replace(source_page(NOTICE), mime_type="application/json")
+        page = replace(page, capture_sha256=_capture_digest(page))
+        finding = validate_finding(public_input(), finding_payload(), {"source-1": page})
+>       assert finding.action is None and "source_metadata_not_notice" in finding.block_reasons
+E       AssertionError: assert ('terminal_delisting' is None)
+E        +  where 'terminal_delisting' = ValidatedFinding(finding=WebFinding(source_ticker='OLD', issuer_name='Issuer Old Inc', security_class='Class A common ...:00:00+00:00'),), action='terminal_delisting', block_reasons=(), unique_passage_count=1, independent_source_count=None).action
+
+tests/test_lifecycle_source_context.py:90: AssertionError
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/metadata_claims_delisting-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_context.py::test_json_metadata_cannot_stand_in_for_a_listing_notice
+1 failed, 434 passed in 20.23s

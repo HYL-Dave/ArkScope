@@ -1,0 +1,134 @@
+........................................................................ [ 17%]
+........................................................................ [ 35%]
+........................................................................ [ 53%]
+........................................................................ [ 71%]
+........................................................................ [ 89%]
+.................FFFF.......................                             [100%]
+=================================== FAILURES ===================================
+__ test_source_read_failure_remains_visible_and_never_retries[openai-api_key] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b9eb294d270>
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+        assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+        assert result.source_failures == {"source-2": "source_unavailable"}
+        assert result.source_failure_urls == {"source-2": urls[1]}
+        material = json.loads(calls[1][0].prompt.split("\n", 1)[1])
+        assert material["unread_sources"] == [{"source_id": "source-2", "url": urls[1], "reason": "source_unavailable"}]
+>       assert "Do not treat an unread supplement alone as a material unresolved condition" in calls[1][0].prompt
+E       assert 'Do not treat an unread supplement alone as a material unresolved condition' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}'
+E        +  where 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}' = ModelCall(selection=ExecutionSelection(provider='openai', auth_mode='api_key', model='gpt-5.6-luna', credential_id='lo..., call_id='analysis-1', phase='analysis', effort='high', output_token_limit=4096, max_search_uses=2, timeout_seconds=3).prompt
+
+tests/test_security_lifecycle_web_pipeline.py:117: AssertionError
+_ test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b9eb26ed990>
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+        assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+        assert result.source_failures == {"source-2": "source_unavailable"}
+        assert result.source_failure_urls == {"source-2": urls[1]}
+        material = json.loads(calls[1][0].prompt.split("\n", 1)[1])
+        assert material["unread_sources"] == [{"source_id": "source-2", "url": urls[1], "reason": "source_unavailable"}]
+>       assert "Do not treat an unread supplement alone as a material unresolved condition" in calls[1][0].prompt
+E       assert 'Do not treat an unread supplement alone as a material unresolved condition' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}'
+E        +  where 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}' = ModelCall(selection=ExecutionSelection(provider='openai', auth_mode='chatgpt_oauth', model='gpt-5.6-luna', credential_..., call_id='analysis-1', phase='analysis', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=3).prompt
+
+tests/test_security_lifecycle_web_pipeline.py:117: AssertionError
+_ test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b9eb2606080>
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+        assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+        assert result.source_failures == {"source-2": "source_unavailable"}
+        assert result.source_failure_urls == {"source-2": urls[1]}
+        material = json.loads(calls[1][0].prompt.split("\n", 1)[1])
+        assert material["unread_sources"] == [{"source_id": "source-2", "url": urls[1], "reason": "source_unavailable"}]
+>       assert "Do not treat an unread supplement alone as a material unresolved condition" in calls[1][0].prompt
+E       assert 'Do not treat an unread supplement alone as a material unresolved condition' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}'
+E        +  where 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}' = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='api_key', model='claude-sonnet-5', credential_..., call_id='analysis-1', phase='analysis', effort='high', output_token_limit=4096, max_search_uses=2, timeout_seconds=3).prompt
+
+tests/test_security_lifecycle_web_pipeline.py:117: AssertionError
+_ test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b9eb2774f70>
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    async def test_source_read_failure_remains_visible_and_never_retries(monkeypatch, provider, auth):
+        from src import security_lifecycle_web_pipeline as mod
+    
+        selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5", "local:7")
+        credential = WebCredential(selection, api_key="selected") if auth == "api_key" else WebCredential(selection, token_record=StoredTokenRecord("selected"))
+        control = RunControl(selection=selection, max_model_requests=2)
+        calls = []
+        reader = Reader(fail=True)
+        urls = ["https://ir.example.com/notice", "https://news.example.com/unavailable"]
+        monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=urls))
+        result = await mod.investigate(public_input(), credential, control,
+                                        options=_options(auth), reader_factory=lambda limits: reader)
+        assert result.finding.action == "terminal_delisting" and result.finding.block_reasons == ()
+        assert result.source_failures == {"source-2": "source_unavailable"}
+        assert result.source_failure_urls == {"source-2": urls[1]}
+        material = json.loads(calls[1][0].prompt.split("\n", 1)[1])
+        assert material["unread_sources"] == [{"source_id": "source-2", "url": urls[1], "reason": "source_unavailable"}]
+>       assert "Do not treat an unread supplement alone as a material unresolved condition" in calls[1][0].prompt
+E       assert 'Do not treat an unread supplement alone as a material unresolved condition' in 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}'
+E        +  where 'Assess only the supplied public security using these source passages. This is a supplement to unresolved Massive and ...e_id":"source-2","url":"https://news.example.com/unavailable","reason":"source_unavailable"}],"search_uncertainty":[]}' = ModelCall(selection=ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', model='claude-sonnet-5', c..., call_id='analysis-1', phase='analysis', effort='high', output_token_limit=None, max_search_uses=2, timeout_seconds=3).prompt
+
+tests/test_security_lifecycle_web_pipeline.py:117: AssertionError
+- generated xml file: /tmp/lifecycle-gap-backend-r1/results/prompt_confuses_read_gap_with_material_uncertainty-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]
+FAILED tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]
+4 failed, 400 passed in 18.73s

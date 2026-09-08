@@ -1,0 +1,13 @@
+{"worker": 1, "stage": "retained", "sources": 1}
+{"worker": 0, "stage": "retained", "sources": 1}
+{"worker": 1, "stage": "retained", "sources": 2}
+{"worker": 0, "stage": "retained", "sources": 2}
+{"worker": 1, "stage": "retained", "sources": 3}
+{"worker": 0, "stage": "retained", "sources": 3}
+{"worker": 1, "stage": "retained", "sources": 4}
+{"worker": 0, "stage": "retained", "sources": 4}
+{"worker": 1, "stage": "context_ready", "model_text_bytes": 192796}
+{"worker": 0, "stage": "context_ready", "model_text_bytes": 192796}
+{"worker": 1, "stage": "journal_completed"}
+{"worker": 0, "stage": "journal_completed"}
+{"provider_calls": 0, "network_calls": 0, "production_data_access": false, "concurrent_workers": 2, "retained_sources_per_worker": 4, "decoded_limit_bytes": 134217728, "encoded_limit_bytes": 33554432, "source_timeout_seconds": 45.0, "baseline_peak_rss_bytes": 322740224, "peak_rss_bytes": 3081691136, "peak_growth_bytes": 2758950912, "elapsed_seconds": 97.863}

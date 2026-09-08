@@ -1,0 +1,12 @@
+
+> arkscope-web@0.0.1 test
+> vitest run --maxWorkers=4 --reporter=json --outputFile=/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/frontend-mutations-r3/promote_retained_unknown.json
+
+JSON report written to /tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/frontend-mutations-r3/promote_retained_unknown.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /dev/shm/arkscope-task-ui-mutation-t_4mu5xe/apps/arkscope-web
+npm error workspace arkscope-web@0.0.1
+npm error location /dev/shm/arkscope-task-ui-mutation-t_4mu5xe/apps/arkscope-web
+npm error command failed
+npm error command sh -c vitest run --maxWorkers=4 --reporter=json --outputFile=/tmp/arkscope-lifecycle-terminal-membership/docs/superpowers/evidence/2026-09-07-lifecycle-independent-task/frontend-mutations-r3/promote_retained_unknown.json

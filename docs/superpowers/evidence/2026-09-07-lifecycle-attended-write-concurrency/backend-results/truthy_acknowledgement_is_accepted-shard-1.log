@@ -1,0 +1,44 @@
+........................................................................ [ 13%]
+........................................................................ [ 26%]
+...............FF....................................................... [ 40%]
+........................................................................ [ 53%]
+........................................................................ [ 66%]
+........................................................................ [ 80%]
+........................................................................ [ 93%]
+..................................                                       [100%]
+=================================== FAILURES ===================================
+_________ test_direct_adoption_requires_literal_gap_acknowledgement[1] _________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/truthy_acknowledgement_is_accepted-shard-1/test_direct_adoption_requires_2')
+acknowledgement = 1
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+>       with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:99: Failed
+_______ test_direct_adoption_requires_literal_gap_acknowledgement[true] ________
+
+tmp_path = PosixPath('/dev/shm/lifecycle-attended-backend-r3/truthy_acknowledgement_is_accepted-shard-1/test_direct_adoption_requires_3')
+acknowledgement = 'true'
+
+    @pytest.mark.parametrize("acknowledgement", [False, None, 1, "true"])
+    def test_direct_adoption_requires_literal_gap_acknowledgement(tmp_path, acknowledgement):
+        from src.lifecycle_web_review import confirm as adopt
+        c = context(tmp_path, completion=COMPLETION)
+        packet = prepare(c)
+        before = rows(c)
+>       with pytest.raises(WebJournalError, match="web_source_gaps_not_acknowledged"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:99: Failed
+- generated xml file: /tmp/lifecycle-attended-backend-r3/results/truthy_acknowledgement_is_accepted-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[1]
+FAILED tests/test_lifecycle_web_gaps.py::test_direct_adoption_requires_literal_gap_acknowledgement[true]
+2 failed, 536 passed in 27.29s

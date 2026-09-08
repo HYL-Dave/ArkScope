@@ -1,0 +1,51 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+...............................FF....................................... [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a69a1573a0>
+
+    @pytest.mark.anyio
+    async def test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request(phase="analysis", call_id="analysis-1", prompt="Public evidence only; do not invoke any tool.")
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        result = await mod.call_claude_web(request, credential, control)
+        options = clients[0].options
+        instructions, separator, schema = options.system_prompt.partition("\nOutput schema:\n")
+>       assert separator and json.loads(schema) == options.output_format["schema"] == SCHEMA
+E       AssertionError: assert ('')
+
+tests/test_lifecycle_web_claude_output_contract.py:25: AssertionError
+_________ test_claude_search_keeps_its_existing_prompt_and_tool_budget _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a69a4fa950>
+
+    @pytest.mark.anyio
+    async def test_claude_search_keeps_its_existing_prompt_and_tool_budget(monkeypatch):
+        mod, clients = _setup(monkeypatch)
+        request = _request()
+        control = RunControl(selection=request.selection, max_model_requests=1)
+        credential = WebCredential(request.selection, token_record=StoredTokenRecord("selected-token"))
+        await mod.call_claude_web(request, credential, control)
+        options = clients[0].options
+>       assert options.system_prompt == "Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks."
+E       AssertionError: assert 'Investigate ...ing question.' == 'Investigate ...elated tasks.'
+E         
+E         - Investigate only the supplied public listing question. Return structured source candidates or findings. Do not perform unrelated tasks.
+E         + Investigate only the public listing question.
+
+tests/test_lifecycle_web_claude_output_contract.py:41: AssertionError
+- generated xml file: /dev/shm/lifecycle-turns-campaign-r1/results/analysis_schema_prompt_not_dispatched-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_analysis_prompt_binds_exact_schema_without_repair_or_more_tools
+FAILED tests/test_lifecycle_web_claude_output_contract.py::test_claude_search_keeps_its_existing_prompt_and_tool_budget
+2 failed, 598 passed in 26.98s

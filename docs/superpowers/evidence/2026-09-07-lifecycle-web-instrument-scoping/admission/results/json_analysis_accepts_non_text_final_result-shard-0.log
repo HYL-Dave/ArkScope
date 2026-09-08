@@ -1,0 +1,36 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+.................................F...................................... [ 32%]
+........................................................................ [ 43%]
+........................................................................ [ 53%]
+........................................................................ [ 64%]
+........................................................................ [ 75%]
+........................................................................ [ 86%]
+........................................................................ [ 97%]
+...................                                                      [100%]
+=================================== FAILURES ===================================
+_ test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[value1] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7521b0fd77f0>
+value = {'sources': ['https://ir.example.com/notice']}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("value", [
+        None, OUTPUT, "", "null", "[]", "true", "{", json.dumps({"result": OUTPUT}),
+        "```json\n" + json.dumps(OUTPUT) + "\n```", json.dumps(OUTPUT) + " explanation",
+        json.dumps(OUTPUT) + json.dumps(OUTPUT), '{"sources":[],"sources":["valid"]}',
+        '{"sources":[],"number":NaN}', '{"sources":[],"number":Infinity}',
+        json.dumps({"sources": [], "write_profile": True}), '{"sources":"wrong shape"}',
+    ])
+    async def test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry(monkeypatch, value):
+        mod, clients = setup(monkeypatch, result={"result": value})
+        call = _request(phase="analysis", call_id="analysis-1")
+        control = RunControl(selection=call.selection, max_model_requests=1)
+>       with pytest.raises(WebModelError, match="^model_output_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_web_claude_json_analysis.py:78: Failed
+- generated xml file: /dev/shm/lifecycle-instrument-campaign-r1/results/json_analysis_accepts_non_text_final_result-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_claude_json_analysis.py::test_claude_analysis_rejects_invalid_final_json_without_repair_or_retry[value1]
+1 failed, 666 passed in 29.89s

@@ -1,0 +1,323 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................F......................................F.F...... [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_ test_prevalidated_sources_do_not_cache_mutable_adoption_authority[membership] _
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/changed_disclosure_digest_ignored-shard-2/test_prevalidated_sources_do_n0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71f4d7439390>
+change = 'membership'
+
+    @pytest.mark.parametrize("change", ["membership", "open_position", "observation", "active_otc", "stale"])
+    def test_prevalidated_sources_do_not_cache_mutable_adoption_authority(tmp_path, monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_web_store import LifecycleWebStore
+        from src.portfolio_state import PortfolioStore
+        from src.profile_state import ProfileStateStore
+        from src.security_lifecycle_listing_evidence import _evidence
+        from tests.test_security_lifecycle_provider_authority import record
+    
+        c = context(tmp_path)
+        packet = prepare(c)
+        original, changed = LifecycleWebStore.validated_read, []
+    
+        def read(store, identity):
+            result = original(store, identity)
+            assert not changed
+            changed.append(True)
+            if change == "membership":
+                ProfileStateStore(c["profile"]).import_lists([{"name": "New", "kind": "custom", "tickers": ["OLD"]}])
+            elif change == "open_position":
+                portfolio = PortfolioStore(c["profile"])
+                account = portfolio.ensure_manual_account()
+                portfolio.upsert_manual_position(account_id=account.id, symbol="OLD", quantity=1)
+            elif change == "observation":
+                c["now"][0] = "2026-09-06T01:01:00Z"
+                c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+            elif change == "active_otc":
+                c["checks"].record(ticker="OLD", at=c["now"][0], evidence=[_evidence(replace(
+                    record("massive_reference", "active", market="otc"), retrieved_at=c["now"][0]))], diagnostics={})
+            else:
+                c["now"][0] = "2026-09-10T01:00:00Z"
+            return result
+    
+        monkeypatch.setattr(LifecycleWebStore, "validated_read", read)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed|web_review_ineligible"):
+>           confirm(c, packet)
+
+tests/test_lifecycle_web_attended_concurrency.py:172: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:263: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at, web_read=web_read)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:865: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:181: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x71f5580bb740>
+assessment_id = 'sla_web_71b9434a382d09e7b1a3ef391cb2390e'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/changed_disclosure_digest_ignored-shard-2/test_prevalidated_sources_do_n0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71f4d7439390>
+change = 'membership'
+
+    @pytest.mark.parametrize("change", ["membership", "open_position", "observation", "active_otc", "stale"])
+    def test_prevalidated_sources_do_not_cache_mutable_adoption_authority(tmp_path, monkeypatch, change):
+        from dataclasses import replace
+        from src.lifecycle_web_store import LifecycleWebStore
+        from src.portfolio_state import PortfolioStore
+        from src.profile_state import ProfileStateStore
+        from src.security_lifecycle_listing_evidence import _evidence
+        from tests.test_security_lifecycle_provider_authority import record
+    
+        c = context(tmp_path)
+        packet = prepare(c)
+        original, changed = LifecycleWebStore.validated_read, []
+    
+        def read(store, identity):
+            result = original(store, identity)
+            assert not changed
+            changed.append(True)
+            if change == "membership":
+                ProfileStateStore(c["profile"]).import_lists([{"name": "New", "kind": "custom", "tickers": ["OLD"]}])
+            elif change == "open_position":
+                portfolio = PortfolioStore(c["profile"])
+                account = portfolio.ensure_manual_account()
+                portfolio.upsert_manual_position(account_id=account.id, symbol="OLD", quantity=1)
+            elif change == "observation":
+                c["now"][0] = "2026-09-06T01:01:00Z"
+                c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+            elif change == "active_otc":
+                c["checks"].record(ticker="OLD", at=c["now"][0], evidence=[_evidence(replace(
+                    record("massive_reference", "active", market="otc"), retrieved_at=c["now"][0]))], diagnostics={})
+            else:
+                c["now"][0] = "2026-09-10T01:00:00Z"
+            return result
+    
+        monkeypatch.setattr(LifecycleWebStore, "validated_read", read)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed|web_review_ineligible"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed|web_review_ineligible'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_attended_concurrency.py:171: AssertionError
+_ test_web_confirmation_rejects_changed_material_without_partial_human_adoption[membership] _
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/changed_disclosure_digest_ignored-shard-2/test_web_confirmation_rejects_0')
+change = 'membership'
+
+    @pytest.mark.parametrize("change", ["membership", "new_observation", "evidence", "future_lease", "open_position"])
+    def test_web_confirmation_rejects_changed_material_without_partial_human_adoption(tmp_path, change):
+        c = context(tmp_path)
+        packet = prepare(c)
+        if change == "membership":
+            ProfileStateStore(c["profile"]).import_lists([{"name": "New", "kind": "custom", "tickers": ["OLD"]}])
+        elif change == "new_observation":
+            c["checks"].record(ticker="OLD", at="2026-09-06T01:01:00Z", evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+            c["now"][0] = "2026-09-06T01:01:00Z"
+        elif change == "evidence":
+            with sqlite3.connect(c["profile"]) as conn:
+                SecurityLifecycleInvestigationStore(conn).add_evidence(case_id=c["case_id"], run_id=None, kind="manual_text", adapter="manual",
+                    excerpt="Contradictory evidence", source_url=None, title=None, publisher=None, domain=None, source_published_at=None,
+                    retrieved_at=None, mime_type=None, document_status=None, at=c["now"][0])
+        elif change == "future_lease":
+            c["now"][0] = "2026-09-10T01:00:00Z"
+        else:
+            # Use the same authoritative open-position source as ordinary review.
+            c["service"]._read_service.sources_by_ticker = lambda: {"OLD": ("manual_lists", "portfolio_open"), "LIVE": ("manual_lists",)}
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed|web_review_ineligible"):
+>           confirm(c, packet)
+
+tests/test_lifecycle_web_review.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:263: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at, web_read=web_read)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:865: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:181: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x71f561386640>
+assessment_id = 'sla_web_1e0daf981d95645b1c049427603edfc5'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/changed_disclosure_digest_ignored-shard-2/test_web_confirmation_rejects_0')
+change = 'membership'
+
+    @pytest.mark.parametrize("change", ["membership", "new_observation", "evidence", "future_lease", "open_position"])
+    def test_web_confirmation_rejects_changed_material_without_partial_human_adoption(tmp_path, change):
+        c = context(tmp_path)
+        packet = prepare(c)
+        if change == "membership":
+            ProfileStateStore(c["profile"]).import_lists([{"name": "New", "kind": "custom", "tickers": ["OLD"]}])
+        elif change == "new_observation":
+            c["checks"].record(ticker="OLD", at="2026-09-06T01:01:00Z", evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+            c["now"][0] = "2026-09-06T01:01:00Z"
+        elif change == "evidence":
+            with sqlite3.connect(c["profile"]) as conn:
+                SecurityLifecycleInvestigationStore(conn).add_evidence(case_id=c["case_id"], run_id=None, kind="manual_text", adapter="manual",
+                    excerpt="Contradictory evidence", source_url=None, title=None, publisher=None, domain=None, source_published_at=None,
+                    retrieved_at=None, mime_type=None, document_status=None, at=c["now"][0])
+        elif change == "future_lease":
+            c["now"][0] = "2026-09-10T01:00:00Z"
+        else:
+            # Use the same authoritative open-position source as ordinary review.
+            c["service"]._read_service.sources_by_ticker = lambda: {"OLD": ("manual_lists", "portfolio_open"), "LIVE": ("manual_lists",)}
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed|web_review_ineligible"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed|web_review_ineligible'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_review.py:139: AssertionError
+_ test_web_confirmation_rejects_changed_material_without_partial_human_adoption[evidence] _
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/changed_disclosure_digest_ignored-shard-2/test_web_confirmation_rejects_2')
+change = 'evidence'
+
+    @pytest.mark.parametrize("change", ["membership", "new_observation", "evidence", "future_lease", "open_position"])
+    def test_web_confirmation_rejects_changed_material_without_partial_human_adoption(tmp_path, change):
+        c = context(tmp_path)
+        packet = prepare(c)
+        if change == "membership":
+            ProfileStateStore(c["profile"]).import_lists([{"name": "New", "kind": "custom", "tickers": ["OLD"]}])
+        elif change == "new_observation":
+            c["checks"].record(ticker="OLD", at="2026-09-06T01:01:00Z", evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+            c["now"][0] = "2026-09-06T01:01:00Z"
+        elif change == "evidence":
+            with sqlite3.connect(c["profile"]) as conn:
+                SecurityLifecycleInvestigationStore(conn).add_evidence(case_id=c["case_id"], run_id=None, kind="manual_text", adapter="manual",
+                    excerpt="Contradictory evidence", source_url=None, title=None, publisher=None, domain=None, source_published_at=None,
+                    retrieved_at=None, mime_type=None, document_status=None, at=c["now"][0])
+        elif change == "future_lease":
+            c["now"][0] = "2026-09-10T01:00:00Z"
+        else:
+            # Use the same authoritative open-position source as ordinary review.
+            c["service"]._read_service.sources_by_ticker = lambda: {"OLD": ("manual_lists", "portfolio_open"), "LIVE": ("manual_lists",)}
+        before = rows(c)
+        with pytest.raises((ValueError, RuntimeError), match="review_changed|web_review_ineligible"):
+>           confirm(c, packet)
+
+tests/test_lifecycle_web_review.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_lifecycle_web_review.py:74: in confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"],
+src/lifecycle_web_review.py:263: in confirm
+    preview = approved_preview(conn, packet=packet, case=case, assessment=assessment, confirmation=confirmation, at=at, web_read=web_read)
+src/security_lifecycle_review.py:230: in approved_preview
+    preview = build_transition_preview(conn, case=case, assessment=assessment,
+src/ticker_identity_transition.py:865: in build_transition_preview
+    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+src/lifecycle_web_review.py:181: in web_transition_guard
+    accepted = acceptance_for(conn, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <sqlite3.Connection object at 0x71f5580bbb40>
+assessment_id = 'sla_web_64c992cbc1ed46e0a1e0c3394a7affe0'
+
+    def acceptance_for(conn, assessment_id):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_web_acceptances'").fetchone():
+            return None
+        row = conn.execute("SELECT * FROM lifecycle_web_acceptances WHERE assessment_id=?", (assessment_id,)).fetchone()
+        if row is None:
+            return None
+        verify_web_journal(conn)
+        value = dict(row)
+        packet = json.loads(value["packet_json"])
+        if (packet_digest(packet) != value["packet_sha256"] or packet.get("packet_sha256") != value["packet_sha256"]
+                or packet.get("assessment_id") != assessment_id or packet.get("lane") != "web"
+                or packet.get("web", {}).get("run_id") != value["run_id"] or value["actor"] != "attended_user"):
+>           raise ValueError("web_acceptance_invalid")
+E           ValueError: web_acceptance_invalid
+
+src/lifecycle_web_review.py:41: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/lifecycle-attended-backend-tmp-r1/changed_disclosure_digest_ignored-shard-2/test_web_confirmation_rejects_2')
+change = 'evidence'
+
+    @pytest.mark.parametrize("change", ["membership", "new_observation", "evidence", "future_lease", "open_position"])
+    def test_web_confirmation_rejects_changed_material_without_partial_human_adoption(tmp_path, change):
+        c = context(tmp_path)
+        packet = prepare(c)
+        if change == "membership":
+            ProfileStateStore(c["profile"]).import_lists([{"name": "New", "kind": "custom", "tickers": ["OLD"]}])
+        elif change == "new_observation":
+            c["checks"].record(ticker="OLD", at="2026-09-06T01:01:00Z", evidence=(), diagnostics={}, blockers=("massive_unavailable",))
+            c["now"][0] = "2026-09-06T01:01:00Z"
+        elif change == "evidence":
+            with sqlite3.connect(c["profile"]) as conn:
+                SecurityLifecycleInvestigationStore(conn).add_evidence(case_id=c["case_id"], run_id=None, kind="manual_text", adapter="manual",
+                    excerpt="Contradictory evidence", source_url=None, title=None, publisher=None, domain=None, source_published_at=None,
+                    retrieved_at=None, mime_type=None, document_status=None, at=c["now"][0])
+        elif change == "future_lease":
+            c["now"][0] = "2026-09-10T01:00:00Z"
+        else:
+            # Use the same authoritative open-position source as ordinary review.
+            c["service"]._read_service.sources_by_ticker = lambda: {"OLD": ("manual_lists", "portfolio_open"), "LIVE": ("manual_lists",)}
+        before = rows(c)
+>       with pytest.raises((ValueError, RuntimeError), match="review_changed|web_review_ineligible"):
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'review_changed|web_review_ineligible'
+E        Input: 'web_acceptance_invalid'
+
+tests/test_lifecycle_web_review.py:139: AssertionError
+- generated xml file: /tmp/lifecycle-attended-backend-r1/results/changed_disclosure_digest_ignored-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_attended_concurrency.py::test_prevalidated_sources_do_not_cache_mutable_adoption_authority[membership]
+FAILED tests/test_lifecycle_web_review.py::test_web_confirmation_rejects_changed_material_without_partial_human_adoption[membership]
+FAILED tests/test_lifecycle_web_review.py::test_web_confirmation_rejects_changed_material_without_partial_human_adoption[evidence]
+3 failed, 460 passed in 64.57s (0:01:04)

@@ -1,0 +1,78 @@
+.......................FFF.............................................. [ 23%]
+........................................................................ [ 47%]
+........................................................................ [ 70%]
+........................................................................ [ 94%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited] _
+
+wire = (<function wire.<locals>.start at 0x750d0c741ea0>, {'client': <socket.socket [closed] fd=14, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+status = 429, code = 'source_rate_limited'
+
+    @pytest.mark.parametrize("status,code", [
+        (429, "source_rate_limited"), (503, "source_unavailable"), (302, "source_redirect_limit"),
+    ])
+    def test_response_stream_is_closed_when_headers_reject_source(wire, status, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Unused body", status=status)
+        with pytest.raises(SourceReadError, match=f"^{code}$"):
+            reader.read("https://ir.example.com/notice")
+        assert reader.request_count == 1
+>       assert state["responses"][0].isclosed()
+E       assert False
+E        +  where False = isclosed()
+E        +    where isclosed = <tests.test_lifecycle_public_sources_wire.wire.<locals>.ObservedResponse object at 0x750d0c78fe80>.isclosed
+
+tests/test_lifecycle_public_sources_wire.py:209: AssertionError
+_ test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable] _
+
+wire = (<function wire.<locals>.start at 0x750d04b6c550>, {'client': <socket.socket [closed] fd=14, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+status = 503, code = 'source_unavailable'
+
+    @pytest.mark.parametrize("status,code", [
+        (429, "source_rate_limited"), (503, "source_unavailable"), (302, "source_redirect_limit"),
+    ])
+    def test_response_stream_is_closed_when_headers_reject_source(wire, status, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Unused body", status=status)
+        with pytest.raises(SourceReadError, match=f"^{code}$"):
+            reader.read("https://ir.example.com/notice")
+        assert reader.request_count == 1
+>       assert state["responses"][0].isclosed()
+E       assert False
+E        +  where False = isclosed()
+E        +    where isclosed = <tests.test_lifecycle_public_sources_wire.wire.<locals>.ObservedResponse object at 0x750d0c7bd330>.isclosed
+
+tests/test_lifecycle_public_sources_wire.py:209: AssertionError
+_ test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit] _
+
+wire = (<function wire.<locals>.start at 0x750d04b6ca60>, {'client': <socket.socket [closed] fd=14, family=AddressFamily.AF_U...xml,text/plain\r\nAccept-Encoding: identity\r\nUser-Agent: ArkScope-Lifecycle/1.0\r\nConnection: close\r\n\r\n'], ...})
+status = 302, code = 'source_redirect_limit'
+
+    @pytest.mark.parametrize("status,code", [
+        (429, "source_rate_limited"), (503, "source_unavailable"), (302, "source_redirect_limit"),
+    ])
+    def test_response_stream_is_closed_when_headers_reject_source(wire, status, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        start, state = wire
+        reader = start(body=b"Unused body", status=status)
+        with pytest.raises(SourceReadError, match=f"^{code}$"):
+            reader.read("https://ir.example.com/notice")
+        assert reader.request_count == 1
+>       assert state["responses"][0].isclosed()
+E       assert False
+E        +  where False = isclosed()
+E        +    where isclosed = <tests.test_lifecycle_public_sources_wire.wire.<locals>.ObservedResponse object at 0x750cf5961720>.isclosed
+
+tests/test_lifecycle_public_sources_wire.py:209: AssertionError
+- generated xml file: /tmp/arkscope-lifecycle-web-source-correction-r1/results/response_handle_not_closed_on_header_rejection-shard-3.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_public_sources_wire.py::test_response_stream_is_closed_when_headers_reject_source[429-source_rate_limited]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_response_stream_is_closed_when_headers_reject_source[503-source_unavailable]
+FAILED tests/test_lifecycle_public_sources_wire.py::test_response_stream_is_closed_when_headers_reject_source[302-source_redirect_limit]
+3 failed, 303 passed in 46.09s

@@ -1,0 +1,30 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+............................F........................................... [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+_ test_xml_dtd_entities_and_malformed_documents_are_rejected[<!DOCTYPE x [<!ENTITY a "expanded">]><x>&a;</x>] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77449d9d10c0>
+body = b'<!DOCTYPE x [<!ENTITY a "expanded">]><x>&a;</x>'
+
+    @pytest.mark.parametrize("body", [
+        b'<!DOCTYPE x [<!ENTITY secret SYSTEM "file:///etc/passwd">]><x>&secret;</x>',
+        b'<!DOCTYPE x [<!ENTITY a "expanded">]><x>&a;</x>',
+        b'<x><unclosed></x>',
+    ])
+    def test_xml_dtd_entities_and_malformed_documents_are_rejected(monkeypatch, body):
+        reader, _, _, _ = _reader(monkeypatch, [Response(body, headers={"Content-Type": "application/xml"})])
+>       with pytest.raises(SourceReadError, match="^source_document_invalid$"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_source_compatibility.py:189: Failed
+- generated xml file: /tmp/arkscope-source-context-backend-r2/results/xml_entities_not_rejected-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_compatibility.py::test_xml_dtd_entities_and_malformed_documents_are_rejected[<!DOCTYPE x [<!ENTITY a "expanded">]><x>&a;</x>]
+1 failed, 595 passed in 24.09s

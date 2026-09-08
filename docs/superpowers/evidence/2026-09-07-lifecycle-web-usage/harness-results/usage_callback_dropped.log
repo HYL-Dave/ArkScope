@@ -1,0 +1,311 @@
+...FFF...                                                                [100%]
+=================================== FAILURES ===================================
+_ test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x750df86fcf10>
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7826/test_canary_real_controller_ke0')
+failure = None
+
+    @pytest.mark.parametrize("failure", [None, "source", "analysis"])
+    def test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls(monkeypatch, tmp_path, failure):
+        from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, ToolUseBlock
+        import claude_agent_sdk
+        from src.auth_drivers import token_store
+        from src.lifecycle_public_sources import PublicSourceReader, SourceReadError, SourceReadObservation
+        from src.security_lifecycle_web_finding import WebFinding
+        from tests.test_security_lifecycle_web_finding import finding_payload, source_page
+    
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        helper = load("original_harness_helpers", OLD.parent / "2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py")
+        profile = tmp_path / "production-fixture.sqlite"
+        helper.credentials(profile, [helper.row()])
+        with sqlite3.connect(profile) as conn:
+            conn.execute("CREATE TABLE data_provider_config(provider TEXT,field TEXT,value TEXT)")
+        original = profile.read_bytes()
+        notice = "TravelCenters of America Inc. common stock (TA) was delisted from NASDAQ effective September 1, 2026."
+        finding = WebFinding.model_validate(finding_payload(source_ticker="TA", issuer_name="TravelCenters of America Inc.", security_class="common stock", citations=[{
+            "source_id": "source-1", "quote": notice, "supports": ["security_identity", "listing_ended", "effective_date"]}])).model_dump()
+        queries = []
+    
+        class Tokens:
+            backend = "offline_fixture"
+            def load(self, **kwargs):
+                assert kwargs == {"provider": "anthropic", "auth_mode": "claude_code_oauth", "credential_id": "local:7"}
+                return token_store.StoredTokenRecord("private-fixture-token")
+    
+        class OfflineClient:
+            def __init__(self, *, options):
+                self.options = options
+            async def connect(self):
+                pass
+            async def query(self, prompt, **kwargs):
+                assert kwargs["session_id"] == self.options.session_id
+                queries.append("search" if self.options.tools else "analysis")
+            async def disconnect(self):
+                pass
+            async def interrupt(self):
+                pass
+            async def receive_response(self):
+                options = self.options
+                session = options.session_id
+                yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none", "model": options.model,
+                    "tools": list(options.tools) + ["StructuredOutput"], "mcp_servers": []})
+                search = bool(options.tools)
+                if search:
+                    result = await options.hooks["PreToolUse"][0].hooks[0]({"hook_event_name": "PreToolUse", "session_id": session,
+                        "tool_name": "WebSearch", "tool_input": {"query": "TA common stock listing fixture"}, "tool_use_id": "web-1"}, "web-1", {})
+                    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+                    yield AssistantMessage(model=options.model, content=[ToolUseBlock(id="web-1", name="WebSearch", input={"query": "TA fixture"})])
+                output = {"sources": ["https://ir.example.com/notice"], "unresolved_conditions": []} if search else finding
+                failed = not search and failure == "analysis"
+                yield ResultMessage(subtype="error_during_execution" if failed else "success", duration_ms=1, duration_api_ms=1,
+                    is_error=failed, num_turns=2, session_id=session, terminal_reason="completed", structured_output=output,
+                    usage={"input_tokens": 4, "output_tokens": 1036}, model_usage={options.model: {
+                        "inputTokens": 29706 if search else 300, "outputTokens": 3228 if search else 400,
+                        "cacheReadInputTokens": 3354, "cacheCreationInputTokens": 3976, "webSearchRequests": 2 if search else 0}})
+    
+        def read(self, url):
+            self._request_count += 1
+            self._observations.append(SourceReadObservation(self._request_count, 503 if failure == "source" else 200,
+                "content_length", "identity", 200, 200, 200, "source_http_error" if failure == "source" else "captured"))
+            if failure == "source":
+                raise SourceReadError("source_http_error")
+            return source_page(notice, url)
+    
+        monkeypatch.setattr(token_store, "get_token_store", lambda **kwargs: Tokens())
+        monkeypatch.setattr(claude_agent_sdk, "ClaudeSDKClient", OfflineClient)
+        monkeypatch.setattr(PublicSourceReader, "read", read)
+        plan = api.prepared_plan(profile, "2026-09-07")
+        work = tmp_path / "rehearsal"
+        assert api.execute(profile, plan, work) == (0 if failure is None else 1)
+        value = json.loads((work / "result.json").read_text())
+        metrics = json.loads((work / "metrics.json").read_text())
+        expected_queries = ["search"] if failure == "source" else ["search", "analysis"]
+        assert queries == expected_queries
+        assert metrics["sdk_query_submissions"] == metrics["journal_model_submissions"] == len(expected_queries)
+        assert metrics["source_http_requests"] == metrics["token_loads"] == 1
+        assert metrics["source_reads"][0]["observations"][0]["request_index"] == 1
+        assert metrics["source_reads"][0]["observations"][0]["received_body_bytes"] == 200
+        assert metrics["human_assessments_created"] == metrics["human_adoptions_created"] == 0
+        report = value["usage_report"]
+>       assert report["recorded_submissions"] == (2 if failure is None else 1)
+E       TypeError: 'NoneType' object is not subscriptable
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:149: TypeError
+----------------------------- Captured stdout call -----------------------------
+{
+  "status": "succeeded",
+  "failure_code": null,
+  "model_submissions": 2,
+  "source_http_requests": 1,
+  "human_adoptions": 0
+}
+_ test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x750dee122a10>
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7826/test_canary_real_controller_ke1')
+failure = 'source'
+
+    @pytest.mark.parametrize("failure", [None, "source", "analysis"])
+    def test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls(monkeypatch, tmp_path, failure):
+        from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, ToolUseBlock
+        import claude_agent_sdk
+        from src.auth_drivers import token_store
+        from src.lifecycle_public_sources import PublicSourceReader, SourceReadError, SourceReadObservation
+        from src.security_lifecycle_web_finding import WebFinding
+        from tests.test_security_lifecycle_web_finding import finding_payload, source_page
+    
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        helper = load("original_harness_helpers", OLD.parent / "2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py")
+        profile = tmp_path / "production-fixture.sqlite"
+        helper.credentials(profile, [helper.row()])
+        with sqlite3.connect(profile) as conn:
+            conn.execute("CREATE TABLE data_provider_config(provider TEXT,field TEXT,value TEXT)")
+        original = profile.read_bytes()
+        notice = "TravelCenters of America Inc. common stock (TA) was delisted from NASDAQ effective September 1, 2026."
+        finding = WebFinding.model_validate(finding_payload(source_ticker="TA", issuer_name="TravelCenters of America Inc.", security_class="common stock", citations=[{
+            "source_id": "source-1", "quote": notice, "supports": ["security_identity", "listing_ended", "effective_date"]}])).model_dump()
+        queries = []
+    
+        class Tokens:
+            backend = "offline_fixture"
+            def load(self, **kwargs):
+                assert kwargs == {"provider": "anthropic", "auth_mode": "claude_code_oauth", "credential_id": "local:7"}
+                return token_store.StoredTokenRecord("private-fixture-token")
+    
+        class OfflineClient:
+            def __init__(self, *, options):
+                self.options = options
+            async def connect(self):
+                pass
+            async def query(self, prompt, **kwargs):
+                assert kwargs["session_id"] == self.options.session_id
+                queries.append("search" if self.options.tools else "analysis")
+            async def disconnect(self):
+                pass
+            async def interrupt(self):
+                pass
+            async def receive_response(self):
+                options = self.options
+                session = options.session_id
+                yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none", "model": options.model,
+                    "tools": list(options.tools) + ["StructuredOutput"], "mcp_servers": []})
+                search = bool(options.tools)
+                if search:
+                    result = await options.hooks["PreToolUse"][0].hooks[0]({"hook_event_name": "PreToolUse", "session_id": session,
+                        "tool_name": "WebSearch", "tool_input": {"query": "TA common stock listing fixture"}, "tool_use_id": "web-1"}, "web-1", {})
+                    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+                    yield AssistantMessage(model=options.model, content=[ToolUseBlock(id="web-1", name="WebSearch", input={"query": "TA fixture"})])
+                output = {"sources": ["https://ir.example.com/notice"], "unresolved_conditions": []} if search else finding
+                failed = not search and failure == "analysis"
+                yield ResultMessage(subtype="error_during_execution" if failed else "success", duration_ms=1, duration_api_ms=1,
+                    is_error=failed, num_turns=2, session_id=session, terminal_reason="completed", structured_output=output,
+                    usage={"input_tokens": 4, "output_tokens": 1036}, model_usage={options.model: {
+                        "inputTokens": 29706 if search else 300, "outputTokens": 3228 if search else 400,
+                        "cacheReadInputTokens": 3354, "cacheCreationInputTokens": 3976, "webSearchRequests": 2 if search else 0}})
+    
+        def read(self, url):
+            self._request_count += 1
+            self._observations.append(SourceReadObservation(self._request_count, 503 if failure == "source" else 200,
+                "content_length", "identity", 200, 200, 200, "source_http_error" if failure == "source" else "captured"))
+            if failure == "source":
+                raise SourceReadError("source_http_error")
+            return source_page(notice, url)
+    
+        monkeypatch.setattr(token_store, "get_token_store", lambda **kwargs: Tokens())
+        monkeypatch.setattr(claude_agent_sdk, "ClaudeSDKClient", OfflineClient)
+        monkeypatch.setattr(PublicSourceReader, "read", read)
+        plan = api.prepared_plan(profile, "2026-09-07")
+        work = tmp_path / "rehearsal"
+        assert api.execute(profile, plan, work) == (0 if failure is None else 1)
+        value = json.loads((work / "result.json").read_text())
+        metrics = json.loads((work / "metrics.json").read_text())
+        expected_queries = ["search"] if failure == "source" else ["search", "analysis"]
+        assert queries == expected_queries
+        assert metrics["sdk_query_submissions"] == metrics["journal_model_submissions"] == len(expected_queries)
+        assert metrics["source_http_requests"] == metrics["token_loads"] == 1
+        assert metrics["source_reads"][0]["observations"][0]["request_index"] == 1
+        assert metrics["source_reads"][0]["observations"][0]["received_body_bytes"] == 200
+        assert metrics["human_assessments_created"] == metrics["human_adoptions_created"] == 0
+        report = value["usage_report"]
+>       assert report["recorded_submissions"] == (2 if failure is None else 1)
+E       assert 0 == 1
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:149: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{
+  "status": "failed",
+  "failure_code": "source_read_incomplete",
+  "model_submissions": 1,
+  "source_http_requests": 1,
+  "human_adoptions": 0
+}
+_ test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x750dee17df60>
+tmp_path = PosixPath('/tmp/pytest-of-hyl/pytest-7826/test_canary_real_controller_ke2')
+failure = 'analysis'
+
+    @pytest.mark.parametrize("failure", [None, "source", "analysis"])
+    def test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls(monkeypatch, tmp_path, failure):
+        from claude_agent_sdk import AssistantMessage, ResultMessage, SystemMessage, ToolUseBlock
+        import claude_agent_sdk
+        from src.auth_drivers import token_store
+        from src.lifecycle_public_sources import PublicSourceReader, SourceReadError, SourceReadObservation
+        from src.security_lifecycle_web_finding import WebFinding
+        from tests.test_security_lifecycle_web_finding import finding_payload, source_page
+    
+        api = module()
+        checkpoint(api, monkeypatch, tmp_path)
+        helper = load("original_harness_helpers", OLD.parent / "2026-09-07-lifecycle-web-oauth-canary/test_live_harness.py")
+        profile = tmp_path / "production-fixture.sqlite"
+        helper.credentials(profile, [helper.row()])
+        with sqlite3.connect(profile) as conn:
+            conn.execute("CREATE TABLE data_provider_config(provider TEXT,field TEXT,value TEXT)")
+        original = profile.read_bytes()
+        notice = "TravelCenters of America Inc. common stock (TA) was delisted from NASDAQ effective September 1, 2026."
+        finding = WebFinding.model_validate(finding_payload(source_ticker="TA", issuer_name="TravelCenters of America Inc.", security_class="common stock", citations=[{
+            "source_id": "source-1", "quote": notice, "supports": ["security_identity", "listing_ended", "effective_date"]}])).model_dump()
+        queries = []
+    
+        class Tokens:
+            backend = "offline_fixture"
+            def load(self, **kwargs):
+                assert kwargs == {"provider": "anthropic", "auth_mode": "claude_code_oauth", "credential_id": "local:7"}
+                return token_store.StoredTokenRecord("private-fixture-token")
+    
+        class OfflineClient:
+            def __init__(self, *, options):
+                self.options = options
+            async def connect(self):
+                pass
+            async def query(self, prompt, **kwargs):
+                assert kwargs["session_id"] == self.options.session_id
+                queries.append("search" if self.options.tools else "analysis")
+            async def disconnect(self):
+                pass
+            async def interrupt(self):
+                pass
+            async def receive_response(self):
+                options = self.options
+                session = options.session_id
+                yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none", "model": options.model,
+                    "tools": list(options.tools) + ["StructuredOutput"], "mcp_servers": []})
+                search = bool(options.tools)
+                if search:
+                    result = await options.hooks["PreToolUse"][0].hooks[0]({"hook_event_name": "PreToolUse", "session_id": session,
+                        "tool_name": "WebSearch", "tool_input": {"query": "TA common stock listing fixture"}, "tool_use_id": "web-1"}, "web-1", {})
+                    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+                    yield AssistantMessage(model=options.model, content=[ToolUseBlock(id="web-1", name="WebSearch", input={"query": "TA fixture"})])
+                output = {"sources": ["https://ir.example.com/notice"], "unresolved_conditions": []} if search else finding
+                failed = not search and failure == "analysis"
+                yield ResultMessage(subtype="error_during_execution" if failed else "success", duration_ms=1, duration_api_ms=1,
+                    is_error=failed, num_turns=2, session_id=session, terminal_reason="completed", structured_output=output,
+                    usage={"input_tokens": 4, "output_tokens": 1036}, model_usage={options.model: {
+                        "inputTokens": 29706 if search else 300, "outputTokens": 3228 if search else 400,
+                        "cacheReadInputTokens": 3354, "cacheCreationInputTokens": 3976, "webSearchRequests": 2 if search else 0}})
+    
+        def read(self, url):
+            self._request_count += 1
+            self._observations.append(SourceReadObservation(self._request_count, 503 if failure == "source" else 200,
+                "content_length", "identity", 200, 200, 200, "source_http_error" if failure == "source" else "captured"))
+            if failure == "source":
+                raise SourceReadError("source_http_error")
+            return source_page(notice, url)
+    
+        monkeypatch.setattr(token_store, "get_token_store", lambda **kwargs: Tokens())
+        monkeypatch.setattr(claude_agent_sdk, "ClaudeSDKClient", OfflineClient)
+        monkeypatch.setattr(PublicSourceReader, "read", read)
+        plan = api.prepared_plan(profile, "2026-09-07")
+        work = tmp_path / "rehearsal"
+        assert api.execute(profile, plan, work) == (0 if failure is None else 1)
+        value = json.loads((work / "result.json").read_text())
+        metrics = json.loads((work / "metrics.json").read_text())
+        expected_queries = ["search"] if failure == "source" else ["search", "analysis"]
+        assert queries == expected_queries
+        assert metrics["sdk_query_submissions"] == metrics["journal_model_submissions"] == len(expected_queries)
+        assert metrics["source_http_requests"] == metrics["token_loads"] == 1
+        assert metrics["source_reads"][0]["observations"][0]["request_index"] == 1
+        assert metrics["source_reads"][0]["observations"][0]["received_body_bytes"] == 200
+        assert metrics["human_assessments_created"] == metrics["human_adoptions_created"] == 0
+        report = value["usage_report"]
+>       assert report["recorded_submissions"] == (2 if failure is None else 1)
+E       assert 0 == 1
+
+../lifecycle-usage-canary-noys2813/docs/superpowers/evidence/2026-09-07-lifecycle-web-usage-canary/test_usage_canary.py:149: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{
+  "status": "failed",
+  "failure_code": "model_result_incomplete",
+  "model_submissions": 2,
+  "source_http_requests": 1,
+  "human_adoptions": 0
+}
+- generated xml file: /tmp/lifecycle-usage-canary-admission/usage_callback_dropped.xml -
+=========================== short test summary info ============================
+FAILED ::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[None]
+FAILED ::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[source]
+FAILED ::test_canary_real_controller_keeps_usage_hook_and_exact_budget_without_live_calls[analysis]
+3 failed, 6 passed in 2.65s

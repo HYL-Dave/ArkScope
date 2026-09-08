@@ -1,0 +1,36 @@
+........................................................................ [ 12%]
+................................F....................................... [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 62%]
+........................................................................ [ 75%]
+........................................................................ [ 88%]
+....................................................................     [100%]
+=================================== FAILURES ===================================
+_ test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x764afedf87f0>
+headers = {'Content-Length': '9'}, body = b'short'
+code = 'source_body_incomplete'
+
+    @pytest.mark.parametrize("headers,body,code", [
+        ({"Content-Type": "application/pdf"}, b"%PDF", "source_format_unsupported"),
+        ({"Content-Encoding": "gzip"}, b"compressed", "source_compression_invalid"),
+        ({"Content-Length": "9"}, b"short", "source_body_incomplete"),
+        ({"Content-Length": "bad"}, b"text", "source_response_invalid"),
+        ({"Content-Type": "text/plain; charset=not-a-codec"}, b"text", "source_encoding_unsupported"),
+        ({}, b"\xff", "source_encoding_unsupported"),
+        ({}, b"", "source_text_empty"),
+    ])
+    def test_invalid_source_response_is_not_usable_evidence(monkeypatch, headers, body, code):
+        from src.lifecycle_public_sources import SourceReadError
+    
+        reader, connections, _, _ = _reader(monkeypatch, [Response(body, headers=headers)])
+>       with pytest.raises(SourceReadError, match=code):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_public_sources.SourceReadError'>
+
+tests/test_lifecycle_public_sources.py:200: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r3/results/incomplete_body_is_admitted-shard-2.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_public_sources.py::test_invalid_source_response_is_not_usable_evidence[headers2-short-source_body_incomplete]
+1 failed, 571 passed in 23.19s

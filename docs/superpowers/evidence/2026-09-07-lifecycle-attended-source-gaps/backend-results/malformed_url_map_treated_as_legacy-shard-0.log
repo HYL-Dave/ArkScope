@@ -1,0 +1,79 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+...............FFF...................................................... [ 48%]
+........................................................................ [ 60%]
+........................................................................ [ 72%]
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_ test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[None] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/malformed_url_map_treated_as_legacy-shard-0/test_reopened_journal_rejects_0')
+value = None
+
+    @pytest.mark.parametrize("value", [None, [], {}, {"source-2": "http://plain.example.com/notice"}])
+    def test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash(tmp_path, value):
+        from src.lifecycle_web_schema import TRIGGERS
+        from src.lifecycle_web_store import _json, _sha
+        c = context(tmp_path, completion=COMPLETION)
+        with c["web"].connection(write=True) as conn:
+            saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_web_results").fetchone()[0])
+            saved["source_failure_urls"] = value
+            trigger = "lifecycle_web_results_update_immutable"
+            conn.execute("DROP TRIGGER " + trigger)
+            conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (_json(saved), _sha(saved)))
+            conn.execute(TRIGGERS[trigger])
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:158: Failed
+_ test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value1] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/malformed_url_map_treated_as_legacy-shard-0/test_reopened_journal_rejects_1')
+value = []
+
+    @pytest.mark.parametrize("value", [None, [], {}, {"source-2": "http://plain.example.com/notice"}])
+    def test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash(tmp_path, value):
+        from src.lifecycle_web_schema import TRIGGERS
+        from src.lifecycle_web_store import _json, _sha
+        c = context(tmp_path, completion=COMPLETION)
+        with c["web"].connection(write=True) as conn:
+            saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_web_results").fetchone()[0])
+            saved["source_failure_urls"] = value
+            trigger = "lifecycle_web_results_update_immutable"
+            conn.execute("DROP TRIGGER " + trigger)
+            conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (_json(saved), _sha(saved)))
+            conn.execute(TRIGGERS[trigger])
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:158: Failed
+_ test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value2] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-gap-backend-r2/malformed_url_map_treated_as_legacy-shard-0/test_reopened_journal_rejects_2')
+value = {}
+
+    @pytest.mark.parametrize("value", [None, [], {}, {"source-2": "http://plain.example.com/notice"}])
+    def test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash(tmp_path, value):
+        from src.lifecycle_web_schema import TRIGGERS
+        from src.lifecycle_web_store import _json, _sha
+        c = context(tmp_path, completion=COMPLETION)
+        with c["web"].connection(write=True) as conn:
+            saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_web_results").fetchone()[0])
+            saved["source_failure_urls"] = value
+            trigger = "lifecycle_web_results_update_immutable"
+            conn.execute("DROP TRIGGER " + trigger)
+            conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (_json(saved), _sha(saved)))
+            conn.execute(TRIGGERS[trigger])
+>       with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
+E       Failed: DID NOT RAISE <class 'src.lifecycle_web_schema.WebJournalError'>
+
+tests/test_lifecycle_web_gaps.py:158: Failed
+- generated xml file: /tmp/lifecycle-gap-backend-r2/results/malformed_url_map_treated_as_legacy-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_gaps.py::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[None]
+FAILED tests/test_lifecycle_web_gaps.py::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value1]
+FAILED tests/test_lifecycle_web_gaps.py::test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash[value2]
+3 failed, 591 passed in 31.52s

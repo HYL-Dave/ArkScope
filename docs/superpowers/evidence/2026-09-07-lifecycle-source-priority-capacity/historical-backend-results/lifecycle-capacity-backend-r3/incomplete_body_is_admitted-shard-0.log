@@ -1,0 +1,38 @@
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+......................F................................................. [ 46%]
+........................................................................ [ 62%]
+........................................................................ [ 77%]
+........................................................................ [ 93%]
+................................                                         [100%]
+=================================== FAILURES ===================================
+___ test_all_source_failures_keep_measured_diagnostics_after_journal_reopen ____
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r3/incomplete_body_is_admitted-shard-0/test_all_source_failures_keep_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff2a1baa0b0>
+
+    @pytest.mark.anyio
+    async def test_all_source_failures_keep_measured_diagnostics_after_journal_reopen(tmp_path, monkeypatch):
+        from src import security_lifecycle_web_pipeline as pipeline
+        from src.lifecycle_web_projection import project_web_run
+        from src.lifecycle_web_store import LifecycleWebStore
+    
+        path, store = setup_store(tmp_path)
+        run = start(store)
+        control = store.control(run["run_id"], owner="worker-1")
+        reader, connections, _, _ = _reader(monkeypatch, [
+            Response(b"short", headers={"Content-Length": "1000"}),
+            Response(status=403, headers={"Set-Cookie": "do-not-retain-this-secret"}),
+        ])
+        calls = []
+        monkeypatch.setattr(pipeline, "call_lifecycle_web_model", _fake_model(calls, sources=[
+            "https://ir.example.com/notice", "https://news.example.com/notice",
+        ]))
+>       with pytest.raises(WebModelError, match="^source_read_incomplete$") as caught:
+E       Failed: DID NOT RAISE <class 'src.auth_drivers.lifecycle_web_models.WebModelError'>
+
+tests/test_lifecycle_source_read_report.py:35: Failed
+- generated xml file: /tmp/lifecycle-capacity-backend-r3/results/incomplete_body_is_admitted-shard-0.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_source_read_report.py::test_all_source_failures_keep_measured_diagnostics_after_journal_reopen
+1 failed, 463 passed in 21.40s

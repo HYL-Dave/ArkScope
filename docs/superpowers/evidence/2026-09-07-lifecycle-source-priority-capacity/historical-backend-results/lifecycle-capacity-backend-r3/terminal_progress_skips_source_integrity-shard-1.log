@@ -1,0 +1,205 @@
+........................................................................ [ 11%]
+...............................................FFFF..................... [ 22%]
+......................FFFF.............................................. [ 34%]
+........................................................................ [ 45%]
+........................................................................ [ 57%]
+........................................................................ [ 68%]
+........................................................................ [ 80%]
+........................................................................ [ 91%]
+...................................................                      [100%]
+=================================== FAILURES ===================================
+_ test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[openai-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r3/terminal_progress_skips_source_integrity-shard-1/test_web_controller_preserves_0')
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free(tmp_path, provider, auth):
+        service, store, calls = controller(tmp_path)
+        selected = selection(provider, auth)
+        try:
+            run = launch(service, selected=selected)
+            result = wait_done(service, run["run_id"])
+            assert result["status"] == "succeeded"
+            assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": selected.model}
+            assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": 100, "output_tokens": 80}
+>           assert result["finding"]["action"] == "terminal_delisting"
+E           AssertionError: assert None == 'terminal_delisting'
+
+tests/test_lifecycle_web_controller.py:79: AssertionError
+_ test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[openai-chatgpt_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r3/terminal_progress_skips_source_integrity-shard-1/test_web_controller_preserves_1')
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free(tmp_path, provider, auth):
+        service, store, calls = controller(tmp_path)
+        selected = selection(provider, auth)
+        try:
+            run = launch(service, selected=selected)
+            result = wait_done(service, run["run_id"])
+            assert result["status"] == "succeeded"
+            assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": selected.model}
+            assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": 100, "output_tokens": 80}
+>           assert result["finding"]["action"] == "terminal_delisting"
+E           AssertionError: assert None == 'terminal_delisting'
+
+tests/test_lifecycle_web_controller.py:79: AssertionError
+_ test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[anthropic-api_key] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r3/terminal_progress_skips_source_integrity-shard-1/test_web_controller_preserves_2')
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free(tmp_path, provider, auth):
+        service, store, calls = controller(tmp_path)
+        selected = selection(provider, auth)
+        try:
+            run = launch(service, selected=selected)
+            result = wait_done(service, run["run_id"])
+            assert result["status"] == "succeeded"
+            assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": selected.model}
+            assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": 100, "output_tokens": 80}
+>           assert result["finding"]["action"] == "terminal_delisting"
+E           AssertionError: assert None == 'terminal_delisting'
+
+tests/test_lifecycle_web_controller.py:79: AssertionError
+_ test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[anthropic-claude_code_oauth] _
+
+tmp_path = PosixPath('/dev/shm/lifecycle-capacity-backend-r3/terminal_progress_skips_source_integrity-shard-1/test_web_controller_preserves_3')
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free(tmp_path, provider, auth):
+        service, store, calls = controller(tmp_path)
+        selected = selection(provider, auth)
+        try:
+            run = launch(service, selected=selected)
+            result = wait_done(service, run["run_id"])
+            assert result["status"] == "succeeded"
+            assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": selected.model}
+            assert result["model_submissions"] == 2 and result["usage"] == {"input_tokens": 100, "output_tokens": 80}
+>           assert result["finding"]["action"] == "terminal_delisting"
+E           AssertionError: assert None == 'terminal_delisting'
+
+tests/test_lifecycle_web_controller.py:79: AssertionError
+_ test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-api_key] _
+
+web_route = {'action': 'terminal_delisting', 'calls': [ExecutionSelection(provider='openai', auth_mode='api_key', model='gpt-5.6-l...6f0569563d1c8b28c', 'checks': <src.security_lifecycle_provider_store.ProviderCheckStore object at 0x7baeafbf94b0>, ...}
+provider = 'openai', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_routes_prepare_start_read_and_confirm_all_four_channels(web_route, provider, auth):
+        c = web_route
+        c["credential"].provider, c["credential"].auth_type = provider, auth
+        c["route"].provider = provider
+        c["route"].model = "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5"
+        preview = c["client"].get(path(c) + "/web-preflight?question=listing_status")
+        assert preview.status_code == 200 and preview.json()["available"]
+        assert c["calls"] == [] and c["permissions"] == []
+        body = {"question": "listing_status", "preflight_sha256": preview.json()["preflight_sha256"], "request_key": "route-click"}
+        started = c["client"].post(path(c) + "/web-runs", json=body)
+        assert started.status_code == 202, started.text
+        identity = started.json()["run_id"]
+        wait_done(c["controller"], identity)
+        result = c["client"].get(f"/security-lifecycle/web-runs/{identity}").json()
+        assert result["execution"]["auth_mode"] == auth and result["status"] == "succeeded"
+>       assert result["finding"]["citations"] and result["model_submissions"] == 2
+E       assert ([])
+
+tests/test_lifecycle_web_routes.py:71: AssertionError
+_ test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-chatgpt_oauth] _
+
+web_route = {'action': 'terminal_delisting', 'calls': [ExecutionSelection(provider='openai', auth_mode='chatgpt_oauth', model='gpt...6f0569563d1c8b28c', 'checks': <src.security_lifecycle_provider_store.ProviderCheckStore object at 0x7baeafd954b0>, ...}
+provider = 'openai', auth = 'chatgpt_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_routes_prepare_start_read_and_confirm_all_four_channels(web_route, provider, auth):
+        c = web_route
+        c["credential"].provider, c["credential"].auth_type = provider, auth
+        c["route"].provider = provider
+        c["route"].model = "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5"
+        preview = c["client"].get(path(c) + "/web-preflight?question=listing_status")
+        assert preview.status_code == 200 and preview.json()["available"]
+        assert c["calls"] == [] and c["permissions"] == []
+        body = {"question": "listing_status", "preflight_sha256": preview.json()["preflight_sha256"], "request_key": "route-click"}
+        started = c["client"].post(path(c) + "/web-runs", json=body)
+        assert started.status_code == 202, started.text
+        identity = started.json()["run_id"]
+        wait_done(c["controller"], identity)
+        result = c["client"].get(f"/security-lifecycle/web-runs/{identity}").json()
+        assert result["execution"]["auth_mode"] == auth and result["status"] == "succeeded"
+>       assert result["finding"]["citations"] and result["model_submissions"] == 2
+E       assert ([])
+
+tests/test_lifecycle_web_routes.py:71: AssertionError
+_ test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-api_key] _
+
+web_route = {'action': 'terminal_delisting', 'calls': [ExecutionSelection(provider='anthropic', auth_mode='api_key', model='claude...6f0569563d1c8b28c', 'checks': <src.security_lifecycle_provider_store.ProviderCheckStore object at 0x7baeafd02a10>, ...}
+provider = 'anthropic', auth = 'api_key'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_routes_prepare_start_read_and_confirm_all_four_channels(web_route, provider, auth):
+        c = web_route
+        c["credential"].provider, c["credential"].auth_type = provider, auth
+        c["route"].provider = provider
+        c["route"].model = "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5"
+        preview = c["client"].get(path(c) + "/web-preflight?question=listing_status")
+        assert preview.status_code == 200 and preview.json()["available"]
+        assert c["calls"] == [] and c["permissions"] == []
+        body = {"question": "listing_status", "preflight_sha256": preview.json()["preflight_sha256"], "request_key": "route-click"}
+        started = c["client"].post(path(c) + "/web-runs", json=body)
+        assert started.status_code == 202, started.text
+        identity = started.json()["run_id"]
+        wait_done(c["controller"], identity)
+        result = c["client"].get(f"/security-lifecycle/web-runs/{identity}").json()
+        assert result["execution"]["auth_mode"] == auth and result["status"] == "succeeded"
+>       assert result["finding"]["citations"] and result["model_submissions"] == 2
+E       assert ([])
+
+tests/test_lifecycle_web_routes.py:71: AssertionError
+_ test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-claude_code_oauth] _
+
+web_route = {'action': 'terminal_delisting', 'calls': [ExecutionSelection(provider='anthropic', auth_mode='claude_code_oauth', mod...6f0569563d1c8b28c', 'checks': <src.security_lifecycle_provider_store.ProviderCheckStore object at 0x7baeb0edcc70>, ...}
+provider = 'anthropic', auth = 'claude_code_oauth'
+
+    @pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                              ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+    def test_web_routes_prepare_start_read_and_confirm_all_four_channels(web_route, provider, auth):
+        c = web_route
+        c["credential"].provider, c["credential"].auth_type = provider, auth
+        c["route"].provider = provider
+        c["route"].model = "gpt-5.6-luna" if provider == "openai" else "claude-sonnet-5"
+        preview = c["client"].get(path(c) + "/web-preflight?question=listing_status")
+        assert preview.status_code == 200 and preview.json()["available"]
+        assert c["calls"] == [] and c["permissions"] == []
+        body = {"question": "listing_status", "preflight_sha256": preview.json()["preflight_sha256"], "request_key": "route-click"}
+        started = c["client"].post(path(c) + "/web-runs", json=body)
+        assert started.status_code == 202, started.text
+        identity = started.json()["run_id"]
+        wait_done(c["controller"], identity)
+        result = c["client"].get(f"/security-lifecycle/web-runs/{identity}").json()
+        assert result["execution"]["auth_mode"] == auth and result["status"] == "succeeded"
+>       assert result["finding"]["citations"] and result["model_submissions"] == 2
+E       assert ([])
+
+tests/test_lifecycle_web_routes.py:71: AssertionError
+- generated xml file: /tmp/lifecycle-capacity-backend-r3/results/terminal_progress_skips_source_integrity-shard-1.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_web_controller.py::test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[openai-api_key]
+FAILED tests/test_lifecycle_web_controller.py::test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_controller.py::test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[anthropic-api_key]
+FAILED tests/test_lifecycle_web_controller.py::test_web_controller_preserves_four_channel_provenance_and_read_is_provider_free[anthropic-claude_code_oauth]
+FAILED tests/test_lifecycle_web_routes.py::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-api_key]
+FAILED tests/test_lifecycle_web_routes.py::test_web_routes_prepare_start_read_and_confirm_all_four_channels[openai-chatgpt_oauth]
+FAILED tests/test_lifecycle_web_routes.py::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-api_key]
+FAILED tests/test_lifecycle_web_routes.py::test_web_routes_prepare_start_read_and_confirm_all_four_channels[anthropic-claude_code_oauth]
+8 failed, 619 passed in 16.66s
