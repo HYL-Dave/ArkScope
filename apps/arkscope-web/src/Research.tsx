@@ -18,7 +18,7 @@
 // OpenAI/Anthropic binary, so compatible providers can slot in later.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MutableRefObject } from "react";
-import { FileSearch, History, Plus } from "lucide-react";
+import { FileSearch, History, Plus, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -187,9 +187,12 @@ const sleep = (ms: number, signal: AbortSignal): Promise<void> => new Promise((r
 });
 
 export interface ResearchConversationSelection {
+  status: "restoring" | "ready" | "blank";
   threadId: string | null;
   selection: ExplicitResearchTuple | null;
   incompleteSelection: { provider: ProviderId; model: string } | null;
+  question: string;
+  tickerInput: string;
 }
 
 export interface ResearchViewProps {
@@ -216,27 +219,41 @@ export function ResearchView({
   const { t: researchT } = useTranslation("research");
   const { t: commonT } = useTranslation("common");
   const [state, dispatch] = useReducer(reduce, initialState);
-  const [question, setQuestion] = useState("");
-  const [tickerInput, setTickerInput] = useState("");
+  const localConversationRef = useRef<ResearchConversationSelection | null>(null);
+  const conversationRef = conversationSelectionRef ?? localConversationRef;
+  const [conversation, setConversation] = useState<ResearchConversationSelection>(() => {
+    const current = conversationRef.current ?? {
+      status: "restoring", threadId: readActiveThreadId(), selection: null,
+      incompleteSelection: null, question: "", tickerInput: "",
+    };
+    // A bookmarked or warm thread must hydrate again before its next submission.
+    const initial: ResearchConversationSelection = current.threadId
+      ? { ...current, status: "restoring" } : current;
+    conversationRef.current = initial;
+    return initial;
+  });
+  const { question, tickerInput, selection: userSelection, incompleteSelection } = conversation;
+  const restorationPending = conversation.status === "restoring";
+  const updateConversation = useCallback((next: ResearchConversationSelection) => {
+    conversationRef.current = next;
+    setConversation(next);
+    writeActiveThreadId(next.threadId);
+  }, [conversationRef]);
+  const setQuestion = useCallback((value: string) => {
+    updateConversation({ ...conversationRef.current!, question: value });
+  }, [conversationRef, updateConversation]);
+  const setTickerInput = useCallback((value: string) => {
+    updateConversation({ ...conversationRef.current!, tickerInput: value });
+  }, [conversationRef, updateConversation]);
   const [sdk, setSdk] = useState<Record<string, boolean> | null>(null);
   const [booting, setBooting] = useState(true);
   const [threadError, setThreadError] = useState<ThreadOutcome | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyReloadKey, setHistoryReloadKey] = useState(0);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [evidencePinned, setEvidencePinned] = useState(false);
   const [evidenceMessageIndex, setEvidenceMessageIndex] = useState<number | null>(null);
-  const [transcriptPendingThreadId, setTranscriptPendingThreadId] = useState<string | null>(
-    () => conversationSelectionRef?.current?.threadId ?? null,
-  );
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
-  const localConversationRef = useRef<ResearchConversationSelection | null>(null);
-  const conversationRef = conversationSelectionRef ?? localConversationRef;
-  const [userSelection, setUserSelection] = useState<ExplicitResearchTuple | null>(
-    () => conversationRef.current?.selection ?? null,
-  );
-  const [incompleteSelection, setIncompleteSelection] = useState<ResearchConversationSelection["incompleteSelection"]>(
-    () => conversationRef.current?.incompleteSelection ?? null,
-  );
   // Track A: opt-in investor profile → per-run assistant stance override.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [runStance, setRunStance] = useState<AssistantStance>("off");
@@ -292,15 +309,14 @@ export function ResearchView({
     threadId: string | null,
     tuple: ExplicitResearchTuple | null,
     incomplete: ResearchConversationSelection["incompleteSelection"] = null,
+    status: ResearchConversationSelection["status"] = threadId ? "ready" : "blank",
   ) => {
-    conversationRef.current = { threadId, selection: tuple, incompleteSelection: incomplete };
-    setUserSelection(tuple);
-    setIncompleteSelection(incomplete);
-    writeActiveThreadId(threadId);
-  }, [conversationRef]);
+    updateConversation({ ...conversationRef.current!, status, threadId, selection: tuple, incompleteSelection: incomplete });
+  }, [conversationRef, updateConversation]);
 
   const rememberUserSelection = useCallback((tuple: ExplicitResearchTuple) => {
-    rememberConversation(conversationRef.current?.threadId ?? null, tuple);
+    const current = conversationRef.current!;
+    rememberConversation(current.threadId, tuple, null, current.status);
   }, [conversationRef, rememberConversation]);
 
   useEffect(() => {
@@ -339,17 +355,18 @@ export function ResearchView({
     onObserveRunRef.current?.(activeRun, thread.title);
   }, []);
 
-  const hydrateThread = useCallback(async (thread: ResearchThreadDTO) => {
+  const hydrateThread = useCallback(async (thread: ResearchThreadDTO, initial = false) => {
     const sequence = ++hydrationSequenceRef.current;
     submissionSequenceRef.current += 1;
-    setTranscriptPendingThreadId(thread.id);
     detachLocalPolling();
     setThreadError(null);
     const current = conversationRef.current;
+    const retainSelection = current?.threadId === thread.id || (initial && current?.threadId === null);
     rememberConversation(
       thread.id,
-      current?.threadId === thread.id ? current.selection : null,
-      current?.threadId === thread.id ? current.incompleteSelection : null,
+      retainSelection ? current!.selection : null,
+      retainSelection ? current!.incompleteSelection : null,
+      "restoring",
     );
     setEvidenceMessageIndex(null);
     observeThreadRun(thread);
@@ -368,16 +385,24 @@ export function ResearchView({
         thread: toClientThread(thread),
         messages: response.messages.map(toClientMessage),
       });
-      setTranscriptPendingThreadId((current) => current === thread.id ? null : current);
+      updateConversation({ ...conversationRef.current!, status: "ready" });
     } catch {
       if (sequence === hydrationSequenceRef.current) {
         setThreadError("active_thread_load_failed");
       }
     }
-  }, [conversationRef, detachLocalPolling, observeThreadRun, rememberConversation]);
+  }, [conversationRef, detachLocalPolling, observeThreadRun, rememberConversation, updateConversation]);
 
   const hydrateThreadById = useCallback(async (threadId: string) => {
     const requestSequence = ++hydrationSequenceRef.current;
+    submissionSequenceRef.current += 1;
+    detachLocalPolling();
+    setThreadError(null);
+    const current = conversationRef.current!;
+    rememberConversation(
+      threadId, current.threadId === threadId ? current.selection : null,
+      current.threadId === threadId ? current.incompleteSelection : null, "restoring",
+    );
     try {
       const { thread } = await getResearchThread(threadId);
       if (requestSequence !== hydrationSequenceRef.current) return "unavailable" as const;
@@ -392,34 +417,42 @@ export function ResearchView({
       }
       return missing ? "missing" as const : "unavailable" as const;
     }
-  }, [hydrateThread]);
+  }, [conversationRef, detachLocalPolling, hydrateThread, rememberConversation]);
 
   const handleInitialHistoryRows = useCallback(async (
     rows: readonly ResearchThreadDTO[],
   ) => {
     for (const thread of rows) observeThreadRun(thread);
     if (navigationRequest || !initialAutoSelectAllowedRef.current) return;
-    // A known blank conversation is not an initial visit: do not reopen history.
-    if (conversationRef.current?.threadId === null) {
-      initialAutoSelectAllowedRef.current = false;
-      return;
-    }
-    const savedActive = conversationRef.current?.threadId ?? readActiveThreadId();
+    initialAutoSelectAllowedRef.current = false;
+    if (conversationRef.current?.status === "blank") return;
+    setThreadError(null);
+    const savedActive = conversationRef.current?.threadId;
     if (savedActive) {
       const target = rows.find((thread) => thread.id === savedActive) ?? null;
       if (target) {
         await hydrateThread(target);
       } else {
-        const result = await hydrateThreadById(savedActive);
-        if (result === "missing" && initialAutoSelectAllowedRef.current && rows[0]) {
-          await hydrateThread(rows[0]);
-        }
+        await hydrateThreadById(savedActive);
       }
     } else if (rows[0]) {
-      await hydrateThread(rows[0]);
+      await hydrateThread(rows[0], true);
+    } else {
+      updateConversation({ ...conversationRef.current!, status: "blank" });
     }
-    initialAutoSelectAllowedRef.current = false;
-  }, [conversationRef, hydrateThread, hydrateThreadById, navigationRequest, observeThreadRun]);
+  }, [conversationRef, hydrateThread, hydrateThreadById, navigationRequest, observeThreadRun, updateConversation]);
+
+  const retryRestoration = useCallback(() => {
+    setThreadError(null);
+    const threadId = conversationRef.current?.threadId;
+    if (threadId) {
+      initialAutoSelectAllowedRef.current = false;
+      void hydrateThreadById(threadId);
+    } else {
+      initialAutoSelectAllowedRef.current = true;
+      setHistoryReloadKey(key => key + 1);
+    }
+  }, [conversationRef, hydrateThreadById]);
 
   // Ignore transcript responses and detach local replay after unmount.
   useEffect(() => {
@@ -523,7 +556,7 @@ export function ResearchView({
   useEffect(() => {
     const run = state.activeThreadId ? activeRunsByThread[state.activeThreadId] : null;
     if (!run || isTerminalRun(run)) return;
-    if (transcriptPendingThreadId === run.thread_id) return;
+    if (restorationPending) return;
     if (state.pending?.threadId === run.thread_id || pollingRunIdRef.current === run.id) return;
     dispatch({
       kind: "attachRun",
@@ -536,7 +569,7 @@ export function ResearchView({
       ts: runStartedMs(run),
     });
     void pollRun(run);
-  }, [activeRunsByThread, pollRun, state.activeThreadId, state.pending?.threadId, transcriptPendingThreadId]);
+  }, [activeRunsByThread, pollRun, state.activeThreadId, state.pending?.threadId, restorationPending]);
 
   useEffect(() => {
     let cancelled = false;
@@ -565,7 +598,7 @@ export function ResearchView({
       || incompleteSelection !== null
       || state.pending
       || currentThread?.archived_at
-      || transcriptPendingThreadId !== null
+      || restorationPending
     ) return;
     const ticker = tickerInput.trim().toUpperCase() || null;
     // Client-owned thread id: reuse the active thread to continue, else a fresh
@@ -587,7 +620,7 @@ export function ResearchView({
       ticker,
       assistant_stance: stanceForRun,
     }, submissionSequence);
-  }, [question, tickerInput, selection, incompleteSelection, state.pending, state.activeThreadId, currentThread?.archived_at, runManaged, stanceForRun, transcriptPendingThreadId, rememberConversation, userSelection]);
+  }, [question, tickerInput, selection, incompleteSelection, state.pending, state.activeThreadId, currentThread?.archived_at, runManaged, stanceForRun, restorationPending, rememberConversation, userSelection, setQuestion]);
 
   // Cancel server work first; keep the pending turn locked until cancellation succeeds.
   const stopStream = useCallback(() => {
@@ -627,7 +660,6 @@ export function ResearchView({
     setEvidenceOpen(false);
     setEvidencePinned(false);
     setEvidenceMessageIndex(null);
-    setTranscriptPendingThreadId(null);
     rememberConversation(null, null);
     dispatch({ kind: "newThread" });
   }, [detachLocalPolling, rememberConversation]);
@@ -656,14 +688,15 @@ export function ResearchView({
       delete next[threadId];
       return next;
     });
-    if (state.activeThreadId === threadId) {
+    if (conversationRef.current?.threadId === threadId) {
       hydrationSequenceRef.current += 1;
+      submissionSequenceRef.current += 1;
       detachLocalPolling();
-      setTranscriptPendingThreadId(null);
+      setThreadError(null);
       rememberConversation(null, null);
     }
     dispatch({ kind: "deleteThread", threadId });
-  }, [detachLocalPolling, rememberConversation, state.activeThreadId]);
+  }, [conversationRef, detachLocalPolling, rememberConversation]);
 
   // --- derived view state ----------------------------------------------------
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
@@ -779,7 +812,8 @@ export function ResearchView({
     const entry = catalog.effective?.tasks.ai_research?.providers?.[provider]
       ?.models.find((candidate) => candidate.id === nextModel);
     if (!entry || taskRouteModelStatus(catalog, provider, nextModel) === "retired") return;
-    rememberConversation(conversationRef.current?.threadId ?? null, userSelection, { provider, model: nextModel });
+    const current = conversationRef.current!;
+    rememberConversation(current.threadId, userSelection, { provider, model: nextModel }, current.status);
   }, [catalog, conversationRef, provider, rememberConversation, userSelection]);
 
   const chooseEffort = useCallback((nextEffort: string) => {
@@ -805,12 +839,14 @@ export function ResearchView({
       && taskRouteModelStatus(catalog, nextProvider, entry.id) !== "retired"
     ));
     if (!selected) return;
-    rememberConversation(conversationRef.current?.threadId ?? null, userSelection, { provider: nextProvider, model: selected.id });
+    const current = conversationRef.current!;
+    rememberConversation(current.threadId, userSelection, { provider: nextProvider, model: selected.id }, current.status);
   }, [catalog, conversationRef, incompleteSelection, provider, selectionReady, rememberConversation, userSelection]);
 
   const retryLastFailed = useCallback(() => {
     if (
       !retryCandidate
+      || restorationPending
       || !state.activeThreadId
       || state.pending
       || selection?.state !== "ready"
@@ -842,7 +878,7 @@ export function ResearchView({
       retry_last_failed: true,
       assistant_stance: stanceForRun,
     }, submissionSequence);
-  }, [currentThread?.archived_at, incompleteSelection, retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
+  }, [currentThread?.archived_at, incompleteSelection, restorationPending, retryCandidate, runManaged, selection, state.activeThreadId, state.pending, stanceForRun]);
   const activeRunIds = useMemo(
     () => new Set(Object.values(activeRunsByThread).map((run) => run.id)),
     [activeRunsByThread],
@@ -941,6 +977,11 @@ export function ResearchView({
             ) : null}
           </div>
           {threadErrorLabel ? <p className="error-text tiny">{threadErrorLabel}</p> : null}
+          {threadErrorLabel && restorationPending ? (
+            <Button size="compact" tone="secondary" icon={<RefreshCw size={16} />} onClick={retryRestoration}>
+              {researchT(($) => $.history.retry)}
+            </Button>
+          ) : null}
           <div className="research-messages">
             {msgs.length === 0 && !state.pending ? (
               <div className="research-empty">
@@ -975,7 +1016,7 @@ export function ResearchView({
                     setHistoryOpen(false);
                     setEvidenceOpen(true);
                   }}
-                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending && !currentThread?.archived_at && selectionReady}
+                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending && !restorationPending && !currentThread?.archived_at && selectionReady}
                   onRetry={retryLastFailed}
                 />
               ))
@@ -1166,7 +1207,7 @@ export function ResearchView({
                       || !!state.pending
                       || !question.trim()
                       || Boolean(currentThread?.archived_at)
-                      || transcriptPendingThreadId !== null
+                      || restorationPending
                     }
                   >
                     {researchT(($) => $.workspace.submit)}
@@ -1190,11 +1231,17 @@ export function ResearchView({
         />
       </div>
       <ResearchHistoryDrawer
+        key={historyReloadKey}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         activeThreadId={state.activeThreadId}
         activeRunIds={activeRunIds}
         onInitialRowsReady={(rows) => void handleInitialHistoryRows(rows)}
+        onInitialLoadFailed={() => {
+          if (!navigationRequest && initialAutoSelectAllowedRef.current && conversationRef.current?.status === "restoring") {
+            setThreadError("thread_load_failed");
+          }
+        }}
         onSelect={(thread) => {
           initialAutoSelectAllowedRef.current = false;
           setHistoryOpen(false);

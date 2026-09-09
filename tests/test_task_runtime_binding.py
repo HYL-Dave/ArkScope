@@ -117,6 +117,61 @@ def test_absent_route_still_uses_exact_defaults(isolated, task, expected):
     assert route.source == "default"
 
 
+@pytest.mark.parametrize("provider,model,effort,prior_provider,prior_model", [
+    ("openai", "gpt-5.6-sol", "low", "anthropic", "claude-sonnet-4-6"),
+    ("anthropic", "claude-sonnet-5", "medium", "openai", "gpt-5.4-mini"),
+])
+def test_managed_research_keeps_prior_context_with_new_explicit_tuple(
+    isolated, monkeypatch, provider, model, effort, prior_provider, prior_model,
+):
+    from src.agents.shared.events import AgentEvent, EventType
+
+    add_key(isolated.credentials, provider, "test-context-key")
+    isolated.threads.ensure_thread(id="restored", title="Prior conversation")
+    isolated.threads.append_message(thread_id="restored", role="user", content="Prior question")
+    isolated.threads.append_message(
+        thread_id="restored", role="assistant", content="Prior answer",
+        provider=prior_provider, model=prior_model, effort="default",
+    )
+    prior_messages = isolated.threads.list_messages("restored")
+    scheduled, calls = {}, []
+    monkeypatch.setattr(research, "schedule_research_run", lambda **kwargs: scheduled.update(kwargs))
+
+    async def adapter(**kwargs):
+        calls.append(kwargs)
+        yield AgentEvent(EventType.done, {
+            "answer": "New answer", "provider": provider, "model": model, "tools_used": [],
+        })
+
+    monkeypatch.setattr(query, "_research_provider_stream", adapter)
+
+    async def drive():
+        result = await research.create_research_run(
+            research.ResearchRunCreate(
+                thread_id="restored", question="Follow up", provider=provider, model=model, effort=effort,
+            ), dal=object(), thread_store=isolated.threads, run_store=isolated.runs,
+        )
+        await execute_research_run(**scheduled)
+        return result["run"]
+
+    created = asyncio.run(drive())
+    assert len(calls) == 1
+    assert calls[0]["history"] == [
+        {"role": "user", "content": "Prior question"},
+        {"role": "assistant", "content": "Prior answer"},
+    ]
+    assert tuple(calls[0][key] for key in ("question", "provider", "model", "effort")) == (
+        "Follow up", provider, model, effort,
+    )
+    run = isolated.runs.get_run(created["id"])
+    assert (run.thread_id, run.status, run.provider, run.model, run.effort) == (
+        "restored", "succeeded", provider, model, effort,
+    )
+    messages = isolated.threads.list_messages("restored")
+    assert messages[:2] == prior_messages
+    assert [message.content for message in messages] == ["Prior question", "Prior answer", "Follow up", "New answer"]
+
+
 @pytest.mark.parametrize("switch_at", ["persist", "schedule", "dispatch"])
 @pytest.mark.parametrize("provider,model,effort", [
     ("openai", "gpt-5.6-luna", "xhigh"), ("anthropic", "claude-sonnet-5", "high"),
