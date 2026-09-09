@@ -17,18 +17,16 @@ class RuntimeAuthUnavailable(ValueError):
     """Bounded failure: selected auth cannot be replaced with current Settings."""
 
 
-def api_key_client_options(provider: str, api_key: str) -> dict[str, Any]:
-    """Ephemeral SDK options: pin API-key auth and its standard destination."""
+def pinned_auth_headers(provider: str, secret: str) -> dict[str, Any]:
+    """Pin the selected API key or OAuth bearer, never ambient auth headers."""
     if provider == "openai":
         from openai import omit
 
-        base_url = "https://api.openai.com/v1"
-        auth_headers = {"Authorization": f"Bearer {api_key}", "X-Api-Key": omit}
+        auth_headers = {"Authorization": f"Bearer {secret}", "X-Api-Key": omit}
     elif provider == "anthropic":
         from anthropic import omit
 
-        base_url = "https://api.anthropic.com"
-        auth_headers = {"Authorization": omit, "X-Api-Key": api_key}
+        auth_headers = {"Authorization": omit, "X-Api-Key": secret}
     else:
         raise RuntimeAuthUnavailable("runtime_auth_unavailable")
     # SDKs merge ambient headers case-sensitively before building HTTP headers.
@@ -45,6 +43,13 @@ def api_key_client_options(provider: str, api_key: str) -> dict[str, Any]:
         if separator and name.lower() in by_name:
             headers[name] = by_name[name.lower()]
     headers.update(auth_headers)
+    return headers
+
+
+def api_key_client_options(provider: str, api_key: str) -> dict[str, Any]:
+    """Ephemeral SDK options: pin API-key auth and its standard destination."""
+    headers = pinned_auth_headers(provider, api_key)
+    base_url = "https://api.openai.com/v1" if provider == "openai" else "https://api.anthropic.com"
     return {"api_key": api_key, "base_url": base_url, "default_headers": headers}
 
 

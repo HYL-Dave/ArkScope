@@ -90,7 +90,7 @@ function flattenResource(tree: ResourceTree, prefix = ""): Map<string, string> {
 describe("bundled i18n resources", () => {
   it("contains the exact Explore subtree inventory in both locales", () => {
     const expectedSubtreeCounts = {
-      errors: 60,
+      errors: 61,
       home: 23,
       watchlist: 71,
       universe: 38,
@@ -265,7 +265,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(1340);
+      expect(flattened.size, `${locale}.explore`).toBe(1341);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -737,7 +737,7 @@ describe("bundled i18n resources", () => {
       shell: 37,
       settings: 919,
       research: 207,
-      explore: 1340,
+      explore: 1341,
       portfolio: 374,
       system: 24,
     } as const;
@@ -821,7 +821,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2983);
+      expect(total, `${locale}.total`).toBe(2984);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(

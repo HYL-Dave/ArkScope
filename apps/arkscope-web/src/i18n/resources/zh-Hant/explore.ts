@@ -43,6 +43,7 @@ const explore = {
       cardSave: "無法將卡片存成報告。",
       cardTranslate: "無法翻譯卡片。",
     },
+    reauthRequired: "所選 Provider 的登入已失效。請重新登入後再試。",
     diagnostics: {
       title: "開發者診斷",
       status: "狀態",

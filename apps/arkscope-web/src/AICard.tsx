@@ -8,7 +8,7 @@
 // 理由 · 失效條件 · per-claim traceability) and can be promoted to a report.
 // CardView / CardModal are exported so Home can read a card in place.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { IconButton } from "./ui/Button";
@@ -41,19 +41,33 @@ type CardSaveAttempt = {
   requestId: number;
 };
 
+export type CardRecoveryDraft = {
+  ticker: string;
+  question: string;
+  cardStance: AssistantStance;
+  showAdv: boolean;
+  newsDays: number;
+  maxNews: number;
+};
+
 export function AICardTab({
   ticker,
   runtime,
   developerMode,
   onNavigateTarget,
+  recoveryDraftRef,
 }: {
   ticker: string;
   runtime?: RuntimeConfig | null;
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
+  recoveryDraftRef?: MutableRefObject<CardRecoveryDraft | null>;
 }) {
   const { t } = useTranslation("explore");
   const { t: commonT } = useTranslation("common");
+  const [recoveredDraft] = useState(() => (
+    recoveryDraftRef?.current?.ticker === ticker ? recoveryDraftRef.current : null
+  ));
   const [recent, setRecent] = useState<CardSummary[] | null>(null);
   const [card, setCard] = useState<ResultCard | null>(null);
   const [executionReceipt, setExecutionReceipt] = useState<ExecutionReceipt | undefined>();
@@ -61,7 +75,7 @@ export function AICardTab({
   const [runId, setRunId] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(recoveredDraft?.question ?? "");
   const [busy, setBusy] = useState(false);
   const [recentErr, setRecentErr] = useState<ExploreErrorState | null>(null);
   const [profileErr, setProfileErr] = useState<ExploreErrorState | null>(null);
@@ -70,12 +84,20 @@ export function AICardTab({
   const [failedSaveAttempt, setFailedSaveAttempt] = useState<CardSaveAttempt | null>(null);
   // Track A: opt-in stance override for card synthesis + trace of the run shown.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
-  const [cardStance, setCardStance] = useState<AssistantStance>("off");
+  const [cardStance, setCardStance] = useState<AssistantStance>(recoveredDraft?.cardStance ?? "off");
   const [lastTrace, setLastTrace] = useState<PersonalizationTrace | null>(null);
   // Evidence news window (defaults match the backend: 21 days / 12 articles).
-  const [showAdv, setShowAdv] = useState(false);
-  const [newsDays, setNewsDays] = useState(21);
-  const [maxNews, setMaxNews] = useState(12);
+  const [showAdv, setShowAdv] = useState(recoveredDraft?.showAdv ?? false);
+  const [newsDays, setNewsDays] = useState(recoveredDraft?.newsDays ?? 21);
+  const [maxNews, setMaxNews] = useState(recoveredDraft?.maxNews ?? 12);
+  const recoveryNeedsProfile = recoveredDraft !== null && investorProfile === null;
+
+  useEffect(() => {
+    // Consume after initialization, not during render (including StrictMode).
+    if (recoveredDraft && recoveryDraftRef?.current === recoveredDraft) {
+      recoveryDraftRef.current = null;
+    }
+  }, [recoveredDraft, recoveryDraftRef]);
 
   // Request token for IN-INSTANCE supersession: generate() and openCard() bump
   // it, so if the user opens a recent card (or starts another generate) while a
@@ -109,13 +131,13 @@ export function AICardTab({
       if (id !== profileReqRef.current) return;
       setInvestorProfile(response);
       setProfileErr(null);
-      if (response.profile.enabled) setCardStance(response.profile.default_stance);
+      if (response.profile.enabled && !recoveredDraft) setCardStance(response.profile.default_stance);
     } catch (e) {
       if (id === profileReqRef.current) {
         setProfileErr(captureExploreError("card_load_investor_profile", e));
       }
     }
-  }, []);
+  }, [recoveredDraft]);
 
   useEffect(() => {
     void loadInvestorProfile();
@@ -144,7 +166,7 @@ export function AICardTab({
   }, [ticker, loadRecent]);
 
   async function generate() {
-    if (busy) return;
+    if (busy || recoveryNeedsProfile) return;
     const id = ++reqRef.current;
     setBusy(true);
     setSaving(false);
@@ -243,6 +265,14 @@ export function AICardTab({
     }
   }
 
+  function recoverFromFailure(target: NavigationTarget) {
+    if (err?.operation === "card_generate" && err.code === "reauth_required"
+      && target.kind === "settings_section" && target.section === "providers" && recoveryDraftRef) {
+      recoveryDraftRef.current = { ticker, question, cardStance, showAdv, newsDays, maxNews };
+    }
+    onNavigateTarget(target);
+  }
+
   return (
     <div className="aicard">
       <div className="aicard-actions">
@@ -256,7 +286,7 @@ export function AICardTab({
             if (e.key === "Enter") void generate();
           }}
         />
-        <button className="btn-ghost" onClick={() => void generate()} disabled={busy}>
+        <button className="btn-ghost" onClick={() => void generate()} disabled={busy || recoveryNeedsProfile}>
           {busy ? t(($) => $.aiCard.generating) : t(($) => $.aiCard.generate)}
         </button>
         <button
@@ -298,6 +328,9 @@ export function AICardTab({
         </div>
       )}
       {busy && <p className="muted tiny">{t(($) => $.aiCard.generationProgress)}</p>}
+      {recoveryNeedsProfile && !profileErr && (
+        <p className="muted tiny" role="status">{t(($) => $.aiCard.loading)}</p>
+      )}
       {recentErr && (
         <ExploreErrorNotice
           state={recentErr}
@@ -322,7 +355,7 @@ export function AICardTab({
           developerMode={developerMode}
           retryLabel={t(($) => $.aiCard.retry)}
           onRetry={retryAction}
-          onNavigate={onNavigateTarget}
+          onNavigate={recoverFromFailure}
         />
       )}
 

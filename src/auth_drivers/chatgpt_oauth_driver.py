@@ -97,8 +97,12 @@ def _task_route_tasks(model: str, *, plan_type: str | None = None) -> list[str]:
 
 def _execution_client(token: str) -> Any:  # seam for tests
     from openai import AsyncOpenAI
+    from src.auth_drivers.runtime_binding import pinned_auth_headers
 
-    return AsyncOpenAI(api_key=token, base_url=CHATGPT_BACKEND_BASE_URL, timeout=300)
+    return AsyncOpenAI(
+        api_key=token, base_url=CHATGPT_BACKEND_BASE_URL, timeout=300,
+        default_headers=pinned_auth_headers("openai", token),
+    )
 
 
 def _err(exc: BaseException) -> str:

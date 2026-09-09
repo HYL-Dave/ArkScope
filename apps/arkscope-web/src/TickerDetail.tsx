@@ -3,7 +3,7 @@
 // is the detail. Gives real room for the price/volume chart (reserved area),
 // evidence, and the §2 AI card — which the 320px side panel could not.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
   addNote,
@@ -29,7 +29,7 @@ import {
   type TagRef,
   type TickerAggregate,
 } from "./api";
-import { AICardTab } from "./AICard";
+import { AICardTab, type CardRecoveryDraft } from "./AICard";
 import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
 import {
   captureExploreError,
@@ -47,12 +47,14 @@ export function TickerDetailView({
   runtime,
   developerMode,
   onNavigateTarget,
+  cardRecoveryDraftRef,
 }: {
   ticker: string;
   onBack: () => void;
   runtime?: RuntimeConfig | null;
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
+  cardRecoveryDraftRef?: MutableRefObject<CardRecoveryDraft | null>;
 }) {
   const { t } = useTranslation("explore");
   const [tab, setTab] = useState<Tab>("overview");
@@ -205,6 +207,7 @@ export function TickerDetailView({
       ) : (
         <div className="detail-ai-wrap">
           <AICardTab
+            recoveryDraftRef={cardRecoveryDraftRef}
             ticker={ticker}
             runtime={runtime}
             developerMode={developerMode}

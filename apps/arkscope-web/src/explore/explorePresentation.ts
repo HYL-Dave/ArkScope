@@ -70,6 +70,7 @@ export type ExploreDiagnosticRow = {
 export type ExploreErrorPresentation = {
   title: string;
   guidance: string | null;
+  retryable: boolean;
   diagnostics: {
     title: string;
     status: ExploreDiagnosticRow | null;
@@ -431,6 +432,10 @@ export function captureExploreError(
 }
 
 const RECOVERY_TARGETS = {
+  reauth_required: {
+    kind: "settings_section",
+    section: "providers",
+  },
   active_universe_unavailable: {
     kind: "settings_section",
     section: "data_sources",
@@ -539,7 +544,9 @@ export function presentExploreError(
   const developerDetail = safeDiagnosticDetail(state.developerDetail);
   const detailOmitted = state.detailOmitted
     || (state.developerDetail !== null && developerDetail === null);
-  const guidance = state.operation === "card_translate"
+  const guidance = code === "reauth_required"
+    ? t(($) => $.errors.reauthRequired)
+    : state.operation === "card_translate"
     ? translationGuidance(code, t)
     : null;
   const recoveryTarget = recoveryTargetForExploreError(state);
@@ -554,6 +561,7 @@ export function presentExploreError(
   return {
     title: OPERATION_PRESENTERS[state.operation](t),
     guidance,
+    retryable: code !== "reauth_required",
     diagnostics: {
       title: t(($) => $.errors.diagnostics.title),
       status: status === null

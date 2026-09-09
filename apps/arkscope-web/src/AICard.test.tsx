@@ -594,6 +594,33 @@ describe("AI Card localization", () => {
     expect(host!.textContent).not.toContain(RAW_ERROR);
   });
 
+  it.each([
+    ["zh-Hant", false], ["zh-Hant", true], ["en", false], ["en", true],
+  ] as const)("offers sign-in recovery for card OAuth failure in %s, diagnostics=%s", async (locale, developerMode) => {
+    const onNavigateTarget = vi.fn();
+    apiMocks.generateCard.mockRejectedValueOnce(
+      structuredError("reauth_required", `/analysis/card/${TICKER}`),
+    );
+    await mountTab({ onNavigateTarget, developerMode });
+    await act(async () => { await i18n.changeLanguage(locale); });
+    const question = host!.querySelector<HTMLInputElement>(".aicard-q")!;
+    await setValue(question, "Keep this question after sign-in.");
+    await click(buttonByText(locale === "en" ? "Generate Card" : "產生卡片"));
+    await waitForCalls(apiMocks.generateCard, 1);
+    const alert = host!.querySelector<HTMLElement>('[role="alert"]')!;
+    const guidance = locale === "en"
+      ? "The selected Provider sign-in is no longer valid. Sign in again, then retry."
+      : "所選 Provider 的登入已失效。請重新登入後再試。";
+    expect(alert.textContent).toContain(guidance);
+    expect(question.value).toBe("Keep this question after sign-in.");
+    expect(alert.textContent).not.toContain(RAW_DIAGNOSTIC);
+    expect(Array.from(alert.querySelectorAll("button"))).toHaveLength(1);
+    await click(buttonByText(locale === "en"
+      ? "Go to Provider Sign-in and Credentials" : "前往 Provider 登入與憑證", alert));
+    expect(onNavigateTarget).toHaveBeenCalledWith({ kind: "settings_section", section: "providers" });
+    expect(apiMocks.generateCard).toHaveBeenCalledTimes(1);
+  });
+
   it("maps save failure without changing Card identity", async () => {
     async function openCardBWhileSavePending(pendingSave: ReturnType<typeof deferred>) {
       apiMocks.saveCard.mockReset().mockReturnValueOnce(pendingSave.promise);

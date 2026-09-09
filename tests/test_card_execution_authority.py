@@ -340,6 +340,44 @@ def test_failed_generation_redacts_selected_key_after_activation(world, wire, mo
     assert all(record.exc_info is None for record in caplog.records)
 
 
+@pytest.mark.parametrize("status", [401, 403, 429])
+def test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage(
+    world, monkeypatch, caplog, status,
+):
+    import httpx
+    from openai import AsyncOpenAI
+
+    select(world, "card_synthesis", "openai", "gpt-5.6-luna", "max", "chatgpt_oauth")
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(status, json={"error": {
+            "message": "Provided access token is expired. Bearer synthetic-token",
+            "type": "authentication_error" if status == 401 else "invalid_request_error",
+        }})
+
+    monkeypatch.setattr("openai.AsyncOpenAI", lambda **kw: AsyncOpenAI(
+        **kw, http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    ))
+    response = world.client.post("/analysis/card/AMD", json={"include_sa": False})
+    assert response.status_code == 502
+    assert len(requests) == 1
+    assert requests[0].headers.get_list("authorization") == ["Bearer synthetic-token"]
+    body = json.loads(requests[0].content)
+    assert (body["model"], body["reasoning"]) == ("gpt-5.6-luna", {"effort": "max"})
+    assert world.cards.recent() == []
+    assert "synthetic-token" not in response.text + caplog.text
+    if status == 401:
+        assert response.json()["detail"] == {
+            "code": "reauth_required", "task": "card_synthesis", "provider": "openai",
+            "model": "gpt-5.6-luna", "effort": "max", "auth_mode": "chatgpt_oauth",
+        }
+        assert "Provided access token" not in response.text
+    else:
+        assert "reauth_required" not in response.text
+
+
 def test_additive_schema_preserves_legacy_payload_and_versions(tmp_path):
     from src.card_execution import ExecutionReceipt
 
