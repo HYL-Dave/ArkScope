@@ -16,16 +16,23 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.auth_drivers.runtime_binding import RuntimeAuthBinding, sanitize_runtime_error
+
 
 class AnthropicRefusalError(RuntimeError):
     """A model declined the request via stop_reason=refusal (HTTP 200)."""
 
-    def __init__(self, model: str, stop_details: Any = None):
+    def __init__(
+        self, model: str, stop_details: Any = None, *,
+        binding: RuntimeAuthBinding | None = None, api_key: str | None = None,
+    ):
         self.model = model
-        self.stop_details = _details_dict(stop_details)
+        self.stop_details = safe_refusal_details(stop_details, binding=binding, api_key=api_key)
         category = self.stop_details.get("category")
         suffix = f" (category: {category})" if category else ""
-        super().__init__(f"model {model} refused the request{suffix}")
+        super().__init__(sanitize_runtime_error(
+            f"model {model} refused the request{suffix}", binding=binding, api_key=api_key,
+        ))
 
 
 def is_refusal(message: Any) -> bool:
@@ -33,15 +40,13 @@ def is_refusal(message: Any) -> bool:
     return getattr(message, "stop_reason", None) == "refusal"
 
 
-def _details_dict(stop_details: Any) -> dict:
-    if isinstance(stop_details, dict):
-        return stop_details
-    if stop_details is None:
-        return {}
-    # SDK objects expose attributes; keep only the documented display fields.
+def safe_refusal_details(
+    stop_details: Any, *, binding: RuntimeAuthBinding | None = None, api_key: str | None = None,
+) -> dict[str, str]:
+    """Closed display shape for SDK objects and adapter dicts, never nested payloads."""
     out = {}
     for key in ("type", "category", "explanation"):
-        value = getattr(stop_details, key, None)
-        if value is not None:
-            out[key] = value
+        value = stop_details.get(key) if isinstance(stop_details, dict) else getattr(stop_details, key, None)
+        if isinstance(value, str):
+            out[key] = sanitize_runtime_error(value, binding=binding, api_key=api_key)
     return out

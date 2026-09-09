@@ -463,7 +463,8 @@ async def run_query_stream(
             # done, never a hidden fallback to another model.
             if is_refusal(response):
                 refusal = AnthropicRefusalError(
-                    model_name, getattr(response, "stop_details", None)
+                    model_name, getattr(response, "stop_details", None),
+                    api_key=getattr(client, "api_key", None),
                 )
                 logger.warning("model refusal: %s", refusal)
                 pad.close()

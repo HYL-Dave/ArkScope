@@ -297,7 +297,7 @@ def test_research_oauth_switch_keeps_original_id_and_refresh_authority(
     assert not any(e.type == "done" for e in isolated.runs.list_events(run.id))
 
 
-def anthropic_sse(model):
+def anthropic_sse(model, *, refusal=False, stop_details=None):
     events = [
         {"type": "message_start", "message": {"id": "msg_fixture", "type": "message",
          "role": "assistant", "model": model, "content": [], "stop_reason": None,
@@ -309,6 +309,9 @@ def anthropic_sse(model):
          "usage": {"output_tokens": 1}},
         {"type": "message_stop"},
     ]
+    if refusal:
+        events = [events[0], events[-2], events[-1]]
+        events[1]["delta"].update(stop_reason="refusal", stop_details=stop_details)
     return "".join(f"event: {e['type']}\ndata: {json.dumps(e)}\n\n" for e in events)
 
 
@@ -602,7 +605,7 @@ def bound_sdk_wire(monkeypatch, isolated):
     import openai
 
     requests, clients = [], []
-    state = SimpleNamespace(error=None, requests=requests)
+    state = SimpleNamespace(error=None, requests=requests, refusal=False, stop_details=None)
 
     def reply(request):
         requests.append(request)
@@ -614,7 +617,8 @@ def bound_sdk_wire(monkeypatch, isolated):
         if "responses" in request.url.path:
             return httpx2.Response(200, json=response_json(body["model"]))
         if body.get("stream"):
-            return httpx2.Response(200, text=anthropic_sse(body["model"]),
+            return httpx2.Response(200, text=anthropic_sse(
+                body["model"], refusal=state.refusal, stop_details=state.stop_details),
                                    headers={"content-type": "text/event-stream"})
         return httpx2.Response(200, json={"id": "msg_fixture", "type": "message", "role": "assistant",
             "model": body["model"], "content": [{"type": "text", "text": "OK"}],
@@ -828,6 +832,102 @@ def test_runtime_error_redacts_exact_key_before_length_bound(isolated):
     with activate_runtime_auth(capture_runtime_auth("openai")):
         detail = sanitize_research_detail("x " * 246 + "fixture-selected-alpha" + " tail" * 100)
     assert detail == "x " * 246 + "[REDACTE"
+
+
+@pytest.mark.parametrize("boundary", [
+    "native", "native_unbound", "legacy", "managed", "legacy_adapter", "managed_adapter",
+])
+@pytest.mark.parametrize("details,expected", [
+    pytest.param({"type": "refusal", "category": "fixture-selected-alpha", "explanation": "Policy declined"},
+                 {"type": "refusal", "category": "[REDACTED]", "explanation": "Policy declined"}, id="category-key"),
+    pytest.param({"type": "refusal", "category": "safety", "explanation": "Echo fixture-selected-alpha"},
+                 {"type": "refusal", "category": "safety", "explanation": "Echo [REDACTED]"}, id="explanation-only-key"),
+    pytest.param({"type": "fixture-selected-alpha", "category": "safety"},
+                 {"type": "[REDACTED]", "category": "safety"}, id="type-key"),
+    pytest.param({"type": "refusal", "category": "safety", "explanation": "Policy declined"},
+                 {"type": "refusal", "category": "safety", "explanation": "Policy declined"}, id="benign"),
+    pytest.param({"category": "safety", "unknown": "fixture-selected-alpha",
+                  "explanation": {"nested": "fixture-selected-alpha"}, "type": ["fixture-selected-alpha"]},
+                 {"category": "safety"}, id="closed-shape"),
+    pytest.param(None, {}, id="null"),
+    pytest.param("fixture-selected-alpha", {}, id="malformed"),
+    pytest.param({"category": 42, "explanation": False}, {}, id="malformed-fields"),
+    pytest.param({"category": "safety", "explanation": "x " * 246 + "fixture-selected-alpha" + " tail" * 200},
+                 {"category": "safety", "explanation": "x " * 246 + "[REDACTE"}, id="redact-before-bound"),
+])
+def test_refusal_details_are_private_closed_and_replayable(
+    isolated, monkeypatch, bound_sdk_wire, caplog, boundary, details, expected,
+):
+    from src.agents.anthropic_agent import agent as aa
+    from src.agents.shared.events import AgentEvent, EventType
+    from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth
+
+    secret = "fixture-selected-alpha"
+    model = "claude-fable-5-1"
+    add_key(isolated.credentials, "anthropic", secret)
+    binding = capture_runtime_auth("anthropic")
+    bound_sdk_wire.refusal = True
+    bound_sdk_wire.stop_details = details
+    scheduled, adapter_calls = {}, []
+    monkeypatch.setattr(research, "schedule_research_run", lambda **kw: scheduled.update(kw))
+
+    async def raw_adapter(**kwargs):
+        adapter_calls.append(kwargs)
+        yield AgentEvent(EventType.error, {
+            "error": "Model declined", "code": "model_refusal", "stop_details": details,
+        })
+
+    if boundary.endswith("adapter"):
+        monkeypatch.setattr(query, "_research_provider_stream", raw_adapter)
+
+    async def drive():
+        if boundary.startswith("native"):
+            if boundary == "native":
+                add_key(isolated.credentials, "anthropic", "fixture-replacement-bravo")
+            with activate_runtime_auth(binding) if boundary == "native" else nullcontext():
+                events = [event async for event in aa.run_query_stream("q", model=model, effort="high", dal=object())]
+            assert events[-1].type == EventType.error
+            assert not any(event.type == EventType.done for event in events)
+            return events[-1].data, "".join(event.to_sse() for event in events)
+        if boundary.startswith("legacy"):
+            response = await query.query_agent_stream(query.QueryRequest(
+                question="q", provider="anthropic", model=model, effort="high", thread_id="refusal-private",
+            ), dal=object(), store=isolated.threads)
+            add_key(isolated.credentials, "anthropic", "fixture-replacement-bravo")
+            public = "".join([chunk async for chunk in response.body_iterator])
+            events = [json.loads(line[6:]) for line in public.splitlines() if line.startswith("data: ")]
+            assert events[-1]["type"] == "error"
+            assert not any(event["type"] == "done" for event in events)
+            return events[-1]["data"], public
+        await research.create_research_run(research.ResearchRunCreate(
+            question="q", provider="anthropic", model=model, effort="high",
+        ), dal=object(), thread_store=isolated.threads, run_store=isolated.runs)
+        add_key(isolated.credentials, "anthropic", "fixture-replacement-bravo")
+        await execute_research_run(**scheduled)
+        # Reopen the real SQLite store, then exercise the public replay route.
+        reopened = ResearchRunStore(isolated.path / "profile.db")
+        replay = research.list_research_run_events(scheduled["run_id"], after=0, run_store=reopened)
+        assert replay["run"]["status"] == "failed"
+        assert replay["run"]["error_code"] == "model_refusal"
+        assert replay["events"][-1]["type"] == "error"
+        assert not any(event["type"] == "done" for event in replay["events"])
+        return replay["events"][-1]["data"], json.dumps(replay)
+
+    data, public = asyncio.run(drive())
+    assert data["code"] == "model_refusal"
+    assert data["stop_details"] == expected
+    assert secret not in public + caplog.text
+    assert not any(record.exc_info for record in caplog.records if record.name.startswith("src."))
+    with isolated.runs._connect() as conn:
+        persisted = "\n".join(line for line in conn.iterdump() if 'INSERT INTO "research_' in line)
+    assert secret not in persisted
+    if boundary.endswith("adapter"):
+        assert len(adapter_calls) == 1
+        assert bound_sdk_wire.requests == []
+    else:
+        assert len(bound_sdk_wire.requests) == 1
+        assert bound_sdk_wire.requests[0].headers["x-api-key"] == secret
+        assert json.loads(bound_sdk_wire.requests[0].content)["model"] == model
 
 
 @pytest.mark.parametrize("provider,model", [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")])

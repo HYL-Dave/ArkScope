@@ -13,6 +13,7 @@ import time
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 from src.agents.shared.events import AgentEvent
+from src.anthropic_refusal import safe_refusal_details
 from src.auth_drivers.runtime_binding import (
     RuntimeAuthBinding, RuntimeAuthUnavailable, activate_runtime_auth,
 )
@@ -48,6 +49,7 @@ def _typed_error_event_data(
     failure: ResearchFailure,
     *,
     personalization: Optional[dict] = None,
+    binding: RuntimeAuthBinding | None = None,
 ) -> dict:
     out = {
         key: data[key]
@@ -56,10 +58,11 @@ def _typed_error_event_data(
             "model",
             "token_usage",
             "tools_used",
-            "stop_details",
         )
         if key in data
     }
+    if "stop_details" in data:
+        out["stop_details"] = safe_refusal_details(data["stop_details"], binding=binding)
     out["error"] = failure.detail
     out["code"] = failure.code
     if personalization is not None:
@@ -148,6 +151,7 @@ async def execute_research_run(
                             data,
                             failure,
                             personalization=personalization,
+                            binding=auth_binding,
                         ),
                     )
                     break
@@ -162,6 +166,7 @@ async def execute_research_run(
                     failure = classify_research_failure(
                         raw_detail,
                         explicit_code=data.get("code"),
+                        binding=auth_binding,
                     )
                     terminal_token_usage = data.get("token_usage")
                     run_store.append_event(
@@ -171,6 +176,7 @@ async def execute_research_run(
                             data,
                             failure,
                             personalization=personalization,
+                            binding=auth_binding,
                         ),
                     )
                     break
