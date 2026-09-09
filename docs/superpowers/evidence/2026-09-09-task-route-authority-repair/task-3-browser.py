@@ -267,7 +267,32 @@ def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
 
     page.route("**/*", route)
 
-    def shot(name):
+    def shot(name, answer=None):
+        answer_visibility = None
+        if answer:
+            expect(page.locator(".research-run-progress")).to_have_attribute("data-stage", "succeeded")
+            bubble = page.locator(".research-bubble.assistant").filter(has=page.get_by_text("Synthetic completed answer: " + answer, exact=True))
+            expect(bubble).to_have_count(1)
+            before_scroll = page.locator(".research-messages").evaluate("e => e.scrollTop")
+            bubble.evaluate("e => e.scrollIntoView({block: 'start'})")
+            page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+            answer_visibility = bubble.evaluate("""e => {
+              const panel = e.closest('.research-messages'), viewport = panel.getBoundingClientRect();
+              const bounds = selector => {
+                const box = e.querySelector(selector).getBoundingClientRect();
+                return {top: box.top, bottom: box.bottom, left: box.left, right: box.right};
+              };
+              return {scrollTop: panel.scrollTop, viewport: {top: Math.max(0, viewport.top),
+                bottom: Math.min(innerHeight, viewport.bottom), left: Math.max(0, viewport.left),
+                right: Math.min(innerWidth, viewport.right)}, meta: bounds('.research-bubble-meta'),
+                body: bounds('.research-bubble-body')};
+            }""")
+            answer_visibility["before_scroll"] = before_scroll
+            viewport = answer_visibility["viewport"]
+            for part in ["meta", "body"]:
+                box = answer_visibility[part]
+                assert box["top"] >= viewport["top"] - 1 and box["bottom"] <= viewport["bottom"] + 1, (name, answer_visibility)
+                assert box["left"] >= viewport["left"] - 1 and box["right"] <= viewport["right"] + 1, (name, answer_visibility)
         if cold_case:
             name = f"cold-{cold_case}-{name}"
         if shell_provider:
@@ -292,7 +317,7 @@ def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
             provider_text = page.locator(".research-providerbar").inner_text()
             assert not any(model in provider_text for model in OPENAI + ANTHROPIC), provider_text
             assert page.locator(".research-bubble-meta").evaluate_all("rows => rows.every(e=> !/-\\d+(\\.\\d+)?s/.test(e.textContent))")
-        layouts.append(dict(view=name, overflow=overflow, narrow_prose=narrow_prose))
+        layouts.append(dict(view=name, overflow=overflow, narrow_prose=narrow_prose, answer_visibility=answer_visibility))
         print(f"{locale}-{width}: {name}", flush=True)
 
     def nav(name):
@@ -376,6 +401,9 @@ def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
                     "threadLoadFailed": ("The requested Research conversation could not be loaded. Try again later.", "\u66ab\u6642\u7121\u6cd5\u8f09\u5165\u6307\u5b9a\u7684\u7814\u7a76\u5c0d\u8a71\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002"),
                 }
                 expect(page.locator(".research-convo > .error-text")).to_have_text(labels[error_key][locale != "en"])
+                expect(page.locator(".research-conversation-title")).to_have_text(
+                    "Historical conversation" if failure == "failed-messages" else
+                    "Could not load Research history" if locale == "en" else "\u7121\u6cd5\u8f09\u5165\u7814\u7a76\u6b77\u53f2")
                 captions(next_provider)
                 shot("blocked")
                 failure = None
@@ -387,6 +415,8 @@ def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
                     expect(model).to_have_value(next_model)
                     expect(effort).to_have_value("" if cold_case == "incomplete" else "low")
                     expect(page.locator("textarea")).to_have_value(draft)
+                    expect(page.locator(".research-conversation-title")).to_have_text(
+                        "Loading Research history" if locale == "en" else "\u8f09\u5165\u7814\u7a76\u6b77\u53f2")
                     expect(submit).to_be_disabled()
                     assert not runs()
                     captions(None if cold_case == "incomplete" else next_provider)
@@ -431,7 +461,7 @@ def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
             assert {key: runs()[0][key] for key in ("thread_id", "question", "provider", "model", "effort")} == dict(
                 thread_id=expected_id, question=draft, provider=next_provider, model=next_model, effort=next_effort,
             )
-            shot("completed-exact-context")
+            shot("completed-exact-context", draft)
             if cold_case == "new":
                 round_trip("Settings")
                 expect(page.get_by_text("Synthetic completed answer: " + draft, exact=True)).to_be_visible()
@@ -439,7 +469,7 @@ def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
                 send("After new accepted ID")
                 assert len(runs()) == 2 and runs()[1]["thread_id"] == expected_id
                 assert (runs()[1]["provider"], runs()[1]["model"], runs()[1]["effort"]) == (next_provider, next_model, next_effort)
-                shot("new-first-id-retained")
+                shot("new-first-id-retained", "After new accepted ID")
             assert not cold_pending and not errors, (cold_pending, errors)
             context.close()
             return dict(locale=locale, width=width, shell_provider=shell_provider, cold_case=cold_case,
