@@ -963,7 +963,11 @@ export function ResearchView({
             <h2 className="research-conversation-title">
               {currentThread?.title?.trim()
                 ? currentThread.title
-                : researchT(($) => $.workspace.newConversation)}
+                : restorationPending
+                  ? threadError
+                    ? researchT(($) => $.history.loadFailedTitle)
+                    : researchT(($) => $.history.loadingAria)
+                  : researchT(($) => $.workspace.newConversation)}
             </h2>
             {currentThread?.archived_at ? (
               <span className="warn-text tiny">

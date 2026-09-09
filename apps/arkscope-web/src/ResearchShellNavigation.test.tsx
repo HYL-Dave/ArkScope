@@ -588,7 +588,7 @@ describe("Research shell navigation", () => {
     window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "transient-thread");
     await mountResearch();
 
-    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("新對話");
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("無法載入研究歷史");
     expect(host!.textContent).toContain("暫時無法載入指定的研究對話");
     expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("transient-thread");
 
@@ -608,7 +608,7 @@ describe("Research shell navigation", () => {
     window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "missing-thread");
     await mountResearch();
 
-    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("新對話");
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("無法載入研究歷史");
     expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("missing-thread");
     await click(Array.from(host!.querySelectorAll("button")).find(candidate => candidate.textContent?.trim() === "歷史")!);
     await click(historyThreadButton("Thread A"));

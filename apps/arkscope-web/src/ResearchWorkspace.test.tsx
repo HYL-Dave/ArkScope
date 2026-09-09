@@ -546,6 +546,7 @@ describe("Research workspace contracts", () => {
     });
     window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
     await mountShell();
+    expect.soft(document.querySelector(".research-conversation-title")?.textContent).toBe("Loading Research history");
     await setTextarea("Keep this draft and context");
     if (edit !== "none") {
       await click(buttonContaining(label)!);
@@ -607,6 +608,9 @@ describe("Research workspace contracts", () => {
     await setSelect(select("Model")!, "gpt-5.6-sol");
     await setSelect(select("effort")!, "low");
     expect.soft(document.querySelector(".research > .research-workspace .error-text, .research .error-text")?.textContent).toBeTruthy();
+    expect.soft(document.querySelector(".research-conversation-title")?.textContent).toBe(
+      failure === "messages" ? "Saved context" : "Could not load Research history",
+    );
     expect.soft(button("Send")?.disabled).toBe(true);
     expect.soft(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("same");
     expect(runBodies(fetchMock)).toEqual([]);
