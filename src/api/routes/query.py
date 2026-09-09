@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.personalization import resolve_personalization as _resolve_personalization
+from src.anthropic_refusal import safe_refusal_details
 from src.auth_drivers.runtime_binding import (
     activate_runtime_auth, capture_runtime_auth, current_runtime_auth, sanitize_runtime_error,
 )
@@ -564,6 +565,10 @@ async def query_agent_stream(
                             if key in ("error", "message", "detail") else value
                             for key, value in event.data.items()
                         }
+                        if "stop_details" in event.data:
+                            event.data["stop_details"] = safe_refusal_details(
+                                event.data["stop_details"], binding=auth_binding,
+                            )
                     if etype == "done":
                         # SSE and persistence carry the same injected trace.
                         event.data["personalization"] = dict(personalization)
