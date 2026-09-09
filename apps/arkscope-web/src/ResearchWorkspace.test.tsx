@@ -18,11 +18,16 @@ import type {
 } from "./api";
 import { ApiError } from "./api";
 import { ResearchView } from "./Research";
+import { App } from "./App";
 import { RESEARCH_SELECTION_STORAGE_KEY } from "./researchSelection";
 import type { NavigationTarget } from "./shell/navigation";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
+
+// Keep the real shell and Research lifecycle; unrelated page data is out of scope.
+vi.mock("./Home", () => ({ HomeView: () => <main>Home fixture</main> }));
+vi.mock("./Settings", () => ({ SettingsView: () => <main>Settings fixture</main> }));
 
 const route = (
   task: ModelTask,
@@ -252,6 +257,10 @@ function stubFetch(options: FetchOptions = {}) {
       : input instanceof URL ? input.href : input.url;
     const url = new URL(raw);
     const method = init?.method ?? "GET";
+    if (url.pathname === "/status") return json({
+      status: "ok", timestamp: "2026-09-09T00:00:00Z", tools_registered: 0,
+      tool_categories: {}, data_sources: {},
+    });
     if (url.pathname === "/config/runtime") return json(RUNTIME);
     if (url.pathname === "/query/providers") {
       return json({
@@ -299,6 +308,9 @@ function stubFetch(options: FetchOptions = {}) {
         effort: String(body.effort),
       });
       created.set(createdRun.id, createdRun);
+      if (!threads.some(item => item.id === createdRun.thread_id)) {
+        threads.push(thread(createdRun.thread_id, "Created conversation"));
+      }
       return json({ run: createdRun });
     }
     const events = url.pathname.match(/^\/research\/runs\/([^/]+)\/events$/);
@@ -479,6 +491,195 @@ afterEach(async () => {
 });
 
 describe("Research workspace contracts", () => {
+  async function shellNavigate(name: string) {
+    const nav = Array.from(document.querySelectorAll(".app-shell-nav-item"))
+      .find(item => item.textContent?.trim() === (name === "Research" ? "AI Research" : name));
+    expect(nav).toBeDefined();
+    await click(nav!);
+  }
+
+  async function mountShell() {
+    await i18n.changeLanguage("en");
+    stubMatchMedia(false);
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(<React.StrictMode><App /></React.StrictMode>));
+    await flush();
+    await shellNavigate("Research");
+  }
+
+  const settingsDefaults = [
+    { provider: "openai" as const, model: "gpt-5.6-luna", effort: "xhigh" },
+    { provider: "anthropic" as const, model: "claude-sonnet-5", effort: "medium" },
+  ];
+
+  it.each(settingsDefaults)("binds edits to the restoring conversation with $provider Settings until hydration completes", async tuple => {
+    const cat = catalog();
+    cat.routes.ai_research = { ...route("ai_research"), ...tuple };
+    const rows = [thread("same", "Same conversation")];
+    const delayed = deferred<void>();
+    const fetchMock = stubFetch({ catalog: cat, threads: rows });
+    let restoring = false;
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      if (restoring && new URL(String(input)).pathname === "/research/threads") {
+        return delayed.promise.then(() => json({ threads: rows, total: 1, limit: 50, offset: 0 }));
+      }
+      return fetchMock(input, init);
+    });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    await click(buttonContaining("OpenAI")!);
+    await setSelect(select("Model")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+    await shellNavigate("Home");
+    restoring = true;
+    await shellNavigate("Research");
+    await setSelect(select("effort")!, "high");
+    await setTextarea("Wait for the same conversation");
+    expect(button("Send")?.disabled).toBe(true);
+    await click(button("Send")!);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    delayed.resolve();
+    await flush();
+    expect(document.querySelector(".research-conversation-title")?.textContent).toBe("Same conversation");
+    expect(select("Model")?.value).toBe("gpt-5.6-sol");
+    expect(select("effort")?.value).toBe("high");
+    expect(button("Send")?.disabled).toBe(false);
+    await click(button("Send")!);
+    const create = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({
+      thread_id: "same", provider: "openai", model: "gpt-5.6-sol", effort: "high",
+    });
+  });
+
+  it.each(settingsDefaults.flatMap(tuple => ["Home", "Settings"].flatMap(page =>
+    [false, true].map(fresh => ({ ...tuple, page, fresh })),
+  )))("retains current override across actual $page unmount with $provider Settings (fresh=$fresh)", async ({ page, fresh, ...tuple }) => {
+    const cat = catalog();
+    cat.routes.ai_research = { ...route("ai_research"), ...tuple };
+    const fetchMock = stubFetch({ catalog: cat, threads: [thread("same", "Same conversation")] });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    window.localStorage.setItem(RESEARCH_SELECTION_STORAGE_KEY, JSON.stringify({
+      version: 1, tuple: { provider: "openai", model: "gpt-5.6-luna", effort: "max" },
+    }));
+    await mountShell();
+    if (fresh) await click(button("New Research")!);
+    expect(select("Model")?.value).toBe(tuple.model);
+    expect(select("effort")?.value).toBe(tuple.effort);
+    await click(buttonContaining("OpenAI")!);
+    await setSelect(select("Model")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+
+    async function roundTrip() {
+      const oldComposer = document.querySelector("textarea")!;
+      await shellNavigate(page);
+      expect(document.querySelector("textarea")).toBeNull();
+      expect(oldComposer.isConnected).toBe(false);
+      await shellNavigate("Research");
+      expect(document.querySelector("textarea")).not.toBe(oldComposer);
+      expect(select("Model")?.value).toBe("gpt-5.6-sol");
+      expect(select("effort")?.value).toBe("low");
+    }
+
+    await roundTrip();
+    await setTextarea("First retained turn");
+    await click(button("Send")!);
+    await roundTrip();
+    await setTextarea("Second retained turn");
+    await click(button("Send")!);
+    const bodies = fetchMock.mock.calls.filter(([input, init]) =>
+      new URL(String(input)).pathname === "/research/runs" && init?.method === "POST",
+    ).map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).toMatchObject({ provider: "openai", model: "gpt-5.6-sol", effort: "low" });
+    expect(bodies[0].thread_id).toBeTruthy();
+    if (fresh) expect(bodies[0].thread_id).not.toBe("same");
+    else expect(bodies[0].thread_id).toBe("same");
+    expect(bodies[1]).toMatchObject({
+      thread_id: bodies[0].thread_id, provider: "openai", model: "gpt-5.6-sol", effort: "low",
+    });
+    expect(fetchMock.mock.calls.some(([input]) => new URL(String(input)).pathname.endsWith("/selection"))).toBe(false);
+  });
+
+  it.each(settingsDefaults.flatMap(tuple => ["Home", "Settings"].flatMap(page =>
+    [false, true].map(fresh => ({ ...tuple, page, fresh })),
+  )))("keeps custom model awaiting effort blocked across $page with $provider Settings (fresh=$fresh)", async ({ page, fresh, ...tuple }) => {
+    const cat = catalog();
+    cat.routes.ai_research = { ...route("ai_research"), ...tuple };
+    cat.effective!.tasks.ai_research!.providers!.openai!.models.push({
+      id: "gpt-7-custom", label: "Custom research model", status: "visible",
+      visible_to_credential: true, eligible: true, reason_code: null,
+      effort_options: ["low", "high"], thinking_mode: "none",
+    });
+    const fetchMock = stubFetch({ catalog: cat, threads: [thread("same", "Same conversation")] });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    if (fresh) await click(button("New Research")!);
+    await click(buttonContaining("OpenAI")!);
+    await setSelect(select("Model")!, "gpt-7-custom");
+    await setTextarea("Still requires effort");
+    expect(button("Send")?.disabled).toBe(true);
+    const oldComposer = document.querySelector("textarea")!;
+    await shellNavigate(page);
+    expect(oldComposer.isConnected).toBe(false);
+    await shellNavigate("Research");
+    expect(select("Model")?.value).toBe("gpt-7-custom");
+    expect(select("effort")?.value).toBe("");
+    expect(select("effort")?.getAttribute("aria-invalid")).toBe("true");
+    await setTextarea("Cannot submit until effort is deliberate");
+    expect(button("Send")?.disabled).toBe(true);
+    await click(button("Send")!);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    await setSelect(select("effort")!, "high");
+    expect(button("Send")?.disabled).toBe(false);
+    await click(button("Send")!);
+    const create = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({
+      provider: "openai", model: "gpt-7-custom", effort: "high",
+    });
+  });
+
+  it.each(settingsDefaults.flatMap(tuple => ["new", "other", "delete-current", "delete-other"].flatMap(action =>
+    [false, true].map(incomplete => ({ ...tuple, action, incomplete })),
+  )))("keeps only the current conversation override after $action with $provider Settings (incomplete=$incomplete)", async ({ action, incomplete, ...tuple }) => {
+    const cat = catalog();
+    cat.routes.ai_research = { ...route("ai_research"), ...tuple };
+    vi.stubGlobal("fetch", stubFetch({ catalog: cat, threads: [
+      thread("same", "Same conversation"), thread("other", "Other conversation"),
+    ] }));
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    await click(buttonContaining("OpenAI")!);
+    await setSelect(select("Model")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+    if (incomplete) await setSelect(select("Model")!, "gpt-5.6-sol");
+    if (action === "new") await click(button("New Research")!);
+    else {
+      await click(button("History")!);
+      if (action === "other") {
+        await click(button("Open conversation Other conversation")!);
+        await click(button("History")!);
+        await click(button("Open conversation Same conversation")!);
+      } else {
+        await click(button(action === "delete-current" ? "Permanently delete Same conversation" : "Permanently delete Other conversation")!);
+        await click(button("Permanently delete")!);
+      }
+    }
+    await shellNavigate("Home");
+    expect(document.querySelector("textarea")).toBeNull();
+    await shellNavigate("Research");
+    const retained = action === "delete-other";
+    expect(select("Model")?.value).toBe(retained ? "gpt-5.6-sol" : tuple.model);
+    expect(select("effort")?.value).toBe(retained ? (incomplete ? "" : "low") : tuple.effort);
+    if (action === "new" || action === "delete-current") {
+      expect(document.querySelector(".research-conversation-title")?.textContent).toBe("New conversation");
+    }
+    expect(window.localStorage.getItem(RESEARCH_SELECTION_STORAGE_KEY)).toBeNull();
+  });
+
   it.each(["en", "zh-Hant"])("keeps %s provider/auth toggles independent of stale provider models and the selected route", async locale => {
     await i18n.changeLanguage(locale);
     const cat = catalog("chatgpt_oauth");

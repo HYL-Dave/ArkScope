@@ -7,7 +7,7 @@ import { HoldingsView } from "./Holdings";
 import { HomeView } from "./Home";
 import { SettingsView } from "./Settings";
 import { NewsView } from "./News";
-import { ResearchView } from "./Research";
+import { ResearchView, type ResearchConversationSelection } from "./Research";
 import { TickerDetailView } from "./TickerDetail";
 import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
@@ -51,6 +51,8 @@ export function App() {
   const [detail, setDetail] = useState<{ ticker: string } | null>(null);
   const navigationSequenceRef = useRef(0);
   const [researchNavigation, setResearchNavigation] = useState<ResearchNavigationRequest | null>(null);
+  // One transient conversation, including unfinished picker edits, survives page unmounts.
+  const researchConversationSelectionRef = useRef<ResearchConversationSelection | null>(null);
   const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationRequest | null>(null);
   const [universeNavigation, setUniverseNavigation] = useState<UniverseNavigationRequest | null>(null);
   const researchWork = useResearchWorkRegistry();
@@ -159,6 +161,7 @@ export function App() {
     />
   ) : view === "Research" ? (
     <ResearchView
+      conversationSelectionRef={researchConversationSelectionRef}
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
       navigationRequest={researchNavigation}
       onNavigationConsumed={(sequence) => {

@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[4]
 OWN = Path(__file__).resolve().parent
-OUT = ROOT / "tmp/task-3-ui"
+OUT = ROOT / os.environ.get("ARKSCOPE_UI_EVIDENCE_DIR", "tmp/task-3-ui")
 BASE = "http://127.0.0.1:8467"
 NODE = "/home/hyl/.nvm/versions/node/v22.14.0/bin/node"
 DATE = "2026-09-09T00:00:00Z"
@@ -103,15 +103,22 @@ HTML = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport"
 <script type="module" src="/@fs/ENTRY"></script></body></html>""".replace("ENTRY", str(OWN / "task-3-preview.tsx"))
 
 
-def verify(browser, locale, width, height):
+def verify(browser, locale, width, height, shell_provider=None):
     context = browser.new_context(viewport=dict(width=width, height=height), service_workers="block")
     context.add_init_script("window.arkscope={apiBase:" + json.dumps(BASE + "/__mock") + "}; window.requestIdleCallback=()=>1; window.cancelIdleCallback=()=>{}; "
                             "sessionStorage.setItem('arkscope.aiResearch.activeThreadId','history-a');"
+                            "localStorage.setItem('arkscope.settings.activeGroup.v1','models');"
                             "localStorage.setItem('arkscope.aiResearch.explicitSelection.v1', JSON.stringify({version:1,tuple:{provider:'openai',model:'gpt-5.6-luna',effort:'max'}}));")
     page = context.new_page()
     page.set_default_timeout(8000)
     errors, requests, screenshots, layouts, pending = [], [], [], [], []
-    state = dict(catalog=catalog(), translation="cached", detail="receipt", runs={})
+    state = dict(catalog=catalog(), translation="cached", detail="receipt", runs={}, threads=copy.deepcopy(THREADS))
+    if shell_provider:
+        state["catalog"]["routes"]["ai_research"].update(
+            provider=shell_provider,
+            model="gpt-5.6-luna" if shell_provider == "openai" else "claude-sonnet-5",
+            effort="xhigh" if shell_provider == "openai" else "medium",
+        )
     page.on("pageerror", lambda error: errors.append(str(error)))
 
     def route(request):
@@ -134,7 +141,21 @@ def verify(browser, locale, width, height):
         body = request.request.post_data_json if request.request.post_data else None
         requests.append(dict(path=path, method=method, body=body))
         status = 200
-        if path == "/config/model-catalog":
+        if path == "/status":
+            value = dict(status="ok", timestamp=DATE, tools_registered=0, tool_categories={}, data_sources={})
+        elif path == "/config/runtime":
+            value = dict(
+                anthropic=dict(model="claude-sonnet-5", model_advanced="claude-fable-5-1", effort=None, thinking=False, key_set=True, credentials=[]),
+                openai=dict(model="gpt-5.6-luna", model_advanced="gpt-5.6-sol", reasoning_effort="xhigh", key_set=True, credentials=[]),
+                **{task: row for task, row in state["catalog"]["routes"].items()},
+                research_runtime=dict(max_tool_calls=60, session_timeout_s=900, per_tool_timeout_s=45, source="db", db_saved=True, warning=None),
+                data_keys={},
+            )
+        elif path == "/profile/universe":
+            value = dict(rows=[], as_of=DATE)
+        elif path == "/profile/lists":
+            value = dict(lists=[])
+        elif path == "/config/model-catalog":
             value = state["catalog"]
         elif path == "/config/model-routes" and method == "PUT":
             assert set(body["routes"]) == {"ai_research"}, body
@@ -173,14 +194,14 @@ def verify(browser, locale, width, height):
             elif state["translation"] == "no_op":
                 value.update(card=dict(ticker="AAPL"), cached=False, no_op=True, execution_receipt=None)
         elif path == "/research/threads":
-            value = dict(threads=THREADS, total=2, limit=50, offset=0)
+            value = dict(threads=state["threads"], total=len(state["threads"]), limit=50, offset=0)
         elif path.endswith("/messages") and path.startswith("/research/threads/"):
             value = dict(thread_id=path.split("/")[3], messages=[MESSAGE])
         elif path.startswith("/research/threads/") and path.endswith("/selection"):
             errors.append("historical selection used as authority")
             value = dict(provider="openai", model="gpt-5.4-mini", effort="default")
         elif path.startswith("/research/threads/"):
-            value = dict(thread=next(row for row in THREADS if row["id"] == path.split("/")[3]))
+            value = dict(thread=next(row for row in state["threads"] if row["id"] == path.split("/")[3]))
         elif path == "/research/runs" and method == "POST":
             run_id = "synthetic-run-" + str(len(state["runs"]) + 1)
             completed_at = datetime.now(timezone.utc).isoformat()
@@ -189,6 +210,8 @@ def verify(browser, locale, width, height):
                        credential_id="fixture-run-identity", started_at=completed_at, completed_at=completed_at,
                        created_at=completed_at, updated_at=completed_at, error=None, token_usage=None)
             state["runs"][run_id] = run
+            if not any(row["id"] == run["thread_id"] for row in state["threads"]):
+                state["threads"].append(dict(THREADS[0], id=run["thread_id"], title="Created conversation"))
             value = dict(run=run)
         elif path.startswith("/research/runs/"):
             run = state["runs"][path.split("/")[3]]
@@ -217,6 +240,9 @@ def verify(browser, locale, width, height):
     page.route("**/*", route)
 
     def shot(name):
+        if shell_provider:
+            name = f"shell-{shell_provider}-{name}"
+            assert page.locator(".app-shell-layout").evaluate("e => getComputedStyle(e).display") == "grid"
         path = OUT / f"{locale}-{width}-{name}.png"
         page.screenshot(path=str(path), full_page=True)
         screenshots.append(str(path))
@@ -244,6 +270,91 @@ def verify(browser, locale, width, height):
 
     def translations():
         return [row for row in requests if row["path"].endswith("/translate")]
+
+    if shell_provider:
+        def shell_nav(name):
+            if not page.locator(".app-shell-nav-item:visible").count():
+                page.get_by_role("button", name="Open navigation" if locale == "en" else "\u958b\u555f\u5c0e\u89bd", exact=True).click()
+            labels = {"Home": "\u5de5\u4f5c\u53f0", "Settings": "\u8a2d\u5b9a", "Research": "AI \u7814\u7a76"}
+            label = ("AI Research" if name == "Research" else name) if locale == "en" else labels[name]
+            page.locator(".app-shell-nav-item:visible").filter(has_text=label).click()
+
+        def round_trip(destination):
+            old = page.locator("textarea").element_handle()
+            shell_nav(destination)
+            expect(page.locator("textarea")).to_have_count(0)
+            assert old.evaluate("e => !e.isConnected")
+            shell_nav("Research")
+
+        def send(question):
+            page.locator("textarea").fill(question)
+            page.get_by_role("button", name="Send" if locale == "en" else "\u9001\u51fa", exact=True).click()
+            expect(page.get_by_text("Synthetic completed answer: " + question, exact=True)).to_be_visible()
+
+        page.goto(BASE + "/__task3?view=shell&locale=" + locale)
+        shell_nav("Research")
+        model = page.locator(".research-pickerbar select").nth(0)
+        effort = page.locator(".research-pickerbar select").nth(1)
+        default = state["catalog"]["routes"]["ai_research"]
+        expect(model).to_have_value(default["model"])
+        expect(effort).to_have_value(default["effort"])
+        shot("settings-default")
+        page.locator(".research-providerbar button").filter(has_text="OpenAI").click()
+        model.select_option("gpt-5.6-sol")
+        for destination in ["Home", "Settings"]:
+            round_trip(destination)
+            expect(model).to_have_value("gpt-5.6-sol")
+            expect(effort).to_have_value("")
+            page.locator("textarea").fill("Effort still required")
+            expect(page.get_by_role("button", name="Send" if locale == "en" else "\u9001\u51fa", exact=True)).to_be_disabled()
+            assert not [row for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]
+            shot("incomplete-after-" + destination.lower())
+        effort.select_option("low")
+        round_trip("Home")
+        expect(model).to_have_value("gpt-5.6-sol")
+        expect(effort).to_have_value("low")
+        send("Retained existing conversation")
+        shot("complete-after-home")
+        round_trip("Settings")
+        expect(model).to_have_value("gpt-5.6-sol")
+        expect(effort).to_have_value("low")
+        send("Retained second existing turn")
+        shot("complete-after-settings")
+
+        page.get_by_role("button", name="New Research" if locale == "en" else "\u65b0\u7814\u7a76", exact=True).click()
+        expect(model).to_have_value(default["model"])
+        expect(effort).to_have_value(default["effort"])
+        shot("new-reset")
+        page.locator(".research-providerbar button").filter(has_text="OpenAI").click()
+        model.select_option("gpt-5.6-sol")
+        round_trip("Home")
+        expect(page.locator(".research-conversation-title")).to_have_text("New conversation" if locale == "en" else "\u65b0\u5c0d\u8a71")
+        expect(effort).to_have_value("")
+        shot("new-incomplete-after-home")
+        effort.select_option("high")
+        send("First assigned conversation")
+        round_trip("Settings")
+        expect(model).to_have_value("gpt-5.6-sol")
+        expect(effort).to_have_value("high")
+        send("After first ID assignment")
+        shot("first-id-retained")
+        runs = [row["body"] for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]
+        assert len(runs) == 4, runs
+        assert runs[0]["thread_id"] == runs[1]["thread_id"] == "history-a"
+        assert runs[2]["thread_id"] == runs[3]["thread_id"] != "history-a"
+        assert [(row["provider"], row["model"], row["effort"]) for row in runs] == [
+            ("openai", "gpt-5.6-sol", "low"), ("openai", "gpt-5.6-sol", "low"),
+            ("openai", "gpt-5.6-sol", "high"), ("openai", "gpt-5.6-sol", "high"),
+        ]
+        page.get_by_role("button", name="History" if locale == "en" else "\u6b77\u53f2", exact=True).click()
+        page.locator(".research-history-select").filter(has_text="Another conversation").click()
+        expect(model).to_have_value(default["model"])
+        expect(effort).to_have_value(default["effort"])
+        shot("other-reset")
+        assert not errors, errors
+        context.close()
+        return dict(locale=locale, width=width, shell_provider=shell_provider, screenshots=screenshots,
+                    layouts=layouts, requests=requests, errors=errors)
 
     page.goto(BASE + "/__task3?locale=" + locale)
     expect(page.locator(".aicard-recent li")).to_have_count(1)
@@ -406,7 +517,9 @@ def main():
             with sync_playwright() as pw:
                 browser = pw.chromium.launch(args=["--disable-extensions"])
                 try:
-                    results = [verify(browser, locale, width, height) for locale in ["en", "zh-Hant"] for width, height in [(1280, 960), (390, 844)]]
+                    providers = ["openai", "anthropic"] if os.environ.get("ARKSCOPE_SHELL_NAVIGATION_ONLY") == "1" else [None]
+                    results = [verify(browser, locale, width, height, provider) for provider in providers
+                               for locale in ["en", "zh-Hant"] for width, height in [(1280, 960), (390, 844)]]
                     (OUT / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
                     print(json.dumps(dict(status="passed", contexts=len(results), screenshots=sum(len(row["screenshots"]) for row in results), output=str(OUT))))
                 except Exception:
