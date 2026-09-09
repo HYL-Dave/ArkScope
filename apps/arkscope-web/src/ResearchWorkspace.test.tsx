@@ -514,6 +514,88 @@ describe("Research workspace contracts", () => {
     { provider: "anthropic" as const, model: "claude-sonnet-5", effort: "medium" },
   ];
 
+  it.each([
+    {
+      from: "openai" as const, to: "anthropic" as const,
+      oldModel: "gpt-5.6-luna", model: "claude-sonnet-5", label: "Anthropic",
+      oldAuth: "ChatGPT subscription sign-in", auth: "API key",
+      oldQuota: "Uses subscription quota, not API billing", quota: "Uses API quota and counts toward API billing",
+    },
+    {
+      from: "anthropic" as const, to: "openai" as const,
+      oldModel: "claude-sonnet-5", model: "gpt-5.6-sol", label: "OpenAI",
+      oldAuth: "API key", auth: "ChatGPT subscription sign-in",
+      oldQuota: "Uses API quota and counts toward API billing", quota: "Uses subscription quota, not API billing",
+    },
+  ].flatMap(direction => [false, true].flatMap(priorBlocked =>
+    [false, true].map(runtimeUnavailable => ({ ...direction, priorBlocked, runtimeUnavailable })),
+  )))("shows only the pending choice from $from to $to until effort completes (priorBlocked=$priorBlocked, runtimeUnavailable=$runtimeUnavailable)", async ({ from, to, oldModel, model, label, oldAuth, auth, oldQuota, quota, priorBlocked, runtimeUnavailable }) => {
+    const cat = catalog("chatgpt_oauth");
+    cat.routes.ai_research = route("ai_research", from, oldModel, "high");
+    if (priorBlocked) {
+      const oldEntry = cat.effective!.tasks.ai_research!.providers![from]!.models.find(entry => entry.id === oldModel)!;
+      oldEntry.eligible = false;
+      oldEntry.reason_code = "model_task_unsupported";
+    }
+    const fetchMock = stubFetch({ catalog: cat, threads: [thread("same", "Same conversation")] });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      if (new URL(String(input)).pathname === "/query/providers") {
+        return Promise.resolve(json({ providers: {
+          openai: { available: !(runtimeUnavailable && to === "openai"), model: "gpt-5.6-luna" },
+          anthropic: { available: !(runtimeUnavailable && to === "anthropic"), model: "claude-sonnet-5" },
+        } }));
+      }
+      return fetchMock(input, init);
+    });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    const captions = () => Array.from(document.querySelectorAll(".research-pickerbar > span"))
+      .map(element => element.textContent);
+    expect(captions()).toContain(oldAuth);
+    expect(captions()).toContain(oldQuota);
+    if (priorBlocked) expect(captions()).toContain("This model does not support this task");
+
+    await click(buttonContaining(label)!);
+    await setSelect(select("Model")!, model);
+    for (const page of ["Home", "Settings"]) {
+      const oldComposer = document.querySelector("textarea")!;
+      await shellNavigate(page);
+      expect(oldComposer.isConnected).toBe(false);
+      await shellNavigate("Research");
+      expect(select("Model")?.value).toBe(model);
+      expect(select("effort")?.value).toBe("");
+      expect(document.querySelector(".research-providerbar .ui-button-primary")?.textContent).toContain(label);
+      expect.soft(captions()).toEqual(["Choose an effort for this provider and model before submitting."]);
+      await setTextarea("The pending route is not executable");
+      expect(button("Send")?.disabled).toBe(true);
+    }
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+
+    await setSelect(select("effort")!, "high");
+    await shellNavigate("Settings");
+    await shellNavigate("Research");
+    expect(select("Model")?.value).toBe(model);
+    expect(captions()).toContain(auth);
+    expect(captions()).toContain(quota);
+    expect(captions()).not.toContain(oldAuth);
+    expect(captions()).not.toContain(oldQuota);
+    expect(captions()).not.toContain("This model does not support this task");
+    expect(captions()).not.toContain("model_task_unsupported");
+    await setTextarea("Use the completed route");
+    expect(button("Send")?.disabled).toBe(runtimeUnavailable);
+    if (runtimeUnavailable) {
+      expect(captions()).toContain("This provider's runtime is currently unavailable");
+    } else {
+      expect(captions()).not.toContain("This provider's runtime is currently unavailable");
+      expect(select("effort")?.value).toBe("high");
+      await click(button("Send")!);
+      const create = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+      expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({
+        thread_id: "same", provider: to, model, effort: "high",
+      });
+    }
+  });
+
   it.each(settingsDefaults)("binds edits to the restoring conversation with $provider Settings until hydration completes", async tuple => {
     const cat = catalog();
     cat.routes.ai_research = { ...route("ai_research"), ...tuple };
