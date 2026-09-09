@@ -29,6 +29,7 @@ from src.card_execution import CardExecutionAdmissionError, ExecutionReceipt, ca
 from src.auth_drivers.runtime_binding import (
     RuntimeAuthUnavailable, activate_runtime_auth, sanitize_runtime_error,
 )
+from src.auth_drivers.subscription_structured_output import SubscriptionStructuredOutputError
 from src.model_routing import ModelRouteUnavailable
 from src.card_synthesis import (
     ModelExecutionTimeout,
@@ -178,6 +179,16 @@ def generate_card(
     except CardExecutionAdmissionError as exc:
         raise HTTPException(status_code=400, detail=exc.detail) from None
     except Exception as exc:
+        if isinstance(exc, SubscriptionStructuredOutputError) and exc.code == "reauth_required":
+            logger.warning("Card synthesis requires subscription sign-in for %s", ticker)
+            raise HTTPException(status_code=502, detail={
+                "code": "reauth_required",
+                "task": "card_synthesis",
+                "provider": execution.provider,
+                "model": execution.model,
+                "effort": execution.effort,
+                "auth_mode": execution.auth.auth_mode,
+            }) from None
         detail = sanitize_runtime_error(exc, binding=execution.auth)
         logger.warning("Card synthesis failed for %s: %s", ticker, detail)
         raise HTTPException(status_code=502, detail=f"synthesis failed: {detail}") from None

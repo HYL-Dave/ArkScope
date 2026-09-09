@@ -9,6 +9,7 @@ import { SettingsView } from "./Settings";
 import { NewsView } from "./News";
 import { ResearchView, type ResearchConversationSelection } from "./Research";
 import { TickerDetailView } from "./TickerDetail";
+import type { CardRecoveryDraft } from "./AICard";
 import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
 import { ShellNavigation } from "./shell/ShellNavigation";
@@ -53,6 +54,8 @@ export function App() {
   const [researchNavigation, setResearchNavigation] = useState<ResearchNavigationRequest | null>(null);
   // One transient conversation, including unfinished picker edits, survives page unmounts.
   const researchConversationSelectionRef = useRef<ResearchConversationSelection | null>(null);
+  // One failed card draft can survive an explicit sign-in recovery round trip.
+  const cardRecoveryDraftRef = useRef<CardRecoveryDraft | null>(null);
   const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationRequest | null>(null);
   const [universeNavigation, setUniverseNavigation] = useState<UniverseNavigationRequest | null>(null);
   const researchWork = useResearchWorkRegistry();
@@ -126,6 +129,7 @@ export function App() {
       {...exploreCapabilities}
       key={detail.ticker}
       ticker={detail.ticker}
+      cardRecoveryDraftRef={cardRecoveryDraftRef}
       onBack={() => setDetail(null)}
       runtime={runtime}
     />

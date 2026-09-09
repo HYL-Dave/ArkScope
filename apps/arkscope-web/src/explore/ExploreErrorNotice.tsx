@@ -40,7 +40,9 @@ export function ExploreErrorNotice({
       title={presentation.title}
       action={(
         <>
-          <Button size="compact" onClick={onRetry}>{retryLabel}</Button>
+          {presentation.retryable ? (
+            <Button size="compact" onClick={onRetry}>{retryLabel}</Button>
+          ) : null}
           {recovery ? (
             <Button
               size="compact"

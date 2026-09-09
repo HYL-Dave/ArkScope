@@ -74,12 +74,14 @@ _CLAUDE_SHUTDOWN_TIMEOUT_S = 20.0
 
 def _openai_client(token: str, base_url: str, timeout_s: float) -> Any:  # test seam
     from openai import AsyncOpenAI
+    from src.auth_drivers.runtime_binding import pinned_auth_headers
 
     return AsyncOpenAI(
         api_key=token,
         base_url=base_url,
         timeout=timeout_s,
         max_retries=0,
+        default_headers=pinned_auth_headers("openai", token),
     )
 
 

@@ -43,6 +43,7 @@ const explore = {
       cardSave: "Could not save the Card as a report.",
       cardTranslate: "Could not translate the Card.",
     },
+    reauthRequired: "The selected Provider sign-in is no longer valid. Sign in again, then retry.",
     diagnostics: {
       title: "Developer diagnostics",
       status: "Status",

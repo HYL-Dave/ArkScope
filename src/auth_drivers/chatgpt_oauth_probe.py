@@ -70,12 +70,14 @@ _MODEL_OBSERVED_LIMIT = 20
 
 
 def _openai_client(token: str, base_url: str) -> Any:  # seam for tests
-    """Build a sync OpenAI client with the OAuth access_token as the api_key and an
-    explicit base_url. The SDK turns api_key into the `Authorization: Bearer`
-    header; the proven ChatGPT-backend path adds no other headers."""
+    """Pin the selected OAuth bearer and the probe's explicit destination."""
     from openai import OpenAI
+    from src.auth_drivers.runtime_binding import pinned_auth_headers
 
-    return OpenAI(api_key=token, base_url=base_url)
+    return OpenAI(
+        api_key=token, base_url=base_url,
+        default_headers=pinned_auth_headers("openai", token),
+    )
 
 
 # --- response-shape helpers (mirror Novelloom's to_plain_dict / extract_*) -----

@@ -1,10 +1,18 @@
 # Four-Task Route Repair Hand Test
 
-Status: `codex/task-route-authority`, code `b669d455`, is ready for separate
-merge authorization. The cold-restoration finding passes scoped re-review.
-Not merged; restart only after integration, not against the unchanged master.
+Status: the user-authorized fast-forward through `381552b4` is on local
+`master`. The user has now generated an AMD card successfully with ChatGPT
+OAuth, `gpt-5.6-luna`, effort `max`, after signing in again. This is user-reported
+live acceptance of that combination, not a full four-task/provider matrix.
 
-Current offline verification: 7,593 backend passed / 12 skipped; 1,825 frontend
+The separate September 10 OAuth auth/recovery repair is NOT merged. It pins
+outgoing bearer headers, preserves actionable sign-in errors and retains the
+failed card's draft through an explicit Provider-settings round trip; it does not
+change token refresh policy or require repeating the successful card test.
+Its [verification record](../evidence/2026-09-10-chatgpt-oauth-auth-repair/README.md)
+separates offline coverage from the user's live result.
+
+Route-repair offline verification: 7,593 backend passed / 12 skipped; 1,825 frontend
 passed; typecheck/build passed. Six final frontend mutations were killed and
 restored, including both new context guards; 176 final-code synthetic browser
 screenshots cover desktop/mobile and both locales/providers. Three existing
@@ -19,7 +27,12 @@ This repair does not make unsupported models eligible. Spark remains available o
 
 An execution receipt describes the provider/model/effort/authentication selection sent by ArkScope. It is not a claim that every provider has supplied an independently verified model receipt. Existing transport-specific model checks remain in place.
 
-## After Merge And Manual Restart
+## Remaining Manual Checks
+
+The current App can continue these checks now. There is no need to test every
+model: start with the saved translation route, one supported Research route,
+then one Lifecycle Investigation. Do not deliberately expire/revoke a working
+token just to test the failure UI; that branch is covered offline.
 
 1. In Settings, save a supported provider/model/effort for each of the four task routes. Navigate away and back: the saved choices should remain. Use distinct routes where convenient so an accidental cross-task selection is visible.
 2. Generate a NEW AI card with OpenAI selected for AI Card Generation. Its source must show the selected OpenAI model and effort. Repeat with a supported Anthropic route only when useful; opening an old card is not a new-model test.
